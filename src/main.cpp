@@ -4,7 +4,9 @@
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QCursor>
+#include <QFileInfo>
 #include <QGuiApplication>
+#include <QImageReader>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
@@ -85,6 +87,7 @@ int main(int argc, char *argv[])
     parser.setApplicationDescription(QStringLiteral("Wayland screenshot selection and annotation tool for niri."));
     parser.addHelpOption();
     parser.addVersionOption();
+    parser.addPositionalArgument(QStringLiteral("file"), QStringLiteral("Open an existing image file for annotation instead of capturing the screen."), QStringLiteral("[file]"));
     QCommandLineOption allOutputsOption(QStringLiteral("all-outputs"), QStringLiteral("Capture all outputs instead of the current Qt screen."));
     QCommandLineOption xdgWindowOption(QStringLiteral("xdg-window"), QStringLiteral("Use a regular fullscreen xdg window instead of layer-shell."));
     QCommandLineOption fullscreenAnnotationOption({QStringLiteral("fullscreen"), QStringLiteral("full-screen")},
@@ -94,7 +97,44 @@ int main(int argc, char *argv[])
     parser.addOption(fullscreenAnnotationOption);
     parser.process(app);
 
+    const QStringList positionalArguments = parser.positionalArguments();
+    if (positionalArguments.size() > 1) {
+        QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), QStringLiteral("Only one image file can be opened at a time."));
+        return 1;
+    }
+
     QScreen *screen = focusedScreen();
+    const QString imagePath = positionalArguments.isEmpty() ? QString() : positionalArguments.first();
+    const bool fileMode = !imagePath.isEmpty();
+    if (fileMode) {
+        QFileInfo imageFile(imagePath);
+        if (!imageFile.exists() || !imageFile.isFile()) {
+            QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), QStringLiteral("Image file does not exist: %1").arg(imagePath));
+            return 1;
+        }
+
+        QImageReader reader(imageFile.absoluteFilePath());
+        reader.setAutoTransform(true);
+        const QImage image = reader.read();
+        if (image.isNull()) {
+            QMessageBox::critical(nullptr,
+                                  QStringLiteral("Mark Shot"),
+                                  QStringLiteral("Failed to load image: %1\n%2").arg(imageFile.absoluteFilePath(), reader.errorString()));
+            return 1;
+        }
+
+        ShotWindow *window = new ShotWindow(image, imageFile.fileName());
+        if (screen) {
+            window->setScreen(screen);
+        }
+        window->showFullScreen();
+        window->raise();
+        window->activateWindow();
+        QTimer::singleShot(0, window, [window] {
+            window->startFullscreenAnnotation();
+        });
+        return QApplication::exec();
+    }
 
     const bool allOutputs = parser.isSet(allOutputsOption);
     const QRect captureGeometry = allOutputs ? virtualScreensGeometry() : (screen ? screen->geometry() : QRect());

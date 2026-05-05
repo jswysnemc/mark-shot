@@ -7,6 +7,7 @@
 ## Features
 
 - Captures the current output by default, with `--all-outputs` for a full compositor capture.
+- Opens an existing image file for annotation with `mark-shot path/to/image.png`.
 - Supports region selection, fullscreen annotation, and selection resize or move.
 - Provides pen, line, highlighter, rectangle, ellipse, arrow, text, number, and mosaic tools.
 - Provides a laser pointer tool for temporary teaching marks that fade automatically.
@@ -56,6 +57,12 @@ Annotate the full captured frame without selecting a region first:
 mark-shot --fullscreen
 ```
 
+Open an existing image file and annotate it directly:
+
+```bash
+mark-shot path/to/image.png
+```
+
 Use a regular fullscreen xdg window instead of layer-shell:
 
 ```bash
@@ -73,10 +80,11 @@ Mod+Shift+S { spawn "mark-shot"; }
 - Drag to create a selection.
 - `V`, `S`, `P`, `L`, `H`, `R`, `E`, `A`, `T`, `N`, `M`, and `G` switch to move, select, pen, line, highlighter, rectangle, ellipse, arrow, text, number, mosaic, and laser.
 - `F` toggles the annotation scope between the current selection and the full captured frame.
+- In full-frame annotation mode, the layout button toggles the toolbar between horizontal and vertical layouts.
 - The move tool drags the selection or resizes it from edges and corners.
 - The select tool picks existing annotations; drag the object or its handles to move or resize it.
 - Middle click switches to the select tool.
-- Drawing tools and selected annotations show a toolbar-attached property panel with width and opacity sliders, an alpha-capable Qt color picker, shape fill options, rectangle corner radius, and text font editing where applicable.
+- Drawing tools and selected annotations show a toolbar-attached property panel with width and opacity sliders, an alpha-capable Qt color picker, text background color, shape fill options, rectangle corner radius, and text font editing where applicable.
 - Click the red `x` on a selected annotation to delete only that annotation.
 - Hold `Ctrl` while drawing rectangles or ellipses to constrain them to squares or circles.
 - Right click opens the radial color palette.

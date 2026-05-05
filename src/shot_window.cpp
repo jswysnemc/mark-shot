@@ -9,6 +9,7 @@
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QBuffer>
+#include <QBoxLayout>
 #include <QBrush>
 #include <QClipboard>
 #include <QContextMenuEvent>
@@ -41,6 +42,9 @@
 #include <QStandardPaths>
 #include <QStyle>
 #include <QTextEdit>
+#include <QTextBlock>
+#include <QTextDocument>
+#include <QTextLayout>
 #include <QTextOption>
 #include <QTimer>
 #include <QTransform>
@@ -66,6 +70,8 @@ constexpr qreal kMaxMosaicBlockSize = 48.0;
 constexpr qreal kMinLaserWidth = 4.0;
 constexpr qreal kMaxLaserWidth = 48.0;
 constexpr qint64 kLaserLifetimeMs = 1800;
+constexpr qreal kTextBackgroundPaddingX = 6.0;
+constexpr qreal kTextBackgroundPaddingY = 4.0;
 
 QRectF normalizedRect(QPointF a, QPointF b)
 {
@@ -132,6 +138,21 @@ QStringList desktopSearchDirs()
     }
     appDirs.removeDuplicates();
     return appDirs;
+}
+
+QString markShotPicturesDir()
+{
+    QString pictures = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+    if (pictures.isEmpty()) {
+        pictures = QDir::homePath();
+    }
+
+    const QString markShotDir = QDir(pictures).filePath(QStringLiteral("mark-shot"));
+    QDir dir(markShotDir);
+    if (dir.exists() || dir.mkpath(QStringLiteral("."))) {
+        return markShotDir;
+    }
+    return pictures;
 }
 
 QStringList expandDesktopExec(const ShotWindow::DesktopApp &app, const QString &imagePath)
@@ -333,14 +354,10 @@ private:
 
     void saveImageAs()
     {
-        QString pictures = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
-        if (pictures.isEmpty()) {
-            pictures = QDir::homePath();
-        }
         const QString filename = QStringLiteral("mark-shot-pin-%1.png").arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-hhmmss")));
         const QString path = QFileDialog::getSaveFileName(this,
                                                           QStringLiteral("Save Pinned Image"),
-                                                          QDir(pictures).filePath(filename),
+                                                          QDir(markShotPicturesDir()).filePath(filename),
                                                           QStringLiteral("PNG Images (*.png)"));
         if (!path.isEmpty()) {
             m_pixmap.save(path, "PNG");
@@ -389,36 +406,37 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QWidget *parent)
     m_toolbar->setStyleSheet(markshot::theme::panelStyleSheet());
     m_toolbar->installEventFilter(this);
 
-    auto *layout = new QHBoxLayout(m_toolbar);
-    layout->setContentsMargins(10, 10, 10, 10);
-    layout->setSpacing(7);
+    m_toolbarLayout = new QHBoxLayout(m_toolbar);
+    m_toolbarLayout->setContentsMargins(10, 10, 10, 10);
+    m_toolbarLayout->setSpacing(7);
 
-    layout->addWidget(addToolbarButton(Action::ToolMove, QStringLiteral("V")));
-    layout->addWidget(addToolbarButton(Action::ToolSelect, QStringLiteral("S")));
-    layout->addWidget(addToolbarButton(Action::ToolPen, QStringLiteral("P")));
-    layout->addWidget(addToolbarButton(Action::ToolLine, QStringLiteral("L")));
-    layout->addWidget(addToolbarButton(Action::ToolHighlighter, QStringLiteral("H")));
-    layout->addWidget(addToolbarButton(Action::ToolRectangle, QStringLiteral("R")));
-    layout->addWidget(addToolbarButton(Action::ToolEllipse, QStringLiteral("E")));
-    layout->addWidget(addToolbarButton(Action::ToolArrow, QStringLiteral("A")));
-    layout->addWidget(addToolbarButton(Action::ToolText, QStringLiteral("T")));
-    layout->addWidget(addToolbarButton(Action::ToolNumber, QStringLiteral("N")));
-    layout->addWidget(addToolbarButton(Action::ToolMosaic, QStringLiteral("M")));
-    layout->addWidget(addToolbarButton(Action::ToolLaser, QStringLiteral("G")));
-    layout->addWidget(addToolbarButton(Action::ToggleCaptureScope, QStringLiteral("F")));
-    layout->addWidget(addToolbarButton(Action::Clear, QStringLiteral("Clear")));
-    layout->addWidget(addToolbarButton(Action::Undo, QStringLiteral("Ctrl+Z")));
-    layout->addWidget(addToolbarButton(Action::Redo, QStringLiteral("Ctrl+Shift+Z")));
-    for (Action action : {Action::OpenWith, Action::Pin, Action::Copy, Action::Save, Action::Cancel}) {
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolMove, QStringLiteral("V")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolSelect, QStringLiteral("S")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolPen, QStringLiteral("P")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolLine, QStringLiteral("L")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolHighlighter, QStringLiteral("H")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolRectangle, QStringLiteral("R")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolEllipse, QStringLiteral("E")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolArrow, QStringLiteral("A")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolText, QStringLiteral("T")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolNumber, QStringLiteral("N")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolMosaic, QStringLiteral("M")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolLaser, QStringLiteral("G")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::Clear, QStringLiteral("Clear")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::Undo, QStringLiteral("Ctrl+Z")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::Redo, QStringLiteral("Ctrl+Shift+Z")));
+    for (Action action : {Action::ToggleCaptureScope, Action::ToggleToolbarLayout, Action::OpenWith, Action::Pin, Action::Copy, Action::Save, Action::Cancel}) {
         const QString shortcut = action == Action::OpenWith ? QStringLiteral("Open")
             : action == Action::Pin                  ? QStringLiteral("Pin")
             : action == Action::Copy                 ? QStringLiteral("Ctrl+C")
             : action == Action::Save                 ? QStringLiteral("Ctrl+S")
+            : action == Action::ToggleToolbarLayout  ? QStringLiteral("Layout")
+            : action == Action::ToggleCaptureScope   ? QStringLiteral("F")
                                                      : QStringLiteral("Esc");
         QPushButton *button = addToolbarButton(action, shortcut);
         button->hide();
         m_fullscreenActionButtons.append(button);
-        layout->addWidget(button);
+        m_toolbarLayout->addWidget(button);
     }
     m_toolbar->hide();
 
@@ -428,6 +446,7 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QWidget *parent)
     auto *actionLayout = new QVBoxLayout(m_actionToolbar);
     actionLayout->setContentsMargins(10, 10, 10, 10);
     actionLayout->setSpacing(7);
+    actionLayout->addWidget(addToolbarButton(Action::ToggleCaptureScope, QStringLiteral("F"), m_actionToolbar));
     actionLayout->addWidget(addToolbarButton(Action::OpenWith, QStringLiteral("Open"), m_actionToolbar));
     actionLayout->addWidget(addToolbarButton(Action::Pin, QStringLiteral("Pin"), m_actionToolbar));
     actionLayout->addWidget(addToolbarButton(Action::Copy, QStringLiteral("Ctrl+C"), m_actionToolbar));
@@ -465,6 +484,11 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QWidget *parent)
     m_propertyColorButton->setToolTip(QStringLiteral("Change selected object color"));
     connect(m_propertyColorButton, &QPushButton::clicked, this, [this] { openSelectedAnnotationColorPalette(); });
     propertyLayout->addWidget(m_propertyColorButton);
+    m_propertyTextBackgroundButton = new QPushButton(QStringLiteral("Bg"), m_annotationPropertyPanel);
+    m_propertyTextBackgroundButton->setFocusPolicy(Qt::NoFocus);
+    m_propertyTextBackgroundButton->setToolTip(QStringLiteral("Text background color"));
+    connect(m_propertyTextBackgroundButton, &QPushButton::clicked, this, [this] { openSelectedTextBackgroundColorPalette(); });
+    propertyLayout->addWidget(m_propertyTextBackgroundButton);
     m_propertyFillButton = new QPushButton(m_annotationPropertyPanel);
     m_propertyFillButton->setCheckable(true);
     m_propertyFillButton->setFocusPolicy(Qt::NoFocus);
@@ -567,7 +591,7 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QWidget *parent)
     m_textEditor = new QTextEdit(this);
     m_textEditor->setObjectName(QStringLiteral("textEditor"));
     m_textEditor->setPlaceholderText(QStringLiteral("Type text"));
-    m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(QColor(94, 234, 212), 24));
+    m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(QColor(94, 234, 212), QColor(0, 0, 0, 0), 24));
     m_textEditor->setAcceptRichText(false);
     m_textEditor->setTabChangesFocus(false);
     m_textEditor->setFrameShape(QFrame::NoFrame);
@@ -651,6 +675,7 @@ void ShotWindow::enterFullscreenAnnotation(bool resetAnnotations)
     m_mode = Mode::Editing;
     m_dragging = false;
     m_fullscreenAnnotation = true;
+    applyToolbarLayout();
     m_toolbarDragging = false;
     m_toolbarUserPlaced = false;
     m_selection = QRectF(QPointF(0, 0), QSizeF(m_frozenFrame.size()));
@@ -699,6 +724,8 @@ void ShotWindow::leaveFullscreenAnnotation()
     m_toolbarDragging = false;
     m_toolbarUserPlaced = false;
     m_fullscreenAnnotation = false;
+    m_toolbarVerticalLayout = false;
+    applyToolbarLayout();
     m_selectionDrag = SelectionDrag::None;
     m_annotationDrag = SelectionDrag::None;
     m_annotationSelectionBoxActive = false;
@@ -747,6 +774,28 @@ void ShotWindow::toggleCaptureScope()
     }
 }
 
+void ShotWindow::toggleToolbarLayout()
+{
+    m_toolbarVerticalLayout = !m_toolbarVerticalLayout;
+    m_toolbarUserPlaced = false;
+    applyToolbarLayout();
+    updateToolbarGeometry();
+    updateOpenWithPanelGeometry();
+    updateAnnotationPropertyPanelGeometry();
+    updateToolbarState();
+}
+
+void ShotWindow::applyToolbarLayout()
+{
+    if (!m_toolbarLayout) {
+        return;
+    }
+
+    m_toolbarLayout->setDirection(m_toolbarVerticalLayout ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+    m_toolbar->setFixedSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+    m_toolbar->adjustSize();
+}
+
 QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcutText, QWidget *parentToolbar)
 {
     QWidget *toolbar = parentToolbar ? parentToolbar : m_toolbar;
@@ -793,6 +842,8 @@ QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcut
         connect(button, &QPushButton::clicked, this, [this] { setTool(Tool::Laser); });
     } else if (action == Action::ToggleCaptureScope) {
         connect(button, &QPushButton::clicked, this, [this] { toggleCaptureScope(); });
+    } else if (action == Action::ToggleToolbarLayout) {
+        connect(button, &QPushButton::clicked, this, [this] { toggleToolbarLayout(); });
     } else if (action == Action::Clear) {
         connect(button, &QPushButton::clicked, this, [this] { clearAnnotations(); });
     } else if (action == Action::Undo) {
@@ -1934,8 +1985,10 @@ QRectF ShotWindow::annotationBounds(const Annotation &annotation) const
     case Tool::Rectangle:
     case Tool::Ellipse:
     case Tool::Mosaic:
-    case Tool::Text:
         bounds = annotation.rect.normalized();
+        break;
+    case Tool::Text:
+        bounds = textContentRect(annotation, false);
         break;
     case Tool::Number: {
         if (annotation.points.isEmpty()) {
@@ -2509,6 +2562,9 @@ void ShotWindow::setCurrentColor(QColor color)
     if (m_colorPalette) {
         m_colorPalette->hide();
     }
+    if (m_textEditor && m_textEditor->isVisible() && !m_editingTextAnnotationId.has_value()) {
+        m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(m_currentColor, m_textBackgroundColor, qRound(20.0 + m_shapeWidth)));
+    }
     updateColorPalettePreview();
     updateAnnotationPropertyPanel();
     update();
@@ -2651,6 +2707,55 @@ QRectF ShotWindow::imageRectToWidget(QRectF rect) const
     return QRectF(topLeft, bottomRight).normalized();
 }
 
+QRectF ShotWindow::textContentRect(const Annotation &annotation, bool widgetCoordinates) const
+{
+    const qreal scale = widgetCoordinates && !m_frozenImageRect.isEmpty()
+        ? m_frozenImageRect.width() / std::max<qreal>(1.0, m_frozenFrame.width())
+        : 1.0;
+    const QRectF baseRect = annotation.rect.isEmpty()
+        ? QRectF(annotation.points.value(0), QSizeF(360.0, 140.0))
+        : annotation.rect.normalized();
+    const QPointF topLeft = widgetCoordinates ? imageToWidget(baseRect.topLeft()) : baseRect.topLeft();
+    const qreal wrapWidth = std::max<qreal>(16.0, baseRect.width() * scale - kTextBackgroundPaddingX * 2.0 * scale);
+
+    QFont font(annotation.fontFamily.isEmpty() ? QStringLiteral("Sans Serif") : annotation.fontFamily,
+               qRound((19.0 + annotation.width) * scale),
+               QFont::DemiBold);
+    QTextOption option;
+    option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    option.setAlignment(Qt::AlignLeft | Qt::AlignTop);
+
+    QTextDocument document;
+    document.setDocumentMargin(0.0);
+    document.setDefaultFont(font);
+    document.setDefaultTextOption(option);
+    document.setPlainText(annotation.text);
+    document.setTextWidth(wrapWidth);
+
+    const QSizeF documentSize = document.size();
+    qreal textWidth = 0.0;
+    qreal textHeight = 0.0;
+    for (QTextBlock block = document.begin(); block.isValid(); block = block.next()) {
+        const QTextLayout *layout = block.layout();
+        if (!layout) {
+            continue;
+        }
+        for (int i = 0; i < layout->lineCount(); ++i) {
+            const QTextLine line = layout->lineAt(i);
+            textWidth = std::max(textWidth, line.naturalTextWidth());
+            textHeight = std::max(textHeight, layout->position().y() + line.y() + line.height());
+        }
+    }
+    if (textWidth <= 0.0 || textHeight <= 0.0) {
+        textWidth = documentSize.width();
+        textHeight = documentSize.height();
+    }
+
+    const qreal rectWidth = std::max<qreal>(1.0, std::ceil(textWidth + kTextBackgroundPaddingX * 2.0 * scale));
+    const qreal rectHeight = std::max<qreal>(1.0, std::ceil(textHeight + kTextBackgroundPaddingY * 2.0 * scale));
+    return QRectF(topLeft, QSizeF(rectWidth, rectHeight));
+}
+
 QRectF ShotWindow::constrainedRect(QPointF start, QPointF end) const
 {
     const qreal dx = end.x() - start.x();
@@ -2720,15 +2825,43 @@ void ShotWindow::updateActionToolbarGeometry()
     m_actionToolbar->adjustSize();
     const QRectF selection = imageRectToWidget(normalizedSelection());
     const QSize toolbarSize = m_actionToolbar->sizeHint();
-    int x = qRound(selection.right() + kToolbarMargin);
-    int y = qRound(selection.center().y() - toolbarSize.height() / 2.0);
+    const QRect selectionRect = selection.toAlignedRect();
+    const QRect toolbarRect = m_toolbar && m_toolbar->isVisible() ? m_toolbar->geometry() : QRect();
+    const QRect propertyRect = m_annotationPropertyPanel && m_annotationPropertyPanel->isVisible()
+        ? m_annotationPropertyPanel->geometry()
+        : QRect();
 
-    if (x + toolbarSize.width() > width() - 8) {
-        x = qRound(selection.left() - toolbarSize.width() - kToolbarMargin);
+    auto clamped = [this, toolbarSize](QPoint topLeft) {
+        const int x = std::clamp(topLeft.x(), 8, std::max(8, width() - toolbarSize.width() - 8));
+        const int y = std::clamp(topLeft.y(), 8, std::max(8, height() - toolbarSize.height() - 8));
+        return QRect(QPoint(x, y), toolbarSize);
+    };
+    auto clearOfPanels = [toolbarRect, propertyRect, selectionRect](const QRect &candidate) {
+        const QRect padded = candidate.adjusted(-4, -4, 4, 4);
+        return (toolbarRect.isNull() || !padded.intersects(toolbarRect))
+            && (propertyRect.isNull() || !padded.intersects(propertyRect))
+            && !padded.intersects(selectionRect);
+    };
+
+    const int selectionCenterY = qRound(selection.center().y() - toolbarSize.height() / 2.0);
+    QVector<QRect> candidates = {
+        clamped(QPoint(qRound(selection.right() + kToolbarMargin), selectionCenterY)),
+        clamped(QPoint(qRound(selection.left() - toolbarSize.width() - kToolbarMargin), selectionCenterY)),
+    };
+    if (!toolbarRect.isNull()) {
+        candidates.append(clamped(QPoint(toolbarRect.right() + kToolbarMargin, toolbarRect.top())));
+        candidates.append(clamped(QPoint(toolbarRect.left() - toolbarSize.width() - kToolbarMargin, toolbarRect.top())));
+        candidates.append(clamped(QPoint(toolbarRect.right() - toolbarSize.width(), toolbarRect.bottom() + kToolbarMargin)));
+        candidates.append(clamped(QPoint(toolbarRect.right() - toolbarSize.width(), toolbarRect.top() - toolbarSize.height() - kToolbarMargin)));
     }
-    x = std::clamp(x, 8, std::max(8, width() - toolbarSize.width() - 8));
-    y = std::clamp(y, 8, std::max(8, height() - toolbarSize.height() - 8));
-    m_actionToolbar->setGeometry(x, y, toolbarSize.width(), toolbarSize.height());
+
+    for (const QRect &candidate : candidates) {
+        if (clearOfPanels(candidate)) {
+            m_actionToolbar->setGeometry(candidate);
+            return;
+        }
+    }
+    m_actionToolbar->setGeometry(candidates.first());
 }
 
 void ShotWindow::updateAnnotationPropertyPanel()
@@ -2763,6 +2896,9 @@ void ShotWindow::updateAnnotationPropertyPanel()
     QString title = QStringLiteral("Object");
     const Tool panelTool = groupSelection ? Tool::Select : (annotation ? annotation->tool : m_tool);
     const QColor panelColor = firstSelectedAnnotation ? firstSelectedAnnotation->color : m_currentColor;
+    const QColor panelTextBackgroundColor = annotation && annotation->tool == Tool::Text
+        ? annotation->backgroundColor
+        : m_textBackgroundColor;
     const qreal panelWidth = firstSelectedAnnotation ? firstSelectedAnnotation->width : currentToolWidth();
     const int panelOpacity = qRound(panelColor.alphaF() * 100.0);
     const bool panelFilled = annotation ? annotation->filled : m_shapeFilled;
@@ -2878,9 +3014,17 @@ void ShotWindow::updateAnnotationPropertyPanel()
             m_propertyColorDialogPanel->hide();
         }
     }
+    if (m_propertyTextBackgroundButton) {
+        const bool supportsTextBackground = !groupSelection && panelTool == Tool::Text;
+        m_propertyTextBackgroundButton->setVisible(supportsTextBackground);
+        m_propertyTextBackgroundButton->setStyleSheet(markshot::theme::propertyColorButtonStyleSheet(panelTextBackgroundColor));
+        if (!supportsTextBackground && m_propertyColorDialogPanel && m_propertyColorEditingTextBackground) {
+            m_propertyColorDialogPanel->hide();
+        }
+    }
     if (m_propertyColorPicker && m_propertyColorDialogPanel && m_propertyColorDialogPanel->isVisible()) {
         const QSignalBlocker blocker(m_propertyColorPicker);
-        m_propertyColorPicker->setColor(panelColor);
+        m_propertyColorPicker->setColor(m_propertyColorEditingTextBackground ? panelTextBackgroundColor : panelColor);
     }
 
     m_annotationPropertyPanel->show();
@@ -2937,7 +3081,9 @@ void ShotWindow::updatePropertyColorDialogGeometry()
     // Falling back to the property panel keeps geometry valid when the
     // button is hidden (mosaic case).
     QPoint anchor;
-    if (m_propertyColorButton && m_propertyColorButton->isVisible()) {
+    if (m_propertyColorEditingTextBackground && m_propertyTextBackgroundButton && m_propertyTextBackgroundButton->isVisible()) {
+        anchor = m_propertyTextBackgroundButton->mapTo(this, m_propertyTextBackgroundButton->rect().center());
+    } else if (m_propertyColorButton && m_propertyColorButton->isVisible()) {
         anchor = m_propertyColorButton->mapTo(this, m_propertyColorButton->rect().center());
     } else {
         const QRect propertyRect = m_annotationPropertyPanel->geometry();
@@ -3178,8 +3324,10 @@ void ShotWindow::openSelectedAnnotationColorPalette()
     if (!m_propertyColorDialogPanel || !m_propertyColorPicker || !m_annotationPropertyPanel) {
         return;
     }
+    const bool wasEditingTextBackground = m_propertyColorEditingTextBackground;
+    m_propertyColorEditingTextBackground = false;
 
-    if (m_propertyColorDialogPanel->isVisible()) {
+    if (m_propertyColorDialogPanel->isVisible() && !wasEditingTextBackground) {
         m_propertyColorDialogPanel->hide();
         return;
     }
@@ -3192,6 +3340,59 @@ void ShotWindow::openSelectedAnnotationColorPalette()
     if (!selectedIds.isEmpty()) {
         if (const Annotation *annotation = annotationById(selectedIds.first())) {
             color = annotation->color;
+        }
+    }
+    m_propertyColorEditHistoryCaptured = false;
+    {
+        const QSignalBlocker blocker(m_propertyColorPicker);
+        m_propertyColorPicker->setColor(color);
+    }
+    updateAnnotationPropertyPanel();
+    if (m_annotationPropertyPanel) {
+        m_annotationPropertyPanel->show();
+        m_annotationPropertyPanel->raise();
+        if (QLayout *panelLayout = m_annotationPropertyPanel->layout()) {
+            panelLayout->activate();
+        }
+        updateAnnotationPropertyPanelGeometry();
+    }
+    if (QLayout *colorLayout = m_propertyColorDialogPanel->layout()) {
+        colorLayout->activate();
+    }
+    updatePropertyColorDialogGeometry();
+    m_propertyColorDialogPanel->show();
+    updatePropertyColorDialogGeometry();
+    m_propertyColorDialogPanel->raise();
+    QTimer::singleShot(0, this, [this] {
+        if (m_propertyColorDialogPanel && m_propertyColorDialogPanel->isVisible()) {
+            updatePropertyColorDialogGeometry();
+            m_propertyColorDialogPanel->raise();
+        }
+    });
+}
+
+void ShotWindow::openSelectedTextBackgroundColorPalette()
+{
+    if (!m_propertyColorDialogPanel || !m_propertyColorPicker || !m_annotationPropertyPanel) {
+        return;
+    }
+    const bool wasEditingTextBackground = m_propertyColorEditingTextBackground;
+    m_propertyColorEditingTextBackground = true;
+
+    if (m_propertyColorDialogPanel->isVisible() && wasEditingTextBackground) {
+        m_propertyColorDialogPanel->hide();
+        return;
+    }
+
+    if (m_colorPalette) {
+        m_colorPalette->hide();
+    }
+    QColor color = m_textBackgroundColor;
+    const QVector<int> selectedIds = selectedAnnotationIds();
+    if (selectedIds.size() == 1) {
+        if (const Annotation *annotation = annotationById(selectedIds.first());
+            annotation && annotation->tool == Tool::Text) {
+            color = annotation->backgroundColor;
         }
     }
     m_propertyColorEditHistoryCaptured = false;
@@ -3253,7 +3454,22 @@ void ShotWindow::applyPropertyColor(QColor color)
         return;
     }
     const QVector<int> selectedIds = selectedAnnotationIds();
-    if (!selectedIds.isEmpty()) {
+    if (m_propertyColorEditingTextBackground) {
+        if (!selectedIds.isEmpty()) {
+            if (!m_propertyColorEditHistoryCaptured) {
+                pushHistorySnapshot();
+                m_propertyColorEditHistoryCaptured = true;
+            }
+            for (int id : selectedIds) {
+                if (Annotation *annotation = annotationById(id);
+                    annotation && annotation->tool == Tool::Text) {
+                    annotation->backgroundColor = color;
+                }
+            }
+        } else if (m_tool == Tool::Text) {
+            m_textBackgroundColor = color;
+        }
+    } else if (!selectedIds.isEmpty()) {
         if (!m_propertyColorEditHistoryCaptured) {
             pushHistorySnapshot();
             m_propertyColorEditHistoryCaptured = true;
@@ -3268,6 +3484,19 @@ void ShotWindow::applyPropertyColor(QColor color)
     }
     if (m_draft.has_value()) {
         m_draft->color = color;
+    }
+    if (m_textEditor && m_textEditor->isVisible()) {
+        QColor editorColor = m_currentColor;
+        QColor editorBackgroundColor = m_textBackgroundColor;
+        qreal editorWidth = m_shapeWidth;
+        if (m_editingTextAnnotationId.has_value()) {
+            if (const Annotation *annotation = annotationById(*m_editingTextAnnotationId)) {
+                editorColor = annotation->color;
+                editorBackgroundColor = annotation->backgroundColor;
+                editorWidth = annotation->width;
+            }
+        }
+        m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(editorColor, editorBackgroundColor, qRound(20.0 + editorWidth)));
     }
     updateColorPalettePreview();
     updateAnnotationPropertyPanel();
@@ -3548,10 +3777,13 @@ void ShotWindow::updateToolbarState()
 
     const QString active = currentToolName();
     const QString scopeAction = markshot::ui::actionName(Action::ToggleCaptureScope);
+    const QString layoutAction = markshot::ui::actionName(Action::ToggleToolbarLayout);
     const auto buttons = m_toolbar->findChildren<QPushButton *>();
     for (QPushButton *button : buttons) {
         const QString action = button->property("action").toString();
-        const bool isActiveTool = action == active || (action == scopeAction && m_fullscreenAnnotation);
+        const bool isActiveTool = action == active
+            || (action == scopeAction && m_fullscreenAnnotation)
+            || (action == layoutAction && m_toolbarVerticalLayout);
         button->setProperty("active", isActiveTool);
         button->style()->unpolish(button);
         button->style()->polish(button);
@@ -3641,15 +3873,23 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
         QFont font(annotation.fontFamily.isEmpty() ? QStringLiteral("Sans Serif") : annotation.fontFamily,
                    qRound((19.0 + annotation.width) * scale),
                    QFont::DemiBold);
-        QRectF textRect = annotation.rect.isEmpty()
-            ? QRectF(mapPoint(annotation.points.value(0)), QSizeF(360.0 * scale, 140.0 * scale))
-            : mapRect(annotation.rect);
+        QRectF backgroundRect = textContentRect(annotation, widgetCoordinates);
+        QRectF textRect = backgroundRect.adjusted(kTextBackgroundPaddingX * scale,
+                                                  kTextBackgroundPaddingY * scale,
+                                                  -kTextBackgroundPaddingX * scale,
+                                                  -kTextBackgroundPaddingY * scale);
         QTextOption option;
         option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
         option.setAlignment(Qt::AlignLeft | Qt::AlignTop);
         painter.save();
         painter.setFont(font);
+        if (annotation.backgroundColor.alpha() > 0) {
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(annotation.backgroundColor);
+            painter.drawRoundedRect(backgroundRect, 4.0 * scale, 4.0 * scale);
+        }
         painter.setPen(annotation.color);
+        painter.setBrush(Qt::NoBrush);
         painter.drawText(textRect, annotation.text, option);
         painter.restore();
         break;
@@ -3865,7 +4105,7 @@ void ShotWindow::beginTextAnnotation(QPointF imagePoint)
     m_textEditorImagePoint = imagePoint;
     m_draft.reset();
     m_textEditor->clear();
-    m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(m_currentColor, qRound(20.0 + m_shapeWidth)));
+    m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(m_currentColor, m_textBackgroundColor, qRound(20.0 + m_shapeWidth)));
     m_textEditor->setFont(QFont(m_textFontFamily, qRound(20.0 + m_shapeWidth), QFont::DemiBold));
     m_textEditor->show();
     m_textEditor->raise();
@@ -3888,7 +4128,7 @@ void ShotWindow::beginEditingSelectedTextAnnotation()
     m_textEditorImagePoint = annotation->rect.normalized().topLeft();
     m_draft.reset();
     m_textEditor->setPlainText(annotation->text);
-    m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(annotation->color, qRound(20.0 + annotation->width)));
+    m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(annotation->color, annotation->backgroundColor, qRound(20.0 + annotation->width)));
     m_textEditor->setFont(QFont(annotation->fontFamily.isEmpty() ? QStringLiteral("Sans Serif") : annotation->fontFamily,
                                 qRound(20.0 + annotation->width),
                                 QFont::DemiBold));
@@ -3929,6 +4169,7 @@ void ShotWindow::commitTextEditor()
             annotation->rect = QRectF(widgetToImage(editorGeometry.topLeft()),
                                       widgetToImage(editorGeometry.bottomRight())).normalized();
             annotation->fontFamily = m_textEditor->font().family();
+            annotation->rect = textContentRect(*annotation, false);
             if (!annotation->points.isEmpty()) {
                 annotation->points[0] = annotation->rect.topLeft();
             }
@@ -3950,8 +4191,10 @@ void ShotWindow::commitTextEditor()
                                  widgetToImage(editorGeometry.bottomRight())).normalized();
         annotation.text = text;
         annotation.color = m_currentColor;
+        annotation.backgroundColor = m_textBackgroundColor;
         annotation.width = m_shapeWidth;
         annotation.fontFamily = m_textEditor->font().family();
+        annotation.rect = textContentRect(annotation, false);
         m_textFontFamily = annotation.fontFamily;
         m_annotations.append(annotation);
     }
@@ -4043,13 +4286,8 @@ QImage ShotWindow::renderedSelection() const
 
 QString ShotWindow::defaultSavePath() const
 {
-    QString pictures = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
-    if (pictures.isEmpty()) {
-        pictures = QDir::homePath();
-    }
-
     const QString filename = QStringLiteral("mark-shot-%1.png").arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-hhmmss")));
-    return QDir(pictures).filePath(filename);
+    return QDir(markShotPicturesDir()).filePath(filename);
 }
 
 void ShotWindow::saveSelection()
@@ -4060,15 +4298,58 @@ void ShotWindow::saveSelection()
         return;
     }
 
-    const QString path = QFileDialog::getSaveFileName(this, QStringLiteral("Save Screenshot"), defaultSavePath(), QStringLiteral("PNG Images (*.png)"));
-    if (path.isEmpty()) {
+    const QImage output = renderedSelection();
+    if (output.isNull()) {
         return;
     }
 
-    QImage output = renderedSelection();
-    if (!output.isNull() && output.save(path, "PNG")) {
-        close();
+    if (m_openWithPanel) {
+        m_openWithPanel->hide();
     }
+    if (m_colorPalette) {
+        m_colorPalette->hide();
+    }
+    if (m_annotationPropertyPanel) {
+        m_annotationPropertyPanel->hide();
+    }
+    if (m_propertyColorDialogPanel) {
+        m_propertyColorDialogPanel->hide();
+    }
+    if (m_propertyFontPanel) {
+        m_propertyFontPanel->hide();
+    }
+
+    hide();
+
+    auto *dialog = new QFileDialog(nullptr, QStringLiteral("Save Screenshot"));
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setAcceptMode(QFileDialog::AcceptSave);
+    dialog->setFileMode(QFileDialog::AnyFile);
+    dialog->setNameFilter(QStringLiteral("PNG Images (*.png)"));
+    dialog->setDefaultSuffix(QStringLiteral("png"));
+    dialog->setOption(QFileDialog::DontUseNativeDialog, true);
+    dialog->selectFile(defaultSavePath());
+
+    connect(dialog, &QFileDialog::accepted, this, [this, dialog, output] {
+        const QStringList files = dialog->selectedFiles();
+        if (!files.isEmpty() && output.save(files.first(), "PNG")) {
+            close();
+            return;
+        }
+        show();
+        raise();
+        activateWindow();
+        updateToolbarGeometry();
+        updateActionToolbarGeometry();
+    });
+    connect(dialog, &QFileDialog::rejected, this, [this] {
+        show();
+        raise();
+        activateWindow();
+        updateToolbarGeometry();
+        updateActionToolbarGeometry();
+    });
+    dialog->open();
 }
 
 void ShotWindow::copySelection()

@@ -208,23 +208,34 @@ QString colorPaletteStyleSheet()
         "}");
 }
 
-QString textEditorStyleSheet(const QColor &color, int pointSize)
+QString textEditorStyleSheet(const QColor &color, const QColor &backgroundColor, int pointSize)
 {
+    const QString foreground = QStringLiteral("rgba(%1, %2, %3, %4)")
+                                   .arg(color.red())
+                                   .arg(color.green())
+                                   .arg(color.blue())
+                                   .arg(color.alpha());
+    const QString background = QStringLiteral("rgba(%1, %2, %3, %4)")
+                                   .arg(backgroundColor.red())
+                                   .arg(backgroundColor.green())
+                                   .arg(backgroundColor.blue())
+                                   .arg(backgroundColor.alpha());
     return QStringLiteral(
                "QTextEdit#textEditor {"
                " color: %1;"
-               " background: rgba(15, 23, 42, 18);"
+               " background: %2;"
                " border: 1px dashed rgba(45, 212, 191, 95);"
                " border-radius: 4px;"
                " padding: 2px 4px;"
-               " font-size: %2px;"
+               " font-size: %3px;"
                " font-weight: 700;"
                " selection-background-color: #2DD4BF;"
                " selection-color: #042F2E;"
                "}"
                "QTextEdit#textEditor QAbstractScrollArea { background: transparent; }"
-               "QTextEdit#textEditor QWidget { background: rgba(15, 23, 42, 18); }")
-        .arg(color.name())
+               "QTextEdit#textEditor QWidget { background: %2; }")
+        .arg(foreground)
+        .arg(background)
         .arg(pointSize);
 }
 

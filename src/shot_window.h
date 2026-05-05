@@ -11,6 +11,7 @@
 #include <optional>
 
 class QPainter;
+class QBoxLayout;
 class QLabel;
 class QListWidget;
 class QPushButton;
@@ -40,6 +41,7 @@ public:
         ToolMosaic,
         ToolLaser,
         ToggleCaptureScope,
+        ToggleToolbarLayout,
         Clear,
         Undo,
         Redo,
@@ -114,6 +116,7 @@ private:
         QString text;
         int number = 0;
         QColor color = QColor(255, 77, 77);
+        QColor backgroundColor = QColor(0, 0, 0, 0);
         qreal width = 4.0;
         bool filled = false;
         qreal cornerRadius = 0.0;
@@ -145,6 +148,7 @@ private:
     QPointF imageToWidget(QPointF point) const;
     QRectF normalizedSelection() const;
     QRectF imageRectToWidget(QRectF rect) const;
+    QRectF textContentRect(const Annotation &annotation, bool widgetCoordinates) const;
     QString defaultSavePath() const;
     bool hasUsableSelection() const;
     qreal currentToolWidth() const;
@@ -201,6 +205,8 @@ private:
     void revealSelectionInfo();
     void setTool(Tool tool);
     void toggleCaptureScope();
+    void toggleToolbarLayout();
+    void applyToolbarLayout();
     void enterFullscreenAnnotation(bool resetAnnotations);
     void leaveFullscreenAnnotation();
     void toggleColorPalette(QPoint position);
@@ -223,6 +229,7 @@ private:
     void applyPropertyColor(QColor color);
     void deleteSelectedAnnotation();
     void openSelectedAnnotationColorPalette();
+    void openSelectedTextBackgroundColorPalette();
     void toggleSelectedTextFontPanel();
     void clearAnnotations();
     void updateTextEditorGeometry();
@@ -270,6 +277,7 @@ private:
     bool m_shapeFilled = false;
     qreal m_rectangleCornerRadius = 0.0;
     QString m_textFontFamily = QStringLiteral("Sans Serif");
+    QColor m_textBackgroundColor = QColor(0, 0, 0, 0);
     int m_nextNumber = 1;
     int m_nextAnnotationId = 1;
     std::optional<int> m_selectedAnnotationId;
@@ -279,6 +287,7 @@ private:
     QVector<LaserStroke> m_laserStrokes;
     std::optional<LaserStroke> m_laserDraft;
     QWidget *m_toolbar = nullptr;
+    QBoxLayout *m_toolbarLayout = nullptr;
     QWidget *m_actionToolbar = nullptr;
     QWidget *m_annotationPropertyPanel = nullptr;
     QLabel *m_annotationPropertyTitle = nullptr;
@@ -287,6 +296,7 @@ private:
     QLabel *m_propertyOpacityLabel = nullptr;
     QSlider *m_propertyOpacitySlider = nullptr;
     QPushButton *m_propertyColorButton = nullptr;
+    QPushButton *m_propertyTextBackgroundButton = nullptr;
     QPushButton *m_propertyFillButton = nullptr;
     QLabel *m_propertyRadiusLabel = nullptr;
     QSlider *m_propertyRadiusSlider = nullptr;
@@ -297,6 +307,7 @@ private:
     QWidget *m_propertyColorDialogPanel = nullptr;
     markshot::ui::ColorPicker *m_propertyColorPicker = nullptr;
     bool m_propertyColorEditHistoryCaptured = false;
+    bool m_propertyColorEditingTextBackground = false;
     QWidget *m_openWithPanel = nullptr;
     QWidget *m_colorPalette = nullptr;
     QWidget *m_colorPalettePreview = nullptr;
@@ -305,6 +316,7 @@ private:
     QRect m_toolbarBeforeDrag;
     std::optional<QRectF> m_selectionBeforeFullscreenAnnotation;
     QVector<QPushButton *> m_fullscreenActionButtons;
+    bool m_toolbarVerticalLayout = false;
     QTimer *m_laserTimer = nullptr;
     QTextEdit *m_textEditor = nullptr;
     QPointF m_textEditorImagePoint;

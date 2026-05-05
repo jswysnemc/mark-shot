@@ -35,9 +35,9 @@ QString propertyColorDialogPanelStyleSheet();
 // Stylesheet for the radial color palette popup.
 QString colorPaletteStyleSheet();
 
-// Stylesheet for the inline text annotation editor. The caret color and
-// point size depend on the active annotation, so they are passed in.
-QString textEditorStyleSheet(const QColor &color, int pointSize);
+// Stylesheet for the inline text annotation editor. The foreground,
+// background, and point size depend on the active annotation.
+QString textEditorStyleSheet(const QColor &color, const QColor &backgroundColor, int pointSize);
 
 // Stylesheet for the small color preview button inside the property panel.
 // The button is filled with the annotation color, so the rule has to be

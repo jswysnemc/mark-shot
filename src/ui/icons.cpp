@@ -59,6 +59,8 @@ QString actionName(ShotWindow::Action action)
         return QStringLiteral("Laser");
     case ShotWindow::Action::ToggleCaptureScope:
         return QStringLiteral("Scope");
+    case ShotWindow::Action::ToggleToolbarLayout:
+        return QStringLiteral("Layout");
     case ShotWindow::Action::Clear:
         return QStringLiteral("Clear");
     case ShotWindow::Action::Undo:
@@ -306,6 +308,15 @@ QIcon makeToolIcon(ShotWindow::Action action)
         arrows.lineTo(25.5, 25.5);
         arrows.lineTo(25.5, 23.0);
         p.drawPath(arrows);
+        break;
+    }
+    case ShotWindow::Action::ToggleToolbarLayout: {
+        p.setPen(makePen(kInk, 1.6));
+        p.drawRoundedRect(QRectF(7.0, 8.0, 18.0, 5.0), 1.5, 1.5);
+        p.drawRoundedRect(QRectF(7.0, 19.0, 18.0, 5.0), 1.5, 1.5);
+        p.setPen(makePen(kInkSoft, 1.4));
+        p.drawRoundedRect(QRectF(9.0, 6.5, 5.0, 19.0), 1.5, 1.5);
+        p.drawRoundedRect(QRectF(18.0, 6.5, 5.0, 19.0), 1.5, 1.5);
         break;
     }
     case ShotWindow::Action::Clear: {
