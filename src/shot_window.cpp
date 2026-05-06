@@ -28,6 +28,7 @@
 #include <QLayout>
 #include <QLineF>
 #include <QListWidget>
+#include <QLineEdit>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
@@ -37,6 +38,7 @@
 #include <QProcessEnvironment>
 #include <QPushButton>
 #include <QScreen>
+#include <QShortcut>
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QStandardPaths>
@@ -72,10 +74,28 @@ constexpr qreal kMaxLaserWidth = 48.0;
 constexpr qint64 kLaserLifetimeMs = 1800;
 constexpr qreal kTextBackgroundPaddingX = 6.0;
 constexpr qreal kTextBackgroundPaddingY = 4.0;
+constexpr qreal kMinImageZoom = 0.25;
+constexpr qreal kMaxImageZoom = 8.0;
+constexpr qint64 kCtrlDoubleTapMs = 360;
 
 QRectF normalizedRect(QPointF a, QPointF b)
 {
     return QRectF(a, b).normalized();
+}
+
+qreal imageNavigationWheelFactor(const QWheelEvent *event)
+{
+    const QPoint angleDelta = event->angleDelta();
+    if (angleDelta.y() != 0) {
+        return std::pow(1.12, static_cast<qreal>(angleDelta.y()) / 120.0);
+    }
+
+    const QPoint pixelDelta = event->pixelDelta();
+    if (pixelDelta.y() != 0) {
+        return std::pow(1.12, static_cast<qreal>(pixelDelta.y()) / 80.0);
+    }
+
+    return 1.0;
 }
 
 // Stylesheets, palette presets, action names, and toolbar icons now live in
@@ -454,6 +474,39 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QWidget *parent)
     actionLayout->addWidget(addToolbarButton(Action::Cancel, QStringLiteral("Esc"), m_actionToolbar));
     m_actionToolbar->hide();
 
+    auto shortcutBlockedByTextInput = [this] {
+        if (m_textEditor && m_textEditor->isVisible()) {
+            return true;
+        }
+        QWidget *focusWidget = QApplication::focusWidget();
+        return qobject_cast<QLineEdit *>(focusWidget) != nullptr
+            || qobject_cast<QTextEdit *>(focusWidget) != nullptr;
+    };
+    auto addPlainShortcut = [this, shortcutBlockedByTextInput](const QKeySequence &sequence, auto callback) {
+        auto *shortcut = new QShortcut(sequence, this);
+        shortcut->setContext(Qt::WindowShortcut);
+        shortcut->setAutoRepeat(false);
+        connect(shortcut, &QShortcut::activated, this, [this, shortcutBlockedByTextInput, callback] {
+            if (shortcutBlockedByTextInput()) {
+                return;
+            }
+            callback();
+        });
+    };
+    addPlainShortcut(QKeySequence(Qt::Key_V), [this] { setTool(Tool::Move); });
+    addPlainShortcut(QKeySequence(Qt::Key_S), [this] { setTool(Tool::Select); });
+    addPlainShortcut(QKeySequence(Qt::Key_P), [this] { setTool(Tool::Pen); });
+    addPlainShortcut(QKeySequence(Qt::Key_L), [this] { setTool(Tool::Line); });
+    addPlainShortcut(QKeySequence(Qt::Key_H), [this] { setTool(Tool::Highlighter); });
+    addPlainShortcut(QKeySequence(Qt::Key_R), [this] { setTool(Tool::Rectangle); });
+    addPlainShortcut(QKeySequence(Qt::Key_E), [this] { setTool(Tool::Ellipse); });
+    addPlainShortcut(QKeySequence(Qt::Key_A), [this] { setTool(Tool::Arrow); });
+    addPlainShortcut(QKeySequence(Qt::Key_T), [this] { setTool(Tool::Text); });
+    addPlainShortcut(QKeySequence(Qt::Key_N), [this] { setTool(Tool::Number); });
+    addPlainShortcut(QKeySequence(Qt::Key_M), [this] { setTool(Tool::Mosaic); });
+    addPlainShortcut(QKeySequence(Qt::Key_G), [this] { setTool(Tool::Laser); });
+    addPlainShortcut(QKeySequence(Qt::Key_F), [this] { toggleCaptureScope(); });
+
     m_annotationPropertyPanel = new QWidget(this);
     m_annotationPropertyPanel->setObjectName(QStringLiteral("annotationPropertyPanel"));
     m_annotationPropertyPanel->setStyleSheet(m_toolbar->styleSheet());
@@ -660,6 +713,20 @@ bool ShotWindow::configureLayerShell(QScreen *screen)
 void ShotWindow::startFullscreenAnnotation()
 {
     enterFullscreenAnnotation(true);
+}
+
+void ShotWindow::setImageNavigationEnabled(bool enabled)
+{
+    m_imageNavigationEnabled = enabled;
+    if (!enabled) {
+        m_imageZoom = 1.0;
+        m_imageCenterInitialized = false;
+        m_imageSelected = false;
+        m_imagePanning = false;
+    }
+    updateFrozenImageRect();
+    refreshViewGeometry();
+    update();
 }
 
 void ShotWindow::enterFullscreenAnnotation(bool resetAnnotations)
@@ -917,6 +984,10 @@ QVector<ShotWindow::DesktopApp> ShotWindow::imageDesktopApps() const
 
 bool ShotWindow::eventFilter(QObject *watched, QEvent *event)
 {
+    if (event->type() == QEvent::MouseButtonPress || event->type() == QEvent::KeyPress) {
+        clearWheelPreview();
+    }
+
     const bool isFullscreenMoveButton = m_fullscreenAnnotation
         && watched->property("action").toString() == markshot::ui::actionName(Action::ToolMove);
     if (isFullscreenMoveButton) {
@@ -961,6 +1032,15 @@ bool ShotWindow::eventFilter(QObject *watched, QEvent *event)
 
     if (watched == m_textEditor && event->type() == QEvent::KeyPress) {
         auto *keyEvent = static_cast<QKeyEvent *>(event);
+        if (m_imageNavigationEnabled && keyEvent->key() == Qt::Key_Control && !keyEvent->isAutoRepeat()) {
+            if (m_ctrlTapTimer.isValid() && m_ctrlTapTimer.elapsed() <= kCtrlDoubleTapMs) {
+                resetImageZoom();
+                m_ctrlTapTimer.invalidate();
+            } else {
+                m_ctrlTapTimer.restart();
+            }
+            return true;
+        }
         if (keyEvent->key() == Qt::Key_Escape) {
             m_draft.reset();
             m_editingTextAnnotationId.reset();
@@ -1108,12 +1188,26 @@ void ShotWindow::resizeEvent(QResizeEvent *)
 
 void ShotWindow::mousePressEvent(QMouseEvent *event)
 {
+    clearWheelPreview();
+
     if (event->button() != Qt::LeftButton) {
-        if (event->button() == Qt::MiddleButton && m_mode == Mode::Editing) {
-            setTool(Tool::Select);
+        if (event->button() == Qt::MiddleButton && m_imageNavigationEnabled && m_frozenImageRect.contains(event->position())) {
+            commitTextEditor();
+            m_dragging = false;
+            m_annotationSelectionBoxActive = false;
+            m_imagePanning = true;
+            m_imagePanStartWidget = event->position();
+            m_imagePanStartCenter = m_imageCenterInitialized
+                ? m_imageCenter
+                : QPointF(m_frozenFrame.width() / 2.0, m_frozenFrame.height() / 2.0);
+            updateCursor();
+            event->accept();
+            return;
         }
         if (event->button() == Qt::RightButton && m_mode == Mode::Editing) {
-            toggleColorPalette(event->pos());
+            setTool(Tool::Select);
+            event->accept();
+            return;
         }
         return;
     }
@@ -1200,6 +1294,9 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
             setSelectedAnnotations({*hitAnnotationId});
             beginAnnotationDrag(*hitAnnotationId, drag == SelectionDrag::None ? SelectionDrag::Move : drag, imagePoint);
             updateAnnotationPropertyPanel();
+        } else if (m_imageNavigationEnabled) {
+            beginAnnotationSelectionBox(imagePoint);
+            m_imageSelected = true;
         } else {
             beginAnnotationSelectionBox(imagePoint);
         }
@@ -1258,6 +1355,12 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
 
 void ShotWindow::mouseMoveEvent(QMouseEvent *event)
 {
+    if (m_imagePanning) {
+        panImageTo(event->position());
+        event->accept();
+        return;
+    }
+
     if (m_showWheelPreview && m_wheelPreviewTimer.isValid() && m_wheelPreviewTimer.elapsed() <= 900) {
         m_wheelPreviewPosition = event->position();
         update();
@@ -1421,6 +1524,12 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
 
 void ShotWindow::mouseDoubleClickEvent(QMouseEvent *event)
 {
+    if (event->button() == Qt::RightButton && m_mode == Mode::Editing) {
+        toggleColorPalette(event->pos());
+        event->accept();
+        return;
+    }
+
     if (event->button() != Qt::LeftButton || m_mode != Mode::Editing) {
         QWidget::mouseDoubleClickEvent(event);
         return;
@@ -1508,6 +1617,13 @@ void ShotWindow::mouseDoubleClickEvent(QMouseEvent *event)
 
 void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
 {
+    if ((event->button() == Qt::LeftButton || event->button() == Qt::MiddleButton) && m_imagePanning) {
+        m_imagePanning = false;
+        updateCursor();
+        event->accept();
+        return;
+    }
+
     if (event->button() != Qt::LeftButton || !m_dragging) {
         return;
     }
@@ -1531,6 +1647,18 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
     }
 
     if (m_tool == Tool::Select && m_annotationSelectionBoxActive) {
+        if (m_imageNavigationEnabled && m_imageSelected) {
+            const QRectF box = m_annotationSelectionBox.normalized();
+            if (box.width() < kMinSelectionSize || box.height() < kMinSelectionSize) {
+                m_annotationSelectionBoxActive = false;
+                m_annotationSelectionBox = {};
+                updateAnnotationPropertyPanel();
+                updateCursor();
+                update();
+                return;
+            }
+            m_imageSelected = false;
+        }
         commitAnnotationSelectionBox();
         updateCursor();
         update();
@@ -1582,6 +1710,22 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
 
 void ShotWindow::wheelEvent(QWheelEvent *event)
 {
+    if (m_imageNavigationEnabled) {
+        const qreal factor = imageNavigationWheelFactor(event);
+        if (qFuzzyCompare(factor, 1.0)) {
+            QWidget::wheelEvent(event);
+            return;
+        }
+        zoomImageAt(factor, event->position());
+        m_showWheelPreview = true;
+        m_wheelPreviewPosition = event->position();
+        m_wheelPreviewTimer.restart();
+        updateCursor();
+        event->accept();
+        update();
+        return;
+    }
+
     const int steps = event->angleDelta().y() / 120;
     if (steps == 0 || m_mode != Mode::Editing) {
         QWidget::wheelEvent(event);
@@ -1635,6 +1779,19 @@ void ShotWindow::wheelEvent(QWheelEvent *event)
 
 void ShotWindow::keyPressEvent(QKeyEvent *event)
 {
+    clearWheelPreview();
+
+    if (m_imageNavigationEnabled && event->key() == Qt::Key_Control && !event->isAutoRepeat()) {
+        if (m_ctrlTapTimer.isValid() && m_ctrlTapTimer.elapsed() <= kCtrlDoubleTapMs) {
+            resetImageZoom();
+            m_ctrlTapTimer.invalidate();
+        } else {
+            m_ctrlTapTimer.restart();
+        }
+        event->accept();
+        return;
+    }
+
     if (event->key() == Qt::Key_Escape) {
         close();
         return;
@@ -1799,6 +1956,7 @@ void ShotWindow::commitDraft()
 
 void ShotWindow::setTool(Tool tool)
 {
+    clearWheelPreview();
     commitTextEditor();
     m_selectionDrag = SelectionDrag::None;
     m_annotationDrag = SelectionDrag::None;
@@ -1809,6 +1967,8 @@ void ShotWindow::setTool(Tool tool)
     m_tool = tool;
     if (m_tool != Tool::Select) {
         setSelectedAnnotations({});
+        m_imageSelected = false;
+        m_imagePanning = false;
     }
     updateAnnotationPropertyPanel();
     updateCursor();
@@ -1820,6 +1980,16 @@ void ShotWindow::updateCursor()
 {
     if (m_showWheelPreview && m_wheelPreviewTimer.isValid() && m_wheelPreviewTimer.elapsed() <= 900) {
         setCursor(Qt::BlankCursor);
+        return;
+    }
+
+    if (m_imagePanning) {
+        setCursor(Qt::ClosedHandCursor);
+        return;
+    }
+
+    if (m_imageNavigationEnabled && m_tool == Tool::Select && m_imageSelected) {
+        setCursor(m_imagePanning ? Qt::ClosedHandCursor : Qt::OpenHandCursor);
         return;
     }
 
@@ -1880,10 +2050,33 @@ void ShotWindow::updateCursor()
     setCursor(m_tool == Tool::Text ? Qt::IBeamCursor : Qt::CrossCursor);
 }
 
+void ShotWindow::clearWheelPreview()
+{
+    if (!m_showWheelPreview) {
+        return;
+    }
+
+    m_showWheelPreview = false;
+    m_wheelPreviewTimer.invalidate();
+    updateCursor();
+    update();
+}
+
 bool ShotWindow::hasUsableSelection() const
 {
     const QRectF selection = normalizedSelection();
     return selection.width() >= kMinSelectionSize && selection.height() >= kMinSelectionSize;
+}
+
+qreal ShotWindow::annotationSizeScale(bool widgetCoordinates) const
+{
+    if (!widgetCoordinates || m_frozenFrame.isNull()) {
+        return 1.0;
+    }
+
+    return !m_frozenImageRect.isEmpty()
+        ? m_frozenImageRect.width() / std::max<qreal>(1.0, m_frozenFrame.width())
+        : 1.0;
 }
 
 ShotWindow::SelectionDrag ShotWindow::selectionDragAt(QPointF imagePoint) const
@@ -2030,6 +2223,10 @@ void ShotWindow::setSelectedAnnotations(QVector<int> annotationIds)
     m_selectedAnnotationId = validIds.size() == 1
         ? std::optional<int>(validIds.first())
         : std::nullopt;
+    if (!validIds.isEmpty()) {
+        m_imageSelected = false;
+        m_imagePanning = false;
+    }
 }
 
 QRectF ShotWindow::selectedAnnotationsBounds() const
@@ -2255,6 +2452,15 @@ std::optional<int> ShotWindow::annotationAt(QPointF imagePoint) const
 
 void ShotWindow::drawSelectedAnnotationFrame(QPainter &painter) const
 {
+    if (m_imageNavigationEnabled && m_tool == Tool::Select && m_imageSelected && selectedAnnotationIds().isEmpty()) {
+        painter.save();
+        painter.setPen(QPen(QColor(45, 212, 191), 2.0, Qt::DashLine));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRoundedRect(m_frozenImageRect.adjusted(2.0, 2.0, -2.0, -2.0), 6.0, 6.0);
+        painter.restore();
+        return;
+    }
+
     const QVector<int> selectedIds = selectedAnnotationIds();
     if (selectedIds.isEmpty()) {
         return;
@@ -2510,9 +2716,7 @@ qreal ShotWindow::currentToolWidth() const
 
 qreal ShotWindow::currentToolPreviewSize() const
 {
-    const qreal scale = !m_frozenImageRect.isEmpty()
-        ? m_frozenImageRect.width() / std::max(1, m_frozenFrame.width())
-        : 1.0;
+    const qreal scale = annotationSizeScale(true);
 
     switch (m_tool) {
     case Tool::Move:
@@ -2709,9 +2913,7 @@ QRectF ShotWindow::imageRectToWidget(QRectF rect) const
 
 QRectF ShotWindow::textContentRect(const Annotation &annotation, bool widgetCoordinates) const
 {
-    const qreal scale = widgetCoordinates && !m_frozenImageRect.isEmpty()
-        ? m_frozenImageRect.width() / std::max<qreal>(1.0, m_frozenFrame.width())
-        : 1.0;
+    const qreal scale = annotationSizeScale(widgetCoordinates);
     const QRectF baseRect = annotation.rect.isEmpty()
         ? QRectF(annotation.points.value(0), QSizeF(360.0, 140.0))
         : annotation.rect.normalized();
@@ -2770,13 +2972,108 @@ void ShotWindow::updateFrozenImageRect()
 {
     if (m_frozenFrame.isNull()) {
         m_frozenImageRect = {};
+        m_imageCenterInitialized = false;
         return;
     }
 
     QSizeF frameSize = m_frozenFrame.size();
     frameSize.scale(size(), Qt::KeepAspectRatio);
-    const QPointF topLeft((width() - frameSize.width()) / 2.0, (height() - frameSize.height()) / 2.0);
+    if (!m_imageNavigationEnabled) {
+        const QPointF topLeft((width() - frameSize.width()) / 2.0, (height() - frameSize.height()) / 2.0);
+        m_frozenImageRect = QRectF(topLeft, frameSize);
+        return;
+    }
+
+    const qreal fitScale = frameSize.width() / std::max<qreal>(1.0, m_frozenFrame.width());
+    const qreal scale = fitScale * m_imageZoom;
+    frameSize = QSizeF(m_frozenFrame.width() * scale, m_frozenFrame.height() * scale);
+    if (!m_imageCenterInitialized) {
+        m_imageCenter = QPointF(m_frozenFrame.width() / 2.0, m_frozenFrame.height() / 2.0);
+        m_imageCenterInitialized = true;
+    }
+
+    if (frameSize.width() <= width()) {
+        m_imageCenter.setX(m_frozenFrame.width() / 2.0);
+    } else {
+        const qreal halfVisibleWidth = width() / (2.0 * scale);
+        m_imageCenter.setX(std::clamp(m_imageCenter.x(), halfVisibleWidth, m_frozenFrame.width() - halfVisibleWidth));
+    }
+    if (frameSize.height() <= height()) {
+        m_imageCenter.setY(m_frozenFrame.height() / 2.0);
+    } else {
+        const qreal halfVisibleHeight = height() / (2.0 * scale);
+        m_imageCenter.setY(std::clamp(m_imageCenter.y(), halfVisibleHeight, m_frozenFrame.height() - halfVisibleHeight));
+    }
+
+    const QPointF widgetCenter(width() / 2.0, height() / 2.0);
+    const QPointF topLeft(widgetCenter.x() - m_imageCenter.x() * scale,
+                          widgetCenter.y() - m_imageCenter.y() * scale);
     m_frozenImageRect = QRectF(topLeft, frameSize);
+}
+
+void ShotWindow::zoomImageAt(qreal factor, QPointF widgetAnchor)
+{
+    if (!m_imageNavigationEnabled || m_frozenFrame.isNull() || m_frozenImageRect.isEmpty() || factor <= 0.0) {
+        return;
+    }
+
+    const QPointF anchorImage = m_frozenImageRect.contains(widgetAnchor)
+        ? widgetToImage(widgetAnchor)
+        : (m_imageCenterInitialized ? m_imageCenter : QPointF(m_frozenFrame.width() / 2.0, m_frozenFrame.height() / 2.0));
+    m_imageZoom = std::clamp(m_imageZoom * factor, kMinImageZoom, kMaxImageZoom);
+
+    QSizeF fitSize = m_frozenFrame.size();
+    fitSize.scale(size(), Qt::KeepAspectRatio);
+    const qreal scale = fitSize.width() / std::max<qreal>(1.0, m_frozenFrame.width()) * m_imageZoom;
+    const QPointF widgetCenter(width() / 2.0, height() / 2.0);
+    m_imageCenter = QPointF(anchorImage.x() - (widgetAnchor.x() - widgetCenter.x()) / scale,
+                            anchorImage.y() - (widgetAnchor.y() - widgetCenter.y()) / scale);
+    m_imageCenterInitialized = true;
+    updateFrozenImageRect();
+    refreshViewGeometry();
+    update();
+}
+
+void ShotWindow::resetImageZoom()
+{
+    if (!m_imageNavigationEnabled || m_frozenFrame.isNull()) {
+        return;
+    }
+
+    m_imageZoom = 1.0;
+    m_imageCenter = QPointF(m_frozenFrame.width() / 2.0, m_frozenFrame.height() / 2.0);
+    m_imageCenterInitialized = true;
+    updateFrozenImageRect();
+    refreshViewGeometry();
+    update();
+}
+
+void ShotWindow::panImageTo(QPointF widgetPosition)
+{
+    if (!m_imageNavigationEnabled || m_frozenFrame.isNull() || m_frozenImageRect.isEmpty()) {
+        return;
+    }
+
+    const qreal scale = m_frozenImageRect.width() / std::max<qreal>(1.0, m_frozenFrame.width());
+    if (scale <= 0.0) {
+        return;
+    }
+
+    const QPointF delta = widgetPosition - m_imagePanStartWidget;
+    m_imageCenter = m_imagePanStartCenter - delta / scale;
+    m_imageCenterInitialized = true;
+    updateFrozenImageRect();
+    refreshViewGeometry();
+    update();
+}
+
+void ShotWindow::refreshViewGeometry()
+{
+    updateTextEditorGeometry();
+    updateToolbarGeometry();
+    updateActionToolbarGeometry();
+    updateAnnotationPropertyPanelGeometry();
+    updateOpenWithPanelGeometry();
 }
 
 QRect ShotWindow::clampedToolbarGeometry(QRect toolbarGeometry) const
@@ -2797,6 +3094,13 @@ void ShotWindow::updateToolbarGeometry()
         const QSize toolbarSize = m_toolbar->sizeHint();
         QRect toolbarGeometry = m_toolbar->geometry();
         toolbarGeometry.setSize(toolbarSize);
+        m_toolbar->setGeometry(clampedToolbarGeometry(toolbarGeometry));
+        updateAnnotationPropertyPanelGeometry();
+        return;
+    }
+    if (m_imageNavigationEnabled && m_fullscreenAnnotation) {
+        const QSize toolbarSize = m_toolbar->sizeHint();
+        const QRect toolbarGeometry(QPoint(qRound((width() - toolbarSize.width()) / 2.0), 12), toolbarSize);
         m_toolbar->setGeometry(clampedToolbarGeometry(toolbarGeometry));
         updateAnnotationPropertyPanelGeometry();
         return;
@@ -3737,7 +4041,7 @@ void ShotWindow::updateTextEditorGeometry()
     }
     if (m_editingTextAnnotationId.has_value()) {
         if (const Annotation *annotation = annotationById(*m_editingTextAnnotationId)) {
-            QRect editorRect = imageRectToWidget(annotation->rect.normalized()).toAlignedRect().adjusted(0, 0, 1, 1);
+            QRect editorRect = textContentRect(*annotation, true).toAlignedRect().adjusted(0, 0, 1, 1);
             editorRect.moveLeft(std::clamp(editorRect.left(), 8, std::max(8, width() - editorRect.width() - 8)));
             editorRect.moveTop(std::clamp(editorRect.top(), 8, std::max(8, height() - editorRect.height() - 8)));
             m_textEditor->setGeometry(editorRect);
@@ -3801,9 +4105,7 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
         return widgetCoordinates ? imageRectToWidget(rect) : rect;
     };
 
-    const qreal scale = widgetCoordinates && !m_frozenImageRect.isEmpty()
-        ? m_frozenImageRect.width() / std::max(1, m_frozenFrame.width())
-        : 1.0;
+    const qreal scale = annotationSizeScale(widgetCoordinates);
     const qreal penWidth = std::max<qreal>(1.5, annotation.width * scale);
 
     painter.save();
@@ -3956,6 +4258,31 @@ void ShotWindow::drawWheelPreview(QPainter &painter)
         return;
     }
 
+    if (m_imageNavigationEnabled) {
+        const QString zoomText = QStringLiteral("%1%").arg(qRound(m_imageZoom * 100.0));
+        painter.save();
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setFont(QFont(QStringLiteral("Sans Serif"), 12, QFont::DemiBold));
+        const QFontMetrics metrics(painter.font());
+        const QRectF textBounds = metrics.boundingRect(zoomText);
+        QRectF bubble(m_wheelPreviewPosition.x() + 14.0,
+                      m_wheelPreviewPosition.y() + 14.0,
+                      textBounds.width() + 24.0,
+                      textBounds.height() + 14.0);
+        bubble.moveLeft(std::min<qreal>(bubble.left(), width() - bubble.width() - 8.0));
+        bubble.moveTop(std::min<qreal>(bubble.top(), height() - bubble.height() - 8.0));
+        bubble.moveLeft(std::max<qreal>(8.0, bubble.left()));
+        bubble.moveTop(std::max<qreal>(8.0, bubble.top()));
+
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(8, 13, 19, 230));
+        painter.drawRoundedRect(bubble, 10.0, 10.0);
+        painter.setPen(QColor(204, 251, 241, 245));
+        painter.drawText(bubble, Qt::AlignCenter, zoomText);
+        painter.restore();
+        return;
+    }
+
     const qreal size = std::clamp(currentToolPreviewSize(), 2.0, 96.0);
     QRectF preview(m_wheelPreviewPosition.x() - size / 2.0,
                    m_wheelPreviewPosition.y() - size / 2.0,
@@ -3979,9 +4306,7 @@ void ShotWindow::drawLaserStroke(QPainter &painter, const LaserStroke &stroke, b
     auto mapPoint = [this, widgetCoordinates](QPointF point) {
         return widgetCoordinates ? imageToWidget(point) : point;
     };
-    const qreal scale = widgetCoordinates && !m_frozenImageRect.isEmpty()
-        ? m_frozenImageRect.width() / std::max(1, m_frozenFrame.width())
-        : 1.0;
+    const qreal scale = annotationSizeScale(widgetCoordinates);
     const qreal width = std::max<qreal>(3.0, stroke.width * scale);
 
     QPainterPath path(mapPoint(stroke.points.first()));
@@ -4059,12 +4384,15 @@ void ShotWindow::cleanupLaserStrokes()
     update();
 }
 
-void ShotWindow::drawNumber(QPainter &painter, QPointF imagePoint, int number, QColor color, qreal width, bool widgetCoordinates) const
+void ShotWindow::drawNumber(QPainter &painter,
+                            QPointF imagePoint,
+                            int number,
+                            QColor color,
+                            qreal width,
+                            bool widgetCoordinates) const
 {
     const QPointF center = widgetCoordinates ? imageToWidget(imagePoint) : imagePoint;
-    const qreal scale = widgetCoordinates && !m_frozenImageRect.isEmpty()
-        ? m_frozenImageRect.width() / std::max(1, m_frozenFrame.width())
-        : 1.0;
+    const qreal scale = annotationSizeScale(widgetCoordinates);
     const qreal radius = std::max<qreal>(13.0, (13.0 + width * 1.35) * scale);
     const QRectF bubble(center.x() - radius, center.y() - radius, radius * 2.0, radius * 2.0);
 
@@ -4143,7 +4471,7 @@ void ShotWindow::beginEditingSelectedTextAnnotation()
     }
     m_textEditor->show();
     m_textEditor->raise();
-    const QRectF widgetRect = imageRectToWidget(annotation->rect.normalized());
+    const QRectF widgetRect = textContentRect(*annotation, true);
     m_textEditor->setGeometry(widgetRect.toAlignedRect().adjusted(0, 0, 1, 1));
     m_textEditor->setFocus(Qt::MouseFocusReason);
     update();

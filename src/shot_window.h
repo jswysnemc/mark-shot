@@ -62,6 +62,7 @@ public:
     explicit ShotWindow(QImage frozenFrame, QString outputName, QWidget *parent = nullptr);
     bool configureLayerShell(QScreen *screen);
     void startFullscreenAnnotation();
+    void setImageNavigationEnabled(bool enabled);
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -151,6 +152,7 @@ private:
     QRectF textContentRect(const Annotation &annotation, bool widgetCoordinates) const;
     QString defaultSavePath() const;
     bool hasUsableSelection() const;
+    qreal annotationSizeScale(bool widgetCoordinates) const;
     qreal currentToolWidth() const;
     qreal currentToolPreviewSize() const;
     SelectionDrag selectionDragAt(QPointF imagePoint) const;
@@ -212,6 +214,7 @@ private:
     void toggleColorPalette(QPoint position);
     void toggleOpenWithPanel();
     void updateCursor();
+    void clearWheelPreview();
     void updateColorPaletteGeometry(QPoint anchor);
     void updateColorPalettePreview();
     void updateOpenWithPanel();
@@ -234,6 +237,10 @@ private:
     void clearAnnotations();
     void updateTextEditorGeometry();
     void updateFrozenImageRect();
+    void zoomImageAt(qreal factor, QPointF widgetAnchor);
+    void resetImageZoom();
+    void panImageTo(QPointF widgetPosition);
+    void refreshViewGeometry();
     void updateActionToolbarGeometry();
     void updateToolbarGeometry();
     void updateToolbarState();
@@ -243,6 +250,14 @@ private:
     QImage m_frozenFrame;
     QString m_outputName;
     QRectF m_frozenImageRect;
+    bool m_imageNavigationEnabled = false;
+    qreal m_imageZoom = 1.0;
+    QPointF m_imageCenter;
+    bool m_imageCenterInitialized = false;
+    bool m_imageSelected = false;
+    bool m_imagePanning = false;
+    QPointF m_imagePanStartWidget;
+    QPointF m_imagePanStartCenter;
     QRectF m_selection;
     QPointF m_selectionStart;
     QRectF m_selectionBeforeDrag;
@@ -265,6 +280,7 @@ private:
     bool m_showSelectionInfo = false;
     bool m_showWheelPreview = false;
     QElapsedTimer m_selectionInfoTimer;
+    QElapsedTimer m_ctrlTapTimer;
     QPointF m_wheelPreviewPosition;
     QElapsedTimer m_wheelPreviewTimer;
     QElapsedTimer m_laserClock;

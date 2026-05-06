@@ -83,12 +83,12 @@ Mod+Shift+S { spawn "mark-shot"; }
 - In full-frame annotation mode, the layout button toggles the toolbar between horizontal and vertical layouts.
 - The move tool drags the selection or resizes it from edges and corners.
 - The select tool picks existing annotations; drag the object or its handles to move or resize it.
-- Middle click switches to the select tool.
 - Drawing tools and selected annotations show a toolbar-attached property panel with width and opacity sliders, an alpha-capable Qt color picker, text background color, shape fill options, rectangle corner radius, and text font editing where applicable.
 - Click the red `x` on a selected annotation to delete only that annotation.
 - Hold `Ctrl` while drawing rectangles or ellipses to constrain them to squares or circles.
-- Right click opens the radial color palette.
+- Right click switches to the select tool, and double right click opens the radial color palette.
 - Mouse wheel changes stroke width, number size, text size, or mosaic block size for the active tool or selected annotation.
+- In image-file mode, mouse wheel zooms around the cursor, middle-button drag pans the image, and double-tapping `Ctrl` resets the view.
 - `Ctrl+Z` undoes, and `Ctrl+Shift+Z` or `Ctrl+Y` redoes.
 - `Ctrl+C` copies the edited selection.
 - `Ctrl+S` or `Enter` saves the edited selection.

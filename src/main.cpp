@@ -74,6 +74,27 @@ QScreen *focusedScreen()
     return QGuiApplication::primaryScreen();
 }
 
+QRect centeredImageWindowGeometry(const QSize &imageSize, QScreen *screen)
+{
+    if (imageSize.isEmpty()) {
+        return {};
+    }
+
+    const QRect availableGeometry = screen
+        ? screen->availableGeometry()
+        : QRect(QPoint(0, 0), imageSize);
+    QSize targetSize = imageSize;
+    const QSize maxSize(qMax(320, qRound(availableGeometry.width() * 0.9)),
+                        qMax(240, qRound(availableGeometry.height() * 0.9)));
+    if (targetSize.width() > maxSize.width() || targetSize.height() > maxSize.height()) {
+        targetSize.scale(maxSize, Qt::KeepAspectRatio);
+    }
+
+    const QPoint topLeft(availableGeometry.center().x() - targetSize.width() / 2,
+                         availableGeometry.center().y() - targetSize.height() / 2);
+    return QRect(topLeft, targetSize);
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -127,7 +148,13 @@ int main(int argc, char *argv[])
         if (screen) {
             window->setScreen(screen);
         }
-        window->showFullScreen();
+        window->setWindowFlags(Qt::Window);
+        const QRect windowGeometry = centeredImageWindowGeometry(image.size(), screen);
+        if (windowGeometry.isValid() && !windowGeometry.isEmpty()) {
+            window->setGeometry(windowGeometry);
+        }
+        window->setImageNavigationEnabled(true);
+        window->show();
         window->raise();
         window->activateWindow();
         QTimer::singleShot(0, window, [window] {
