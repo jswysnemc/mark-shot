@@ -172,7 +172,10 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    ShotWindow *window = new ShotWindow(capture.image, capture.outputName);
+    const QRect sourceGeometry = capture.sourceGeometry.isValid() && !capture.sourceGeometry.isEmpty()
+        ? capture.sourceGeometry
+        : captureGeometry;
+    ShotWindow *window = new ShotWindow(capture.image, capture.outputName, sourceGeometry);
     if (screen && !allOutputs) {
         window->setScreen(screen);
     }

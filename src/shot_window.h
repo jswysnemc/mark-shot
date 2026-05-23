@@ -4,6 +4,7 @@
 #include <QElapsedTimer>
 #include <QImage>
 #include <QPointF>
+#include <QRect>
 #include <QRectF>
 #include <QStringList>
 #include <QWidget>
@@ -69,7 +70,7 @@ public:
         bool closeOnStart = true;
     };
 
-    explicit ShotWindow(QImage frozenFrame, QString outputName, QWidget *parent = nullptr);
+    explicit ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeometry = {}, QWidget *parent = nullptr);
     bool configureLayerShell(QScreen *screen);
     void startFullscreenAnnotation();
     void setImageNavigationEnabled(bool enabled);
@@ -159,6 +160,7 @@ private:
     QPointF widgetToImage(QPointF point) const;
     QPointF imageToWidget(QPointF point) const;
     QRectF normalizedSelection() const;
+    QString slurpSelectionGeometry() const;
     QRectF imageRectToWidget(QRectF rect) const;
     QRectF textContentRect(const Annotation &annotation, bool widgetCoordinates) const;
     QString defaultSavePath() const;
@@ -266,6 +268,7 @@ private:
 
     QImage m_frozenFrame;
     QString m_outputName;
+    QRect m_sourceGeometry;
     QRectF m_frozenImageRect;
     bool m_imageNavigationEnabled = false;
     qreal m_imageZoom = 1.0;

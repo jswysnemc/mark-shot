@@ -94,7 +94,7 @@ binds {
   "commands": [
     {
       "name": "Long screenshot",
-      "command": "./target/release/wayscrollshot \"$(slurp)\"",
+      "command": "./target/release/wayscrollshot {slurp}",
       "workingDirectory": "~/Desktop/projecies/wayscrollshot",
       "closeOnStart": true
     },
@@ -107,7 +107,7 @@ binds {
 }
 ```
 
-`command` 会通过 `$SHELL -c` 执行，因此支持 `$(slurp)` 这类 shell 表达式。使用 `{image}` 或 `{imagePath}` 可把当前已渲染选区作为临时 PNG 路径传入命令，使用 `{imageUrl}` 可传入 `file://` URL。若未使用图片占位符，可设置 `saveImage` 或 `needsImage` 为 `true`，程序会自动把临时 PNG 路径追加到命令末尾。`workingDirectory` 与 `cwd` 等价。`closeOnStart` 默认值为 `true`，命令启动前会先隐藏并关闭 Mark Shot。
+`command` 会通过 `$SHELL -c` 执行，因此支持 shell 表达式。使用 `{slurp}` 可把当前选区作为 `x,y widthxheight` 几何字符串传入命令。使用 `{image}` 或 `{imagePath}` 可把当前已渲染选区作为临时 PNG 路径传入命令，使用 `{imageUrl}` 可传入 `file://` URL。这些占位符会自动进行 shell 引用转义，配置中不要再额外加引号。若未使用图片占位符，可设置 `saveImage` 或 `needsImage` 为 `true`，程序会自动把临时 PNG 路径追加到命令末尾。`workingDirectory` 与 `cwd` 等价。`closeOnStart` 默认值为 `true`，命令启动前会先隐藏并关闭 Mark Shot。
 
 ---
 

@@ -94,7 +94,7 @@ The right-side action toolbar includes an **Extensions** button. It reads user-d
   "commands": [
     {
       "name": "Long screenshot",
-      "command": "./target/release/wayscrollshot \"$(slurp)\"",
+      "command": "./target/release/wayscrollshot {slurp}",
       "workingDirectory": "~/Desktop/projecies/wayscrollshot",
       "closeOnStart": true
     },
@@ -107,7 +107,7 @@ The right-side action toolbar includes an **Extensions** button. It reads user-d
 }
 ```
 
-`command` is executed through `$SHELL -c`, so shell features like `$(slurp)` work. Use `{image}` or `{imagePath}` to pass the current rendered selection as a temporary PNG path, or `{imageUrl}` for a `file://` URL. Set `saveImage` or `needsImage` to `true` to append the temporary PNG path when no image placeholder is present. `workingDirectory` and `cwd` are aliases. `closeOnStart` defaults to `true`, hiding and closing Mark Shot before the command starts.
+`command` is executed through `$SHELL -c`, so shell features work. Use `{slurp}` to pass the current selection as `x,y widthxheight` geometry. Use `{image}` or `{imagePath}` to pass the current rendered selection as a temporary PNG path, or `{imageUrl}` for a `file://` URL. These placeholders are shell-quoted automatically, so write them without extra quotes. Set `saveImage` or `needsImage` to `true` to append the temporary PNG path when no image placeholder is present. `workingDirectory` and `cwd` are aliases. `closeOnStart` defaults to `true`, hiding and closing Mark Shot before the command starts.
 
 ---
 

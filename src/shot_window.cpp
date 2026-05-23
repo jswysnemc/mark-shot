@@ -199,6 +199,16 @@ QString extensionCommandsConfigPath()
     return QDir(markShotConfigDir()).filePath(QStringLiteral("extensions.json"));
 }
 
+QString slurpGeometry(QRect geometry)
+{
+    geometry = geometry.normalized();
+    return QStringLiteral("%1,%2 %3x%4")
+        .arg(geometry.x())
+        .arg(geometry.y())
+        .arg(geometry.width())
+        .arg(geometry.height());
+}
+
 QString expandUserPath(const QString &path)
 {
     if (path == QStringLiteral("~")) {
@@ -247,6 +257,16 @@ bool replaceExtensionImagePlaceholders(QString *command, const QString &imagePat
         replaced = true;
     }
     return replaced;
+}
+
+bool replaceExtensionSlurpPlaceholder(QString *command, const QString &geometry)
+{
+    if (!command || !command->contains(QStringLiteral("{slurp}"))) {
+        return false;
+    }
+
+    command->replace(QStringLiteral("{slurp}"), shellQuote(geometry));
+    return true;
 }
 
 QStringList expandDesktopExec(const ShotWindow::DesktopApp &app, const QString &imagePath)
@@ -505,10 +525,11 @@ private:
 
 } // namespace
 
-ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QWidget *parent)
+ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeometry, QWidget *parent)
     : QWidget(parent)
     , m_frozenFrame(std::move(frozenFrame))
     , m_outputName(std::move(outputName))
+    , m_sourceGeometry(sourceGeometry)
 {
     setWindowTitle(QStringLiteral("Mark Shot"));
     setCursor(Qt::CrossCursor);
@@ -3033,6 +3054,24 @@ QRectF ShotWindow::normalizedSelection() const
     return m_selection.normalized().intersected(QRectF(QPointF(0, 0), QSizeF(m_frozenFrame.size())));
 }
 
+QString ShotWindow::slurpSelectionGeometry() const
+{
+    if (!hasUsableSelection()) {
+        return {};
+    }
+
+    const QRect sourceBounds(QPoint(0, 0), m_frozenFrame.size());
+    QRect selectionRect = normalizedSelection().toAlignedRect().intersected(sourceBounds);
+    if (selectionRect.isEmpty()) {
+        return {};
+    }
+
+    if (m_sourceGeometry.isValid() && !m_sourceGeometry.isEmpty()) {
+        selectionRect.translate(m_sourceGeometry.topLeft());
+    }
+    return slurpGeometry(selectionRect);
+}
+
 QPointF ShotWindow::widgetToImage(QPointF point) const
 {
     if (m_frozenImageRect.isEmpty() || m_frozenFrame.isNull()) {
@@ -4984,6 +5023,14 @@ void ShotWindow::runExtensionCommand(const ExtensionCommand &command)
     }
 
     QString commandLine = command.command;
+    if (commandLine.contains(QStringLiteral("{slurp}"))) {
+        const QString geometry = slurpSelectionGeometry();
+        if (geometry.isEmpty()) {
+            return;
+        }
+        replaceExtensionSlurpPlaceholder(&commandLine, geometry);
+    }
+
     bool replacedImagePlaceholder = false;
     QString imagePath;
     if (command.saveImage) {
