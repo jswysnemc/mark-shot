@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(mark-shot VERSION 0.1.8 LANGUAGES CXX)
+project(mark-shot VERSION 0.1.9 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -36,6 +36,11 @@ target_link_libraries(mark-shot
 )
 
 install(TARGETS mark-shot RUNTIME DESTINATION bin)
+install(PROGRAMS
+    scripts/mark-shot-ocr
+    scripts/mark-shot-translate
+    DESTINATION bin
+)
 install(FILES
     data/mark-shot.desktop
     data/mark-shot-edit.desktop

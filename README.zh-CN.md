@@ -26,11 +26,13 @@
 
 ### 贴图悬浮固定（Pin）
 - 支持将截图或标注区域作为一个独立、无边框且置顶的悬浮贴图窗口（`PinnedImageWindow`）固定在屏幕上。
+- 支持在贴图窗口中直接选择 OCR 识别出的文字，使用 `Ctrl + C` 或右键菜单复制图片文字。
+- 支持通过 OpenAI 兼容接口调用 LLM 翻译 OCR 文本，并将译文按原图位置覆盖渲染到贴图上。
 - **便捷交互**：
   - 鼠标左键拖动可自由平移贴图位置。
   - 滚动鼠标滚轮可等比例缩放贴图，双击 `Ctrl` 键复位大小。
   - 双击鼠标左键或按下 `Esc` 键即可关闭贴图。
-  - 右键单击唤出菜单，支持多角度旋转、透明度微调（0.2 - 1.0）、另存为、复制或关闭。
+  - 右键单击唤出菜单，支持多角度旋转、透明度微调（0.2 - 1.0）、复制图片文字、翻译、另存为、复制或关闭。
 - **右键误触拦截**：由于 Qt 6 原生上下文菜单的弹出点击机制，右键可能在弹出时误触发菜单项。我们为此设计了局部的 `LeftClickMenuFilter` 事件过滤器，拦截非左键在菜单范围内的动作，从而杜绝误触。
 
 ### Wayland 与系统深度集成
@@ -109,6 +111,35 @@ binds {
 
 `command` 会通过 `$SHELL -c` 执行，因此支持 shell 表达式。使用 `{slurp}` 可把当前选区作为 `x,y widthxheight` 几何字符串传入命令。使用 `{image}` 或 `{imagePath}` 可把当前已渲染选区作为临时 PNG 路径传入命令，使用 `{imageUrl}` 可传入 `file://` URL。这些占位符会自动进行 shell 引用转义，配置中不要再额外加引号。若未使用图片占位符，可设置 `saveImage` 或 `needsImage` 为 `true`，程序会自动把临时 PNG 路径追加到命令末尾。`workingDirectory` 与 `cwd` 等价。`closeOnStart` 默认值为 `true`，命令启动前会先隐藏并关闭 Mark Shot。
 
+### 贴图 OCR 与 LLM 翻译配置
+
+贴图窗口会从 `~/.config/mark-shot/config.json` 读取 OCR 与翻译配置。默认 OCR helper 会优先使用 `rapidocr`，也可以回退到 `tesseract`。翻译 helper 使用 OpenAI 兼容的 `/chat/completions` 接口。
+
+```json
+{
+  "ocr": {
+    "enabled": true,
+    "backend": "rapidocr",
+    "command": "",
+    "timeoutMs": 30000
+  },
+  "translation": {
+    "targetLanguage": "Simplified Chinese",
+    "apiBase": "https://api.openai.com/v1",
+    "apiKeyEnv": "OPENAI_API_KEY",
+    "apiKey": "",
+    "model": "gpt-4o-mini",
+    "temperature": 0.2,
+    "timeoutMs": 60000,
+    "timeoutSeconds": 60,
+    "systemPrompt": "",
+    "command": ""
+  }
+}
+```
+
+如果手动安装到 `/usr/bin`，必须同时安装 `mark-shot`、`mark-shot-ocr` 和 `mark-shot-translate`。否则贴图窗口可以打开，但复制图片文字与翻译功能无法调用后端脚本。
+
 ---
 
 ## 编译与安装
@@ -119,6 +150,13 @@ binds {
 
 ```bash
 sudo pacman -S --needed base-devel cmake ninja qt6-base qt6-wayland layer-shell-qt grim wl-clipboard
+```
+
+若要使用 RapidOCR 后端，建议创建用户级 Python 虚拟环境：
+
+```bash
+python -m venv ~/.local/share/mark-shot/ocr-venv
+~/.local/share/mark-shot/ocr-venv/bin/python -m pip install -U pip rapidocr onnxruntime
 ```
 
 ### 构建与编译
@@ -180,7 +218,7 @@ cmake --install build --prefix "$HOME/.local"
 
 - **绘制图形约束**：在绘制 **矩形（Rectangle）** 或 **椭圆（Ellipse）** 时，按住 `Ctrl` 键可强制约束为正方形或正圆形。
 - **快速切换至选择工具**：在标注过程中，在画布空白处单击鼠标右键可立即切换到 **选择（Select）** 工具。
-- **双击呼出调色盘**：在画布空白处双击鼠标右键，可瞬间打开环形调色盘。
+- **双击右键快速切换颜色**：在画布空白处双击鼠标右键，可打开环形调色盘，快速切换当前标注工具的颜色。
 - **滚轮无级调节**：在对应标注工具激活状态下，滚动鼠标滚轮可实时调整当前工具的线宽、字号大小、序号标贴尺寸或马赛克格网尺寸。
 - **画布平移与缩放**：在 **选择（Select）** 工具模式下，或在编辑本地文件时，滚动鼠标滚轮可进行画布无缝缩放，按住鼠标中键拖拽可平移画布。双击 `Ctrl` 键复位缩放与平移。
 

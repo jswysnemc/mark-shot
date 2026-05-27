@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("mark-shot"));
     QApplication::setApplicationDisplayName(QStringLiteral("Mark Shot"));
-    QApplication::setApplicationVersion(QStringLiteral("0.1.8"));
+    QApplication::setApplicationVersion(QStringLiteral("0.1.9"));
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("Wayland screenshot selection and annotation tool for niri."));

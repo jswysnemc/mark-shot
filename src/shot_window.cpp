@@ -7,12 +7,15 @@
 #include <LayerShellQt/Window>
 
 #include <QAbstractItemView>
+#include <QAction>
 #include <QApplication>
 #include <QBuffer>
 #include <QBoxLayout>
 #include <QBrush>
 #include <QClipboard>
 #include <QContextMenuEvent>
+#include <QCoreApplication>
+#include <QCursor>
 #include <QDateTime>
 #include <QDir>
 #include <QDirIterator>
@@ -48,6 +51,7 @@
 #include <QSlider>
 #include <QStandardPaths>
 #include <QStyle>
+#include <QTemporaryFile>
 #include <QTextEdit>
 #include <QTextBlock>
 #include <QTextDocument>
@@ -62,6 +66,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <utility>
 
 namespace {
@@ -82,6 +87,8 @@ constexpr qreal kTextBackgroundPaddingY = 4.0;
 constexpr qreal kMinImageZoom = 0.25;
 constexpr qreal kMaxImageZoom = 8.0;
 constexpr qint64 kCtrlDoubleTapMs = 360;
+constexpr int kPinnedOcrTimeoutMs = 30000;
+constexpr int kPinnedTranslationTimeoutMs = 60000;
 
 QRectF normalizedRect(QPointF a, QPointF b)
 {
@@ -199,6 +206,25 @@ QString extensionCommandsConfigPath()
     return QDir(markShotConfigDir()).filePath(QStringLiteral("extensions.json"));
 }
 
+QString appConfigPath()
+{
+    return QDir(markShotConfigDir()).filePath(QStringLiteral("config.json"));
+}
+
+QString markShotDataDir()
+{
+    QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (!dataDir.isEmpty()) {
+        return dataDir;
+    }
+
+    const QString genericDataDir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+    if (!genericDataDir.isEmpty()) {
+        return QDir(genericDataDir).filePath(QStringLiteral("mark-shot"));
+    }
+    return QDir::home().filePath(QStringLiteral(".local/share/mark-shot"));
+}
+
 QString slurpGeometry(QRect geometry)
 {
     geometry = geometry.normalized();
@@ -269,6 +295,17 @@ bool replaceExtensionSlurpPlaceholder(QString *command, const QString &geometry)
     return true;
 }
 
+void replaceShellPlaceholder(QString *command, const QString &placeholder, const QString &value, bool *replaced = nullptr)
+{
+    if (!command || !command->contains(placeholder)) {
+        return;
+    }
+    command->replace(placeholder, shellQuote(value));
+    if (replaced) {
+        *replaced = true;
+    }
+}
+
 QStringList expandDesktopExec(const ShotWindow::DesktopApp &app, const QString &imagePath)
 {
     QStringList command = QProcess::splitCommand(app.exec);
@@ -321,11 +358,128 @@ QStringList expandDesktopExec(const ShotWindow::DesktopApp &app, const QString &
     return expanded;
 }
 
+QString helperProgramPath(const QString &programName)
+{
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QString configDir = markShotConfigDir();
+    const QString dataDir = markShotDataDir();
+    const QStringList candidates = {
+        QDir(appDir).filePath(programName),
+        QDir(appDir).filePath(QStringLiteral("../scripts/%1").arg(programName)),
+        QDir(appDir).filePath(QStringLiteral("../libexec/mark-shot/%1").arg(programName)),
+        QDir(appDir).filePath(QStringLiteral("../lib/mark-shot/%1").arg(programName)),
+        QDir::current().filePath(QStringLiteral("scripts/%1").arg(programName)),
+        QDir(configDir).filePath(programName),
+        QDir(configDir).filePath(QStringLiteral("scripts/%1").arg(programName)),
+        QDir(dataDir).filePath(programName),
+        QDir(dataDir).filePath(QStringLiteral("scripts/%1").arg(programName)),
+        QDir::home().filePath(QStringLiteral(".local/bin/%1").arg(programName)),
+        QStringLiteral("/usr/local/bin/%1").arg(programName),
+        QStringLiteral("/usr/bin/%1").arg(programName),
+    };
+
+    for (const QString &candidate : candidates) {
+        QFileInfo fileInfo(expandUserPath(QDir::cleanPath(candidate)));
+        if (fileInfo.isExecutable()) {
+            return fileInfo.absoluteFilePath();
+        }
+    }
+
+    return programName;
+}
+
+struct PinnedWindowConfig {
+    bool ocrEnabled = true;
+    QString ocrBackend = QStringLiteral("auto");
+    QString ocrCommand;
+    int ocrTimeoutMs = kPinnedOcrTimeoutMs;
+    QString translationCommand;
+    QString translationTargetLanguage = QStringLiteral("Simplified Chinese");
+    int translationTimeoutMs = kPinnedTranslationTimeoutMs;
+};
+
+QJsonObject objectValue(const QJsonObject &object, const QString &key)
+{
+    const QJsonValue value = object.value(key);
+    return value.isObject() ? value.toObject() : QJsonObject();
+}
+
+PinnedWindowConfig pinnedWindowConfig()
+{
+    PinnedWindowConfig config;
+
+    QFile file(appConfigPath());
+    if (file.exists() && file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+        if (parseError.error == QJsonParseError::NoError && document.isObject()) {
+            const QJsonObject root = document.object();
+            const QJsonObject ocr = objectValue(root, QStringLiteral("ocr"));
+            if (ocr.value(QStringLiteral("enabled")).isBool()) {
+                config.ocrEnabled = ocr.value(QStringLiteral("enabled")).toBool();
+            }
+            config.ocrBackend = ocr.value(QStringLiteral("backend")).toString(config.ocrBackend).trimmed();
+            config.ocrCommand = ocr.value(QStringLiteral("command")).toString().trimmed();
+            if (ocr.value(QStringLiteral("timeoutMs")).isDouble()) {
+                config.ocrTimeoutMs = std::max(1000, ocr.value(QStringLiteral("timeoutMs")).toInt(config.ocrTimeoutMs));
+            }
+
+            const QJsonObject translation = objectValue(root, QStringLiteral("translation"));
+            config.translationCommand = translation.value(QStringLiteral("command")).toString().trimmed();
+            config.translationTargetLanguage = translation.value(QStringLiteral("targetLanguage"))
+                                                   .toString(config.translationTargetLanguage)
+                                                   .trimmed();
+            if (translation.value(QStringLiteral("timeoutMs")).isDouble()) {
+                config.translationTimeoutMs = std::max(3000, translation.value(QStringLiteral("timeoutMs")).toInt(config.translationTimeoutMs));
+            }
+        }
+    }
+
+    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    const QString disabled = env.value(QStringLiteral("MARK_SHOT_OCR_DISABLED")).trimmed().toLower();
+    if (disabled == QStringLiteral("1") || disabled == QStringLiteral("true") || disabled == QStringLiteral("yes")) {
+        config.ocrEnabled = false;
+    }
+    const QString envOcrBackend = env.value(QStringLiteral("MARK_SHOT_OCR_BACKEND")).trimmed();
+    if (!envOcrBackend.isEmpty()) {
+        config.ocrBackend = envOcrBackend;
+    }
+    const QString envOcrCommand = env.value(QStringLiteral("MARK_SHOT_OCR_COMMAND")).trimmed();
+    if (!envOcrCommand.isEmpty()) {
+        config.ocrCommand = envOcrCommand;
+    }
+    const QString envTargetLanguage = env.value(QStringLiteral("MARK_SHOT_TRANSLATION_TARGET_LANGUAGE")).trimmed();
+    if (!envTargetLanguage.isEmpty()) {
+        config.translationTargetLanguage = envTargetLanguage;
+    }
+    const QString envTranslationCommand = env.value(QStringLiteral("MARK_SHOT_TRANSLATION_COMMAND")).trimmed();
+    if (!envTranslationCommand.isEmpty()) {
+        config.translationCommand = envTranslationCommand;
+    }
+
+    if (config.ocrBackend.isEmpty()) {
+        config.ocrBackend = QStringLiteral("auto");
+    }
+    if (config.translationTargetLanguage.isEmpty()) {
+        config.translationTargetLanguage = QStringLiteral("Simplified Chinese");
+    }
+    return config;
+}
+
 class PinnedImageWindow final : public QWidget {
 public:
+    struct OcrToken {
+        QString text;
+        QRectF imageRect;
+        int line = 0;
+        int index = 0;
+        qreal confidence = 0.0;
+    };
+
     explicit PinnedImageWindow(QImage image)
         : m_pixmap(QPixmap::fromImage(std::move(image)))
         , m_imageSize(m_pixmap.size())
+        , m_config(pinnedWindowConfig())
     {
         setWindowTitle(QStringLiteral("Pinned Mark Shot"));
         setAttribute(Qt::WA_DeleteOnClose);
@@ -345,6 +499,14 @@ public:
         } else {
             setFixedSize(targetSize);
         }
+
+        QTimer::singleShot(0, this, [this] { startOcr(); });
+    }
+
+    ~PinnedImageWindow() override
+    {
+        cancelTranslation();
+        cancelOcr();
     }
 
 protected:
@@ -353,11 +515,39 @@ protected:
         QPainter painter(this);
         painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
         painter.drawPixmap(rect(), m_pixmap);
+
+        if (m_translationActive) {
+            drawTranslationOverlay(painter);
+        }
+
+        if (!hasTextSelection()) {
+            return;
+        }
+
+        painter.setRenderHint(QPainter::Antialiasing, false);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(72, 132, 245, 96));
+        const auto [first, last] = selectionRange();
+        const QVector<OcrToken> &tokens = activeTokens();
+        for (int i = first; i <= last; ++i) {
+            painter.drawRect(imageToWidget(tokens.at(i).imageRect).intersected(QRectF(rect())));
+        }
     }
 
     void mousePressEvent(QMouseEvent *event) override
     {
         if (event->button() == Qt::LeftButton) {
+            if (const std::optional<int> token = tokenAt(widgetToImage(event->position()))) {
+                m_selectingText = true;
+                m_selectionAnchor = *token;
+                m_selectionFocus = *token;
+                setCursor(Qt::IBeamCursor);
+                update();
+                event->accept();
+                return;
+            }
+
+            clearTextSelection();
             m_dragOffset = event->globalPosition().toPoint() - frameGeometry().topLeft();
             setCursor(Qt::ClosedHandCursor);
             if (QWindow *window = windowHandle()) {
@@ -374,18 +564,40 @@ protected:
 
     void mouseMoveEvent(QMouseEvent *event) override
     {
+        if (m_selectingText) {
+            const QPointF imagePoint = widgetToImage(event->position());
+            const std::optional<int> token = tokenAt(imagePoint).has_value()
+                ? tokenAt(imagePoint)
+                : closestToken(imagePoint);
+            if (token && m_selectionFocus != *token) {
+                m_selectionFocus = *token;
+                update();
+            }
+            event->accept();
+            return;
+        }
+
         if (event->buttons().testFlag(Qt::LeftButton)) {
             move(event->globalPosition().toPoint() - m_dragOffset);
             event->accept();
             return;
         }
+
+        updateCursorForPosition(event->position());
         QWidget::mouseMoveEvent(event);
     }
 
     void mouseReleaseEvent(QMouseEvent *event) override
     {
         if (event->button() == Qt::LeftButton) {
-            setCursor(Qt::OpenHandCursor);
+            if (m_selectingText) {
+                m_selectingText = false;
+                updateCursorForPosition(event->position());
+                event->accept();
+                return;
+            }
+
+            updateCursorForPosition(event->position());
             event->accept();
             return;
         }
@@ -408,6 +620,14 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *event) override
     {
         if (event->button() == Qt::LeftButton) {
+            if (const std::optional<int> token = tokenAt(widgetToImage(event->position()))) {
+                m_selectionAnchor = *token;
+                m_selectionFocus = *token;
+                update();
+                event->accept();
+                return;
+            }
+
             close();
             event->accept();
             return;
@@ -456,6 +676,19 @@ protected:
         menu.addAction(QStringLiteral("Copy"), this, [this] {
             QApplication::clipboard()->setPixmap(m_pixmap);
         });
+        QAction *copyTextAction = menu.addAction(QStringLiteral("Copy Image Text"), this, [this] {
+            QApplication::clipboard()->setText(allText());
+        });
+        copyTextAction->setEnabled(!activeTokens().isEmpty());
+        QAction *translateAction = menu.addAction(QStringLiteral("Translate"), this, [this] {
+            requestTranslation();
+        });
+        translateAction->setEnabled(canRequestTranslation());
+        QAction *toggleTranslationAction = menu.addAction(
+            m_translationActive ? QStringLiteral("Show Original Text") : QStringLiteral("Show Translated Text"),
+            this,
+            [this] { setTranslationActive(!m_translationActive); });
+        toggleTranslationAction->setEnabled(!m_translationOverlayTokens.isEmpty() && !m_translationProcess);
         menu.addAction(QStringLiteral("Save As"), this, [this] { saveImageAs(); });
         menu.addSeparator();
         menu.addAction(QStringLiteral("Increase Opacity"), this, [this] {
@@ -471,6 +704,12 @@ protected:
 
     void keyPressEvent(QKeyEvent *event) override
     {
+        if (event->matches(QKeySequence::Copy) && hasTextSelection()) {
+            QApplication::clipboard()->setText(selectedText());
+            event->accept();
+            return;
+        }
+
         if (event->key() == Qt::Key_Escape) {
             close();
             return;
@@ -484,8 +723,16 @@ private:
         const QPoint center = frameGeometry().center();
         m_pixmap = m_pixmap.transformed(QTransform().rotate(degrees), Qt::SmoothTransformation);
         m_imageSize = m_pixmap.size();
+        clearTextSelection();
+        m_ocrTokens.clear();
+        m_translatedTokens.clear();
+        m_translationOverlayTokens.clear();
+        m_translationActive = false;
+        m_translateAfterOcr = false;
+        cancelTranslation();
         resizeByScale(m_scale, center, QPointF(width() / 2.0, height() / 2.0));
         update();
+        startOcr();
     }
 
     void saveImageAs()
@@ -517,10 +764,786 @@ private:
         move(topLeft);
     }
 
+    void startOcr()
+    {
+        cancelOcr();
+
+        if (!m_config.ocrEnabled) {
+            return;
+        }
+
+        QTemporaryFile tempFile(QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation).isEmpty()
+                                    ? QDir::tempPath()
+                                    : QStandardPaths::writableLocation(QStandardPaths::TempLocation))
+                                    .filePath(QStringLiteral("mark-shot-pin-ocr-XXXXXX.png")));
+        tempFile.setAutoRemove(false);
+        if (!tempFile.open()) {
+            return;
+        }
+
+        m_ocrTempPath = tempFile.fileName();
+        if (!m_pixmap.save(&tempFile, "PNG")) {
+            tempFile.close();
+            QFile::remove(m_ocrTempPath);
+            m_ocrTempPath.clear();
+            return;
+        }
+        tempFile.close();
+
+        auto *process = new QProcess(this);
+        m_ocrProcess = process;
+
+        if (!m_config.ocrCommand.isEmpty()) {
+            QString commandLine = m_config.ocrCommand;
+            const bool replaced = replaceExtensionImagePlaceholders(&commandLine, m_ocrTempPath);
+            if (!replaced) {
+                commandLine += QLatin1Char(' ');
+                commandLine += shellQuote(m_ocrTempPath);
+            }
+
+            QString shell = QProcessEnvironment::systemEnvironment().value(QStringLiteral("SHELL"), QStringLiteral("/bin/sh"));
+            if (shell.isEmpty()) {
+                shell = QStringLiteral("/bin/sh");
+            }
+            process->setProgram(shell);
+            process->setArguments({QStringLiteral("-c"), commandLine});
+        } else {
+            process->setProgram(defaultOcrHelperProgram());
+            process->setArguments({QStringLiteral("--format"),
+                                   QStringLiteral("json"),
+                                   QStringLiteral("--backend"),
+                                   m_config.ocrBackend,
+                                   m_ocrTempPath});
+        }
+
+        connect(process, &QProcess::errorOccurred, this, [this, process] {
+            if (process == m_ocrProcess && process->state() == QProcess::NotRunning) {
+                finishOcr(process, QByteArray());
+            }
+        });
+        connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+                [this, process](int exitCode, QProcess::ExitStatus exitStatus) {
+            const QByteArray output = exitStatus == QProcess::NormalExit && exitCode == 0
+                ? process->readAllStandardOutput()
+                : QByteArray();
+            finishOcr(process, output);
+        });
+        QTimer::singleShot(m_config.ocrTimeoutMs, process, [process] {
+            if (process->state() != QProcess::NotRunning) {
+                process->kill();
+            }
+        });
+
+        process->start();
+    }
+
+    QString defaultOcrHelperProgram() const
+    {
+        return helperProgramPath(QStringLiteral("mark-shot-ocr"));
+    }
+
+    void cancelOcr()
+    {
+        if (m_ocrProcess) {
+            disconnect(m_ocrProcess, nullptr, this, nullptr);
+            if (m_ocrProcess->state() != QProcess::NotRunning) {
+                m_ocrProcess->kill();
+            }
+            m_ocrProcess->deleteLater();
+            m_ocrProcess = nullptr;
+        }
+
+        if (!m_ocrTempPath.isEmpty()) {
+            QFile::remove(m_ocrTempPath);
+            m_ocrTempPath.clear();
+        }
+    }
+
+    void finishOcr(QProcess *process, const QByteArray &output)
+    {
+        if (process != m_ocrProcess) {
+            return;
+        }
+
+        if (!output.isEmpty()) {
+            applyOcrOutput(output);
+        } else {
+            m_translateAfterOcr = false;
+        }
+
+        m_ocrProcess = nullptr;
+        if (!m_ocrTempPath.isEmpty()) {
+            QFile::remove(m_ocrTempPath);
+            m_ocrTempPath.clear();
+        }
+        process->deleteLater();
+    }
+
+    void applyOcrOutput(const QByteArray &output)
+    {
+        const QVector<OcrToken> tokens = tokensFromJsonOutput(output);
+        if (tokens.isEmpty()) {
+            m_translateAfterOcr = false;
+            return;
+        }
+
+        m_ocrTokens = tokens;
+        m_translatedTokens.clear();
+        m_translationOverlayTokens.clear();
+        m_translationActive = false;
+        const bool translateAfterOcr = m_translateAfterOcr;
+        m_translateAfterOcr = false;
+        updateCursorForPosition(mapFromGlobal(QCursor::pos()));
+        if (translateAfterOcr) {
+            startTranslation();
+        } else {
+            update();
+        }
+    }
+
+    QVector<OcrToken> tokensFromJsonOutput(const QByteArray &output) const
+    {
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(output, &parseError);
+        if (parseError.error != QJsonParseError::NoError) {
+            return {};
+        }
+
+        QJsonArray tokenArray;
+        if (document.isArray()) {
+            tokenArray = document.array();
+        } else if (document.isObject()) {
+            tokenArray = document.object().value(QStringLiteral("tokens")).toArray();
+        }
+
+        QVector<OcrToken> tokens;
+        tokens.reserve(tokenArray.size());
+        int fallbackIndex = 0;
+        for (const QJsonValue &value : tokenArray) {
+            if (!value.isObject()) {
+                continue;
+            }
+
+            const QJsonObject object = value.toObject();
+            OcrToken token;
+            token.text = object.value(QStringLiteral("text")).toString().trimmed();
+            if (token.text.isEmpty()) {
+                continue;
+            }
+
+            const std::optional<QRectF> rect = ocrRect(object);
+            if (!rect) {
+                continue;
+            }
+
+            token.imageRect = rect->normalized().intersected(QRectF(QPointF(0.0, 0.0), QSizeF(m_imageSize)));
+            if (token.imageRect.isEmpty()) {
+                continue;
+            }
+
+            token.line = object.value(QStringLiteral("line")).toInt(0);
+            token.index = object.value(QStringLiteral("index")).toInt(fallbackIndex++);
+            token.confidence = object.value(QStringLiteral("confidence")).toDouble(0.0);
+            tokens.append(token);
+        }
+
+        std::stable_sort(tokens.begin(), tokens.end(), [](const OcrToken &left, const OcrToken &right) {
+            if (left.line != right.line) {
+                return left.line < right.line;
+            }
+            if (left.index != right.index) {
+                return left.index < right.index;
+            }
+            if (!qFuzzyCompare(left.imageRect.top(), right.imageRect.top())) {
+                return left.imageRect.top() < right.imageRect.top();
+            }
+            return left.imageRect.left() < right.imageRect.left();
+        });
+
+        return tokens;
+    }
+
+    void startTranslation()
+    {
+        if (m_ocrTokens.isEmpty()) {
+            return;
+        }
+
+        cancelTranslation();
+        clearTextSelection();
+
+        QTemporaryFile inputFile(QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation).isEmpty()
+                                     ? QDir::tempPath()
+                                     : QStandardPaths::writableLocation(QStandardPaths::TempLocation))
+                                     .filePath(QStringLiteral("mark-shot-translate-XXXXXX.json")));
+        inputFile.setAutoRemove(false);
+        if (!inputFile.open()) {
+            return;
+        }
+
+        m_translationInputPath = inputFile.fileName();
+        inputFile.write(translationInputJson());
+        inputFile.close();
+
+        auto *process = new QProcess(this);
+        m_translationProcess = process;
+
+        if (!m_config.translationCommand.isEmpty()) {
+            QString commandLine = m_config.translationCommand;
+            bool replaced = false;
+            replaceShellPlaceholder(&commandLine, QStringLiteral("{input}"), m_translationInputPath, &replaced);
+            replaceShellPlaceholder(&commandLine, QStringLiteral("{inputPath}"), m_translationInputPath, &replaced);
+            replaceShellPlaceholder(&commandLine, QStringLiteral("{targetLanguage}"), m_config.translationTargetLanguage, &replaced);
+            replaceShellPlaceholder(&commandLine, QStringLiteral("{config}"), appConfigPath(), &replaced);
+            if (!replaced) {
+                commandLine += QLatin1Char(' ');
+                commandLine += shellQuote(m_translationInputPath);
+            }
+
+            QString shell = QProcessEnvironment::systemEnvironment().value(QStringLiteral("SHELL"), QStringLiteral("/bin/sh"));
+            if (shell.isEmpty()) {
+                shell = QStringLiteral("/bin/sh");
+            }
+            process->setProgram(shell);
+            process->setArguments({QStringLiteral("-c"), commandLine});
+        } else {
+            process->setProgram(defaultTranslationHelperProgram());
+            process->setArguments({QStringLiteral("--input"),
+                                   m_translationInputPath,
+                                   QStringLiteral("--target-language"),
+                                   m_config.translationTargetLanguage,
+                                   QStringLiteral("--config"),
+                                   appConfigPath()});
+        }
+
+        connect(process, &QProcess::errorOccurred, this, [this, process] {
+            if (process == m_translationProcess && process->state() == QProcess::NotRunning) {
+                finishTranslation(process, QByteArray());
+            }
+        });
+        connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+                [this, process](int exitCode, QProcess::ExitStatus exitStatus) {
+            const QByteArray output = exitStatus == QProcess::NormalExit && exitCode == 0
+                ? process->readAllStandardOutput()
+                : QByteArray();
+            finishTranslation(process, output);
+        });
+        QTimer::singleShot(m_config.translationTimeoutMs, process, [process] {
+            if (process->state() != QProcess::NotRunning) {
+                process->kill();
+            }
+        });
+
+        setTranslationBusyCursor(true);
+        process->start();
+        update();
+    }
+
+    QByteArray translationInputJson() const
+    {
+        QJsonArray tokens;
+        for (const OcrToken &token : m_ocrTokens) {
+            QJsonObject object;
+            object.insert(QStringLiteral("text"), token.text);
+            object.insert(QStringLiteral("box"), rectToJson(token.imageRect));
+            object.insert(QStringLiteral("line"), token.line);
+            object.insert(QStringLiteral("index"), token.index);
+            object.insert(QStringLiteral("confidence"), token.confidence);
+            tokens.append(object);
+        }
+
+        QJsonObject root;
+        root.insert(QStringLiteral("targetLanguage"), m_config.translationTargetLanguage);
+        root.insert(QStringLiteral("tokens"), tokens);
+        return QJsonDocument(root).toJson(QJsonDocument::Compact);
+    }
+
+    QJsonArray rectToJson(QRectF rect) const
+    {
+        QJsonArray array;
+        array.append(rect.x());
+        array.append(rect.y());
+        array.append(rect.width());
+        array.append(rect.height());
+        return array;
+    }
+
+    QString defaultTranslationHelperProgram() const
+    {
+        return helperProgramPath(QStringLiteral("mark-shot-translate"));
+    }
+
+    void cancelTranslation()
+    {
+        if (m_translationProcess) {
+            disconnect(m_translationProcess, nullptr, this, nullptr);
+            if (m_translationProcess->state() != QProcess::NotRunning) {
+                m_translationProcess->kill();
+            }
+            m_translationProcess->deleteLater();
+            m_translationProcess = nullptr;
+        }
+
+        if (!m_translationInputPath.isEmpty()) {
+            QFile::remove(m_translationInputPath);
+            m_translationInputPath.clear();
+        }
+        setTranslationBusyCursor(false);
+    }
+
+    void finishTranslation(QProcess *process, const QByteArray &output)
+    {
+        if (process != m_translationProcess) {
+            return;
+        }
+
+        if (!output.isEmpty()) {
+            const QVector<OcrToken> tokens = tokensFromJsonOutput(output);
+            if (!tokens.isEmpty()) {
+                m_translationOverlayTokens = tokens;
+                m_translatedTokens = selectableTranslationTokens(tokens);
+                m_translationActive = true;
+                clearTextSelection();
+                updateCursorForPosition(mapFromGlobal(QCursor::pos()));
+                update();
+            }
+        }
+
+        m_translationProcess = nullptr;
+        if (!m_translationInputPath.isEmpty()) {
+            QFile::remove(m_translationInputPath);
+            m_translationInputPath.clear();
+        }
+        setTranslationBusyCursor(false);
+        process->deleteLater();
+    }
+
+    std::optional<QRectF> ocrRect(const QJsonObject &object) const
+    {
+        if (object.contains(QStringLiteral("box"))) {
+            return rectFromJsonValue(object.value(QStringLiteral("box")));
+        }
+        if (object.contains(QStringLiteral("bbox"))) {
+            return rectFromJsonValue(object.value(QStringLiteral("bbox")));
+        }
+        if (object.contains(QStringLiteral("points"))) {
+            return rectFromJsonValue(object.value(QStringLiteral("points")));
+        }
+
+        if (object.contains(QStringLiteral("x")) && object.contains(QStringLiteral("y"))) {
+            return QRectF(object.value(QStringLiteral("x")).toDouble(),
+                          object.value(QStringLiteral("y")).toDouble(),
+                          object.value(QStringLiteral("width")).toDouble(),
+                          object.value(QStringLiteral("height")).toDouble());
+        }
+
+        if (object.contains(QStringLiteral("left")) && object.contains(QStringLiteral("top"))) {
+            return QRectF(object.value(QStringLiteral("left")).toDouble(),
+                          object.value(QStringLiteral("top")).toDouble(),
+                          object.value(QStringLiteral("width")).toDouble(),
+                          object.value(QStringLiteral("height")).toDouble());
+        }
+
+        return std::nullopt;
+    }
+
+    std::optional<QRectF> rectFromJsonValue(const QJsonValue &value) const
+    {
+        if (!value.isArray()) {
+            return std::nullopt;
+        }
+
+        const QJsonArray array = value.toArray();
+        if (array.size() == 4 && array.at(0).isDouble()) {
+            return QRectF(array.at(0).toDouble(),
+                          array.at(1).toDouble(),
+                          array.at(2).toDouble(),
+                          array.at(3).toDouble());
+        }
+
+        if (array.size() < 2 || !array.at(0).isArray()) {
+            return std::nullopt;
+        }
+
+        QRectF bounds;
+        bool initialized = false;
+        for (const QJsonValue &pointValue : array) {
+            if (!pointValue.isArray()) {
+                continue;
+            }
+            const QJsonArray point = pointValue.toArray();
+            if (point.size() < 2) {
+                continue;
+            }
+            const QPointF p(point.at(0).toDouble(), point.at(1).toDouble());
+            bounds = initialized ? bounds.united(QRectF(p, QSizeF(0.0, 0.0))) : QRectF(p, QSizeF(0.0, 0.0));
+            initialized = true;
+        }
+
+        if (!initialized) {
+            return std::nullopt;
+        }
+        return bounds;
+    }
+
+    QPointF widgetToImage(QPointF point) const
+    {
+        if (width() <= 0 || height() <= 0 || m_imageSize.isEmpty()) {
+            return {};
+        }
+        return QPointF(point.x() * static_cast<qreal>(m_imageSize.width()) / static_cast<qreal>(width()),
+                       point.y() * static_cast<qreal>(m_imageSize.height()) / static_cast<qreal>(height()));
+    }
+
+    QRectF imageToWidget(QRectF imageRect) const
+    {
+        if (m_imageSize.isEmpty()) {
+            return {};
+        }
+        const qreal sx = static_cast<qreal>(width()) / static_cast<qreal>(m_imageSize.width());
+        const qreal sy = static_cast<qreal>(height()) / static_cast<qreal>(m_imageSize.height());
+        return QRectF(imageRect.left() * sx,
+                      imageRect.top() * sy,
+                      imageRect.width() * sx,
+                      imageRect.height() * sy);
+    }
+
+    std::optional<int> tokenAt(QPointF imagePoint) const
+    {
+        const QVector<OcrToken> &tokens = activeTokens();
+        for (int i = 0; i < tokens.size(); ++i) {
+            const QRectF hitRect = tokens.at(i).imageRect.adjusted(-2.0, -2.0, 2.0, 2.0);
+            if (hitRect.contains(imagePoint)) {
+                return i;
+            }
+        }
+        return std::nullopt;
+    }
+
+    std::optional<int> closestToken(QPointF imagePoint) const
+    {
+        const QVector<OcrToken> &tokens = activeTokens();
+        if (tokens.isEmpty()) {
+            return std::nullopt;
+        }
+
+        int bestIndex = 0;
+        qreal bestDistance = std::numeric_limits<qreal>::max();
+        for (int i = 0; i < tokens.size(); ++i) {
+            const QRectF rect = tokens.at(i).imageRect;
+            const qreal dx = imagePoint.x() < rect.left()
+                ? rect.left() - imagePoint.x()
+                : imagePoint.x() > rect.right() ? imagePoint.x() - rect.right() : 0.0;
+            const qreal dy = imagePoint.y() < rect.top()
+                ? rect.top() - imagePoint.y()
+                : imagePoint.y() > rect.bottom() ? imagePoint.y() - rect.bottom() : 0.0;
+            const qreal distance = dx * dx + dy * dy;
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
+    }
+
+    void updateCursorForPosition(QPointF widgetPoint)
+    {
+        if (tokenAt(widgetToImage(widgetPoint))) {
+            setCursor(Qt::IBeamCursor);
+        } else {
+            setCursor(Qt::OpenHandCursor);
+        }
+    }
+
+    bool hasTextSelection() const
+    {
+        const QVector<OcrToken> &tokens = activeTokens();
+        return m_selectionAnchor >= 0
+            && m_selectionFocus >= 0
+            && m_selectionAnchor < tokens.size()
+            && m_selectionFocus < tokens.size();
+    }
+
+    std::pair<int, int> selectionRange() const
+    {
+        const int first = std::min(m_selectionAnchor, m_selectionFocus);
+        const int last = std::max(m_selectionAnchor, m_selectionFocus);
+        return {first, last};
+    }
+
+    void clearTextSelection()
+    {
+        if (m_selectionAnchor < 0 && m_selectionFocus < 0) {
+            return;
+        }
+        m_selectionAnchor = -1;
+        m_selectionFocus = -1;
+        update();
+    }
+
+    QString selectedText() const
+    {
+        if (!hasTextSelection()) {
+            return {};
+        }
+
+        const auto [first, last] = selectionRange();
+        return tokenRangeText(first, last);
+    }
+
+    QString allText() const
+    {
+        const QVector<OcrToken> &tokens = activeTokens();
+        if (tokens.isEmpty()) {
+            return {};
+        }
+        return tokenRangeText(0, tokens.size() - 1);
+    }
+
+    QString tokenRangeText(int first, int last) const
+    {
+        const QVector<OcrToken> &tokens = activeTokens();
+        QString text;
+        int currentLine = -1;
+        QRectF previousRect;
+        QString previousText;
+        for (int i = first; i <= last; ++i) {
+            const OcrToken &token = tokens.at(i);
+            if (currentLine != token.line) {
+                if (!text.isEmpty()) {
+                    text += QLatin1Char('\n');
+                }
+                currentLine = token.line;
+            } else if (shouldInsertSpace(previousText, token.text, previousRect, token.imageRect)) {
+                text += QLatin1Char(' ');
+            }
+            text += token.text;
+            previousText = token.text;
+            previousRect = token.imageRect;
+        }
+        return text;
+    }
+
+    const QVector<OcrToken> &activeTokens() const
+    {
+        return m_translationActive ? m_translatedTokens : m_ocrTokens;
+    }
+
+    bool canRequestTranslation() const
+    {
+        return m_config.ocrEnabled && !m_translationProcess;
+    }
+
+    void requestTranslation()
+    {
+        if (!canRequestTranslation()) {
+            return;
+        }
+
+        if (m_ocrTokens.isEmpty()) {
+            m_translateAfterOcr = true;
+            if (!m_ocrProcess) {
+                startOcr();
+            }
+            return;
+        }
+
+        m_translateAfterOcr = false;
+        startTranslation();
+    }
+
+    void setTranslationActive(bool active)
+    {
+        if (active && m_translationOverlayTokens.isEmpty()) {
+            return;
+        }
+
+        m_translationActive = active;
+        clearTextSelection();
+        updateCursorForPosition(mapFromGlobal(QCursor::pos()));
+        update();
+    }
+
+    void setTranslationBusyCursor(bool active)
+    {
+        if (m_translationBusyCursor == active) {
+            return;
+        }
+
+        m_translationBusyCursor = active;
+        if (active) {
+            QApplication::setOverrideCursor(Qt::WaitCursor);
+        } else {
+            QApplication::restoreOverrideCursor();
+            updateCursorForPosition(mapFromGlobal(QCursor::pos()));
+        }
+    }
+
+    QVector<OcrToken> selectableTranslationTokens(const QVector<OcrToken> &tokens) const
+    {
+        QVector<OcrToken> selectableTokens;
+        int selectableIndex = 0;
+        for (const OcrToken &token : tokens) {
+            const QVector<OcrToken> splitTokens = splitTokenForSelection(token);
+            for (OcrToken splitToken : splitTokens) {
+                splitToken.index = selectableIndex++;
+                selectableTokens.append(splitToken);
+            }
+        }
+        return selectableTokens;
+    }
+
+    QVector<OcrToken> splitTokenForSelection(const OcrToken &token) const
+    {
+        QVector<OcrToken> splitTokens;
+        if (token.text.size() <= 1) {
+            splitTokens.append(token);
+            return splitTokens;
+        }
+
+        qreal totalWeight = 0.0;
+        QVector<qreal> weights;
+        weights.reserve(token.text.size());
+        for (const QChar ch : token.text) {
+            const qreal weight = selectionCharacterWeight(ch);
+            weights.append(weight);
+            totalWeight += weight;
+        }
+
+        if (totalWeight <= 0.0 || token.imageRect.width() <= 0.0) {
+            splitTokens.append(token);
+            return splitTokens;
+        }
+
+        qreal offset = 0.0;
+        for (int i = 0; i < token.text.size(); ++i) {
+            const qreal nextOffset = offset + token.imageRect.width() * weights.at(i) / totalWeight;
+            OcrToken splitToken = token;
+            splitToken.text = token.text.mid(i, 1);
+            splitToken.imageRect = QRectF(token.imageRect.left() + offset,
+                                          token.imageRect.top(),
+                                          std::max<qreal>(1.0, nextOffset - offset),
+                                          token.imageRect.height());
+            splitTokens.append(splitToken);
+            offset = nextOffset;
+        }
+
+        return splitTokens;
+    }
+
+    qreal selectionCharacterWeight(QChar ch) const
+    {
+        if (ch.isSpace()) {
+            return 0.45;
+        }
+        if (isNoLeadingSpacePunctuation(ch)) {
+            return 0.65;
+        }
+        if (ch.unicode() < 0x80) {
+            return 0.75;
+        }
+        return 1.0;
+    }
+
+    void drawTranslationOverlay(QPainter &painter) const
+    {
+        painter.save();
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setRenderHint(QPainter::TextAntialiasing, true);
+
+        for (const OcrToken &token : m_translationOverlayTokens) {
+            const QRectF textRect = imageToWidget(token.imageRect).adjusted(-3.0, -2.0, 3.0, 2.0);
+            if (textRect.isEmpty()) {
+                continue;
+            }
+
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(255, 255, 255, 232));
+            painter.drawRoundedRect(textRect, 2.0, 2.0);
+
+            QFont font = painter.font();
+            const int pixelSize = std::clamp(qRound(textRect.height() * 0.62), 8, 28);
+            font.setPixelSize(pixelSize);
+
+            QTextDocument document;
+            document.setDefaultFont(font);
+            document.setDocumentMargin(1.0);
+            document.setTextWidth(textRect.width());
+            QTextOption option;
+            option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+            document.setDefaultTextOption(option);
+            document.setPlainText(token.text);
+
+            painter.save();
+            painter.setClipRect(textRect);
+            painter.translate(textRect.topLeft());
+            document.drawContents(&painter, QRectF(QPointF(0.0, 0.0), textRect.size()));
+            painter.restore();
+        }
+
+        painter.restore();
+    }
+
+    bool shouldInsertSpace(const QString &previousText, const QString &currentText, QRectF previousRect, QRectF currentRect) const
+    {
+        if (previousText.isEmpty() || currentText.isEmpty()) {
+            return false;
+        }
+        const QChar currentFirst = currentText.front();
+        if (isNoLeadingSpacePunctuation(currentFirst)) {
+            return false;
+        }
+        const qreal gap = currentRect.left() - previousRect.right();
+        const qreal threshold = std::max<qreal>(3.0, std::min(previousRect.height(), currentRect.height()) * 0.28);
+        return gap > threshold;
+    }
+
+    bool isNoLeadingSpacePunctuation(QChar ch) const
+    {
+        switch (ch.unicode()) {
+        case '.':
+        case ',':
+        case ';':
+        case ':':
+        case '!':
+        case '?':
+        case ')':
+        case ']':
+        case '}':
+        case 0x3001:
+        case 0x3002:
+        case 0x300B:
+        case 0x3011:
+        case 0xFF01:
+        case 0xFF09:
+        case 0xFF0C:
+        case 0xFF1A:
+        case 0xFF1B:
+        case 0xFF1F:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     QPixmap m_pixmap;
     QSize m_imageSize;
     qreal m_scale = 1.0;
     QPoint m_dragOffset;
+    PinnedWindowConfig m_config;
+    QVector<OcrToken> m_ocrTokens;
+    QVector<OcrToken> m_translatedTokens;
+    QVector<OcrToken> m_translationOverlayTokens;
+    QProcess *m_ocrProcess = nullptr;
+    QProcess *m_translationProcess = nullptr;
+    QString m_ocrTempPath;
+    QString m_translationInputPath;
+    int m_selectionAnchor = -1;
+    int m_selectionFocus = -1;
+    bool m_selectingText = false;
+    bool m_translationActive = false;
+    bool m_translateAfterOcr = false;
+    bool m_translationBusyCursor = false;
 };
 
 } // namespace

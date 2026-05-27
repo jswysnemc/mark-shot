@@ -29,3 +29,6 @@ build.ninja
 *.tar
 *.tar.*
 *.zip
+.ace-tool/
+__pycache__/
+*.py[cod]

@@ -26,11 +26,13 @@ It captures lossless screen frames instantly using `grim` and opens an interacti
 
 ### Pinned Window Stickers
 - Pins any cropped region or annotated screenshot as an independent, frameless, and top-level floating window (`PinnedImageWindow`).
+- Supports direct selection of OCR-recognized text in the pinned window, with `Ctrl + C` and context-menu copying.
+- Supports OpenAI-compatible LLM translation for OCR text, rendering translated text back onto the image at the original layout positions.
 - **Interactive Gestures**:
   - Drag with left click to reposition.
   - Scroll mouse wheel to scale, or double-tap `Ctrl` to reset to original aspect ratio.
   - Double left-click or press `Esc` to close.
-  - Right-click to open a context menu with options to rotate, save, copy, or adjust opacity (0.2 to 1.0).
+  - Right-click to open a context menu with options to rotate, copy image text, translate, save, copy, or adjust opacity (0.2 to 1.0).
 - **Accidental Click Filter**: Integrates a `LeftClickMenuFilter` that blocks non-left-click triggers within the popup menu area to avoid accidental triggers in Qt 6 environments.
 
 ### Wayland & Desktop Integration
@@ -109,6 +111,35 @@ The right-side action toolbar includes an **Extensions** button. It reads user-d
 
 `command` is executed through `$SHELL -c`, so shell features work. Use `{slurp}` to pass the current selection as `x,y widthxheight` geometry. Use `{image}` or `{imagePath}` to pass the current rendered selection as a temporary PNG path, or `{imageUrl}` for a `file://` URL. These placeholders are shell-quoted automatically, so write them without extra quotes. Set `saveImage` or `needsImage` to `true` to append the temporary PNG path when no image placeholder is present. `workingDirectory` and `cwd` are aliases. `closeOnStart` defaults to `true`, hiding and closing Mark Shot before the command starts.
 
+### Pinned OCR and LLM Translation Config
+
+Pinned windows read OCR and translation settings from `~/.config/mark-shot/config.json`. The default OCR helper prefers `rapidocr` and can fall back to `tesseract`. The translation helper calls an OpenAI-compatible `/chat/completions` endpoint.
+
+```json
+{
+  "ocr": {
+    "enabled": true,
+    "backend": "rapidocr",
+    "command": "",
+    "timeoutMs": 30000
+  },
+  "translation": {
+    "targetLanguage": "Simplified Chinese",
+    "apiBase": "https://api.openai.com/v1",
+    "apiKeyEnv": "OPENAI_API_KEY",
+    "apiKey": "",
+    "model": "gpt-4o-mini",
+    "temperature": 0.2,
+    "timeoutMs": 60000,
+    "timeoutSeconds": 60,
+    "systemPrompt": "",
+    "command": ""
+  }
+}
+```
+
+When installing manually to `/usr/bin`, install `mark-shot`, `mark-shot-ocr`, and `mark-shot-translate` together. Otherwise the pinned window opens, but image-text copying and translation cannot call the backend helpers.
+
 ---
 
 ## Compilation & Installation
@@ -119,6 +150,13 @@ Install the necessary dependencies before building:
 
 ```bash
 sudo pacman -S --needed base-devel cmake ninja qt6-base qt6-wayland layer-shell-qt grim wl-clipboard
+```
+
+For the RapidOCR backend, create a user-level Python virtual environment:
+
+```bash
+python -m venv ~/.local/share/mark-shot/ocr-venv
+~/.local/share/mark-shot/ocr-venv/bin/python -m pip install -U pip rapidocr onnxruntime
 ```
 
 ### Build Steps
@@ -180,7 +218,7 @@ cmake --install build --prefix "$HOME/.local"
 
 - **Constrain Drawing**: Hold `Ctrl` while drawing Rectangles or Ellipses to constrain them to perfect squares or circles.
 - **Quick Select Tool**: Right-click once on the canvas to switch to the **Select** tool instantly.
-- **Radial Color Palette**: Double right-click on the canvas to open the radial color picker overlay.
+- **Quick Color Switch**: Double right-click on the canvas to open the radial color palette and quickly switch the active annotation color.
 - **Scroll Wheel Regulation**: While a drawing tool is active, scroll the mouse wheel to dynamically adjust stroke width, text size, auto-increment number scale, or mosaic block size.
 - **Canvas Zoom & Pan**: Under **Select** tool (or in local image mode), scroll the mouse wheel to zoom the canvas, and hold the middle mouse button to pan. Double-tap `Ctrl` to reset zoom and pan.
 
