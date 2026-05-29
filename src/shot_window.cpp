@@ -488,6 +488,7 @@ public:
         setAttribute(Qt::WA_DeleteOnClose);
         setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
         setFocusPolicy(Qt::StrongFocus);
+        setMouseTracking(true);
         setCursor(Qt::OpenHandCursor);
 
         QSize targetSize = m_imageSize;

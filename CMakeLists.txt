@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets DBus)
 find_package(LayerShellQt QUIET)
 find_package(X11 COMPONENTS xcb QUIET)
 
@@ -32,6 +32,7 @@ target_include_directories(mark-shot PRIVATE src)
 target_link_libraries(mark-shot
     PRIVATE
         Qt6::Core
+        Qt6::DBus
         Qt6::Gui
         Qt6::Widgets
 )

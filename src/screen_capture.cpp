@@ -1,12 +1,24 @@
 #include "screen_capture.h"
 
+#include <QDBusConnection>
+#include <QDBusInterface>
+#include <QDBusObjectPath>
+#include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
+#include <QEventLoop>
+#include <QFile>
 #include <QGuiApplication>
+#include <QObject>
 #include <QPixmap>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QRect>
 #include <QScreen>
 #include <QStringList>
+#include <QTimer>
+#include <QUrl>
+#include <QUuid>
+#include <QVariantMap>
 
 #ifdef HAVE_XCB
 #include <xcb/xcb.h>
@@ -14,10 +26,53 @@
 
 namespace {
 
+class PortalResponseReceiver : public QObject {
+    Q_OBJECT
+
+public:
+    bool received = false;
+    uint response = 2;
+    QVariantMap results;
+
+public slots:
+    void handleResponse(uint responseCode, const QVariantMap &responseResults)
+    {
+        received = true;
+        response = responseCode;
+        results = responseResults;
+        emit finished();
+    }
+
+signals:
+    void finished();
+};
+
 bool isWaylandSession()
 {
     const QString sessionType = QProcessEnvironment::systemEnvironment().value(QStringLiteral("XDG_SESSION_TYPE")).toLower();
     return sessionType == QStringLiteral("wayland");
+}
+
+QString desktopEnvironmentText()
+{
+    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    return (env.value(QStringLiteral("XDG_CURRENT_DESKTOP")) + QLatin1Char(':')
+            + env.value(QStringLiteral("XDG_SESSION_DESKTOP")) + QLatin1Char(':')
+            + env.value(QStringLiteral("DESKTOP_SESSION")) + QLatin1Char(':')
+            + env.value(QStringLiteral("WAYLAND_DISPLAY")))
+        .toLower();
+}
+
+bool prefersGrim()
+{
+    const QString desktop = desktopEnvironmentText();
+    return desktop.contains(QStringLiteral("sway"))
+        || desktop.contains(QStringLiteral("hyprland"))
+        || desktop.contains(QStringLiteral("niri"))
+        || desktop.contains(QStringLiteral("river"))
+        || desktop.contains(QStringLiteral("wayfire"))
+        || desktop.contains(QStringLiteral("labwc"))
+        || desktop.contains(QStringLiteral("wlroots"));
 }
 
 CaptureResult captureWithQScreen(const CaptureRequest &request)
@@ -90,14 +145,165 @@ CaptureResult runGrim(const QStringList &arguments, const QString &outputName, Q
     return {image.convertToFormat(QImage::Format_ARGB32_Premultiplied), {}, outputName, sourceGeometry};
 }
 
-} // namespace
-
-CaptureResult captureScreenFrame(const CaptureRequest &request)
+QString portalToken()
 {
-    if (!isWaylandSession()) {
-        return captureWithQScreen(request);
+    QString token = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    token.replace(QLatin1Char('-'), QLatin1Char('_'));
+    return QStringLiteral("mark_shot_%1").arg(token);
+}
+
+QString portalRequestPath(const QString &handleToken)
+{
+    const QString connectionName = QDBusConnection::sessionBus().baseService().mid(1).replace(QLatin1Char('.'), QLatin1Char('_'));
+    return QStringLiteral("/org/freedesktop/portal/desktop/request/%1/%2").arg(connectionName, handleToken);
+}
+
+bool connectPortalResponse(const QString &signalPath, PortalResponseReceiver *receiver)
+{
+    return QDBusConnection::sessionBus().connect(QStringLiteral("org.freedesktop.portal.Desktop"),
+                                                 signalPath,
+                                                 QStringLiteral("org.freedesktop.portal.Request"),
+                                                 QStringLiteral("Response"),
+                                                 receiver,
+                                                 SLOT(handleResponse(uint,QVariantMap)));
+}
+
+void disconnectPortalResponse(const QString &signalPath, PortalResponseReceiver *receiver)
+{
+    QDBusConnection::sessionBus().disconnect(QStringLiteral("org.freedesktop.portal.Desktop"),
+                                             signalPath,
+                                             QStringLiteral("org.freedesktop.portal.Request"),
+                                             QStringLiteral("Response"),
+                                             receiver,
+                                             SLOT(handleResponse(uint,QVariantMap)));
+}
+
+QRect virtualScreensGeometry()
+{
+    QRect geometry;
+    const QList<QScreen *> screens = QGuiApplication::screens();
+    for (QScreen *screen : screens) {
+        geometry = geometry.isNull() ? screen->geometry() : geometry.united(screen->geometry());
+    }
+    return geometry;
+}
+
+QVariantMap waitForPortalResponse(PortalResponseReceiver *receiver, QString *error)
+{
+    if (receiver->received) {
+        return receiver->response == 0 ? receiver->results : QVariantMap();
     }
 
+    QEventLoop loop;
+    QTimer timeout;
+    timeout.setSingleShot(true);
+    QObject::connect(receiver, &PortalResponseReceiver::finished, &loop, &QEventLoop::quit);
+    QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+    timeout.start(120000);
+    loop.exec();
+
+    if (!receiver->received) {
+        if (error) {
+            *error = QStringLiteral("xdg-desktop-portal screenshot request timed out");
+        }
+        return {};
+    }
+
+    if (receiver->response != 0) {
+        if (error) {
+            *error = receiver->response == 1
+                ? QStringLiteral("screenshot request was cancelled")
+                : QStringLiteral("screenshot request failed with response code %1").arg(receiver->response);
+        }
+        return {};
+    }
+
+    return receiver->results;
+}
+
+CaptureResult captureWithPortalScreenshot(const CaptureRequest &request)
+{
+    QDBusInterface portal(QStringLiteral("org.freedesktop.portal.Desktop"),
+                          QStringLiteral("/org/freedesktop/portal/desktop"),
+                          QStringLiteral("org.freedesktop.portal.Screenshot"),
+                          QDBusConnection::sessionBus());
+    if (!portal.isValid()) {
+        return {{}, QStringLiteral("xdg-desktop-portal Screenshot interface is not available"), {}, request.sourceGeometry};
+    }
+
+    const QString handleToken = portalToken();
+    const QString expectedSignalPath = portalRequestPath(handleToken);
+    PortalResponseReceiver receiver;
+    if (!connectPortalResponse(expectedSignalPath, &receiver)) {
+        return {{}, QStringLiteral("failed to connect to xdg-desktop-portal response signal"), {}, request.sourceGeometry};
+    }
+
+    QVariantMap options;
+    options.insert(QStringLiteral("handle_token"), handleToken);
+    options.insert(QStringLiteral("interactive"), false);
+    options.insert(QStringLiteral("modal"), true);
+
+    QDBusPendingReply<QDBusObjectPath> pending = portal.asyncCall(QStringLiteral("Screenshot"), QString(), options);
+    QDBusPendingCallWatcher watcher(pending);
+    QEventLoop callLoop;
+    QObject::connect(&watcher, &QDBusPendingCallWatcher::finished, &callLoop, &QEventLoop::quit);
+    callLoop.exec();
+
+    pending = watcher;
+    if (pending.isError()) {
+        disconnectPortalResponse(expectedSignalPath, &receiver);
+        return {{}, pending.error().message(), {}, request.sourceGeometry};
+    }
+
+    const QString returnedSignalPath = pending.value().path();
+    if (returnedSignalPath != expectedSignalPath && !receiver.received) {
+        connectPortalResponse(returnedSignalPath, &receiver);
+    }
+
+    QString error;
+    const QVariantMap response = waitForPortalResponse(&receiver, &error);
+    disconnectPortalResponse(expectedSignalPath, &receiver);
+    if (returnedSignalPath != expectedSignalPath) {
+        disconnectPortalResponse(returnedSignalPath, &receiver);
+    }
+    if (!error.isEmpty()) {
+        return {{}, error, {}, request.sourceGeometry};
+    }
+
+    const QUrl screenshotUrl(response.value(QStringLiteral("uri")).toString());
+    if (!screenshotUrl.isLocalFile()) {
+        return {{}, QStringLiteral("xdg-desktop-portal returned a non-local screenshot URI"), {}, request.sourceGeometry};
+    }
+
+    const QString screenshotPath = screenshotUrl.toLocalFile();
+    QImage image;
+    if (!image.load(screenshotPath) || image.isNull()) {
+        return {{}, QStringLiteral("failed to load portal screenshot: %1").arg(screenshotPath), {}, request.sourceGeometry};
+    }
+    QFile::remove(screenshotPath);
+
+    image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    QRect sourceGeometry = request.sourceGeometry;
+    if (request.sourceGeometry.isValid() && !request.sourceGeometry.isEmpty() && !request.allOutputs) {
+        const QRect imageRect(QPoint(0, 0), image.size());
+        const QRect requested = request.sourceGeometry.normalized();
+        QRect cropRect(QPoint(0, 0), requested.size());
+        if (image.size() != requested.size()) {
+            const QRect virtualGeometry = virtualScreensGeometry();
+            cropRect = requested.translated(-virtualGeometry.topLeft());
+        }
+        cropRect = cropRect.intersected(imageRect);
+        if (!cropRect.isEmpty() && cropRect.size() != image.size()) {
+            image = image.copy(cropRect);
+            sourceGeometry = requested;
+        }
+    }
+
+    return {image, {}, request.allOutputs ? QString() : request.preferredOutputName, sourceGeometry};
+}
+
+CaptureResult captureWithGrim(const CaptureRequest &request)
+{
     const QStringList baseArguments{QStringLiteral("-t"), QStringLiteral("ppm"), QStringLiteral("-s"), QStringLiteral("1")};
 
     if (request.sourceGeometry.isValid() && !request.sourceGeometry.isEmpty()) {
@@ -118,6 +324,48 @@ CaptureResult captureScreenFrame(const CaptureRequest &request)
     QStringList arguments = baseArguments;
     arguments << QStringLiteral("-");
     return runGrim(arguments, {}, {});
+}
+
+CaptureResult captureWaylandFrame(const CaptureRequest &request)
+{
+    if (prefersGrim()) {
+        CaptureResult grimCapture = captureWithGrim(request);
+        if (!grimCapture.image.isNull()) {
+            return grimCapture;
+        }
+
+        CaptureResult portalCapture = captureWithPortalScreenshot(request);
+        if (!portalCapture.image.isNull()) {
+            return portalCapture;
+        }
+
+        return {{}, QStringLiteral("%1\nPortal fallback: %2").arg(grimCapture.error, portalCapture.error), {}, request.sourceGeometry};
+    }
+
+    CaptureResult portalCapture = captureWithPortalScreenshot(request);
+    if (!portalCapture.image.isNull()) {
+        return portalCapture;
+    }
+
+    CaptureResult grimCapture = captureWithGrim(request);
+    if (!grimCapture.image.isNull()) {
+        return grimCapture;
+    }
+
+    return {{}, QStringLiteral("%1\nGrim fallback: %2").arg(portalCapture.error, grimCapture.error), {}, request.sourceGeometry};
+}
+
+} // namespace
+
+#include "screen_capture.moc"
+
+CaptureResult captureScreenFrame(const CaptureRequest &request)
+{
+    if (!isWaylandSession()) {
+        return captureWithQScreen(request);
+    }
+
+    return captureWaylandFrame(request);
 }
 
 QVector<QRect> enumerateX11WindowGeometries()
