@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Package version for test runs, for example 0.1.9+test1'
+        description: 'Package version for test runs, for example 0.1.10+test1'
         required: true
         type: string
 
