@@ -4,7 +4,9 @@
 #include "ui/icons.h"
 #include "ui/theme.h"
 
+#ifdef HAVE_LAYER_SHELL
 #include <LayerShellQt/Window>
+#endif
 
 #include <QAbstractItemView>
 #include <QAction>
@@ -1590,12 +1592,14 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
                           Action::OpenWith,
                           Action::Extensions,
                           Action::Pin,
+                          Action::OcrCopy,
                           Action::Copy,
                           Action::Save,
                           Action::Cancel}) {
         const QString shortcut = action == Action::OpenWith ? QStringLiteral("Open")
             : action == Action::Extensions           ? QStringLiteral("Ext")
             : action == Action::Pin                  ? QStringLiteral("Pin")
+            : action == Action::OcrCopy              ? QStringLiteral("OCR")
             : action == Action::Copy                 ? QStringLiteral("Ctrl+C")
             : action == Action::Save                 ? QStringLiteral("Ctrl+S")
             : action == Action::ToggleToolbarLayout  ? QStringLiteral("Layout")
@@ -1618,6 +1622,7 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     actionLayout->addWidget(addToolbarButton(Action::OpenWith, QStringLiteral("Open"), m_actionToolbar));
     actionLayout->addWidget(addToolbarButton(Action::Extensions, QStringLiteral("Ext"), m_actionToolbar));
     actionLayout->addWidget(addToolbarButton(Action::Pin, QStringLiteral("Pin"), m_actionToolbar));
+    actionLayout->addWidget(addToolbarButton(Action::OcrCopy, QStringLiteral("OCR"), m_actionToolbar));
     actionLayout->addWidget(addToolbarButton(Action::Copy, QStringLiteral("Ctrl+C"), m_actionToolbar));
     actionLayout->addWidget(addToolbarButton(Action::Save, QStringLiteral("Ctrl+S"), m_actionToolbar));
     actionLayout->addWidget(addToolbarButton(Action::Cancel, QStringLiteral("Esc"), m_actionToolbar));
@@ -1820,6 +1825,10 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
 
 bool ShotWindow::configureLayerShell(QScreen *screen)
 {
+#ifndef HAVE_LAYER_SHELL
+    Q_UNUSED(screen);
+    return false;
+#else
     if (screen) {
         setScreen(screen);
     } else {
@@ -1865,6 +1874,7 @@ bool ShotWindow::configureLayerShell(QScreen *screen)
     }
 
     return true;
+#endif
 }
 
 void ShotWindow::startFullscreenAnnotation()
@@ -2043,7 +2053,7 @@ QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcut
         button->setProperty("role", QStringLiteral("primary"));
     } else if (action == Action::Cancel) {
         button->setProperty("role", QStringLiteral("danger"));
-    } else if (action == Action::OpenWith || action == Action::Extensions || action == Action::Pin || action == Action::Copy) {
+    } else if (action == Action::OpenWith || action == Action::Extensions || action == Action::Pin || action == Action::OcrCopy || action == Action::Copy) {
         button->setProperty("role", QStringLiteral("secondary"));
     }
 
@@ -2087,6 +2097,8 @@ QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcut
         connect(button, &QPushButton::clicked, this, [this] { toggleExtensionPanel(); });
     } else if (action == Action::Pin) {
         connect(button, &QPushButton::clicked, this, [this] { pinSelection(); });
+    } else if (action == Action::OcrCopy) {
+        connect(button, &QPushButton::clicked, this, [this] { ocrCopySelection(); });
     } else if (action == Action::Copy) {
         connect(button, &QPushButton::clicked, this, [this] { copySelection(); });
     } else if (action == Action::Save) {
@@ -6134,6 +6146,193 @@ void ShotWindow::pinSelection()
     close();
 }
 
+void ShotWindow::ocrCopySelection()
+{
+    commitTextEditor();
+    if (!hasUsableSelection()) {
+        return;
+    }
+
+    const QString tempPath = saveSelectionToTempFile();
+    if (tempPath.isEmpty()) {
+        return;
+    }
+
+    const QString ocrProgram = helperProgramPath(QStringLiteral("mark-shot-ocr"));
+    if (ocrProgram.isEmpty()) {
+        QFile::remove(tempPath);
+        showToast(QStringLiteral("OCR helper not found"));
+        return;
+    }
+
+    const PinnedWindowConfig config = pinnedWindowConfig();
+
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+
+    QProcess process;
+    process.setProgram(ocrProgram);
+    process.setArguments({QStringLiteral("--format"),
+                          QStringLiteral("json"),
+                          QStringLiteral("--backend"),
+                          config.ocrBackend,
+                          tempPath});
+    process.start();
+    if (!process.waitForFinished(config.ocrTimeoutMs)) {
+        process.kill();
+        process.waitForFinished(1000);
+        QFile::remove(tempPath);
+        QApplication::restoreOverrideCursor();
+        showToast(QStringLiteral("OCR timed out"));
+        return;
+    }
+
+    QFile::remove(tempPath);
+    QApplication::restoreOverrideCursor();
+
+    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+        showToast(QStringLiteral("OCR failed"));
+        return;
+    }
+
+    const QByteArray output = process.readAllStandardOutput();
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(output, &parseError);
+    if (parseError.error != QJsonParseError::NoError) {
+        return;
+    }
+
+    QJsonArray tokenArray;
+    if (document.isArray()) {
+        tokenArray = document.array();
+    } else if (document.isObject()) {
+        tokenArray = document.object().value(QStringLiteral("tokens")).toArray();
+    }
+
+    auto rectFromJson = [](const QJsonValue &value) -> std::optional<QRectF> {
+        if (!value.isArray()) {
+            return std::nullopt;
+        }
+        const QJsonArray array = value.toArray();
+        if (array.size() == 4 && array.at(0).isDouble()) {
+            return QRectF(array.at(0).toDouble(), array.at(1).toDouble(),
+                          array.at(2).toDouble(), array.at(3).toDouble());
+        }
+        if (array.size() < 2 || !array.at(0).isArray()) {
+            return std::nullopt;
+        }
+        QRectF bounds;
+        bool initialized = false;
+        for (const QJsonValue &pv : array) {
+            if (!pv.isArray()) continue;
+            const QJsonArray pt = pv.toArray();
+            if (pt.size() < 2) continue;
+            const QPointF p(pt.at(0).toDouble(), pt.at(1).toDouble());
+            bounds = initialized ? bounds.united(QRectF(p, QSizeF(0, 0))) : QRectF(p, QSizeF(0, 0));
+            initialized = true;
+        }
+        return initialized ? std::optional(bounds) : std::nullopt;
+    };
+
+    auto ocrRect = [&](const QJsonObject &obj) -> std::optional<QRectF> {
+        for (const auto &key : {QStringLiteral("box"), QStringLiteral("bbox"), QStringLiteral("points")}) {
+            if (obj.contains(key)) return rectFromJson(obj.value(key));
+        }
+        if (obj.contains(QStringLiteral("x")) && obj.contains(QStringLiteral("y"))) {
+            return QRectF(obj.value(QStringLiteral("x")).toDouble(), obj.value(QStringLiteral("y")).toDouble(),
+                          obj.value(QStringLiteral("width")).toDouble(), obj.value(QStringLiteral("height")).toDouble());
+        }
+        if (obj.contains(QStringLiteral("left")) && obj.contains(QStringLiteral("top"))) {
+            return QRectF(obj.value(QStringLiteral("left")).toDouble(), obj.value(QStringLiteral("top")).toDouble(),
+                          obj.value(QStringLiteral("width")).toDouble(), obj.value(QStringLiteral("height")).toDouble());
+        }
+        return std::nullopt;
+    };
+
+    auto isNoSpacePunctuation = [](QChar ch) {
+        switch (ch.unicode()) {
+        case '.': case ',': case ';': case ':': case '!': case '?':
+        case ')': case ']': case '}':
+        case 0x3001: case 0x3002: case 0x300B: case 0x3011:
+        case 0xFF01: case 0xFF09: case 0xFF0C: case 0xFF1A: case 0xFF1B: case 0xFF1F:
+            return true;
+        default:
+            return false;
+        }
+    };
+
+    struct LineToken {
+        int line;
+        int index;
+        QString text;
+        QRectF rect;
+    };
+    QVector<LineToken> tokens;
+    int fallbackIndex = 0;
+    for (const QJsonValue &value : tokenArray) {
+        if (!value.isObject()) continue;
+        const QJsonObject object = value.toObject();
+        const QString text = object.value(QStringLiteral("text")).toString().trimmed();
+        if (text.isEmpty()) continue;
+        const auto rect = ocrRect(object);
+        if (!rect) continue;
+        LineToken token;
+        token.text = text;
+        token.line = object.value(QStringLiteral("line")).toInt(0);
+        token.index = object.value(QStringLiteral("index")).toInt(fallbackIndex++);
+        token.rect = rect->normalized();
+        tokens.append(token);
+    }
+
+    if (tokens.isEmpty()) {
+        showToast(QStringLiteral("No text recognized"));
+        return;
+    }    std::stable_sort(tokens.begin(), tokens.end(), [](const LineToken &a, const LineToken &b) {
+        return a.line != b.line ? a.line < b.line : a.index < b.index;
+    });
+
+    QString result;
+    int currentLine = -1;
+    QRectF prevRect;
+    QString prevText;
+    for (const LineToken &token : tokens) {
+        if (currentLine != token.line) {
+            if (!result.isEmpty()) {
+                result += QLatin1Char('\n');
+            }
+            currentLine = token.line;
+        } else if (!prevText.isEmpty() && !token.text.isEmpty()
+                   && !isNoSpacePunctuation(token.text.front())) {
+            const qreal gap = token.rect.left() - prevRect.right();
+            const qreal threshold = std::max<qreal>(3.0, std::min(prevRect.height(), token.rect.height()) * 0.28);
+            if (gap > threshold) {
+                result += QLatin1Char(' ');
+            }
+        }
+        result += token.text;
+        prevText = token.text;
+        prevRect = token.rect;
+    }
+
+    QApplication::clipboard()->setText(result);
+    showToast(QStringLiteral("OCR text copied"));
+}
+
+void ShotWindow::showToast(const QString &text, int durationMs)
+{
+    auto *label = new QLabel(text, this);
+    label->setAlignment(Qt::AlignCenter);
+    label->setFont(QFont(QStringLiteral("Sans Serif"), 12, QFont::DemiBold));
+    label->setStyleSheet(QStringLiteral(
+        "background: rgba(8, 13, 19, 220);"
+        "color: rgba(204, 251, 241, 238);"
+        "border-radius: 14px;"
+        "padding: 8px 22px;"));
+    label->adjustSize();
+    label->move((width() - label->width()) / 2, height() - label->height() - 80);
+    label->show();
+    QTimer::singleShot(durationMs, label, &QObject::deleteLater);
+}
+
 QImage ShotWindow::renderedSelection() const
 {
     const QRect sourceBounds(QPoint(0, 0), m_frozenFrame.size());
@@ -6244,14 +6443,30 @@ void ShotWindow::copySelection()
     buffer.open(QIODevice::WriteOnly);
     output.save(&buffer, "PNG");
 
-    QProcess wlCopy;
-    wlCopy.setProgram(QStringLiteral("wl-copy"));
-    wlCopy.setArguments({QStringLiteral("--type"), QStringLiteral("image/png")});
-    wlCopy.start(QIODevice::WriteOnly);
-    if (wlCopy.waitForStarted(1000)) {
-        wlCopy.write(png);
-        wlCopy.closeWriteChannel();
-        wlCopy.waitForFinished(2500);
+    const bool isWayland = QProcessEnvironment::systemEnvironment()
+        .value(QStringLiteral("XDG_SESSION_TYPE")).toLower() == QStringLiteral("wayland");
+
+    if (isWayland) {
+        QProcess wlCopy;
+        wlCopy.setProgram(QStringLiteral("wl-copy"));
+        wlCopy.setArguments({QStringLiteral("--type"), QStringLiteral("image/png")});
+        wlCopy.start(QIODevice::WriteOnly);
+        if (wlCopy.waitForStarted(1000)) {
+            wlCopy.write(png);
+            wlCopy.closeWriteChannel();
+            wlCopy.waitForFinished(2500);
+        }
+    } else {
+        QProcess xclip;
+        xclip.setProgram(QStringLiteral("xclip"));
+        xclip.setArguments({QStringLiteral("-selection"), QStringLiteral("clipboard"),
+                            QStringLiteral("-t"), QStringLiteral("image/png")});
+        xclip.start(QIODevice::WriteOnly);
+        if (xclip.waitForStarted(1000)) {
+            xclip.write(png);
+            xclip.closeWriteChannel();
+            xclip.waitForFinished(2500);
+        }
     }
 
     close();

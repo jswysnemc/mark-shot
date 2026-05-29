@@ -73,6 +73,8 @@ QString actionName(ShotWindow::Action action)
         return QStringLiteral("Extensions");
     case ShotWindow::Action::Pin:
         return QStringLiteral("Pin");
+    case ShotWindow::Action::OcrCopy:
+        return QStringLiteral("OCR Copy");
     case ShotWindow::Action::Copy:
         return QStringLiteral("Copy");
     case ShotWindow::Action::Save:
@@ -387,6 +389,23 @@ QIcon makeToolIcon(ShotWindow::Action action)
         p.setBrush(QColor(229, 231, 235, 70));
         p.drawPath(pin);
         p.setBrush(Qt::NoBrush);
+        break;
+    }
+    case ShotWindow::Action::OcrCopy: {
+        // Text recognition icon: document outline with "A" and scan lines
+        p.setPen(makePen(kInk, 1.6));
+        p.drawRoundedRect(QRectF(8.0, 6.5, 16.0, 19.0), 2.0, 2.0);
+        // Letter "A" in center
+        QPainterPath aPath;
+        aPath.moveTo(16.0, 10.0);
+        aPath.lineTo(12.5, 20.0);
+        aPath.moveTo(16.0, 10.0);
+        aPath.lineTo(19.5, 20.0);
+        p.drawPath(aPath);
+        p.drawLine(QPointF(13.8, 17.0), QPointF(18.2, 17.0));
+        // Scan line hints
+        p.setPen(makePen(kInkSoft, 1.2));
+        p.drawLine(QPointF(11.0, 22.5), QPointF(21.0, 22.5));
         break;
     }
     case ShotWindow::Action::Copy: {
