@@ -2,6 +2,7 @@
 
 #include "screen_capture.h"
 #include "ui/color_picker.h"
+#include "ui/i18n.h"
 #include "ui/icons.h"
 #include "ui/theme.h"
 
@@ -484,7 +485,7 @@ public:
         , m_imageSize(m_pixmap.size())
         , m_config(pinnedWindowConfig())
     {
-        setWindowTitle(QStringLiteral("Pinned Mark Shot"));
+        setWindowTitle(MS_TR("Pinned Mark Shot"));
         setAttribute(Qt::WA_DeleteOnClose);
         setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
         setFocusPolicy(Qt::StrongFocus);
@@ -664,45 +665,42 @@ protected:
         LeftClickMenuFilter filter(&menu);
         menu.installEventFilter(&filter);
 
-        menu.addAction(QStringLiteral("Rotate Left"), this, [this] { rotateImage(-90); });
-        menu.addAction(QStringLiteral("Rotate Right"), this, [this] { rotateImage(90); });
+        menu.addAction(MS_TR("Rotate Left"), this, [this] { rotateImage(-90); });
+        menu.addAction(MS_TR("Rotate Right"), this, [this] { rotateImage(90); });
         menu.addSeparator();
-        menu.addAction(QStringLiteral("Zoom In"), this, [this, event] {
+        menu.addAction(MS_TR("Zoom In"), this, [this, event] {
             resizeByScale(m_scale * 1.18, event->globalPos(), rect().center());
         });
-        menu.addAction(QStringLiteral("Zoom Out"), this, [this, event] {
+        menu.addAction(MS_TR("Zoom Out"), this, [this, event] {
             resizeByScale(m_scale / 1.18, event->globalPos(), rect().center());
         });
-        menu.addAction(QStringLiteral("Reset Size"), this, [this] {
+        menu.addAction(MS_TR("Reset Size"), this, [this] {
             resizeByScale(1.0, frameGeometry().center(), QPointF(width() / 2.0, height() / 2.0));
         });
         menu.addSeparator();
-        menu.addAction(QStringLiteral("Copy"), this, [this] {
+        menu.addAction(MS_TR("Copy"), this, [this] {
             QApplication::clipboard()->setPixmap(m_pixmap);
         });
-        QAction *copyTextAction = menu.addAction(QStringLiteral("Copy Image Text"), this, [this] {
+        QAction *copySelectedTextAction = menu.addAction(MS_TR("Copy Selected Text"), this, [this] {
+            QApplication::clipboard()->setText(selectedText());
+        });
+        copySelectedTextAction->setEnabled(hasTextSelection());
+        QAction *copyTextAction = menu.addAction(MS_TR("Copy Image Text"), this, [this] {
             QApplication::clipboard()->setText(allText());
         });
         copyTextAction->setEnabled(!activeTokens().isEmpty());
-        QAction *translateAction = menu.addAction(QStringLiteral("Translate"), this, [this] {
+        QAction *translateAction = menu.addAction(MS_TR("Translate"), this, [this] {
             requestTranslation();
         });
         translateAction->setEnabled(canRequestTranslation());
         QAction *toggleTranslationAction = menu.addAction(
-            m_translationActive ? QStringLiteral("Show Original Text") : QStringLiteral("Show Translated Text"),
+            m_translationActive ? MS_TR("Show Original Text") : MS_TR("Show Translated Text"),
             this,
             [this] { setTranslationActive(!m_translationActive); });
         toggleTranslationAction->setEnabled(!m_translationOverlayTokens.isEmpty() && !m_translationProcess);
-        menu.addAction(QStringLiteral("Save As"), this, [this] { saveImageAs(); });
+        menu.addAction(MS_TR("Save As"), this, [this] { saveImageAs(); });
         menu.addSeparator();
-        menu.addAction(QStringLiteral("Increase Opacity"), this, [this] {
-            setWindowOpacity(std::min(1.0, windowOpacity() + 0.1));
-        });
-        menu.addAction(QStringLiteral("Decrease Opacity"), this, [this] {
-            setWindowOpacity(std::max(0.2, windowOpacity() - 0.1));
-        });
-        menu.addSeparator();
-        menu.addAction(QStringLiteral("Close"), this, &QWidget::close);
+        menu.addAction(MS_TR("Close"), this, &QWidget::close);
         menu.exec(event->globalPos());
     }
 
@@ -743,9 +741,9 @@ private:
     {
         const QString filename = QStringLiteral("mark-shot-pin-%1.png").arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-hhmmss")));
         const QString path = QFileDialog::getSaveFileName(this,
-                                                          QStringLiteral("Save Pinned Image"),
+                                                          MS_TR("Save Pinned Image"),
                                                           QDir(markShotPicturesDir()).filePath(filename),
-                                                          QStringLiteral("PNG Images (*.png)"));
+                                                          MS_TR("PNG Images (*.png)"));
         if (!path.isEmpty()) {
             m_pixmap.save(path, "PNG");
         }
@@ -1558,7 +1556,7 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     , m_outputName(std::move(outputName))
     , m_sourceGeometry(sourceGeometry)
 {
-    setWindowTitle(QStringLiteral("Mark Shot"));
+    setWindowTitle(MS_TR("Mark Shot"));
     setCursor(Qt::CrossCursor);
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
@@ -1671,31 +1669,31 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     propertyLayout->setSpacing(7);
     m_annotationPropertyTitle = new QLabel(QStringLiteral("Object"), m_annotationPropertyPanel);
     propertyLayout->addWidget(m_annotationPropertyTitle);
-    m_propertyWidthLabel = new QLabel(QStringLiteral("Width 2"), m_annotationPropertyPanel);
+    m_propertyWidthLabel = new QLabel(MS_TR("Width %1").arg(2), m_annotationPropertyPanel);
     propertyLayout->addWidget(m_propertyWidthLabel);
     m_propertyWidthSlider = new QSlider(Qt::Horizontal, m_annotationPropertyPanel);
     m_propertyWidthSlider->setFocusPolicy(Qt::NoFocus);
     m_propertyWidthSlider->setFixedWidth(120);
-    m_propertyWidthSlider->setToolTip(QStringLiteral("Selected object width or size"));
+    m_propertyWidthSlider->setToolTip(MS_TR("Selected object width or size"));
     connect(m_propertyWidthSlider, &QSlider::valueChanged, this, [this](int value) { setSelectedAnnotationWidth(value); });
     propertyLayout->addWidget(m_propertyWidthSlider);
-    m_propertyOpacityLabel = new QLabel(QStringLiteral("Opacity 100%"), m_annotationPropertyPanel);
+    m_propertyOpacityLabel = new QLabel(MS_TR("Opacity %1%").arg(100), m_annotationPropertyPanel);
     propertyLayout->addWidget(m_propertyOpacityLabel);
     m_propertyOpacitySlider = new QSlider(Qt::Horizontal, m_annotationPropertyPanel);
     m_propertyOpacitySlider->setFocusPolicy(Qt::NoFocus);
     m_propertyOpacitySlider->setRange(0, 100);
     m_propertyOpacitySlider->setFixedWidth(110);
-    m_propertyOpacitySlider->setToolTip(QStringLiteral("Selected object opacity"));
+    m_propertyOpacitySlider->setToolTip(MS_TR("Selected object opacity"));
     connect(m_propertyOpacitySlider, &QSlider::valueChanged, this, [this](int value) { setSelectedAnnotationOpacity(value); });
     propertyLayout->addWidget(m_propertyOpacitySlider);
     m_propertyColorButton = new QPushButton(m_annotationPropertyPanel);
     m_propertyColorButton->setFocusPolicy(Qt::NoFocus);
-    m_propertyColorButton->setToolTip(QStringLiteral("Change selected object color"));
+    m_propertyColorButton->setToolTip(MS_TR("Change selected object color"));
     connect(m_propertyColorButton, &QPushButton::clicked, this, [this] { openSelectedAnnotationColorPalette(); });
     propertyLayout->addWidget(m_propertyColorButton);
-    m_propertyTextBackgroundButton = new QPushButton(QStringLiteral("Bg"), m_annotationPropertyPanel);
+    m_propertyTextBackgroundButton = new QPushButton(MS_TR("Bg"), m_annotationPropertyPanel);
     m_propertyTextBackgroundButton->setFocusPolicy(Qt::NoFocus);
-    m_propertyTextBackgroundButton->setToolTip(QStringLiteral("Text background color"));
+    m_propertyTextBackgroundButton->setToolTip(MS_TR("Text background color"));
     connect(m_propertyTextBackgroundButton, &QPushButton::clicked, this, [this] { openSelectedTextBackgroundColorPalette(); });
     propertyLayout->addWidget(m_propertyTextBackgroundButton);
     m_propertyFillButton = new QPushButton(m_annotationPropertyPanel);
@@ -1703,30 +1701,30 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     m_propertyFillButton->setFocusPolicy(Qt::NoFocus);
     m_propertyFillButton->setIcon(markshot::ui::makeFillIcon(false));
     m_propertyFillButton->setIconSize(QSize(26, 26));
-    m_propertyFillButton->setToolTip(QStringLiteral("Toggle shape fill"));
+    m_propertyFillButton->setToolTip(MS_TR("Toggle shape fill"));
     connect(m_propertyFillButton, &QPushButton::toggled, this, [this](bool checked) {
         m_propertyFillButton->setIcon(markshot::ui::makeFillIcon(checked));
         setSelectedAnnotationFilled(checked);
     });
     propertyLayout->addWidget(m_propertyFillButton);
-    m_propertyRadiusLabel = new QLabel(QStringLiteral("Radius 0"), m_annotationPropertyPanel);
+    m_propertyRadiusLabel = new QLabel(MS_TR("Radius %1").arg(0), m_annotationPropertyPanel);
     propertyLayout->addWidget(m_propertyRadiusLabel);
     m_propertyRadiusSlider = new QSlider(Qt::Horizontal, m_annotationPropertyPanel);
     m_propertyRadiusSlider->setFocusPolicy(Qt::NoFocus);
     m_propertyRadiusSlider->setRange(0, 48);
     m_propertyRadiusSlider->setFixedWidth(100);
-    m_propertyRadiusSlider->setToolTip(QStringLiteral("Rectangle corner radius"));
+    m_propertyRadiusSlider->setToolTip(MS_TR("Rectangle corner radius"));
     connect(m_propertyRadiusSlider, &QSlider::valueChanged, this, [this](int value) { setSelectedAnnotationCornerRadius(value); });
     propertyLayout->addWidget(m_propertyRadiusSlider);
-    m_propertyFontButton = new QPushButton(QStringLiteral("Font"), m_annotationPropertyPanel);
+    m_propertyFontButton = new QPushButton(MS_TR("Font"), m_annotationPropertyPanel);
     m_propertyFontButton->setFocusPolicy(Qt::NoFocus);
     m_propertyFontButton->setFixedWidth(160);
-    m_propertyFontButton->setToolTip(QStringLiteral("Text font"));
+    m_propertyFontButton->setToolTip(MS_TR("Text font"));
     connect(m_propertyFontButton, &QPushButton::clicked, this, [this] { toggleSelectedTextFontPanel(); });
     propertyLayout->addWidget(m_propertyFontButton);
-    m_propertyEditTextButton = new QPushButton(QStringLiteral("Edit"), m_annotationPropertyPanel);
+    m_propertyEditTextButton = new QPushButton(MS_TR("Edit"), m_annotationPropertyPanel);
     m_propertyEditTextButton->setFocusPolicy(Qt::NoFocus);
-    m_propertyEditTextButton->setToolTip(QStringLiteral("Edit selected text"));
+    m_propertyEditTextButton->setToolTip(MS_TR("Edit selected text"));
     connect(m_propertyEditTextButton, &QPushButton::clicked, this, [this] { beginEditingSelectedTextAnnotation(); });
     propertyLayout->addWidget(m_propertyEditTextButton);
     m_annotationPropertyPanel->hide();
@@ -1807,7 +1805,7 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
 
     m_textEditor = new QTextEdit(this);
     m_textEditor->setObjectName(QStringLiteral("textEditor"));
-    m_textEditor->setPlaceholderText(QStringLiteral("Type text"));
+    m_textEditor->setPlaceholderText(MS_TR("Type text"));
     m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(QColor(94, 234, 212), QColor(0, 0, 0, 0), 24));
     m_textEditor->setAcceptRichText(false);
     m_textEditor->setTabChangesFocus(false);
@@ -1815,7 +1813,7 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     m_textEditor->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_textEditor->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_textEditor->viewport()->setAutoFillBackground(false);
-    m_textEditor->setToolTip(QStringLiteral("Enter inserts newline, click outside commits, Esc cancels"));
+    m_textEditor->setToolTip(MS_TR("Enter inserts newline, click outside commits, Esc cancels"));
     m_textEditor->hide();
     m_textEditor->installEventFilter(this);
 
@@ -2066,7 +2064,7 @@ QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcut
     button->setIcon(markshot::ui::makeToolIcon(action));
     button->setIconSize(QSize(26, 26));
     button->setFocusPolicy(Qt::NoFocus);
-    button->setToolTip(QStringLiteral("%1 (%2)").arg(markshot::ui::actionName(action), shortcutText));
+    button->setToolTip(QStringLiteral("%1 (%2)").arg(markshot::i18n::translate(markshot::ui::actionName(action)), shortcutText));
     button->setProperty("action", markshot::ui::actionName(action));
     if (!parentToolbar && action == Action::ToolMove) {
         button->installEventFilter(this);
@@ -4648,8 +4646,8 @@ void ShotWindow::updateAnnotationPropertyPanel()
 
     if (m_annotationPropertyTitle) {
         m_annotationPropertyTitle->setText(groupSelection
-                                               ? QStringLiteral("Group %1").arg(selectedIds.size())
-                                               : title);
+                                               ? MS_TR("Group %1").arg(selectedIds.size())
+                                               : markshot::i18n::translate(title));
     }
     if (m_propertyEditTextButton) {
         m_propertyEditTextButton->setVisible(!groupSelection && editingAnnotation && panelTool == Tool::Text);
@@ -4658,7 +4656,7 @@ void ShotWindow::updateAnnotationPropertyPanel()
         m_propertyFontButton->setVisible(!groupSelection && panelTool == Tool::Text);
         if (!groupSelection && panelTool == Tool::Text) {
             const QString family = panelFontFamily.isEmpty() ? QStringLiteral("Sans Serif") : panelFontFamily;
-            m_propertyFontButton->setText(QStringLiteral("Font"));
+            m_propertyFontButton->setText(MS_TR("Font"));
             m_propertyFontButton->setToolTip(family);
             if (m_propertyFontList) {
                 const auto matches = m_propertyFontList->findItems(family, Qt::MatchExactly);
@@ -4669,7 +4667,7 @@ void ShotWindow::updateAnnotationPropertyPanel()
             }
         } else if (m_propertyFontPanel) {
             m_propertyFontPanel->hide();
-            m_propertyFontButton->setToolTip(QStringLiteral("Text font"));
+            m_propertyFontButton->setToolTip(MS_TR("Text font"));
         }
     }
     if (m_propertyFillButton) {
@@ -4681,7 +4679,7 @@ void ShotWindow::updateAnnotationPropertyPanel()
     }
     if (m_propertyRadiusLabel) {
         m_propertyRadiusLabel->setVisible(!groupSelection && panelTool == Tool::Rectangle);
-        m_propertyRadiusLabel->setText(QStringLiteral("Radius %1").arg(qRound(panelRadius)));
+        m_propertyRadiusLabel->setText(MS_TR("Radius %1").arg(qRound(panelRadius)));
     }
     if (m_propertyRadiusSlider) {
         m_propertyRadiusSlider->setVisible(!groupSelection && panelTool == Tool::Rectangle);
@@ -4689,7 +4687,7 @@ void ShotWindow::updateAnnotationPropertyPanel()
         m_propertyRadiusSlider->setValue(qRound(panelRadius));
     }
     if (m_propertyWidthLabel) {
-        m_propertyWidthLabel->setText(QStringLiteral("Width %1").arg(qRound(panelWidth)));
+        m_propertyWidthLabel->setText(MS_TR("Width %1").arg(qRound(panelWidth)));
     }
     if (m_propertyWidthSlider) {
         const QSignalBlocker blocker(m_propertyWidthSlider);
@@ -4707,7 +4705,7 @@ void ShotWindow::updateAnnotationPropertyPanel()
         m_propertyWidthSlider->setValue(qRound(panelWidth));
     }
     if (m_propertyOpacityLabel) {
-        m_propertyOpacityLabel->setText(QStringLiteral("Opacity %1%").arg(panelOpacity));
+        m_propertyOpacityLabel->setText(MS_TR("Opacity %1%").arg(panelOpacity));
     }
     if (m_propertyOpacitySlider) {
         const QSignalBlocker blocker(m_propertyOpacitySlider);
@@ -5313,12 +5311,12 @@ void ShotWindow::updateOpenWithPanel()
         delete item;
     }
 
-    auto *title = new QLabel(QStringLiteral("Open with"), m_openWithPanel);
+    auto *title = new QLabel(MS_TR("Open with"), m_openWithPanel);
     layout->addWidget(title);
 
     const QVector<DesktopApp> apps = imageDesktopApps();
     if (apps.isEmpty()) {
-        auto *empty = new QLabel(QStringLiteral("No image desktop entries found"), m_openWithPanel);
+        auto *empty = new QLabel(MS_TR("No image desktop entries found"), m_openWithPanel);
         empty->setWordWrap(true);
         layout->addWidget(empty);
         m_openWithPanel->adjustSize();
@@ -5425,7 +5423,7 @@ void ShotWindow::updateExtensionPanel()
         delete item;
     }
 
-    auto *title = new QLabel(QStringLiteral("Extensions"), m_extensionPanel);
+    auto *title = new QLabel(MS_TR("Extensions"), m_extensionPanel);
     layout->addWidget(title);
 
     QString errorMessage;
@@ -5439,7 +5437,7 @@ void ShotWindow::updateExtensionPanel()
     }
 
     if (commands.isEmpty()) {
-        auto *empty = new QLabel(QStringLiteral("No extension commands configured.\nCreate %1").arg(extensionCommandsConfigPath()),
+        auto *empty = new QLabel(MS_TR("No extension commands configured.\nCreate %1").arg(extensionCommandsConfigPath()),
                                  m_extensionPanel);
         empty->setWordWrap(true);
         layout->addWidget(empty);
@@ -6234,7 +6232,7 @@ void ShotWindow::ocrCopySelection()
     const QString ocrProgram = helperProgramPath(QStringLiteral("mark-shot-ocr"));
     if (ocrProgram.isEmpty()) {
         QFile::remove(tempPath);
-        showToast(QStringLiteral("OCR helper not found"));
+        showToast(MS_TR("OCR helper not found"));
         return;
     }
 
@@ -6255,7 +6253,7 @@ void ShotWindow::ocrCopySelection()
         process.waitForFinished(1000);
         QFile::remove(tempPath);
         QApplication::restoreOverrideCursor();
-        showToast(QStringLiteral("OCR timed out"));
+        showToast(MS_TR("OCR timed out"));
         return;
     }
 
@@ -6263,7 +6261,7 @@ void ShotWindow::ocrCopySelection()
     QApplication::restoreOverrideCursor();
 
     if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
-        showToast(QStringLiteral("OCR failed"));
+        showToast(MS_TR("OCR failed"));
         return;
     }
 
@@ -6357,7 +6355,7 @@ void ShotWindow::ocrCopySelection()
     }
 
     if (tokens.isEmpty()) {
-        showToast(QStringLiteral("No text recognized"));
+        showToast(MS_TR("No text recognized"));
         return;
     }    std::stable_sort(tokens.begin(), tokens.end(), [](const LineToken &a, const LineToken &b) {
         return a.line != b.line ? a.line < b.line : a.index < b.index;
@@ -6387,7 +6385,7 @@ void ShotWindow::ocrCopySelection()
     }
 
     QApplication::clipboard()->setText(result);
-    showToast(QStringLiteral("OCR text copied"));
+    showToast(MS_TR("OCR text copied"));
 }
 
 void ShotWindow::showToast(const QString &text, int durationMs)
@@ -6465,11 +6463,11 @@ void ShotWindow::saveSelection()
 
     hide();
 
-    auto *dialog = new QFileDialog(nullptr, QStringLiteral("Save Screenshot"));
+    auto *dialog = new QFileDialog(nullptr, MS_TR("Save Screenshot"));
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setAcceptMode(QFileDialog::AcceptSave);
     dialog->setFileMode(QFileDialog::AnyFile);
-    dialog->setNameFilter(QStringLiteral("PNG Images (*.png)"));
+    dialog->setNameFilter(MS_TR("PNG Images (*.png)"));
     dialog->setDefaultSuffix(QStringLiteral("png"));
     dialog->setOption(QFileDialog::DontUseNativeDialog, true);
     dialog->selectFile(defaultSavePath());

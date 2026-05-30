@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(mark-shot VERSION 0.1.10 LANGUAGES CXX)
+project(mark-shot VERSION 0.1.11 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -29,6 +29,8 @@ qt_add_executable(mark-shot
     src/ui/color_picker.h
     src/ui/icons.cpp
     src/ui/icons.h
+    src/ui/i18n.cpp
+    src/ui/i18n.h
     src/ui/theme.cpp
     src/ui/theme.h
 )
