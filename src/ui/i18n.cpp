@@ -111,6 +111,10 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Enter inserts newline, click outside commits, Esc cancels"),
          QStringLiteral("回车换行，点击外部确认，Esc 取消")},
 
+        // Selection overlay hint.
+        {QStringLiteral("Drag to select   Esc cancels"),
+         QStringLiteral("拖动选择区域   Esc 取消")},
+
         // Open-with / extensions panels.
         {QStringLiteral("Open with"), QStringLiteral("打开方式")},
         {QStringLiteral("No image desktop entries found"), QStringLiteral("未找到可处理图片的应用")},

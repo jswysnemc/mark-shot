@@ -76,7 +76,7 @@
 namespace {
 
 constexpr qreal kMinSelectionSize = 8.0;
-constexpr qreal kToolbarMargin = 12.0;
+constexpr qreal kToolbarMargin = 10.0;
 constexpr qreal kMinStrokeWidth = 1.0;
 constexpr qreal kMaxStrokeWidth = 24.0;
 constexpr qreal kMinNumberWidth = 1.0;
@@ -97,6 +97,36 @@ constexpr int kPinnedTranslationTimeoutMs = 60000;
 QRectF normalizedRect(QPointF a, QPointF b)
 {
     return QRectF(a, b).normalized();
+}
+
+// Builds a smoothed stroke path from raw sample points. Each sample point is
+// used as the control point of a quadratic segment whose endpoints are the
+// midpoints of adjacent samples, so the curve passes through every midpoint
+// and rounds off the corners that appear when the pointer moves fast and the
+// samples are sparse. The original points are left untouched; this only
+// affects rendering.
+QPainterPath smoothedStrokePath(const QVector<QPointF> &points)
+{
+    QPainterPath path;
+    if (points.isEmpty()) {
+        return path;
+    }
+    if (points.size() < 3) {
+        path.moveTo(points.first());
+        for (int i = 1; i < points.size(); ++i) {
+            path.lineTo(points.at(i));
+        }
+        return path;
+    }
+
+    path.moveTo(points.first());
+    path.lineTo((points.at(0) + points.at(1)) / 2.0);
+    for (int i = 1; i < points.size() - 1; ++i) {
+        const QPointF midpoint = (points.at(i) + points.at(i + 1)) / 2.0;
+        path.quadTo(points.at(i), midpoint);
+    }
+    path.lineTo(points.last());
+    return path;
 }
 
 qreal imageNavigationWheelFactor(const QWheelEvent *event)
@@ -1569,8 +1599,8 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     m_toolbar->installEventFilter(this);
 
     m_toolbarLayout = new QHBoxLayout(m_toolbar);
-    m_toolbarLayout->setContentsMargins(10, 10, 10, 10);
-    m_toolbarLayout->setSpacing(7);
+    m_toolbarLayout->setContentsMargins(6, 6, 6, 6);
+    m_toolbarLayout->setSpacing(3);
 
     m_toolbarLayout->addWidget(addToolbarButton(Action::ToolMove, QStringLiteral("V")));
     m_toolbarLayout->addWidget(addToolbarButton(Action::ToolSelect, QStringLiteral("S")));
@@ -1614,18 +1644,31 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
 
     m_actionToolbar = new QWidget(this);
     m_actionToolbar->setObjectName(QStringLiteral("actionToolbar"));
-    m_actionToolbar->setStyleSheet(m_toolbar->styleSheet());
+    m_actionToolbar->setStyleSheet(m_toolbar->styleSheet()
+        + QStringLiteral(
+              "QWidget#actionToolbar QPushButton {"
+              " border-radius: 6px;"
+              " min-width: 28px;"
+              " min-height: 28px;"
+              " max-width: 28px;"
+              " max-height: 28px;"
+              "}"));
     auto *actionLayout = new QVBoxLayout(m_actionToolbar);
-    actionLayout->setContentsMargins(10, 10, 10, 10);
-    actionLayout->setSpacing(7);
-    actionLayout->addWidget(addToolbarButton(Action::ToggleCaptureScope, QStringLiteral("F"), m_actionToolbar));
-    actionLayout->addWidget(addToolbarButton(Action::OpenWith, QStringLiteral("Open"), m_actionToolbar));
-    actionLayout->addWidget(addToolbarButton(Action::Extensions, QStringLiteral("Ext"), m_actionToolbar));
-    actionLayout->addWidget(addToolbarButton(Action::Pin, QStringLiteral("Pin"), m_actionToolbar));
-    actionLayout->addWidget(addToolbarButton(Action::OcrCopy, QStringLiteral("OCR"), m_actionToolbar));
-    actionLayout->addWidget(addToolbarButton(Action::Copy, QStringLiteral("Ctrl+C"), m_actionToolbar));
-    actionLayout->addWidget(addToolbarButton(Action::Save, QStringLiteral("Ctrl+S"), m_actionToolbar));
-    actionLayout->addWidget(addToolbarButton(Action::Cancel, QStringLiteral("Esc"), m_actionToolbar));
+    actionLayout->setContentsMargins(4, 4, 4, 4);
+    actionLayout->setSpacing(2);
+    for (QPushButton *button : {
+             addToolbarButton(Action::ToggleCaptureScope, QStringLiteral("F"), m_actionToolbar),
+             addToolbarButton(Action::OpenWith, QStringLiteral("Open"), m_actionToolbar),
+             addToolbarButton(Action::Extensions, QStringLiteral("Ext"), m_actionToolbar),
+             addToolbarButton(Action::Pin, QStringLiteral("Pin"), m_actionToolbar),
+             addToolbarButton(Action::OcrCopy, QStringLiteral("OCR"), m_actionToolbar),
+             addToolbarButton(Action::Copy, QStringLiteral("Ctrl+C"), m_actionToolbar),
+             addToolbarButton(Action::Save, QStringLiteral("Ctrl+S"), m_actionToolbar),
+             addToolbarButton(Action::Cancel, QStringLiteral("Esc"), m_actionToolbar),
+         }) {
+        button->setIconSize(QSize(20, 20));
+        actionLayout->addWidget(button);
+    }
     m_actionToolbar->hide();
 
     auto shortcutBlockedByTextInput = [this] {
@@ -1665,15 +1708,15 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     m_annotationPropertyPanel->setObjectName(QStringLiteral("annotationPropertyPanel"));
     m_annotationPropertyPanel->setStyleSheet(m_toolbar->styleSheet());
     auto *propertyLayout = new QHBoxLayout(m_annotationPropertyPanel);
-    propertyLayout->setContentsMargins(10, 10, 10, 10);
-    propertyLayout->setSpacing(7);
+    propertyLayout->setContentsMargins(6, 6, 6, 6);
+    propertyLayout->setSpacing(5);
     m_annotationPropertyTitle = new QLabel(QStringLiteral("Object"), m_annotationPropertyPanel);
     propertyLayout->addWidget(m_annotationPropertyTitle);
     m_propertyWidthLabel = new QLabel(MS_TR("Width %1").arg(2), m_annotationPropertyPanel);
     propertyLayout->addWidget(m_propertyWidthLabel);
     m_propertyWidthSlider = new QSlider(Qt::Horizontal, m_annotationPropertyPanel);
     m_propertyWidthSlider->setFocusPolicy(Qt::NoFocus);
-    m_propertyWidthSlider->setFixedWidth(120);
+    m_propertyWidthSlider->setFixedWidth(96);
     m_propertyWidthSlider->setToolTip(MS_TR("Selected object width or size"));
     connect(m_propertyWidthSlider, &QSlider::valueChanged, this, [this](int value) { setSelectedAnnotationWidth(value); });
     propertyLayout->addWidget(m_propertyWidthSlider);
@@ -1682,7 +1725,7 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     m_propertyOpacitySlider = new QSlider(Qt::Horizontal, m_annotationPropertyPanel);
     m_propertyOpacitySlider->setFocusPolicy(Qt::NoFocus);
     m_propertyOpacitySlider->setRange(0, 100);
-    m_propertyOpacitySlider->setFixedWidth(110);
+    m_propertyOpacitySlider->setFixedWidth(88);
     m_propertyOpacitySlider->setToolTip(MS_TR("Selected object opacity"));
     connect(m_propertyOpacitySlider, &QSlider::valueChanged, this, [this](int value) { setSelectedAnnotationOpacity(value); });
     propertyLayout->addWidget(m_propertyOpacitySlider);
@@ -1700,7 +1743,7 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     m_propertyFillButton->setCheckable(true);
     m_propertyFillButton->setFocusPolicy(Qt::NoFocus);
     m_propertyFillButton->setIcon(markshot::ui::makeFillIcon(false));
-    m_propertyFillButton->setIconSize(QSize(26, 26));
+    m_propertyFillButton->setIconSize(QSize(20, 20));
     m_propertyFillButton->setToolTip(MS_TR("Toggle shape fill"));
     connect(m_propertyFillButton, &QPushButton::toggled, this, [this](bool checked) {
         m_propertyFillButton->setIcon(markshot::ui::makeFillIcon(checked));
@@ -1712,13 +1755,13 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     m_propertyRadiusSlider = new QSlider(Qt::Horizontal, m_annotationPropertyPanel);
     m_propertyRadiusSlider->setFocusPolicy(Qt::NoFocus);
     m_propertyRadiusSlider->setRange(0, 48);
-    m_propertyRadiusSlider->setFixedWidth(100);
+    m_propertyRadiusSlider->setFixedWidth(84);
     m_propertyRadiusSlider->setToolTip(MS_TR("Rectangle corner radius"));
     connect(m_propertyRadiusSlider, &QSlider::valueChanged, this, [this](int value) { setSelectedAnnotationCornerRadius(value); });
     propertyLayout->addWidget(m_propertyRadiusSlider);
     m_propertyFontButton = new QPushButton(MS_TR("Font"), m_annotationPropertyPanel);
     m_propertyFontButton->setFocusPolicy(Qt::NoFocus);
-    m_propertyFontButton->setFixedWidth(160);
+    m_propertyFontButton->setFixedWidth(128);
     m_propertyFontButton->setToolTip(MS_TR("Text font"));
     connect(m_propertyFontButton, &QPushButton::clicked, this, [this] { toggleSelectedTextFontPanel(); });
     propertyLayout->addWidget(m_propertyFontButton);
@@ -1733,7 +1776,7 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     m_propertyColorDialogPanel->setObjectName(QStringLiteral("propertyColorDialogPanel"));
     m_propertyColorDialogPanel->setStyleSheet(markshot::theme::propertyColorDialogPanelStyleSheet());
     auto *propertyColorLayout = new QVBoxLayout(m_propertyColorDialogPanel);
-    propertyColorLayout->setContentsMargins(12, 12, 12, 12);
+    propertyColorLayout->setContentsMargins(8, 8, 8, 8);
     propertyColorLayout->setSpacing(0);
     m_propertyColorPicker = new markshot::ui::ColorPicker(m_propertyColorDialogPanel);
     m_propertyColorPicker->setColor(m_currentColor);
@@ -1746,12 +1789,12 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     m_propertyFontPanel->setObjectName(QStringLiteral("propertyFontPanel"));
     m_propertyFontPanel->setStyleSheet(markshot::theme::openWithPanelStyleSheet());
     auto *fontPanelLayout = new QVBoxLayout(m_propertyFontPanel);
-    fontPanelLayout->setContentsMargins(8, 8, 8, 8);
+    fontPanelLayout->setContentsMargins(6, 6, 6, 6);
     fontPanelLayout->setSpacing(0);
     m_propertyFontList = new QListWidget(m_propertyFontPanel);
     m_propertyFontList->setFocusPolicy(Qt::NoFocus);
     m_propertyFontList->setUniformItemSizes(true);
-    m_propertyFontList->setMinimumHeight(96);
+    m_propertyFontList->setMinimumHeight(84);
     m_propertyFontList->setMaximumHeight(260);
     m_propertyFontList->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     m_propertyFontList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -1776,16 +1819,16 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     m_openWithPanel->setObjectName(QStringLiteral("openWithPanel"));
     m_openWithPanel->setStyleSheet(markshot::theme::openWithPanelStyleSheet());
     auto *openLayout = new QVBoxLayout(m_openWithPanel);
-    openLayout->setContentsMargins(12, 12, 12, 12);
-    openLayout->setSpacing(7);
+    openLayout->setContentsMargins(8, 8, 8, 8);
+    openLayout->setSpacing(4);
     m_openWithPanel->hide();
 
     m_extensionPanel = new QWidget(this);
     m_extensionPanel->setObjectName(QStringLiteral("extensionPanel"));
     m_extensionPanel->setStyleSheet(markshot::theme::openWithPanelStyleSheet());
     auto *extensionLayout = new QVBoxLayout(m_extensionPanel);
-    extensionLayout->setContentsMargins(12, 12, 12, 12);
-    extensionLayout->setSpacing(7);
+    extensionLayout->setContentsMargins(8, 8, 8, 8);
+    extensionLayout->setSpacing(4);
     m_extensionPanel->hide();
 
     m_colorPalette = new QWidget(this);
@@ -2062,7 +2105,7 @@ QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcut
     QWidget *toolbar = parentToolbar ? parentToolbar : m_toolbar;
     auto *button = new QPushButton(toolbar);
     button->setIcon(markshot::ui::makeToolIcon(action));
-    button->setIconSize(QSize(26, 26));
+    button->setIconSize(QSize(22, 22));
     button->setFocusPolicy(Qt::NoFocus);
     button->setToolTip(QStringLiteral("%1 (%2)").arg(markshot::i18n::translate(markshot::ui::actionName(action)), shortcutText));
     button->setProperty("action", markshot::ui::actionName(action));
@@ -2444,7 +2487,7 @@ void ShotWindow::paintEvent(QPaintEvent *)
     }
 
     if (!hasUsableSelection()) {
-        const QString hint = QStringLiteral("Drag to select   Esc cancels");
+        const QString hint = MS_TR("Drag to select   Esc cancels");
         painter.setFont(QFont(QStringLiteral("Sans Serif"), 15, QFont::DemiBold));
         const QFontMetrics metrics(painter.font());
         const QRectF hintRect((width() - metrics.horizontalAdvance(hint) - 44.0) / 2.0,
@@ -5346,7 +5389,7 @@ void ShotWindow::updateOpenWithPanel()
             item->setIcon(icon);
         }
     }
-    list->setFixedHeight(std::min(420, std::max(58, static_cast<int>(apps.size()) * 44)));
+    list->setFixedHeight(std::min(360, std::max(48, static_cast<int>(apps.size()) * 36)));
     connect(list, &QListWidget::itemClicked, this, [this](QListWidgetItem *item) {
         if (!item) {
             return;
@@ -5461,7 +5504,7 @@ void ShotWindow::updateExtensionPanel()
         item->setData(Qt::UserRole + 3, command.saveImage);
         item->setData(Qt::UserRole + 4, command.closeOnStart);
     }
-    list->setFixedHeight(std::min(420, std::max(58, static_cast<int>(commands.size()) * 44)));
+    list->setFixedHeight(std::min(360, std::max(48, static_cast<int>(commands.size()) * 36)));
     connect(list, &QListWidget::itemClicked, this, [this](QListWidgetItem *item) {
         if (!item) {
             return;
@@ -5659,11 +5702,12 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
         if (annotation.points.size() < 2) {
             break;
         }
-        QPainterPath path(mapPoint(annotation.points.first()));
-        for (int i = 1; i < annotation.points.size(); ++i) {
-            path.lineTo(mapPoint(annotation.points.at(i)));
+        QVector<QPointF> mapped;
+        mapped.reserve(annotation.points.size());
+        for (const QPointF &point : annotation.points) {
+            mapped.append(mapPoint(point));
         }
-        painter.drawPath(path);
+        painter.drawPath(smoothedStrokePath(mapped));
         break;
     }
     case Tool::Highlighter: {
@@ -5675,11 +5719,12 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
         painter.save();
         painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
         painter.setPen(QPen(color, std::max<qreal>(6.0, penWidth), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        QPainterPath path(mapPoint(annotation.points.first()));
-        for (int i = 1; i < annotation.points.size(); ++i) {
-            path.lineTo(mapPoint(annotation.points.at(i)));
+        QVector<QPointF> mapped;
+        mapped.reserve(annotation.points.size());
+        for (const QPointF &point : annotation.points) {
+            mapped.append(mapPoint(point));
         }
-        painter.drawPath(path);
+        painter.drawPath(smoothedStrokePath(mapped));
         painter.restore();
         break;
     }

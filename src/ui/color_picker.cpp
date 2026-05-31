@@ -20,11 +20,11 @@ namespace markshot::ui {
 
 namespace {
 
-constexpr int kSvWidth = 208;
-constexpr int kSvHeight = 132;
-constexpr int kTrackHeight = 14;
-constexpr int kSwatchSize = 30;
-constexpr qreal kHandleRadius = 6.5;
+constexpr int kSvWidth = 184;
+constexpr int kSvHeight = 112;
+constexpr int kTrackHeight = 12;
+constexpr int kSwatchSize = 26;
+constexpr qreal kHandleRadius = 6.0;
 
 void drawCheckerboard(QPainter &p, const QRectF &rect, int cell = 5)
 {
@@ -317,7 +317,7 @@ ColorPicker::ColorPicker(QWidget *parent) : QWidget(parent)
 {
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(8);
+    layout->setSpacing(6);
 
     m_svField = new SVField(this);
     layout->addWidget(m_svField);
@@ -330,7 +330,7 @@ ColorPicker::ColorPicker(QWidget *parent) : QWidget(parent)
 
     auto *bottom = new QHBoxLayout;
     bottom->setContentsMargins(0, 0, 0, 0);
-    bottom->setSpacing(8);
+    bottom->setSpacing(6);
     m_swatch = new ColorSwatch(this);
     bottom->addWidget(m_swatch);
     m_hex = new QLineEdit(this);
