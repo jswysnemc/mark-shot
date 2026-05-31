@@ -10,6 +10,7 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets DBus)
 find_package(LayerShellQt QUIET)
 find_package(X11 COMPONENTS xcb QUIET)
+find_package(OpenCV QUIET COMPONENTS core imgproc features2d calib3d)
 
 if(COMMAND qt_standard_project_setup)
     qt_standard_project_setup()
@@ -25,6 +26,14 @@ qt_add_executable(mark-shot
     src/screen_capture.h
     src/shot_window.cpp
     src/shot_window.h
+    src/annotation_launch.cpp
+    src/annotation_launch.h
+    src/scroll/stitcher.cpp
+    src/scroll/stitcher.h
+    src/scroll/stitch_orb.cpp
+    src/scroll/stitch_orb.h
+    src/scroll/scroll_session_window.cpp
+    src/scroll/scroll_session_window.h
     src/ui/color_picker.cpp
     src/ui/color_picker.h
     src/ui/icons.cpp
@@ -53,6 +62,15 @@ endif()
 if(LayerShellQt_FOUND)
     target_link_libraries(mark-shot PRIVATE LayerShellQt::Interface)
     target_compile_definitions(mark-shot PRIVATE HAVE_LAYER_SHELL)
+endif()
+
+if(OpenCV_FOUND)
+    target_link_libraries(mark-shot PRIVATE ${OpenCV_LIBS})
+    target_include_directories(mark-shot PRIVATE ${OpenCV_INCLUDE_DIRS})
+    target_compile_definitions(mark-shot PRIVATE HAVE_OPENCV)
+    message(STATUS "mark-shot: OpenCV ${OpenCV_VERSION} found, scrolling capture ORB path enabled")
+else()
+    message(STATUS "mark-shot: OpenCV not found, scrolling capture falls back to col-sample")
 endif()
 
 install(TARGETS mark-shot RUNTIME DESTINATION bin)

@@ -1,6 +1,8 @@
 #include "shot_window.h"
 
 #include "screen_capture.h"
+#include "scroll/scroll_session_window.h"
+#include "scroll/stitcher.h"
 #include "ui/color_picker.h"
 #include "ui/i18n.h"
 #include "ui/icons.h"
@@ -1621,6 +1623,7 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
                           Action::ToggleToolbarLayout,
                           Action::OpenWith,
                           Action::Extensions,
+                          Action::ScrollCapture,
                           Action::Pin,
                           Action::OcrCopy,
                           Action::Copy,
@@ -1628,6 +1631,7 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
                           Action::Cancel}) {
         const QString shortcut = action == Action::OpenWith ? QStringLiteral("Open")
             : action == Action::Extensions           ? QStringLiteral("Ext")
+            : action == Action::ScrollCapture        ? QStringLiteral("Scroll")
             : action == Action::Pin                  ? QStringLiteral("Pin")
             : action == Action::OcrCopy              ? QStringLiteral("OCR")
             : action == Action::Copy                 ? QStringLiteral("Ctrl+C")
@@ -1660,6 +1664,7 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
              addToolbarButton(Action::ToggleCaptureScope, QStringLiteral("F"), m_actionToolbar),
              addToolbarButton(Action::OpenWith, QStringLiteral("Open"), m_actionToolbar),
              addToolbarButton(Action::Extensions, QStringLiteral("Ext"), m_actionToolbar),
+             addToolbarButton(Action::ScrollCapture, QStringLiteral("Scroll"), m_actionToolbar),
              addToolbarButton(Action::Pin, QStringLiteral("Pin"), m_actionToolbar),
              addToolbarButton(Action::OcrCopy, QStringLiteral("OCR"), m_actionToolbar),
              addToolbarButton(Action::Copy, QStringLiteral("Ctrl+C"), m_actionToolbar),
@@ -2116,7 +2121,7 @@ QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcut
         button->setProperty("role", QStringLiteral("primary"));
     } else if (action == Action::Cancel) {
         button->setProperty("role", QStringLiteral("danger"));
-    } else if (action == Action::OpenWith || action == Action::Extensions || action == Action::Pin || action == Action::OcrCopy || action == Action::Copy) {
+    } else if (action == Action::OpenWith || action == Action::Extensions || action == Action::Pin || action == Action::OcrCopy || action == Action::Copy || action == Action::ScrollCapture) {
         button->setProperty("role", QStringLiteral("secondary"));
     }
 
@@ -2160,6 +2165,8 @@ QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcut
         connect(button, &QPushButton::clicked, this, [this] { toggleExtensionPanel(); });
     } else if (action == Action::Pin) {
         connect(button, &QPushButton::clicked, this, [this] { pinSelection(); });
+    } else if (action == Action::ScrollCapture) {
+        connect(button, &QPushButton::clicked, this, [this] { startScrollCapture(); });
     } else if (action == Action::OcrCopy) {
         connect(button, &QPushButton::clicked, this, [this] { ocrCopySelection(); });
     } else if (action == Action::Copy) {
@@ -4215,7 +4222,7 @@ QRectF ShotWindow::normalizedSelection() const
     return m_selection.normalized().intersected(QRectF(QPointF(0, 0), QSizeF(m_frozenFrame.size())));
 }
 
-QString ShotWindow::slurpSelectionGeometry() const
+QRect ShotWindow::selectionGlobalRect() const
 {
     if (!hasUsableSelection()) {
         return {};
@@ -4229,6 +4236,15 @@ QString ShotWindow::slurpSelectionGeometry() const
 
     if (m_sourceGeometry.isValid() && !m_sourceGeometry.isEmpty()) {
         selectionRect.translate(m_sourceGeometry.topLeft());
+    }
+    return selectionRect;
+}
+
+QString ShotWindow::slurpSelectionGeometry() const
+{
+    const QRect selectionRect = selectionGlobalRect();
+    if (selectionRect.isEmpty()) {
+        return {};
     }
     return slurpGeometry(selectionRect);
 }
@@ -6241,6 +6257,32 @@ void ShotWindow::runExtensionCommand(const ExtensionCommand &command)
         updateActionToolbarGeometry();
         updateExtensionPanelGeometry();
     }
+}
+
+void ShotWindow::startScrollCapture()
+{
+    commitTextEditor();
+    if (!hasUsableSelection()) {
+        return;
+    }
+
+    const QRect geometry = selectionGlobalRect();
+    if (geometry.isEmpty()) {
+        return;
+    }
+
+    // TODO(task #9): switch back to OpenCvOrb once the ORB path is implemented.
+    // The ORB estimator is still a stub, so force the validated col-sample path.
+    const markshot::scroll::StitchAlgorithm algorithm = markshot::scroll::StitchAlgorithm::ColSample;
+
+    // The session window configures its own layer-shell overlay (with a
+    // plain-window fallback) in its constructor.
+    auto *window =
+        new markshot::scroll::ScrollSessionWindow(geometry, m_outputName, algorithm, screen());
+    window->show();
+    window->raise();
+    window->activateWindow();
+    close();
 }
 
 void ShotWindow::pinSelection()

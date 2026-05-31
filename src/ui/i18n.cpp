@@ -83,6 +83,7 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Open With"), QStringLiteral("打开方式")},
         {QStringLiteral("Extensions"), QStringLiteral("扩展")},
         {QStringLiteral("Pin"), QStringLiteral("钉住")},
+        {QStringLiteral("Scroll Capture"), QStringLiteral("滚动截屏")},
         {QStringLiteral("OCR Copy"), QStringLiteral("OCR 复制")},
         {QStringLiteral("Copy"), QStringLiteral("复制")},
         {QStringLiteral("Save"), QStringLiteral("保存")},
@@ -133,6 +134,18 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("OCR failed"), QStringLiteral("OCR 失败")},
         {QStringLiteral("No text recognized"), QStringLiteral("未识别到文字")},
         {QStringLiteral("OCR text copied"), QStringLiteral("已复制 OCR 文字")},
+
+        // Scrolling capture session window.
+        {QStringLiteral("Pause"), QStringLiteral("暂停")},
+        {QStringLiteral("Resume"), QStringLiteral("继续")},
+        {QStringLiteral("Annotate"), QStringLiteral("标注")},
+        {QStringLiteral("Scroll down to capture"), QStringLiteral("向下滚动以捕获")},
+        {QStringLiteral("Capturing"), QStringLiteral("正在捕获")},
+        {QStringLiteral("Waiting for scroll"), QStringLiteral("等待滚动")},
+        {QStringLiteral("No overlap match"), QStringLiteral("无重叠匹配")},
+        {QStringLiteral("Capture error"), QStringLiteral("捕获错误")},
+        {QStringLiteral("Height %1 px"), QStringLiteral("高度 %1 px")},
+        {QStringLiteral("Save Scrolling Screenshot"), QStringLiteral("保存滚动截图")},
     };
     return table;
 }

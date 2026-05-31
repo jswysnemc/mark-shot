@@ -49,6 +49,7 @@ public:
         OpenWith,
         Extensions,
         Pin,
+        ScrollCapture,
         OcrCopy,
         Copy,
         Save,
@@ -162,6 +163,7 @@ private:
     QPointF imageToWidget(QPointF point) const;
     QRectF normalizedSelection() const;
     QString slurpSelectionGeometry() const;
+    QRect selectionGlobalRect() const;
     QRectF imageRectToWidget(QRectF rect) const;
     QRectF textContentRect(const Annotation &annotation, bool widgetCoordinates) const;
     QString defaultSavePath() const;
@@ -218,6 +220,7 @@ private:
     void openSelectionWithDesktop(const DesktopApp &app);
     void runExtensionCommand(const ExtensionCommand &command);
     void pinSelection();
+    void startScrollCapture();
     void ocrCopySelection();
     void showToast(const QString &text, int durationMs = 2000);
     QString saveSelectionToTempFile() const;

@@ -71,6 +71,8 @@ QString actionName(ShotWindow::Action action)
         return QStringLiteral("Open With");
     case ShotWindow::Action::Extensions:
         return QStringLiteral("Extensions");
+    case ShotWindow::Action::ScrollCapture:
+        return QStringLiteral("Scroll Capture");
     case ShotWindow::Action::Pin:
         return QStringLiteral("Pin");
     case ShotWindow::Action::OcrCopy:
@@ -372,6 +374,24 @@ QIcon makeToolIcon(ShotWindow::Action action)
         p.setPen(makePen(kInkSoft, 1.3));
         p.drawLine(QPointF(23.5, 6.5), QPointF(23.5, 11.0));
         p.drawLine(QPointF(21.25, 8.75), QPointF(25.75, 8.75));
+        break;
+    }
+    case ShotWindow::Action::ScrollCapture: {
+        // Tall framed viewport with stacked content lines and a downward arrow,
+        // suggesting a long capture that grows as the page scrolls down.
+        p.setPen(makePen(kInk, 1.7));
+        p.drawRoundedRect(QRectF(8.0, 5.5, 16.0, 21.0), 2.4, 2.4);
+        p.setPen(makePen(kInkSoft, 1.3));
+        p.drawLine(QPointF(11.5, 9.5), QPointF(20.5, 9.5));
+        p.drawLine(QPointF(11.5, 12.5), QPointF(20.5, 12.5));
+        // Downward arrow in the lower half implying the scroll direction.
+        p.setPen(makePen(kInk, 1.7));
+        p.drawLine(QPointF(16.0, 15.0), QPointF(16.0, 22.5));
+        QPainterPath arrow;
+        arrow.moveTo(12.5, 19.0);
+        arrow.lineTo(16.0, 22.5);
+        arrow.lineTo(19.5, 19.0);
+        p.drawPath(arrow);
         break;
     }
     case ShotWindow::Action::Pin: {
