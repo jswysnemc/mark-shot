@@ -44,7 +44,11 @@
 #include <spa/buffer/buffer.h>
 #include <spa/param/format-utils.h>
 #include <spa/param/param.h>
+#if __has_include(<spa/param/video/raw-utils.h>)
 #include <spa/param/video/raw-utils.h>
+#else
+#include <spa/param/video/format-utils.h>
+#endif
 #include <spa/pod/builder.h>
 #if __has_include(<spa/param/buffers.h>)
 #include <spa/param/buffers.h>
