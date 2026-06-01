@@ -110,11 +110,6 @@ private:
         Laser,
     };
 
-    enum class ArrowStyle {
-        Filled,
-        Line,
-    };
-
     enum class SelectionDrag {
         None,
         Move,
@@ -140,7 +135,6 @@ private:
         qreal width = 4.0;
         bool filled = false;
         qreal cornerRadius = 0.0;
-        ArrowStyle arrowStyle = ArrowStyle::Filled;
         QString fontFamily = QStringLiteral("Sans Serif");
     };
 
@@ -213,7 +207,7 @@ private:
     void copySelection();
     void redoAnnotation();
     void drawAnnotation(QPainter &painter, const Annotation &annotation, bool widgetCoordinates) const;
-    void drawArrow(QPainter &painter, QPointF start, QPointF end, qreal width, ArrowStyle style) const;
+    void drawArrow(QPainter &painter, QPointF start, QPointF end, qreal width) const;
     void drawMosaic(QPainter &painter, QRectF imageRect, qreal blockSize, bool widgetCoordinates) const;
     void drawNumber(QPainter &painter, QPointF imagePoint, int number, QColor color, qreal width, bool widgetCoordinates) const;
     void drawWheelPreview(QPainter &painter);
@@ -260,7 +254,6 @@ private:
     void setSelectedAnnotationOpacity(int opacity);
     void setSelectedAnnotationFilled(bool filled);
     void setSelectedAnnotationCornerRadius(int radius);
-    void toggleSelectedArrowStyle();
     void setSelectedTextFontFamily(const QString &fontFamily);
     void applyPropertyColor(QColor color);
     void deleteSelectedAnnotation();
@@ -334,7 +327,6 @@ private:
     qreal m_laserWidth = 10.0;
     bool m_shapeFilled = false;
     qreal m_rectangleCornerRadius = 0.0;
-    ArrowStyle m_arrowStyle = ArrowStyle::Filled;
     QString m_textFontFamily = QStringLiteral("Sans Serif");
     QColor m_textBackgroundColor = QColor(0, 0, 0, 0);
     int m_nextNumber = 1;
@@ -359,7 +351,6 @@ private:
     QPushButton *m_propertyColorButton = nullptr;
     QPushButton *m_propertyTextBackgroundButton = nullptr;
     QPushButton *m_propertyFillButton = nullptr;
-    QPushButton *m_propertyArrowStyleButton = nullptr;
     QLabel *m_propertyRadiusLabel = nullptr;
     QSlider *m_propertyRadiusSlider = nullptr;
     QPushButton *m_propertyFontButton = nullptr;

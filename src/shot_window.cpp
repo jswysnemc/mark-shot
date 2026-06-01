@@ -1991,11 +1991,6 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
         setSelectedAnnotationFilled(checked);
     });
     propertyLayout->addWidget(m_propertyFillButton);
-    m_propertyArrowStyleButton = new QPushButton(m_annotationPropertyPanel);
-    m_propertyArrowStyleButton->setFocusPolicy(Qt::NoFocus);
-    m_propertyArrowStyleButton->setToolTip(MS_TR("Toggle arrow style"));
-    connect(m_propertyArrowStyleButton, &QPushButton::clicked, this, [this] { toggleSelectedArrowStyle(); });
-    propertyLayout->addWidget(m_propertyArrowStyleButton);
     m_propertyRadiusLabel = new QLabel(MS_TR("Radius %1").arg(0), m_annotationPropertyPanel);
     propertyLayout->addWidget(m_propertyRadiusLabel);
     m_propertyRadiusSlider = new QSlider(Qt::Horizontal, m_annotationPropertyPanel);
@@ -2813,18 +2808,6 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
     clearWheelPreview();
 
     if (event->button() != Qt::LeftButton) {
-        if (m_mode == Mode::Selecting) {
-            if (event->button() == Qt::RightButton) {
-                close();
-                event->accept();
-                return;
-            }
-            if (event->button() == Qt::MiddleButton) {
-                enterFullscreenAnnotation(true);
-                event->accept();
-                return;
-            }
-        }
         if (event->button() == Qt::MiddleButton && imageNavigationAvailable() && m_frozenImageRect.contains(event->position())) {
             commitTextEditor();
             m_dragging = false;
@@ -2977,7 +2960,6 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
     annotation.width = currentToolWidth();
     annotation.filled = m_shapeFilled;
     annotation.cornerRadius = m_tool == Tool::Rectangle ? m_rectangleCornerRadius : 0.0;
-    annotation.arrowStyle = m_arrowStyle;
     annotation.fontFamily = m_textFontFamily;
     if (m_tool == Tool::Pen || m_tool == Tool::Highlighter) {
         annotation.points.append(imagePoint);
@@ -3884,15 +3866,9 @@ QRectF ShotWindow::annotationBounds(const Annotation &annotation) const
     case Tool::Pen:
     case Tool::Highlighter:
     case Tool::Line:
-        bounds = pointsBounds();
-        bounds.adjust(-annotation.width, -annotation.width, annotation.width, annotation.width);
-        break;
     case Tool::Arrow:
         bounds = pointsBounds();
-        bounds.adjust(-annotation.width * 6.0,
-                      -annotation.width * 6.0,
-                      annotation.width * 6.0,
-                      annotation.width * 6.0);
+        bounds.adjust(-annotation.width, -annotation.width, annotation.width, annotation.width);
         break;
     case Tool::Rectangle:
     case Tool::Ellipse:
@@ -5070,7 +5046,6 @@ void ShotWindow::updateAnnotationPropertyPanel()
     const bool panelFilled = annotation ? annotation->filled : m_shapeFilled;
     const qreal panelRadius = annotation ? annotation->cornerRadius : m_rectangleCornerRadius;
     const QString panelFontFamily = annotation ? annotation->fontFamily : m_textFontFamily;
-    const ArrowStyle panelArrowStyle = annotation ? annotation->arrowStyle : m_arrowStyle;
 
     switch (panelTool) {
     case Tool::Move:
@@ -5141,13 +5116,6 @@ void ShotWindow::updateAnnotationPropertyPanel()
         const QSignalBlocker blocker(m_propertyFillButton);
         m_propertyFillButton->setChecked(panelFilled);
         m_propertyFillButton->setIcon(markshot::ui::makeFillIcon(panelFilled));
-    }
-    if (m_propertyArrowStyleButton) {
-        const bool supportsArrowStyle = !groupSelection && panelTool == Tool::Arrow;
-        m_propertyArrowStyleButton->setVisible(supportsArrowStyle);
-        m_propertyArrowStyleButton->setText(panelArrowStyle == ArrowStyle::Line
-                                                ? MS_TR("Arrow: Line")
-                                                : MS_TR("Arrow: Filled"));
     }
     if (m_propertyRadiusLabel) {
         m_propertyRadiusLabel->setVisible(!groupSelection && panelTool == Tool::Rectangle);
@@ -5482,32 +5450,6 @@ void ShotWindow::setSelectedAnnotationCornerRadius(int radius)
             return;
         }
         m_rectangleCornerRadius = radius;
-    }
-    updateAnnotationPropertyPanel();
-    update();
-}
-
-void ShotWindow::toggleSelectedArrowStyle()
-{
-    auto nextStyle = [](ArrowStyle style) {
-        return style == ArrowStyle::Filled ? ArrowStyle::Line : ArrowStyle::Filled;
-    };
-
-    if (m_selectedAnnotationId.has_value()) {
-        Annotation *annotation = annotationById(*m_selectedAnnotationId);
-        if (!annotation || annotation->tool != Tool::Arrow) {
-            return;
-        }
-        pushHistorySnapshot();
-        annotation->arrowStyle = nextStyle(annotation->arrowStyle);
-    } else {
-        if (m_tool != Tool::Arrow) {
-            return;
-        }
-        m_arrowStyle = nextStyle(m_arrowStyle);
-        if (m_draft.has_value() && m_draft->tool == Tool::Arrow) {
-            m_draft->arrowStyle = m_arrowStyle;
-        }
     }
     updateAnnotationPropertyPanel();
     update();
@@ -6205,11 +6147,7 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
         break;
     case Tool::Arrow:
         if (annotation.points.size() >= 2) {
-            drawArrow(painter,
-                      mapPoint(annotation.points.first()),
-                      mapPoint(annotation.points.last()),
-                      penWidth,
-                      annotation.arrowStyle);
+            drawArrow(painter, mapPoint(annotation.points.first()), mapPoint(annotation.points.last()), penWidth);
         }
         break;
     case Tool::Text: {
@@ -6252,7 +6190,7 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
     painter.restore();
 }
 
-void ShotWindow::drawArrow(QPainter &painter, QPointF start, QPointF end, qreal width, ArrowStyle style) const
+void ShotWindow::drawArrow(QPainter &painter, QPointF start, QPointF end, qreal width) const
 {
     const QLineF line(start, end);
     const qreal L = line.length();
@@ -6261,40 +6199,6 @@ void ShotWindow::drawArrow(QPainter &painter, QPointF start, QPointF end, qreal 
     }
 
     const QColor color = painter.pen().color();
-
-    if (style == ArrowStyle::Line) {
-        const QPointF direction(line.dx() / L, line.dy() / L);
-        const QPointF normal(-direction.y(), direction.x());
-        qreal headLength = std::clamp(L * 0.18, width * 5.0, width * 10.0);
-        headLength = std::min(headLength, L * 0.62);
-        headLength = std::clamp(headLength, 12.0, 54.0);
-        const qreal headHalfWidth = std::max(width * 1.8, headLength * 0.34);
-        const QPointF headBase = end - direction * headLength;
-
-        QPainterPath head;
-        head.moveTo(end);
-        head.lineTo(headBase + normal * headHalfWidth);
-        head.lineTo(headBase - normal * headHalfWidth);
-        head.closeSubpath();
-
-        const QPointF shadowOffset(width * 0.55, width * 0.65);
-        QColor shadow(0, 0, 0, std::clamp(color.alpha() / 3, 48, 110));
-        painter.save();
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen(shadow, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.drawLine(start + shadowOffset, headBase + shadowOffset);
-        painter.setBrush(shadow);
-        painter.setPen(Qt::NoPen);
-        painter.drawPath(head.translated(shadowOffset));
-
-        painter.setPen(QPen(color, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.drawLine(start, headBase);
-        painter.setBrush(color);
-        painter.setPen(Qt::NoPen);
-        painter.drawPath(head);
-        painter.restore();
-        return;
-    }
 
     // 1. Calculate normalized direction and normal vectors
     const QPointF direction = QPointF(line.dx() / L, line.dy() / L);
