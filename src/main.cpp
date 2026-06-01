@@ -3,6 +3,7 @@
 #include "ui/i18n.h"
 
 #include <QApplication>
+#include <QByteArray>
 #include <QCommandLineParser>
 #include <QCursor>
 #include <QFileInfo>
@@ -75,6 +76,24 @@ QScreen *focusedScreen()
     return QGuiApplication::primaryScreen();
 }
 
+void disableQtPortalServicesForHostApp()
+{
+#if defined(Q_OS_UNIX) && !defined(Q_OS_DARWIN)
+    if (qEnvironmentVariableIsSet("QT_NO_XDG_DESKTOP_PORTAL")) {
+        return;
+    }
+    if (QFileInfo::exists(QStringLiteral("/.flatpak-info")) || qEnvironmentVariableIsSet("SNAP")) {
+        return;
+    }
+
+    // Qt 6.10+ can query the portal before registering the app id, which makes
+    // host registration fail on xdg-desktop-portal versions that bind an id to
+    // the first portal call. mark-shot performs its own registration before
+    // screenshot portal calls.
+    qputenv("QT_NO_XDG_DESKTOP_PORTAL", QByteArrayLiteral("1"));
+#endif
+}
+
 QRect centeredImageWindowGeometry(const QSize &imageSize, QScreen *screen)
 {
     if (imageSize.isEmpty()) {
@@ -100,10 +119,13 @@ QRect centeredImageWindowGeometry(const QSize &imageSize, QScreen *screen)
 
 int main(int argc, char *argv[])
 {
+    QGuiApplication::setDesktopFileName(QStringLiteral("mark-shot"));
+    disableQtPortalServicesForHostApp();
+
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("mark-shot"));
     QApplication::setApplicationDisplayName(QStringLiteral("Mark Shot"));
-    QApplication::setApplicationVersion(QStringLiteral("0.1.11"));
+    QApplication::setApplicationVersion(QStringLiteral("0.1.12"));
 
     markshot::i18n::initialize();
 

@@ -14,7 +14,7 @@ env:
 
 jobs:
   linux:
-    name: Linux Qt 6
+    name: Linux Qt 6 (x86_64)
     runs-on: ubuntu-latest
     container: archlinux:base-devel
 
@@ -28,6 +28,8 @@ jobs:
             cmake \
             gcc \
             ninja \
+            pkgconf \
+            pipewire \
             qt6-base \
             qt6-wayland \
             layer-shell-qt
@@ -51,4 +53,48 @@ jobs:
         with:
           name: mark-shot-linux-x86_64
           path: mark-shot-linux-x86_64.tar.gz
+          if-no-files-found: error
+
+  linux-arm64:
+    name: Linux Qt 6 (arm64)
+    runs-on: ubuntu-22.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            libgl1-mesa-dev \
+            libpipewire-0.3-dev \
+            libx11-xcb-dev \
+            libxcb1-dev \
+            ninja-build \
+            pkg-config \
+            qt6-base-dev \
+            qt6-base-dev-tools
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Install into artifact tree
+        run: |
+          cmake --install build --prefix "$PWD/app"
+          tar -C app -czf mark-shot-linux-arm64.tar.gz .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mark-shot-linux-arm64
+          path: mark-shot-linux-arm64.tar.gz
           if-no-files-found: error

@@ -19,8 +19,16 @@ env:
 
 jobs:
   deb:
-    name: Build Ubuntu/Debian amd64 package
-    runs-on: ubuntu-22.04
+    name: Build Ubuntu/Debian ${{ matrix.deb_arch }} package
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - deb_arch: amd64
+            runner: ubuntu-22.04
+          - deb_arch: arm64
+            runner: ubuntu-22.04-arm
 
     steps:
       - name: Resolve version
@@ -38,9 +46,11 @@ jobs:
           else
             CHECKOUT_REF="${{ github.ref_name }}"
           fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "checkout_ref=$CHECKOUT_REF" >> "$GITHUB_OUTPUT"
+          {
+            echo "tag=$TAG"
+            echo "version=$VERSION"
+            echo "checkout_ref=$CHECKOUT_REF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Checkout source
         uses: actions/checkout@v4
@@ -57,9 +67,11 @@ jobs:
             fakeroot \
             file \
             libgl1-mesa-dev \
+            libpipewire-0.3-dev \
             libx11-xcb-dev \
             libxcb1-dev \
             ninja-build \
+            pkg-config \
             qt6-base-dev \
             qt6-base-dev-tools
 
@@ -82,7 +94,14 @@ jobs:
           INSTALL_DIR="$PACKAGE_DIR/usr"
           CONTROL_DIR="$PACKAGE_DIR/DEBIAN"
           VERSION="${{ steps.version.outputs.version }}"
-          ASSET="mark-shot_${VERSION}_amd64.deb"
+          DEB_ARCH="${{ matrix.deb_arch }}"
+          HOST_ARCH="$(dpkg --print-architecture)"
+          ASSET="mark-shot_${VERSION}_${DEB_ARCH}.deb"
+
+          if [ "$HOST_ARCH" != "$DEB_ARCH" ]; then
+            echo "Runner architecture $HOST_ARCH does not match package architecture $DEB_ARCH" >&2
+            exit 1
+          fi
 
           rm -rf "$PACKAGE_DIR"
           cmake --install build --prefix "$INSTALL_DIR"
@@ -109,7 +128,7 @@ jobs:
 
           SHLIB_DEPS="$(dpkg-shlibdeps -O -e"$PACKAGE_DIR/usr/bin/mark-shot" | sed 's/^shlibs:Depends=//')"
           MANUAL_DEPS="python3"
-          RECOMMENDS="python3-venv, xdg-desktop-portal, grim, wl-clipboard, xclip"
+          RECOMMENDS="python3-venv, xdg-desktop-portal, pipewire, grim, wl-clipboard, xclip"
           if [ -n "$SHLIB_DEPS" ]; then
             DEPENDS="$SHLIB_DEPS, $MANUAL_DEPS"
           else
@@ -121,7 +140,7 @@ jobs:
           Version: $VERSION
           Section: graphics
           Priority: optional
-          Architecture: amd64
+          Architecture: $DEB_ARCH
           Maintainer: jswysnemc <snemc@qq.com>
           Depends: $DEPENDS
           Recommends: $RECOMMENDS
@@ -135,14 +154,16 @@ jobs:
           fakeroot dpkg-deb --build --root-owner-group "$PACKAGE_DIR" "$ASSET"
           sha256sum "$ASSET" > "$ASSET.sha256"
 
-          echo "asset=$ASSET" >> "$GITHUB_OUTPUT"
-          echo "checksum=$ASSET.sha256" >> "$GITHUB_OUTPUT"
+          {
+            echo "asset=$ASSET"
+            echo "checksum=$ASSET.sha256"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Upload deb artifact
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: mark-shot-deb-${{ steps.version.outputs.version }}
+          name: mark-shot-deb-${{ steps.version.outputs.version }}-${{ matrix.deb_arch }}
           path: |
             ${{ steps.package.outputs.asset }}
             ${{ steps.package.outputs.checksum }}

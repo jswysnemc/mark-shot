@@ -4,7 +4,7 @@
 
 <video src="https://github.com/user-attachments/assets/c2298867-06b4-404d-87bc-62ab8d81088b" width="100%" controls></video>
 
-`mark-shot` 是一款基于 Qt 6 开发的高性能截图标注工具。最初针对 `niri` 等 Wayland 窗口管理器设计，现已原生支持 X11/GNOME 桌面环境。
+`mark-shot` 是一款基于 Qt 6 开发的高性能截图标注工具。项目最初针对 `niri` 等 Wayland 窗口管理器设计，也支持在 X11/GNOME 桌面环境中完成常规截图与标注工作流。
 
 它可以瞬间截取屏幕画面，并打开自适应全屏标注覆盖层，为用户提供区域裁切、标注、复制到剪贴板、保存以及桌面贴图等功能。
 
@@ -34,8 +34,14 @@
   - 双击鼠标左键或按下 `Esc` 键即可关闭贴图。
   - 右键单击唤出菜单，支持多角度旋转、透明度微调（0.2 - 1.0）、复制图片文字、翻译、另存为、复制或关闭。
 
+### 滚动截图
+- 通过 PipeWire screencast、交互式滚动覆盖层和图像拼接器，捕获长页面或长区域截图。
+- 该功能主要面向 `niri` 以及行为相近的 Wayland 环境；这些环境的输出几何、捕获时序和窗口位置更容易保持稳定。
+- **兼容性说明**：滚动截图目前属于实验性功能。在 GNOME 或 KDE 中，该功能可能无法工作，原因包括 portal 后端策略、Shell 或 KWin 窗口管理行为、帧时序、滚动事件处理和窗口几何反馈存在差异。要稳定适配 GNOME Shell 与 KWin，通常需要针对不同桌面栈进行专门处理，适配难度较高。
+- 如果滚动截图在 GNOME 或 KDE 中无法使用，请使用普通截图流程，或者通过 Mark Shot 拓展命令接入外部长截图工具。
+
 ### 跨显示服务器支持
-- **Wayland**：使用 `grim` 截屏、`layer-shell-qt` 创建原生覆盖层、`wl-copy` 持久化剪贴板。
+- **Wayland**：使用 PipeWire portal screencast 支持实验性滚动截图，使用 `grim` 支持 wlroots 截屏，使用 `layer-shell-qt` 创建原生覆盖层，使用 `wl-copy` 持久化剪贴板。
 - **X11**：使用 `QScreen::grabWindow` 截屏、全屏置顶窗口作为覆盖层、`xclip` 持久化剪贴板。
 - 运行时通过 `$XDG_SESSION_TYPE` 自动检测，无需手动配置。
 
@@ -149,22 +155,31 @@ binds {
 
 ## 编译与安装
 
+### 正式版产物
+
+每次正式发布会提供 Linux 二进制压缩包与 Debian 安装包：
+
+- `linux-x86_64.tar.gz` 与 `linux-arm64.tar.gz`
+- `amd64.deb` 与 `arm64.deb`
+
+Debian 安装包会同时安装 `mark-shot`、辅助脚本、桌面快捷方式、图标和运行元数据。
+
 ### 系统依赖
 
 #### Wayland (Arch Linux)
 
 ```bash
-sudo pacman -S --needed base-devel cmake ninja qt6-base qt6-wayland layer-shell-qt grim wl-clipboard
+sudo pacman -S --needed base-devel cmake ninja pkgconf qt6-base qt6-wayland layer-shell-qt pipewire grim wl-clipboard
 ```
 
 #### X11/GNOME (Ubuntu/Debian)
 
 ```bash
 # 构建工具
-sudo apt install build-essential cmake ninja-build
+sudo apt install build-essential cmake ninja-build pkg-config libpipewire-0.3-dev
 
-# 剪贴板工具
-sudo apt install xclip
+# Portal 与剪贴板工具
+sudo apt install xdg-desktop-portal pipewire xclip
 
 # Qt 6（若系统仓库无 Qt 6，可通过 aqtinstall 安装到用户目录）
 pip install aqtinstall
@@ -274,6 +289,21 @@ cmake --install build --prefix "$HOME/.local"
 | **双击 Ctrl 键** | 一键复位贴图窗口的物理尺寸为原始比例。 |
 | **鼠标右键单击** | 弹出功能菜单（包括旋转、调整透明度、复制图片文字、翻译、保存、复制、关闭等）。 |
 | **Esc 键** | 关闭当前获得焦点的贴图窗口。 |
+
+---
+
+## 发版说明
+
+### 0.1.12
+
+- 新增 Wayland 原生滚动截图能力，目前作为实验性功能发布。
+- 重构标注属性面板，改为更紧凑的图标化布局。
+- 新增箭头样式选择，包括类似 KDE/Spectacle 的开放式箭头。
+- 修复 GNOME 等 portal 桌面环境中重复注册应用 ID 导致的启动警告。
+- 新增 Linux ARM64 tar 包与 Ubuntu/Debian ARM64 `.deb` 安装包。
+- 改进对旧版 PipeWire SPA 头文件的兼容性。
+
+滚动截图不保证在 GNOME 或 KDE 中可用。该能力依赖 portal 捕获行为、窗口管理器时序、窗口几何反馈和滚动事件处理。GNOME Shell 与 KWin 的相关行为差异较大，稳定适配成本较高。
 
 ---
 

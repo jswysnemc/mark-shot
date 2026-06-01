@@ -1,6 +1,7 @@
 /build*/
 /app/
 /app-*/
+/dist/
 /.cache/
 /.cmake/
 

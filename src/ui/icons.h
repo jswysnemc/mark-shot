@@ -2,6 +2,7 @@
 
 #include "shot_window.h"
 
+#include <QColor>
 #include <QIcon>
 #include <QString>
 
@@ -14,6 +15,20 @@ QString actionName(ShotWindow::Action action);
 // Generates a 32x32 pixmap-backed QIcon for the given action. All icons are
 // drawn with QPainter so the binary stays free of image assets.
 QIcon makeToolIcon(ShotWindow::Action action);
+
+enum class PropertyIcon {
+    StrokeWidth,
+    Opacity,
+    Color,
+    TextBackground,
+    CornerRadius,
+    Font,
+    EditText,
+};
+
+// Generates a 32x32 pixmap-backed QIcon for compact controls in the
+// annotation property panel. Passing ink overrides the default toolbar color.
+QIcon makePropertyIcon(PropertyIcon icon, QColor ink = QColor());
 
 // Hollow square when filled=false, solid square when filled=true. Used by the
 // Fill toggle so the glyph itself communicates the state.

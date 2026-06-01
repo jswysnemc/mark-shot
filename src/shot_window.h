@@ -13,9 +13,11 @@
 
 class QPainter;
 class QBoxLayout;
+class QComboBox;
 class QLabel;
 class QListWidget;
 class QPushButton;
+class QScrollBar;
 class QScreen;
 class QSlider;
 class QTextEdit;
@@ -49,6 +51,7 @@ public:
         OpenWith,
         Extensions,
         Pin,
+        ScrollCapture,
         OcrCopy,
         Copy,
         Save,
@@ -108,6 +111,11 @@ private:
         Laser,
     };
 
+    enum class ArrowStyle {
+        Fletched,
+        Kde,
+    };
+
     enum class SelectionDrag {
         None,
         Move,
@@ -133,6 +141,7 @@ private:
         qreal width = 4.0;
         bool filled = false;
         qreal cornerRadius = 0.0;
+        ArrowStyle arrowStyle = ArrowStyle::Fletched;
         QString fontFamily = QStringLiteral("Sans Serif");
     };
 
@@ -162,6 +171,7 @@ private:
     QPointF imageToWidget(QPointF point) const;
     QRectF normalizedSelection() const;
     QString slurpSelectionGeometry() const;
+    QRect selectionGlobalRect() const;
     QRectF imageRectToWidget(QRectF rect) const;
     QRectF textContentRect(const Annotation &annotation, bool widgetCoordinates) const;
     QString defaultSavePath() const;
@@ -204,7 +214,7 @@ private:
     void copySelection();
     void redoAnnotation();
     void drawAnnotation(QPainter &painter, const Annotation &annotation, bool widgetCoordinates) const;
-    void drawArrow(QPainter &painter, QPointF start, QPointF end, qreal width) const;
+    void drawArrow(QPainter &painter, QPointF start, QPointF end, qreal width, ArrowStyle style) const;
     void drawMosaic(QPainter &painter, QRectF imageRect, qreal blockSize, bool widgetCoordinates) const;
     void drawNumber(QPainter &painter, QPointF imagePoint, int number, QColor color, qreal width, bool widgetCoordinates) const;
     void drawWheelPreview(QPainter &painter);
@@ -218,6 +228,7 @@ private:
     void openSelectionWithDesktop(const DesktopApp &app);
     void runExtensionCommand(const ExtensionCommand &command);
     void pinSelection();
+    void startScrollCapture();
     void ocrCopySelection();
     void showToast(const QString &text, int durationMs = 2000);
     QString saveSelectionToTempFile() const;
@@ -250,6 +261,7 @@ private:
     void setSelectedAnnotationOpacity(int opacity);
     void setSelectedAnnotationFilled(bool filled);
     void setSelectedAnnotationCornerRadius(int radius);
+    void setSelectedAnnotationArrowStyle(ArrowStyle style);
     void setSelectedTextFontFamily(const QString &fontFamily);
     void applyPropertyColor(QColor color);
     void deleteSelectedAnnotation();
@@ -263,6 +275,9 @@ private:
     void resetImageZoom();
     void panImageTo(QPointF widgetPosition);
     void refreshViewGeometry();
+    void updateImageScrollBars();
+    void setImageCenterFromScrollBars();
+    void updateMinimumImageWindowSize();
     void updateActionToolbarGeometry();
     void updateToolbarGeometry();
     void updateToolbarState();
@@ -279,6 +294,11 @@ private:
     bool m_imageCenterInitialized = false;
     bool m_imageSelected = false;
     bool m_imagePanning = false;
+    bool m_syncingImageScrollBars = false;
+    QImage m_sharpViewportCache;
+    QRectF m_sharpViewportCacheSourceRect;
+    QSize m_sharpViewportCacheTargetSize;
+    qreal m_sharpViewportCacheDpr = 0.0;
     QPointF m_imagePanStartWidget;
     QPointF m_imagePanStartCenter;
     QRectF m_selection;
@@ -315,6 +335,7 @@ private:
     qreal m_laserWidth = 10.0;
     bool m_shapeFilled = false;
     qreal m_rectangleCornerRadius = 0.0;
+    ArrowStyle m_arrowStyle = ArrowStyle::Fletched;
     QString m_textFontFamily = QStringLiteral("Sans Serif");
     QColor m_textBackgroundColor = QColor(0, 0, 0, 0);
     int m_nextNumber = 1;
@@ -327,6 +348,8 @@ private:
     std::optional<LaserStroke> m_laserDraft;
     QWidget *m_toolbar = nullptr;
     QBoxLayout *m_toolbarLayout = nullptr;
+    QScrollBar *m_horizontalImageScrollBar = nullptr;
+    QScrollBar *m_verticalImageScrollBar = nullptr;
     QWidget *m_actionToolbar = nullptr;
     QWidget *m_annotationPropertyPanel = nullptr;
     QLabel *m_annotationPropertyTitle = nullptr;
@@ -337,8 +360,11 @@ private:
     QPushButton *m_propertyColorButton = nullptr;
     QPushButton *m_propertyTextBackgroundButton = nullptr;
     QPushButton *m_propertyFillButton = nullptr;
+    QLabel *m_propertyRadiusGlyphLabel = nullptr;
     QLabel *m_propertyRadiusLabel = nullptr;
     QSlider *m_propertyRadiusSlider = nullptr;
+    QLabel *m_propertyArrowStyleLabel = nullptr;
+    QComboBox *m_propertyArrowStyleCombo = nullptr;
     QPushButton *m_propertyFontButton = nullptr;
     QWidget *m_propertyFontPanel = nullptr;
     QListWidget *m_propertyFontList = nullptr;

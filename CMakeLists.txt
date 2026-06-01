@@ -1,15 +1,19 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(mark-shot VERSION 0.1.11 LANGUAGES CXX)
+project(mark-shot VERSION 0.1.12 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets DBus)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets DBus Concurrent)
 find_package(LayerShellQt QUIET)
 find_package(X11 COMPONENTS xcb QUIET)
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+    pkg_check_modules(PipeWire QUIET IMPORTED_TARGET libpipewire-0.3)
+endif()
 
 if(COMMAND qt_standard_project_setup)
     qt_standard_project_setup()
@@ -25,6 +29,12 @@ qt_add_executable(mark-shot
     src/screen_capture.h
     src/shot_window.cpp
     src/shot_window.h
+    src/annotation_launch.cpp
+    src/annotation_launch.h
+    src/scroll/stitcher.cpp
+    src/scroll/stitcher.h
+    src/scroll/scroll_session_window.cpp
+    src/scroll/scroll_session_window.h
     src/ui/color_picker.cpp
     src/ui/color_picker.h
     src/ui/icons.cpp
@@ -40,6 +50,7 @@ target_include_directories(mark-shot PRIVATE src)
 target_link_libraries(mark-shot
     PRIVATE
         Qt6::Core
+        Qt6::Concurrent
         Qt6::DBus
         Qt6::Gui
         Qt6::Widgets
@@ -53,6 +64,14 @@ endif()
 if(LayerShellQt_FOUND)
     target_link_libraries(mark-shot PRIVATE LayerShellQt::Interface)
     target_compile_definitions(mark-shot PRIVATE HAVE_LAYER_SHELL)
+endif()
+
+if(PipeWire_FOUND)
+    target_link_libraries(mark-shot PRIVATE PkgConfig::PipeWire)
+    target_compile_definitions(mark-shot PRIVATE HAVE_PIPEWIRE)
+    message(STATUS "mark-shot: PipeWire ${PipeWire_VERSION} found, portal screencast capture enabled")
+else()
+    message(STATUS "mark-shot: PipeWire not found, Wayland scrolling capture falls back to screenshot portal/grim")
 endif()
 
 install(TARGETS mark-shot RUNTIME DESTINATION bin)

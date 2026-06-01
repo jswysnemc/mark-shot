@@ -34,8 +34,10 @@ jobs:
             exit 1
           fi
           VERSION="${TAG#v}"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          {
+            echo "tag=$TAG"
+            echo "version=$VERSION"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Checkout release source
         uses: actions/checkout@v4
@@ -48,6 +50,8 @@ jobs:
             cmake \
             gcc \
             ninja \
+            pkgconf \
+            pipewire \
             qt6-base \
             qt6-wayland \
             layer-shell-qt
@@ -74,9 +78,100 @@ jobs:
           sha256sum "$ASSET" > "$ASSET.sha256"
 
       - name: Upload binaries to release
+        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           files: |
             mark-shot-${{ steps.version.outputs.tag }}-linux-x86_64.tar.gz
             mark-shot-${{ steps.version.outputs.tag }}-linux-x86_64.tar.gz.sha256
+
+      - name: Upload binaries artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mark-shot-linux-x86_64-${{ steps.version.outputs.tag }}
+          path: |
+            mark-shot-${{ steps.version.outputs.tag }}-linux-x86_64.tar.gz
+            mark-shot-${{ steps.version.outputs.tag }}-linux-x86_64.tar.gz.sha256
+          if-no-files-found: error
+
+  linux-arm64:
+    name: Build Linux arm64 binary package
+    runs-on: ubuntu-22.04-arm
+
+    steps:
+      - name: Resolve tag
+        id: version
+        shell: bash
+        run: |
+          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            echo "No release tag was provided" >&2
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          {
+            echo "tag=$TAG"
+            echo "version=$VERSION"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Checkout release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.version.outputs.tag }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            libgl1-mesa-dev \
+            libpipewire-0.3-dev \
+            libx11-xcb-dev \
+            libxcb1-dev \
+            ninja-build \
+            pkg-config \
+            qt6-base-dev \
+            qt6-base-dev-tools
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Package install tree
+        shell: bash
+        run: |
+          cmake --install build --prefix "$PWD/app"
+          install -Dm644 LICENSE app/share/licenses/mark-shot/LICENSE
+          install -Dm644 README.md app/share/doc/mark-shot/README.md
+          install -Dm644 README.zh-CN.md app/share/doc/mark-shot/README.zh-CN.md
+
+          ASSET="mark-shot-${{ steps.version.outputs.tag }}-linux-arm64.tar.gz"
+          tar -C app -czf "$ASSET" .
+          sha256sum "$ASSET" > "$ASSET.sha256"
+
+      - name: Upload binaries to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          files: |
+            mark-shot-${{ steps.version.outputs.tag }}-linux-arm64.tar.gz
+            mark-shot-${{ steps.version.outputs.tag }}-linux-arm64.tar.gz.sha256
+
+      - name: Upload binaries artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mark-shot-linux-arm64-${{ steps.version.outputs.tag }}
+          path: |
+            mark-shot-${{ steps.version.outputs.tag }}-linux-arm64.tar.gz
+            mark-shot-${{ steps.version.outputs.tag }}-linux-arm64.tar.gz.sha256
+          if-no-files-found: error

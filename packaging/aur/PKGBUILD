@@ -1,12 +1,12 @@
 pkgname=mark-shot
-pkgver=0.1.11
+pkgver=0.1.12
 pkgrel=1
 pkgdesc='Qt 6 Wayland screenshot selection and annotation tool'
-arch=('x86_64')
+arch=('x86_64' 'aarch64')
 url='https://github.com/jswysnemc/mark-shot'
 license=('MIT')
-depends=('qt6-base' 'qt6-wayland' 'layer-shell-qt' 'grim' 'wl-clipboard')
-makedepends=('cmake' 'ninja')
+depends=('qt6-base' 'qt6-wayland' 'layer-shell-qt' 'pipewire' 'grim' 'wl-clipboard')
+makedepends=('cmake' 'ninja' 'pkgconf')
 optdepends=(
     'python: pinned-window OCR and LLM translation helpers'
     'tesseract: fallback OCR backend'

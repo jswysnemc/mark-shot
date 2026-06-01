@@ -4,7 +4,7 @@
 
 <video src="https://github.com/user-attachments/assets/c2298867-06b4-404d-87bc-62ab8d81088b" width="100%" controls></video>
 
-`mark-shot` is a high-performance screenshot and annotation tool built with Qt 6. Originally designed for Wayland compositors such as `niri`, it now also runs natively on X11/GNOME desktops.
+`mark-shot` is a high-performance screenshot and annotation tool built with Qt 6. It was originally designed for Wayland compositors such as `niri`, and it also supports standard screenshot and annotation workflows on X11/GNOME desktops.
 
 It captures screen frames instantly and opens an interactive fullscreen overlay, providing region cropping, rich annotation, clipboard copying, saving, and desktop pinning features.
 
@@ -34,8 +34,14 @@ It captures screen frames instantly and opens an interactive fullscreen overlay,
   - Double left-click or press `Esc` to close.
   - Right-click to open a context menu with options to rotate, copy image text, translate, save, copy, or adjust opacity (0.2 to 1.0).
 
+### Scrolling Screenshot Capture
+- Captures a long scrolling region by combining PipeWire screencast frames with an interactive scrolling overlay and stitcher.
+- Designed primarily for `niri` and similar Wayland environments where output geometry and capture timing can be controlled predictably.
+- **Compatibility notice**: scrolling capture is experimental. It may not work on GNOME or KDE because their portal backends, shell policies, window geometry behavior, and frame timing differ substantially. Adapting this feature reliably across GNOME Shell and KWin is difficult and may require compositor-specific work.
+- If scrolling capture fails on GNOME or KDE, use normal screenshots or configure an external long-screenshot command through Mark Shot extension commands.
+
 ### Cross-Platform Display Server Support
-- **Wayland**: Uses `grim` for screen capture, `layer-shell-qt` for native overlay, and `wl-copy` for clipboard persistence.
+- **Wayland**: Uses PipeWire portal screencast for experimental scrolling capture, `grim` for wlroots screenshot capture, `layer-shell-qt` for native overlay, and `wl-copy` for clipboard persistence.
 - **X11**: Uses `QScreen::grabWindow` for screen capture, fullscreen top-level window for overlay, and `xclip` for clipboard persistence.
 - Runtime auto-detection via `$XDG_SESSION_TYPE` — no configuration needed.
 
@@ -149,22 +155,31 @@ When installing manually, install `mark-shot`, `mark-shot-ocr`, and `mark-shot-t
 
 ## Compilation & Installation
 
+### Official Release Artifacts
+
+Each release publishes Linux binary archives and Debian packages:
+
+- `linux-x86_64.tar.gz` and `linux-arm64.tar.gz`
+- `amd64.deb` and `arm64.deb`
+
+The Debian package installs `mark-shot`, helper scripts, desktop entries, icons, and runtime metadata together.
+
 ### Dependencies
 
 #### Wayland (Arch Linux)
 
 ```bash
-sudo pacman -S --needed base-devel cmake ninja qt6-base qt6-wayland layer-shell-qt grim wl-clipboard
+sudo pacman -S --needed base-devel cmake ninja pkgconf qt6-base qt6-wayland layer-shell-qt pipewire grim wl-clipboard
 ```
 
 #### X11/GNOME (Ubuntu/Debian)
 
 ```bash
 # Build essentials
-sudo apt install build-essential cmake ninja-build
+sudo apt install build-essential cmake ninja-build pkg-config libpipewire-0.3-dev
 
-# Clipboard tool
-sudo apt install xclip
+# Portal and clipboard tools
+sudo apt install xdg-desktop-portal pipewire xclip
 
 # Qt 6 (if not available in system repos, install via aqtinstall)
 pip install aqtinstall
@@ -274,6 +289,21 @@ This installs the binary, helper scripts (`mark-shot-ocr`, `mark-shot-translate`
 | **Double Tap Ctrl Key** | Resets the window size to original aspect ratio. |
 | **Right Click** | Opens the context menu (Rotate, Opacity, Copy Image Text, Translate, Save, Copy, Close). |
 | **Esc Key** | Closes the currently active pinned window. |
+
+---
+
+## Release Notes
+
+### 0.1.12
+
+- Added experimental native scrolling screenshot capture for Wayland.
+- Reworked the annotation property panel into a compact icon-based layout.
+- Added alternate arrow styles, including a KDE/Spectacle-like arrow.
+- Improved GNOME portal behavior by avoiding duplicate host portal app registration.
+- Added Linux ARM64 tarball and Ubuntu/Debian ARM64 `.deb` release artifacts.
+- Improved PipeWire SPA header compatibility for older distributions.
+
+Scrolling screenshot capture is not guaranteed on GNOME or KDE. The feature depends on portal capture behavior, compositor timing, window geometry, and scroll event handling, so robust GNOME/KDE support has a high adaptation cost.
 
 ---
 

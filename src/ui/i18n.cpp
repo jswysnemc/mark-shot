@@ -83,6 +83,7 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Open With"), QStringLiteral("打开方式")},
         {QStringLiteral("Extensions"), QStringLiteral("扩展")},
         {QStringLiteral("Pin"), QStringLiteral("钉住")},
+        {QStringLiteral("Scroll Capture"), QStringLiteral("滚动截屏")},
         {QStringLiteral("OCR Copy"), QStringLiteral("OCR 复制")},
         {QStringLiteral("Copy"), QStringLiteral("复制")},
         {QStringLiteral("Save"), QStringLiteral("保存")},
@@ -103,6 +104,9 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Text background color"), QStringLiteral("文字背景颜色")},
         {QStringLiteral("Toggle shape fill"), QStringLiteral("切换形状填充")},
         {QStringLiteral("Rectangle corner radius"), QStringLiteral("矩形圆角半径")},
+        {QStringLiteral("Arrow style"), QStringLiteral("箭头样式")},
+        {QStringLiteral("Fletched"), QStringLiteral("燕尾")},
+        {QStringLiteral("KDE"), QStringLiteral("KDE")},
         {QStringLiteral("Text font"), QStringLiteral("文字字体")},
         {QStringLiteral("Edit selected text"), QStringLiteral("编辑所选文字")},
 
@@ -110,6 +114,10 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Type text"), QStringLiteral("输入文字")},
         {QStringLiteral("Enter inserts newline, click outside commits, Esc cancels"),
          QStringLiteral("回车换行，点击外部确认，Esc 取消")},
+
+        // Selection overlay hint.
+        {QStringLiteral("Drag to select   Middle switches   Right/Esc cancels"),
+         QStringLiteral("拖动选择区域   中键切换全屏标注   右键/Esc 取消")},
 
         // Open-with / extensions panels.
         {QStringLiteral("Open with"), QStringLiteral("打开方式")},
@@ -129,6 +137,20 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("OCR failed"), QStringLiteral("OCR 失败")},
         {QStringLiteral("No text recognized"), QStringLiteral("未识别到文字")},
         {QStringLiteral("OCR text copied"), QStringLiteral("已复制 OCR 文字")},
+
+        // Scrolling capture session window.
+        {QStringLiteral("Pause"), QStringLiteral("暂停")},
+        {QStringLiteral("Resume"), QStringLiteral("继续")},
+        {QStringLiteral("Annotate"), QStringLiteral("标注")},
+        {QStringLiteral("Scroll down to capture"), QStringLiteral("向下滚动以捕获")},
+        {QStringLiteral("Capturing"), QStringLiteral("正在捕获")},
+        {QStringLiteral("Waiting for scroll"), QStringLiteral("等待滚动")},
+        {QStringLiteral("No overlap match"), QStringLiteral("无重叠匹配")},
+        {QStringLiteral("Capture error"), QStringLiteral("捕获错误")},
+        {QStringLiteral("Height %1 px"), QStringLiteral("高度 %1 px")},
+        {QStringLiteral("Save Scrolling Screenshot"), QStringLiteral("保存滚动截图")},
+        {QStringLiteral("Dir: Vertical"), QStringLiteral("方向：纵向")},
+        {QStringLiteral("Dir: Horizontal"), QStringLiteral("方向：横向")},
     };
     return table;
 }
