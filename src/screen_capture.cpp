@@ -1,8 +1,10 @@
 #include "screen_capture.h"
 
+#include <QDBusError>
 #include <QDBusConnection>
 #include <QDBusArgument>
 #include <QDBusInterface>
+#include <QDBusMessage>
 #include <QDBusMetaType>
 #include <QDBusObjectPath>
 #include <QDBusPendingCallWatcher>
@@ -281,6 +283,45 @@ QRect virtualScreensGeometry()
     return geometry;
 }
 
+void registerHostPortalApplication()
+{
+    static QMutex mutex;
+    static bool attempted = false;
+
+    QMutexLocker locker(&mutex);
+    if (attempted) {
+        return;
+    }
+    attempted = true;
+
+    if (QFile::exists(QStringLiteral("/.flatpak-info")) || qEnvironmentVariableIsSet("SNAP")) {
+        return;
+    }
+
+    const QString desktopFileName = QGuiApplication::desktopFileName();
+    if (desktopFileName.isEmpty()) {
+        return;
+    }
+
+    QDBusMessage message = QDBusMessage::createMethodCall(QStringLiteral("org.freedesktop.portal.Desktop"),
+                                                          QStringLiteral("/org/freedesktop/portal/desktop"),
+                                                          QStringLiteral("org.freedesktop.host.portal.Registry"),
+                                                          QStringLiteral("Register"));
+    message << desktopFileName << QVariantMap();
+
+    const QDBusMessage reply = QDBusConnection::sessionBus().call(message, QDBus::Block, 3000);
+    if (reply.type() == QDBusMessage::ErrorMessage) {
+        const QDBusError error(reply);
+        if (error.type() == QDBusError::UnknownInterface || error.type() == QDBusError::UnknownMethod) {
+            return;
+        }
+        if (error.name() == QStringLiteral("org.freedesktop.portal.Error.Failed")
+            && error.message().contains(QStringLiteral("Connection already associated"))) {
+            return;
+        }
+    }
+}
+
 QVariantMap waitForPortalResponse(PortalResponseReceiver *receiver, QString *error)
 {
     if (receiver->received) {
@@ -316,6 +357,8 @@ QVariantMap waitForPortalResponse(PortalResponseReceiver *receiver, QString *err
 
 CaptureResult captureWithPortalScreenshot(const CaptureRequest &request)
 {
+    registerHostPortalApplication();
+
     QDBusInterface portal(QStringLiteral("org.freedesktop.portal.Desktop"),
                           QStringLiteral("/org/freedesktop/portal/desktop"),
                           QStringLiteral("org.freedesktop.portal.Screenshot"),
