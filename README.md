@@ -294,6 +294,10 @@ This installs the binary, helper scripts (`mark-shot-ocr`, `mark-shot-translate`
 
 ## Release Notes
 
+### 0.1.13
+
+- Fixed scrolling screenshot selection geometry on scaled `niri` outputs.
+
 ### 0.1.12
 
 - Added experimental native scrolling screenshot capture for Wayland.

@@ -4590,7 +4590,28 @@ QRect ShotWindow::selectionGlobalRect() const
     }
 
     if (m_sourceGeometry.isValid() && !m_sourceGeometry.isEmpty()) {
-        selectionRect.translate(m_sourceGeometry.topLeft());
+        const QSize imageSize = m_frozenFrame.size();
+        if (imageSize.width() <= 0 || imageSize.height() <= 0) {
+            return {};
+        }
+
+        const QRect sourceGeometry = m_sourceGeometry.normalized();
+        // Wayland captures can be in output pixels while compositor geometry is
+        // logical. Map the image-space selection back before passing it to grim.
+        const qreal scaleX = static_cast<qreal>(sourceGeometry.width()) / imageSize.width();
+        const qreal scaleY = static_cast<qreal>(sourceGeometry.height()) / imageSize.height();
+        const int left = sourceGeometry.left() + qRound(selectionRect.left() * scaleX);
+        const int top = sourceGeometry.top() + qRound(selectionRect.top() * scaleY);
+        const int right = sourceGeometry.left() + qRound((selectionRect.left() + selectionRect.width()) * scaleX);
+        const int bottom = sourceGeometry.top() + qRound((selectionRect.top() + selectionRect.height()) * scaleY);
+        selectionRect = QRect(left,
+                              top,
+                              std::max(1, right - left),
+                              std::max(1, bottom - top))
+                            .intersected(sourceGeometry);
+        if (selectionRect.isEmpty()) {
+            return {};
+        }
     }
     return selectionRect;
 }

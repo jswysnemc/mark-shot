@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.13 - 2026-06-01
+
+### Fixes
+
+- Fixed scrolling screenshot selection geometry on scaled `niri` outputs by mapping image pixel coordinates back to compositor logical coordinates before starting the scroll capture session.
+
+### Release Artifacts
+
+- `mark-shot-v0.1.13-linux-x86_64.tar.gz`
+- `mark-shot-v0.1.13-linux-arm64.tar.gz`
+- `mark-shot_0.1.13_amd64.deb`
+- `mark-shot_0.1.13_arm64.deb`
+
 ## 0.1.12 - 2026-06-01
 
 ### Highlights
