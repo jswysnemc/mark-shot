@@ -16,6 +16,7 @@ class QBoxLayout;
 class QLabel;
 class QListWidget;
 class QPushButton;
+class QScrollBar;
 class QScreen;
 class QSlider;
 class QTextEdit;
@@ -273,6 +274,9 @@ private:
     void resetImageZoom();
     void panImageTo(QPointF widgetPosition);
     void refreshViewGeometry();
+    void updateImageScrollBars();
+    void setImageCenterFromScrollBars();
+    void updateMinimumImageWindowSize();
     void updateActionToolbarGeometry();
     void updateToolbarGeometry();
     void updateToolbarState();
@@ -289,6 +293,11 @@ private:
     bool m_imageCenterInitialized = false;
     bool m_imageSelected = false;
     bool m_imagePanning = false;
+    bool m_syncingImageScrollBars = false;
+    QImage m_sharpViewportCache;
+    QRectF m_sharpViewportCacheSourceRect;
+    QSize m_sharpViewportCacheTargetSize;
+    qreal m_sharpViewportCacheDpr = 0.0;
     QPointF m_imagePanStartWidget;
     QPointF m_imagePanStartCenter;
     QRectF m_selection;
@@ -338,6 +347,8 @@ private:
     std::optional<LaserStroke> m_laserDraft;
     QWidget *m_toolbar = nullptr;
     QBoxLayout *m_toolbarLayout = nullptr;
+    QScrollBar *m_horizontalImageScrollBar = nullptr;
+    QScrollBar *m_verticalImageScrollBar = nullptr;
     QWidget *m_actionToolbar = nullptr;
     QWidget *m_annotationPropertyPanel = nullptr;
     QLabel *m_annotationPropertyTitle = nullptr;

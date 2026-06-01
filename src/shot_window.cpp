@@ -51,6 +51,7 @@
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QPushButton>
+#include <QScrollBar>
 #include <QScreen>
 #include <QShortcut>
 #include <QSignalBlocker>
@@ -63,17 +64,20 @@
 #include <QTextDocument>
 #include <QTextLayout>
 #include <QTextOption>
+#include <QThread>
 #include <QTimer>
 #include <QTransform>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QWindow>
 #include <QWheelEvent>
+#include <QtConcurrent>
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -91,10 +95,15 @@ constexpr qint64 kLaserLifetimeMs = 1800;
 constexpr qreal kTextBackgroundPaddingX = 6.0;
 constexpr qreal kTextBackgroundPaddingY = 4.0;
 constexpr qreal kMinImageZoom = 0.25;
-constexpr qreal kMaxImageZoom = 8.0;
+constexpr qreal kMaxImageZoom = 64.0;
 constexpr qint64 kCtrlDoubleTapMs = 360;
 constexpr int kPinnedOcrTimeoutMs = 30000;
 constexpr int kPinnedTranslationTimeoutMs = 60000;
+constexpr int kImageScrollBarExtent = 14;
+constexpr int kImageWindowMinimumToolbarPadding = 24;
+constexpr qsizetype kMaxSharpViewportPixels = 50'000'000;
+constexpr double kSharpKernelRadius = 2.5;
+constexpr int kMinSharpRowsPerThread = 64;
 
 QRectF normalizedRect(QPointF a, QPointF b)
 {
@@ -144,6 +153,206 @@ qreal imageNavigationWheelFactor(const QWheelEvent *event)
     }
 
     return 1.0;
+}
+
+struct AxisSample {
+    int index = 0;
+    double weight = 0.0;
+};
+
+struct AxisTable {
+    std::vector<std::vector<AxisSample>> samples;
+    int first = 0;
+    int last = -1;
+};
+
+double sharpKernel(double distance)
+{
+    const double x = std::abs(distance);
+    if (x > kSharpKernelRadius) {
+        return 0.0;
+    }
+    if (x <= 0.5) {
+        return 17.0 / 16.0 - 7.0 / 4.0 * x * x;
+    }
+    if (x <= 1.5) {
+        return x * x - 11.0 / 4.0 * x + 7.0 / 4.0;
+    }
+    return -1.0 / 8.0 * x * x + 5.0 / 8.0 * x - 25.0 / 32.0;
+}
+
+AxisTable buildAxisTable(int inputSize, int outputSize, double sourceStart, double scale)
+{
+    AxisTable table;
+    table.samples.resize(outputSize);
+    table.first = inputSize;
+
+    const double filterScale = std::min(scale, 1.0);
+    const double radius = kSharpKernelRadius / filterScale;
+    for (int output = 0; output < outputSize; ++output) {
+        const double center = sourceStart + (static_cast<double>(output) + 0.5) / scale - 0.5;
+        const int first = std::max(0, static_cast<int>(std::floor(center - radius)));
+        const int last = std::min(inputSize - 1, static_cast<int>(std::ceil(center + radius)));
+
+        double sum = 0.0;
+        std::vector<AxisSample> samples;
+        samples.reserve(std::max(0, last - first + 1));
+        for (int input = first; input <= last; ++input) {
+            const double weight = sharpKernel((static_cast<double>(input) - center) * filterScale);
+            if (weight == 0.0) {
+                continue;
+            }
+            samples.push_back({input, weight});
+            sum += weight;
+        }
+
+        if (samples.empty() || qFuzzyIsNull(sum)) {
+            const int nearest = std::clamp(static_cast<int>(std::round(center)), 0, inputSize - 1);
+            samples.push_back({nearest, 1.0});
+            table.first = std::min(table.first, nearest);
+            table.last = std::max(table.last, nearest);
+        } else {
+            for (AxisSample &sample : samples) {
+                sample.weight /= sum;
+                table.first = std::min(table.first, sample.index);
+                table.last = std::max(table.last, sample.index);
+            }
+        }
+
+        table.samples[output] = std::move(samples);
+    }
+
+    if (table.first > table.last) {
+        table.first = 0;
+        table.last = 0;
+    }
+    return table;
+}
+
+int byteFromWeightedSum(double value)
+{
+    return std::clamp(static_cast<int>(std::lround(value)), 0, 255);
+}
+
+QRgb premultipliedPixel(double red, double green, double blue, double alpha)
+{
+    const int a = byteFromWeightedSum(alpha);
+    const int r = std::min(byteFromWeightedSum(red), a);
+    const int g = std::min(byteFromWeightedSum(green), a);
+    const int b = std::min(byteFromWeightedSum(blue), a);
+    return qRgba(r, g, b, a);
+}
+
+template <typename Function>
+void forRowRanges(int rowCount, Function function)
+{
+    if (rowCount <= 0) {
+        return;
+    }
+
+    const int idealThreads = std::max(1, QThread::idealThreadCount());
+    const int threadCount = std::clamp(rowCount / kMinSharpRowsPerThread, 1, idealThreads);
+    if (threadCount == 1) {
+        function(0, rowCount);
+        return;
+    }
+
+    std::vector<std::pair<int, int>> ranges;
+    ranges.reserve(threadCount);
+    const int rowsPerThread = rowCount / threadCount;
+    int begin = 0;
+    for (int i = 0; i < threadCount; ++i) {
+        const int end = i == threadCount - 1 ? rowCount : begin + rowsPerThread;
+        ranges.push_back({begin, end});
+        begin = end;
+    }
+
+    QtConcurrent::blockingMap(ranges, [&function](const std::pair<int, int> &range) {
+        function(range.first, range.second);
+    });
+}
+
+QImage renderSharpViewport(const QImage &source, const QRectF &sourceRect, const QSize &targetSize)
+{
+    if (source.isNull() || sourceRect.isEmpty() || targetSize.isEmpty()) {
+        return {};
+    }
+
+    const QImage src = source.format() == QImage::Format_ARGB32_Premultiplied
+        ? source
+        : source.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    const QRectF sourceBounds(QPointF(0.0, 0.0), QSizeF(src.size()));
+    const QRectF clampedSourceRect = sourceRect.intersected(sourceBounds);
+    if (clampedSourceRect.isEmpty()) {
+        return {};
+    }
+
+    const double scaleX = static_cast<double>(targetSize.width()) / clampedSourceRect.width();
+    const double scaleY = static_cast<double>(targetSize.height()) / clampedSourceRect.height();
+    const AxisTable xTable =
+        buildAxisTable(src.width(), targetSize.width(), clampedSourceRect.left(), scaleX);
+    const AxisTable yTable =
+        buildAxisTable(src.height(), targetSize.height(), clampedSourceRect.top(), scaleY);
+
+    const int intermediateHeight = yTable.last - yTable.first + 1;
+    QImage horizontal(targetSize.width(), intermediateHeight, QImage::Format_ARGB32_Premultiplied);
+    const uchar *sourceBits = src.constBits();
+    const int sourceStride = src.bytesPerLine();
+    uchar *horizontalBits = horizontal.bits();
+    const int horizontalStride = horizontal.bytesPerLine();
+
+    forRowRanges(intermediateHeight, [&](int begin, int end) {
+        for (int row = begin; row < end; ++row) {
+            const int y = yTable.first + row;
+            const auto *sourceLine =
+                reinterpret_cast<const QRgb *>(sourceBits + y * sourceStride);
+            auto *targetLine =
+                reinterpret_cast<QRgb *>(horizontalBits + row * horizontalStride);
+            for (int x = 0; x < targetSize.width(); ++x) {
+                double a = 0.0;
+                double r = 0.0;
+                double g = 0.0;
+                double b = 0.0;
+                for (const AxisSample &sample : xTable.samples[x]) {
+                    const QRgb pixel = sourceLine[sample.index];
+                    a += sample.weight * qAlpha(pixel);
+                    r += sample.weight * qRed(pixel);
+                    g += sample.weight * qGreen(pixel);
+                    b += sample.weight * qBlue(pixel);
+                }
+                targetLine[x] = premultipliedPixel(r, g, b, a);
+            }
+        }
+    });
+
+    QImage target(targetSize, QImage::Format_ARGB32_Premultiplied);
+    const uchar *horizontalReadBits = horizontal.constBits();
+    const int horizontalReadStride = horizontal.bytesPerLine();
+    uchar *targetBits = target.bits();
+    const int targetStride = target.bytesPerLine();
+
+    forRowRanges(targetSize.height(), [&](int begin, int end) {
+        for (int y = begin; y < end; ++y) {
+            auto *targetLine = reinterpret_cast<QRgb *>(targetBits + y * targetStride);
+            for (int x = 0; x < targetSize.width(); ++x) {
+                double a = 0.0;
+                double r = 0.0;
+                double g = 0.0;
+                double b = 0.0;
+                for (const AxisSample &sample : yTable.samples[y]) {
+                    const auto *sourceLine = reinterpret_cast<const QRgb *>(
+                        horizontalReadBits + (sample.index - yTable.first) * horizontalReadStride);
+                    const QRgb pixel = sourceLine[x];
+                    a += sample.weight * qAlpha(pixel);
+                    r += sample.weight * qRed(pixel);
+                    g += sample.weight * qGreen(pixel);
+                    b += sample.weight * qBlue(pixel);
+                }
+                targetLine[x] = premultipliedPixel(r, g, b, a);
+            }
+        }
+    });
+    return target;
 }
 
 // Stylesheets, palette presets, action names, and toolbar icons now live in
@@ -1594,6 +1803,9 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     setFocusPolicy(Qt::StrongFocus);
     setAttribute(Qt::WA_DeleteOnClose);
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+    if (m_frozenFrame.format() != QImage::Format_ARGB32_Premultiplied) {
+        m_frozenFrame = m_frozenFrame.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    }
 
     m_toolbar = new QWidget(this);
     m_toolbar->setObjectName(QStringLiteral("shotToolbar"));
@@ -1645,6 +1857,29 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
         m_toolbarLayout->addWidget(button);
     }
     m_toolbar->hide();
+
+    m_horizontalImageScrollBar = new QScrollBar(Qt::Horizontal, this);
+    m_horizontalImageScrollBar->setFocusPolicy(Qt::NoFocus);
+    m_horizontalImageScrollBar->hide();
+    m_verticalImageScrollBar = new QScrollBar(Qt::Vertical, this);
+    m_verticalImageScrollBar->setFocusPolicy(Qt::NoFocus);
+    m_verticalImageScrollBar->hide();
+    const QString imageScrollBarStyle = QStringLiteral(
+        "QScrollBar { background: rgba(8,13,19,190); border: 0; }"
+        "QScrollBar:horizontal { height: 14px; }"
+        "QScrollBar:vertical { width: 14px; }"
+        "QScrollBar::handle { background: rgba(45,212,191,180); border-radius: 6px; min-width: 28px; min-height: 28px; }"
+        "QScrollBar::handle:hover { background: rgba(94,234,212,220); }"
+        "QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }"
+        "QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }");
+    m_horizontalImageScrollBar->setStyleSheet(imageScrollBarStyle);
+    m_verticalImageScrollBar->setStyleSheet(imageScrollBarStyle);
+    connect(m_horizontalImageScrollBar, &QScrollBar::valueChanged, this, [this] {
+        setImageCenterFromScrollBars();
+    });
+    connect(m_verticalImageScrollBar, &QScrollBar::valueChanged, this, [this] {
+        setImageCenterFromScrollBars();
+    });
 
     m_actionToolbar = new QWidget(this);
     m_actionToolbar->setObjectName(QStringLiteral("actionToolbar"));
@@ -1964,6 +2199,7 @@ void ShotWindow::setImageNavigationEnabled(bool enabled)
         m_imageSelected = false;
         m_imagePanning = false;
     }
+    updateMinimumImageWindowSize();
     updateFrozenImageRect();
     refreshViewGeometry();
     update();
@@ -1983,6 +2219,7 @@ void ShotWindow::enterFullscreenAnnotation(bool resetAnnotations)
     m_dragging = false;
     m_fullscreenAnnotation = true;
     applyToolbarLayout();
+    updateMinimumImageWindowSize();
     m_toolbarDragging = false;
     m_toolbarUserPlaced = false;
     m_selection = QRectF(QPointF(0, 0), QSizeF(m_frozenFrame.size()));
@@ -2019,6 +2256,7 @@ void ShotWindow::enterFullscreenAnnotation(bool resetAnnotations)
         setFullscreenActionButtonsVisible(true);
         m_toolbar->show();
     }
+    updateMinimumImageWindowSize();
     if (m_actionToolbar) {
         m_actionToolbar->hide();
     }
@@ -2411,7 +2649,45 @@ void ShotWindow::paintEvent(QPaintEvent *)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.fillRect(rect(), QColor(0, 0, 0));
-    painter.drawImage(m_frozenImageRect, m_frozenFrame);
+    const qreal imageScale = m_frozenFrame.isNull()
+        ? 1.0
+        : m_frozenImageRect.width() / std::max<qreal>(1.0, m_frozenFrame.width());
+    const QRectF visibleImageRect = m_frozenImageRect.intersected(QRectF(rect()));
+    const qreal dpr = devicePixelRatioF();
+    const QSize sharpTargetSize(qMax(1, qRound(visibleImageRect.width() * dpr)),
+                                qMax(1, qRound(visibleImageRect.height() * dpr)));
+    const qsizetype sharpPixels =
+        static_cast<qsizetype>(sharpTargetSize.width()) * sharpTargetSize.height();
+    if (imageNavigationAvailable() && imageScale > 1.01 && !visibleImageRect.isEmpty()
+        && sharpPixels <= kMaxSharpViewportPixels) {
+        const QRectF sourceRect((visibleImageRect.left() - m_frozenImageRect.left()) / imageScale,
+                                (visibleImageRect.top() - m_frozenImageRect.top()) / imageScale,
+                                visibleImageRect.width() / imageScale,
+                                visibleImageRect.height() / imageScale);
+        const bool cacheHit = !m_sharpViewportCache.isNull()
+            && m_sharpViewportCacheSourceRect == sourceRect
+            && m_sharpViewportCacheTargetSize == sharpTargetSize
+            && qFuzzyCompare(m_sharpViewportCacheDpr, dpr);
+        QImage rendered = cacheHit
+            ? m_sharpViewportCache
+            : renderSharpViewport(m_frozenFrame, sourceRect, sharpTargetSize);
+        if (!rendered.isNull()) {
+            rendered.setDevicePixelRatio(dpr);
+            if (!cacheHit) {
+                m_sharpViewportCache = rendered;
+                m_sharpViewportCacheSourceRect = sourceRect;
+                m_sharpViewportCacheTargetSize = sharpTargetSize;
+                m_sharpViewportCacheDpr = dpr;
+            }
+            painter.drawImage(visibleImageRect, rendered);
+        } else {
+            m_sharpViewportCache = {};
+            painter.drawImage(m_frozenImageRect, m_frozenFrame);
+        }
+    } else {
+        m_sharpViewportCache = {};
+        painter.drawImage(m_frozenImageRect, m_frozenFrame);
+    }
 
     const QRectF selection = normalizedSelection();
     QPainterPath dimPath;
@@ -2523,6 +2799,7 @@ void ShotWindow::resizeEvent(QResizeEvent *)
         updateColorPaletteGeometry(m_colorPaletteAnchor);
     }
     updateTextEditorGeometry();
+    updateImageScrollBars();
     updateToolbarGeometry();
     updateActionToolbarGeometry();
     updateAnnotationPropertyPanelGeometry();
@@ -4547,9 +4824,112 @@ void ShotWindow::panImageTo(QPointF widgetPosition)
     update();
 }
 
+void ShotWindow::updateImageScrollBars()
+{
+    if (!m_horizontalImageScrollBar || !m_verticalImageScrollBar) {
+        return;
+    }
+    if (!imageNavigationAvailable() || m_frozenFrame.isNull() || m_frozenImageRect.isEmpty()) {
+        m_horizontalImageScrollBar->hide();
+        m_verticalImageScrollBar->hide();
+        return;
+    }
+
+    const qreal scale = m_frozenImageRect.width() / std::max<qreal>(1.0, m_frozenFrame.width());
+    if (scale <= 0.0) {
+        m_horizontalImageScrollBar->hide();
+        m_verticalImageScrollBar->hide();
+        return;
+    }
+
+    const int scaledWidth = qRound(m_frozenFrame.width() * scale);
+    const int scaledHeight = qRound(m_frozenFrame.height() * scale);
+    const int maxX = std::max(0, scaledWidth - width());
+    const int maxY = std::max(0, scaledHeight - height());
+    const bool showHorizontal = maxX > 0;
+    const bool showVertical = maxY > 0;
+
+    const int horizontalWidth = std::max(0, width() - (showVertical ? kImageScrollBarExtent : 0));
+    const int verticalHeight = std::max(0, height() - (showHorizontal ? kImageScrollBarExtent : 0));
+    m_horizontalImageScrollBar->setGeometry(0,
+                                            height() - kImageScrollBarExtent,
+                                            horizontalWidth,
+                                            kImageScrollBarExtent);
+    m_verticalImageScrollBar->setGeometry(width() - kImageScrollBarExtent,
+                                          0,
+                                          kImageScrollBarExtent,
+                                          verticalHeight);
+
+    const QSignalBlocker blockHorizontal(m_horizontalImageScrollBar);
+    const QSignalBlocker blockVertical(m_verticalImageScrollBar);
+    m_syncingImageScrollBars = true;
+    m_horizontalImageScrollBar->setRange(0, maxX);
+    m_horizontalImageScrollBar->setPageStep(std::max(1, width()));
+    m_horizontalImageScrollBar->setSingleStep(std::max(1, width() / 12));
+    m_horizontalImageScrollBar->setValue(std::clamp(qRound(-m_frozenImageRect.left()), 0, maxX));
+    m_verticalImageScrollBar->setRange(0, maxY);
+    m_verticalImageScrollBar->setPageStep(std::max(1, height()));
+    m_verticalImageScrollBar->setSingleStep(std::max(1, height() / 12));
+    m_verticalImageScrollBar->setValue(std::clamp(qRound(-m_frozenImageRect.top()), 0, maxY));
+    m_syncingImageScrollBars = false;
+
+    m_horizontalImageScrollBar->setVisible(showHorizontal);
+    m_verticalImageScrollBar->setVisible(showVertical);
+    if (showHorizontal) {
+        m_horizontalImageScrollBar->raise();
+    }
+    if (showVertical) {
+        m_verticalImageScrollBar->raise();
+    }
+}
+
+void ShotWindow::setImageCenterFromScrollBars()
+{
+    if (m_syncingImageScrollBars || !imageNavigationAvailable()
+        || m_frozenFrame.isNull() || m_frozenImageRect.isEmpty()) {
+        return;
+    }
+
+    const qreal scale = m_frozenImageRect.width() / std::max<qreal>(1.0, m_frozenFrame.width());
+    if (scale <= 0.0) {
+        return;
+    }
+
+    const bool hasHorizontal = m_horizontalImageScrollBar && m_horizontalImageScrollBar->maximum() > 0;
+    const bool hasVertical = m_verticalImageScrollBar && m_verticalImageScrollBar->maximum() > 0;
+    const qreal centerX = hasHorizontal
+        ? (m_horizontalImageScrollBar->value() + width() / 2.0) / scale
+        : m_frozenFrame.width() / 2.0;
+    const qreal centerY = hasVertical
+        ? (m_verticalImageScrollBar->value() + height() / 2.0) / scale
+        : m_frozenFrame.height() / 2.0;
+
+    m_imageCenter = QPointF(centerX, centerY);
+    m_imageCenterInitialized = true;
+    updateFrozenImageRect();
+    refreshViewGeometry();
+    update();
+}
+
+void ShotWindow::updateMinimumImageWindowSize()
+{
+    if (!m_imageNavigationEnabled || !m_toolbar) {
+        setMinimumSize(QSize(0, 0));
+        return;
+    }
+
+    m_toolbar->adjustSize();
+    const int minWidth = m_toolbar->sizeHint().width() + kImageWindowMinimumToolbarPadding;
+    setMinimumWidth(minWidth);
+    if (width() < minWidth) {
+        resize(minWidth, height());
+    }
+}
+
 void ShotWindow::refreshViewGeometry()
 {
     updateTextEditorGeometry();
+    updateImageScrollBars();
     updateToolbarGeometry();
     updateActionToolbarGeometry();
     updateAnnotationPropertyPanelGeometry();
