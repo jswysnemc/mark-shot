@@ -42,10 +42,24 @@
 #ifdef HAVE_PIPEWIRE
 #include <pipewire/pipewire.h>
 #include <spa/buffer/buffer.h>
-#include <spa/param/buffers.h>
 #include <spa/param/format-utils.h>
+#include <spa/param/param.h>
 #include <spa/param/video/raw-utils.h>
 #include <spa/pod/builder.h>
+#if __has_include(<spa/param/buffers.h>)
+#include <spa/param/buffers.h>
+#define MARKSHOT_SPA_PARAM_BUFFERS_BUFFERS SPA_PARAM_BUFFERS_buffers
+#define MARKSHOT_SPA_PARAM_BUFFERS_BLOCKS SPA_PARAM_BUFFERS_blocks
+#define MARKSHOT_SPA_PARAM_BUFFERS_SIZE SPA_PARAM_BUFFERS_size
+#define MARKSHOT_SPA_PARAM_BUFFERS_STRIDE SPA_PARAM_BUFFERS_stride
+#define MARKSHOT_SPA_PARAM_BUFFERS_DATA_TYPE SPA_PARAM_BUFFERS_dataType
+#else
+constexpr int MARKSHOT_SPA_PARAM_BUFFERS_BUFFERS = 1;
+constexpr int MARKSHOT_SPA_PARAM_BUFFERS_BLOCKS = 2;
+constexpr int MARKSHOT_SPA_PARAM_BUFFERS_SIZE = 3;
+constexpr int MARKSHOT_SPA_PARAM_BUFFERS_STRIDE = 4;
+constexpr int MARKSHOT_SPA_PARAM_BUFFERS_DATA_TYPE = 6;
+#endif
 #endif
 
 struct PortalStream {
@@ -908,11 +922,11 @@ private:
         params[0] = static_cast<const spa_pod *>(
             spa_pod_builder_add_object(&builder,
                                        SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
-                                       SPA_PARAM_BUFFERS_buffers, SPA_POD_CHOICE_RANGE_Int(8, 2, 16),
-                                       SPA_PARAM_BUFFERS_blocks, SPA_POD_Int(1),
-                                       SPA_PARAM_BUFFERS_size, SPA_POD_Int(size),
-                                       SPA_PARAM_BUFFERS_stride, SPA_POD_Int(stride),
-                                       SPA_PARAM_BUFFERS_dataType,
+                                       MARKSHOT_SPA_PARAM_BUFFERS_BUFFERS, SPA_POD_CHOICE_RANGE_Int(8, 2, 16),
+                                       MARKSHOT_SPA_PARAM_BUFFERS_BLOCKS, SPA_POD_Int(1),
+                                       MARKSHOT_SPA_PARAM_BUFFERS_SIZE, SPA_POD_Int(size),
+                                       MARKSHOT_SPA_PARAM_BUFFERS_STRIDE, SPA_POD_Int(stride),
+                                       MARKSHOT_SPA_PARAM_BUFFERS_DATA_TYPE,
                                        SPA_POD_CHOICE_FLAGS_Int((1u << SPA_DATA_MemPtr)
                                                                 | (1u << SPA_DATA_MemFd))));
         pw_stream_update_params(self->m_stream, params, 1);
