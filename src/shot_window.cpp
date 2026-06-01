@@ -2808,6 +2808,18 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
     clearWheelPreview();
 
     if (event->button() != Qt::LeftButton) {
+        if (m_mode == Mode::Selecting) {
+            if (event->button() == Qt::RightButton) {
+                close();
+                event->accept();
+                return;
+            }
+            if (event->button() == Qt::MiddleButton) {
+                enterFullscreenAnnotation(true);
+                event->accept();
+                return;
+            }
+        }
         if (event->button() == Qt::MiddleButton && imageNavigationAvailable() && m_frozenImageRect.contains(event->position())) {
             commitTextEditor();
             m_dragging = false;
