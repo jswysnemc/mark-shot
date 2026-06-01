@@ -104,6 +104,9 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(QStringLiteral("mark-shot"));
     QApplication::setApplicationDisplayName(QStringLiteral("Mark Shot"));
     QApplication::setApplicationVersion(QStringLiteral("0.1.11"));
+    // Matches mark-shot.desktop so the desktop portal can attribute screenshot
+    // requests to a stable app id and persist a granted permission.
+    QGuiApplication::setDesktopFileName(QStringLiteral("mark-shot"));
 
     markshot::i18n::initialize();
 

@@ -17,6 +17,7 @@
 #include <QApplication>
 #include <QBuffer>
 #include <QBoxLayout>
+#include <QComboBox>
 #include <QBrush>
 #include <QClipboard>
 #include <QContextMenuEvent>
@@ -2045,6 +2046,19 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     m_propertyRadiusSlider->setToolTip(MS_TR("Rectangle corner radius"));
     connect(m_propertyRadiusSlider, &QSlider::valueChanged, this, [this](int value) { setSelectedAnnotationCornerRadius(value); });
     propertyLayout->addWidget(m_propertyRadiusSlider);
+    m_propertyArrowStyleCombo = new QComboBox(m_annotationPropertyPanel);
+    m_propertyArrowStyleCombo->setFocusPolicy(Qt::NoFocus);
+    m_propertyArrowStyleCombo->addItem(MS_TR("Fletched"), static_cast<int>(ArrowStyle::Fletched));
+    m_propertyArrowStyleCombo->addItem(MS_TR("KDE"), static_cast<int>(ArrowStyle::Kde));
+    m_propertyArrowStyleCombo->setToolTip(MS_TR("Arrow style"));
+    m_propertyArrowStyleCombo->setAccessibleName(MS_TR("Arrow style"));
+    connect(m_propertyArrowStyleCombo, QOverload<int>::of(&QComboBox::activated), this, [this](int index) {
+        if (index < 0 || !m_propertyArrowStyleCombo) {
+            return;
+        }
+        setSelectedAnnotationArrowStyle(static_cast<ArrowStyle>(m_propertyArrowStyleCombo->itemData(index).toInt()));
+    });
+    propertyLayout->addWidget(m_propertyArrowStyleCombo);
     m_propertyFontButton = new QPushButton(m_annotationPropertyPanel);
     m_propertyFontButton->setFocusPolicy(Qt::NoFocus);
     m_propertyFontButton->setIcon(markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::Font));
@@ -3022,6 +3036,7 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
     annotation.width = currentToolWidth();
     annotation.filled = m_shapeFilled;
     annotation.cornerRadius = m_tool == Tool::Rectangle ? m_rectangleCornerRadius : 0.0;
+    annotation.arrowStyle = m_arrowStyle;
     annotation.fontFamily = m_textFontFamily;
     if (m_tool == Tool::Pen || m_tool == Tool::Highlighter) {
         annotation.points.append(imagePoint);
@@ -5190,6 +5205,15 @@ void ShotWindow::updateAnnotationPropertyPanel()
         const QSignalBlocker blocker(m_propertyRadiusSlider);
         m_propertyRadiusSlider->setValue(qRound(panelRadius));
     }
+    if (m_propertyArrowStyleCombo) {
+        const bool supportsArrowStyle = !groupSelection && panelTool == Tool::Arrow;
+        m_propertyArrowStyleCombo->setVisible(supportsArrowStyle);
+        if (supportsArrowStyle) {
+            const ArrowStyle panelArrowStyle = annotation ? annotation->arrowStyle : m_arrowStyle;
+            const QSignalBlocker blocker(m_propertyArrowStyleCombo);
+            m_propertyArrowStyleCombo->setCurrentIndex(panelArrowStyle == ArrowStyle::Kde ? 1 : 0);
+        }
+    }
     if (m_propertyWidthLabel) {
         m_propertyWidthLabel->setText(QString::number(qRound(panelWidth)));
     }
@@ -5518,6 +5542,25 @@ void ShotWindow::setSelectedAnnotationCornerRadius(int radius)
             return;
         }
         m_rectangleCornerRadius = radius;
+    }
+    updateAnnotationPropertyPanel();
+    update();
+}
+
+void ShotWindow::setSelectedAnnotationArrowStyle(ArrowStyle style)
+{
+    if (m_selectedAnnotationId.has_value()) {
+        Annotation *annotation = annotationById(*m_selectedAnnotationId);
+        if (!annotation || annotation->tool != Tool::Arrow || annotation->arrowStyle == style) {
+            return;
+        }
+        pushHistorySnapshot();
+        annotation->arrowStyle = style;
+    } else {
+        if (m_tool != Tool::Arrow || m_arrowStyle == style) {
+            return;
+        }
+        m_arrowStyle = style;
     }
     updateAnnotationPropertyPanel();
     update();
@@ -6215,7 +6258,8 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
         break;
     case Tool::Arrow:
         if (annotation.points.size() >= 2) {
-            drawArrow(painter, mapPoint(annotation.points.first()), mapPoint(annotation.points.last()), penWidth);
+            drawArrow(painter, mapPoint(annotation.points.first()), mapPoint(annotation.points.last()), penWidth,
+                      annotation.arrowStyle);
         }
         break;
     case Tool::Text: {
@@ -6258,7 +6302,7 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
     painter.restore();
 }
 
-void ShotWindow::drawArrow(QPainter &painter, QPointF start, QPointF end, qreal width) const
+void ShotWindow::drawArrow(QPainter &painter, QPointF start, QPointF end, qreal width, ArrowStyle style) const
 {
     const QLineF line(start, end);
     const qreal L = line.length();
@@ -6271,6 +6315,33 @@ void ShotWindow::drawArrow(QPainter &painter, QPointF start, QPointF end, qreal 
     // 1. Calculate normalized direction and normal vectors
     const QPointF direction = QPointF(line.dx() / L, line.dy() / L);
     const QPointF normal(-direction.y(), direction.x());
+
+    if (style == ArrowStyle::Kde) {
+        // Uniform round-capped shaft topped by an open V head, matching the
+        // KDE/Spectacle arrow: the stroke width stays constant end to end.
+        qreal headLength = std::clamp(L * 0.32, width * 2.6, width * 6.0);
+        if (headLength > L) {
+            headLength = L;
+        }
+        const qreal headHalfWidth = headLength * 0.62;
+        const QPointF headBase = end - direction * headLength;
+        const QPointF leftWing = headBase + normal * headHalfWidth;
+        const QPointF rightWing = headBase - normal * headHalfWidth;
+
+        painter.save();
+        QPen pen(color, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(pen);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.drawLine(start, end);
+        QPainterPath head;
+        head.moveTo(leftWing);
+        head.lineTo(end);
+        head.lineTo(rightWing);
+        painter.drawPath(head);
+        painter.restore();
+        return;
+    }
 
     // 2. Compute physical body half-width (perfectly aligned with pen brush width)
     const qreal bodyHalfWidth = width * 0.5;

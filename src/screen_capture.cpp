@@ -324,43 +324,82 @@ CaptureResult captureWithPortalScreenshot(const CaptureRequest &request)
         return {{}, QStringLiteral("xdg-desktop-portal Screenshot interface is not available"), {}, request.sourceGeometry};
     }
 
-    const QString handleToken = portalToken();
-    const QString expectedSignalPath = portalRequestPath(handleToken);
-    PortalResponseReceiver receiver;
-    if (!connectPortalResponse(expectedSignalPath, &receiver)) {
-        return {{}, QStringLiteral("failed to connect to xdg-desktop-portal response signal"), {}, request.sourceGeometry};
-    }
+    auto requestScreenshot = [&portal](bool interactive, bool *userCancelled, QString *error) -> QVariantMap {
+        if (userCancelled) {
+            *userCancelled = false;
+        }
+        const QString handleToken = portalToken();
+        const QString expectedSignalPath = portalRequestPath(handleToken);
+        PortalResponseReceiver receiver;
+        if (!connectPortalResponse(expectedSignalPath, &receiver)) {
+            if (error) {
+                *error = QStringLiteral("failed to connect to xdg-desktop-portal response signal");
+            }
+            return {};
+        }
 
-    QVariantMap options;
-    options.insert(QStringLiteral("handle_token"), handleToken);
-    options.insert(QStringLiteral("interactive"), false);
-    options.insert(QStringLiteral("modal"), true);
+        QVariantMap options;
+        options.insert(QStringLiteral("handle_token"), handleToken);
+        options.insert(QStringLiteral("interactive"), interactive);
+        options.insert(QStringLiteral("modal"), true);
 
-    QDBusPendingReply<QDBusObjectPath> pending = portal.asyncCall(QStringLiteral("Screenshot"), QString(), options);
-    QDBusPendingCallWatcher watcher(pending);
-    QEventLoop callLoop;
-    QObject::connect(&watcher, &QDBusPendingCallWatcher::finished, &callLoop, &QEventLoop::quit);
-    callLoop.exec();
+        QDBusPendingReply<QDBusObjectPath> pending = portal.asyncCall(QStringLiteral("Screenshot"), QString(), options);
+        QDBusPendingCallWatcher watcher(pending);
+        QEventLoop callLoop;
+        QObject::connect(&watcher, &QDBusPendingCallWatcher::finished, &callLoop, &QEventLoop::quit);
+        callLoop.exec();
 
-    pending = watcher;
-    if (pending.isError()) {
+        pending = watcher;
+        if (pending.isError()) {
+            disconnectPortalResponse(expectedSignalPath, &receiver);
+            if (error) {
+                *error = pending.error().message();
+            }
+            return {};
+        }
+
+        const QString returnedSignalPath = pending.value().path();
+        if (returnedSignalPath != expectedSignalPath && !receiver.received) {
+            connectPortalResponse(returnedSignalPath, &receiver);
+        }
+
+        QString waitError;
+        const QVariantMap result = waitForPortalResponse(&receiver, &waitError);
         disconnectPortalResponse(expectedSignalPath, &receiver);
-        return {{}, pending.error().message(), {}, request.sourceGeometry};
-    }
+        if (returnedSignalPath != expectedSignalPath) {
+            disconnectPortalResponse(returnedSignalPath, &receiver);
+        }
+        if (userCancelled && receiver.received && receiver.response == 1) {
+            *userCancelled = true;
+        }
+        if (error) {
+            *error = waitError;
+        }
+        return result;
+    };
 
-    const QString returnedSignalPath = pending.value().path();
-    if (returnedSignalPath != expectedSignalPath && !receiver.received) {
-        connectPortalResponse(returnedSignalPath, &receiver);
-    }
-
+    // GNOME refuses non-interactive screenshots when the app is launched from
+    // a .desktop entry (the portal sees a confined app_id without a stored
+    // permission and returns response code 2), while a shell-launched process
+    // runs as the trusted host and succeeds silently. Try the quiet path first,
+    // then fall back to an interactive request so the portal can prompt for
+    // access. A genuine user cancellation is not retried.
+    bool userCancelled = false;
     QString error;
-    const QVariantMap response = waitForPortalResponse(&receiver, &error);
-    disconnectPortalResponse(expectedSignalPath, &receiver);
-    if (returnedSignalPath != expectedSignalPath) {
-        disconnectPortalResponse(returnedSignalPath, &receiver);
+    QVariantMap response = requestScreenshot(false, &userCancelled, &error);
+    if (response.isEmpty() && !userCancelled) {
+        QString interactiveError;
+        bool interactiveCancelled = false;
+        const QVariantMap interactiveResponse = requestScreenshot(true, &interactiveCancelled, &interactiveError);
+        if (!interactiveResponse.isEmpty()) {
+            response = interactiveResponse;
+            error.clear();
+        } else if (!interactiveCancelled && !interactiveError.isEmpty()) {
+            error = interactiveError;
+        }
     }
-    if (!error.isEmpty()) {
-        return {{}, error, {}, request.sourceGeometry};
+    if (response.isEmpty()) {
+        return {{}, error.isEmpty() ? QStringLiteral("screenshot request failed") : error, {}, request.sourceGeometry};
     }
 
     const QUrl screenshotUrl(response.value(QStringLiteral("uri")).toString());

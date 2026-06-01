@@ -104,6 +104,9 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Text background color"), QStringLiteral("文字背景颜色")},
         {QStringLiteral("Toggle shape fill"), QStringLiteral("切换形状填充")},
         {QStringLiteral("Rectangle corner radius"), QStringLiteral("矩形圆角半径")},
+        {QStringLiteral("Arrow style"), QStringLiteral("箭头样式")},
+        {QStringLiteral("Fletched"), QStringLiteral("燕尾")},
+        {QStringLiteral("KDE"), QStringLiteral("KDE")},
         {QStringLiteral("Text font"), QStringLiteral("文字字体")},
         {QStringLiteral("Edit selected text"), QStringLiteral("编辑所选文字")},
 
