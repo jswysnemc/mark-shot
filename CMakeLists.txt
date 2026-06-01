@@ -28,6 +28,8 @@ qt_add_executable(mark-shot
     src/shot_window.h
     src/annotation_launch.cpp
     src/annotation_launch.h
+    src/scroll/scroll_config.cpp
+    src/scroll/scroll_config.h
     src/scroll/stitcher.cpp
     src/scroll/stitcher.h
     src/scroll/stitch_orb.cpp

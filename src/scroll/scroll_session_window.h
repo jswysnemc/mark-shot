@@ -11,8 +11,10 @@
 #include <cstdint>
 
 class QLabel;
+class QKeyEvent;
 class QPushButton;
 class QScreen;
+class QSlider;
 class QTimer;
 
 namespace markshot::scroll {
@@ -43,25 +45,55 @@ public:
 protected:
     void paintEvent(QPaintEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     void showEvent(QShowEvent *event) override;
 
 private:
     void captureTick();
     void togglePause();
+    void toggleAlgorithm();
+    void toggleAxis();
     void annotateResult();
     void saveResult();
     void copyResult();
     void buildControlBar();
     void layoutOverlay();
     void updateInputMask();
+    void refreshControlLabels();
+    bool previewCanFitOutsideRegion() const;
+    bool shouldAutoHideOverlayUi() const;
+    void setOverlayUiVisible(bool visible);
     QImage currentResult() const;
+
+    // Geometry shared by the scrubber and the painter so their notions of "how
+    // much of the long image is visible" and "how far the slider can travel"
+    // never diverge (an off-by-one there makes the view jump when content is
+    // prepended). All lengths are in stitched-image pixels along the scroll axis.
+    struct PreviewLayout {
+        bool valid = false;
+        bool overflow = false;  // image exceeds the detail rect along the axis
+        QRect detailRect;       // scrubbable window view
+        QRect globalRect;       // whole-image thumbnail (empty unless overflow)
+        qreal detailScale = 1.0;// source px -> preview px in the detail view
+        int longLen = 0;        // long image extent along the scroll axis
+        int viewportLen = 0;    // source px visible in the detail view
+        int maxScrub = 0;       // longLen - viewportLen, clamped to >= 0
+    };
+    // The image preview rectangle, between the status row and the scrubber.
+    QRect imageAreaRect() const;
+    // Derives the preview layout from the current result, axis, and panel rects.
+    PreviewLayout computePreviewLayout() const;
+    // Re-derives the scrubber range, then either follows the current captured
+    // frame or shifts the manual view when content was prepended.
+    void syncScrubber(const StitchResult &outcome);
 
     // Maps the captured region (global compositor coordinates) into this
     // overlay's local coordinate space.
     QRect regionLocalRect() const;
     // The preview panel rectangle in local coordinates.
     QRect previewPanelRect() const;
+    QRect overlayUiFrameRect(const QImage &frame) const;
 
     QRect m_geometry;          // captured region, global coordinates
     QPoint m_screenOrigin;     // this overlay's top-left in global coordinates
@@ -72,16 +104,35 @@ private:
     bool m_blinkOn = true;
     bool m_paused = false;
     bool m_layerShell = false;
+    bool m_autoHideOverlayUi = false;
+    bool m_overlayUiVisible = true;
+    bool m_captureSuspendedForUi = false;
+    bool m_hiddenProbePending = false;
+    qint64 m_idleSince = 0;
+    qint64 m_resumeCaptureAt = 0;
+    qint64 m_nextVisibleDetectAt = 0;
     QVector<std::uint8_t> m_lastSignature;
     QString m_statusText;
     int m_lastAppend = 0;       // pixels added by the most recent frame
 
+    // Non-destructive scrubber: the whole long image is always kept; the slider
+    // only moves which window of it the detail view shows. While following, it
+    // tracks the current captured frame; dragging it away stops following until
+    // the user releases it back at the end.
+    bool m_following = true;
+    int m_scrubPos = 0;         // top/left of the viewed window, stitched pixels
+    int m_capturePos = 0;       // current screen selection top/left in stitched pixels
+    int m_captureLen = 0;       // current screen selection extent along the scroll axis
+
     QWidget *m_controlBar = nullptr;
+    QPushButton *m_algorithmButton = nullptr;
+    QPushButton *m_axisButton = nullptr;
     QPushButton *m_pauseButton = nullptr;
     QPushButton *m_annotateButton = nullptr;
     QPushButton *m_saveButton = nullptr;
     QPushButton *m_copyButton = nullptr;
     QPushButton *m_cancelButton = nullptr;
+    QSlider *m_scrubber = nullptr;
 };
 
 }  // namespace markshot::scroll

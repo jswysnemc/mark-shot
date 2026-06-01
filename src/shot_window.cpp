@@ -1,6 +1,7 @@
 #include "shot_window.h"
 
 #include "screen_capture.h"
+#include "scroll/scroll_config.h"
 #include "scroll/scroll_session_window.h"
 #include "scroll/stitcher.h"
 #include "ui/color_picker.h"
@@ -6747,9 +6748,10 @@ void ShotWindow::startScrollCapture()
         return;
     }
 
-    // TODO(task #9): switch back to OpenCvOrb once the ORB path is implemented.
-    // The ORB estimator is still a stub, so force the validated col-sample path.
-    const markshot::scroll::StitchAlgorithm algorithm = markshot::scroll::StitchAlgorithm::ColSample;
+    // The starting algorithm comes from the CLI override, else config.json, else
+    // the built-in default (col-sample). The session window lets the user switch
+    // mid-capture regardless of this initial choice.
+    const markshot::scroll::StitchAlgorithm algorithm = markshot::scroll::resolveScrollAlgorithm();
 
     // The session window configures its own layer-shell overlay (with a
     // plain-window fallback) in its constructor.

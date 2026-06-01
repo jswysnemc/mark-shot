@@ -149,6 +149,10 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Capture error"), QStringLiteral("捕获错误")},
         {QStringLiteral("Height %1 px"), QStringLiteral("高度 %1 px")},
         {QStringLiteral("Save Scrolling Screenshot"), QStringLiteral("保存滚动截图")},
+        {QStringLiteral("Algo: ORB"), QStringLiteral("算法：ORB")},
+        {QStringLiteral("Algo: Fast"), QStringLiteral("算法：快速")},
+        {QStringLiteral("Dir: Vertical"), QStringLiteral("方向：纵向")},
+        {QStringLiteral("Dir: Horizontal"), QStringLiteral("方向：横向")},
     };
     return table;
 }

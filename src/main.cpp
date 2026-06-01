@@ -1,4 +1,5 @@
 #include "screen_capture.h"
+#include "scroll/scroll_config.h"
 #include "shot_window.h"
 #include "ui/i18n.h"
 
@@ -116,10 +117,20 @@ int main(int argc, char *argv[])
     QCommandLineOption xdgWindowOption(QStringLiteral("xdg-window"), QStringLiteral("Use a regular fullscreen xdg window instead of layer-shell."));
     QCommandLineOption fullscreenAnnotationOption({QStringLiteral("fullscreen"), QStringLiteral("full-screen")},
                                                   QStringLiteral("Skip region selection and annotate the full captured frame."));
+    QCommandLineOption scrollAlgorithmOption(QStringLiteral("scroll-algorithm"),
+                                             QStringLiteral("Stitching algorithm for scrolling capture: col-sample (default, fast) or opencv-orb (higher accuracy)."),
+                                             QStringLiteral("name"));
     parser.addOption(allOutputsOption);
     parser.addOption(xdgWindowOption);
     parser.addOption(fullscreenAnnotationOption);
+    parser.addOption(scrollAlgorithmOption);
     parser.process(app);
+
+    if (parser.isSet(scrollAlgorithmOption)) {
+        const QString name = parser.value(scrollAlgorithmOption);
+        markshot::scroll::setScrollAlgorithmOverride(
+            markshot::scroll::parseAlgorithmName(name, markshot::scroll::kDefaultAlgorithm));
+    }
 
     const QStringList positionalArguments = parser.positionalArguments();
     if (positionalArguments.size() > 1) {
