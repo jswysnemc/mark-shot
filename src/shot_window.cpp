@@ -105,6 +105,16 @@ constexpr qsizetype kMaxSharpViewportPixels = 50'000'000;
 constexpr double kSharpKernelRadius = 2.5;
 constexpr int kMinSharpRowsPerThread = 64;
 
+QColor propertyIconInkForFill(const QColor &fillColor)
+{
+    if (!fillColor.isValid() || fillColor.alpha() < 48) {
+        return QColor(229, 231, 235);
+    }
+    const int luma =
+        (fillColor.red() * 299 + fillColor.green() * 587 + fillColor.blue() * 114) / 1000;
+    return luma > 150 ? QColor(15, 23, 42) : QColor(248, 250, 252);
+}
+
 QRectF normalizedRect(QPointF a, QPointF b)
 {
     return QRectF(a, b).normalized();
@@ -1948,35 +1958,68 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     m_annotationPropertyPanel->setObjectName(QStringLiteral("annotationPropertyPanel"));
     m_annotationPropertyPanel->setStyleSheet(m_toolbar->styleSheet());
     auto *propertyLayout = new QHBoxLayout(m_annotationPropertyPanel);
-    propertyLayout->setContentsMargins(6, 6, 6, 6);
-    propertyLayout->setSpacing(5);
+    propertyLayout->setContentsMargins(8, 6, 8, 6);
+    propertyLayout->setSpacing(6);
+    auto addPropertyGlyph = [this, propertyLayout](markshot::ui::PropertyIcon icon, const QString &tooltip) {
+        auto *label = new QLabel(m_annotationPropertyPanel);
+        label->setObjectName(QStringLiteral("propertyGlyph"));
+        label->setAlignment(Qt::AlignCenter);
+        label->setPixmap(markshot::ui::makePropertyIcon(icon).pixmap(QSize(18, 18)));
+        label->setToolTip(tooltip);
+        propertyLayout->addWidget(label);
+        return label;
+    };
+    auto configurePropertyValueLabel = [](QLabel *label, int width, const QString &tooltip) {
+        label->setObjectName(QStringLiteral("propertyValue"));
+        label->setAlignment(Qt::AlignCenter);
+        label->setFixedWidth(width);
+        label->setToolTip(tooltip);
+    };
+
     m_annotationPropertyTitle = new QLabel(QStringLiteral("Object"), m_annotationPropertyPanel);
+    m_annotationPropertyTitle->setObjectName(QStringLiteral("propertyTitle"));
+    m_annotationPropertyTitle->setAlignment(Qt::AlignCenter);
+    m_annotationPropertyTitle->setMinimumWidth(58);
+    m_annotationPropertyTitle->setToolTip(MS_TR("Selected object type"));
     propertyLayout->addWidget(m_annotationPropertyTitle);
-    m_propertyWidthLabel = new QLabel(MS_TR("Width %1").arg(2), m_annotationPropertyPanel);
+    propertyLayout->addSpacing(2);
+    addPropertyGlyph(markshot::ui::PropertyIcon::StrokeWidth, MS_TR("Selected object width or size"));
+    m_propertyWidthLabel = new QLabel(QStringLiteral("2"), m_annotationPropertyPanel);
+    configurePropertyValueLabel(m_propertyWidthLabel, 34, MS_TR("Selected object width or size"));
     propertyLayout->addWidget(m_propertyWidthLabel);
     m_propertyWidthSlider = new QSlider(Qt::Horizontal, m_annotationPropertyPanel);
     m_propertyWidthSlider->setFocusPolicy(Qt::NoFocus);
-    m_propertyWidthSlider->setFixedWidth(96);
+    m_propertyWidthSlider->setFixedWidth(88);
     m_propertyWidthSlider->setToolTip(MS_TR("Selected object width or size"));
     connect(m_propertyWidthSlider, &QSlider::valueChanged, this, [this](int value) { setSelectedAnnotationWidth(value); });
     propertyLayout->addWidget(m_propertyWidthSlider);
-    m_propertyOpacityLabel = new QLabel(MS_TR("Opacity %1%").arg(100), m_annotationPropertyPanel);
+    propertyLayout->addSpacing(2);
+    addPropertyGlyph(markshot::ui::PropertyIcon::Opacity, MS_TR("Selected object opacity"));
+    m_propertyOpacityLabel = new QLabel(QStringLiteral("100%"), m_annotationPropertyPanel);
+    configurePropertyValueLabel(m_propertyOpacityLabel, 36, MS_TR("Selected object opacity"));
     propertyLayout->addWidget(m_propertyOpacityLabel);
     m_propertyOpacitySlider = new QSlider(Qt::Horizontal, m_annotationPropertyPanel);
     m_propertyOpacitySlider->setFocusPolicy(Qt::NoFocus);
     m_propertyOpacitySlider->setRange(0, 100);
-    m_propertyOpacitySlider->setFixedWidth(88);
+    m_propertyOpacitySlider->setFixedWidth(76);
     m_propertyOpacitySlider->setToolTip(MS_TR("Selected object opacity"));
     connect(m_propertyOpacitySlider, &QSlider::valueChanged, this, [this](int value) { setSelectedAnnotationOpacity(value); });
     propertyLayout->addWidget(m_propertyOpacitySlider);
+    propertyLayout->addSpacing(2);
     m_propertyColorButton = new QPushButton(m_annotationPropertyPanel);
     m_propertyColorButton->setFocusPolicy(Qt::NoFocus);
+    m_propertyColorButton->setIcon(markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::Color));
+    m_propertyColorButton->setIconSize(QSize(18, 18));
     m_propertyColorButton->setToolTip(MS_TR("Change selected object color"));
+    m_propertyColorButton->setAccessibleName(MS_TR("Change selected object color"));
     connect(m_propertyColorButton, &QPushButton::clicked, this, [this] { openSelectedAnnotationColorPalette(); });
     propertyLayout->addWidget(m_propertyColorButton);
-    m_propertyTextBackgroundButton = new QPushButton(MS_TR("Bg"), m_annotationPropertyPanel);
+    m_propertyTextBackgroundButton = new QPushButton(m_annotationPropertyPanel);
     m_propertyTextBackgroundButton->setFocusPolicy(Qt::NoFocus);
+    m_propertyTextBackgroundButton->setIcon(markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::TextBackground));
+    m_propertyTextBackgroundButton->setIconSize(QSize(18, 18));
     m_propertyTextBackgroundButton->setToolTip(MS_TR("Text background color"));
+    m_propertyTextBackgroundButton->setAccessibleName(MS_TR("Text background color"));
     connect(m_propertyTextBackgroundButton, &QPushButton::clicked, this, [this] { openSelectedTextBackgroundColorPalette(); });
     propertyLayout->addWidget(m_propertyTextBackgroundButton);
     m_propertyFillButton = new QPushButton(m_annotationPropertyPanel);
@@ -1985,29 +2028,37 @@ ShotWindow::ShotWindow(QImage frozenFrame, QString outputName, QRect sourceGeome
     m_propertyFillButton->setIcon(markshot::ui::makeFillIcon(false));
     m_propertyFillButton->setIconSize(QSize(20, 20));
     m_propertyFillButton->setToolTip(MS_TR("Toggle shape fill"));
+    m_propertyFillButton->setAccessibleName(MS_TR("Toggle shape fill"));
     connect(m_propertyFillButton, &QPushButton::toggled, this, [this](bool checked) {
         m_propertyFillButton->setIcon(markshot::ui::makeFillIcon(checked));
         setSelectedAnnotationFilled(checked);
     });
     propertyLayout->addWidget(m_propertyFillButton);
-    m_propertyRadiusLabel = new QLabel(MS_TR("Radius %1").arg(0), m_annotationPropertyPanel);
+    m_propertyRadiusGlyphLabel = addPropertyGlyph(markshot::ui::PropertyIcon::CornerRadius, MS_TR("Rectangle corner radius"));
+    m_propertyRadiusLabel = new QLabel(QStringLiteral("0"), m_annotationPropertyPanel);
+    configurePropertyValueLabel(m_propertyRadiusLabel, 24, MS_TR("Rectangle corner radius"));
     propertyLayout->addWidget(m_propertyRadiusLabel);
     m_propertyRadiusSlider = new QSlider(Qt::Horizontal, m_annotationPropertyPanel);
     m_propertyRadiusSlider->setFocusPolicy(Qt::NoFocus);
     m_propertyRadiusSlider->setRange(0, 48);
-    m_propertyRadiusSlider->setFixedWidth(84);
+    m_propertyRadiusSlider->setFixedWidth(72);
     m_propertyRadiusSlider->setToolTip(MS_TR("Rectangle corner radius"));
     connect(m_propertyRadiusSlider, &QSlider::valueChanged, this, [this](int value) { setSelectedAnnotationCornerRadius(value); });
     propertyLayout->addWidget(m_propertyRadiusSlider);
-    m_propertyFontButton = new QPushButton(MS_TR("Font"), m_annotationPropertyPanel);
+    m_propertyFontButton = new QPushButton(m_annotationPropertyPanel);
     m_propertyFontButton->setFocusPolicy(Qt::NoFocus);
-    m_propertyFontButton->setFixedWidth(128);
+    m_propertyFontButton->setIcon(markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::Font));
+    m_propertyFontButton->setIconSize(QSize(20, 20));
     m_propertyFontButton->setToolTip(MS_TR("Text font"));
+    m_propertyFontButton->setAccessibleName(MS_TR("Text font"));
     connect(m_propertyFontButton, &QPushButton::clicked, this, [this] { toggleSelectedTextFontPanel(); });
     propertyLayout->addWidget(m_propertyFontButton);
-    m_propertyEditTextButton = new QPushButton(MS_TR("Edit"), m_annotationPropertyPanel);
+    m_propertyEditTextButton = new QPushButton(m_annotationPropertyPanel);
     m_propertyEditTextButton->setFocusPolicy(Qt::NoFocus);
+    m_propertyEditTextButton->setIcon(markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::EditText));
+    m_propertyEditTextButton->setIconSize(QSize(20, 20));
     m_propertyEditTextButton->setToolTip(MS_TR("Edit selected text"));
+    m_propertyEditTextButton->setAccessibleName(MS_TR("Edit selected text"));
     connect(m_propertyEditTextButton, &QPushButton::clicked, this, [this] { beginEditingSelectedTextAnnotation(); });
     propertyLayout->addWidget(m_propertyEditTextButton);
     m_annotationPropertyPanel->hide();
@@ -5107,7 +5158,6 @@ void ShotWindow::updateAnnotationPropertyPanel()
         m_propertyFontButton->setVisible(!groupSelection && panelTool == Tool::Text);
         if (!groupSelection && panelTool == Tool::Text) {
             const QString family = panelFontFamily.isEmpty() ? QStringLiteral("Sans Serif") : panelFontFamily;
-            m_propertyFontButton->setText(MS_TR("Font"));
             m_propertyFontButton->setToolTip(family);
             if (m_propertyFontList) {
                 const auto matches = m_propertyFontList->findItems(family, Qt::MatchExactly);
@@ -5128,9 +5178,12 @@ void ShotWindow::updateAnnotationPropertyPanel()
         m_propertyFillButton->setChecked(panelFilled);
         m_propertyFillButton->setIcon(markshot::ui::makeFillIcon(panelFilled));
     }
+    if (m_propertyRadiusGlyphLabel) {
+        m_propertyRadiusGlyphLabel->setVisible(!groupSelection && panelTool == Tool::Rectangle);
+    }
     if (m_propertyRadiusLabel) {
         m_propertyRadiusLabel->setVisible(!groupSelection && panelTool == Tool::Rectangle);
-        m_propertyRadiusLabel->setText(MS_TR("Radius %1").arg(qRound(panelRadius)));
+        m_propertyRadiusLabel->setText(QString::number(qRound(panelRadius)));
     }
     if (m_propertyRadiusSlider) {
         m_propertyRadiusSlider->setVisible(!groupSelection && panelTool == Tool::Rectangle);
@@ -5138,7 +5191,7 @@ void ShotWindow::updateAnnotationPropertyPanel()
         m_propertyRadiusSlider->setValue(qRound(panelRadius));
     }
     if (m_propertyWidthLabel) {
-        m_propertyWidthLabel->setText(MS_TR("Width %1").arg(qRound(panelWidth)));
+        m_propertyWidthLabel->setText(QString::number(qRound(panelWidth)));
     }
     if (m_propertyWidthSlider) {
         const QSignalBlocker blocker(m_propertyWidthSlider);
@@ -5156,7 +5209,7 @@ void ShotWindow::updateAnnotationPropertyPanel()
         m_propertyWidthSlider->setValue(qRound(panelWidth));
     }
     if (m_propertyOpacityLabel) {
-        m_propertyOpacityLabel->setText(MS_TR("Opacity %1%").arg(panelOpacity));
+        m_propertyOpacityLabel->setText(QStringLiteral("%1%").arg(panelOpacity));
     }
     if (m_propertyOpacitySlider) {
         const QSignalBlocker blocker(m_propertyOpacitySlider);
@@ -5164,6 +5217,8 @@ void ShotWindow::updateAnnotationPropertyPanel()
     }
     if (m_propertyColorButton) {
         m_propertyColorButton->setStyleSheet(markshot::theme::propertyColorButtonStyleSheet(panelColor));
+        m_propertyColorButton->setIcon(markshot::ui::makePropertyIcon(
+            markshot::ui::PropertyIcon::Color, propertyIconInkForFill(panelColor)));
         m_propertyColorButton->setVisible(panelTool != Tool::Mosaic);
         if (panelTool == Tool::Mosaic && m_propertyColorDialogPanel) {
             m_propertyColorDialogPanel->hide();
@@ -5173,6 +5228,8 @@ void ShotWindow::updateAnnotationPropertyPanel()
         const bool supportsTextBackground = !groupSelection && panelTool == Tool::Text;
         m_propertyTextBackgroundButton->setVisible(supportsTextBackground);
         m_propertyTextBackgroundButton->setStyleSheet(markshot::theme::propertyColorButtonStyleSheet(panelTextBackgroundColor));
+        m_propertyTextBackgroundButton->setIcon(markshot::ui::makePropertyIcon(
+            markshot::ui::PropertyIcon::TextBackground, propertyIconInkForFill(panelTextBackgroundColor)));
         if (!supportsTextBackground && m_propertyColorDialogPanel && m_propertyColorEditingTextBackground) {
             m_propertyColorDialogPanel->hide();
         }

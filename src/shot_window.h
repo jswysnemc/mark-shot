@@ -351,6 +351,7 @@ private:
     QPushButton *m_propertyColorButton = nullptr;
     QPushButton *m_propertyTextBackgroundButton = nullptr;
     QPushButton *m_propertyFillButton = nullptr;
+    QLabel *m_propertyRadiusGlyphLabel = nullptr;
     QLabel *m_propertyRadiusLabel = nullptr;
     QSlider *m_propertyRadiusSlider = nullptr;
     QPushButton *m_propertyFontButton = nullptr;

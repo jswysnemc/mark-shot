@@ -28,6 +28,12 @@ QPen makePen(QColor color, qreal width = 1.75)
     return QPen(color, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
 }
 
+QColor withAlpha(QColor color, int alpha)
+{
+    color.setAlpha(alpha);
+    return color;
+}
+
 }  // namespace
 
 QString actionName(ShotWindow::Action action)
@@ -455,6 +461,127 @@ QIcon makeToolIcon(ShotWindow::Action action)
         p.setPen(makePen(kInk, 1.6));
         p.drawLine(QPointF(10, 10), QPointF(22, 22));
         p.drawLine(QPointF(22, 10), QPointF(10, 22));
+        break;
+    }
+    }
+
+    p.end();
+    return QIcon(pixmap);
+}
+
+QIcon makePropertyIcon(PropertyIcon icon, QColor ink)
+{
+    const QColor iconInk = ink.isValid() ? ink : kInk;
+    const QColor iconSoft = withAlpha(iconInk, 145);
+    const QColor iconFaint = withAlpha(iconInk, 80);
+
+    QPixmap pixmap(kIconSize, kIconSize);
+    pixmap.fill(Qt::transparent);
+
+    QPainter p(&pixmap);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setRenderHint(QPainter::TextAntialiasing, true);
+    p.setBrush(Qt::NoBrush);
+    p.setPen(makePen(iconInk));
+
+    switch (icon) {
+    case PropertyIcon::StrokeWidth:
+        p.setPen(QPen(iconInk, 1.4, Qt::SolidLine, Qt::RoundCap));
+        p.drawLine(QPointF(8, 9), QPointF(24, 9));
+        p.setPen(QPen(iconInk, 2.2, Qt::SolidLine, Qt::RoundCap));
+        p.drawLine(QPointF(8, 16), QPointF(24, 16));
+        p.setPen(QPen(iconInk, 3.4, Qt::SolidLine, Qt::RoundCap));
+        p.drawLine(QPointF(8, 23), QPointF(24, 23));
+        break;
+    case PropertyIcon::Opacity: {
+        QPainterPath drop;
+        drop.moveTo(16.0, 6.5);
+        drop.cubicTo(11.5, 11.0, 9.0, 15.0, 9.0, 19.0);
+        drop.cubicTo(9.0, 24.0, 12.6, 27.0, 16.0, 27.0);
+        drop.cubicTo(19.4, 27.0, 23.0, 24.0, 23.0, 19.0);
+        drop.cubicTo(23.0, 15.0, 20.5, 11.0, 16.0, 6.5);
+        drop.closeSubpath();
+        p.setPen(makePen(iconInk, 1.7));
+        p.setBrush(withAlpha(iconInk, 42));
+        p.drawPath(drop);
+        p.setBrush(Qt::NoBrush);
+        p.setPen(makePen(iconSoft, 1.3));
+        p.drawLine(QPointF(11.5, 20.0), QPointF(20.5, 16.0));
+        p.drawLine(QPointF(12.8, 23.0), QPointF(21.2, 19.2));
+        break;
+    }
+    case PropertyIcon::Color: {
+        QPainterPath brush;
+        brush.moveTo(9.5, 22.5);
+        brush.cubicTo(9.5, 18.8, 12.0, 16.6, 15.1, 16.2);
+        brush.lineTo(22.7, 8.6);
+        brush.cubicTo(23.6, 7.7, 25.0, 7.7, 25.8, 8.6);
+        brush.cubicTo(26.6, 9.5, 26.6, 10.8, 25.7, 11.7);
+        brush.lineTo(18.1, 19.3);
+        brush.cubicTo(17.7, 22.6, 15.1, 25.0, 11.4, 25.0);
+        brush.lineTo(8.0, 25.0);
+        brush.cubicTo(8.9, 24.2, 9.5, 23.4, 9.5, 22.5);
+        p.setPen(makePen(iconInk, 1.6));
+        p.drawPath(brush);
+        p.setPen(makePen(iconSoft, 1.2));
+        p.drawLine(QPointF(17.1, 17.0), QPointF(20.9, 13.2));
+        break;
+    }
+    case PropertyIcon::TextBackground: {
+        p.setPen(makePen(iconSoft, 1.4));
+        p.setBrush(withAlpha(iconInk, 34));
+        p.drawRoundedRect(QRectF(7.0, 18.0, 18.0, 6.5), 2.0, 2.0);
+        p.setBrush(Qt::NoBrush);
+        p.setPen(makePen(iconInk, 1.6));
+        QPainterPath textA;
+        textA.moveTo(16.0, 7.0);
+        textA.lineTo(10.5, 22.0);
+        textA.moveTo(16.0, 7.0);
+        textA.lineTo(21.5, 22.0);
+        p.drawPath(textA);
+        p.drawLine(QPointF(12.3, 17.0), QPointF(19.7, 17.0));
+        break;
+    }
+    case PropertyIcon::CornerRadius: {
+        p.setPen(makePen(iconFaint, 1.4));
+        p.drawLine(QPointF(8.0, 24.0), QPointF(8.0, 13.5));
+        p.drawLine(QPointF(18.5, 8.0), QPointF(24.0, 8.0));
+        p.setPen(makePen(iconInk, 2.0));
+        QPainterPath corner;
+        corner.moveTo(8.0, 24.0);
+        corner.lineTo(8.0, 15.5);
+        corner.cubicTo(8.0, 10.5, 10.5, 8.0, 15.5, 8.0);
+        corner.lineTo(24.0, 8.0);
+        p.drawPath(corner);
+        p.setPen(makePen(iconSoft, 1.2));
+        p.drawRoundedRect(QRectF(15.0, 15.0, 9.0, 9.0), 2.5, 2.5);
+        break;
+    }
+    case PropertyIcon::Font: {
+        p.setPen(makePen(iconInk, 1.7));
+        p.drawLine(QPointF(8.0, 8.5), QPointF(24.0, 8.5));
+        p.drawLine(QPointF(16.0, 8.5), QPointF(16.0, 24.0));
+        p.drawLine(QPointF(12.0, 24.0), QPointF(20.0, 24.0));
+        p.setPen(makePen(iconSoft, 1.3));
+        p.drawLine(QPointF(9.5, 8.5), QPointF(9.5, 12.5));
+        p.drawLine(QPointF(22.5, 8.5), QPointF(22.5, 12.5));
+        break;
+    }
+    case PropertyIcon::EditText: {
+        p.setPen(makePen(iconSoft, 1.3));
+        p.drawRoundedRect(QRectF(7.5, 8.5, 13.5, 15.0), 2.2, 2.2);
+        p.drawLine(QPointF(10.5, 13.0), QPointF(17.5, 13.0));
+        p.drawLine(QPointF(10.5, 17.0), QPointF(15.5, 17.0));
+        p.setPen(makePen(iconInk, 1.7));
+        QPainterPath pencil;
+        pencil.moveTo(16.0, 23.0);
+        pencil.lineTo(24.6, 14.4);
+        pencil.lineTo(26.5, 16.3);
+        pencil.lineTo(17.9, 24.9);
+        pencil.lineTo(15.2, 25.7);
+        pencil.closeSubpath();
+        p.drawPath(pencil);
+        p.drawLine(QPointF(22.9, 12.7), QPointF(26.5, 16.3));
         break;
     }
     }
