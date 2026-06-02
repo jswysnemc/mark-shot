@@ -17,6 +17,8 @@ struct CaptureRequest {
     QRect sourceGeometry;
     bool allOutputs = false;
     bool preferScreencast = false;
+    bool allowInteractivePortal = true;
+    bool allowPortalScreenshotFallback = true;
 };
 
 CaptureResult captureScreenFrame(const CaptureRequest &request);

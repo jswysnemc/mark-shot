@@ -61,7 +61,7 @@ constexpr float kDuplicateAvgDiff = 1.1f;
 constexpr int kDuplicateMaxDiff = 4;
 
 constexpr int kBorderWidth = 3;       // thickness of the capture frame
-constexpr int kBorderGap = 2;         // gap between region and border (kept outside)
+constexpr int kBorderGap = 10;        // gap between region and border (kept outside)
 constexpr int kPanelWidth = 340;      // preview panel width
 constexpr int kPanelGap = 14;         // gap between region and preview panel
 constexpr int kPanelPadding = 12;
@@ -379,10 +379,9 @@ bool ScrollSessionWindow::configureLayerShell(QScreen *screen)
     layerWindow->setAnchors(anchors);
     layerWindow->setMargins({});
     layerWindow->setExclusiveZone(-1);
-    // Keep keyboard focus so Esc can cancel the session. Pointer input remains
-    // controlled by the input mask, so scrolling the page through the selected
-    // region still works.
-    layerWindow->setKeyboardInteractivity(LayerShellQt::Window::KeyboardInteractivityExclusive);
+    // Do not hold exclusive keyboard focus; the page below should keep receiving
+    // keyboard and wheel input while the panel can still take focus when clicked.
+    layerWindow->setKeyboardInteractivity(LayerShellQt::Window::KeyboardInteractivityOnDemand);
     layerWindow->setActivateOnShow(true);
     layerWindow->setCloseOnDismissed(false);
     if (screen) {
@@ -547,6 +546,9 @@ void ScrollSessionWindow::updateInputMask()
     mask -= QRegion(inner);
     mask += QRegion(previewPanelRect());
     setMask(mask);
+    if (QWindow *nativeWindow = windowHandle()) {
+        nativeWindow->setMask(mask);
+    }
 }
 
 void ScrollSessionWindow::showEvent(QShowEvent *event)
@@ -582,6 +584,8 @@ void ScrollSessionWindow::captureTick()
         request.sourceGeometry = m_geometry;
         request.allOutputs = false;
         request.preferScreencast = true;
+        request.allowInteractivePortal = false;
+        request.allowPortalScreenshotFallback = false;
 
         const CaptureResult result = captureScreenFrame(request);
         if (result.image.isNull()) {

@@ -96,6 +96,11 @@ const QDBusArgument &operator>>(const QDBusArgument &argument, PortalStream &str
 
 namespace {
 
+constexpr uint kPortalSourceMonitor = 1u;
+constexpr uint kPortalCursorHidden = 1u;
+constexpr uint kPortalCursorEmbedded = 2u;
+constexpr uint kPortalCursorMetadata = 4u;
+
 class PortalResponseReceiver : public QObject {
     Q_OBJECT
 
@@ -430,7 +435,7 @@ CaptureResult captureWithPortalScreenshot(const CaptureRequest &request)
     bool userCancelled = false;
     QString error;
     QVariantMap response = requestScreenshot(false, &userCancelled, &error);
-    if (response.isEmpty() && !userCancelled) {
+    if (response.isEmpty() && !userCancelled && request.allowInteractivePortal) {
         QString interactiveError;
         bool interactiveCancelled = false;
         const QVariantMap interactiveResponse = requestScreenshot(true, &interactiveCancelled, &interactiveError);
@@ -604,6 +609,38 @@ QVariant unwrappedVariant(QVariant value)
     return value;
 }
 
+uint portalUintProperty(const QString &interfaceName, const QString &propertyName)
+{
+    QDBusMessage message = QDBusMessage::createMethodCall(QStringLiteral("org.freedesktop.portal.Desktop"),
+                                                          QStringLiteral("/org/freedesktop/portal/desktop"),
+                                                          QStringLiteral("org.freedesktop.DBus.Properties"),
+                                                          QStringLiteral("Get"));
+    message << interfaceName << propertyName;
+
+    const QDBusMessage reply = QDBusConnection::sessionBus().call(message, QDBus::Block, 3000);
+    if (reply.type() == QDBusMessage::ErrorMessage || reply.arguments().isEmpty()) {
+        return 0;
+    }
+
+    bool ok = false;
+    const uint value = unwrappedVariant(reply.arguments().first()).toUInt(&ok);
+    return ok ? value : 0;
+}
+
+uint preferredPortalCursorMode(uint availableModes)
+{
+    if (availableModes & kPortalCursorHidden) {
+        return kPortalCursorHidden;
+    }
+    if (availableModes & kPortalCursorEmbedded) {
+        return kPortalCursorEmbedded;
+    }
+    if (availableModes & kPortalCursorMetadata) {
+        return kPortalCursorMetadata;
+    }
+    return 0;
+}
+
 QRect streamGeometryFromProperties(const QVariantMap &properties, const QSize &frameSize)
 {
     int x = 0;
@@ -668,7 +705,10 @@ public:
             m_frameReady.wait(&m_frameMutex, 2500);
         }
         if (m_latestFrame.isNull()) {
-            return {{}, QStringLiteral("portal screencast did not produce a frame"), {}, request.sourceGeometry};
+            const QString error = m_lastError.isEmpty()
+                ? QStringLiteral("portal screencast did not produce a frame")
+                : QStringLiteral("portal screencast did not produce a frame: %1").arg(m_lastError);
+            return {{}, error, {}, request.sourceGeometry};
         }
 
         const QImage frame = m_latestFrame.copy();
@@ -786,11 +826,26 @@ private:
             return false;
         }
 
+        const QString screenCastInterface = QStringLiteral("org.freedesktop.portal.ScreenCast");
+        const uint sourceTypes =
+            portalUintProperty(screenCastInterface, QStringLiteral("AvailableSourceTypes"));
+        if (sourceTypes != 0 && !(sourceTypes & kPortalSourceMonitor)) {
+            if (error) {
+                *error = QStringLiteral("ScreenCast portal does not advertise monitor capture");
+            }
+            return false;
+        }
+
         QVariantMap selectOptions;
         selectOptions.insert(QStringLiteral("handle_token"), portalToken());
-        selectOptions.insert(QStringLiteral("types"), 1u);       // Monitor
+        selectOptions.insert(QStringLiteral("types"), kPortalSourceMonitor);
         selectOptions.insert(QStringLiteral("multiple"), false);
-        selectOptions.insert(QStringLiteral("cursor_mode"), 1u); // Hidden cursor
+        const uint cursorMode =
+            preferredPortalCursorMode(portalUintProperty(screenCastInterface,
+                                                         QStringLiteral("AvailableCursorModes")));
+        if (cursorMode != 0) {
+            selectOptions.insert(QStringLiteral("cursor_mode"), cursorMode);
+        }
         callPortalRequest(&portal, QStringLiteral("SelectSources"),
                           {QVariant::fromValue(sessionPath), selectOptions},
                           QStringLiteral("ScreenCast SelectSources"), &requestError);
@@ -824,7 +879,12 @@ private:
         }
         m_nodeId = streams.first().nodeId;
         m_streamProperties = streams.first().properties;
-        m_targetObject = unwrappedVariant(m_streamProperties.value(QStringLiteral("pipewire.node.serial"))).toString();
+        m_targetObject =
+            unwrappedVariant(m_streamProperties.value(QStringLiteral("pipewire-serial"))).toString();
+        if (m_targetObject.isEmpty()) {
+            m_targetObject =
+                unwrappedVariant(m_streamProperties.value(QStringLiteral("pipewire.node.serial"))).toString();
+        }
 
         QDBusPendingReply<QDBusUnixFileDescriptor> pending =
             portal.asyncCall(QStringLiteral("OpenPipeWireRemote"),
@@ -1036,30 +1096,45 @@ private:
             return;
         }
 
-        QImage image = self->imageFromBuffer(buffer);
+        QString imageError;
+        QImage image = self->imageFromBuffer(buffer, &imageError);
         if (!image.isNull()) {
             QMutexLocker locker(&self->m_frameMutex);
             self->m_latestFrame = std::move(image);
             self->m_streamGeometry = streamGeometryFromProperties(self->m_streamProperties, self->m_latestFrame.size());
             self->m_frameReady.wakeAll();
+        } else if (!imageError.isEmpty()) {
+            QMutexLocker locker(&self->m_frameMutex);
+            self->m_lastError = imageError;
+            self->m_frameReady.wakeAll();
         }
         pw_stream_queue_buffer(self->m_stream, buffer);
     }
 
-    QImage imageFromBuffer(pw_buffer *pipewireBuffer) const
+    QImage imageFromBuffer(pw_buffer *pipewireBuffer, QString *error) const
     {
         if (!pipewireBuffer || !pipewireBuffer->buffer || pipewireBuffer->buffer->n_datas == 0) {
+            if (error) {
+                *error = QStringLiteral("PipeWire delivered an empty buffer");
+            }
             return {};
         }
         const spa_buffer *spaBuffer = pipewireBuffer->buffer;
         const spa_data &data = spaBuffer->datas[0];
         if (!data.data || !data.chunk) {
+            if (error) {
+                *error = QStringLiteral("PipeWire buffer is not CPU-mappable (data type %1)")
+                             .arg(static_cast<uint>(data.type));
+            }
             return {};
         }
 
         const int width = static_cast<int>(m_videoInfo.size.width);
         const int height = static_cast<int>(m_videoInfo.size.height);
         if (width <= 0 || height <= 0) {
+            if (error) {
+                *error = QStringLiteral("PipeWire frame size is invalid");
+            }
             return {};
         }
 
@@ -1068,6 +1143,9 @@ private:
             : width * 4;
         const uchar *source = static_cast<const uchar *>(data.data) + data.chunk->offset;
         if (!source || stride < width * 4) {
+            if (error) {
+                *error = QStringLiteral("PipeWire frame stride is invalid");
+            }
             return {};
         }
 
@@ -1084,6 +1162,10 @@ private:
         case SPA_VIDEO_FORMAT_ARGB:
             return convertRgbaLikeFrame(source, width, height, stride, m_videoInfo.format);
         default:
+            if (error) {
+                *error = QStringLiteral("unsupported PipeWire video format %1")
+                             .arg(static_cast<int>(m_videoInfo.format));
+            }
             return {};
         }
     }
@@ -1206,14 +1288,27 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
         if (!screencastCapture.image.isNull()) {
             return screencastCapture;
         }
+        stopPortalScreencast();
+
+        CaptureResult portalCapture;
+        if (request.allowPortalScreenshotFallback) {
+            portalCapture = captureWithPortalScreenshot(request);
+            if (!portalCapture.image.isNull()) {
+                return portalCapture;
+            }
+        }
 
         CaptureResult grimCapture = captureWithGrim(request);
         if (!grimCapture.image.isNull()) {
             return grimCapture;
         }
-
         return {{},
-                QStringLiteral("%1\nGrim fallback: %2").arg(screencastCapture.error, grimCapture.error),
+                QStringLiteral("%1\nPortal screenshot fallback: %2\nGrim fallback: %3")
+                    .arg(screencastCapture.error,
+                         request.allowPortalScreenshotFallback
+                             ? portalCapture.error
+                             : QStringLiteral("disabled for live scrolling capture"),
+                         grimCapture.error),
                 {},
                 request.sourceGeometry};
     }
