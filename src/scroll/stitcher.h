@@ -118,6 +118,8 @@ private:
     ColSamples m_lastCols;
     int m_lastOffset = 0;
     int m_bestBottomTrim = 0;
+    StitchEdge m_pendingEdge = StitchEdge::None;
+    StitchEdge m_growthEdge = StitchEdge::None;
     // Absolute position of the anchor frame's top edge within the long image,
     // along the scroll axis. The frame the next match is measured against sits at
     // [m_anchorPos, m_anchorPos + frameLen) in long-image coordinates. Scrolling

@@ -1,12 +1,14 @@
 #include "scroll/stitcher.h"
 
+#include "debug_log.h"
+
 #include <QPainter>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdarg>
-#include <cstdio>
+#include <limits>
 #include <vector>
 
 namespace markshot::scroll {
@@ -210,6 +212,17 @@ QImage transposeImage(const QImage &src)
     return dst;
 }
 
+QImage normalizePixelImage(QImage image)
+{
+    if (!image.isNull()) {
+        if (image.format() != QImage::Format_ARGB32_Premultiplied) {
+            image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        }
+        image.setDevicePixelRatio(1.0);
+    }
+    return image;
+}
+
 const char *algorithmDebugName()
 {
     return "col-sample";
@@ -235,18 +248,13 @@ const char *edgeDebugName(StitchEdge edge)
 
 void logStitchDebug(const char *format, ...)
 {
-    FILE *file = std::fopen("/tmp/mark-shot-scroll.log", "a");
-    if (!file) {
+    if (!markshot::debugEnabled()) {
         return;
     }
-
-    std::fprintf(file, "[stitch] ");
     va_list args;
     va_start(args, format);
-    std::vfprintf(file, format, args);
+    markshot::debugLogV("stitch", format, args);
     va_end(args);
-    std::fprintf(file, "\n");
-    std::fclose(file);
 }
 
 }  // namespace
@@ -379,14 +387,32 @@ std::pair<int, float> Stitcher::findKnownPosition(const ColSamples &frameCols, i
         return {0, kNoMatchConfidence};
     }
 
-    int bestPos = 0;
+    const int predictedInsidePos = std::clamp(predictedPos, 0, maxPos);
+    const float predictedDiff = knownOverlapDiff(frameCols, predictedInsidePos);
+    if (predictedDiff <= m_config.acceptDiff) {
+        return {predictedInsidePos, predictedDiff};
+    }
+
+    int bestPos = predictedInsidePos;
     float bestDiff = kNoMatchConfidence;
+    int bestGoodPos = predictedInsidePos;
+    float bestGoodDiff = kNoMatchConfidence;
+    int bestGoodDistance = std::numeric_limits<int>::max();
     auto visit = [&](int pos) {
         pos = std::clamp(pos, 0, maxPos);
         const float diff = knownOverlapDiff(frameCols, pos);
         if (diff < bestDiff) {
             bestDiff = diff;
             bestPos = pos;
+        }
+        if (diff <= m_config.acceptDiff) {
+            const int distance = std::abs(pos - predictedInsidePos);
+            if (distance < bestGoodDistance
+                || (distance == bestGoodDistance && diff < bestGoodDiff)) {
+                bestGoodDistance = distance;
+                bestGoodDiff = diff;
+                bestGoodPos = pos;
+            }
         }
     };
 
@@ -406,6 +432,9 @@ std::pair<int, float> Stitcher::findKnownPosition(const ColSamples &frameCols, i
         visit(pos);
     }
 
+    if (bestGoodDiff <= m_config.acceptDiff) {
+        return {bestGoodPos, bestGoodDiff};
+    }
     return {bestPos, bestDiff};
 }
 
@@ -577,13 +606,17 @@ void Stitcher::appendSlice(const QImage &frame, int amount, int trimBottom)
     trimBottom = std::clamp(trimBottom, 0, std::max(0, m_full.height() - 1));
     const int keepHeight = m_full.height() - trimBottom;
     QImage combined(w, keepHeight + amount, QImage::Format_ARGB32_Premultiplied);
+    combined.setDevicePixelRatio(1.0);
     combined.fill(Qt::transparent);
 
     QPainter painter(&combined);
-    painter.drawImage(0, 0, m_full, 0, 0, w, keepHeight);
+    painter.drawImage(QRect(0, 0, w, keepHeight),
+                      m_full,
+                      QRect(0, 0, w, keepHeight));
     const int overlap = frame.height() - amount;
-    const QImage slice = frame.copy(0, overlap, frame.width(), amount);
-    painter.drawImage(0, keepHeight, slice);
+    painter.drawImage(QRect(0, keepHeight, frame.width(), amount),
+                      frame,
+                      QRect(0, overlap, frame.width(), amount));
     painter.end();
 
     m_full = combined;
@@ -594,14 +627,18 @@ void Stitcher::prependSlice(const QImage &frame, int amount)
 {
     const int w = m_full.width();
     QImage combined(w, m_full.height() + amount, QImage::Format_ARGB32_Premultiplied);
+    combined.setDevicePixelRatio(1.0);
     combined.fill(Qt::transparent);
 
     QPainter painter(&combined);
     // The top `amount` rows of the current frame are the newly-revealed content
     // above the previous anchor; place them first, then the old image below.
-    const QImage slice = frame.copy(0, 0, frame.width(), amount);
-    painter.drawImage(0, 0, slice);
-    painter.drawImage(0, amount, m_full);
+    painter.drawImage(QRect(0, 0, frame.width(), amount),
+                      frame,
+                      QRect(0, 0, frame.width(), amount));
+    painter.drawImage(QRect(0, amount, w, m_full.height()),
+                      m_full,
+                      QRect(0, 0, w, m_full.height()));
     painter.end();
 
     m_full = combined;
@@ -625,14 +662,16 @@ StitchResult Stitcher::pushFrame(const QImage &rawFrame)
     // Horizontal capture runs the whole vertical pipeline on a transposed frame;
     // everything below works in the transposed (vertical) space, and fullImage()
     // transposes m_full back for output.
-    const QImage frame =
-        m_axis == ScrollAxis::Horizontal ? transposeImage(rawFrame) : rawFrame;
+    const QImage frame = normalizePixelImage(
+        m_axis == ScrollAxis::Horizontal ? transposeImage(rawFrame) : rawFrame);
 
     if (m_full.isNull()) {
-        m_full = frame.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        m_full = frame;
         m_fullCols = computeCols(m_full);
         m_anchorPos = 0;
         m_bestBottomTrim = 0;
+        m_pendingEdge = StitchEdge::None;
+        m_growthEdge = StitchEdge::None;
         m_stats.frameCount = 1;
         m_stats.totalHeight = m_full.height();
         m_stats.lastAppend = m_full.height();
@@ -667,13 +706,13 @@ StitchResult Stitcher::pushFrame(const QImage &rawFrame)
         m_anchorPos = pos;
         rememberFrame(frame);
         m_lastOffset = appliedOffset;
+        m_pendingEdge = StitchEdge::None;
         return StitchResult{StitchStatus::NoProgress, 0, StitchEdge::None, pos, fh};
     };
 
     auto holdPendingFrame = [&](int pos, int appliedOffset, StitchEdge pendingEdge) {
-        m_anchorPos = pos;
-        rememberFrame(frame);
-        m_lastOffset = appliedOffset;
+        Q_UNUSED(appliedOffset);
+        m_pendingEdge = pendingEdge;
         return StitchResult{StitchStatus::NoProgress, 0, pendingEdge, pos, fh};
     };
 
@@ -787,11 +826,26 @@ StitchResult Stitcher::pushFrame(const QImage &rawFrame)
         }
     };
     refreshEdgeOverlap();
+
+    const bool switchingGrowthEdge =
+        m_growthEdge != StitchEdge::None && edge != StitchEdge::None && edge != m_growthEdge;
+    const bool switchingAtBoundary =
+        (edge == StitchEdge::Start && m_anchorPos <= m_config.minAppend && newPos <= 0)
+        || (edge == StitchEdge::End
+            && m_anchorPos + fh >= H - m_config.minAppend
+            && newPos + fh >= H - bottomTrim);
+    const bool trustedOppositeEdgeSwitch =
+        switchingGrowthEdge
+        && switchingAtBoundary
+        && effectiveConfidence <= m_config.acceptDiff
+        && std::abs(appliedOffset) >= m_config.minAppend
+        && overlapLen >= m_config.minOverlap;
+
     if (amount > 0 && (edgeDiff > m_config.acceptDiff || overlapLen < m_config.minOverlap)) {
         const int rejectedPos = newPos;
         const float rejectedDiff = edgeDiff;
         const int rejectedOverlap = overlapLen;
-        if (!usedEdgeRecovery && tryEdgeRecovery()) {
+        if (!usedEdgeRecovery && confidence > m_config.acceptDiff && tryEdgeRecovery()) {
             refreshEdgeOverlap();
             logStitchDebug("recover-edge-after-overlap-reject alg=%s axis=%s off=%d conf=%.3f accept=%.3f "
                            "anchor=%d pred=%d rejected_pos=%d rejected_diff=%.3f rejected_overlap=%d "
@@ -804,7 +858,8 @@ StitchResult Stitcher::pushFrame(const QImage &rawFrame)
     }
 
     if (amount > 0 && H >= fh) {
-        if (edgeDiff > m_config.acceptDiff || overlapLen < m_config.minOverlap) {
+        if (!trustedOppositeEdgeSwitch
+            && (edgeDiff > m_config.acceptDiff || overlapLen < m_config.minOverlap)) {
             const std::pair<int, float> known = findKnownPosition(frameCols, predictedPos);
             knownPos = known.first;
             knownDiff = known.second;
@@ -823,19 +878,75 @@ StitchResult Stitcher::pushFrame(const QImage &rawFrame)
 
     const int heightDelta = edge == StitchEdge::End ? amount - bottomTrim : amount;
     if (heightDelta >= m_config.minAppend) {
-        if (edgeDiff > m_config.acceptDiff || overlapLen < m_config.minOverlap) {
-            logStitchDebug("reject-edge-overlap alg=%s axis=%s off=%d conf=%.3f accept=%.3f "
-                           "anchor=%d pred=%d pos=%d amount=%d edge=%s edge_diff=%.3f overlap=%d "
-                           "known=%d known_diff=%.3f used_known=%d edge_recovery=%d "
-                           "line_recovery=%d edge_pos=%d edge_recovery_diff=%.3f bottom_trim=%d "
-                           "line_rows=%d H=%d fh=%d",
+        auto canSwitchGrowthEdge = [&]() {
+            if (m_growthEdge == StitchEdge::None || edge == StitchEdge::None || edge == m_growthEdge) {
+                return true;
+            }
+            if (trustedOppositeEdgeSwitch) {
+                return true;
+            }
+            if (edgeDiff > m_config.acceptDiff || overlapLen < m_config.minOverlap) {
+                return false;
+            }
+            if (edge == StitchEdge::Start) {
+                return newPos <= 0;
+            }
+            if (edge == StitchEdge::End) {
+                return newPos + fh >= H - bottomTrim;
+            }
+            return false;
+        };
+        if (m_pendingEdge != StitchEdge::None && edge != StitchEdge::None && edge != m_pendingEdge) {
+            logStitchDebug("reject-opposite-pending alg=%s axis=%s off=%d conf=%.3f accept=%.3f "
+                           "anchor=%d pred=%d pos=%d amount=%d edge=%s pending_edge=%s "
+                           "edge_diff=%.3f overlap=%d H=%d fh=%d",
                            algorithmDebugName(), axisDebugName(m_axis),
                            offset, confidence, m_config.acceptDiff, m_anchorPos, predictedPos,
-                           newPos, amount, edgeDebugName(edge), edgeDiff, overlapLen, knownPos,
-                           knownDiff, usedKnown ? 1 : 0, usedEdgeRecovery ? 1 : 0,
-                           usedLineRecovery ? 1 : 0, edgeRecoveryPos, edgeRecoveryDiff,
-                           bottomTrim, lineMatchedRows, H, fh);
+                           newPos, amount, edgeDebugName(edge), edgeDebugName(m_pendingEdge),
+                           edgeDiff, overlapLen, H, fh);
+            m_pendingEdge = StitchEdge::None;
             return StitchResult{StitchStatus::NoMatch, 0};
+        }
+        if (!canSwitchGrowthEdge()) {
+            logStitchDebug("reject-opposite-growth alg=%s axis=%s off=%d conf=%.3f accept=%.3f "
+                           "anchor=%d pred=%d pos=%d amount=%d edge=%s growth_edge=%s "
+                           "edge_diff=%.3f overlap=%d H=%d fh=%d",
+                           algorithmDebugName(), axisDebugName(m_axis),
+                           offset, confidence, m_config.acceptDiff, m_anchorPos, predictedPos,
+                           newPos, amount, edgeDebugName(edge), edgeDebugName(m_growthEdge),
+                           edgeDiff, overlapLen, H, fh);
+            return StitchResult{StitchStatus::NoMatch, 0};
+        }
+        if (m_growthEdge != StitchEdge::None && edge != StitchEdge::None && edge != m_growthEdge) {
+            logStitchDebug("switch-growth-edge alg=%s axis=%s old=%s new=%s "
+                           "anchor=%d pred=%d pos=%d amount=%d H=%d fh=%d",
+                           algorithmDebugName(), axisDebugName(m_axis),
+                           edgeDebugName(m_growthEdge), edgeDebugName(edge),
+                           m_anchorPos, predictedPos, newPos, amount, H, fh);
+        }
+        if (edgeDiff > m_config.acceptDiff || overlapLen < m_config.minOverlap) {
+            if (trustedOppositeEdgeSwitch) {
+                logStitchDebug("allow-opposite-growth-edge alg=%s axis=%s off=%d conf=%.3f accept=%.3f "
+                               "anchor=%d pred=%d pos=%d amount=%d edge=%s growth_edge=%s "
+                               "edge_diff=%.3f overlap=%d H=%d fh=%d",
+                               algorithmDebugName(), axisDebugName(m_axis),
+                               offset, confidence, m_config.acceptDiff, m_anchorPos, predictedPos,
+                               newPos, amount, edgeDebugName(edge), edgeDebugName(m_growthEdge),
+                               edgeDiff, overlapLen, H, fh);
+            } else {
+                logStitchDebug("reject-edge-overlap alg=%s axis=%s off=%d conf=%.3f accept=%.3f "
+                               "anchor=%d pred=%d pos=%d amount=%d edge=%s edge_diff=%.3f overlap=%d "
+                               "known=%d known_diff=%.3f used_known=%d edge_recovery=%d "
+                               "line_recovery=%d edge_pos=%d edge_recovery_diff=%.3f bottom_trim=%d "
+                               "line_rows=%d H=%d fh=%d",
+                               algorithmDebugName(), axisDebugName(m_axis),
+                               offset, confidence, m_config.acceptDiff, m_anchorPos, predictedPos,
+                               newPos, amount, edgeDebugName(edge), edgeDiff, overlapLen, knownPos,
+                               knownDiff, usedKnown ? 1 : 0, usedEdgeRecovery ? 1 : 0,
+                               usedLineRecovery ? 1 : 0, edgeRecoveryPos, edgeRecoveryDiff,
+                               bottomTrim, lineMatchedRows, H, fh);
+                return StitchResult{StitchStatus::NoMatch, 0};
+            }
         }
 
         if (edge == StitchEdge::End) {
@@ -849,6 +960,10 @@ StitchResult Stitcher::pushFrame(const QImage &rawFrame)
             m_anchorPos = newPos + amount; // the prepend shifts the old origin down
         }
         m_axisLocked = true;               // orientation fixed once the image grew
+        m_pendingEdge = StitchEdge::None;
+        if (edge != StitchEdge::None) {
+            m_growthEdge = edge;
+        }
         rememberFrame(frame);
         m_lastOffset = appliedOffset;
         m_stats.frameCount += 1;
@@ -878,9 +993,9 @@ StitchResult Stitcher::pushFrame(const QImage &rawFrame)
                        knownPos, knownDiff, usedKnown ? 1 : 0, H, fh);
         return adoptKnownFrame(newPos, appliedOffset);
     }
-    // else: a sub-minAppend sliver is forming past an edge. Hold both the anchor
-    // frame and the position so it accumulates and stitches in one clean piece
-    // once movement clears minAppend, instead of welding 1-2px jitter into a seam.
+    // else: a sub-minAppend sliver is forming past an edge. Remember only its
+    // direction so jitter cannot flip the next append; keep the anchor frame
+    // unchanged until movement clears minAppend.
     logStitchDebug("wait-min-append alg=%s axis=%s off=%d conf=%.3f accept=%.3f "
                    "anchor=%d pred=%d pos=%d amount=%d edge=%s edge_diff=%.3f overlap=%d "
                    "min_append=%d known=%d known_diff=%.3f used_known=%d edge_recovery=%d H=%d fh=%d",
@@ -893,10 +1008,9 @@ StitchResult Stitcher::pushFrame(const QImage &rawFrame)
 
 QImage Stitcher::fullImage() const
 {
-    if (m_axis == ScrollAxis::Horizontal) {
-        return transposeImage(m_full);
-    }
-    return m_full;
+    QImage result = m_axis == ScrollAxis::Horizontal ? transposeImage(m_full) : m_full;
+    result.setDevicePixelRatio(1.0);
+    return result;
 }
 
 StitchStats Stitcher::stats() const
@@ -928,6 +1042,8 @@ void Stitcher::setAxis(ScrollAxis axis)
         return;
     }
     m_axis = axis;
+    m_pendingEdge = StitchEdge::None;
+    m_growthEdge = StitchEdge::None;
 
     // The seed state is stored in the pipeline's (vertical) space, which is the
     // transpose of the captured frame when horizontal. Flipping the axis flips
