@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("mark-shot"));
     QApplication::setApplicationDisplayName(QStringLiteral("Mark Shot"));
-    QApplication::setApplicationVersion(QStringLiteral("0.1.12"));
+    QApplication::setApplicationVersion(QStringLiteral(MARK_SHOT_VERSION));
 
     markshot::i18n::initialize();
 

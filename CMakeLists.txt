@@ -13,6 +13,7 @@ find_package(X11 COMPONENTS xcb QUIET)
 find_package(PkgConfig QUIET)
 if(PkgConfig_FOUND)
     pkg_check_modules(PipeWire QUIET IMPORTED_TARGET libpipewire-0.3)
+    pkg_check_modules(LibPortal QUIET IMPORTED_TARGET libportal)
 endif()
 
 if(COMMAND qt_standard_project_setup)
@@ -48,6 +49,7 @@ qt_add_executable(mark-shot
 )
 
 target_include_directories(mark-shot PRIVATE src)
+target_compile_definitions(mark-shot PRIVATE MARK_SHOT_VERSION="${PROJECT_VERSION}")
 
 target_link_libraries(mark-shot
     PRIVATE
@@ -72,6 +74,13 @@ if(PipeWire_FOUND)
     target_link_libraries(mark-shot PRIVATE PkgConfig::PipeWire)
     target_compile_definitions(mark-shot PRIVATE HAVE_PIPEWIRE)
     message(STATUS "mark-shot: PipeWire ${PipeWire_VERSION} found, portal screencast capture enabled")
+    if(LibPortal_FOUND)
+        target_link_libraries(mark-shot PRIVATE PkgConfig::LibPortal)
+        target_compile_definitions(mark-shot PRIVATE HAVE_LIBPORTAL)
+        message(STATUS "mark-shot: libportal ${LibPortal_VERSION} found, libportal screencast negotiation enabled")
+    else()
+        message(STATUS "mark-shot: libportal not found, using direct D-Bus portal screencast negotiation")
+    endif()
 else()
     message(STATUS "mark-shot: PipeWire not found, Wayland scrolling capture falls back to screenshot portal/grim")
 endif()

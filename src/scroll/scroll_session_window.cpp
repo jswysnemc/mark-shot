@@ -65,6 +65,7 @@ constexpr int kBorderWidth = 3;       // thickness of the capture frame
 constexpr int kBorderGap = 10;        // gap between region and border (kept outside)
 constexpr int kPanelWidth = 340;      // preview panel width
 constexpr int kPanelGap = 14;         // gap between region and preview panel
+constexpr int kNoLayerPanelGap = 96;  // GNOME xdg windows can bleed into PipeWire captures
 constexpr int kPanelPadding = 12;
 constexpr int kControlBarHeight = 54;   // single row of icon actions
 constexpr int kStatusHeight = 22;
@@ -495,9 +496,10 @@ QRect ScrollSessionWindow::previewPanelRect() const
 
     // Prefer the right side of the region; fall back to the left when there is
     // not enough room.
-    int left = region.right() + kPanelGap;
+    const int panelGap = m_layerShell ? kPanelGap : kNoLayerPanelGap;
+    int left = region.right() + panelGap;
     if (left + kPanelWidth > bounds.right() - 4) {
-        const int leftAlt = region.left() - kPanelGap - kPanelWidth;
+        const int leftAlt = region.left() - panelGap - kPanelWidth;
         if (leftAlt >= 4) {
             left = leftAlt;
         } else {
@@ -551,13 +553,20 @@ void ScrollSessionWindow::updateInputMask()
 void ScrollSessionWindow::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
+    if (!m_layerShell) {
+        m_screenOrigin = geometry().topLeft();
+    }
     layoutOverlay();
     updateInputMask();
     const QRect region = regionLocalRect();
     const QRect panel = previewPanelRect();
-    logScrollDebug("layout region=%d,%d %dx%d panel=%d,%d %dx%d panel_overlap=%d layer_shell=%d",
+    logScrollDebug("layout window=%d,%d %dx%d screen_origin=%d,%d region=%d,%d %dx%d "
+                   "panel=%d,%d %dx%d panel_gap=%d panel_overlap=%d layer_shell=%d",
+                   geometry().x(), geometry().y(), geometry().width(), geometry().height(),
+                   m_screenOrigin.x(), m_screenOrigin.y(),
                    region.x(), region.y(), region.width(), region.height(),
                    panel.x(), panel.y(), panel.width(), panel.height(),
+                   m_layerShell ? kPanelGap : kNoLayerPanelGap,
                    panel.intersects(region) ? 1 : 0, m_layerShell ? 1 : 0);
     if (m_timer && !m_timer->isActive()) {
         // Let the compositor apply the window mask before the first X11 capture;

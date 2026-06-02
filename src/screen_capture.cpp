@@ -28,6 +28,7 @@
 #include <QRectF>
 #include <QScreen>
 #include <QStringList>
+#include <QThread>
 #include <QTimer>
 #include <QUrl>
 #include <QUuid>
@@ -48,6 +49,19 @@
 #endif
 
 #ifdef HAVE_PIPEWIRE
+#ifdef HAVE_LIBPORTAL
+#ifdef signals
+#define MARKSHOT_RESTORE_QT_SIGNALS_MACRO
+#pragma push_macro("signals")
+#undef signals
+#endif
+#include <libportal/portal.h>
+#include <libportal/portal-helpers.h>
+#ifdef MARKSHOT_RESTORE_QT_SIGNALS_MACRO
+#pragma pop_macro("signals")
+#undef MARKSHOT_RESTORE_QT_SIGNALS_MACRO
+#endif
+#endif
 #include <pipewire/pipewire.h>
 #include <spa/buffer/buffer.h>
 #include <spa/param/format-utils.h>
@@ -106,6 +120,7 @@ constexpr uint kPortalSourceMonitor = 1u;
 constexpr uint kPortalCursorHidden = 1u;
 constexpr uint kPortalCursorEmbedded = 2u;
 constexpr uint kPortalCursorMetadata = 4u;
+constexpr unsigned long kScreencastFirstFrameSettleMs = 1500;
 
 class PortalResponseReceiver : public QObject {
     Q_OBJECT
@@ -393,6 +408,8 @@ QVariantMap waitForPortalResponse(PortalResponseReceiver *receiver, QString *err
     return receiver->results;
 }
 
+QRect scaledCropRect(QRect sourceGeometry, QRect requestedGeometry, QSize imageSize);
+
 CaptureResult captureWithPortalScreenshot(const CaptureRequest &request)
 {
     registerHostPortalApplication();
@@ -498,18 +515,36 @@ CaptureResult captureWithPortalScreenshot(const CaptureRequest &request)
     image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
     QRect sourceGeometry = request.sourceGeometry;
     if (request.sourceGeometry.isValid() && !request.sourceGeometry.isEmpty() && !request.allOutputs) {
-        const QRect imageRect(QPoint(0, 0), image.size());
         const QRect requested = request.sourceGeometry.normalized();
-        QRect cropRect(QPoint(0, 0), requested.size());
-        if (image.size() != requested.size()) {
-            const QRect virtualGeometry = virtualScreensGeometry();
-            cropRect = requested.translated(-virtualGeometry.topLeft());
+        const QRect virtualGeometry = virtualScreensGeometry();
+        const QRect coverage = virtualGeometry.isEmpty() ? requested : virtualGeometry;
+        const QRect overlap = requested.intersected(coverage);
+        if (overlap.isEmpty()) {
+            return {{}, QStringLiteral("portal screenshot does not cover requested geometry"), {}, request.sourceGeometry};
         }
-        cropRect = cropRect.intersected(imageRect);
-        if (!cropRect.isEmpty() && cropRect.size() != image.size()) {
+
+        const QSize rawSize = image.size();
+        QRect cropRect(QPoint(0, 0), image.size());
+        if (rawSize != overlap.size()) {
+            cropRect = scaledCropRect(coverage, overlap, rawSize);
+        }
+        if (cropRect.isEmpty()) {
+            return {{}, QStringLiteral("portal screenshot physical crop is empty"), {}, request.sourceGeometry};
+        }
+
+        if (cropRect != QRect(QPoint(0, 0), image.size())) {
             image = image.copy(cropRect);
-            sourceGeometry = requested;
         }
+        sourceGeometry = overlap;
+        markshot::debugLog("capture",
+                           "portal-screenshot raw=%dx%d coverage=%d,%d %dx%d requested=%d,%d %dx%d "
+                           "crop=%d,%d %dx%d display_logical=%dx%d result=%dx%d",
+                           rawSize.width(), rawSize.height(),
+                           coverage.x(), coverage.y(), coverage.width(), coverage.height(),
+                           requested.x(), requested.y(), requested.width(), requested.height(),
+                           cropRect.x(), cropRect.y(), cropRect.width(), cropRect.height(),
+                           overlap.width(), overlap.height(),
+                           image.width(), image.height());
     }
 
     return {image, {}, request.allOutputs ? QString() : request.preferredOutputName, sourceGeometry};
@@ -721,7 +756,320 @@ QImage cropFrameToRequest(const QImage &frame, QRect streamGeometry, QRect reque
     return boundedCrop.isEmpty() ? QImage() : frame.copy(boundedCrop);
 }
 
+QImage normalizeScreencastCropToLogicalSize(QImage image,
+                                            QRect streamGeometry,
+                                            QRect requestedGeometry)
+{
+    if (image.isNull() || requestedGeometry.isEmpty()) {
+        return image;
+    }
+
+    if (streamGeometry.isNull() || streamGeometry.isEmpty()) {
+        return image;
+    }
+
+    const QRect overlap = requestedGeometry.normalized().intersected(streamGeometry);
+    const QSize targetSize = overlap.size();
+    if (targetSize.isEmpty() || image.size() == targetSize) {
+        return image;
+    }
+
+    image = image.scaled(targetSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    image.setDevicePixelRatio(1.0);
+    return image;
+}
+
+QRect scaledCropRect(QRect sourceGeometry, QRect requestedGeometry, QSize imageSize)
+{
+    if (sourceGeometry.isEmpty() || requestedGeometry.isEmpty() || imageSize.isEmpty()) {
+        return {};
+    }
+
+    const QRect source = sourceGeometry.normalized();
+    const QRect requested = requestedGeometry.normalized();
+    const QRect overlap = requested.intersected(source);
+    if (overlap.isEmpty()) {
+        return {};
+    }
+
+    const qreal scaleX = static_cast<qreal>(imageSize.width()) / source.width();
+    const qreal scaleY = static_cast<qreal>(imageSize.height()) / source.height();
+    const int left = qRound((overlap.left() - source.left()) * scaleX);
+    const int top = qRound((overlap.top() - source.top()) * scaleY);
+    const int right = qRound((overlap.right() + 1 - source.left()) * scaleX);
+    const int bottom = qRound((overlap.bottom() + 1 - source.top()) * scaleY);
+    return QRect(left, top, std::max(1, right - left), std::max(1, bottom - top))
+        .intersected(QRect(QPoint(0, 0), imageSize));
+}
+
 #ifdef HAVE_PIPEWIRE
+
+#ifdef HAVE_LIBPORTAL
+
+QString glibErrorText(const GError *error)
+{
+    return error && error->message
+        ? QString::fromUtf8(error->message)
+        : QStringLiteral("unknown libportal error");
+}
+
+QVariant gVariantToQVariant(GVariant *value)
+{
+    if (!value) {
+        return {};
+    }
+
+    if (g_variant_is_of_type(value, G_VARIANT_TYPE_VARIANT)) {
+        GVariant *nested = g_variant_get_variant(value);
+        const QVariant converted = gVariantToQVariant(nested);
+        g_variant_unref(nested);
+        return converted;
+    }
+
+    switch (g_variant_classify(value)) {
+    case G_VARIANT_CLASS_BOOLEAN:
+        return static_cast<bool>(g_variant_get_boolean(value));
+    case G_VARIANT_CLASS_BYTE:
+        return static_cast<int>(g_variant_get_byte(value));
+    case G_VARIANT_CLASS_INT16:
+        return static_cast<int>(g_variant_get_int16(value));
+    case G_VARIANT_CLASS_UINT16:
+        return static_cast<uint>(g_variant_get_uint16(value));
+    case G_VARIANT_CLASS_INT32:
+        return g_variant_get_int32(value);
+    case G_VARIANT_CLASS_UINT32:
+        return g_variant_get_uint32(value);
+    case G_VARIANT_CLASS_INT64:
+        return static_cast<qlonglong>(g_variant_get_int64(value));
+    case G_VARIANT_CLASS_UINT64:
+        return static_cast<qulonglong>(g_variant_get_uint64(value));
+    case G_VARIANT_CLASS_HANDLE:
+        return g_variant_get_handle(value);
+    case G_VARIANT_CLASS_DOUBLE:
+        return g_variant_get_double(value);
+    case G_VARIANT_CLASS_STRING:
+    case G_VARIANT_CLASS_OBJECT_PATH:
+    case G_VARIANT_CLASS_SIGNATURE:
+        return QString::fromUtf8(g_variant_get_string(value, nullptr));
+    case G_VARIANT_CLASS_ARRAY:
+    case G_VARIANT_CLASS_TUPLE: {
+        QVariantList list;
+        const gsize childCount = g_variant_n_children(value);
+        list.reserve(static_cast<int>(childCount));
+        for (gsize i = 0; i < childCount; ++i) {
+            GVariant *child = g_variant_get_child_value(value, i);
+            list.push_back(gVariantToQVariant(child));
+            g_variant_unref(child);
+        }
+        return list;
+    }
+    default:
+        break;
+    }
+
+    gchar *printed = g_variant_print(value, TRUE);
+    const QString fallback = printed
+        ? QString::fromUtf8(printed)
+        : QStringLiteral("<unprintable>");
+    g_free(printed);
+    return fallback;
+}
+
+QVariantMap gVariantDictionaryToVariantMap(GVariant *dictionary)
+{
+    QVariantMap map;
+    if (!dictionary) {
+        return map;
+    }
+
+    const gsize childCount = g_variant_n_children(dictionary);
+    for (gsize i = 0; i < childCount; ++i) {
+        GVariant *entry = g_variant_get_child_value(dictionary, i);
+        if (!entry || g_variant_n_children(entry) < 2) {
+            if (entry) {
+                g_variant_unref(entry);
+            }
+            continue;
+        }
+
+        GVariant *key = g_variant_get_child_value(entry, 0);
+        GVariant *value = g_variant_get_child_value(entry, 1);
+        if (key && g_variant_is_of_type(key, G_VARIANT_TYPE_STRING)) {
+            map.insert(QString::fromUtf8(g_variant_get_string(key, nullptr)),
+                       gVariantToQVariant(value));
+        }
+        if (value) {
+            g_variant_unref(value);
+        }
+        if (key) {
+            g_variant_unref(key);
+        }
+        g_variant_unref(entry);
+    }
+    return map;
+}
+
+bool readLibportalStream(GVariant *streams,
+                         uint *nodeId,
+                         QVariantMap *properties,
+                         QString *error)
+{
+    if (!streams || g_variant_n_children(streams) == 0) {
+        if (error) {
+            *error = QStringLiteral("libportal ScreenCast Start returned no PipeWire stream");
+        }
+        return false;
+    }
+
+    GVariant *stream = g_variant_get_child_value(streams, 0);
+    if (!stream || g_variant_n_children(stream) < 2) {
+        if (stream) {
+            g_variant_unref(stream);
+        }
+        if (error) {
+            *error = QStringLiteral("libportal returned an invalid stream descriptor");
+        }
+        return false;
+    }
+
+    GVariant *nodeValue = g_variant_get_child_value(stream, 0);
+    GVariant *propertiesValue = g_variant_get_child_value(stream, 1);
+    const bool nodeOk = nodeValue && g_variant_is_of_type(nodeValue, G_VARIANT_TYPE_UINT32);
+    if (nodeOk && nodeId) {
+        *nodeId = g_variant_get_uint32(nodeValue);
+    }
+    if (propertiesValue && properties) {
+        *properties = gVariantDictionaryToVariantMap(propertiesValue);
+    }
+
+    if (propertiesValue) {
+        g_variant_unref(propertiesValue);
+    }
+    if (nodeValue) {
+        g_variant_unref(nodeValue);
+    }
+    g_variant_unref(stream);
+
+    if (!nodeOk || !nodeId || *nodeId == 0) {
+        if (error) {
+            *error = QStringLiteral("libportal returned a PipeWire stream without a node id");
+        }
+        return false;
+    }
+    return true;
+}
+
+class LibportalOperation final {
+public:
+    LibportalOperation(GMainContext *context, GCancellable *cancellable)
+        : m_loop(g_main_loop_new(context, FALSE))
+        , m_cancellable(cancellable)
+    {
+        m_timeoutSource = g_timeout_source_new_seconds(120);
+        g_source_set_callback(m_timeoutSource, &LibportalOperation::timeoutCallback, this, nullptr);
+        g_source_attach(m_timeoutSource, context);
+    }
+
+    ~LibportalOperation()
+    {
+        if (m_timeoutSource) {
+            if (!g_source_is_destroyed(m_timeoutSource)) {
+                g_source_destroy(m_timeoutSource);
+            }
+            g_source_unref(m_timeoutSource);
+        }
+        if (m_loop) {
+            g_main_loop_unref(m_loop);
+        }
+    }
+
+    GMainLoop *loop() const
+    {
+        return m_loop;
+    }
+
+    void finish()
+    {
+        m_done = true;
+        if (m_loop) {
+            g_main_loop_quit(m_loop);
+        }
+    }
+
+    bool wait(const QString &operation, QString *error)
+    {
+        if (!m_done && m_loop) {
+            g_main_loop_run(m_loop);
+        }
+        if (m_timedOut) {
+            if (error) {
+                *error = QStringLiteral("%1 timed out").arg(operation);
+            }
+            return false;
+        }
+        return true;
+    }
+
+private:
+    static gboolean timeoutCallback(gpointer data)
+    {
+        auto *self = static_cast<LibportalOperation *>(data);
+        if (!self) {
+            return G_SOURCE_REMOVE;
+        }
+        self->m_timedOut = true;
+        if (self->m_cancellable) {
+            g_cancellable_cancel(self->m_cancellable);
+        }
+        return G_SOURCE_REMOVE;
+    }
+
+    GMainLoop *m_loop = nullptr;
+    GCancellable *m_cancellable = nullptr;
+    GSource *m_timeoutSource = nullptr;
+    bool m_timedOut = false;
+    bool m_done = false;
+};
+
+struct LibportalCreateCall {
+    LibportalOperation *operation = nullptr;
+    XdpSession *session = nullptr;
+    GError *error = nullptr;
+};
+
+void onLibportalCreateScreencastFinished(GObject *object,
+                                         GAsyncResult *result,
+                                         gpointer data)
+{
+    auto *call = static_cast<LibportalCreateCall *>(data);
+    if (!call || !call->operation) {
+        return;
+    }
+    call->session = xdp_portal_create_screencast_session_finish(XDP_PORTAL(object),
+                                                                result,
+                                                                &call->error);
+    call->operation->finish();
+}
+
+struct LibportalStartCall {
+    LibportalOperation *operation = nullptr;
+    gboolean ok = FALSE;
+    GError *error = nullptr;
+};
+
+void onLibportalSessionStartFinished(GObject *object,
+                                     GAsyncResult *result,
+                                     gpointer data)
+{
+    auto *call = static_cast<LibportalStartCall *>(data);
+    if (!call || !call->operation) {
+        return;
+    }
+    call->ok = xdp_session_start_finish(XDP_SESSION(object), result, &call->error);
+    call->operation->finish();
+}
+
+#endif  // HAVE_LIBPORTAL
 
 class PortalPipeWireScreencast {
 public:
@@ -747,6 +1095,13 @@ public:
                                m_targetObject.isEmpty() ? "(none)"
                                                         : m_targetObject.toUtf8().constData(),
                                m_sessionHandle.toUtf8().constData());
+        }
+
+        if (firstStart) {
+            markshot::debugLog("screencast",
+                               "settle-first-frame delay_ms=%lu",
+                               kScreencastFirstFrameSettleMs);
+            QThread::msleep(kScreencastFirstFrameSettleMs);
         }
 
         QMutexLocker locker(&m_frameMutex);
@@ -776,14 +1131,22 @@ public:
         QImage image = wantCrop
             ? cropFrameToRequest(frame, streamGeometry, requested)
             : frame;
+        const QSize croppedSize = image.size();
+        if (wantCrop) {
+            image = normalizeScreencastCropToLogicalSize(std::move(image),
+                                                         streamGeometry,
+                                                         requested);
+        }
         markshot::debugLog("screencast",
                            "frame raw=%dx%d stream_geom=%d,%d %dx%d requested=%d,%d %dx%d "
-                           "want_crop=%d cropped=%dx%d",
+                           "want_crop=%d cropped=%dx%d normalized=%dx%d",
                            frame.width(), frame.height(),
                            streamGeometry.x(), streamGeometry.y(),
                            streamGeometry.width(), streamGeometry.height(),
                            requested.x(), requested.y(), requested.width(), requested.height(),
-                           wantCrop ? 1 : 0, image.width(), image.height());
+                           wantCrop ? 1 : 0,
+                           croppedSize.width(), croppedSize.height(),
+                           image.width(), image.height());
         if (image.isNull()) {
             markshot::debugLog("screencast",
                                "crop-miss frame=%dx%d stream_geom=%d,%d %dx%d requested=%d,%d %dx%d",
@@ -833,7 +1196,7 @@ public:
                 m_context = nullptr;
             }
         }
-        if (!m_sessionHandle.isEmpty()) {
+        if (m_ownsDbusSessionHandle && !m_sessionHandle.isEmpty()) {
             QDBusInterface session(QStringLiteral("org.freedesktop.portal.Desktop"),
                                    m_sessionHandle,
                                    QStringLiteral("org.freedesktop.portal.Session"),
@@ -841,8 +1204,20 @@ public:
             if (session.isValid()) {
                 session.call(QStringLiteral("Close"));
             }
-            m_sessionHandle.clear();
         }
+#ifdef HAVE_LIBPORTAL
+        if (m_libportalSession) {
+            xdp_session_close(m_libportalSession);
+            g_object_unref(m_libportalSession);
+            m_libportalSession = nullptr;
+        }
+        if (m_libportalPortal) {
+            g_object_unref(m_libportalPortal);
+            m_libportalPortal = nullptr;
+        }
+#endif
+        m_sessionHandle.clear();
+        m_ownsDbusSessionHandle = false;
         markshot::debugLog("screencast", "stop session=%s frames_seen=%d",
                            m_sessionHandle.isEmpty() ? "<closed>" : "closing", m_frameCount);
         m_started = false;
@@ -856,6 +1231,207 @@ public:
 
 private:
     bool start(QString *error)
+    {
+#ifdef HAVE_LIBPORTAL
+        QString libportalError;
+        if (startWithLibportal(&libportalError)) {
+            m_started = true;
+            return true;
+        }
+        markshot::debugLog("screencast", "libportal-start-failed error=%s",
+                           libportalError.toUtf8().constData());
+        stop();
+#endif
+
+        QString dbusError;
+        if (!startWithDbusPortal(&dbusError)) {
+            if (error) {
+#ifdef HAVE_LIBPORTAL
+                *error = libportalError.isEmpty()
+                    ? dbusError
+                    : QStringLiteral("libportal: %1\nD-Bus portal: %2")
+                          .arg(libportalError, dbusError);
+#else
+                *error = dbusError;
+#endif
+            }
+            return false;
+        }
+        m_started = true;
+        return true;
+    }
+
+#ifdef HAVE_LIBPORTAL
+    bool startWithLibportal(QString *error)
+    {
+        registerHostPortalApplication();
+
+        GMainContext *context = g_main_context_new();
+        GCancellable *cancellable = g_cancellable_new();
+        g_main_context_push_thread_default(context);
+
+        GError *portalError = nullptr;
+        XdpPortal *portal = xdp_portal_initable_new(&portalError);
+        if (!portal) {
+            if (error) {
+                *error = QStringLiteral("failed to initialize libportal: %1")
+                             .arg(glibErrorText(portalError));
+            }
+            if (portalError) {
+                g_error_free(portalError);
+            }
+            g_main_context_pop_thread_default(context);
+            g_object_unref(cancellable);
+            g_main_context_unref(context);
+            return false;
+        }
+
+        XdpSession *session = nullptr;
+        bool ok = false;
+        QString failure;
+
+        const uint availableCursorModes =
+            portalUintProperty(QStringLiteral("org.freedesktop.portal.ScreenCast"),
+                               QStringLiteral("AvailableCursorModes"));
+        uint cursorMode = preferredPortalCursorMode(availableCursorModes);
+        if (cursorMode == 0) {
+            cursorMode = XDP_CURSOR_MODE_HIDDEN;
+        }
+        markshot::debugLog("screencast",
+                           "libportal-start source=monitor cursor_modes=0x%x chosen_cursor=%u",
+                           availableCursorModes, cursorMode);
+
+        {
+            LibportalOperation operation(context, cancellable);
+            LibportalCreateCall call;
+            call.operation = &operation;
+            markshot::debugLog("screencast", "libportal-create-session");
+            xdp_portal_create_screencast_session(portal,
+                                                 XDP_OUTPUT_MONITOR,
+                                                 XDP_SCREENCAST_FLAG_NONE,
+                                                 static_cast<XdpCursorMode>(cursorMode),
+                                                 XDP_PERSIST_MODE_NONE,
+                                                 nullptr,
+                                                 cancellable,
+                                                 onLibportalCreateScreencastFinished,
+                                                 &call);
+            if (!operation.wait(QStringLiteral("libportal CreateScreencast"), &failure)) {
+                if (call.error) {
+                    g_error_free(call.error);
+                }
+                goto cleanup;
+            }
+            if (!call.session) {
+                failure = QStringLiteral("libportal CreateScreencast failed: %1")
+                              .arg(glibErrorText(call.error));
+                if (call.error) {
+                    g_error_free(call.error);
+                }
+                goto cleanup;
+            }
+            session = call.session;
+            if (call.error) {
+                g_error_free(call.error);
+            }
+        }
+
+        {
+            LibportalOperation operation(context, cancellable);
+            LibportalStartCall call;
+            call.operation = &operation;
+            markshot::debugLog("screencast", "libportal-start-session");
+            xdp_session_start(session,
+                              nullptr,
+                              cancellable,
+                              onLibportalSessionStartFinished,
+                              &call);
+            if (!operation.wait(QStringLiteral("libportal Start"), &failure)) {
+                if (call.error) {
+                    g_error_free(call.error);
+                }
+                goto cleanup;
+            }
+            if (!call.ok) {
+                failure = QStringLiteral("libportal Start failed: %1")
+                              .arg(glibErrorText(call.error));
+                if (call.error) {
+                    g_error_free(call.error);
+                }
+                goto cleanup;
+            }
+            if (call.error) {
+                g_error_free(call.error);
+            }
+        }
+
+        {
+            GVariant *streams = xdp_session_get_streams(session);
+            if (!readLibportalStream(streams, &m_nodeId, &m_streamProperties, &failure)) {
+                goto cleanup;
+            }
+            m_targetObject =
+                unwrappedVariant(m_streamProperties.value(QStringLiteral("pipewire-serial"))).toString();
+            if (m_targetObject.isEmpty()) {
+                m_targetObject =
+                    unwrappedVariant(m_streamProperties.value(QStringLiteral("pipewire.node.serial"))).toString();
+            }
+
+            if (markshot::debugEnabled()) {
+                gchar *streamsText = streams ? g_variant_print(streams, TRUE) : nullptr;
+                QStringList propKeys = m_streamProperties.keys();
+                markshot::debugLog("screencast",
+                                   "libportal streams=%s node=%u target_object=%s prop_keys=[%s]",
+                                   streamsText ? streamsText : "<null>",
+                                   m_nodeId,
+                                   m_targetObject.isEmpty()
+                                       ? "<none>"
+                                       : m_targetObject.toUtf8().constData(),
+                                   propKeys.join(QLatin1Char(',')).toUtf8().constData());
+                g_free(streamsText);
+            }
+        }
+
+        {
+            const int pipewireFd = xdp_session_open_pipewire_remote(session);
+            if (pipewireFd < 0) {
+                failure = QStringLiteral("libportal OpenPipeWireRemote returned an invalid fd");
+                goto cleanup;
+            }
+
+            m_libportalPortal = portal;
+            m_libportalSession = session;
+            portal = nullptr;
+            session = nullptr;
+            ok = startPipeWire(pipewireFd, &failure);
+            if (!ok) {
+                goto cleanup;
+            }
+        }
+
+    cleanup:
+        g_main_context_pop_thread_default(context);
+        g_object_unref(cancellable);
+        g_main_context_unref(context);
+        if (!ok) {
+            if (session) {
+                xdp_session_close(session);
+                g_object_unref(session);
+            }
+            if (portal) {
+                g_object_unref(portal);
+            }
+            if (error) {
+                *error = failure.isEmpty()
+                    ? QStringLiteral("libportal screencast start failed")
+                    : failure;
+            }
+            return false;
+        }
+        return true;
+    }
+#endif
+
+    bool startWithDbusPortal(QString *error)
     {
         static bool dbusTypesRegistered = [] {
             qRegisterMetaType<PortalStream>("PortalStream");
@@ -924,6 +1500,7 @@ private:
             }
             return false;
         }
+        m_ownsDbusSessionHandle = true;
 
         markshot::debugLog("capture", "screencast session created handle=%s",
                            m_sessionHandle.toUtf8().constData());
@@ -1388,6 +1965,11 @@ private:
     uint m_nodeId = 0;
     QString m_targetObject;
     QString m_sessionHandle;
+    bool m_ownsDbusSessionHandle = false;
+#ifdef HAVE_LIBPORTAL
+    XdpPortal *m_libportalPortal = nullptr;
+    XdpSession *m_libportalSession = nullptr;
+#endif
     QString m_lastError;
     QVariantMap m_streamProperties;
     QMutex m_frameMutex;
