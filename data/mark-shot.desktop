@@ -9,3 +9,4 @@ Terminal=false
 Categories=Graphics;Utility;
 Keywords=screenshot;screen capture;wayland;niri;grim;
 Keywords[zh_CN]=截图;屏幕捕获;标注;wayland;niri;grim;
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2

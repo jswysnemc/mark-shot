@@ -1,5 +1,7 @@
 #include "screen_capture.h"
 
+#include "debug_log.h"
+
 #include <QDBusError>
 #include <QDBusConnection>
 #include <QDBusArgument>
@@ -9,6 +11,7 @@
 #include <QDBusObjectPath>
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
+#include <QDBusReply>
 #include <QDBusUnixFileDescriptor>
 #include <QDBusVariant>
 #include <QEventLoop>
@@ -22,6 +25,7 @@
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QRect>
+#include <QRectF>
 #include <QScreen>
 #include <QStringList>
 #include <QTimer>
@@ -35,6 +39,8 @@
 #include <cstring>
 #include <memory>
 
+#include <fcntl.h>
+#include <poll.h>
 #include <unistd.h>
 
 #ifdef HAVE_XCB
@@ -150,15 +156,23 @@ bool prefersGrim()
         || desktop.contains(QStringLiteral("wlroots"));
 }
 
-bool hasMatchingAspectRatio(const QSize &a, const QSize &b)
+// KWin exposes org.kde.KWin.ScreenShot2, which can capture an exact pixel
+// region server-side with no portal dialog. That is the right backend for live
+// scrolling capture on Plasma; the portal ScreenCast path forces a source
+// picker and reports a virtual-desktop geometry that does not match KWin's real
+// outputs, so its crop math is unreliable here.
+bool isKdePlasma()
 {
-    if (a.isEmpty() || b.isEmpty()) {
-        return false;
-    }
+    const QString desktop = desktopEnvironmentText();
+    return desktop.contains(QStringLiteral("kde")) || desktop.contains(QStringLiteral("plasma"));
+}
 
-    const qreal lhs = static_cast<qreal>(a.width()) / a.height();
-    const qreal rhs = static_cast<qreal>(b.width()) / b.height();
-    return std::abs(lhs - rhs) < 0.01;
+QImage normalizeCaptureImage(QImage image)
+{
+    if (!image.isNull()) {
+        image.setDevicePixelRatio(1.0);
+    }
+    return image;
 }
 
 CaptureResult captureWithQScreen(const CaptureRequest &request)
@@ -179,23 +193,42 @@ CaptureResult captureWithQScreen(const CaptureRequest &request)
         return {{}, QStringLiteral("QScreen::grabWindow returned null pixmap"), {}, {}};
     }
 
-    QImage image = pixmap.toImage().convertToFormat(QImage::Format_ARGB32_Premultiplied);
-    const QSize logicalScreenSize = screen->geometry().size();
-    if (image.size() != logicalScreenSize && hasMatchingAspectRatio(image.size(), logicalScreenSize)) {
-        image = image.scaled(logicalScreenSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    }
+    const QImage rawImage = pixmap.toImage();
+    QImage image = rawImage.convertToFormat(QImage::Format_ARGB32_Premultiplied);
 
+    QRect cropRect;
     if (request.sourceGeometry.isValid() && !request.sourceGeometry.isEmpty()) {
-        QRect geo = request.sourceGeometry.normalized();
-        if (geo.intersects(screen->geometry())) {
-            geo = geo.translated(-screen->geometry().topLeft());
+        const QRect requested = request.sourceGeometry.normalized();
+        const QRect screenGeometry = screen->geometry();
+        const QRect overlap = requested.intersected(screenGeometry);
+        if (!overlap.isEmpty()) {
+            const qreal scaleX = static_cast<qreal>(image.width()) / std::max(1, screenGeometry.width());
+            const qreal scaleY = static_cast<qreal>(image.height()) / std::max(1, screenGeometry.height());
+            const int left = static_cast<int>(std::lround((overlap.left() - screenGeometry.left()) * scaleX));
+            const int top = static_cast<int>(std::lround((overlap.top() - screenGeometry.top()) * scaleY));
+            const int right = static_cast<int>(std::lround((overlap.right() + 1 - screenGeometry.left()) * scaleX));
+            const int bottom = static_cast<int>(std::lround((overlap.bottom() + 1 - screenGeometry.top()) * scaleY));
+            cropRect = QRect(QPoint(left, top), QPoint(right - 1, bottom - 1)).intersected(image.rect());
         }
-        geo = geo.intersected(image.rect());
-        if (!geo.isEmpty()) {
-            image = image.copy(geo);
+        if (cropRect.isEmpty()) {
+            return {{}, QStringLiteral("QScreen capture does not cover requested geometry"), {}, request.sourceGeometry};
         }
+        image = image.copy(cropRect);
     }
 
+    markshot::debugLog("capture",
+                       "qscreen frame screen=%s screen_geom=%d,%d %dx%d "
+                       "pixmap=%dx%d pixmap_dpr=%.3f image=%dx%d requested=%d,%d %dx%d "
+                       "crop=%d,%d %dx%d result=%dx%d",
+                       screen->name().toUtf8().constData(),
+                       screen->geometry().x(), screen->geometry().y(),
+                       screen->geometry().width(), screen->geometry().height(),
+                       pixmap.width(), pixmap.height(), pixmap.devicePixelRatioF(),
+                       rawImage.width(), rawImage.height(),
+                       request.sourceGeometry.x(), request.sourceGeometry.y(),
+                       request.sourceGeometry.width(), request.sourceGeometry.height(),
+                       cropRect.x(), cropRect.y(), cropRect.width(), cropRect.height(),
+                       image.width(), image.height());
     return {image, {}, {}, request.sourceGeometry};
 }
 
@@ -533,17 +566,23 @@ QVariantMap callPortalRequest(QDBusInterface *portal,
 
     const QString returnedSignalPath = pending.value().path();
     if (expectedSignalPath.isEmpty()) {
+        // No handle_token was present in the arguments, so the request object
+        // path could not be predicted up front; subscribe now to the path the
+        // portal actually returned.
         expectedSignalPath = returnedSignalPath;
-    }
-    if (returnedSignalPath != expectedSignalPath && !receiver.received) {
-        connectPortalResponse(returnedSignalPath, &receiver);
-    }
-    if (expectedSignalPath == returnedSignalPath && !receiver.received
-        && !connectPortalResponse(expectedSignalPath, &receiver)) {
-        if (error) {
-            *error = QStringLiteral("%1: failed to connect to xdg-desktop-portal response signal").arg(errorPrefix);
+        if (!receiver.received
+            && !connectPortalResponse(expectedSignalPath, &receiver)) {
+            if (error) {
+                *error = QStringLiteral("%1: failed to connect to xdg-desktop-portal response signal").arg(errorPrefix);
+            }
+            return {};
         }
-        return {};
+    } else if (returnedSignalPath != expectedSignalPath && !receiver.received) {
+        // The portal used a different request path than predicted; also listen
+        // on the real one so the response is not missed. Re-subscribing the
+        // already-connected predicted path here would make QDBusConnection
+        // reject the duplicate and report a spurious connection failure.
+        connectPortalResponse(returnedSignalPath, &receiver);
     }
 
     QString responseError;
@@ -673,12 +712,13 @@ QImage cropFrameToRequest(const QImage &frame, QRect streamGeometry, QRect reque
 
     const qreal scaleX = static_cast<qreal>(frame.width()) / streamGeometry.width();
     const qreal scaleY = static_cast<qreal>(frame.height()) / streamGeometry.height();
-    const QRectF cropF((overlap.left() - streamGeometry.left()) * scaleX,
-                       (overlap.top() - streamGeometry.top()) * scaleY,
-                       overlap.width() * scaleX,
-                       overlap.height() * scaleY);
-    const QRect crop = cropF.toAlignedRect().intersected(frame.rect());
-    return crop.isEmpty() ? QImage() : frame.copy(crop);
+    const int left = qRound((overlap.left() - streamGeometry.left()) * scaleX);
+    const int top = qRound((overlap.top() - streamGeometry.top()) * scaleY);
+    const int right = qRound((overlap.right() + 1 - streamGeometry.left()) * scaleX);
+    const int bottom = qRound((overlap.bottom() + 1 - streamGeometry.top()) * scaleY);
+    const QRect crop(left, top, std::max(1, right - left), std::max(1, bottom - top));
+    const QRect boundedCrop = crop.intersected(frame.rect());
+    return boundedCrop.isEmpty() ? QImage() : frame.copy(boundedCrop);
 }
 
 #ifdef HAVE_PIPEWIRE
@@ -692,22 +732,38 @@ public:
 
     CaptureResult capture(const CaptureRequest &request)
     {
+        const bool firstStart = !m_started;
         if (!m_started) {
             QString error;
             if (!start(&error)) {
+                markshot::debugLog("screencast", "start failed: %s",
+                                   error.toUtf8().constData());
                 stop();
                 return {{}, error, {}, request.sourceGeometry};
             }
+            markshot::debugLog("screencast",
+                               "started node_id=%u target=%s session=%s",
+                               m_nodeId,
+                               m_targetObject.isEmpty() ? "(none)"
+                                                        : m_targetObject.toUtf8().constData(),
+                               m_sessionHandle.toUtf8().constData());
         }
 
         QMutexLocker locker(&m_frameMutex);
+        bool waited = false;
         if (m_latestFrame.isNull()) {
+            waited = true;
             m_frameReady.wait(&m_frameMutex, 2500);
         }
         if (m_latestFrame.isNull()) {
             const QString error = m_lastError.isEmpty()
                 ? QStringLiteral("portal screencast did not produce a frame")
                 : QStringLiteral("portal screencast did not produce a frame: %1").arg(m_lastError);
+            markshot::debugLog("screencast",
+                               "no-frame first_start=%d waited=%d last_error=%s",
+                               firstStart ? 1 : 0, waited ? 1 : 0,
+                               m_lastError.isEmpty() ? "(none)"
+                                                     : m_lastError.toUtf8().constData());
             return {{}, error, {}, request.sourceGeometry};
         }
 
@@ -715,10 +771,27 @@ public:
         const QRect streamGeometry = m_streamGeometry;
         locker.unlock();
 
-        QImage image = request.sourceGeometry.isValid() && !request.sourceGeometry.isEmpty()
-            ? cropFrameToRequest(frame, streamGeometry, request.sourceGeometry)
+        const QRect requested = request.sourceGeometry;
+        const bool wantCrop = requested.isValid() && !requested.isEmpty();
+        QImage image = wantCrop
+            ? cropFrameToRequest(frame, streamGeometry, requested)
             : frame;
+        markshot::debugLog("screencast",
+                           "frame raw=%dx%d stream_geom=%d,%d %dx%d requested=%d,%d %dx%d "
+                           "want_crop=%d cropped=%dx%d",
+                           frame.width(), frame.height(),
+                           streamGeometry.x(), streamGeometry.y(),
+                           streamGeometry.width(), streamGeometry.height(),
+                           requested.x(), requested.y(), requested.width(), requested.height(),
+                           wantCrop ? 1 : 0, image.width(), image.height());
         if (image.isNull()) {
+            markshot::debugLog("screencast",
+                               "crop-miss frame=%dx%d stream_geom=%d,%d %dx%d requested=%d,%d %dx%d",
+                               frame.width(), frame.height(),
+                               streamGeometry.x(), streamGeometry.y(),
+                               streamGeometry.width(), streamGeometry.height(),
+                               requested.x(), requested.y(),
+                               requested.width(), requested.height());
             return {{}, QStringLiteral("portal screencast frame does not cover requested geometry"), {}, request.sourceGeometry};
         }
         return {image.convertToFormat(QImage::Format_ARGB32_Premultiplied), {}, request.preferredOutputName, request.sourceGeometry};
@@ -770,9 +843,12 @@ public:
             }
             m_sessionHandle.clear();
         }
+        markshot::debugLog("screencast", "stop session=%s frames_seen=%d",
+                           m_sessionHandle.isEmpty() ? "<closed>" : "closing", m_frameCount);
         m_started = false;
         m_nodeId = 0;
         m_targetObject.clear();
+        m_frameCount = 0;
         QMutexLocker locker(&m_frameMutex);
         m_latestFrame = {};
         m_streamGeometry = {};
@@ -816,15 +892,45 @@ private:
             return false;
         }
 
-        const QDBusObjectPath sessionPath =
-            qvariant_cast<QDBusObjectPath>(createResponse.value(QStringLiteral("session_handle")));
-        m_sessionHandle = sessionPath.path();
+        // The session handle lives in an a{sv} map, so it arrives wrapped in a
+        // QDBusVariant. Per the xdg-desktop-portal spec session_handle is a
+        // string ('s'), but some backends have historically returned an object
+        // path ('o'); unwrap the variant and accept either type instead of
+        // casting straight to QDBusObjectPath (which yields an empty path for the
+        // string form, and silently breaks the whole ScreenCast session).
+        const QVariant rawSessionHandle =
+            createResponse.value(QStringLiteral("session_handle"));
+        const QVariant sessionHandleValue = unwrappedVariant(rawSessionHandle);
+        if (sessionHandleValue.metaType() == QMetaType::fromType<QDBusObjectPath>()) {
+            m_sessionHandle = qvariant_cast<QDBusObjectPath>(sessionHandleValue).path();
+        } else {
+            m_sessionHandle = sessionHandleValue.toString();
+        }
+        if (markshot::debugEnabled()) {
+            markshot::debugLog("capture",
+                               "screencast create-response keys=[%s] "
+                               "session_handle type=%s value=%s",
+                               createResponse.keys().join(QLatin1Char(',')).toUtf8().constData(),
+                               sessionHandleValue.typeName()
+                                   ? sessionHandleValue.typeName()
+                                   : "<null>",
+                               m_sessionHandle.isEmpty()
+                                   ? "<empty>"
+                                   : m_sessionHandle.toUtf8().constData());
+        }
         if (m_sessionHandle.isEmpty()) {
             if (error) {
                 *error = QStringLiteral("ScreenCast CreateSession returned no session handle");
             }
             return false;
         }
+
+        markshot::debugLog("capture", "screencast session created handle=%s",
+                           m_sessionHandle.toUtf8().constData());
+
+        // SelectSources/Start/OpenPipeWireRemote take the session as an object
+        // path ('o'), so rebuild one from the (possibly string-typed) handle.
+        const QDBusObjectPath sessionPath{m_sessionHandle};
 
         const QString screenCastInterface = QStringLiteral("org.freedesktop.portal.ScreenCast");
         const uint sourceTypes =
@@ -840,12 +946,15 @@ private:
         selectOptions.insert(QStringLiteral("handle_token"), portalToken());
         selectOptions.insert(QStringLiteral("types"), kPortalSourceMonitor);
         selectOptions.insert(QStringLiteral("multiple"), false);
-        const uint cursorMode =
-            preferredPortalCursorMode(portalUintProperty(screenCastInterface,
-                                                         QStringLiteral("AvailableCursorModes")));
+        const uint availableCursorModes =
+            portalUintProperty(screenCastInterface, QStringLiteral("AvailableCursorModes"));
+        const uint cursorMode = preferredPortalCursorMode(availableCursorModes);
         if (cursorMode != 0) {
             selectOptions.insert(QStringLiteral("cursor_mode"), cursorMode);
         }
+        markshot::debugLog("capture",
+                           "screencast negotiate source_types=0x%x cursor_modes=0x%x chosen_cursor=%u",
+                           sourceTypes, availableCursorModes, cursorMode);
         callPortalRequest(&portal, QStringLiteral("SelectSources"),
                           {QVariant::fromValue(sessionPath), selectOptions},
                           QStringLiteral("ScreenCast SelectSources"), &requestError);
@@ -884,6 +993,26 @@ private:
         if (m_targetObject.isEmpty()) {
             m_targetObject =
                 unwrappedVariant(m_streamProperties.value(QStringLiteral("pipewire.node.serial"))).toString();
+        }
+
+        if (markshot::debugEnabled()) {
+            int sx = 0;
+            int sy = 0;
+            int sw = 0;
+            int sh = 0;
+            const bool hasPos =
+                readPairVariant(m_streamProperties.value(QStringLiteral("position")), &sx, &sy);
+            const bool hasSize =
+                readPairVariant(m_streamProperties.value(QStringLiteral("size")), &sw, &sh);
+            QStringList propKeys = m_streamProperties.keys();
+            markshot::debugLog("screencast",
+                               "start streams=%d node=%u target_object=%s stream_pos=%s(%d,%d) "
+                               "stream_size=%s(%dx%d) prop_keys=[%s]",
+                               static_cast<int>(streams.size()), m_nodeId,
+                               m_targetObject.isEmpty() ? "<none>" : m_targetObject.toUtf8().constData(),
+                               hasPos ? "yes" : "no", sx, sy,
+                               hasSize ? "yes" : "no", sw, sh,
+                               propKeys.join(QLatin1Char(',')).toUtf8().constData());
         }
 
         QDBusPendingReply<QDBusUnixFileDescriptor> pending =
@@ -1024,13 +1153,38 @@ private:
             if (error) {
                 *error = QStringLiteral("failed to connect PipeWire stream");
             }
+            markshot::debugLog("screencast",
+                               "pw-connect-failed result=%d node=%u target_id=%d target_object=%s",
+                               result, m_nodeId, targetId,
+                               m_targetObject.isEmpty() ? "<none>" : m_targetObject.toUtf8().constData());
             return false;
         }
+        markshot::debugLog("screencast",
+                           "pw-connect ok node=%u target_id=%d target_object=%s flags=AUTOCONNECT|MAP_BUFFERS",
+                           m_nodeId, targetId,
+                           m_targetObject.isEmpty() ? "<none>" : m_targetObject.toUtf8().constData());
         return true;
     }
 
+    static const char *streamStateName(pw_stream_state state)
+    {
+        switch (state) {
+        case PW_STREAM_STATE_ERROR:
+            return "error";
+        case PW_STREAM_STATE_UNCONNECTED:
+            return "unconnected";
+        case PW_STREAM_STATE_CONNECTING:
+            return "connecting";
+        case PW_STREAM_STATE_PAUSED:
+            return "paused";
+        case PW_STREAM_STATE_STREAMING:
+            return "streaming";
+        }
+        return "unknown";
+    }
+
     static void onStreamStateChanged(void *data,
-                                     pw_stream_state,
+                                     pw_stream_state old,
                                      pw_stream_state state,
                                      const char *error)
     {
@@ -1038,6 +1192,9 @@ private:
         if (!self) {
             return;
         }
+        markshot::debugLog("screencast", "pw-state %s -> %s%s%s",
+                           streamStateName(old), streamStateName(state),
+                           error ? " error=" : "", error ? error : "");
         if (state == PW_STREAM_STATE_ERROR && error) {
             QMutexLocker locker(&self->m_frameMutex);
             self->m_lastError = QString::fromUtf8(error);
@@ -1055,12 +1212,20 @@ private:
         spa_video_info_raw info = {};
         if (spa_format_video_raw_parse(param, &info) < 0
             || info.size.width == 0 || info.size.height == 0) {
+            markshot::debugLog("screencast",
+                               "pw-param-changed rejected (parse failed or zero size)");
             return;
         }
 
         self->m_videoInfo = info;
         const uint32_t stride = info.size.width * 4;
         const uint32_t size = stride * info.size.height;
+
+        markshot::debugLog("screencast",
+                           "pw-param-changed format=%d size=%ux%u stride=%u "
+                           "framerate=%u/%u",
+                           static_cast<int>(info.format), info.size.width, info.size.height,
+                           stride, info.max_framerate.num, info.max_framerate.denom);
 
         uint8_t buffer[1024];
         spa_pod_builder builder = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
@@ -1103,10 +1268,24 @@ private:
             self->m_latestFrame = std::move(image);
             self->m_streamGeometry = streamGeometryFromProperties(self->m_streamProperties, self->m_latestFrame.size());
             self->m_frameReady.wakeAll();
+            self->m_frameCount += 1;
+            // Per-frame logging would flood the log at the 45ms capture cadence;
+            // record only the first frame and then every 100th so the stream stays
+            // observable without drowning the stitch trace.
+            if (self->m_frameCount == 1 || self->m_frameCount % 100 == 0) {
+                markshot::debugLog("screencast",
+                                   "pw-frame #%d image=%dx%d stream_geom=%d,%d %dx%d",
+                                   self->m_frameCount,
+                                   self->m_latestFrame.width(), self->m_latestFrame.height(),
+                                   self->m_streamGeometry.x(), self->m_streamGeometry.y(),
+                                   self->m_streamGeometry.width(), self->m_streamGeometry.height());
+            }
         } else if (!imageError.isEmpty()) {
             QMutexLocker locker(&self->m_frameMutex);
             self->m_lastError = imageError;
             self->m_frameReady.wakeAll();
+            markshot::debugLog("screencast", "pw-frame-error %s",
+                               imageError.toUtf8().constData());
         }
         pw_stream_queue_buffer(self->m_stream, buffer);
     }
@@ -1222,6 +1401,7 @@ private:
     spa_hook m_streamListener = {};
     pw_stream_events m_streamEvents = {};
     spa_video_info_raw m_videoInfo = {};
+    int m_frameCount = 0;  // process-callback frames seen; gates first-frame logging
 };
 
 std::unique_ptr<PortalPipeWireScreencast> &activeScreencast()
@@ -1281,27 +1461,191 @@ CaptureResult captureWithGrim(const CaptureRequest &request)
     return runGrim(arguments, {}, {});
 }
 
+// KWin's own org.kde.KWin.ScreenShot2.CaptureArea renders the exact requested
+// rectangle server-side and streams the raw pixels back over a pipe fd. Unlike
+// the xdg-desktop-portal ScreenCast path it needs no source-selection dialog,
+// keeps no session, and returns a frame whose size already matches the request
+// (so there is no virtual-geometry scaling to get wrong). It requires the
+// caller's .desktop file to list org.kde.KWin.ScreenShot2 in
+// X-KDE-DBUS-Restricted-Interfaces; without that KWin replies NoAuthorized and
+// this returns a null image so the caller can fall back to the portal path.
+CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
+{
+    const QRect geometry = request.sourceGeometry.normalized();
+    if (geometry.isEmpty()) {
+        return {{}, QStringLiteral("KWin ScreenShot2 requires a non-empty geometry"), {}, request.sourceGeometry};
+    }
+
+    QDBusInterface kwin(QStringLiteral("org.kde.KWin.ScreenShot2"),
+                        QStringLiteral("/org/kde/KWin/ScreenShot2"),
+                        QStringLiteral("org.kde.KWin.ScreenShot2"),
+                        QDBusConnection::sessionBus());
+    if (!kwin.isValid()) {
+        return {{}, QStringLiteral("org.kde.KWin.ScreenShot2 interface is not available"), {}, request.sourceGeometry};
+    }
+
+    int fds[2];
+    if (::pipe2(fds, O_CLOEXEC) != 0) {
+        return {{}, QStringLiteral("failed to create pipe for KWin ScreenShot2"), {}, request.sourceGeometry};
+    }
+
+    QVariantMap options;
+    options.insert(QStringLiteral("include-cursor"), false);
+    // native-resolution keeps device pixels on HiDPI instead of downscaling to
+    // logical size, so the stitched result stays sharp.
+    options.insert(QStringLiteral("native-resolution"), true);
+
+    // KWin sends the D-Bus reply with the buffer metadata first, then writes the
+    // pixels to the pipe, so this synchronous call does not deadlock even when
+    // the image is larger than the pipe buffer.
+    QDBusReply<QVariantMap> reply =
+        kwin.call(QStringLiteral("CaptureArea"),
+                  geometry.x(), geometry.y(),
+                  static_cast<uint>(geometry.width()), static_cast<uint>(geometry.height()),
+                  options,
+                  QVariant::fromValue(QDBusUnixFileDescriptor(fds[1])));
+    ::close(fds[1]);
+
+    if (!reply.isValid()) {
+        ::close(fds[0]);
+        markshot::debugLog("kwin", "capture-area-error geom=%d,%d %dx%d name=%s msg=%s",
+                           geometry.x(), geometry.y(), geometry.width(), geometry.height(),
+                           reply.error().name().toUtf8().constData(),
+                           reply.error().message().toUtf8().constData());
+        return {{},
+                QStringLiteral("KWin ScreenShot2 CaptureArea failed: %1: %2")
+                    .arg(reply.error().name(), reply.error().message()),
+                {},
+                request.sourceGeometry};
+    }
+
+    const QVariantMap results = reply.value();
+    const int width = results.value(QStringLiteral("width")).toInt();
+    const int height = results.value(QStringLiteral("height")).toInt();
+    const int stride = results.value(QStringLiteral("stride")).toInt();
+    const uint format = results.value(QStringLiteral("format")).toUInt();
+    if (width <= 0 || height <= 0 || stride < width * 4) {
+        ::close(fds[0]);
+        return {{},
+                QStringLiteral("KWin ScreenShot2 returned invalid buffer metadata (%1x%2 stride=%3)")
+                    .arg(width).arg(height).arg(stride),
+                {},
+                request.sourceGeometry};
+    }
+
+    const qulonglong total = static_cast<qulonglong>(stride) * static_cast<qulonglong>(height);
+    QByteArray buffer(static_cast<int>(total), Qt::Uninitialized);
+    qulonglong received = 0;
+    while (received < total) {
+        struct pollfd pfd { fds[0], POLLIN, 0 };
+        const int polled = ::poll(&pfd, 1, 2000);
+        if (polled <= 0) {
+            break;  // timeout or poll error
+        }
+        const ssize_t bytes = ::read(fds[0], buffer.data() + received, total - received);
+        if (bytes <= 0) {
+            break;  // EOF or read error
+        }
+        received += static_cast<qulonglong>(bytes);
+    }
+    ::close(fds[0]);
+
+    if (received < total) {
+        markshot::debugLog("kwin", "short-read got=%llu want=%llu %dx%d stride=%d",
+                           received, total, width, height, stride);
+        return {{},
+                QStringLiteral("KWin ScreenShot2 delivered a truncated frame (%1/%2 bytes)")
+                    .arg(received).arg(total),
+                {},
+                request.sourceGeometry};
+    }
+
+    const QImage::Format imageFormat =
+        format != 0 ? static_cast<QImage::Format>(format) : QImage::Format_ARGB32_Premultiplied;
+    const QImage view(reinterpret_cast<const uchar *>(buffer.constData()),
+                      width, height, stride, imageFormat);
+    if (view.isNull()) {
+        return {{}, QStringLiteral("KWin ScreenShot2 frame could not be wrapped as an image"), {}, request.sourceGeometry};
+    }
+
+    markshot::debugLog("kwin", "capture-area-ok geom=%d,%d %dx%d -> frame=%dx%d stride=%d format=%u",
+                       geometry.x(), geometry.y(), geometry.width(), geometry.height(),
+                       width, height, stride, format);
+    // Detach from the soon-to-be-freed buffer and normalize the format.
+    return {view.copy().convertToFormat(QImage::Format_ARGB32_Premultiplied),
+            {},
+            request.allOutputs ? QString() : request.preferredOutputName,
+            request.sourceGeometry};
+}
+
 CaptureResult captureWaylandFrame(const CaptureRequest &request)
 {
-    if (request.preferScreencast && !prefersGrim()) {
+    const bool grimPreferred = prefersGrim();
+    markshot::debugLog("capture",
+                       "wayland-frame geom=%d,%d %dx%d output=%s all_outputs=%d "
+                       "prefer_screencast=%d allow_interactive=%d allow_screenshot_fallback=%d "
+                       "prefers_grim=%d desktop=%s",
+                       request.sourceGeometry.x(), request.sourceGeometry.y(),
+                       request.sourceGeometry.width(), request.sourceGeometry.height(),
+                       request.preferredOutputName.toUtf8().constData(),
+                       request.allOutputs ? 1 : 0, request.preferScreencast ? 1 : 0,
+                       request.allowInteractivePortal ? 1 : 0,
+                       request.allowPortalScreenshotFallback ? 1 : 0, grimPreferred ? 1 : 0,
+                       desktopEnvironmentText().toUtf8().constData());
+
+    // On KDE, ScreenShot2.CaptureArea can capture the exact requested region
+    // without an interactive portal dialog. Prefer it for both the initial
+    // single-output screenshot and live scrolling frames; failures fall back to
+    // the existing portal/grim routes.
+    if (isKdePlasma() && request.sourceGeometry.isValid()
+        && !request.sourceGeometry.isEmpty() && !request.allOutputs) {
+        markshot::debugLog("capture", "route=kwin-screenshot (KDE Plasma)");
+        CaptureResult kwinCapture = captureWithKWinScreenShot(request);
+        if (!kwinCapture.image.isNull()) {
+            markshot::debugLog("capture", "kwin-screenshot-ok frame=%dx%d",
+                               kwinCapture.image.width(), kwinCapture.image.height());
+            return kwinCapture;
+        }
+        markshot::debugLog("capture", "kwin-screenshot-failed (falling back) error=%s",
+                           kwinCapture.error.toUtf8().constData());
+    }
+
+    if (request.preferScreencast && !grimPreferred) {
+        markshot::debugLog("capture", "route=screencast (preferScreencast && !prefersGrim)");
         CaptureResult screencastCapture = captureWithPortalScreencast(request);
         if (!screencastCapture.image.isNull()) {
+            markshot::debugLog("capture", "screencast-ok frame=%dx%d",
+                               screencastCapture.image.width(), screencastCapture.image.height());
             return screencastCapture;
         }
+        markshot::debugLog("capture", "screencast-failed error=%s",
+                           screencastCapture.error.toUtf8().constData());
         stopPortalScreencast();
 
         CaptureResult portalCapture;
         if (request.allowPortalScreenshotFallback) {
+            markshot::debugLog("capture", "fallback=portal-screenshot");
             portalCapture = captureWithPortalScreenshot(request);
             if (!portalCapture.image.isNull()) {
+                markshot::debugLog("capture", "portal-screenshot-ok frame=%dx%d",
+                                   portalCapture.image.width(), portalCapture.image.height());
                 return portalCapture;
             }
+            markshot::debugLog("capture", "portal-screenshot-failed error=%s",
+                               portalCapture.error.toUtf8().constData());
+        } else {
+            markshot::debugLog("capture", "portal-screenshot-fallback disabled");
         }
 
+        markshot::debugLog("capture", "fallback=grim");
         CaptureResult grimCapture = captureWithGrim(request);
         if (!grimCapture.image.isNull()) {
+            markshot::debugLog("capture", "grim-ok frame=%dx%d",
+                               grimCapture.image.width(), grimCapture.image.height());
             return grimCapture;
         }
+        markshot::debugLog("capture", "grim-failed error=%s all-routes-exhausted",
+                           grimCapture.error.toUtf8().constData());
         return {{},
                 QStringLiteral("%1\nPortal screenshot fallback: %2\nGrim fallback: %3")
                     .arg(screencastCapture.error,
@@ -1346,11 +1690,11 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
 
 CaptureResult captureScreenFrame(const CaptureRequest &request)
 {
-    if (!isWaylandSession()) {
-        return captureWithQScreen(request);
-    }
-
-    return captureWaylandFrame(request);
+    CaptureResult result = isWaylandSession()
+        ? captureWaylandFrame(request)
+        : captureWithQScreen(request);
+    result.image = normalizeCaptureImage(result.image);
+    return result;
 }
 
 void stopActiveScreencastCapture()

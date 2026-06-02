@@ -12,3 +12,4 @@ Keywords=image;photo;picture;annotation;markup;screenshot;
 Keywords[zh_CN]=图片;照片;图像;标注;编辑;截图;
 MimeType=image/png;image/jpeg;image/webp;image/gif;image/bmp;image/tiff;image/svg+xml;
 StartupNotify=true
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2
