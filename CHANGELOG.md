@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.14 - 2026-06-02
+
+### Highlights
+
+- Improved portal screencast negotiation with optional libportal support before falling back to direct D-Bus portal calls.
+- Normalized portal screenshot and PipeWire screencast crops so scrolling capture uses compositor logical geometry consistently.
+- Added first-frame settle timing and no-layer-shell panel spacing to reduce accidental overlay capture in desktop environments that use regular XDG windows.
+- Synced the application version with the CMake project version so `mark-shot --version` tracks release metadata.
+
+### Scrolling Screenshot Compatibility
+
+Scrolling screenshot support outside `niri` remains a test feature. KDE, GNOME, X11, and other non-`niri` environments are not complete targets yet because portal behavior, compositor timing, window geometry feedback, and scroll event handling vary across desktop stacks.
+
+If scrolling capture fails, run `DEBUG=1 mark-shot`, reproduce the issue, and attach `/tmp/mark-shot-scroll.log` to a GitHub issue. Set `MARK_SHOT_DEBUG_LOG=/path/to/log` to write the debug log elsewhere.
+
+### Release Artifacts
+
+- `mark-shot-v0.1.14-linux-x86_64.tar.gz`
+- `mark-shot-v0.1.14-linux-arm64.tar.gz`
+- `mark-shot_0.1.14_amd64.deb`
+- `mark-shot_0.1.14_arm64.deb`
+
 ## 0.1.13 - 2026-06-01
 
 ### Fixes

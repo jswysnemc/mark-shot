@@ -37,8 +37,9 @@
 ### 滚动截图
 - 通过 PipeWire screencast、交互式滚动覆盖层和图像拼接器，捕获长页面或长区域截图。
 - 该功能主要面向 `niri` 以及行为相近的 Wayland 环境；这些环境的输出几何、捕获时序和窗口位置更容易保持稳定。
-- **兼容性说明**：滚动截图目前属于实验性功能。在 GNOME 或 KDE 中，该功能可能无法工作，原因包括 portal 后端策略、Shell 或 KWin 窗口管理行为、帧时序、滚动事件处理和窗口几何反馈存在差异。要稳定适配 GNOME Shell 与 KWin，通常需要针对不同桌面栈进行专门处理，适配难度较高。
-- 如果滚动截图在 GNOME 或 KDE 中无法使用，请使用普通截图流程，或者通过 Mark Shot 拓展命令接入外部长截图工具。
+- **兼容性说明**：KDE、GNOME、X11 以及其他非 `niri` 环境中的滚动截图仍是测试特性，尚不完善。这些桌面栈的 portal 后端策略、Shell 或窗口管理器行为、窗口几何反馈、帧时序和滚动事件处理存在差异。
+- 如果滚动截图无法使用，请使用普通截图流程，或者通过 Mark Shot 拓展命令接入外部长截图工具。
+- 如果需要提交滚动截图问题，请先运行 `DEBUG=1 mark-shot` 并复现问题，然后把 `/tmp/mark-shot-scroll.log` 附到 GitHub issue 中。需要自定义日志路径时，可设置 `MARK_SHOT_DEBUG_LOG=/path/to/log`。
 
 ### 跨显示服务器支持
 - **Wayland**：使用 PipeWire portal screencast 支持实验性滚动截图，使用 `grim` 支持 wlroots 截屏，使用 `layer-shell-qt` 创建原生覆盖层，使用 `wl-copy` 持久化剪贴板。
@@ -293,6 +294,12 @@ cmake --install build --prefix "$HOME/.local"
 ---
 
 ## 发版说明
+
+### 0.1.14
+
+- 改进 portal screencast 协商、裁剪尺寸归一化和首帧等待时序，提高滚动截图稳定性。
+- 更新滚动截图文档：KDE、GNOME、X11 以及其他非 `niri` 环境仍是测试目标，提交问题时请提供调试日志。
+- 将应用版本号改为使用 CMake 项目版本，避免 `--version` 输出滞后。
 
 ### 0.1.13
 

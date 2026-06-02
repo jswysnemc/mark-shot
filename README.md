@@ -37,8 +37,9 @@ It captures screen frames instantly and opens an interactive fullscreen overlay,
 ### Scrolling Screenshot Capture
 - Captures a long scrolling region by combining PipeWire screencast frames with an interactive scrolling overlay and stitcher.
 - Designed primarily for `niri` and similar Wayland environments where output geometry and capture timing can be controlled predictably.
-- **Compatibility notice**: scrolling capture is experimental. It may not work on GNOME or KDE because their portal backends, shell policies, window geometry behavior, and frame timing differ substantially. Adapting this feature reliably across GNOME Shell and KWin is difficult and may require compositor-specific work.
-- If scrolling capture fails on GNOME or KDE, use normal screenshots or configure an external long-screenshot command through Mark Shot extension commands.
+- **Compatibility notice**: scrolling capture on KDE, GNOME, X11, and other non-`niri` environments is a test feature and is not complete yet. Portal backends, shell policies, window geometry behavior, frame timing, and scroll event handling differ substantially across these desktop stacks.
+- If scrolling capture fails, use normal screenshots or configure an external long-screenshot command through Mark Shot extension commands.
+- To report a scrolling capture issue, run `DEBUG=1 mark-shot`, reproduce the failure, then attach `/tmp/mark-shot-scroll.log` to a GitHub issue. Set `MARK_SHOT_DEBUG_LOG=/path/to/log` if the log should be written elsewhere.
 
 ### Cross-Platform Display Server Support
 - **Wayland**: Uses PipeWire portal screencast for experimental scrolling capture, `grim` for wlroots screenshot capture, `layer-shell-qt` for native overlay, and `wl-copy` for clipboard persistence.
@@ -293,6 +294,12 @@ This installs the binary, helper scripts (`mark-shot-ocr`, `mark-shot-translate`
 ---
 
 ## Release Notes
+
+### 0.1.14
+
+- Improved portal screencast negotiation, crop normalization, and first-frame timing for scrolling capture.
+- Updated scrolling screenshot documentation: KDE, GNOME, X11, and other non-`niri` environments remain test targets and still need debug logs for issue reports.
+- Synced the application version with the CMake project version to avoid stale `--version` output.
 
 ### 0.1.13
 
