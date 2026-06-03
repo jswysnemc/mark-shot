@@ -403,16 +403,18 @@ This installs the binary, helper scripts (`mark-shot-ocr`, `mark-shot-translate`
 
 ### 0.1.15
 
-- Added draggable scrolling screenshot region adjustment and fixed stale overlay pixels after moving the region.
-- Replaced the scrolling preview panel's bottom scrubber with a directly draggable overview viewport frame.
-- Added mouse wheel navigation inside the scrolling preview panel, with live-follow restoration at the captured edge.
-- Added explicit LayerShellQt build switches and AppImage release packaging for both `layershell` and `nolayershell` x86_64 builds.
+- **Flexible Scrolling Area Adjustment**: Supported dragging edges from the direction controls to dynamically resize the scrolling capture region on the fly.
+- **Interactive Overview Navigation**: Replaced the bottom scrollbar in the preview panel with direct viewport dragging on the mini-map for cleaner navigation.
+- **Seamless Live-Follow Scrolling**: Added mouse-wheel navigation within the preview panel, which automatically snaps back to tracking live capture updates once you scroll back to the active edge.
+- **Configurable Window Borders Detection**: Supported detecting window boundaries on Wayland using external scripts, including a default script for `niri`.
+- **Dual-Mode Desktop Builds**: Added compilation options and released dual-variant AppImage packages (native Layer Shell and regular XDG window variants) to ensure cross-desktop compatibility.
+- **Persistent Clipboard Storage**: Resolved clipboard data loss issues after application exit, keeping images reliably in the system clipboard.
 
 ### 0.1.14
 
-- Improved portal screencast negotiation, crop normalization, and first-frame timing for scrolling capture.
-- Updated scrolling screenshot documentation: KDE, GNOME, X11, and other non-`niri` environments remain test targets and still need debug logs for issue reports.
-- Synced the application version with the CMake project version to avoid stale `--version` output.
+- **Optimized Scrolling Capture Stability**: Refined portal negotiation and logical coordinate handling to improve stitching accuracy.
+- **Updated Scroll Compatibility Guide**: Clarified experimental support status and logging tools for KDE, GNOME, and X11 environments.
+- **Accurate Release Versioning**: Linked CLI metadata to CMake compilation configurations to ensure `mark-shot --version` reports correctly.
 
 ### 0.1.13
 
