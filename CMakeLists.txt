@@ -107,6 +107,7 @@ install(PROGRAMS
     scripts/mark-shot-ocr
     scripts/mark-shot-translate
     scripts/mark-shot-window-detection-niri
+    scripts/mark-shot-window-detection-hyprland
     DESTINATION bin
 )
 install(FILES

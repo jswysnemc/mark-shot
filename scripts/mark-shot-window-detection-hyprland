@@ -1,0 +1,263 @@
+#!/usr/bin/env python3
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+
+def hypr_json(command):
+    hyprctl = shutil.which("hyprctl")
+    if not hyprctl:
+        raise RuntimeError("hyprctl command not found")
+
+    result = subprocess.run(
+        [hyprctl, "-j", *command],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=1.0,
+    )
+    return json.loads(result.stdout)
+
+
+def number(value):
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return None
+    return None
+
+
+def pair(value):
+    if not isinstance(value, list) or len(value) < 2:
+        return None
+    first = number(value[0])
+    second = number(value[1])
+    if first is None or second is None:
+        return None
+    return first, second
+
+
+def env_int(name):
+    value = os.environ.get(name)
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def capture_rect():
+    x = env_int("MARK_SHOT_CAPTURE_X")
+    y = env_int("MARK_SHOT_CAPTURE_Y")
+    width = env_int("MARK_SHOT_CAPTURE_WIDTH")
+    height = env_int("MARK_SHOT_CAPTURE_HEIGHT")
+    if x is None or y is None or width is None or height is None:
+        return None
+    if width <= 0 or height <= 0:
+        return None
+    return x, y, width, height
+
+
+def intersects(left, right):
+    ax, ay, aw, ah = left
+    bx, by, bw, bh = right
+    return ax < bx + bw and bx < ax + aw and ay < by + bh and by < ay + ah
+
+
+def rect_adjustment():
+    return (
+        env_int("MARK_SHOT_HYPRLAND_OFFSET_X") or 0,
+        env_int("MARK_SHOT_HYPRLAND_OFFSET_Y") or 0,
+        env_int("MARK_SHOT_HYPRLAND_OFFSET_WIDTH") or 0,
+        env_int("MARK_SHOT_HYPRLAND_OFFSET_HEIGHT") or 0,
+    )
+
+
+def adjusted_rect(rect):
+    dx, dy, dw, dh = rect_adjustment()
+    x, y, width, height = rect
+    adjusted = (x + dx, y + dy, width + dw, height + dh)
+    if adjusted[2] <= 1 or adjusted[3] <= 1:
+        return None
+    return adjusted
+
+
+def workspace_key(workspace, key):
+    if not isinstance(workspace, dict):
+        return None
+    return workspace.get(key)
+
+
+def selected_monitor_targets(monitors):
+    all_outputs = os.environ.get("MARK_SHOT_CAPTURE_ALL_OUTPUTS") == "1"
+    target_output = os.environ.get("MARK_SHOT_CAPTURE_OUTPUT", "").strip()
+    monitor_items = [monitor for monitor in monitors if isinstance(monitor, dict)]
+
+    if all_outputs:
+        selected = monitor_items
+    elif target_output:
+        selected = [
+            monitor
+            for monitor in monitor_items
+            if str(monitor.get("name", "")) == target_output
+        ]
+    else:
+        selected = [monitor for monitor in monitor_items if monitor.get("focused")]
+
+    if not selected:
+        selected = monitor_items
+
+    workspace_ids = set()
+    workspace_names = set()
+    monitor_ids = set()
+    monitor_names = set()
+
+    for monitor in selected:
+        monitor_id = monitor.get("id")
+        if isinstance(monitor_id, int):
+            monitor_ids.add(monitor_id)
+        monitor_name = monitor.get("name")
+        if isinstance(monitor_name, str) and monitor_name:
+            monitor_names.add(monitor_name)
+
+        active_workspace = monitor.get("activeWorkspace")
+        workspace_id = workspace_key(active_workspace, "id")
+        workspace_name = workspace_key(active_workspace, "name")
+        if isinstance(workspace_id, int):
+            workspace_ids.add(workspace_id)
+        if isinstance(workspace_name, str) and workspace_name:
+            workspace_names.add(workspace_name)
+
+    return {
+        "workspace_ids": workspace_ids,
+        "workspace_names": workspace_names,
+        "monitor_ids": monitor_ids,
+        "monitor_names": monitor_names,
+    }
+
+
+def monitor_matches(client, targets):
+    monitor_ids = targets["monitor_ids"]
+    monitor_names = targets["monitor_names"]
+    if not monitor_ids and not monitor_names:
+        return True
+
+    monitor = client.get("monitor")
+    if isinstance(monitor, int) and monitor in monitor_ids:
+        return True
+    if isinstance(monitor, str) and monitor in monitor_names:
+        return True
+
+    monitor_name = client.get("monitorName")
+    return isinstance(monitor_name, str) and monitor_name in monitor_names
+
+
+def workspace_matches(client, targets):
+    if os.environ.get("MARK_SHOT_HYPRLAND_INCLUDE_INACTIVE") == "1":
+        return True
+
+    workspace = client.get("workspace")
+    workspace_id = workspace_key(workspace, "id")
+    workspace_name = workspace_key(workspace, "name")
+    if isinstance(workspace_name, str) and workspace_name.startswith("special:"):
+        return monitor_matches(client, targets)
+    if isinstance(workspace_id, int) and workspace_id in targets["workspace_ids"]:
+        return True
+    return isinstance(workspace_name, str) and workspace_name in targets["workspace_names"]
+
+
+def client_rect(client):
+    at = pair(client.get("at"))
+    size = pair(client.get("size"))
+    if at is None or size is None:
+        return None
+
+    x = int(round(at[0]))
+    y = int(round(at[1]))
+    width = int(round(size[0]))
+    height = int(round(size[1]))
+    if width <= 1 or height <= 1:
+        return None
+    return x, y, width, height
+
+
+def append_client(result, seen, client, capture, targets):
+    if client.get("mapped") is False:
+        return
+    if client.get("hidden") is True:
+        return
+    if not workspace_matches(client, targets) and not client.get("pinned"):
+        return
+    if client.get("pinned") and not monitor_matches(client, targets):
+        return
+
+    rect = client_rect(client)
+    if rect is None:
+        return
+    rect = adjusted_rect(rect)
+    if rect is None:
+        return
+    if capture is not None and not intersects(rect, capture):
+        return
+
+    key = tuple(rect)
+    if key in seen:
+        return
+    seen.add(key)
+
+    workspace = client.get("workspace")
+    item = {
+        "x": rect[0],
+        "y": rect[1],
+        "width": rect[2],
+        "height": rect[3],
+    }
+    for key_name in ("address", "class", "title", "initialClass", "initialTitle"):
+        value = client.get(key_name)
+        if isinstance(value, str) and value:
+            item[key_name] = value
+    if isinstance(workspace, dict):
+        workspace_name = workspace.get("name")
+        workspace_id = workspace.get("id")
+        if isinstance(workspace_name, str) and workspace_name:
+            item["workspace"] = workspace_name
+        if isinstance(workspace_id, int):
+            item["workspaceId"] = workspace_id
+    for key_name in ("floating", "fullscreen", "pinned", "monitor"):
+        if key_name in client:
+            item[key_name] = client[key_name]
+
+    result.append(item)
+
+
+def main():
+    monitors = hypr_json(["monitors"])
+    clients = hypr_json(["clients"])
+    if not isinstance(monitors, list) or not isinstance(clients, list):
+        raise RuntimeError("unexpected hyprctl JSON shape")
+
+    targets = selected_monitor_targets(monitors)
+    capture = capture_rect()
+    result = []
+    seen = set()
+
+    for client in clients:
+        if isinstance(client, dict):
+            append_client(result, seen, client, capture, targets)
+
+    print(json.dumps({"compositor": "hyprland", "windows": result}, separators=(",", ":")))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(1)

@@ -175,11 +175,17 @@ Fullscreen annotation has no separate capture selection to move. If its default 
 
 `annotation.defaultColor` sets the initial annotation color. Use `#RRGGBB` for opaque colors or `#RRGGBBAA` to include alpha. The runtime option `--default-color <color>` overrides this config value.
 
-`windowDetection.env` (alias: `environment`) is passed to the detection script as environment variables. The bundled niri script supports `MARK_SHOT_NIRI_PANEL_EDGE` (`top`, `bottom`, `left`, `right`, or `none`) and pixel adjustments through `MARK_SHOT_NIRI_OFFSET_X`, `MARK_SHOT_NIRI_OFFSET_Y`, `MARK_SHOT_NIRI_OFFSET_WIDTH`, and `MARK_SHOT_NIRI_OFFSET_HEIGHT`.
+`windowDetection.env` (alias: `environment`) is passed to the detection script as environment variables.
+- **Niri Script** (`mark-shot-window-detection-niri`): Supports `MARK_SHOT_NIRI_PANEL_EDGE` (`top`, `bottom`, `left`, `right`, or `none`) and pixel adjustments through `MARK_SHOT_NIRI_OFFSET_X/Y/WIDTH/HEIGHT`.
+- **Hyprland Script** (`mark-shot-window-detection-hyprland`): Supports `MARK_SHOT_HYPRLAND_INCLUDE_INACTIVE` (`1` to detect windows on inactive workspaces, defaults to `0` for active only) and pixel offsets via `MARK_SHOT_HYPRLAND_OFFSET_X/Y/WIDTH/HEIGHT` to calibrate window borders.
 
 ### Pre-Capture Window Detection & Script Contribution Guide
 
-To ensure precise window boundary detection across different Wayland compositors (such as niri, Hyprland, etc.), Mark Shot uses a flexible external script invocation mechanism. Users can configure a detection script via `windowDetection.command`. The script is responsible for querying window geometries from the compositor and outputting the data in a unified format for Mark Shot to consume.
+To ensure precise window boundary detection across different Wayland compositors, Mark Shot uses a flexible external script invocation mechanism. Users can configure a detection script via `windowDetection.command`. The script is responsible for querying window geometries from the compositor and outputting the data in a unified format for Mark Shot to consume.
+
+The project bundles default window detection scripts for the following window managers:
+- **Niri**: `mark-shot-window-detection-niri`
+- **Hyprland**: `mark-shot-window-detection-hyprland`
 
 We highly welcome and encourage community members to contribute adapter scripts for various desktop environments and Wayland compositors to expand compatibility.
 
