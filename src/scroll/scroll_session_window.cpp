@@ -9,9 +9,11 @@
 #include "ui/theme.h"
 
 #include <QCloseEvent>
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
 #include <QEvent>
+#include <QEventLoop>
 #include <QFileDialog>
 #include <QFont>
 #include <QGuiApplication>
@@ -125,6 +127,12 @@ QString scrollSavePath()
 const char *algorithmDebugName()
 {
     return "col-sample";
+}
+
+bool isWaylandPlatform()
+{
+    return QGuiApplication::platformName().compare(QStringLiteral("wayland"),
+                                                   Qt::CaseInsensitive) == 0;
 }
 
 const char *axisDebugName(ScrollAxis axis)
@@ -317,9 +325,14 @@ ScrollSessionWindow::ScrollSessionWindow(QRect globalGeometry,
     buildControlBar();
 
     m_layerShell = configureLayerShell(screen);
+    m_panelOnlyWindow = !m_layerShell && isWaylandPlatform();
     if (!m_layerShell && screen) {
         setScreen(screen);
-        setGeometry(screen->geometry());
+        if (m_panelOnlyWindow) {
+            setGeometry(floatingPanelGlobalRect());
+        } else {
+            setGeometry(screen->geometry());
+        }
     }
 
     m_timer = new QTimer(this);
@@ -425,6 +438,10 @@ QRect ScrollSessionWindow::regionLocalRect() const
 
 QRect ScrollSessionWindow::previewPanelRect() const
 {
+    if (m_panelOnlyWindow) {
+        return QRect(QPoint(0, 0), size());
+    }
+
     const QRect region = regionLocalRect();
     const QRect bounds(QPoint(0, 0), size());
 
@@ -466,11 +483,85 @@ QRect ScrollSessionWindow::captureBoundsGlobal() const
     return targetScreen ? targetScreen->geometry() : m_geometry.normalized();
 }
 
+QRect ScrollSessionWindow::floatingPanelGlobalRect() const
+{
+    const QRect bounds = captureBoundsGlobal();
+    if (bounds.isEmpty()) {
+        return QRect(QPoint(0, 0), QSize(kPanelWidth, 360));
+    }
+
+    const QRect region = m_geometry.normalized();
+    const int minHeight = kControlBarHeight + kStatusHeight + kPanelPadding * 3 + 120;
+    int panelHeight = std::max(minHeight, region.height());
+    panelHeight = std::min(panelHeight, std::max(minHeight, bounds.height() - 8));
+    const QSize panelSize(kPanelWidth, panelHeight);
+    const int margin = 4;
+    const int gap = kNoLayerPanelGap;
+
+    auto clampTop = [&](int top) {
+        return std::clamp(top, bounds.top() + margin,
+                          std::max(bounds.top() + margin,
+                                   bounds.bottom() - panelSize.height() - margin + 1));
+    };
+    auto clampLeft = [&](int left) {
+        return std::clamp(left, bounds.left() + margin,
+                          std::max(bounds.left() + margin,
+                                   bounds.right() - panelSize.width() - margin + 1));
+    };
+    auto makeRect = [&](int left, int top) {
+        return QRect(QPoint(clampLeft(left), clampTop(top)), panelSize);
+    };
+
+    QVector<QRect> candidates;
+    candidates.reserve(8);
+    candidates.append(makeRect(region.right() + 1 + gap, region.top()));
+    candidates.append(makeRect(region.left() - gap - panelSize.width(), region.top()));
+    candidates.append(makeRect(region.left(), region.bottom() + 1 + gap));
+    candidates.append(makeRect(region.left(), region.top() - gap - panelSize.height()));
+    candidates.append(makeRect(bounds.right() - panelSize.width() - margin + 1,
+                               bounds.top() + margin));
+    candidates.append(makeRect(bounds.left() + margin, bounds.top() + margin));
+    candidates.append(makeRect(bounds.right() - panelSize.width() - margin + 1,
+                               bounds.bottom() - panelSize.height() - margin + 1));
+    candidates.append(makeRect(bounds.left() + margin,
+                               bounds.bottom() - panelSize.height() - margin + 1));
+
+    const QRect avoid = region.adjusted(-8, -8, 8, 8);
+    for (const QRect &candidate : std::as_const(candidates)) {
+        if (!candidate.intersects(avoid)) {
+            return candidate;
+        }
+    }
+
+    auto intersectionArea = [&](const QRect &candidate) {
+        const QRect overlap = candidate.intersected(avoid);
+        return overlap.isEmpty() ? 0 : overlap.width() * overlap.height();
+    };
+    return *std::min_element(candidates.begin(), candidates.end(), [&](const QRect &a, const QRect &b) {
+        return intersectionArea(a) < intersectionArea(b);
+    });
+}
+
+void ScrollSessionWindow::updatePanelWindowGeometry()
+{
+    if (!m_panelOnlyWindow) {
+        return;
+    }
+    const QRect panel = floatingPanelGlobalRect();
+    if (geometry() != panel) {
+        setGeometry(panel);
+    }
+    m_screenOrigin = panel.topLeft();
+}
+
 QRegion ScrollSessionWindow::overlayPaintRegion() const
 {
     const QRect bounds(QPoint(0, 0), size());
     if (bounds.isEmpty()) {
         return {};
+    }
+    if (m_panelOnlyWindow) {
+        return QRegion(bounds);
     }
 
     const QRect region = regionLocalRect();
@@ -496,6 +587,9 @@ void ScrollSessionWindow::setRegionGeometry(QRect geometry)
 
     const QRegion oldPaint = overlayPaintRegion();
     m_geometry = geometry;
+    if (m_panelOnlyWindow && !m_axisDragging) {
+        updatePanelWindowGeometry();
+    }
     layoutOverlay();
     m_transientPaintMask += oldPaint;
     m_transientPaintMask += overlayPaintRegion();
@@ -520,6 +614,15 @@ void ScrollSessionWindow::layoutOverlay()
 
 void ScrollSessionWindow::updateInputMask()
 {
+    if (m_panelOnlyWindow) {
+        const QRegion mask(rect());
+        setMask(mask);
+        if (QWindow *nativeWindow = windowHandle()) {
+            nativeWindow->setMask(mask);
+        }
+        return;
+    }
+
     // Only the preview panel should catch input; the captured region
     // interior and the rest of the overlay stay click-through so the user
     // can keep scrolling the page underneath. The axis button drag-to-
@@ -538,7 +641,9 @@ void ScrollSessionWindow::updateInputMask()
 void ScrollSessionWindow::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
-    if (!m_layerShell) {
+    if (m_panelOnlyWindow) {
+        updatePanelWindowGeometry();
+    } else if (!m_layerShell) {
         m_screenOrigin = geometry().topLeft();
     }
     layoutOverlay();
@@ -546,13 +651,14 @@ void ScrollSessionWindow::showEvent(QShowEvent *event)
     const QRect region = regionLocalRect();
     const QRect panel = previewPanelRect();
     logScrollDebug("layout window=%d,%d %dx%d screen_origin=%d,%d region=%d,%d %dx%d "
-                   "panel=%d,%d %dx%d panel_gap=%d panel_overlap=%d layer_shell=%d",
+                   "panel=%d,%d %dx%d panel_gap=%d panel_overlap=%d layer_shell=%d panel_only=%d",
                    geometry().x(), geometry().y(), geometry().width(), geometry().height(),
                    m_screenOrigin.x(), m_screenOrigin.y(),
                    region.x(), region.y(), region.width(), region.height(),
                    panel.x(), panel.y(), panel.width(), panel.height(),
                    m_layerShell ? kPanelGap : kNoLayerPanelGap,
-                   panel.intersects(region) ? 1 : 0, m_layerShell ? 1 : 0);
+                   panel.intersects(region) ? 1 : 0, m_layerShell ? 1 : 0,
+                   m_panelOnlyWindow ? 1 : 0);
     if (m_timer && !m_timer->isActive()) {
         // Let the compositor apply the window mask before the first X11 capture;
         // otherwise the seed frame can include the scroll overlay itself.
@@ -590,7 +696,18 @@ void ScrollSessionWindow::captureTick()
         request.allowInteractivePortal = false;
         request.allowPortalScreenshotFallback = false;
 
+        const bool hidePanelForCapture =
+            m_panelOnlyWindow && isVisible() && geometry().intersects(m_geometry.normalized());
+        if (hidePanelForCapture) {
+            hide();
+            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        }
         const CaptureResult result = captureScreenFrame(request);
+        if (hidePanelForCapture) {
+            show();
+            raise();
+            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        }
         if (result.image.isNull()) {
             m_paused = true;
             stopActiveScreencastCapture();
@@ -1020,16 +1137,18 @@ void ScrollSessionWindow::paintEvent(QPaintEvent *)
     // 1. Capture border, drawn just outside the captured region so grim
     //    never records it.
     const QRect region = regionLocalRect();
-    const QRect borderRect = region.adjusted(-(kBorderGap + kBorderWidth / 2),
-                                             -(kBorderGap + kBorderWidth / 2),
-                                             kBorderGap + kBorderWidth / 2,
-                                             kBorderGap + kBorderWidth / 2);
-    const QColor borderColor = m_paused
-        ? QColor(250, 204, 21, 235)                       // amber while paused
-        : QColor(45, 212, 191, 255);
-    painter.setPen(QPen(borderColor, kBorderWidth));
-    painter.setBrush(Qt::NoBrush);
-    painter.drawRect(borderRect);
+    if (!m_panelOnlyWindow) {
+        const QRect borderRect = region.adjusted(-(kBorderGap + kBorderWidth / 2),
+                                                 -(kBorderGap + kBorderWidth / 2),
+                                                 kBorderGap + kBorderWidth / 2,
+                                                 kBorderGap + kBorderWidth / 2);
+        const QColor borderColor = m_paused
+            ? QColor(250, 204, 21, 235)                       // amber while paused
+            : QColor(45, 212, 191, 255);
+        painter.setPen(QPen(borderColor, kBorderWidth));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRect(borderRect);
+    }
 
     // 2. Preview panel.
     const QRect panel = previewPanelRect();
@@ -1336,6 +1455,7 @@ bool ScrollSessionWindow::eventFilter(QObject *watched, QEvent *event)
         m_lastSignature.clear();
         m_statusText = MS_TR("Region adjusted");
         refreshControlLabels();
+        updatePanelWindowGeometry();
         m_transientPaintMask += overlayPaintRegion();
         m_restoreMaskAfterPaint = !m_transientPaintMask.isEmpty();
         // Keep the temporary paint mask active for one cleanup repaint. If it

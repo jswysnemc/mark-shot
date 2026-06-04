@@ -72,6 +72,8 @@ private:
     void dumpDebugFrame(const QImage &frame, const char *tag);
     QImage currentResult() const;
     QRect captureBoundsGlobal() const;
+    QRect floatingPanelGlobalRect() const;
+    void updatePanelWindowGeometry();
     void setRegionGeometry(QRect geometry);
     QRegion overlayPaintRegion() const;
 
@@ -120,6 +122,7 @@ private:
     QTimer *m_timer = nullptr;
     bool m_paused = false;
     bool m_layerShell = false;
+    bool m_panelOnlyWindow = false;
     QVector<std::uint8_t> m_lastSignature;
     QString m_statusText;
     int m_lastAppend = 0;       // pixels added by the most recent frame

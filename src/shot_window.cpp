@@ -214,12 +214,6 @@ QRectF normalizedRect(QPointF a, QPointF b)
     return QRectF(a, b).normalized();
 }
 
-bool isWaylandPlatform()
-{
-    return QGuiApplication::platformName().compare(QStringLiteral("wayland"),
-                                                   Qt::CaseInsensitive) == 0;
-}
-
 QRect windowGeometryToImageRect(QRect windowGeometry, QRect sourceGeometry, QSize imageSize)
 {
     return markshot::capture::imageRectFromGeometry(windowGeometry, sourceGeometry, imageSize);
@@ -1038,11 +1032,11 @@ protected:
             markshot::copyImageToClipboard(m_pixmap.toImage());
         });
         QAction *copySelectedTextAction = menu.addAction(MS_TR("Copy Selected Text"), this, [this] {
-            QApplication::clipboard()->setText(selectedText());
+            markshot::copyTextToClipboard(selectedText());
         });
         copySelectedTextAction->setEnabled(hasTextSelection());
         QAction *copyTextAction = menu.addAction(MS_TR("Copy Image Text"), this, [this] {
-            QApplication::clipboard()->setText(allText());
+            markshot::copyTextToClipboard(allText());
         });
         copyTextAction->setEnabled(!activeTokens().isEmpty());
         QAction *translateAction = menu.addAction(MS_TR("Translate"), this, [this] {
@@ -1063,7 +1057,7 @@ protected:
     void keyPressEvent(QKeyEvent *event) override
     {
         if (event->matches(QKeySequence::Copy) && hasTextSelection()) {
-            QApplication::clipboard()->setText(selectedText());
+            markshot::copyTextToClipboard(selectedText());
             event->accept();
             return;
         }
@@ -3015,7 +3009,7 @@ void ShotWindow::showStartupColorDialog(QColor color, QPoint anchor)
         auto *copyButton = new QPushButton(MS_TR("Copy"), frame);
         copyButton->setFocusPolicy(Qt::NoFocus);
         connect(copyButton, &QPushButton::clicked, this, [this, value = row.value] {
-            QApplication::clipboard()->setText(value);
+            markshot::copyTextToClipboard(value);
             emit sessionCancelRequested();
             close();
         });
@@ -7514,18 +7508,6 @@ void ShotWindow::startScrollCapture()
     QTimer::singleShot(120, qApp, [self, geometry, outputName, targetScreen] {
         auto *window =
             new markshot::scroll::ScrollSessionWindow(geometry, outputName, targetScreen);
-        if (isWaylandPlatform() && !window->layerShellActive()) {
-            window->deleteLater();
-            if (self) {
-                self->show();
-                self->raise();
-                self->activateWindow();
-                self->updateToolbarGeometry();
-                self->updateActionToolbarGeometry();
-                self->showToast(MS_TR("Scrolling capture requires layer-shell on Wayland"));
-            }
-            return;
-        }
         window->show();
         window->raise();
         window->activateWindow();
@@ -7721,7 +7703,7 @@ void ShotWindow::ocrCopySelection()
         prevRect = token.rect;
     }
 
-    QApplication::clipboard()->setText(result);
+    markshot::copyTextToClipboard(result);
     showToast(MS_TR("OCR text copied"));
 }
 

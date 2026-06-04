@@ -223,6 +223,25 @@ bool copyUrlToClipboard(const QUrl &url)
 
 } // namespace
 
+bool copyTextToClipboard(const QString &text)
+{
+    if (text.isEmpty()) {
+        return false;
+    }
+
+    bool copied = false;
+    if (QClipboard *clipboard = QApplication::clipboard()) {
+        clipboard->setText(text);
+        copied = true;
+    }
+
+    const std::optional<ClipboardOwnerCommand> owner = clipboardOwnerCommand(ClipboardPayload::Text);
+    if (owner.has_value()) {
+        copied = copyToPersistentClipboardOwner(text.toUtf8(), QStringLiteral(".txt"), *owner) || copied;
+    }
+    return copied;
+}
+
 bool copyImageToClipboard(const QImage &image)
 {
     if (image.isNull()) {

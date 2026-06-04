@@ -141,8 +141,8 @@ jobs:
           EOF
 
           SHLIB_DEPS="$(dpkg-shlibdeps -O -e"$PACKAGE_DIR/usr/bin/mark-shot" -e"$PLUGIN_PATH" | sed 's/^shlibs:Depends=//')"
-          MANUAL_DEPS="python3"
-          RECOMMENDS="python3-venv, xdg-desktop-portal, pipewire, grim, wl-clipboard, xclip"
+          MANUAL_DEPS="python3, wl-clipboard"
+          RECOMMENDS="python3-venv, xdg-desktop-portal, pipewire, grim, xclip"
           if [ -n "$SHLIB_DEPS" ]; then
             DEPENDS="$SHLIB_DEPS, $MANUAL_DEPS"
           else

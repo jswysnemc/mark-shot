@@ -6,9 +6,25 @@
 
 #include <QObject>
 #include <QGuiApplication>
+#include <QProcessEnvironment>
 #include <QScreen>
 #include <QWidget>
 #include <QWindow>
+
+namespace {
+
+bool isGnomeDesktop()
+{
+    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    const QString desktop =
+        (env.value(QStringLiteral("XDG_CURRENT_DESKTOP")) + QLatin1Char(':')
+         + env.value(QStringLiteral("XDG_SESSION_DESKTOP")) + QLatin1Char(':')
+         + env.value(QStringLiteral("DESKTOP_SESSION")))
+            .toLower();
+    return desktop.contains(QStringLiteral("gnome"));
+}
+
+}  // namespace
 
 class MarkShotLayerShellPlugin final
     : public QObject
@@ -25,6 +41,11 @@ public:
     {
         if (!widget) {
             markshot::debugLog("layershell", "configure failed: widget is null");
+            return false;
+        }
+        if (isGnomeDesktop()) {
+            markshot::debugLog("layershell",
+                               "configure skipped: GNOME does not support the layer-shell protocol");
             return false;
         }
 
