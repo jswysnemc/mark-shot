@@ -17,6 +17,7 @@
 #include <QBoxLayout>
 #include <QComboBox>
 #include <QBrush>
+#include <QClipboard>
 #include <QContextMenuEvent>
 #include <QCoreApplication>
 #include <QCursor>
