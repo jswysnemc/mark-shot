@@ -3171,22 +3171,47 @@ void ShotWindow::drawStartupRuler(QPainter &painter) const
                              .arg(widthPx * heightPx);
     const QFontMetrics metrics(painter.font());
     const QSizeF infoSize(metrics.horizontalAdvance(info) + 20.0, metrics.height() + 10.0);
+    constexpr qreal kRulerFloatingGap = 8.0;
+    constexpr qreal kRulerMajorTickLength = 13.0;
+    constexpr qreal kRulerMinorTickLength = 6.0;
+    constexpr qreal kRulerTopLabelOffset = 30.0;
+    constexpr qreal kRulerTopLabelWidth = 68.0;
+    constexpr qreal kRulerTickLabelHeight = 16.0;
+    constexpr qreal kRulerLeftLabelOffset = 62.0;
+    constexpr qreal kRulerLeftLabelWidth = 48.0;
+    constexpr qreal kRulerTopScaleGap = kRulerTopLabelOffset + kRulerFloatingGap;
+    constexpr qreal kRulerBottomScaleGap = kRulerMajorTickLength + kRulerFloatingGap;
+    constexpr qreal kRulerRightScaleGap = kRulerMajorTickLength + kRulerFloatingGap;
+    constexpr qreal kRulerLeftScaleGap = kRulerLeftLabelOffset + kRulerFloatingGap;
     const QVector<QRectF> infoCandidates = {
-        QRectF(QPointF(widgetRect.left(), widgetRect.bottom() + 8.0), infoSize),
-        QRectF(QPointF(widgetRect.left(), widgetRect.top() - infoSize.height() - 8.0), infoSize),
-        QRectF(QPointF(widgetRect.right() + 8.0, widgetRect.top()), infoSize),
-        QRectF(QPointF(widgetRect.left() - infoSize.width() - 8.0, widgetRect.top()), infoSize),
+        QRectF(QPointF(widgetRect.left(), widgetRect.bottom() + kRulerBottomScaleGap), infoSize),
+        QRectF(QPointF(widgetRect.left(), widgetRect.top() - infoSize.height() - kRulerTopScaleGap), infoSize),
+        QRectF(QPointF(widgetRect.right() + kRulerRightScaleGap, widgetRect.top()), infoSize),
+        QRectF(QPointF(widgetRect.left() - infoSize.width() - kRulerLeftScaleGap, widgetRect.top()), infoSize),
+    };
+    const QRectF rulerScaleArea = widgetRect.adjusted(-kRulerLeftScaleGap,
+                                                      -kRulerTopScaleGap,
+                                                      kRulerRightScaleGap,
+                                                      kRulerBottomScaleGap);
+    auto overlapsInfoObstacle = [&](const QRectF &rect) {
+        if (rect.intersects(rulerScaleArea)) {
+            return true;
+        }
+        if (!hoverLabelRect.has_value()) {
+            return false;
+        }
+        return rect.intersects(hoverLabelRect->adjusted(-kRulerFloatingGap,
+                                                        -kRulerFloatingGap,
+                                                        kRulerFloatingGap,
+                                                        kRulerFloatingGap));
     };
 
     QRectF infoRect = clampFloatingRect(infoCandidates.first());
-    if (hoverLabelRect.has_value()) {
-        const QRectF occupied = hoverLabelRect->adjusted(-8.0, -8.0, 8.0, 8.0);
-        for (const QRectF &candidate : infoCandidates) {
-            const QRectF clamped = clampFloatingRect(candidate);
-            if (!clamped.intersects(occupied)) {
-                infoRect = clamped;
-                break;
-            }
+    for (const QRectF &candidate : infoCandidates) {
+        const QRectF clamped = clampFloatingRect(candidate);
+        if (!overlapsInfoObstacle(clamped)) {
+            infoRect = clamped;
+            break;
         }
     }
     drawRoundedLabel(painter, infoRect, info);
@@ -3201,12 +3226,17 @@ void ShotWindow::drawStartupRuler(QPainter &painter) const
             return;
         }
         const qreal x = widgetRect.left() + tick * widgetRect.width() / imageRect.width();
-        const qreal length = major ? 13.0 : 6.0;
+        const qreal length = major ? kRulerMajorTickLength : kRulerMinorTickLength;
         painter.drawLine(QPointF(x, widgetRect.top()), QPointF(x, widgetRect.top() - length));
         painter.drawLine(QPointF(x, widgetRect.bottom()), QPointF(x, widgetRect.bottom() + length));
         if (major) {
             const QString text = QString::number(tick);
-            painter.drawText(QRectF(x - 34.0, widgetRect.top() - 30.0, 68.0, 16.0), Qt::AlignCenter, text);
+            painter.drawText(QRectF(x - kRulerTopLabelWidth / 2.0,
+                                    widgetRect.top() - kRulerTopLabelOffset,
+                                    kRulerTopLabelWidth,
+                                    kRulerTickLabelHeight),
+                             Qt::AlignCenter,
+                             text);
         }
     };
     auto drawYTick = [&](int tick, bool major) {
@@ -3214,12 +3244,17 @@ void ShotWindow::drawStartupRuler(QPainter &painter) const
             return;
         }
         const qreal y = widgetRect.top() + tick * widgetRect.height() / imageRect.height();
-        const qreal length = major ? 13.0 : 6.0;
+        const qreal length = major ? kRulerMajorTickLength : kRulerMinorTickLength;
         painter.drawLine(QPointF(widgetRect.left(), y), QPointF(widgetRect.left() - length, y));
         painter.drawLine(QPointF(widgetRect.right(), y), QPointF(widgetRect.right() + length, y));
         if (major) {
             const QString text = QString::number(tick);
-            painter.drawText(QRectF(widgetRect.left() - 62.0, y - 8.0, 48.0, 16.0), Qt::AlignRight | Qt::AlignVCenter, text);
+            painter.drawText(QRectF(widgetRect.left() - kRulerLeftLabelOffset,
+                                    y - kRulerTickLabelHeight / 2.0,
+                                    kRulerLeftLabelWidth,
+                                    kRulerTickLabelHeight),
+                             Qt::AlignRight | Qt::AlignVCenter,
+                             text);
         }
     };
 

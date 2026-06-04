@@ -773,6 +773,14 @@ void ScrollSessionWindow::syncPreviewScroll(const StitchResult &outcome)
 {
     const PreviewLayout layout = computePreviewLayout();
     const int maxScrub = layout.maxScrub;
+    const bool stitchedNewContent =
+        outcome.status == StitchStatus::Appended && outcome.added > 0;
+
+    if (stitchedNewContent) {
+        // Manual overview scrubbing is only for browsing the current stitched image.
+        // Once the image grows again, snap the detail view back to the live capture.
+        m_following = true;
+    }
 
     // Prepended content (reverse scroll) is inserted ahead of the current view,
     // so everything already on screen shifts by outcome.added; nudge the viewed
