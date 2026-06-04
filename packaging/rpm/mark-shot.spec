@@ -31,6 +31,7 @@ Recommends:     xdg-desktop-portal
 Recommends:     pipewire
 Suggests:       tesseract
 Suggests:       tesseract-langpack-chi_sim
+Suggests:       gnome-shell
 
 %description
 Mark Shot captures screenshots, annotates image regions, pins floating image
@@ -66,8 +67,12 @@ sed -i '1s|^#!/usr/bin/env python3$|#!/usr/bin/python3|' \
 %{_datadir}/applications/mark-shot-edit.desktop
 %{_datadir}/icons/hicolor/scalable/apps/mark-shot.svg
 %{_datadir}/icons/hicolor/scalable/apps/mark-shot-edit.svg
+%{_datadir}/gnome-shell/extensions/mark-shot-scroll-helper@snemc.org/
 
 %changelog
+* Fri Jun 05 2026 jswysnemc <snemc@qq.com> - 0.1.19-1
+- Update to version 0.1.19
+
 * Thu Jun 04 2026 jswysnemc <snemc@qq.com> - 0.1.18-1
 - Update to version 0.1.18
 
