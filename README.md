@@ -367,9 +367,9 @@ The distribution packages install `mark-shot`, helper scripts, desktop entries, 
 ##### Arch Linux (AUR)
 Arch Linux users can install directly from the AUR using helpers like `paru` or `yay`:
 ```bash
-paru -S mark-shot-git
+paru -S mark-shot
 # or
-yay -S mark-shot-git
+yay -S mark-shot
 ```
 
 ##### Other Distributions (Pre-built Packages)
