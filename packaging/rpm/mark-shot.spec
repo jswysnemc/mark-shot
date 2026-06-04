@@ -1,5 +1,5 @@
 Name:           mark-shot
-Version:        0.1.16
+Version:        0.1.17
 Release:        1%{?dist}
 Summary:        Qt 6 screenshot selection and annotation tool
 
@@ -68,5 +68,8 @@ sed -i '1s|^#!/usr/bin/env python3$|#!/usr/bin/python3|' \
 %{_datadir}/icons/hicolor/scalable/apps/mark-shot-edit.svg
 
 %changelog
+* Thu Jun 04 2026 jswysnemc <snemc@qq.com> - 0.1.17-1
+- Update to version 0.1.17
+
 * Thu Jun 04 2026 jswysnemc <snemc@qq.com> - 0.1.16-1
 - Initial Fedora RPM packaging

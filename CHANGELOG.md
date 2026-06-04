@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.17 - 2026-06-04
+
+### Features & Enhancements
+
+- **Quick Save Shortcut**: Mapped `Ctrl+S` to perform a direct quick save to the default directory (usually `~/Pictures`) without opening the file dialog, sending a desktop notification via D-Bus on completion. Changed the toolbar save button to "Save As".
+- **Application Environment Configuration**: Supported configuring a top-level `env` (or `environment`) block in `config.json` to load variables like `QT_FONT_DPI` prior to `QApplication` creation, preventing environment settings from breaking screenshot geometry.
+- **Improved Ruler Layout and Interaction**: Standardized layout parameters in the measurement ruler and improved its overlap detection algorithm to ensure the metadata box does not obscure the ruler metrics or cursor indicators.
+- **Scroll Live Follow**: Automatically re-enable live-follow mode when new content is appended during scrolling capture, even if the user has manually panned the viewport.
+
+### Bug Fixes
+
+- **Linux Capture Geometry Stabilization**: Relocated and consolidated screenshot crop arithmetic to standalone module `capture_geometry` with dedicated unit tests. Resolved scaling and multi-monitor layout coordinate rounding bugs on Wayland, mapping image-space selections back to logical geometry accurately.
+- **NixOS OCR Directory Access**: Redirected RapidOCR model caching to a writable directory under XDG data home (defaulting to `~/.local/share/mark-shot/models`) with optional override via `MARK_SHOT_OCR_MODEL_DIR`, avoiding crashes on read-only environments like NixOS.
+- **Missing Header Include**: Fixed a compilation error by explicitly including the `<QClipboard>` header.
+
+### Release Artifacts
+
+- `mark-shot-v0.1.17-linux-x86_64.tar.gz`
+- `mark-shot-v0.1.17-linux-arm64.tar.gz`
+- `mark-shot_0.1.17_amd64.deb`
+- `mark-shot_0.1.17_arm64.deb`
+- `mark-shot_0.1.17_fedora_x86_64.rpm`
+- `mark-shot_0.1.17_fedora_aarch64.rpm`
+- `mark-shot-v0.1.17-linux-x86_64-layershell.AppImage`
+- `mark-shot-v0.1.17-linux-x86_64-nolayershell.AppImage`
+
 ## 0.1.16 - 2026-06-04
 
 ### Features & Enhancements
