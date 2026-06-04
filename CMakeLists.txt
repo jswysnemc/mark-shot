@@ -93,6 +93,8 @@ endif()
 
 if(MARK_SHOT_WITH_LAYER_SHELL AND LayerShellQt_FOUND)
     qt_add_plugin(mark-shot-layer-shell MODULE
+        src/debug_log.cpp
+        src/debug_log.h
         src/layer_shell_plugin.cpp
         src/layer_shell_plugin_interface.h
     )
