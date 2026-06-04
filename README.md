@@ -143,6 +143,26 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json`. Pin
     "fullscreenDefaultTool": "laser",
     "defaultColor": "#FF4D4D"
   },
+  "shortcuts": {
+    "tools": {
+      "pen": "P",
+      "rectangle": "R"
+    },
+    "actions": {
+      "copy": "Ctrl+C",
+      "save": "Ctrl+S",
+      "pin": "Ctrl+P"
+    },
+    "startup": {
+      "colorPicker": "C",
+      "ruler": "R"
+    }
+  },
+  "pinnedWindow": {
+    "border": false,
+    "borderColor": "#2DD4BF",
+    "borderWidth": 2
+  },
   "windowDetection": {
     "command": "mark-shot-window-detection-niri",
     "env": {
@@ -177,6 +197,14 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json`. Pin
 Fullscreen annotation has no separate capture selection to move. If its default tool is configured as `move`, Mark Shot starts fullscreen mode with `select` instead.
 
 `annotation.defaultColor` sets the initial annotation color. Use `#RRGGBB` for opaque colors or `#RRGGBBAA` to include alpha. The runtime option `--default-color <color>` overrides this config value.
+
+`shortcuts` (alias: `hotkeys`, or under `annotation.shortcuts` / `annotation.hotkeys`) configures tool keys, global action keys, and startup overlay tools. It supports the following sub-nodes:
+- `tools` (alias: `tool`, `toolShortcuts`): Configures keys for tools. Supported tool names match `annotation.defaultTool` (`move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, and `laser`).
+- `actions` (alias: `action`, `actionShortcuts`): Configures global action keys. Supported actions include `copy`, `save`, `pin`, `undo`, `redo`, `cancel` (or `escape`, `close`), `openWith` (or `open`), `extensions` (or `extension`), `scrollCapture` (or `scroll`), `ocrCopy` (or `ocr`), `clear`, `toggleCaptureScope` (or `scope`, `fullscreen`), and `toggleToolbarLayout` (or `layout`).
+- `startup` (alias: `startupTools`, `selection`): Configures startup overlay tools. Supported keys are `colorPicker` (alias: `color`, `pickcolor`) and `ruler` (alias: `measure`).
+Shortcut values use Qt key-sequence text such as `Ctrl+C`, `Ctrl+Shift+Z`, or `Alt+R`. Shortcut keys can also be specified directly at the root of `shortcuts`.
+
+`pinnedWindow` (alias: `pinned`, `pin`) configures properties of pinned sticker windows. `pinnedWindow.border` controls whether pinned sticker windows draw an outer border. It can be a boolean value, or an object containing `enabled`, `color` (which accepts color names, hex strings like `#RRGGBB` or `0xRRGGBBAA`, or RGBA objects like `{"r": 255, "g": 0, "b": 0, "a": 255}`), and `width` (border line width, clamped between `1.0` and `12.0`). Alternatively, you can directly set `pinnedWindow.borderEnabled`, `pinnedWindow.borderColor`, and `pinnedWindow.borderWidth` as top-level properties within the pinned window node.
 
 Top-level `env` (alias: `environment`) is applied to the Mark Shot process before `QApplication` is created. This is useful for Qt startup variables such as `QT_FONT_DPI`; for example, set `"QT_FONT_DPI": 96` to prevent font-DPI overrides from changing capture and selection geometry.
 

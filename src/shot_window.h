@@ -3,6 +3,7 @@
 #include <QColor>
 #include <QElapsedTimer>
 #include <QImage>
+#include <QKeySequence>
 #include <QPointF>
 #include <QRect>
 #include <QRectF>
@@ -10,11 +11,13 @@
 #include <QVector>
 #include <QWidget>
 
+#include <array>
 #include <optional>
 
 class QPainter;
 class QBoxLayout;
 class QComboBox;
+class QKeyEvent;
 class QLabel;
 class QListWidget;
 class QPushButton;
@@ -314,6 +317,15 @@ private:
     void drawStartupToolOverlay(QPainter &painter);
     void drawStartupColorLoupe(QPainter &painter, QPointF imagePoint) const;
     void drawStartupRuler(QPainter &painter) const;
+    QKeySequence shortcutForAction(Action action) const;
+    QKeySequence shortcutForTool(Tool tool) const;
+    QString shortcutText(Action action, const QString &fallback = {}) const;
+    QString shortcutText(Tool tool) const;
+    bool eventMatchesShortcut(const QKeyEvent *event, Action action) const;
+    bool eventMatchesShortcut(const QKeyEvent *event, Tool tool) const;
+    bool eventMatchesStartupShortcut(const QKeyEvent *event, StartupTool tool) const;
+    bool handleConfiguredActionShortcut(QKeyEvent *event);
+    bool handleConfiguredToolShortcut(QKeyEvent *event);
 
     QImage m_frozenFrame;
     QString m_outputName;
@@ -354,6 +366,10 @@ private:
     Tool m_tool = Tool::Pen;
     Tool m_defaultTool = Tool::Pen;
     Tool m_fullscreenDefaultTool = Tool::Pen;
+    std::array<QKeySequence, static_cast<int>(Action::Cancel) + 1> m_actionShortcuts;
+    std::array<QKeySequence, static_cast<int>(Tool::Laser) + 1> m_toolShortcuts;
+    QKeySequence m_startupColorPickerShortcut;
+    QKeySequence m_startupRulerShortcut;
     bool m_dragging = false;
     bool m_annotationHistoryCaptured = false;
     bool m_annotationSelectionBoxActive = false;

@@ -41,6 +41,7 @@
 #include <QJsonParseError>
 #include <QJsonValue>
 #include <QKeyEvent>
+#include <QKeySequence>
 #include <QLabel>
 #include <QLayout>
 #include <QLineF>
@@ -79,6 +80,7 @@
 #include <QtConcurrent>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <utility>
@@ -768,12 +770,406 @@ struct PinnedWindowConfig {
     QString translationCommand;
     QString translationTargetLanguage = QStringLiteral("Simplified Chinese");
     int translationTimeoutMs = kPinnedTranslationTimeoutMs;
+    bool borderEnabled = false;
+    QColor borderColor = QColor(94, 234, 212);
+    qreal borderWidth = 2.0;
 };
 
 QJsonObject objectValue(const QJsonObject &object, const QString &key)
 {
     const QJsonValue value = object.value(key);
     return value.isObject() ? value.toObject() : QJsonObject();
+}
+
+QJsonObject objectValue(const QJsonObject &object, const QStringList &keys)
+{
+    for (const QString &key : keys) {
+        const QJsonValue value = object.value(key);
+        if (value.isObject()) {
+            return value.toObject();
+        }
+    }
+    return {};
+}
+
+QString normalizedConfigKey(QString key)
+{
+    key = key.trimmed().toLower();
+    key.remove(QLatin1Char(' '));
+    key.remove(QLatin1Char('_'));
+    key.remove(QLatin1Char('-'));
+    key.remove(QLatin1Char('.'));
+    return key;
+}
+
+bool isHexColorDigits(const QString &text)
+{
+    if (text.isEmpty()) {
+        return false;
+    }
+    for (const QChar ch : text) {
+        if (!ch.isDigit()
+            && (ch < QLatin1Char('a') || ch > QLatin1Char('f'))
+            && (ch < QLatin1Char('A') || ch > QLatin1Char('F'))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::optional<QColor> colorFromConfigString(QString value)
+{
+    QString text = value.trimmed();
+    if (text.isEmpty()) {
+        return std::nullopt;
+    }
+    if (text.startsWith(QStringLiteral("0x"), Qt::CaseInsensitive)) {
+        text = text.mid(2);
+    }
+    if (!text.startsWith(QLatin1Char('#')) && (text.size() == 6 || text.size() == 8)
+        && isHexColorDigits(text)) {
+        text.prepend(QLatin1Char('#'));
+    }
+    if (text.startsWith(QLatin1Char('#')) && text.size() == 9 && isHexColorDigits(text.mid(1))) {
+        bool ok = false;
+        const int red = text.mid(1, 2).toInt(&ok, 16);
+        if (!ok) return std::nullopt;
+        const int green = text.mid(3, 2).toInt(&ok, 16);
+        if (!ok) return std::nullopt;
+        const int blue = text.mid(5, 2).toInt(&ok, 16);
+        if (!ok) return std::nullopt;
+        const int alpha = text.mid(7, 2).toInt(&ok, 16);
+        if (!ok) return std::nullopt;
+        return QColor(red, green, blue, alpha);
+    }
+
+    const QColor color(text);
+    return color.isValid() ? std::optional<QColor>(color) : std::nullopt;
+}
+
+std::optional<QColor> colorFromConfigValue(const QJsonValue &value)
+{
+    if (value.isString()) {
+        return colorFromConfigString(value.toString());
+    }
+    if (!value.isObject()) {
+        return std::nullopt;
+    }
+
+    const QJsonObject object = value.toObject();
+    for (const QString &key : {QStringLiteral("value"), QStringLiteral("color"), QStringLiteral("hex")}) {
+        if (object.value(key).isString()) {
+            return colorFromConfigString(object.value(key).toString());
+        }
+    }
+    if (!object.value(QStringLiteral("r")).isDouble()
+        || !object.value(QStringLiteral("g")).isDouble()
+        || !object.value(QStringLiteral("b")).isDouble()) {
+        return std::nullopt;
+    }
+    const int alpha = object.value(QStringLiteral("a")).isDouble()
+        ? std::clamp(object.value(QStringLiteral("a")).toInt(), 0, 255)
+        : 255;
+    return QColor(std::clamp(object.value(QStringLiteral("r")).toInt(), 0, 255),
+                  std::clamp(object.value(QStringLiteral("g")).toInt(), 0, 255),
+                  std::clamp(object.value(QStringLiteral("b")).toInt(), 0, 255),
+                  alpha);
+}
+
+std::optional<qreal> realFromConfigValue(const QJsonValue &value)
+{
+    if (value.isDouble()) {
+        return value.toDouble();
+    }
+    if (value.isString()) {
+        bool ok = false;
+        const qreal number = value.toString().trimmed().toDouble(&ok);
+        if (ok) {
+            return number;
+        }
+    }
+    return std::nullopt;
+}
+
+using ActionShortcuts = std::array<QKeySequence, static_cast<int>(ShotWindow::Action::Cancel) + 1>;
+using ToolShortcuts = std::array<QKeySequence, static_cast<int>(ShotWindow::Tool::Laser) + 1>;
+
+struct ShortcutConfig {
+    ActionShortcuts actions;
+    ToolShortcuts tools;
+    QKeySequence startupColorPicker;
+    QKeySequence startupRuler;
+};
+
+int actionIndex(ShotWindow::Action action)
+{
+    return static_cast<int>(action);
+}
+
+int toolIndex(ShotWindow::Tool tool)
+{
+    return static_cast<int>(tool);
+}
+
+ActionShortcuts defaultActionShortcuts()
+{
+    ActionShortcuts shortcuts{};
+    shortcuts[actionIndex(ShotWindow::Action::ToggleCaptureScope)] = QKeySequence(Qt::Key_F);
+    shortcuts[actionIndex(ShotWindow::Action::Pin)] = QKeySequence(Qt::CTRL | Qt::Key_P);
+    shortcuts[actionIndex(ShotWindow::Action::Copy)] = QKeySequence(Qt::CTRL | Qt::Key_C);
+    shortcuts[actionIndex(ShotWindow::Action::Save)] = QKeySequence(Qt::CTRL | Qt::Key_S);
+    shortcuts[actionIndex(ShotWindow::Action::Cancel)] = QKeySequence(Qt::Key_Escape);
+    shortcuts[actionIndex(ShotWindow::Action::Undo)] = QKeySequence(Qt::CTRL | Qt::Key_Z);
+    shortcuts[actionIndex(ShotWindow::Action::Redo)] = QKeySequence(Qt::CTRL | Qt::Key_Y);
+    return shortcuts;
+}
+
+ToolShortcuts defaultToolShortcuts()
+{
+    ToolShortcuts shortcuts{};
+    shortcuts[toolIndex(ShotWindow::Tool::Move)] = QKeySequence(Qt::Key_V);
+    shortcuts[toolIndex(ShotWindow::Tool::Select)] = QKeySequence(Qt::Key_S);
+    shortcuts[toolIndex(ShotWindow::Tool::Pen)] = QKeySequence(Qt::Key_P);
+    shortcuts[toolIndex(ShotWindow::Tool::Line)] = QKeySequence(Qt::Key_L);
+    shortcuts[toolIndex(ShotWindow::Tool::Highlighter)] = QKeySequence(Qt::Key_H);
+    shortcuts[toolIndex(ShotWindow::Tool::Rectangle)] = QKeySequence(Qt::Key_R);
+    shortcuts[toolIndex(ShotWindow::Tool::Ellipse)] = QKeySequence(Qt::Key_E);
+    shortcuts[toolIndex(ShotWindow::Tool::Arrow)] = QKeySequence(Qt::Key_A);
+    shortcuts[toolIndex(ShotWindow::Tool::Text)] = QKeySequence(Qt::Key_T);
+    shortcuts[toolIndex(ShotWindow::Tool::Number)] = QKeySequence(Qt::Key_N);
+    shortcuts[toolIndex(ShotWindow::Tool::Mosaic)] = QKeySequence(Qt::Key_M);
+    shortcuts[toolIndex(ShotWindow::Tool::Laser)] = QKeySequence(Qt::Key_G);
+    return shortcuts;
+}
+
+std::optional<QKeySequence> keySequenceFromConfigValue(const QJsonValue &value)
+{
+    if (!value.isString()) {
+        return std::nullopt;
+    }
+
+    const QString text = value.toString().trimmed();
+    if (text.isEmpty()) {
+        return std::nullopt;
+    }
+
+    QKeySequence sequence(text, QKeySequence::PortableText);
+    if (sequence.isEmpty()) {
+        sequence = QKeySequence(text, QKeySequence::NativeText);
+    }
+    return sequence.isEmpty() ? std::nullopt : std::optional<QKeySequence>(sequence);
+}
+
+std::optional<ShotWindow::Action> actionFromConfigName(QString name)
+{
+    const QString key = normalizedConfigKey(std::move(name));
+    if (key == QStringLiteral("scope") || key == QStringLiteral("togglecapturescope")
+        || key == QStringLiteral("fullscreen")) {
+        return ShotWindow::Action::ToggleCaptureScope;
+    }
+    if (key == QStringLiteral("layout") || key == QStringLiteral("toggletoolbarlayout")) {
+        return ShotWindow::Action::ToggleToolbarLayout;
+    }
+    if (key == QStringLiteral("clear")) return ShotWindow::Action::Clear;
+    if (key == QStringLiteral("undo")) return ShotWindow::Action::Undo;
+    if (key == QStringLiteral("redo")) return ShotWindow::Action::Redo;
+    if (key == QStringLiteral("open") || key == QStringLiteral("openwith")) return ShotWindow::Action::OpenWith;
+    if (key == QStringLiteral("extension") || key == QStringLiteral("extensions")) return ShotWindow::Action::Extensions;
+    if (key == QStringLiteral("pin")) return ShotWindow::Action::Pin;
+    if (key == QStringLiteral("scroll") || key == QStringLiteral("scrollcapture")) return ShotWindow::Action::ScrollCapture;
+    if (key == QStringLiteral("ocr") || key == QStringLiteral("ocrcopy")) return ShotWindow::Action::OcrCopy;
+    if (key == QStringLiteral("copy")) return ShotWindow::Action::Copy;
+    if (key == QStringLiteral("save") || key == QStringLiteral("saveas")) return ShotWindow::Action::Save;
+    if (key == QStringLiteral("cancel") || key == QStringLiteral("close") || key == QStringLiteral("escape")) {
+        return ShotWindow::Action::Cancel;
+    }
+    return std::nullopt;
+}
+
+void applyToolShortcutObject(const QJsonObject &object, ToolShortcuts *shortcuts)
+{
+    if (!shortcuts) {
+        return;
+    }
+    for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
+        const std::optional<ShotWindow::Tool> tool = ShotWindow::toolFromName(it.key());
+        const std::optional<QKeySequence> sequence = keySequenceFromConfigValue(it.value());
+        if (tool.has_value() && sequence.has_value()) {
+            (*shortcuts)[toolIndex(*tool)] = *sequence;
+        }
+    }
+}
+
+void applyActionShortcutObject(const QJsonObject &object, ActionShortcuts *shortcuts)
+{
+    if (!shortcuts) {
+        return;
+    }
+    for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
+        const std::optional<ShotWindow::Action> action = actionFromConfigName(it.key());
+        const std::optional<QKeySequence> sequence = keySequenceFromConfigValue(it.value());
+        if (action.has_value() && sequence.has_value()) {
+            (*shortcuts)[actionIndex(*action)] = *sequence;
+        }
+    }
+}
+
+void applyStartupShortcutObject(const QJsonObject &object, ShortcutConfig *config)
+{
+    if (!config) {
+        return;
+    }
+
+    for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
+        const QString key = normalizedConfigKey(it.key());
+        const std::optional<QKeySequence> sequence = keySequenceFromConfigValue(it.value());
+        if (!sequence.has_value()) {
+            continue;
+        }
+        if (key == QStringLiteral("colorpicker") || key == QStringLiteral("color")
+            || key == QStringLiteral("pickcolor")) {
+            config->startupColorPicker = *sequence;
+        } else if (key == QStringLiteral("ruler") || key == QStringLiteral("measure")) {
+            config->startupRuler = *sequence;
+        }
+    }
+}
+
+void applyShortcutObject(const QJsonObject &object, ShortcutConfig *config)
+{
+    if (!config || object.isEmpty()) {
+        return;
+    }
+
+    applyToolShortcutObject(objectValue(object, {QStringLiteral("tools"),
+                                                 QStringLiteral("tool"),
+                                                 QStringLiteral("toolShortcuts")}),
+                            &config->tools);
+    applyActionShortcutObject(objectValue(object, {QStringLiteral("actions"),
+                                                   QStringLiteral("action"),
+                                                   QStringLiteral("actionShortcuts")}),
+                              &config->actions);
+    applyStartupShortcutObject(objectValue(object, {QStringLiteral("startup"),
+                                                    QStringLiteral("startupTools"),
+                                                    QStringLiteral("selection")}),
+                               config);
+
+    for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
+        if (it.value().isObject()) {
+            continue;
+        }
+        const std::optional<QKeySequence> sequence = keySequenceFromConfigValue(it.value());
+        if (!sequence.has_value()) {
+            continue;
+        }
+        if (const std::optional<ShotWindow::Tool> tool = ShotWindow::toolFromName(it.key())) {
+            config->tools[toolIndex(*tool)] = *sequence;
+            continue;
+        }
+        if (const std::optional<ShotWindow::Action> action = actionFromConfigName(it.key())) {
+            config->actions[actionIndex(*action)] = *sequence;
+            continue;
+        }
+        QJsonObject startupShortcut;
+        startupShortcut.insert(it.key(), it.value());
+        applyStartupShortcutObject(startupShortcut, config);
+    }
+}
+
+ShortcutConfig configuredShortcuts()
+{
+    ShortcutConfig config{defaultActionShortcuts(),
+                          defaultToolShortcuts(),
+                          QKeySequence(Qt::Key_C),
+                          QKeySequence(Qt::Key_R)};
+
+    QFile file(appConfigPath());
+    if (!file.exists() || !file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return config;
+    }
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        return config;
+    }
+
+    const QJsonObject root = document.object();
+    const QJsonObject annotation = objectValue(root, QStringLiteral("annotation"));
+    for (const QJsonObject &object : {
+             objectValue(root, QStringLiteral("shortcuts")),
+             objectValue(root, QStringLiteral("hotkeys")),
+             objectValue(annotation, QStringLiteral("shortcuts")),
+             objectValue(annotation, QStringLiteral("hotkeys")),
+         }) {
+        applyShortcutObject(object, &config);
+    }
+    return config;
+}
+
+QStringList jsonStringList(const QJsonValue &value)
+{
+    QStringList items;
+    if (value.isString()) {
+        items.append(value.toString());
+    } else if (value.isArray()) {
+        for (const QJsonValue &item : value.toArray()) {
+            if (item.isString()) {
+                items.append(item.toString());
+            }
+        }
+    }
+    return items;
+}
+
+bool ocrErrorLooksLikeMissingBackend(QString errorText)
+{
+    const QString text = errorText.toLower();
+    return text.contains(QStringLiteral("no module named"))
+        || text.contains(QStringLiteral("modulenotfounderror"))
+        || text.contains(QStringLiteral("importerror"))
+        || text.contains(QStringLiteral("not installed"))
+        || text.contains(QStringLiteral("not found"))
+        || text.contains(QStringLiteral("no such file or directory"));
+}
+
+bool ocrOutputReportsMissingBackend(const QByteArray &stdoutData,
+                                    const QByteArray &stderrData,
+                                    const QString &configuredBackend)
+{
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(stdoutData, &parseError);
+    QStringList errors;
+    QString reportedBackend;
+    QJsonArray tokenArray;
+    if (parseError.error == QJsonParseError::NoError && document.isObject()) {
+        const QJsonObject root = document.object();
+        reportedBackend = root.value(QStringLiteral("backend")).toString().trimmed();
+        errors = jsonStringList(root.value(QStringLiteral("errors")));
+        tokenArray = root.value(QStringLiteral("tokens")).toArray();
+    }
+
+    if (!stderrData.trimmed().isEmpty()) {
+        errors.append(QString::fromUtf8(stderrData).trimmed());
+    }
+
+    if (tokenArray.isEmpty() && reportedBackend.isEmpty() && !errors.isEmpty()) {
+        return true;
+    }
+
+    const QString backend = configuredBackend.trimmed().toLower();
+    if (backend == QStringLiteral("auto")) {
+        return false;
+    }
+
+    for (const QString &error : std::as_const(errors)) {
+        if (ocrErrorLooksLikeMissingBackend(error)) {
+            return true;
+        }
+    }
+
+    return tokenArray.isEmpty() && !errors.isEmpty()
+        && reportedBackend.compare(backend, Qt::CaseInsensitive) == 0;
 }
 
 PinnedWindowConfig pinnedWindowConfig()
@@ -803,6 +1199,41 @@ PinnedWindowConfig pinnedWindowConfig()
                                                    .trimmed();
             if (translation.value(QStringLiteral("timeoutMs")).isDouble()) {
                 config.translationTimeoutMs = std::max(3000, translation.value(QStringLiteral("timeoutMs")).toInt(config.translationTimeoutMs));
+            }
+
+            const QJsonObject pinned = objectValue(root,
+                                                   {QStringLiteral("pinnedWindow"),
+                                                    QStringLiteral("pinned"),
+                                                    QStringLiteral("pin")});
+            if (!pinned.isEmpty()) {
+                const QJsonValue border = pinned.value(QStringLiteral("border"));
+                if (border.isBool()) {
+                    config.borderEnabled = border.toBool();
+                } else if (border.isObject()) {
+                    const QJsonObject borderObject = border.toObject();
+                    if (borderObject.value(QStringLiteral("enabled")).isBool()) {
+                        config.borderEnabled = borderObject.value(QStringLiteral("enabled")).toBool();
+                    } else {
+                        config.borderEnabled = true;
+                    }
+                    if (const std::optional<QColor> color = colorFromConfigValue(borderObject)) {
+                        config.borderColor = *color;
+                    }
+                    if (const std::optional<qreal> width = realFromConfigValue(borderObject.value(QStringLiteral("width")))) {
+                        config.borderWidth = std::clamp(*width, 1.0, 12.0);
+                    }
+                }
+                if (pinned.value(QStringLiteral("borderEnabled")).isBool()) {
+                    config.borderEnabled = pinned.value(QStringLiteral("borderEnabled")).toBool();
+                }
+                if (const std::optional<QColor> color =
+                        colorFromConfigValue(pinned.value(QStringLiteral("borderColor")))) {
+                    config.borderColor = *color;
+                }
+                if (const std::optional<qreal> width =
+                        realFromConfigValue(pinned.value(QStringLiteral("borderWidth")))) {
+                    config.borderWidth = std::clamp(*width, 1.0, 12.0);
+                }
             }
         }
     }
@@ -893,7 +1324,21 @@ protected:
             drawTranslationOverlay(painter);
         }
 
+        auto drawBorder = [this, &painter] {
+            if (!m_config.borderEnabled || !m_config.borderColor.isValid() || m_config.borderWidth <= 0.0) {
+                return;
+            }
+            painter.save();
+            painter.setRenderHint(QPainter::Antialiasing, false);
+            painter.setBrush(Qt::NoBrush);
+            painter.setPen(QPen(m_config.borderColor, m_config.borderWidth));
+            const qreal inset = m_config.borderWidth / 2.0;
+            painter.drawRect(QRectF(rect()).adjusted(inset, inset, -inset, -inset));
+            painter.restore();
+        };
+
         if (!hasTextSelection()) {
+            drawBorder();
             return;
         }
 
@@ -905,6 +1350,7 @@ protected:
         for (int i = first; i <= last; ++i) {
             painter.drawRect(imageToWidget(tokens.at(i).imageRect).intersected(QRectF(rect())));
         }
+        drawBorder();
     }
 
     void mousePressEvent(QMouseEvent *event) override
@@ -1186,17 +1632,24 @@ private:
                                    m_ocrTempPath});
         }
 
-        connect(process, &QProcess::errorOccurred, this, [this, process] {
+        connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError error) {
             if (process == m_ocrProcess && process->state() == QProcess::NotRunning) {
-                finishOcr(process, QByteArray());
+                finishOcr(process,
+                          QByteArray(),
+                          process->readAllStandardError(),
+                          -1,
+                          QProcess::CrashExit,
+                          error);
             }
         });
         connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
                 [this, process](int exitCode, QProcess::ExitStatus exitStatus) {
-            const QByteArray output = exitStatus == QProcess::NormalExit && exitCode == 0
-                ? process->readAllStandardOutput()
-                : QByteArray();
-            finishOcr(process, output);
+            finishOcr(process,
+                      process->readAllStandardOutput(),
+                      process->readAllStandardError(),
+                      exitCode,
+                      exitStatus,
+                      process->error());
         });
         QTimer::singleShot(m_config.ocrTimeoutMs, process, [process] {
             if (process->state() != QProcess::NotRunning) {
@@ -1229,14 +1682,27 @@ private:
         }
     }
 
-    void finishOcr(QProcess *process, const QByteArray &output)
+    void finishOcr(QProcess *process,
+                   const QByteArray &output,
+                   const QByteArray &errorOutput,
+                   int exitCode,
+                   QProcess::ExitStatus exitStatus,
+                   QProcess::ProcessError processError)
     {
         if (process != m_ocrProcess) {
             return;
         }
 
-        if (!output.isEmpty()) {
-            applyOcrOutput(output);
+        const bool success = exitStatus == QProcess::NormalExit && exitCode == 0;
+        if (success && !output.isEmpty()) {
+            applyOcrOutput(output, errorOutput);
+        } else if (processError == QProcess::FailedToStart && m_config.ocrCommand.isEmpty()) {
+            notifyMissingOcrBackend();
+            m_translateAfterOcr = false;
+        } else if (m_config.ocrCommand.isEmpty()
+                   && ocrOutputReportsMissingBackend(output, errorOutput, m_config.ocrBackend)) {
+            notifyMissingOcrBackend();
+            m_translateAfterOcr = false;
         } else {
             m_translateAfterOcr = false;
         }
@@ -1249,10 +1715,14 @@ private:
         process->deleteLater();
     }
 
-    void applyOcrOutput(const QByteArray &output)
+    void applyOcrOutput(const QByteArray &output, const QByteArray &errorOutput)
     {
         const QVector<OcrToken> tokens = tokensFromJsonOutput(output);
         if (tokens.isEmpty()) {
+            if (m_config.ocrCommand.isEmpty()
+                && ocrOutputReportsMissingBackend(output, errorOutput, m_config.ocrBackend)) {
+                notifyMissingOcrBackend();
+            }
             m_translateAfterOcr = false;
             return;
         }
@@ -1269,6 +1739,16 @@ private:
         } else {
             update();
         }
+    }
+
+    void notifyMissingOcrBackend()
+    {
+        if (m_ocrBackendWarningShown) {
+            return;
+        }
+        m_ocrBackendWarningShown = true;
+        sendDesktopNotification(QStringLiteral("Mark Shot"),
+                                MS_TR("OCR backend not installed. Install rapidocr or tesseract."));
     }
 
     QVector<OcrToken> tokensFromJsonOutput(const QByteArray &output) const
@@ -1914,6 +2394,7 @@ private:
     bool m_translationActive = false;
     bool m_translateAfterOcr = false;
     bool m_translationBusyCursor = false;
+    bool m_ocrBackendWarningShown = false;
 };
 
 } // namespace
@@ -1990,6 +2471,12 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     , m_outputName(std::move(outputName))
     , m_sourceGeometry(sourceGeometry)
 {
+    const ShortcutConfig shortcutConfig = configuredShortcuts();
+    m_actionShortcuts = shortcutConfig.actions;
+    m_toolShortcuts = shortcutConfig.tools;
+    m_startupColorPickerShortcut = shortcutConfig.startupColorPicker;
+    m_startupRulerShortcut = shortcutConfig.startupRuler;
+
     setWindowTitle(MS_TR("Mark Shot"));
     setCursor(Qt::CrossCursor);
     setMouseTracking(true);
@@ -2013,21 +2500,21 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     m_toolbarLayout->setContentsMargins(6, 6, 6, 6);
     m_toolbarLayout->setSpacing(3);
 
-    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolMove, QStringLiteral("V")));
-    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolSelect, QStringLiteral("S")));
-    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolPen, QStringLiteral("P")));
-    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolLine, QStringLiteral("L")));
-    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolHighlighter, QStringLiteral("H")));
-    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolRectangle, QStringLiteral("R")));
-    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolEllipse, QStringLiteral("E")));
-    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolArrow, QStringLiteral("A")));
-    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolText, QStringLiteral("T")));
-    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolNumber, QStringLiteral("N")));
-    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolMosaic, QStringLiteral("M")));
-    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolLaser, QStringLiteral("G")));
-    m_toolbarLayout->addWidget(addToolbarButton(Action::Clear, QStringLiteral("Clear")));
-    m_toolbarLayout->addWidget(addToolbarButton(Action::Undo, QStringLiteral("Ctrl+Z")));
-    m_toolbarLayout->addWidget(addToolbarButton(Action::Redo, QStringLiteral("Ctrl+Shift+Z")));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolMove, shortcutText(Tool::Move)));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolSelect, shortcutText(Tool::Select)));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolPen, shortcutText(Tool::Pen)));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolLine, shortcutText(Tool::Line)));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolHighlighter, shortcutText(Tool::Highlighter)));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolRectangle, shortcutText(Tool::Rectangle)));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolEllipse, shortcutText(Tool::Ellipse)));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolArrow, shortcutText(Tool::Arrow)));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolText, shortcutText(Tool::Text)));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolNumber, shortcutText(Tool::Number)));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolMosaic, shortcutText(Tool::Mosaic)));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolLaser, shortcutText(Tool::Laser)));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::Clear, shortcutText(Action::Clear, QStringLiteral("Clear"))));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::Undo, shortcutText(Action::Undo)));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::Redo, shortcutText(Action::Redo, QStringLiteral("Ctrl+Shift+Z"))));
     for (Action action : {Action::ToggleCaptureScope,
                           Action::ToggleToolbarLayout,
                           Action::OpenWith,
@@ -2038,16 +2525,16 @@ ShotWindow::ShotWindow(QImage frozenFrame,
                           Action::Copy,
                           Action::Save,
                           Action::Cancel}) {
-        const QString shortcut = action == Action::OpenWith ? QStringLiteral("Open")
-            : action == Action::Extensions           ? QStringLiteral("Ext")
-            : action == Action::ScrollCapture        ? QStringLiteral("Scroll")
-            : action == Action::Pin                  ? QStringLiteral("Ctrl+P")
-            : action == Action::OcrCopy              ? QStringLiteral("OCR")
-            : action == Action::Copy                 ? QStringLiteral("Ctrl+C")
-            : action == Action::Save                 ? QStringLiteral("Save As")
-            : action == Action::ToggleToolbarLayout  ? QStringLiteral("Layout")
-            : action == Action::ToggleCaptureScope   ? QStringLiteral("F")
-                                                     : QStringLiteral("Esc");
+        const QString shortcut = action == Action::OpenWith ? shortcutText(action, QStringLiteral("Open"))
+            : action == Action::Extensions           ? shortcutText(action, QStringLiteral("Ext"))
+            : action == Action::ScrollCapture        ? shortcutText(action, QStringLiteral("Scroll"))
+            : action == Action::Pin                  ? shortcutText(action)
+            : action == Action::OcrCopy              ? shortcutText(action, QStringLiteral("OCR"))
+            : action == Action::Copy                 ? shortcutText(action)
+            : action == Action::Save                 ? shortcutText(action, QStringLiteral("Save As"))
+            : action == Action::ToggleToolbarLayout  ? shortcutText(action, QStringLiteral("Layout"))
+            : action == Action::ToggleCaptureScope   ? shortcutText(action)
+                                                     : shortcutText(action);
         QPushButton *button = addToolbarButton(action, shortcut);
         button->hide();
         m_fullscreenActionButtons.append(button);
@@ -2093,15 +2580,15 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     actionLayout->setContentsMargins(4, 4, 4, 4);
     actionLayout->setSpacing(2);
     for (QPushButton *button : {
-             addToolbarButton(Action::ToggleCaptureScope, QStringLiteral("F"), m_actionToolbar),
-             addToolbarButton(Action::OpenWith, QStringLiteral("Open"), m_actionToolbar),
-             addToolbarButton(Action::Extensions, QStringLiteral("Ext"), m_actionToolbar),
-             addToolbarButton(Action::ScrollCapture, QStringLiteral("Scroll"), m_actionToolbar),
-             addToolbarButton(Action::Pin, QStringLiteral("Ctrl+P"), m_actionToolbar),
-             addToolbarButton(Action::OcrCopy, QStringLiteral("OCR"), m_actionToolbar),
-             addToolbarButton(Action::Copy, QStringLiteral("Ctrl+C"), m_actionToolbar),
-             addToolbarButton(Action::Save, QStringLiteral("Save As"), m_actionToolbar),
-             addToolbarButton(Action::Cancel, QStringLiteral("Esc"), m_actionToolbar),
+             addToolbarButton(Action::ToggleCaptureScope, shortcutText(Action::ToggleCaptureScope), m_actionToolbar),
+             addToolbarButton(Action::OpenWith, shortcutText(Action::OpenWith, QStringLiteral("Open")), m_actionToolbar),
+             addToolbarButton(Action::Extensions, shortcutText(Action::Extensions, QStringLiteral("Ext")), m_actionToolbar),
+             addToolbarButton(Action::ScrollCapture, shortcutText(Action::ScrollCapture, QStringLiteral("Scroll")), m_actionToolbar),
+             addToolbarButton(Action::Pin, shortcutText(Action::Pin), m_actionToolbar),
+             addToolbarButton(Action::OcrCopy, shortcutText(Action::OcrCopy, QStringLiteral("OCR")), m_actionToolbar),
+             addToolbarButton(Action::Copy, shortcutText(Action::Copy), m_actionToolbar),
+             addToolbarButton(Action::Save, shortcutText(Action::Save, QStringLiteral("Save As")), m_actionToolbar),
+             addToolbarButton(Action::Cancel, shortcutText(Action::Cancel), m_actionToolbar),
          }) {
         button->setIconSize(QSize(20, 20));
         actionLayout->addWidget(button);
@@ -2117,6 +2604,9 @@ ShotWindow::ShotWindow(QImage frozenFrame,
             || qobject_cast<QTextEdit *>(focusWidget) != nullptr;
     };
     auto addPlainShortcut = [this, shortcutBlockedByTextInput](const QKeySequence &sequence, auto callback) {
+        if (sequence.isEmpty()) {
+            return;
+        }
         auto *shortcut = new QShortcut(sequence, this);
         shortcut->setContext(Qt::WindowShortcut);
         shortcut->setAutoRepeat(false);
@@ -2127,26 +2617,85 @@ ShotWindow::ShotWindow(QImage frozenFrame,
             callback();
         });
     };
-    addPlainShortcut(QKeySequence(Qt::Key_V), [this] { setTool(Tool::Move); });
-    addPlainShortcut(QKeySequence(Qt::Key_S), [this] { setTool(Tool::Select); });
-    addPlainShortcut(QKeySequence(Qt::Key_P), [this] { setTool(Tool::Pen); });
-    addPlainShortcut(QKeySequence(Qt::Key_L), [this] { setTool(Tool::Line); });
-    addPlainShortcut(QKeySequence(Qt::Key_H), [this] { setTool(Tool::Highlighter); });
-    addPlainShortcut(QKeySequence(Qt::Key_R), [this] {
-        if (m_mode == Mode::Selecting) {
-            setStartupTool(StartupTool::Ruler);
+    auto addToolShortcut = [this, addPlainShortcut](Tool tool) {
+        const QKeySequence sequence = this->shortcutForTool(tool);
+        addPlainShortcut(sequence, [this, tool, sequence] {
+            if (m_mode == Mode::Selecting && sequence == m_startupColorPickerShortcut) {
+                setStartupTool(StartupTool::ColorPicker);
+                return;
+            }
+            if (m_mode == Mode::Selecting && sequence == m_startupRulerShortcut) {
+                setStartupTool(StartupTool::Ruler);
+                return;
+            }
+            setTool(tool);
+        });
+    };
+    for (Tool tool : {Tool::Move,
+                      Tool::Select,
+                      Tool::Pen,
+                      Tool::Line,
+                      Tool::Highlighter,
+                      Tool::Rectangle,
+                      Tool::Ellipse,
+                      Tool::Arrow,
+                      Tool::Text,
+                      Tool::Number,
+                      Tool::Mosaic,
+                      Tool::Laser}) {
+        addToolShortcut(tool);
+    }
+    auto sequenceUsedByTool = [this](const QKeySequence &sequence) {
+        for (const QKeySequence &toolSequence : m_toolShortcuts) {
+            if (!sequence.isEmpty() && sequence == toolSequence) {
+                return true;
+            }
+        }
+        return false;
+    };
+    if (!sequenceUsedByTool(m_startupColorPickerShortcut)) {
+        addPlainShortcut(m_startupColorPickerShortcut, [this] {
+            if (m_mode == Mode::Selecting) {
+                setStartupTool(StartupTool::ColorPicker);
+            }
+        });
+    }
+    if (!sequenceUsedByTool(m_startupRulerShortcut)) {
+        addPlainShortcut(m_startupRulerShortcut, [this] {
+            if (m_mode == Mode::Selecting) {
+                setStartupTool(StartupTool::Ruler);
+            }
+        });
+    }
+    auto addActionShortcut = [this, addPlainShortcut](Action action, auto callback) {
+        addPlainShortcut(this->shortcutForAction(action), callback);
+    };
+    addActionShortcut(Action::ToggleCaptureScope, [this] { toggleCaptureScope(); });
+    addActionShortcut(Action::Pin, [this] { pinSelection(); });
+    addActionShortcut(Action::Copy, [this] {
+        commitTextEditor();
+        copySelection();
+    });
+    addActionShortcut(Action::Save, [this] {
+        commitTextEditor();
+        saveSelection();
+    });
+    addActionShortcut(Action::Undo, [this] { undoAnnotationEdit(); });
+    addActionShortcut(Action::Redo, [this] { redoAnnotation(); });
+    addActionShortcut(Action::OpenWith, [this] { toggleOpenWithPanel(); });
+    addActionShortcut(Action::Extensions, [this] { toggleExtensionPanel(); });
+    addActionShortcut(Action::ScrollCapture, [this] { startScrollCapture(); });
+    addActionShortcut(Action::OcrCopy, [this] { ocrCopySelection(); });
+    addActionShortcut(Action::Clear, [this] { clearAnnotations(); });
+    addActionShortcut(Action::ToggleToolbarLayout, [this] { toggleToolbarLayout(); });
+    addActionShortcut(Action::Cancel, [this] {
+        if (m_mode == Mode::Selecting && m_startupTool != StartupTool::None) {
+            leaveStartupTool();
             return;
         }
-        setTool(Tool::Rectangle);
+        emit sessionCancelRequested();
+        close();
     });
-    addPlainShortcut(QKeySequence(Qt::Key_E), [this] { setTool(Tool::Ellipse); });
-    addPlainShortcut(QKeySequence(Qt::Key_A), [this] { setTool(Tool::Arrow); });
-    addPlainShortcut(QKeySequence(Qt::Key_T), [this] { setTool(Tool::Text); });
-    addPlainShortcut(QKeySequence(Qt::Key_N), [this] { setTool(Tool::Number); });
-    addPlainShortcut(QKeySequence(Qt::Key_M), [this] { setTool(Tool::Mosaic); });
-    addPlainShortcut(QKeySequence(Qt::Key_G), [this] { setTool(Tool::Laser); });
-    addPlainShortcut(QKeySequence(Qt::Key_F), [this] { toggleCaptureScope(); });
-    addPlainShortcut(QKeySequence(Qt::CTRL | Qt::Key_P), [this] { pinSelection(); });
 
     m_annotationPropertyPanel = new QWidget(this);
     m_annotationPropertyPanel->setObjectName(QStringLiteral("annotationPropertyPanel"));
@@ -2432,6 +2981,145 @@ void ShotWindow::setDefaultTools(Tool tool, Tool fullscreenTool)
 void ShotWindow::setDefaultColor(QColor color)
 {
     setCurrentColor(color);
+}
+
+QKeySequence ShotWindow::shortcutForAction(Action action) const
+{
+    return m_actionShortcuts.at(actionIndex(action));
+}
+
+QKeySequence ShotWindow::shortcutForTool(Tool tool) const
+{
+    return m_toolShortcuts.at(toolIndex(tool));
+}
+
+QString ShotWindow::shortcutText(Action action, const QString &fallback) const
+{
+    const QKeySequence sequence = shortcutForAction(action);
+    if (sequence.isEmpty()) {
+        return fallback;
+    }
+    return sequence.toString(QKeySequence::NativeText);
+}
+
+QString ShotWindow::shortcutText(Tool tool) const
+{
+    const QKeySequence sequence = shortcutForTool(tool);
+    return sequence.isEmpty() ? QString() : sequence.toString(QKeySequence::NativeText);
+}
+
+bool shortcutMatchesEvent(const QKeySequence &sequence, const QKeyEvent *event)
+{
+    if (!event || sequence.isEmpty() || event->key() == Qt::Key_unknown) {
+        return false;
+    }
+    return QKeySequence(event->keyCombination()).matches(sequence) == QKeySequence::ExactMatch;
+}
+
+bool ShotWindow::eventMatchesShortcut(const QKeyEvent *event, Action action) const
+{
+    return shortcutMatchesEvent(shortcutForAction(action), event);
+}
+
+bool ShotWindow::eventMatchesShortcut(const QKeyEvent *event, Tool tool) const
+{
+    return shortcutMatchesEvent(shortcutForTool(tool), event);
+}
+
+bool ShotWindow::eventMatchesStartupShortcut(const QKeyEvent *event, StartupTool tool) const
+{
+    if (tool == StartupTool::ColorPicker) {
+        return shortcutMatchesEvent(m_startupColorPickerShortcut, event);
+    }
+    if (tool == StartupTool::Ruler) {
+        return shortcutMatchesEvent(m_startupRulerShortcut, event);
+    }
+    return false;
+}
+
+bool ShotWindow::handleConfiguredActionShortcut(QKeyEvent *event)
+{
+    if (eventMatchesShortcut(event, Action::Cancel)) {
+        emit sessionCancelRequested();
+        close();
+        return true;
+    }
+    if (eventMatchesShortcut(event, Action::Copy)) {
+        commitTextEditor();
+        copySelection();
+        return true;
+    }
+    if (eventMatchesShortcut(event, Action::Save)) {
+        commitTextEditor();
+        saveSelection();
+        return true;
+    }
+    if (eventMatchesShortcut(event, Action::Pin)) {
+        pinSelection();
+        return true;
+    }
+    if (eventMatchesShortcut(event, Action::Undo)) {
+        undoAnnotationEdit();
+        return true;
+    }
+    if (eventMatchesShortcut(event, Action::Redo) || event->matches(QKeySequence::Redo)) {
+        redoAnnotation();
+        return true;
+    }
+    if (eventMatchesShortcut(event, Action::ToggleCaptureScope)) {
+        toggleCaptureScope();
+        return true;
+    }
+    if (eventMatchesShortcut(event, Action::ToggleToolbarLayout)) {
+        toggleToolbarLayout();
+        return true;
+    }
+    if (eventMatchesShortcut(event, Action::OpenWith)) {
+        toggleOpenWithPanel();
+        return true;
+    }
+    if (eventMatchesShortcut(event, Action::Extensions)) {
+        toggleExtensionPanel();
+        return true;
+    }
+    if (eventMatchesShortcut(event, Action::ScrollCapture)) {
+        startScrollCapture();
+        return true;
+    }
+    if (eventMatchesShortcut(event, Action::OcrCopy)) {
+        ocrCopySelection();
+        return true;
+    }
+    if (eventMatchesShortcut(event, Action::Clear)) {
+        clearAnnotations();
+        return true;
+    }
+    return false;
+}
+
+bool ShotWindow::handleConfiguredToolShortcut(QKeyEvent *event)
+{
+    const std::array<Tool, static_cast<int>(Tool::Laser) + 1> tools = {
+        Tool::Move,
+        Tool::Select,
+        Tool::Pen,
+        Tool::Line,
+        Tool::Highlighter,
+        Tool::Rectangle,
+        Tool::Ellipse,
+        Tool::Arrow,
+        Tool::Text,
+        Tool::Number,
+        Tool::Mosaic,
+        Tool::Laser,
+    };
+    for (Tool tool : tools) {
+        if (eventMatchesShortcut(event, tool)) {
+            setTool(tool);
+            return true;
+        }
+    }
+    return false;
 }
 
 void ShotWindow::enterFullscreenAnnotation(bool resetAnnotations)
@@ -3031,9 +3719,13 @@ void ShotWindow::showStartupColorDialog(QColor color, QPoint anchor)
         auto *copyButton = new QPushButton(MS_TR("Copy"), frame);
         copyButton->setFocusPolicy(Qt::NoFocus);
         connect(copyButton, &QPushButton::clicked, this, [this, value = row.value] {
-            markshot::copyTextToClipboard(value);
-            emit sessionCancelRequested();
-            close();
+            if (!markshot::copyTextToClipboard(value)) {
+                return;
+            }
+            QTimer::singleShot(180, this, [this] {
+                emit sessionCancelRequested();
+                close();
+            });
         });
         rowLayout->addWidget(copyButton);
         layout->addWidget(frame);
@@ -4219,19 +4911,21 @@ void ShotWindow::keyPressEvent(QKeyEvent *event)
 {
     clearWheelPreview();
 
-    if (m_mode == Mode::Selecting && m_startupTool != StartupTool::None && event->key() == Qt::Key_Escape) {
+    if (m_mode == Mode::Selecting
+        && m_startupTool != StartupTool::None
+        && eventMatchesShortcut(event, Action::Cancel)) {
         leaveStartupTool();
         event->accept();
         return;
     }
 
-    if (m_mode == Mode::Selecting && event->modifiers() == Qt::NoModifier) {
-        if (event->key() == Qt::Key_C) {
+    if (m_mode == Mode::Selecting) {
+        if (eventMatchesStartupShortcut(event, StartupTool::ColorPicker)) {
             setStartupTool(StartupTool::ColorPicker);
             event->accept();
             return;
         }
-        if (event->key() == Qt::Key_R) {
+        if (eventMatchesStartupShortcut(event, StartupTool::Ruler)) {
             setStartupTool(StartupTool::Ruler);
             event->accept();
             return;
@@ -4249,36 +4943,8 @@ void ShotWindow::keyPressEvent(QKeyEvent *event)
         return;
     }
 
-    if (event->key() == Qt::Key_Escape) {
-        emit sessionCancelRequested();
-        close();
-        return;
-    }
-
-    if (event->matches(QKeySequence::Copy)) {
-        commitTextEditor();
-        copySelection();
-        return;
-    }
-
-    if (event->matches(QKeySequence::Save)) {
-        commitTextEditor();
-        saveSelection();
-        return;
-    }
-
-    if (event->modifiers() == Qt::ControlModifier && event->key() == Qt::Key_P) {
-        pinSelection();
-        return;
-    }
-
-    if (event->matches(QKeySequence::Undo)) {
-        undoAnnotationEdit();
-        return;
-    }
-
-    if (event->matches(QKeySequence::Redo)) {
-        redoAnnotation();
+    if (handleConfiguredActionShortcut(event)) {
+        event->accept();
         return;
     }
 
@@ -4296,47 +4962,12 @@ void ShotWindow::keyPressEvent(QKeyEvent *event)
     case Qt::Key_Enter:
         saveSelection();
         break;
-    case Qt::Key_V:
-        setTool(Tool::Move);
-        break;
-    case Qt::Key_S:
-        setTool(Tool::Select);
-        break;
-    case Qt::Key_P:
-        setTool(Tool::Pen);
-        break;
-    case Qt::Key_L:
-        setTool(Tool::Line);
-        break;
-    case Qt::Key_H:
-        setTool(Tool::Highlighter);
-        break;
-    case Qt::Key_R:
-        setTool(Tool::Rectangle);
-        break;
-    case Qt::Key_E:
-        setTool(Tool::Ellipse);
-        break;
-    case Qt::Key_A:
-        setTool(Tool::Arrow);
-        break;
-    case Qt::Key_T:
-        setTool(Tool::Text);
-        break;
-    case Qt::Key_N:
-        setTool(Tool::Number);
-        break;
-    case Qt::Key_M:
-        setTool(Tool::Mosaic);
-        break;
-    case Qt::Key_G:
-        setTool(Tool::Laser);
-        break;
-    case Qt::Key_F:
-        toggleCaptureScope();
-        break;
     default:
-        QWidget::keyPressEvent(event);
+        if (!handleConfiguredToolShortcut(event)) {
+            QWidget::keyPressEvent(event);
+        } else {
+            event->accept();
+        }
         break;
     }
 }
@@ -7578,25 +8209,45 @@ void ShotWindow::ocrCopySelection()
         return;
     }
 
-    const QString ocrProgram = helperProgramPath(QStringLiteral("mark-shot-ocr"));
-    if (ocrProgram.isEmpty()) {
+    const PinnedWindowConfig config = pinnedWindowConfig();
+    if (!config.ocrEnabled) {
         QFile::remove(tempPath);
-        showToast(MS_TR("OCR helper not found"));
         return;
     }
-
-    const PinnedWindowConfig config = pinnedWindowConfig();
 
     QApplication::setOverrideCursor(Qt::WaitCursor);
 
     QProcess process;
-    process.setProgram(ocrProgram);
-    process.setArguments({QStringLiteral("--format"),
-                          QStringLiteral("json"),
-                          QStringLiteral("--backend"),
-                          config.ocrBackend,
-                          tempPath});
+    if (!config.ocrCommand.isEmpty()) {
+        QString commandLine = config.ocrCommand;
+        const bool replaced = replaceExtensionImagePlaceholders(&commandLine, tempPath);
+        if (!replaced) {
+            commandLine += QLatin1Char(' ');
+            commandLine += shellQuote(tempPath);
+        }
+        QString shell = QProcessEnvironment::systemEnvironment().value(QStringLiteral("SHELL"), QStringLiteral("/bin/sh"));
+        if (shell.isEmpty()) {
+            shell = QStringLiteral("/bin/sh");
+        }
+        process.setProgram(shell);
+        process.setArguments({QStringLiteral("-c"), commandLine});
+    } else {
+        process.setProgram(helperProgramPath(QStringLiteral("mark-shot-ocr")));
+        process.setArguments({QStringLiteral("--format"),
+                              QStringLiteral("json"),
+                              QStringLiteral("--backend"),
+                              config.ocrBackend,
+                              tempPath});
+    }
     process.start();
+    if (!process.waitForStarted(3000)) {
+        QFile::remove(tempPath);
+        QApplication::restoreOverrideCursor();
+        showToast(config.ocrCommand.isEmpty()
+                      ? MS_TR("OCR helper not found")
+                      : MS_TR("OCR failed"));
+        return;
+    }
     if (!process.waitForFinished(config.ocrTimeoutMs)) {
         process.kill();
         process.waitForFinished(1000);
@@ -7609,15 +8260,23 @@ void ShotWindow::ocrCopySelection()
     QFile::remove(tempPath);
     QApplication::restoreOverrideCursor();
 
+    const QByteArray output = process.readAllStandardOutput();
+    const QByteArray errorOutput = process.readAllStandardError();
     if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
-        showToast(MS_TR("OCR failed"));
+        showToast(config.ocrCommand.isEmpty()
+                      && ocrOutputReportsMissingBackend(output, errorOutput, config.ocrBackend)
+                      ? MS_TR("OCR backend not installed. Install rapidocr or tesseract.")
+                      : MS_TR("OCR failed"));
         return;
     }
 
-    const QByteArray output = process.readAllStandardOutput();
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(output, &parseError);
     if (parseError.error != QJsonParseError::NoError) {
+        showToast(config.ocrCommand.isEmpty()
+                      && ocrOutputReportsMissingBackend(output, errorOutput, config.ocrBackend)
+                      ? MS_TR("OCR backend not installed. Install rapidocr or tesseract.")
+                      : MS_TR("OCR failed"));
         return;
     }
 
@@ -7704,9 +8363,13 @@ void ShotWindow::ocrCopySelection()
     }
 
     if (tokens.isEmpty()) {
-        showToast(MS_TR("No text recognized"));
+        showToast(config.ocrCommand.isEmpty()
+                      && ocrOutputReportsMissingBackend(output, errorOutput, config.ocrBackend)
+                      ? MS_TR("OCR backend not installed. Install rapidocr or tesseract.")
+                      : MS_TR("No text recognized"));
         return;
-    }    std::stable_sort(tokens.begin(), tokens.end(), [](const LineToken &a, const LineToken &b) {
+    }
+    std::stable_sort(tokens.begin(), tokens.end(), [](const LineToken &a, const LineToken &b) {
         return a.line != b.line ? a.line < b.line : a.index < b.index;
     });
 

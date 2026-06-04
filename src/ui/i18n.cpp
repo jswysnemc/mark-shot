@@ -141,6 +141,8 @@ const QHash<QString, QString> &chineseTable()
 
         // Toasts.
         {QStringLiteral("OCR helper not found"), QStringLiteral("未找到 OCR 辅助程序")},
+        {QStringLiteral("OCR backend not installed. Install rapidocr or tesseract."),
+         QStringLiteral("未安装 OCR 后端，请安装 rapidocr 或 tesseract。")},
         {QStringLiteral("OCR timed out"), QStringLiteral("OCR 超时")},
         {QStringLiteral("OCR failed"), QStringLiteral("OCR 失败")},
         {QStringLiteral("No text recognized"), QStringLiteral("未识别到文字")},
