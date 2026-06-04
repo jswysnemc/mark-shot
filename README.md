@@ -22,7 +22,7 @@ It captures screen frames instantly and opens an interactive fullscreen overlay,
 - **Geometric Shapes**: High-precision Line, Rectangle, and Ellipse paths.
 - **Refined Arrow**: Sharp 6-vertex acute arrow path rendering with anti-aliasing.
 - **Dual-Gesture Text**:
-  - Supports font sizes up to `1000px`, adjustable via scroll wheel or property sliders.
+  - Supports dynamic, ultra-large font sizing with fluid adjustment via scroll wheel or property sliders.
   - Implements a physical width buffer to prevent unexpected wrapping across extreme scales.
   - **Diagonal handles** scale font size and boundary box proportionally; **side borders** only adjust wrap width.
 - **Laser Pointer**: Dedicated presentation tool with pen traces that dissolve smoothly over time.
@@ -233,6 +233,21 @@ The project bundles default window detection scripts for the following window ma
 - **Niri**: `mark-shot-window-detection-niri`
 - **Hyprland**: `mark-shot-window-detection-hyprland`
 
+##### How to Use & Configure:
+1. Copy the script corresponding to your compositor from the `scripts/` directory in the repository to a folder in your system `$PATH` (e.g. `~/.local/bin/` or `/usr/local/bin/`).
+2. Make the script executable:
+   ```bash
+   chmod +x ~/.local/bin/mark-shot-window-detection-niri
+   # or
+   chmod +x ~/.local/bin/mark-shot-window-detection-hyprland
+   ```
+3. Update your `~/.config/mark-shot/config.json` configuration file, specifying the script name or its absolute path in the `windowDetection.command` field:
+   ```json
+   "windowDetection": {
+     "command": "mark-shot-window-detection-niri"
+   }
+   ```
+
 We highly welcome and encourage community members to contribute adapter scripts for various desktop environments and Wayland compositors to expand compatibility.
 
 #### 1. Input Provided to the Script (Environment Variables)
@@ -347,6 +362,27 @@ Each release publishes Linux binary archives, Debian packages, and Fedora RPM pa
 
 The distribution packages install `mark-shot`, helper scripts, desktop entries, icons, and runtime metadata together.
 
+#### Installation Guide
+
+##### Arch Linux (AUR)
+Arch Linux users can install directly from the AUR using helpers like `paru` or `yay`:
+```bash
+paru -S mark-shot-git
+# or
+yay -S mark-shot-git
+```
+
+##### Other Distributions (Pre-built Packages)
+For other distributions (such as Debian, Ubuntu, or Fedora), download the compiled package from the Releases page and install it via:
+- **Debian / Ubuntu**:
+  ```bash
+  sudo apt install ./mark-shot_<version>_amd64.deb
+  ```
+- **Fedora**:
+  ```bash
+  sudo dnf install ./mark-shot-<version>-1.x86_64.rpm
+  ```
+
 The official `.deb` package is built on a Debian 12 compatibility baseline. It intentionally avoids linking the optional LayerShellQt plugin so that Deepin and other Debian-derived systems with Qt 6.8-era packages can install it without Ubuntu `t64` or newer GCC runtime dependencies.
 
 ### Dependencies
@@ -425,20 +461,32 @@ This installs the binary, helper scripts (`mark-shot-ocr`, `mark-shot-translate`
 
 ### GNOME Wayland Scrolling Capture Extension
 
-GNOME Wayland scrolling capture needs the Mark Shot Scroll Helper extension. Without it, Mark Shot cannot take silent repeated area screenshots or draw the GNOME-native scroll preview panel, so the scrolling capture button is disabled on GNOME Wayland.
+GNOME Wayland scrolling capture requires the **Mark Shot Scroll Helper** extension. Without it, Mark Shot cannot perform silent repeated area screenshots or display the GNOME-native scroll preview panel, causing the scrolling capture action to be disabled on GNOME Wayland.
 
-If Mark Shot was installed from a distribution package, the extension files are installed under `/usr/share/gnome-shell/extensions/mark-shot-scroll-helper@snemc.org`. Enable it for the current user:
+The extension files are bundled in the project repository at `packaging/gnome-extension/mark-shot-scroll-helper@snemc.org`.
 
+#### Enabling the Extension
+
+##### Method A: Installed from Distribution Package
+If Mark Shot was installed via a distribution package, the extension is already installed system-wide. Enable it with:
 ```bash
 gnome-extensions enable mark-shot-scroll-helper@snemc.org
 ```
+*If not found, log out and log back in, then retry.*
 
-If `gnome-extensions` reports that the extension is not found, log out and log back in, then retry the command. For source-tree or local builds, install the extension into the user extension directory:
-
+##### Method B: Installed from Repository Source
+To manually install and enable the extension directly from the repository source folder:
 ```bash
+# Define the extension UUID
 UUID=mark-shot-scroll-helper@snemc.org
+
+# Create the user GNOME extensions directory
 mkdir -p "$HOME/.local/share/gnome-shell/extensions"
+
+# Copy the extension files from the repository
 cp -r "packaging/gnome-extension/$UUID" "$HOME/.local/share/gnome-shell/extensions/"
+
+# Enable the extension (you may need to restart GNOME Shell or log out and back in)
 gnome-extensions enable "$UUID"
 ```
 
