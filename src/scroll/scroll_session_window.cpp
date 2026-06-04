@@ -682,7 +682,7 @@ void ScrollSessionWindow::resizeEvent(QResizeEvent *event)
 
 void ScrollSessionWindow::captureTick()
 {
-    if (m_paused) {
+    if (m_paused || m_axisDragging) {
         return;
     }
 
@@ -1390,9 +1390,9 @@ bool ScrollSessionWindow::eventFilter(QObject *watched, QEvent *event)
                 std::abs(delta.y()) < kDragThresholdPx) {
                 return false;  // below threshold, not yet dragging
             }
-            // Threshold exceeded: enter drag mode.
-            // Capture stays active so the stitcher appends continuously as
-            // the region moves, giving a smooth live-stitching feel.
+            // Threshold exceeded: enter drag mode. Capture is paused while the
+            // region moves so intermediate drag frames do not disturb the
+            // stitcher's current anchor.
             m_axisDragging = true;
             m_lastSignature.clear();
             m_transientPaintMask = overlayPaintRegion();
@@ -1449,9 +1449,7 @@ bool ScrollSessionWindow::eventFilter(QObject *watched, QEvent *event)
         }
 
         // Drag just finished: clear the frame signature so the next capture
-        // tick is accepted as a fresh frame. Capture was never paused during
-        // the drag, so the timer keeps running and stitching resumes
-        // immediately — no delayed resume needed.
+        // tick is accepted as a fresh frame at the adjusted region.
         m_lastSignature.clear();
         m_statusText = MS_TR("Region adjusted");
         refreshControlLabels();
