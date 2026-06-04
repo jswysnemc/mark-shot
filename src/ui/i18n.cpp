@@ -147,6 +147,9 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("OCR text copied"), QStringLiteral("已复制 OCR 文字")},
 
         // Scrolling capture session window.
+        {QStringLiteral("Scroll Capture"), QStringLiteral("滚动截图")},
+        {QStringLiteral("Scroll with the mouse wheel or touchpad.\nPress Enter to finish, Esc to cancel.\nDo not click the page before finishing."),
+         QStringLiteral("使用鼠标滚轮或触控板滚动。\n按 Enter 结束，按 Esc 取消。\n结束前不要点击页面。")},
         {QStringLiteral("Pause"), QStringLiteral("暂停")},
         {QStringLiteral("Resume"), QStringLiteral("继续")},
         {QStringLiteral("Annotate"), QStringLiteral("标注")},

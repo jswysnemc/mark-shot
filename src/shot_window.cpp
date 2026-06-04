@@ -33,6 +33,7 @@
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QFrame>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -46,6 +47,7 @@
 #include <QListWidget>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMessageBox>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -130,6 +132,22 @@ bool sendDesktopNotification(const QString &summary, const QString &body, int ti
                                             QVariantMap(),
                                             timeoutMs);
     return reply.type() != QDBusMessage::ErrorMessage;
+}
+
+bool isGnomeWaylandSession()
+{
+    if (QGuiApplication::platformName().compare(QStringLiteral("wayland"),
+                                                Qt::CaseInsensitive) != 0) {
+        return false;
+    }
+
+    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    const QString desktop =
+        (env.value(QStringLiteral("XDG_CURRENT_DESKTOP")) + QLatin1Char(':')
+         + env.value(QStringLiteral("XDG_SESSION_DESKTOP")) + QLatin1Char(':')
+         + env.value(QStringLiteral("DESKTOP_SESSION")))
+            .toLower();
+    return desktop.contains(QStringLiteral("gnome"));
 }
 
 QColor propertyIconInkForFill(const QColor &fillColor)
@@ -7499,6 +7517,13 @@ void ShotWindow::startScrollCapture()
     const QString outputName = m_outputName;
     QScreen *targetScreen = screen();
     QPointer<ShotWindow> self(this);
+
+    if (isGnomeWaylandSession()) {
+        QMessageBox::information(
+            this,
+            MS_TR("Scroll Capture"),
+            MS_TR("Scroll with the mouse wheel or touchpad.\nPress Enter to finish, Esc to cancel.\nDo not click the page before finishing."));
+    }
 
     // On X11, QScreen::grabWindow captures visible top-level windows. Hide the
     // selection UI and give the compositor one repaint before seeding the scroll

@@ -26,6 +26,7 @@
 #include <QPainterPath>
 #include <QPaintEvent>
 #include <QPixmap>
+#include <QProcessEnvironment>
 #include <QPushButton>
 #include <QRegion>
 #include <QResizeEvent>
@@ -133,6 +134,17 @@ bool isWaylandPlatform()
 {
     return QGuiApplication::platformName().compare(QStringLiteral("wayland"),
                                                    Qt::CaseInsensitive) == 0;
+}
+
+bool isGnomeDesktop()
+{
+    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    const QString desktop =
+        (env.value(QStringLiteral("XDG_CURRENT_DESKTOP")) + QLatin1Char(':')
+         + env.value(QStringLiteral("XDG_SESSION_DESKTOP")) + QLatin1Char(':')
+         + env.value(QStringLiteral("DESKTOP_SESSION")))
+            .toLower();
+    return desktop.contains(QStringLiteral("gnome"));
 }
 
 const char *axisDebugName(ScrollAxis axis)
@@ -326,10 +338,12 @@ ScrollSessionWindow::ScrollSessionWindow(QRect globalGeometry,
 
     m_layerShell = configureLayerShell(screen);
     m_panelOnlyWindow = !m_layerShell && isWaylandPlatform();
+    m_panellessWindow = m_panelOnlyWindow && isGnomeDesktop();
     if (!m_layerShell && screen) {
         setScreen(screen);
         if (m_panelOnlyWindow) {
-            setGeometry(floatingPanelGlobalRect());
+            setGeometry(m_panellessWindow ? QRect(m_geometry.center(), QSize(1, 1))
+                                          : floatingPanelGlobalRect());
         } else {
             setGeometry(screen->geometry());
         }
@@ -438,6 +452,9 @@ QRect ScrollSessionWindow::regionLocalRect() const
 
 QRect ScrollSessionWindow::previewPanelRect() const
 {
+    if (m_panellessWindow) {
+        return {};
+    }
     if (m_panelOnlyWindow) {
         return QRect(QPoint(0, 0), size());
     }
@@ -547,6 +564,14 @@ void ScrollSessionWindow::updatePanelWindowGeometry()
     if (!m_panelOnlyWindow) {
         return;
     }
+    if (m_panellessWindow) {
+        const QRect panel(m_geometry.center(), QSize(1, 1));
+        if (geometry() != panel) {
+            setGeometry(panel);
+        }
+        m_screenOrigin = panel.topLeft();
+        return;
+    }
     const QRect panel = floatingPanelGlobalRect();
     if (geometry() != panel) {
         setGeometry(panel);
@@ -558,6 +583,9 @@ QRegion ScrollSessionWindow::overlayPaintRegion() const
 {
     const QRect bounds(QPoint(0, 0), size());
     if (bounds.isEmpty()) {
+        return {};
+    }
+    if (m_panellessWindow) {
         return {};
     }
     if (m_panelOnlyWindow) {
@@ -604,6 +632,15 @@ void ScrollSessionWindow::setRegionGeometry(QRect geometry)
 void ScrollSessionWindow::layoutOverlay()
 {
     const QRect panel = previewPanelRect();
+    if (panel.isEmpty()) {
+        if (m_controlBar) {
+            m_controlBar->hide();
+        }
+        return;
+    }
+    if (m_controlBar && !m_controlBar->isVisible() && !m_panelTransparentForCapture) {
+        m_controlBar->show();
+    }
     const int barWidth = panel.width() - kPanelPadding * 2;
     const int barTop = panel.bottom() - kPanelPadding - kControlBarHeight;
     m_controlBar->setGeometry(panel.left() + kPanelPadding,
@@ -615,6 +652,14 @@ void ScrollSessionWindow::layoutOverlay()
 void ScrollSessionWindow::updateInputMask()
 {
     if (m_panelOnlyWindow) {
+        if (m_panellessWindow) {
+            const QRegion mask(rect());
+            setMask(mask);
+            if (QWindow *nativeWindow = windowHandle()) {
+                nativeWindow->setMask(mask);
+            }
+            return;
+        }
         const QRegion mask(rect());
         setMask(mask);
         if (QWindow *nativeWindow = windowHandle()) {
@@ -696,7 +741,8 @@ void ScrollSessionWindow::captureTick()
         request.allowInteractivePortal = false;
         request.allowPortalScreenshotFallback = false;
 
-        const bool makePanelTransparentForCapture = m_panelOnlyWindow && isVisible();
+        const bool makePanelTransparentForCapture =
+            m_panelOnlyWindow && !m_panellessWindow && isVisible();
         if (makePanelTransparentForCapture) {
             m_panelTransparentForCapture = true;
             if (m_controlBar) {
@@ -1142,6 +1188,9 @@ void ScrollSessionWindow::paintEvent(QPaintEvent *)
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
+    if (m_panellessWindow) {
+        return;
+    }
     if (m_panelTransparentForCapture) {
         return;
     }
@@ -1295,6 +1344,11 @@ void ScrollSessionWindow::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Escape) {
         close();
+        event->accept();
+        return;
+    }
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        annotateResult();
         event->accept();
         return;
     }
