@@ -19,8 +19,10 @@ env:
 
 jobs:
   deb:
-    name: Build Ubuntu/Debian ${{ matrix.deb_arch }} package
+    name: Build Ubuntu 26.04 ${{ matrix.deb_arch }} package
     runs-on: ${{ matrix.runner }}
+    container:
+      image: ubuntu:26.04
     strategy:
       fail-fast: false
       matrix:
@@ -52,34 +54,40 @@ jobs:
             echo "checkout_ref=$CHECKOUT_REF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Checkout source
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.version.outputs.checkout_ref }}
-
       - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          apt-get update
+          apt-get install -y --no-install-recommends \
             build-essential \
+            ca-certificates \
             cmake \
             dpkg-dev \
             fakeroot \
             file \
+            git \
             libgl1-mesa-dev \
+            liblayershellqtinterface-dev \
             libpipewire-0.3-dev \
             libx11-xcb-dev \
             libxcb1-dev \
             ninja-build \
             pkg-config \
             qt6-base-dev \
-            qt6-base-dev-tools
+            qt6-base-dev-tools \
+            qt6-wayland-dev
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.version.outputs.checkout_ref }}
 
       - name: Configure
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=/usr
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DMARK_SHOT_WITH_LAYER_SHELL=ON \
+            -DMARK_SHOT_REQUIRE_LAYER_SHELL=ON
 
       - name: Build
         run: cmake --build build --parallel
@@ -105,6 +113,11 @@ jobs:
 
           rm -rf "$PACKAGE_DIR"
           cmake --install build --prefix "$INSTALL_DIR"
+          PLUGIN_PATH="$(find "$PACKAGE_DIR/usr" -path '*/mark-shot/libmark-shot-layer-shell.so' -print -quit)"
+          if [ -z "$PLUGIN_PATH" ]; then
+            echo "Layer-shell plugin was not installed" >&2
+            exit 1
+          fi
           install -Dm644 LICENSE "$PACKAGE_DIR/usr/share/doc/mark-shot/copyright"
           install -Dm644 README.md "$PACKAGE_DIR/usr/share/doc/mark-shot/README.md"
           install -Dm644 README.zh-CN.md "$PACKAGE_DIR/usr/share/doc/mark-shot/README.zh-CN.md"
@@ -126,7 +139,7 @@ jobs:
            Mark Shot captures screenshots and annotates image regions.
           EOF
 
-          SHLIB_DEPS="$(dpkg-shlibdeps -O -e"$PACKAGE_DIR/usr/bin/mark-shot" | sed 's/^shlibs:Depends=//')"
+          SHLIB_DEPS="$(dpkg-shlibdeps -O -e"$PACKAGE_DIR/usr/bin/mark-shot" -e"$PLUGIN_PATH" | sed 's/^shlibs:Depends=//')"
           MANUAL_DEPS="python3"
           RECOMMENDS="python3-venv, xdg-desktop-portal, pipewire, grim, wl-clipboard, xclip"
           if [ -n "$SHLIB_DEPS" ]; then
