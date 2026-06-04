@@ -11,9 +11,12 @@
 #include <QCloseEvent>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QDBusConnection>
+#include <QDBusMessage>
 #include <QDir>
 #include <QEvent>
 #include <QEventLoop>
+#include <QFile>
 #include <QFileDialog>
 #include <QFont>
 #include <QGuiApplication>
@@ -63,6 +66,11 @@ constexpr int kNoLayerPanelGap = 96;  // GNOME xdg windows can bleed into PipeWi
 constexpr int kPanelPadding = 12;
 constexpr int kControlBarHeight = 54;   // single row of icon actions
 constexpr int kStatusHeight = 22;
+constexpr int kGnomePreviewIntervalMs = 140;
+
+constexpr auto kGnomeShellService = "org.gnome.Shell";
+constexpr auto kGnomeHelperPath = "/org/gnome/Shell/Extensions/MarkShotScrollHelper";
+constexpr auto kGnomeHelperInterface = "org.gnome.Shell.Extensions.MarkShotScrollHelper";
 
 std::uint8_t grayPixel(const QImage &frame, int x, int y)
 {
@@ -323,6 +331,16 @@ ScrollSessionWindow::ScrollSessionWindow(QRect globalGeometry,
     m_screenOrigin = screen ? screen->geometry().topLeft() : QPoint(0, 0);
 
     buildControlBar();
+    m_gnomeShellPreview = isGnomeWaylandSession() && hasGnomeScrollPreviewHelper();
+    m_gnomePreviewSessionId = QString::number(m_sessionId);
+    if (m_gnomeShellPreview) {
+        QDBusConnection::sessionBus().connect(QString::fromLatin1(kGnomeShellService),
+                                              QString::fromLatin1(kGnomeHelperPath),
+                                              QString::fromLatin1(kGnomeHelperInterface),
+                                              QStringLiteral("PreviewAction"),
+                                              this,
+                                              SLOT(handleGnomePreviewAction(QString,QString)));
+    }
 
     m_layerShell = configureLayerShell(screen);
     m_panelOnlyWindow = !m_layerShell && isWaylandPlatform();
@@ -599,10 +617,19 @@ void ScrollSessionWindow::setRegionGeometry(QRect geometry)
     } else {
         update();
     }
+    m_gnomePreviewImageDirty = true;
+    updateGnomeShellPreview(true);
 }
 
 void ScrollSessionWindow::layoutOverlay()
 {
+    if (m_gnomeShellPreview) {
+        if (m_controlBar) {
+            m_controlBar->hide();
+        }
+        return;
+    }
+
     const QRect panel = previewPanelRect();
     if (m_controlBar && !m_controlBar->isVisible() && !m_panelTransparentForCapture) {
         m_controlBar->show();
@@ -617,6 +644,15 @@ void ScrollSessionWindow::layoutOverlay()
 
 void ScrollSessionWindow::updateInputMask()
 {
+    if (m_gnomeShellPreview) {
+        const QRegion emptyMask;
+        setMask(emptyMask);
+        if (QWindow *nativeWindow = windowHandle()) {
+            nativeWindow->setMask(emptyMask);
+        }
+        return;
+    }
+
     if (m_panelOnlyWindow) {
         const QRegion mask(rect());
         setMask(mask);
@@ -662,6 +698,7 @@ void ScrollSessionWindow::showEvent(QShowEvent *event)
                    m_layerShell ? kPanelGap : kNoLayerPanelGap,
                    panel.intersects(region) ? 1 : 0, m_layerShell ? 1 : 0,
                    m_panelOnlyWindow ? 1 : 0);
+    updateGnomeShellPreview(true);
     if (m_timer && !m_timer->isActive()) {
         // Let the compositor apply the window mask before the first X11 capture;
         // otherwise the seed frame can include the scroll overlay itself.
@@ -699,7 +736,8 @@ void ScrollSessionWindow::captureTick()
         request.allowInteractivePortal = false;
         request.allowPortalScreenshotFallback = false;
 
-        const bool makePanelTransparentForCapture = m_panelOnlyWindow && isVisible();
+        const bool makePanelTransparentForCapture =
+            !m_gnomeShellPreview && m_panelOnlyWindow && isVisible();
         if (makePanelTransparentForCapture) {
             m_panelTransparentForCapture = true;
             if (m_controlBar) {
@@ -724,6 +762,7 @@ void ScrollSessionWindow::captureTick()
             stopActiveScreencastCapture();
             m_statusText = MS_TR("Capture error");
             refreshControlLabels();
+            updateGnomeShellPreview(true);
             logScrollDebug("%s-capture-error geom=%d,%d %dx%d output=%s error=%s",
                            debugTag,
                            request.sourceGeometry.x(), request.sourceGeometry.y(),
@@ -749,6 +788,7 @@ void ScrollSessionWindow::captureTick()
         logScrollDebug("skip-duplicate frame=%dx%d axis=%s",
                        frame.width(), frame.height(),
                        axisDebugName(m_stitcher.axis()));
+        updateGnomeShellPreview();
         update();
         return;
     }
@@ -757,6 +797,8 @@ void ScrollSessionWindow::captureTick()
 
     const StitchResult outcome = m_stitcher.pushFrame(frame);
     const StitchStats stats = m_stitcher.stats();
+    const int oldCapturePos = m_capturePos;
+    const int oldCaptureLen = m_captureLen;
 
     switch (outcome.status) {
     case StitchStatus::FirstFrame:
@@ -777,8 +819,15 @@ void ScrollSessionWindow::captureTick()
         m_capturePos = outcome.position;
         m_captureLen = outcome.frameLength;
     }
+    if (outcome.status == StitchStatus::FirstFrame
+        || outcome.status == StitchStatus::Appended
+        || oldCapturePos != m_capturePos
+        || oldCaptureLen != m_captureLen) {
+        m_gnomePreviewImageDirty = true;
+    }
     syncPreviewScroll(outcome);
     refreshControlLabels();
+    updateGnomeShellPreview();
     logScrollDebug("tick status=%s edge=%s added=%d pos=%d frame_len=%d full_len=%d frames=%d "
                    "scrub=%d following=%d axis=%s",
                    statusDebugName(outcome.status), edgeDebugName(outcome.edge), outcome.added,
@@ -813,6 +862,7 @@ void ScrollSessionWindow::togglePause()
         m_lastSignature.clear();
     }
     refreshControlLabels();
+    updateGnomeShellPreview(true);
     update();
 }
 
@@ -824,8 +874,10 @@ void ScrollSessionWindow::toggleAxis()
         ? ScrollAxis::Vertical
         : ScrollAxis::Horizontal;
     m_stitcher.setAxis(next);
+    m_gnomePreviewImageDirty = true;
     updateInputMask();
     refreshControlLabels();
+    updateGnomeShellPreview(true);
     update();
 }
 
@@ -843,9 +895,13 @@ QRect ScrollSessionWindow::imageAreaRect() const
 
 ScrollSessionWindow::PreviewLayout ScrollSessionWindow::computePreviewLayout() const
 {
+    return computePreviewLayout(imageAreaRect());
+}
+
+ScrollSessionWindow::PreviewLayout ScrollSessionWindow::computePreviewLayout(const QRect &area) const
+{
     PreviewLayout layout;
     const QImage result = currentResult();
-    const QRect area = imageAreaRect();
     if (result.isNull() || area.width() <= 0 || area.height() <= 0
         || result.width() <= 0 || result.height() <= 0) {
         return layout;
@@ -895,6 +951,103 @@ ScrollSessionWindow::PreviewLayout ScrollSessionWindow::computePreviewLayout() c
         std::max(1, static_cast<int>(std::lround(detailLongPx / layout.detailScale))));
     layout.maxScrub = std::max(0, layout.longLen - layout.viewportLen);
     return layout;
+}
+
+void ScrollSessionWindow::drawPreviewContent(QPainter &painter, const QRect &area) const
+{
+    if (area.height() <= 10) {
+        return;
+    }
+
+    painter.fillRect(area, QColor(8, 13, 19, 220));
+
+    const PreviewLayout layout = computePreviewLayout(area);
+    if (!layout.valid) {
+        return;
+    }
+
+    const QImage result = currentResult();
+    const bool horizontal = m_stitcher.axis() == ScrollAxis::Horizontal;
+    auto drawCaptureMarker = [&](const QRect &target,
+                                 int sourceStart,
+                                 int sourceLen,
+                                 bool fillInterior) {
+        if (m_captureLen <= 0 || sourceLen <= 0 || target.isEmpty()) {
+            return;
+        }
+
+        const int sourceEnd = sourceStart + sourceLen;
+        const int captureStart = std::max(m_capturePos, sourceStart);
+        const int captureEnd = std::min(m_capturePos + m_captureLen, sourceEnd);
+        if (captureEnd <= captureStart) {
+            return;
+        }
+
+        QRect marker;
+        if (horizontal) {
+            const qreal scale = static_cast<qreal>(target.width()) / sourceLen;
+            const int x = target.left()
+                + static_cast<int>(std::lround((captureStart - sourceStart) * scale));
+            const int w = std::max(3, static_cast<int>(
+                                          std::lround((captureEnd - captureStart) * scale)));
+            marker = QRect(x, target.top(), w, target.height());
+        } else {
+            const qreal scale = static_cast<qreal>(target.height()) / sourceLen;
+            const int y = target.top()
+                + static_cast<int>(std::lround((captureStart - sourceStart) * scale));
+            const int h = std::max(3, static_cast<int>(
+                                          std::lround((captureEnd - captureStart) * scale)));
+            marker = QRect(target.left(), y, target.width(), h);
+        }
+
+        painter.setPen(QPen(QColor(250, 204, 21, 245), 2));
+        painter.setBrush(fillInterior ? QColor(250, 204, 21, 42) : Qt::NoBrush);
+        painter.drawRect(marker.intersected(target));
+    };
+
+    const QRect &detailRect = layout.detailRect;
+    const int pos = std::clamp(m_scrubPos, 0, layout.maxScrub);
+    QRect srcRect;
+    QRect detailTarget;
+    if (horizontal) {
+        const int srcW = std::min(layout.viewportLen, result.width());
+        srcRect = QRect(pos, 0, srcW, result.height());
+        const int targetW = std::min(detailRect.width(),
+            std::max(1, static_cast<int>(std::lround(srcW * layout.detailScale))));
+        detailTarget = QRect(detailRect.left(), detailRect.top(), targetW, detailRect.height());
+    } else {
+        const int srcH = std::min(layout.viewportLen, result.height());
+        srcRect = QRect(0, pos, result.width(), srcH);
+        const int targetH = std::min(detailRect.height(),
+            std::max(1, static_cast<int>(std::lround(srcH * layout.detailScale))));
+        detailTarget = QRect(detailRect.left(), detailRect.top(), detailRect.width(), targetH);
+    }
+    painter.drawImage(detailTarget, result, srcRect);
+    painter.setPen(QPen(QColor(255, 255, 255, 40), 1));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRect(detailTarget);
+
+    if (layout.globalRect.isEmpty()) {
+        return;
+    }
+
+    const QRect overviewTarget = overviewTargetRect(layout, result);
+    if (overviewTarget.isEmpty()) {
+        return;
+    }
+    painter.drawImage(overviewTarget, result);
+    painter.setPen(QPen(QColor(255, 255, 255, 40), 1));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRect(overviewTarget);
+
+    drawCaptureMarker(overviewTarget,
+                      0,
+                      horizontal ? result.width() : result.height(),
+                      true);
+    const QRect marker = overviewViewportRect(overviewTarget, layout);
+    painter.setPen(QPen(QColor(45, 212, 191, m_overviewDragging ? 255 : 235), 2));
+    painter.setBrush(QColor(45, 212, 191, m_overviewDragging ? 70 : 45));
+    painter.drawRect(marker.intersected(overviewTarget));
 }
 
 void ScrollSessionWindow::syncPreviewScroll(const StitchResult &outcome)
@@ -1145,6 +1298,10 @@ void ScrollSessionWindow::paintEvent(QPaintEvent *)
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
+    if (m_gnomeShellPreview) {
+        return;
+    }
+
     if (m_panelTransparentForCapture) {
         return;
     }
@@ -1188,99 +1345,7 @@ void ScrollSessionWindow::paintEvent(QPaintEvent *)
 
     // Preview image area: between the status row and the control bar.
     const QRect imageArea = imageAreaRect();
-    if (imageArea.height() > 10) {
-        painter.fillRect(imageArea, QColor(8, 13, 19, 220));
-
-        const PreviewLayout layout = computePreviewLayout();
-        if (layout.valid) {
-            const QImage result = currentResult();
-            const bool horizontal = m_stitcher.axis() == ScrollAxis::Horizontal;
-            auto drawCaptureMarker = [&](const QRect &target,
-                                         int sourceStart,
-                                         int sourceLen,
-                                         bool fillInterior) {
-                if (m_captureLen <= 0 || sourceLen <= 0 || target.isEmpty()) {
-                    return;
-                }
-
-                const int sourceEnd = sourceStart + sourceLen;
-                const int captureStart = std::max(m_capturePos, sourceStart);
-                const int captureEnd = std::min(m_capturePos + m_captureLen, sourceEnd);
-                if (captureEnd <= captureStart) {
-                    return;
-                }
-
-                QRect marker;
-                if (horizontal) {
-                    const qreal scale = static_cast<qreal>(target.width()) / sourceLen;
-                    const int x = target.left()
-                        + static_cast<int>(std::lround((captureStart - sourceStart) * scale));
-                    const int w = std::max(3, static_cast<int>(
-                                                  std::lround((captureEnd - captureStart) * scale)));
-                    marker = QRect(x, target.top(), w, target.height());
-                } else {
-                    const qreal scale = static_cast<qreal>(target.height()) / sourceLen;
-                    const int y = target.top()
-                        + static_cast<int>(std::lround((captureStart - sourceStart) * scale));
-                    const int h = std::max(3, static_cast<int>(
-                                                  std::lround((captureEnd - captureStart) * scale)));
-                    marker = QRect(target.left(), y, target.width(), h);
-                }
-
-                painter.setPen(QPen(QColor(250, 204, 21, 245), 2));
-                painter.setBrush(fillInterior ? QColor(250, 204, 21, 42) : Qt::NoBrush);
-                painter.drawRect(marker.intersected(target));
-            };
-
-            // Detail view: shows the window [m_scrubPos, m_scrubPos + viewportLen)
-            // of the long image along the scroll axis, scaled to the detail rect.
-            // Following tracks the current captured frame; the overview frame moves
-            // it without ever discarding stitched content.
-            {
-                const QRect &rect = layout.detailRect;
-                const int pos = std::clamp(m_scrubPos, 0, layout.maxScrub);
-                QRect srcRect;
-                QRect target;
-                if (horizontal) {
-                    const int srcW = std::min(layout.viewportLen, result.width());
-                    srcRect = QRect(pos, 0, srcW, result.height());
-                    const int tw = std::min(rect.width(),
-                        std::max(1, static_cast<int>(std::lround(srcW * layout.detailScale))));
-                    target = QRect(rect.left(), rect.top(), tw, rect.height());
-                } else {
-                    const int srcH = std::min(layout.viewportLen, result.height());
-                    srcRect = QRect(0, pos, result.width(), srcH);
-                    const int th = std::min(rect.height(),
-                        std::max(1, static_cast<int>(std::lround(srcH * layout.detailScale))));
-                    target = QRect(rect.left(), rect.top(), rect.width(), th);
-                }
-                painter.drawImage(target, result, srcRect);
-                painter.setPen(QPen(QColor(255, 255, 255, 40), 1));
-                painter.setBrush(Qt::NoBrush);
-                painter.drawRect(target);
-            }
-
-            // Global view: the whole stitched image (contain), with a teal marker
-            // boxing the window the detail view currently shows, plus an amber
-            // marker for the current screen selection range.
-            if (!layout.globalRect.isEmpty()) {
-                const QRect target = overviewTargetRect(layout, result);
-                painter.drawImage(target, result);
-                painter.setPen(QPen(QColor(255, 255, 255, 40), 1));
-                painter.setBrush(Qt::NoBrush);
-                painter.drawRect(target);
-
-                drawCaptureMarker(target,
-                                  0,
-                                  horizontal ? result.width() : result.height(),
-                                  true);
-                const QRect marker = overviewViewportRect(target, layout);
-                painter.setPen(QPen(QColor(45, 212, 191, m_overviewDragging ? 255 : 235), 2));
-                painter.setBrush(QColor(45, 212, 191, m_overviewDragging ? 70 : 45));
-                painter.drawRect(marker.intersected(target));
-            }
-        }
-    }
+    drawPreviewContent(painter, imageArea);
 
     if (m_restoreMaskAfterPaint && !m_axisDragging) {
         m_restoreMaskAfterPaint = false;
@@ -1496,10 +1561,164 @@ bool ScrollSessionWindow::eventFilter(QObject *watched, QEvent *event)
     }
 }
 
+bool ScrollSessionWindow::gnomeShellPreviewActive() const
+{
+    return m_gnomeShellPreview;
+}
+
+QSize ScrollSessionWindow::gnomePreviewImageSize() const
+{
+    const QRect bounds = captureBoundsGlobal();
+    const int minHeight = kControlBarHeight + kStatusHeight + kPanelPadding * 3 + 120;
+    int panelHeight = std::max(minHeight, m_geometry.height());
+    if (!bounds.isEmpty()) {
+        panelHeight = std::min(panelHeight, std::max(minHeight, bounds.height() - 8));
+    }
+
+    const int width = std::max(64, kPanelWidth - kPanelPadding * 2);
+    const int height = std::max(96, panelHeight - kStatusHeight - kControlBarHeight - kPanelPadding * 4);
+    return QSize(width, height);
+}
+
+QImage ScrollSessionWindow::renderGnomePreviewImage(const QSize &size) const
+{
+    if (size.isEmpty()) {
+        return {};
+    }
+
+    QImage preview(size, QImage::Format_ARGB32_Premultiplied);
+    preview.fill(QColor(8, 13, 19, 220));
+
+    QPainter painter(&preview);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    drawPreviewContent(painter, QRect(QPoint(0, 0), size));
+
+    return preview;
+}
+
+void ScrollSessionWindow::updateGnomeShellPreview(bool force)
+{
+    if (!gnomeShellPreviewActive()) {
+        return;
+    }
+
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (!force && now - m_lastGnomePreviewUpdateMs < kGnomePreviewIntervalMs) {
+        return;
+    }
+    m_lastGnomePreviewUpdateMs = now;
+
+    QString previewPath;
+    if (force || m_gnomePreviewImageDirty) {
+        const QSize previewSize = gnomePreviewImageSize();
+        const QImage preview = renderGnomePreviewImage(previewSize);
+        if (!preview.isNull()) {
+            const QString tempDir = QFile::exists(QStringLiteral("/dev/shm"))
+                ? QStringLiteral("/dev/shm")
+                : QDir::tempPath();
+            previewPath = QStringLiteral("%1/mark-shot-gnome-preview-%2-%3.png")
+                .arg(tempDir, m_gnomePreviewSessionId)
+                .arg(++m_gnomePreviewSerial);
+            if (preview.save(previewPath, "PNG")) {
+                m_gnomePreviewFiles.append(previewPath);
+                cleanupGnomePreviewFiles(8);
+                m_gnomePreviewImageDirty = false;
+            } else {
+                previewPath.clear();
+            }
+        }
+    }
+
+    const QImage result = currentResult();
+    const bool horizontal = m_stitcher.axis() == ScrollAxis::Horizontal;
+    const int totalLen = result.isNull() ? 0 : (horizontal ? result.width() : result.height());
+    const QString status = m_statusText.isEmpty() ? MS_TR("Scroll down to capture") : m_statusText;
+
+    QDBusMessage message = QDBusMessage::createMethodCall(
+        QString::fromLatin1(kGnomeShellService),
+        QString::fromLatin1(kGnomeHelperPath),
+        QString::fromLatin1(kGnomeHelperInterface),
+        QStringLiteral("ShowScrollPreview")
+    );
+    message << m_gnomePreviewSessionId
+            << m_geometry.x()
+            << m_geometry.y()
+            << m_geometry.width()
+            << m_geometry.height()
+            << previewPath
+            << status
+            << (horizontal ? QStringLiteral("horizontal") : QStringLiteral("vertical"))
+            << m_capturePos
+            << m_captureLen
+            << totalLen
+            << m_paused
+            << m_stitcher.axisLocked();
+    QDBusConnection::sessionBus().call(message, QDBus::NoBlock);
+}
+
+void ScrollSessionWindow::hideGnomeShellPreview()
+{
+    if (!gnomeShellPreviewActive()) {
+        return;
+    }
+
+    QDBusMessage message = QDBusMessage::createMethodCall(
+        QString::fromLatin1(kGnomeShellService),
+        QString::fromLatin1(kGnomeHelperPath),
+        QString::fromLatin1(kGnomeHelperInterface),
+        QStringLiteral("HideScrollPreview")
+    );
+    message << m_gnomePreviewSessionId;
+    QDBusConnection::sessionBus().call(message, QDBus::NoBlock);
+    cleanupGnomePreviewFiles(0);
+}
+
+void ScrollSessionWindow::cleanupGnomePreviewFiles(int keepLatest)
+{
+    keepLatest = std::max(0, keepLatest);
+    while (m_gnomePreviewFiles.size() > keepLatest) {
+        QFile::remove(m_gnomePreviewFiles.takeFirst());
+    }
+}
+
+void ScrollSessionWindow::handleGnomePreviewAction(const QString &sessionId, const QString &action)
+{
+    if (!gnomeShellPreviewActive() || sessionId != m_gnomePreviewSessionId) {
+        return;
+    }
+
+    if (action == QStringLiteral("pause")) {
+        togglePause();
+    } else if (action == QStringLiteral("axis")) {
+        if (!m_stitcher.axisLocked()) {
+            toggleAxis();
+        }
+    } else if (action == QStringLiteral("annotate")) {
+        annotateResult();
+    } else if (action == QStringLiteral("save")) {
+        saveResult();
+        updateGnomeShellPreview(true);
+    } else if (action == QStringLiteral("copy")) {
+        copyResult();
+    } else if (action == QStringLiteral("cancel")) {
+        close();
+    }
+}
+
 void ScrollSessionWindow::closeEvent(QCloseEvent *event)
 {
     if (m_timer) {
         m_timer->stop();
+    }
+    hideGnomeShellPreview();
+    if (m_gnomeShellPreview) {
+        QDBusConnection::sessionBus().disconnect(QString::fromLatin1(kGnomeShellService),
+                                                 QString::fromLatin1(kGnomeHelperPath),
+                                                 QString::fromLatin1(kGnomeHelperInterface),
+                                                 QStringLiteral("PreviewAction"),
+                                                 this,
+                                                 SLOT(handleGnomePreviewAction(QString,QString)));
     }
     stopActiveScreencastCapture();
     event->accept();

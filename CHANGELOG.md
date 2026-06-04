@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.1.19 - 2026-06-05
+
+### Features & Enhancements
+
+- **GNOME Wayland Scrolling Capture**: Added the bundled `mark-shot-scroll-helper@snemc.org` GNOME Shell extension, enabling GNOME Wayland scrolling screenshots through a private D-Bus helper for area capture and native scroll preview controls.
+- **On-Demand Pinned OCR**: Changed pinned windows to run OCR on demand by default, controlled through `pinnedWindow.autoOcr` and `MARK_SHOT_PINNED_AUTO_OCR`.
+- **Pinned Translation Prefetch**: Added `translation.autoAfterOcr` and `MARK_SHOT_TRANSLATION_AUTO_AFTER_OCR` to optionally prefetch translations after pinned-window OCR completes.
+- **Context Menu Text Copy**: Improved "Copy Image Text" so it can trigger OCR automatically when no recognized text is cached yet, then copy the result after OCR finishes.
+
+### Packaging
+
+- **Debian Compatibility Baseline**: Reworked `.deb` release packaging to build on Debian 12 without the optional LayerShellQt plugin, avoiding newer Ubuntu `t64` and GCC runtime dependencies for Debian-derived systems.
+
+### Release Artifacts
+
+- `mark-shot-v0.1.19-linux-x86_64.tar.gz`
+- `mark-shot-v0.1.19-linux-arm64.tar.gz`
+- `mark-shot_0.1.19_amd64.deb`
+- `mark-shot_0.1.19_arm64.deb`
+- `mark-shot_0.1.19_fedora_x86_64.rpm`
+- `mark-shot_0.1.19_fedora_aarch64.rpm`
+- `mark-shot-v0.1.19-linux-x86_64.AppImage`
+
 ## 0.1.18 - 2026-06-04
 
 ### Features & Enhancements

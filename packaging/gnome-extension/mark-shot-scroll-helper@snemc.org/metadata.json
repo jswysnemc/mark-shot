@@ -1,0 +1,14 @@
+{
+  "uuid": "mark-shot-scroll-helper@snemc.org",
+  "name": "Mark Shot Scroll Helper",
+  "description": "Helper extension for Mark Shot to support scrolling screenshot on GNOME Wayland session by exposing a private DBus interface.",
+  "shell-version": [
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50"
+  ],
+  "url": "https://github.com/snemc/mark-shot"
+}

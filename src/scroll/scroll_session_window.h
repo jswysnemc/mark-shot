@@ -6,7 +6,9 @@
 #include <QPoint>
 #include <QRect>
 #include <QRegion>
+#include <QSize>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 #include <QWidget>
 
@@ -15,6 +17,7 @@
 class QLabel;
 class QKeyEvent;
 class QMouseEvent;
+class QPainter;
 class QPushButton;
 class QScreen;
 class QTimer;
@@ -58,6 +61,9 @@ protected:
     void showEvent(QShowEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
 
+private slots:
+    void handleGnomePreviewAction(const QString &sessionId, const QString &action);
+
 private:
     void captureTick();
     void togglePause();
@@ -76,6 +82,12 @@ private:
     void updatePanelWindowGeometry();
     void setRegionGeometry(QRect geometry);
     QRegion overlayPaintRegion() const;
+    bool gnomeShellPreviewActive() const;
+    QSize gnomePreviewImageSize() const;
+    QImage renderGnomePreviewImage(const QSize &size) const;
+    void updateGnomeShellPreview(bool force = false);
+    void hideGnomeShellPreview();
+    void cleanupGnomePreviewFiles(int keepLatest = 0);
 
     // Geometry shared by preview interaction and painting so their notions of
     // "how much of the long image is visible" and "how far the view can travel"
@@ -95,6 +107,8 @@ private:
     QRect imageAreaRect() const;
     // Derives the preview layout from the current result, axis, and panel rects.
     PreviewLayout computePreviewLayout() const;
+    PreviewLayout computePreviewLayout(const QRect &area) const;
+    void drawPreviewContent(QPainter &painter, const QRect &area) const;
     // Re-derives the preview range, then either follows the current captured
     // frame or shifts the manual view when content was prepended.
     void syncPreviewScroll(const StitchResult &outcome);
@@ -149,6 +163,12 @@ private:
     bool m_panelTransparentForCapture = false;
     bool m_overviewDragging = false;
     int m_overviewDragOffsetPx = 0;
+    bool m_gnomeShellPreview = false;
+    QString m_gnomePreviewSessionId;
+    QStringList m_gnomePreviewFiles;
+    qint64 m_lastGnomePreviewUpdateMs = 0;
+    int m_gnomePreviewSerial = 0;
+    bool m_gnomePreviewImageDirty = true;
 
     QWidget *m_controlBar = nullptr;
     QPushButton *m_axisButton = nullptr;

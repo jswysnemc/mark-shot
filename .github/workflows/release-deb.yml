@@ -19,10 +19,10 @@ env:
 
 jobs:
   deb:
-    name: Build Ubuntu 26.04 ${{ matrix.deb_arch }} package
+    name: Build Debian 12 compatible ${{ matrix.deb_arch }} package
     runs-on: ${{ matrix.runner }}
     container:
-      image: ubuntu:26.04
+      image: debian:12
     strategy:
       fail-fast: false
       matrix:
@@ -66,7 +66,6 @@ jobs:
             file \
             git \
             libgl1-mesa-dev \
-            liblayershellqtinterface-dev \
             libpipewire-0.3-dev \
             libx11-xcb-dev \
             libxcb1-dev \
@@ -87,8 +86,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
             -DCMAKE_INSTALL_LIBDIR=lib \
-            -DMARK_SHOT_WITH_LAYER_SHELL=ON \
-            -DMARK_SHOT_REQUIRE_LAYER_SHELL=ON
+            -DMARK_SHOT_WITH_LAYER_SHELL=OFF
 
       - name: Build
         run: cmake --build build --parallel
@@ -114,11 +112,6 @@ jobs:
 
           rm -rf "$PACKAGE_DIR"
           cmake --install build --prefix "$INSTALL_DIR"
-          PLUGIN_PATH="$(find "$PACKAGE_DIR/usr" -path '*/mark-shot/libmark-shot-layer-shell.so' -print -quit)"
-          if [ -z "$PLUGIN_PATH" ]; then
-            echo "Layer-shell plugin was not installed" >&2
-            exit 1
-          fi
           install -Dm644 LICENSE "$PACKAGE_DIR/usr/share/doc/mark-shot/copyright"
           install -Dm644 README.md "$PACKAGE_DIR/usr/share/doc/mark-shot/README.md"
           install -Dm644 README.zh-CN.md "$PACKAGE_DIR/usr/share/doc/mark-shot/README.zh-CN.md"
@@ -140,13 +133,20 @@ jobs:
            Mark Shot captures screenshots and annotates image regions.
           EOF
 
-          SHLIB_DEPS="$(dpkg-shlibdeps -O -e"$PACKAGE_DIR/usr/bin/mark-shot" -e"$PLUGIN_PATH" | sed 's/^shlibs:Depends=//')"
-          MANUAL_DEPS="python3, wl-clipboard"
-          RECOMMENDS="python3-venv, xdg-desktop-portal, pipewire, grim, xclip"
+          SHLIB_DEPS="$(dpkg-shlibdeps -O -e"$PACKAGE_DIR/usr/bin/mark-shot" | sed 's/^shlibs:Depends=//')"
+          MANUAL_DEPS="python3"
+          RECOMMENDS="python3-venv, xdg-desktop-portal, pipewire, qt6-wayland, grim, wl-clipboard, xclip"
+          SUGGESTS="gnome-shell, tesseract-ocr, tesseract-ocr-chi-sim"
           if [ -n "$SHLIB_DEPS" ]; then
             DEPENDS="$SHLIB_DEPS, $MANUAL_DEPS"
           else
             DEPENDS="$MANUAL_DEPS"
+          fi
+
+          if echo "$DEPENDS" | grep -Eq 't64|libstdc\+\+6 \(>= 14|libqt6[^,]+ \(>= 6\.(9|10)|liblayershellqtinterface|wl-clipboard'; then
+            echo "Generated dependencies are too new for the Debian/Deepin compatible package:" >&2
+            echo "$DEPENDS" >&2
+            exit 1
           fi
 
           cat > "$CONTROL_DIR/control" <<EOF
@@ -158,7 +158,7 @@ jobs:
           Maintainer: jswysnemc <snemc@qq.com>
           Depends: $DEPENDS
           Recommends: $RECOMMENDS
-          Suggests: tesseract-ocr, tesseract-ocr-chi-sim
+          Suggests: $SUGGESTS
           Description: Qt 6 screenshot selection and annotation tool
            Mark Shot captures screenshots, annotates image regions, pins floating
            image stickers, and provides OCR and translation helpers for pinned

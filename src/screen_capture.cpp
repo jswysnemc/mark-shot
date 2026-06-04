@@ -16,6 +16,7 @@
 #include <QDBusUnixFileDescriptor>
 #include <QDBusVariant>
 #include <QDateTime>
+#include <QDir>
 #include <QEventLoop>
 #include <QFile>
 #include <QGuiApplication>
@@ -117,6 +118,10 @@ const QDBusArgument &operator>>(const QDBusArgument &argument, PortalStream &str
     argument.endStructure();
     return argument;
 }
+
+bool isGnomeWaylandSession();
+bool hasGnomeScrollHelper();
+CaptureResult captureWithGnomeScrollHelper(const CaptureRequest &request);
 
 namespace {
 
@@ -2275,6 +2280,19 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
                        request.allowPortalScreenshotFallback ? 1 : 0, grimPreferred ? 1 : 0,
                        desktopEnvironmentText().toUtf8().constData());
 
+    if (isGnomeWaylandSession() && hasGnomeScrollHelper() && request.sourceGeometry.isValid()
+        && !request.sourceGeometry.isEmpty() && !request.allOutputs) {
+        markshot::debugLog("capture", "route=gnome-scroll-helper");
+        CaptureResult gnomeCapture = captureWithGnomeScrollHelper(request);
+        if (!gnomeCapture.image.isNull()) {
+            markshot::debugLog("capture", "gnome-scroll-helper-ok frame=%dx%d",
+                               gnomeCapture.image.width(), gnomeCapture.image.height());
+            return gnomeCapture;
+        }
+        markshot::debugLog("capture", "gnome-scroll-helper-failed (falling back) error=%s",
+                           gnomeCapture.error.toUtf8().constData());
+    }
+
     // On KDE, ScreenShot2.CaptureArea can capture the exact requested region
     // without an interactive portal dialog. Prefer it for both the initial
     // single-output screenshot and live scrolling frames; failures fall back to
@@ -2477,4 +2495,88 @@ QVector<QRect> enumerateX11WindowGeometries()
 #endif
 
     return results;
+}
+
+bool isGnomeWaylandSession()
+{
+    if (!isWaylandSession()) {
+        return false;
+    }
+    return desktopEnvironmentText().toLower().contains(QStringLiteral("gnome"));
+}
+
+bool hasGnomeScrollHelper()
+{
+    QDBusInterface helper(QStringLiteral("org.gnome.Shell"),
+                          QStringLiteral("/org/gnome/Shell/Extensions/MarkShotScrollHelper"),
+                          QStringLiteral("org.gnome.Shell.Extensions.MarkShotScrollHelper"),
+                          QDBusConnection::sessionBus());
+    if (!helper.isValid()) {
+        return false;
+    }
+
+    QDBusMessage reply = helper.call(QStringLiteral("Version"));
+    return reply.type() != QDBusMessage::ErrorMessage && !reply.arguments().isEmpty();
+}
+
+bool hasGnomeScrollPreviewHelper()
+{
+    QDBusInterface helper(QStringLiteral("org.gnome.Shell"),
+                          QStringLiteral("/org/gnome/Shell/Extensions/MarkShotScrollHelper"),
+                          QStringLiteral("org.gnome.Shell.Extensions.MarkShotScrollHelper"),
+                          QDBusConnection::sessionBus());
+    if (!helper.isValid()) {
+        return false;
+    }
+
+    QDBusMessage reply = helper.call(QStringLiteral("Version"));
+    if (reply.type() == QDBusMessage::ErrorMessage || reply.arguments().isEmpty()) {
+        return false;
+    }
+
+    bool ok = false;
+    const int version = reply.arguments().first().toString().toInt(&ok);
+    return ok && version >= 2;
+}
+
+CaptureResult captureWithGnomeScrollHelper(const CaptureRequest &request)
+{
+    const QString tempDir = QFile::exists(QStringLiteral("/dev/shm"))
+        ? QStringLiteral("/dev/shm")
+        : QDir::tempPath();
+    const QString tempPath = QStringLiteral("%1/mark-shot-scroll-frame-%2.png")
+        .arg(tempDir, QUuid::createUuid().toString(QUuid::Id128));
+
+    QDBusMessage message = QDBusMessage::createMethodCall(
+        QStringLiteral("org.gnome.Shell"),
+        QStringLiteral("/org/gnome/Shell/Extensions/MarkShotScrollHelper"),
+        QStringLiteral("org.gnome.Shell.Extensions.MarkShotScrollHelper"),
+        QStringLiteral("ScreenshotArea")
+    );
+    message << request.sourceGeometry.x()
+            << request.sourceGeometry.y()
+            << request.sourceGeometry.width()
+            << request.sourceGeometry.height()
+            << tempPath;
+
+    QDBusMessage reply = QDBusConnection::sessionBus().call(message);
+    if (reply.type() == QDBusMessage::ErrorMessage) {
+        QFile::remove(tempPath);
+        return {{}, reply.errorMessage(), {}, request.sourceGeometry};
+    }
+
+    QList<QVariant> args = reply.arguments();
+    if (args.size() < 2 || !args.at(0).toBool()) {
+        QFile::remove(tempPath);
+        return {{}, QStringLiteral("Failed to capture area via GNOME Shell extension"), {}, request.sourceGeometry};
+    }
+
+    QString actualPath = args.at(1).toString();
+    QImage img(actualPath);
+    if (img.isNull()) {
+        return {{}, QStringLiteral("Failed to load captured frame from %1").arg(actualPath), {}, request.sourceGeometry};
+    }
+
+    QFile::remove(actualPath);
+    return {img, {}, {}, request.sourceGeometry};
 }

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(mark-shot VERSION 0.1.18 LANGUAGES CXX)
+project(mark-shot VERSION 0.1.19 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -175,4 +175,11 @@ install(FILES
     data/icons/hicolor/scalable/apps/mark-shot.svg
     data/icons/hicolor/scalable/apps/mark-shot-edit.svg
     DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
+)
+install(DIRECTORY
+    packaging/gnome-extension/mark-shot-scroll-helper@snemc.org/
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/gnome-shell/extensions/mark-shot-scroll-helper@snemc.org
+    FILES_MATCHING
+        PATTERN "metadata.json"
+        PATTERN "extension.js"
 )

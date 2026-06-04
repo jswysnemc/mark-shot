@@ -25,3 +25,6 @@ struct CaptureRequest {
 CaptureResult captureScreenFrame(const CaptureRequest &request);
 void stopActiveScreencastCapture();
 QVector<QRect> enumerateX11WindowGeometries();
+bool isGnomeWaylandSession();
+bool hasGnomeScrollHelper();
+bool hasGnomeScrollPreviewHelper();

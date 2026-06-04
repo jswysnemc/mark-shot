@@ -136,21 +136,7 @@ bool sendDesktopNotification(const QString &summary, const QString &body, int ti
     return reply.type() != QDBusMessage::ErrorMessage;
 }
 
-bool isGnomeWaylandSession()
-{
-    if (QGuiApplication::platformName().compare(QStringLiteral("wayland"),
-                                                Qt::CaseInsensitive) != 0) {
-        return false;
-    }
 
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString desktop =
-        (env.value(QStringLiteral("XDG_CURRENT_DESKTOP")) + QLatin1Char(':')
-         + env.value(QStringLiteral("XDG_SESSION_DESKTOP")) + QLatin1Char(':')
-         + env.value(QStringLiteral("DESKTOP_SESSION")))
-            .toLower();
-    return desktop.contains(QStringLiteral("gnome"));
-}
 
 QColor propertyIconInkForFill(const QColor &fillColor)
 {
@@ -764,12 +750,14 @@ QString helperProgramPath(const QString &programName)
 
 struct PinnedWindowConfig {
     bool ocrEnabled = true;
+    bool autoOcr = false;
     QString ocrBackend = QStringLiteral("auto");
     QString ocrCommand;
     int ocrTimeoutMs = kPinnedOcrTimeoutMs;
     QString translationCommand;
     QString translationTargetLanguage = QStringLiteral("Simplified Chinese");
     int translationTimeoutMs = kPinnedTranslationTimeoutMs;
+    bool autoTranslateAfterOcr = false;
     bool borderEnabled = false;
     QColor borderColor = QColor(94, 234, 212);
     qreal borderWidth = 2.0;
@@ -790,6 +778,17 @@ QJsonObject objectValue(const QJsonObject &object, const QStringList &keys)
         }
     }
     return {};
+}
+
+std::optional<bool> boolValue(const QJsonObject &object, const QStringList &keys)
+{
+    for (const QString &key : keys) {
+        const QJsonValue value = object.value(key);
+        if (value.isBool()) {
+            return value.toBool();
+        }
+    }
+    return std::nullopt;
 }
 
 QString normalizedConfigKey(QString key)
@@ -1186,6 +1185,16 @@ PinnedWindowConfig pinnedWindowConfig()
             if (ocr.value(QStringLiteral("enabled")).isBool()) {
                 config.ocrEnabled = ocr.value(QStringLiteral("enabled")).toBool();
             }
+            if (const std::optional<bool> autoOcr =
+                    boolValue(ocr,
+                              {QStringLiteral("autoOnPin"),
+                               QStringLiteral("autoPinned"),
+                               QStringLiteral("autoOcr"),
+                               QStringLiteral("autoOCR"),
+                               QStringLiteral("background")});
+                autoOcr.has_value()) {
+                config.autoOcr = *autoOcr;
+            }
             config.ocrBackend = ocr.value(QStringLiteral("backend")).toString(config.ocrBackend).trimmed();
             config.ocrCommand = ocr.value(QStringLiteral("command")).toString().trimmed();
             if (ocr.value(QStringLiteral("timeoutMs")).isDouble()) {
@@ -1197,6 +1206,16 @@ PinnedWindowConfig pinnedWindowConfig()
             config.translationTargetLanguage = translation.value(QStringLiteral("targetLanguage"))
                                                    .toString(config.translationTargetLanguage)
                                                    .trimmed();
+            if (const std::optional<bool> autoTranslate =
+                    boolValue(translation,
+                              {QStringLiteral("autoAfterOcr"),
+                               QStringLiteral("autoAfterOCR"),
+                               QStringLiteral("autoTranslateAfterOcr"),
+                               QStringLiteral("autoTranslateAfterOCR"),
+                               QStringLiteral("auto")});
+                autoTranslate.has_value()) {
+                config.autoTranslateAfterOcr = *autoTranslate;
+            }
             if (translation.value(QStringLiteral("timeoutMs")).isDouble()) {
                 config.translationTimeoutMs = std::max(3000, translation.value(QStringLiteral("timeoutMs")).toInt(config.translationTimeoutMs));
             }
@@ -1206,6 +1225,18 @@ PinnedWindowConfig pinnedWindowConfig()
                                                     QStringLiteral("pinned"),
                                                     QStringLiteral("pin")});
             if (!pinned.isEmpty()) {
+                if (const std::optional<bool> autoOcr =
+                        boolValue(pinned,
+                                  {QStringLiteral("autoOcr"),
+                                   QStringLiteral("autoOCR"),
+                                   QStringLiteral("autoRecognizeText"),
+                                   QStringLiteral("autoTextRecognition"),
+                                   QStringLiteral("ocrOnPin"),
+                                   QStringLiteral("backgroundOcr"),
+                                   QStringLiteral("backgroundOCR")});
+                    autoOcr.has_value()) {
+                    config.autoOcr = *autoOcr;
+                }
                 const QJsonValue border = pinned.value(QStringLiteral("border"));
                 if (border.isBool()) {
                     config.borderEnabled = border.toBool();
@@ -1243,6 +1274,12 @@ PinnedWindowConfig pinnedWindowConfig()
     if (disabled == QStringLiteral("1") || disabled == QStringLiteral("true") || disabled == QStringLiteral("yes")) {
         config.ocrEnabled = false;
     }
+    const QString autoOcr = env.value(QStringLiteral("MARK_SHOT_PINNED_AUTO_OCR")).trimmed().toLower();
+    if (autoOcr == QStringLiteral("1") || autoOcr == QStringLiteral("true") || autoOcr == QStringLiteral("yes")) {
+        config.autoOcr = true;
+    } else if (autoOcr == QStringLiteral("0") || autoOcr == QStringLiteral("false") || autoOcr == QStringLiteral("no")) {
+        config.autoOcr = false;
+    }
     const QString envOcrBackend = env.value(QStringLiteral("MARK_SHOT_OCR_BACKEND")).trimmed();
     if (!envOcrBackend.isEmpty()) {
         config.ocrBackend = envOcrBackend;
@@ -1258,6 +1295,14 @@ PinnedWindowConfig pinnedWindowConfig()
     const QString envTranslationCommand = env.value(QStringLiteral("MARK_SHOT_TRANSLATION_COMMAND")).trimmed();
     if (!envTranslationCommand.isEmpty()) {
         config.translationCommand = envTranslationCommand;
+    }
+    const QString autoTranslate = env.value(QStringLiteral("MARK_SHOT_TRANSLATION_AUTO_AFTER_OCR")).trimmed().toLower();
+    if (autoTranslate == QStringLiteral("1") || autoTranslate == QStringLiteral("true")
+        || autoTranslate == QStringLiteral("yes")) {
+        config.autoTranslateAfterOcr = true;
+    } else if (autoTranslate == QStringLiteral("0") || autoTranslate == QStringLiteral("false")
+               || autoTranslate == QStringLiteral("no")) {
+        config.autoTranslateAfterOcr = false;
     }
 
     if (config.ocrBackend.isEmpty()) {
@@ -1304,7 +1349,9 @@ public:
             setFixedSize(targetSize);
         }
 
-        QTimer::singleShot(0, this, [this] { startOcr(); });
+        if (m_config.autoOcr) {
+            QTimer::singleShot(0, this, [this] { startOcr(); });
+        }
     }
 
     ~PinnedImageWindow() override
@@ -1500,9 +1547,9 @@ protected:
         });
         copySelectedTextAction->setEnabled(hasTextSelection());
         QAction *copyTextAction = menu.addAction(MS_TR("Copy Image Text"), this, [this] {
-            markshot::copyTextToClipboard(allText());
+            copyImageText();
         });
-        copyTextAction->setEnabled(!activeTokens().isEmpty());
+        copyTextAction->setEnabled(m_config.ocrEnabled);
         QAction *translateAction = menu.addAction(MS_TR("Translate"), this, [this] {
             requestTranslation();
         });
@@ -1545,10 +1592,13 @@ private:
         m_translationOverlayTokens.clear();
         m_translationActive = false;
         m_translateAfterOcr = false;
+        m_copyTextAfterOcr = false;
         cancelTranslation();
         resizeByScale(m_scale, center, QPointF(width() / 2.0, height() / 2.0));
         update();
-        startOcr();
+        if (m_config.autoOcr) {
+            startOcr();
+        }
     }
 
     void saveImageAs()
@@ -1585,6 +1635,8 @@ private:
         cancelOcr();
 
         if (!m_config.ocrEnabled) {
+            m_translateAfterOcr = false;
+            m_copyTextAfterOcr = false;
             return;
         }
 
@@ -1594,6 +1646,8 @@ private:
                                     .filePath(QStringLiteral("mark-shot-pin-ocr-XXXXXX.png")));
         tempFile.setAutoRemove(false);
         if (!tempFile.open()) {
+            m_translateAfterOcr = false;
+            m_copyTextAfterOcr = false;
             return;
         }
 
@@ -1602,6 +1656,8 @@ private:
             tempFile.close();
             QFile::remove(m_ocrTempPath);
             m_ocrTempPath.clear();
+            m_translateAfterOcr = false;
+            m_copyTextAfterOcr = false;
             return;
         }
         tempFile.close();
@@ -1699,12 +1755,15 @@ private:
         } else if (processError == QProcess::FailedToStart && m_config.ocrCommand.isEmpty()) {
             notifyMissingOcrBackend();
             m_translateAfterOcr = false;
+            m_copyTextAfterOcr = false;
         } else if (m_config.ocrCommand.isEmpty()
                    && ocrOutputReportsMissingBackend(output, errorOutput, m_config.ocrBackend)) {
             notifyMissingOcrBackend();
             m_translateAfterOcr = false;
+            m_copyTextAfterOcr = false;
         } else {
             m_translateAfterOcr = false;
+            m_copyTextAfterOcr = false;
         }
 
         m_ocrProcess = nullptr;
@@ -1724,6 +1783,7 @@ private:
                 notifyMissingOcrBackend();
             }
             m_translateAfterOcr = false;
+            m_copyTextAfterOcr = false;
             return;
         }
 
@@ -1732,10 +1792,17 @@ private:
         m_translationOverlayTokens.clear();
         m_translationActive = false;
         const bool translateAfterOcr = m_translateAfterOcr;
+        const bool copyTextAfterOcr = m_copyTextAfterOcr;
         m_translateAfterOcr = false;
+        m_copyTextAfterOcr = false;
         updateCursorForPosition(mapFromGlobal(QCursor::pos()));
+        if (copyTextAfterOcr) {
+            markshot::copyTextToClipboard(allText());
+        }
         if (translateAfterOcr) {
-            startTranslation();
+            startTranslation(true);
+        } else if (m_config.autoTranslateAfterOcr) {
+            startTranslation(false, false);
         } else {
             update();
         }
@@ -1813,7 +1880,7 @@ private:
         return tokens;
     }
 
-    void startTranslation()
+    void startTranslation(bool activateWhenFinished = true, bool showBusyCursor = true)
     {
         if (m_ocrTokens.isEmpty()) {
             return;
@@ -1821,6 +1888,7 @@ private:
 
         cancelTranslation();
         clearTextSelection();
+        m_activateTranslationWhenFinished = activateWhenFinished;
 
         QTemporaryFile inputFile(QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation).isEmpty()
                                      ? QDir::tempPath()
@@ -1828,6 +1896,7 @@ private:
                                      .filePath(QStringLiteral("mark-shot-translate-XXXXXX.json")));
         inputFile.setAutoRemove(false);
         if (!inputFile.open()) {
+            m_activateTranslationWhenFinished = true;
             return;
         }
 
@@ -1884,7 +1953,9 @@ private:
             }
         });
 
-        setTranslationBusyCursor(true);
+        if (showBusyCursor) {
+            setTranslationBusyCursor(true);
+        }
         process->start();
         update();
     }
@@ -1938,6 +2009,7 @@ private:
             QFile::remove(m_translationInputPath);
             m_translationInputPath.clear();
         }
+        m_activateTranslationWhenFinished = true;
         setTranslationBusyCursor(false);
     }
 
@@ -1952,7 +2024,7 @@ private:
             if (!tokens.isEmpty()) {
                 m_translationOverlayTokens = tokens;
                 m_translatedTokens = selectableTranslationTokens(tokens);
-                m_translationActive = true;
+                m_translationActive = m_activateTranslationWhenFinished;
                 clearTextSelection();
                 updateCursorForPosition(mapFromGlobal(QCursor::pos()));
                 update();
@@ -1965,6 +2037,7 @@ private:
             m_translationInputPath.clear();
         }
         setTranslationBusyCursor(false);
+        m_activateTranslationWhenFinished = true;
         process->deleteLater();
     }
 
@@ -2150,6 +2223,23 @@ private:
         return tokenRangeText(0, tokens.size() - 1);
     }
 
+    void copyImageText()
+    {
+        if (!m_config.ocrEnabled) {
+            return;
+        }
+
+        if (!activeTokens().isEmpty()) {
+            markshot::copyTextToClipboard(allText());
+            return;
+        }
+
+        m_copyTextAfterOcr = true;
+        if (!m_ocrProcess) {
+            startOcr();
+        }
+    }
+
     QString tokenRangeText(int first, int last) const
     {
         const QVector<OcrToken> &tokens = activeTokens();
@@ -2190,6 +2280,11 @@ private:
             return;
         }
 
+        if (!m_translationOverlayTokens.isEmpty()) {
+            setTranslationActive(true);
+            return;
+        }
+
         if (m_ocrTokens.isEmpty()) {
             m_translateAfterOcr = true;
             if (!m_ocrProcess) {
@@ -2199,7 +2294,7 @@ private:
         }
 
         m_translateAfterOcr = false;
-        startTranslation();
+        startTranslation(true);
     }
 
     void setTranslationActive(bool active)
@@ -2393,7 +2488,9 @@ private:
     bool m_selectingText = false;
     bool m_translationActive = false;
     bool m_translateAfterOcr = false;
+    bool m_copyTextAfterOcr = false;
     bool m_translationBusyCursor = false;
+    bool m_activateTranslationWhenFinished = true;
     bool m_ocrBackendWarningShown = false;
 };
 
@@ -3275,7 +3372,7 @@ QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcut
     button->setFocusPolicy(Qt::NoFocus);
     button->setToolTip(QStringLiteral("%1 (%2)").arg(markshot::i18n::translate(markshot::ui::actionName(action)), shortcutText));
     button->setProperty("action", markshot::ui::actionName(action));
-    if (action == Action::ScrollCapture && isGnomeWaylandSession()) {
+    if (action == Action::ScrollCapture && isGnomeWaylandSession() && !hasGnomeScrollHelper()) {
         button->setEnabled(false);
         button->setToolTip(MS_TR("Scroll capture is not supported on GNOME Wayland."));
     }
@@ -8149,7 +8246,7 @@ void ShotWindow::startScrollCapture()
         return;
     }
 
-    if (isGnomeWaylandSession()) {
+    if (isGnomeWaylandSession() && !hasGnomeScrollHelper()) {
         QMessageBox::information(
             this,
             MS_TR("Scroll Capture"),

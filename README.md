@@ -2,7 +2,12 @@
 
 [中文说明](README.zh-CN.md)
 
-<video src="https://github.com/user-attachments/assets/c2298867-06b4-404d-87bc-62ab8d81088b" width="100%" controls></video>
+<details>
+<summary>Video Demo</summary>
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/c2298867-06b4-404d-87bc-62ab8d81088b" width="100%" controls></video>
+</p>
+</details>
 
 `mark-shot` is a high-performance screenshot and annotation tool built with Qt 6. It was originally designed for Wayland compositors such as `niri`, and it also supports standard screenshot and annotation workflows on X11/GNOME desktops.
 
@@ -37,12 +42,14 @@ It captures screen frames instantly and opens an interactive fullscreen overlay,
 ### Scrolling Screenshot Capture
 - Captures a long scrolling region by combining PipeWire screencast frames with an interactive scrolling overlay and stitcher.
 - Designed primarily for `niri` and similar Wayland environments where output geometry and capture timing can be controlled predictably.
-- **Compatibility notice**: scrolling capture on KDE, GNOME, X11, and other non-`niri` environments is a test feature and is not complete yet. Portal backends, shell policies, window geometry behavior, frame timing, and scroll event handling differ substantially across these desktop stacks.
+- **GNOME Wayland**: scrolling capture requires the bundled `mark-shot-scroll-helper@snemc.org` GNOME Shell extension. GNOME does not expose the capture and preview hooks Mark Shot needs to normal desktop applications, so the extension provides a private D-Bus helper for area screenshots and the scroll preview panel.
+- **Compatibility notice**: scrolling capture on KDE, X11, and other non-`niri` environments is a test feature and is not complete yet. Portal backends, shell policies, window geometry behavior, frame timing, and scroll event handling differ substantially across these desktop stacks.
 - If scrolling capture fails, use normal screenshots or configure an external long-screenshot command through Mark Shot extension commands.
 - To report a scrolling capture issue, run `DEBUG=1 mark-shot`, reproduce the failure, then attach `/tmp/mark-shot-scroll.log` to a GitHub issue. Set `MARK_SHOT_DEBUG_LOG=/path/to/log` if the log should be written elsewhere.
 
 ### Cross-Platform Display Server Support
 - **Wayland**: Uses PipeWire portal screencast for experimental scrolling capture, `grim` for wlroots screenshot capture, `layer-shell-qt` for native overlay, and `wl-copy` for clipboard persistence.
+- **GNOME Wayland**: Uses the Mark Shot Scroll Helper GNOME Shell extension for scrolling capture. Without the extension, Mark Shot disables the scrolling capture action on GNOME Wayland.
 - **X11**: Uses `QScreen::grabWindow` for screen capture, fullscreen top-level window for overlay, and `xclip` for clipboard persistence.
 - Runtime auto-detection via `$XDG_SESSION_TYPE` — no configuration needed.
 
@@ -159,6 +166,7 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json`. Pin
     }
   },
   "pinnedWindow": {
+    "autoOcr": false,
     "border": false,
     "borderColor": "#2DD4BF",
     "borderWidth": 2
@@ -178,6 +186,7 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json`. Pin
     "timeoutMs": 30000
   },
   "translation": {
+    "autoAfterOcr": false,
     "targetLanguage": "Simplified Chinese",
     "apiBase": "https://api.openai.com/v1",
     "apiKeyEnv": "OPENAI_API_KEY",
@@ -192,25 +201,29 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json`. Pin
 }
 ```
 
-`annotation.defaultTool` sets the tool selected after region selection. `annotation.fullscreenDefaultTool` sets the tool selected in fullscreen annotation mode, including `--fullscreen` and image-file annotation. Supported values are `move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, and `laser`. `--default-tool <tool>` overrides the normal default and, for compatibility, also seeds fullscreen mode unless `--fullscreen-default-tool <tool>` is set.
+| Configuration Key | Data Type | Default Value | Description |
+| :--- | :---: | :---: | :--- |
+| `env` | Object | `{}` | Environment variables applied to the process before `QApplication` creation (e.g., `"QT_FONT_DPI": 96` to normalize high-DPI scaling). Alias: `environment`. |
+| `annotation.defaultTool` | String | `"move"` | The default annotation tool active after selecting a region. Supported values: `move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, `laser`. Overridden by CLI `--default-tool`. |
+| `annotation.fullscreenDefaultTool` | String | `"laser"` | The default tool active in fullscreen annotation mode. Overridden by CLI `--fullscreen-default-tool`. If configured as `move` in fullscreen, the program defaults to `select`. |
+| `annotation.defaultColor` | String | `"#FF4D4D"` | Initial annotation color. Supports `#RRGGBB` (opaque) or `#RRGGBBAA` (with alpha). Overridden by CLI `--default-color`. |
+| `shortcuts` | Object | - | Customizable keyboard shortcuts. Alias: `hotkeys` (or under `annotation.shortcuts`/`annotation.hotkeys`). See details below. |
+| `pinnedWindow.autoOcr` | Boolean | `false` | Controls whether a pinned sticker window starts OCR text recognition in the background immediately on creation. If disabled, OCR runs on demand when Copy Image Text or Translate is chosen. Alias: `pinned`, `pin`. |
+| `pinnedWindow.border` | Boolean/Object | `false` | Outer border configuration for pinned sticker windows. Can be a boolean, or an object containing `enabled` (bool), `color` (name/hex/RGBA object), and `width` (float, `1.0` to `12.0`). Also flat configs like `borderEnabled`, `borderColor`, and `borderWidth` are supported. |
+| `ocr.enabled` | Boolean | `true` | Controls whether OCR features are available. Does not enable pinned-window background OCR by itself. |
+| `translation.autoAfterOcr` | Boolean | `false` | Controls whether translation starts automatically after a successful pinned-window OCR result. If enabled, choosing Translate later displays the cached translation instantly. |
+| `windowDetection.env` | Object | `{}` | Environment variables passed to the window boundary detection script. Alias: `environment`. <br>• **Niri Script**: Supports `MARK_SHOT_NIRI_PANEL_EDGE` (`top`/`bottom`/`left`/`right`/`none`) and pixel offsets `MARK_SHOT_NIRI_OFFSET_X/Y/WIDTH/HEIGHT`.<br>• **Hyprland Script**: Supports `MARK_SHOT_HYPRLAND_INCLUDE_INACTIVE` (`1`/`0`) and pixel offsets `MARK_SHOT_HYPRLAND_OFFSET_X/Y/WIDTH/HEIGHT`. |
 
-Fullscreen annotation has no separate capture selection to move. If its default tool is configured as `move`, Mark Shot starts fullscreen mode with `select` instead.
+<details>
+<summary>Keyboard Shortcut Config Details</summary>
 
-`annotation.defaultColor` sets the initial annotation color. Use `#RRGGBB` for opaque colors or `#RRGGBBAA` to include alpha. The runtime option `--default-color <color>` overrides this config value.
+The `shortcuts` node supports the following sub-nodes:
+- **`tools`** (alias: `tool`, `toolShortcuts`): Keyboard shortcuts for switching tools (`move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, `laser`).
+- **`actions`** (alias: `action`, `actionShortcuts`): Keyboard shortcuts for global actions (`copy`, `save`, `pin`, `undo`, `redo`, `cancel`, `openWith`, `extensions`, `scrollCapture`, `ocrCopy`, `clear`, `toggleCaptureScope`, `toggleToolbarLayout`).
+- **`startup`** (alias: `startupTools`, `selection`): Keyboard shortcuts for selection-phase tools (`colorPicker`, `ruler`).
 
-`shortcuts` (alias: `hotkeys`, or under `annotation.shortcuts` / `annotation.hotkeys`) configures tool keys, global action keys, and startup overlay tools. It supports the following sub-nodes:
-- `tools` (alias: `tool`, `toolShortcuts`): Configures keys for tools. Supported tool names match `annotation.defaultTool` (`move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, and `laser`).
-- `actions` (alias: `action`, `actionShortcuts`): Configures global action keys. Supported actions include `copy`, `save`, `pin`, `undo`, `redo`, `cancel` (or `escape`, `close`), `openWith` (or `open`), `extensions` (or `extension`), `scrollCapture` (or `scroll`), `ocrCopy` (or `ocr`), `clear`, `toggleCaptureScope` (or `scope`, `fullscreen`), and `toggleToolbarLayout` (or `layout`).
-- `startup` (alias: `startupTools`, `selection`): Configures startup overlay tools. Supported keys are `colorPicker` (alias: `color`, `pickcolor`) and `ruler` (alias: `measure`).
-Shortcut values use Qt key-sequence text such as `Ctrl+C`, `Ctrl+Shift+Z`, or `Alt+R`. Shortcut keys can also be specified directly at the root of `shortcuts`.
-
-`pinnedWindow` (alias: `pinned`, `pin`) configures properties of pinned sticker windows. `pinnedWindow.border` controls whether pinned sticker windows draw an outer border. It can be a boolean value, or an object containing `enabled`, `color` (which accepts color names, hex strings like `#RRGGBB` or `0xRRGGBBAA`, or RGBA objects like `{"r": 255, "g": 0, "b": 0, "a": 255}`), and `width` (border line width, clamped between `1.0` and `12.0`). Alternatively, you can directly set `pinnedWindow.borderEnabled`, `pinnedWindow.borderColor`, and `pinnedWindow.borderWidth` as top-level properties within the pinned window node.
-
-Top-level `env` (alias: `environment`) is applied to the Mark Shot process before `QApplication` is created. This is useful for Qt startup variables such as `QT_FONT_DPI`; for example, set `"QT_FONT_DPI": 96` to prevent font-DPI overrides from changing capture and selection geometry.
-
-`windowDetection.env` (alias: `environment`) is passed to the detection script as environment variables.
-- **Niri Script** (`mark-shot-window-detection-niri`): Supports `MARK_SHOT_NIRI_PANEL_EDGE` (`top`, `bottom`, `left`, `right`, or `none`) and pixel adjustments through `MARK_SHOT_NIRI_OFFSET_X/Y/WIDTH/HEIGHT`.
-- **Hyprland Script** (`mark-shot-window-detection-hyprland`): Supports `MARK_SHOT_HYPRLAND_INCLUDE_INACTIVE` (`1` to detect windows on inactive workspaces, defaults to `0` for active only) and pixel offsets via `MARK_SHOT_HYPRLAND_OFFSET_X/Y/WIDTH/HEIGHT` to calibrate window borders.
+*Shortcut values use Qt key-sequence text (e.g. `Ctrl+C`, `Ctrl+Shift+Z`, or `Alt+R`). Shortcut keys can also be specified directly at the root of `shortcuts`.*
+</details>
 
 ### Pre-Capture Window Detection & Script Contribution Guide
 
@@ -334,6 +347,8 @@ Each release publishes Linux binary archives, Debian packages, and Fedora RPM pa
 
 The distribution packages install `mark-shot`, helper scripts, desktop entries, icons, and runtime metadata together.
 
+The official `.deb` package is built on a Debian 12 compatibility baseline. It intentionally avoids linking the optional LayerShellQt plugin so that Deepin and other Debian-derived systems with Qt 6.8-era packages can install it without Ubuntu `t64` or newer GCC runtime dependencies.
+
 ### Dependencies
 
 #### Wayland (Arch Linux)
@@ -408,6 +423,36 @@ cmake --install build --prefix "$HOME/.local"
 
 This installs the binary, helper scripts (`mark-shot-ocr`, `mark-shot-translate`), desktop entries, and icons.
 
+### GNOME Wayland Scrolling Capture Extension
+
+GNOME Wayland scrolling capture needs the Mark Shot Scroll Helper extension. Without it, Mark Shot cannot take silent repeated area screenshots or draw the GNOME-native scroll preview panel, so the scrolling capture button is disabled on GNOME Wayland.
+
+If Mark Shot was installed from a distribution package, the extension files are installed under `/usr/share/gnome-shell/extensions/mark-shot-scroll-helper@snemc.org`. Enable it for the current user:
+
+```bash
+gnome-extensions enable mark-shot-scroll-helper@snemc.org
+```
+
+If `gnome-extensions` reports that the extension is not found, log out and log back in, then retry the command. For source-tree or local builds, install the extension into the user extension directory:
+
+```bash
+UUID=mark-shot-scroll-helper@snemc.org
+mkdir -p "$HOME/.local/share/gnome-shell/extensions"
+cp -r "packaging/gnome-extension/$UUID" "$HOME/.local/share/gnome-shell/extensions/"
+gnome-extensions enable "$UUID"
+```
+
+Verify that the helper D-Bus interface is available:
+
+```bash
+gdbus call --session \
+  --dest org.gnome.Shell \
+  --object-path /org/gnome/Shell/Extensions/MarkShotScrollHelper \
+  --method org.gnome.Shell.Extensions.MarkShotScrollHelper.Version
+```
+
+The expected result is `('2',)`. On GNOME Wayland, restart `mark-shot` after enabling the extension.
+
 ---
 
 ## Shortcuts & Interactive Gestures
@@ -472,6 +517,15 @@ This installs the binary, helper scripts (`mark-shot-ocr`, `mark-shot-translate`
 
 ## Release Notes
 
+### 0.1.19
+
+- **GNOME Wayland Scrolling Capture**: Supported scrolling screenshot capture on GNOME Wayland by introducing the bundled `mark-shot-scroll-helper@snemc.org` GNOME Shell extension.
+- **On-Demand and Configurable Pinned OCR/Translation**: Added config option `pinnedWindow.autoOcr` (defaults to `false`) to control background text recognition on pin, allowing on-demand triggering via context menu. Added `translation.autoAfterOcr` (defaults to `false`) to automatically perform translation after background OCR.
+- **Improved Context Menu Copy**: Choosing "Copy Image Text" on a pinned sticker window will now automatically trigger OCR in the background if no text is currently recognized, copying to clipboard upon completion.
+
+<details>
+<summary>Older Release Notes</summary>
+
 ### 0.1.18
 
 - **Configurable Shortcuts**: Added full support for customizing tool hotkeys, global action hotkeys, and startup tool hotkeys through `shortcuts` or `hotkeys` configurations, allowing extensive configuration aliases (e.g. `annotation.shortcuts`).
@@ -522,14 +576,7 @@ This installs the binary, helper scripts (`mark-shot-ocr`, `mark-shot-translate`
 - Improved PipeWire SPA header compatibility for older distributions.
 
 Scrolling screenshot capture is not guaranteed on GNOME or KDE. The feature depends on portal capture behavior, compositor timing, window geometry, and scroll event handling, so robust GNOME/KDE support has a high adaptation cost.
-
----
-
-## Feedback & Communication
-
-Scan the QR code below to join the feedback group:
-
-![Feedback Group](.doc/feedback-group.png)
+</details>
 
 ---
 
