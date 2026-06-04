@@ -68,8 +68,8 @@ mark-shot --all-outputs
 # Annotate full captured screen directly (skipping selection)
 mark-shot --fullscreen
 
-# Start with Move after region selection, Laser in fullscreen, and a teal default color
-mark-shot --default-tool move --fullscreen-default-tool laser --default-color '#2DD4BF'
+# Start with Move after region selection, Laser in fullscreen, and a red default color
+mark-shot --default-tool move --fullscreen-default-tool laser --default-color '#FF4D4D'
 
 # Open and annotate an existing local image file
 mark-shot path/to/image.png
@@ -141,7 +141,7 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json`. Pin
   "annotation": {
     "defaultTool": "move",
     "fullscreenDefaultTool": "laser",
-    "defaultColor": "#2DD4BF"
+    "defaultColor": "#FF4D4D"
   },
   "windowDetection": {
     "command": "mark-shot-window-detection-niri",

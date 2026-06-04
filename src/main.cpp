@@ -2,6 +2,7 @@
 #include "shot_window.h"
 #include "debug_log.h"
 #include "ui/i18n.h"
+#include "ui/theme.h"
 #include "window_detection.h"
 
 #include <QApplication>
@@ -30,10 +31,6 @@
 #include <optional>
 
 namespace {
-
-constexpr int kDefaultAnnotationRed = 255;
-constexpr int kDefaultAnnotationGreen = 77;
-constexpr int kDefaultAnnotationBlue = 77;
 
 QRect virtualScreensGeometry()
 {
@@ -186,8 +183,21 @@ std::optional<int> channelValue(const QJsonObject &object, const QStringList &ke
     return intValue(jsonValue(object, keys));
 }
 
+std::optional<QColor> colorFromString(QString value);
+
 std::optional<QColor> colorFromObject(const QJsonObject &object)
 {
+    const QJsonValue nestedColor =
+        jsonValue(object,
+                  {QStringLiteral("value"),
+                   QStringLiteral("color"),
+                   QStringLiteral("hex"),
+                   QStringLiteral("format"),
+                   QStringLiteral("formats")});
+    if (nestedColor.isString()) {
+        return colorFromString(nestedColor.toString());
+    }
+
     const std::optional<int> red = channelValue(object, {QStringLiteral("r"), QStringLiteral("red")});
     const std::optional<int> green = channelValue(object, {QStringLiteral("g"), QStringLiteral("green")});
     const std::optional<int> blue = channelValue(object, {QStringLiteral("b"), QStringLiteral("blue")});
@@ -253,7 +263,7 @@ std::optional<QColor> colorFromValue(const QJsonValue &value)
 struct DefaultTools {
     ShotWindow::Tool normal = ShotWindow::Tool::Pen;
     ShotWindow::Tool fullscreen = ShotWindow::Tool::Pen;
-    QColor color = QColor(kDefaultAnnotationRed, kDefaultAnnotationGreen, kDefaultAnnotationBlue);
+    QColor color = markshot::theme::kDefaultAnnotationColor;
 };
 
 DefaultTools configuredDefaultTools(QString *warning)
@@ -280,7 +290,6 @@ DefaultTools configuredDefaultTools(QString *warning)
     const QJsonObject rootDefaultTools = objectValue(root, QStringLiteral("defaultTools"));
     QStringList warnings;
     bool hasToolWarnings = false;
-    bool hasColorWarnings = false;
 
     auto parseTool = [&warnings, &hasToolWarnings](const QString &name, const QString &source) -> std::optional<ShotWindow::Tool> {
         if (name.isEmpty()) {
@@ -354,8 +363,8 @@ DefaultTools configuredDefaultTools(QString *warning)
         if (const std::optional<QColor> color = colorFromValue(configuredColor)) {
             tools.color = *color;
         } else {
-            warnings.append(MS_TR("Unsupported default color in config annotation.defaultColor"));
-            hasColorWarnings = true;
+            markshot::debugLog("config",
+                               "unsupported default color in annotation.defaultColor; using built-in default");
         }
     }
 
@@ -363,9 +372,6 @@ DefaultTools configuredDefaultTools(QString *warning)
         QStringList supportLines;
         if (hasToolWarnings) {
             supportLines.append(MS_TR("Supported tools: %1").arg(ShotWindow::supportedToolNames().join(QStringLiteral(", "))));
-        }
-        if (hasColorWarnings) {
-            supportLines.append(MS_TR("Supported color formats: #RRGGBB or #RRGGBBAA"));
         }
         *warning = warnings.join(QStringLiteral("\n"));
         if (!supportLines.isEmpty()) {
