@@ -34,7 +34,7 @@ modules:
       - type: dir
         path: ../..
     post-install:
-      - install -Dm644 packaging/flatpak/io.github.jswysnemc.MarkShot.metainfo.xml /app/share/metainfo/io.github.jswysnemc.MarkShot.metainfo.xml
+      - install -Dm644 ../packaging/flatpak/io.github.jswysnemc.MarkShot.metainfo.xml /app/share/metainfo/io.github.jswysnemc.MarkShot.metainfo.xml
       - mv /app/share/applications/mark-shot.desktop /app/share/applications/io.github.jswysnemc.MarkShot.desktop
       - desktop-file-edit --set-key=Icon --set-value=io.github.jswysnemc.MarkShot /app/share/applications/io.github.jswysnemc.MarkShot.desktop
       - desktop-file-edit --set-key=Exec --set-value=mark-shot /app/share/applications/io.github.jswysnemc.MarkShot.desktop
