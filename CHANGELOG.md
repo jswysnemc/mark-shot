@@ -21,6 +21,7 @@
 - `mark-shot_0.1.20_fedora_x86_64.rpm`
 - `mark-shot_0.1.20_fedora_aarch64.rpm`
 - `mark-shot-v0.1.20-linux-x86_64.AppImage`
+- `mark-shot-v0.1.20-linux-x86_64.flatpak`
 
 ## 0.1.19 - 2026-06-05
 

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.jswysnemc.MarkShot</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Mark Shot</name>
+  <summary>Wayland screenshot selection and annotation tool</summary>
+  <summary xml:lang="zh-CN">Wayland 截图选区和标注工具</summary>
+  <description>
+    <p>Mark Shot captures screenshots, annotates image regions, pins floating image stickers, and provides OCR and translation helpers for pinned image text.</p>
+    <p xml:lang="zh-CN">Mark Shot 支持截图选区、图像标注、置顶贴图，以及针对置顶图像文字的 OCR 与翻译辅助功能。</p>
+  </description>
+  <launchable type="desktop-id">io.github.jswysnemc.MarkShot.desktop</launchable>
+  <url type="homepage">https://github.com/jswysnemc/mark-shot</url>
+  <url type="bugtracker">https://github.com/jswysnemc/mark-shot/issues</url>
+  <developer id="io.github.jswysnemc">
+    <name>jswysnemc</name>
+  </developer>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.20" date="2026-06-05" />
+  </releases>
+</component>
