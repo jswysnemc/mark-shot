@@ -69,7 +69,8 @@ jobs:
             desktop-file-utils \
             elfutils \
             flatpak \
-            flatpak-builder
+            flatpak-builder \
+            librsvg2-bin
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
       - name: Build Flatpak bundle
@@ -79,6 +80,11 @@ jobs:
           set -euo pipefail
 
           ASSET="mark-shot-${{ steps.version.outputs.tag }}-linux-x86_64.flatpak"
+          rsvg-convert \
+            -w 128 \
+            -h 128 \
+            data/icons/hicolor/scalable/apps/mark-shot.svg \
+            -o packaging/flatpak/io.github.jswysnemc.MarkShot.png
 
           cd packaging/flatpak
           flatpak-builder \

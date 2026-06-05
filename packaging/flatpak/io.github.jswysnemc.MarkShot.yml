@@ -38,6 +38,7 @@ modules:
       - mv /app/share/applications/mark-shot.desktop /app/share/applications/io.github.jswysnemc.MarkShot.desktop
       - desktop-file-edit --set-key=Icon --set-value=io.github.jswysnemc.MarkShot /app/share/applications/io.github.jswysnemc.MarkShot.desktop
       - desktop-file-edit --set-key=Exec --set-value=mark-shot /app/share/applications/io.github.jswysnemc.MarkShot.desktop
-      - mv /app/share/icons/hicolor/scalable/apps/mark-shot.svg /app/share/icons/hicolor/scalable/apps/io.github.jswysnemc.MarkShot.svg
+      - install -Dm644 ../packaging/flatpak/io.github.jswysnemc.MarkShot.png /app/share/icons/hicolor/128x128/apps/io.github.jswysnemc.MarkShot.png
       - rm -f /app/share/applications/mark-shot-edit.desktop
+      - rm -f /app/share/icons/hicolor/scalable/apps/mark-shot.svg
       - rm -f /app/share/icons/hicolor/scalable/apps/mark-shot-edit.svg
