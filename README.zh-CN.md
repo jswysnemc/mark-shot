@@ -613,6 +613,10 @@ gnome-extensions enable "$UUID"
 
 ## 反馈与交流
 
+### 提交 Issue
+若您在运行中遇到问题或有新功能建议，我们推荐使用 GitHub CLI (`gh`) 命令行工具提交 Issue。我们提供了一键收集环境信息并自动生成的脚本，详情请参阅 [Issue 提交指南](.doc/submit-issue-via-gh.md)。
+
+### 交流群
 扫描下方二维码可加入使用反馈群：
 
 <img src=".doc/feedback-group.png" width="220" alt="反馈群" />
