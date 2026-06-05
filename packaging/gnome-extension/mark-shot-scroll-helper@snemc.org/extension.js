@@ -8,10 +8,10 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 const IFACE = 'org.gnome.Shell.Extensions.MarkShotScrollHelper';
 const OBJECT_PATH = '/org/gnome/Shell/Extensions/MarkShotScrollHelper';
-const VERSION = '2';
+const VERSION = '3';
 
 const PANEL_WIDTH = 340;
-const PANEL_GAP = 14;
+const DEFAULT_PREVIEW_GAP = 5;
 const PANEL_PADDING = 12;
 const CONTROL_BAR_HEIGHT = 54;
 const STATUS_HEIGHT = 22;
@@ -25,6 +25,7 @@ const ACTION_ICONS = {
     annotate: 'document-edit-symbolic',
     save: 'document-save-symbolic',
     copy: 'edit-copy-symbolic',
+    hide: 'view-hidden-symbolic',
     cancel: 'window-close-symbolic',
 };
 
@@ -57,6 +58,7 @@ const DBUS_XML = `
       <arg type="i" name="total_len" direction="in"/>
       <arg type="b" name="paused" direction="in"/>
       <arg type="b" name="axis_locked" direction="in"/>
+      <arg type="i" name="preview_gap" direction="in"/>
     </method>
     <method name="HideScrollPreview">
       <arg type="s" name="session_id" direction="in"/>
@@ -212,6 +214,7 @@ export default class MarkShotScrollHelper extends Extension {
             totalLen,
             paused,
             axisLocked,
+            previewGap,
         ] = parameters.deepUnpack();
 
         this._showScrollPreview({
@@ -225,6 +228,7 @@ export default class MarkShotScrollHelper extends Extension {
             totalLen,
             paused,
             axisLocked,
+            previewGap,
         });
     }
 
@@ -245,15 +249,31 @@ export default class MarkShotScrollHelper extends Extension {
             ].join(' '),
         });
 
+        const statusRow = new St.BoxLayout({
+            vertical: false,
+            x_expand: true,
+            style: 'spacing: 8px;',
+        });
         this._previewStatus = new St.Label({
             text: 'Scroll down to capture',
+            x_expand: true,
             style: [
                 'color: rgb(204, 251, 241);',
                 'font-weight: 700;',
                 'font-size: 10pt;',
             ].join(' '),
         });
-        this._previewRoot.add_child(this._previewStatus);
+        statusRow.add_child(this._previewStatus);
+
+        const hideButton = this._makeButton('hide', ACTION_ICONS.hide, 'Hide Preview', {
+            width: 22,
+            height: 22,
+            iconSize: 16,
+            radius: 7,
+        });
+        statusRow.add_child(hideButton);
+        this._previewButtons.set('hide', hideButton);
+        this._previewRoot.add_child(statusRow);
 
         this._previewImageBin = new St.Bin({
             style: 'background-color: rgba(8, 13, 19, 220);',
@@ -285,7 +305,11 @@ export default class MarkShotScrollHelper extends Extension {
         this._previewRoot.hide();
     }
 
-    _makeButton(action, iconName, label) {
+    _makeButton(action, iconName, label, options = {}) {
+        const width = options.width ?? 40;
+        const height = options.height ?? 36;
+        const iconSize = options.iconSize ?? ICON_SIZE;
+        const radius = options.radius ?? 10;
         const roleStyle = action === 'save'
             ? 'background-color: rgba(45, 212, 191, 92); border-color: rgba(94, 234, 212, 150);'
             : action === 'cancel'
@@ -301,17 +325,17 @@ export default class MarkShotScrollHelper extends Extension {
                 roleStyle,
                 'border-width: 1px;',
                 'border-style: solid;',
-                'border-radius: 10px;',
-                'min-width: 40px;',
-                'max-width: 40px;',
-                'min-height: 36px;',
-                'max-height: 36px;',
+                `border-radius: ${radius}px;`,
+                `min-width: ${width}px;`,
+                `max-width: ${width}px;`,
+                `min-height: ${height}px;`,
+                `max-height: ${height}px;`,
                 'padding: 0;',
             ].join(' '),
         });
         button.set_child(new St.Icon({
             icon_name: iconName,
-            icon_size: ICON_SIZE,
+            icon_size: iconSize,
             style: 'color: rgb(229, 231, 235);',
         }));
         button.connect('clicked', () => {
@@ -334,33 +358,67 @@ export default class MarkShotScrollHelper extends Extension {
             ?? { x: 0, y: 0, width: global.stage.width, height: global.stage.height };
     }
 
-    _panelRectForCapture(rect) {
+    _panelRectForCapture(rect, previewGap = DEFAULT_PREVIEW_GAP) {
         const monitor = this._findMonitor(rect);
         const minHeight = CONTROL_BAR_HEIGHT + STATUS_HEIGHT + PANEL_PADDING * 3 + 120;
         let panelHeight = Math.max(minHeight, rect.height);
         panelHeight = Math.min(panelHeight, Math.max(minHeight, monitor.height - 8));
 
-        let top = clamp(rect.y, monitor.y + 4, monitor.y + monitor.height - panelHeight - 4);
-        let left = rect.x + rect.width + PANEL_GAP;
-        if (left + PANEL_WIDTH > monitor.x + monitor.width - 4) {
-            const leftAlt = rect.x - PANEL_GAP - PANEL_WIDTH;
-            if (leftAlt >= monitor.x + 4) {
-                left = leftAlt;
-            } else {
-                left = monitor.x + monitor.width - PANEL_WIDTH - 4;
+        const gap = Math.max(0, previewGap);
+        const margin = 4;
+        const minLeft = monitor.x + margin;
+        const maxLeft = Math.max(minLeft, monitor.x + monitor.width - PANEL_WIDTH - margin);
+        const minTop = monitor.y + margin;
+        const maxTop = Math.max(minTop, monitor.y + monitor.height - panelHeight - margin);
+        const makeRect = (left, top) => ({
+            x: clamp(left, minLeft, maxLeft),
+            y: clamp(top, minTop, maxTop),
+            width: PANEL_WIDTH,
+            height: panelHeight,
+        });
+        const candidates = [
+            makeRect(rect.x + rect.width + gap, rect.y),
+            makeRect(rect.x - gap - PANEL_WIDTH, rect.y),
+            makeRect(rect.x, rect.y + rect.height + gap),
+            makeRect(rect.x, rect.y - gap - panelHeight),
+            makeRect(rect.x + rect.width + gap, rect.y + rect.height - panelHeight),
+            makeRect(rect.x - gap - PANEL_WIDTH, rect.y + rect.height - panelHeight),
+            makeRect(rect.x + rect.width - PANEL_WIDTH, rect.y + rect.height + gap),
+            makeRect(rect.x + rect.width - PANEL_WIDTH, rect.y - gap - panelHeight),
+            makeRect(monitor.x + monitor.width - PANEL_WIDTH - margin, monitor.y + margin),
+            makeRect(monitor.x + margin, monitor.y + margin),
+            makeRect(monitor.x + monitor.width - PANEL_WIDTH - margin,
+                monitor.y + monitor.height - panelHeight - margin),
+            makeRect(monitor.x + margin, monitor.y + monitor.height - panelHeight - margin),
+        ];
+
+        const intersects = (a, b) => a.x < b.x + b.width
+            && a.x + a.width > b.x
+            && a.y < b.y + b.height
+            && a.y + a.height > b.y;
+
+        for (const candidate of candidates) {
+            if (!intersects(candidate, rect)) {
+                return candidate;
             }
         }
-        left = clamp(left, monitor.x + 4, monitor.x + monitor.width - PANEL_WIDTH - 4);
-        top = clamp(top, monitor.y + 4, monitor.y + monitor.height - panelHeight - 4);
 
-        return { x: left, y: top, width: PANEL_WIDTH, height: panelHeight };
+        const intersectionArea = (candidate) => {
+            const left = Math.max(candidate.x, rect.x);
+            const top = Math.max(candidate.y, rect.y);
+            const right = Math.min(candidate.x + candidate.width, rect.x + rect.width);
+            const bottom = Math.min(candidate.y + candidate.height, rect.y + rect.height);
+            return Math.max(0, right - left) * Math.max(0, bottom - top);
+        };
+        return candidates.reduce((best, candidate) =>
+            intersectionArea(candidate) < intersectionArea(best) ? candidate : best);
     }
 
     _showScrollPreview(state) {
         this._ensurePreview();
         this._previewSessionId = state.sessionId;
 
-        const panel = this._panelRectForCapture(state.rect);
+        const panel = this._panelRectForCapture(state.rect, state.previewGap);
         this._previewRoot.set_position(panel.x, panel.y);
         this._previewRoot.set_size(panel.width, panel.height);
 
@@ -455,7 +513,8 @@ export default class MarkShotScrollHelper extends Extension {
     }
 
     _emitPreviewAction(action) {
-        if (!this._previewSessionId) {
+        const sessionId = this._previewSessionId;
+        if (!sessionId) {
             return;
         }
         Gio.DBus.session.emit_signal(
@@ -463,8 +522,11 @@ export default class MarkShotScrollHelper extends Extension {
             OBJECT_PATH,
             IFACE,
             'PreviewAction',
-            new GLib.Variant('(ss)', [this._previewSessionId, action])
+            new GLib.Variant('(ss)', [sessionId, action])
         );
+        if (action === 'hide') {
+            this._hideScrollPreview(sessionId);
+        }
     }
 
     _hideScrollPreview(sessionId) {

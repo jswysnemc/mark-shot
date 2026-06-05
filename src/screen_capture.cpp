@@ -2524,7 +2524,7 @@ bool hasGnomeScrollPreviewHelper()
 
     bool ok = false;
     const int version = reply.arguments().first().toString().toInt(&ok);
-    return ok && version >= 2;
+    return ok && version >= 3;
 }
 
 CaptureResult captureWithGnomeScrollHelper(const CaptureRequest &request)

@@ -18,6 +18,7 @@ struct OverlayConfig {
     KeyboardInteractivity keyboardInteractivity = KeyboardInteractivity::Exclusive;
     bool closeOnDismissed = true;
     bool wantsActiveScreenWhenNoScreen = true;
+    bool activateOnShow = true;
 };
 
 class PluginInterface {

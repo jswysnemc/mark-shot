@@ -25,12 +25,17 @@ class QWheelEvent;
 
 namespace markshot::scroll {
 
+struct ScrollSessionUiConfig {
+    bool frameEnabled = true;
+    int frameGap = 5;
+    int previewGap = 5;
+};
+
 // Fullscreen, click-through layer-shell overlay that drives a scrolling capture
 // session. It periodically captures the selected screen region, stitches each
-// frame into a growing tall image, and paints two things on top of the live
-// desktop: a border drawn just outside the captured region (so grim
-// never records it), and a preview panel docked to the region's right side that
-// shows the full stitched image plus a marker for the current capture range.
+// frame into a growing tall image, and paints an outer frame plus a preview
+// panel docked outside the region. The frame is separated from the capture
+// region so screenshot backends do not record it while the user scrolls.
 // The input mask keeps the preview panel interactive, so the user can keep
 // scrolling the page underneath.
 class ScrollSessionWindow final : public QWidget {
@@ -40,6 +45,7 @@ public:
     ScrollSessionWindow(QRect globalGeometry,
                          QString outputName,
                          QScreen *screen = nullptr,
+                         ScrollSessionUiConfig uiConfig = {},
                          QWidget *parent = nullptr);
 
     bool layerShellActive() const;
@@ -76,6 +82,9 @@ private:
     void updateInputMask();
     void refreshControlLabels();
     void dumpDebugFrame(const QImage &frame, const char *tag);
+    void togglePreviewPanel();
+    void setPreviewPanelVisible(bool visible, bool userRequested);
+    void syncPreviewPanelDefaultVisibility();
     QImage currentResult() const;
     QRect captureBoundsGlobal() const;
     QRect floatingPanelGlobalRect() const;
@@ -125,12 +134,17 @@ private:
     // Maps the captured region (global compositor coordinates) into this
     // overlay's local coordinate space.
     QRect regionLocalRect() const;
+    QRect frameOuterLocalRect() const;
+    QRect previewAnchorLocalRect() const;
+    QRect previewAnchorGlobalRect() const;
+    bool previewPanelFitsAvailableSpace() const;
     // The preview panel rectangle in local coordinates.
     QRect previewPanelRect() const;
 
     QRect m_geometry;          // captured region, global coordinates
     QPoint m_screenOrigin;     // this overlay's top-left in global coordinates
     QString m_outputName;
+    ScrollSessionUiConfig m_uiConfig;
     qint64 m_sessionId = 0;
     Stitcher m_stitcher;
     QTimer *m_timer = nullptr;
@@ -161,9 +175,13 @@ private:
     QRegion m_transientPaintMask;
     bool m_restoreMaskAfterPaint = false;
     bool m_panelTransparentForCapture = false;
+    bool m_previewPanelVisible = true;
+    bool m_previewPanelUserSet = false;
+    bool m_previewPanelPausedCapture = false;
     bool m_overviewDragging = false;
     int m_overviewDragOffsetPx = 0;
     bool m_gnomeShellPreview = false;
+    bool m_gnomePreviewVisible = false;
     QString m_gnomePreviewSessionId;
     QStringList m_gnomePreviewFiles;
     qint64 m_lastGnomePreviewUpdateMs = 0;
@@ -176,6 +194,7 @@ private:
     QPushButton *m_annotateButton = nullptr;
     QPushButton *m_saveButton = nullptr;
     QPushButton *m_copyButton = nullptr;
+    QPushButton *m_hidePreviewButton = nullptr;
     QPushButton *m_cancelButton = nullptr;
 };
 

@@ -86,7 +86,7 @@ public:
         layerWindow->setMargins({});
         layerWindow->setExclusiveZone(-1);
         layerWindow->setKeyboardInteractivity(keyboardInteractivity(config.keyboardInteractivity));
-        layerWindow->setActivateOnShow(true);
+        layerWindow->setActivateOnShow(config.activateOnShow);
         layerWindow->setCloseOnDismissed(config.closeOnDismissed);
         if (screen) {
             layerWindow->setScreen(screen);

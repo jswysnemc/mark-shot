@@ -58,14 +58,13 @@ constexpr int kSignatureRows = 24;
 constexpr float kDuplicateAvgDiff = 1.1f;
 constexpr int kDuplicateMaxDiff = 4;
 
-constexpr int kBorderWidth = 3;       // thickness of the capture frame
-constexpr int kBorderGap = 10;        // gap between region and border (kept outside)
+constexpr int kCaptureFrameWidth = 3; // thickness of the outer capture frame
 constexpr int kPanelWidth = 340;      // preview panel width
-constexpr int kPanelGap = 14;         // gap between region and preview panel
-constexpr int kNoLayerPanelGap = 96;  // GNOME xdg windows can bleed into PipeWire captures
 constexpr int kPanelPadding = 12;
 constexpr int kControlBarHeight = 54;   // single row of icon actions
 constexpr int kStatusHeight = 22;
+constexpr int kHidePreviewButtonSize = 22;
+constexpr int kPanelMargin = 4;
 constexpr int kGnomePreviewIntervalMs = 140;
 
 constexpr auto kGnomeShellService = "org.gnome.Shell";
@@ -195,12 +194,107 @@ enum class ControlIcon {
     Annotate,
     Save,
     Copy,
+    HidePreview,
     Cancel,
+};
+
+struct PreviewPanelPlacement {
+    QRect rect;
+    bool fitsWithoutOverlap = true;
 };
 
 QPen iconPen(const QColor &color, qreal width = 1.8)
 {
     return QPen(color, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+}
+
+QRect captureFrameOuterRect(QRect region, int frameGap)
+{
+    frameGap = std::max(0, frameGap);
+    return region.adjusted(-(frameGap + kCaptureFrameWidth),
+                           -(frameGap + kCaptureFrameWidth),
+                           frameGap + kCaptureFrameWidth,
+                           frameGap + kCaptureFrameWidth);
+}
+
+QRect captureFrameInnerRect(QRect region, int frameGap)
+{
+    frameGap = std::max(0, frameGap);
+    return region.adjusted(-frameGap, -frameGap, frameGap, frameGap);
+}
+
+QSize previewPanelSizeForAnchor(const QRect &anchor, const QRect &bounds)
+{
+    const int minHeight = kControlBarHeight + kStatusHeight + kPanelPadding * 3 + 120;
+    int panelHeight = std::max(minHeight, anchor.height());
+    const int availableHeight = std::max(1, bounds.height() - kPanelMargin * 2);
+    panelHeight = std::min(panelHeight, std::max(minHeight, availableHeight));
+    return QSize(kPanelWidth, panelHeight);
+}
+
+PreviewPanelPlacement choosePreviewPanelPlacement(const QRect &anchor,
+                                                  const QRect &bounds,
+                                                  const QSize &panelSize,
+                                                  int previewGap)
+{
+    if (bounds.isEmpty() || panelSize.isEmpty()) {
+        return {{}, false};
+    }
+
+    const int gap = std::max(0, previewGap);
+    const int minLeft = bounds.left() + kPanelMargin;
+    const int maxLeft = std::max(minLeft, bounds.right() - panelSize.width() - kPanelMargin + 1);
+    const int minTop = bounds.top() + kPanelMargin;
+    const int maxTop = std::max(minTop, bounds.bottom() - panelSize.height() - kPanelMargin + 1);
+
+    auto makeRect = [&](int left, int top) {
+        return QRect(QPoint(std::clamp(left, minLeft, maxLeft),
+                            std::clamp(top, minTop, maxTop)),
+                     panelSize);
+    };
+
+    QVector<QRect> candidates;
+    candidates.reserve(12);
+    candidates.append(makeRect(anchor.right() + 1 + gap, anchor.top()));
+    candidates.append(makeRect(anchor.left() - gap - panelSize.width(), anchor.top()));
+    candidates.append(makeRect(anchor.left(), anchor.bottom() + 1 + gap));
+    candidates.append(makeRect(anchor.left(), anchor.top() - gap - panelSize.height()));
+    candidates.append(makeRect(anchor.right() + 1 + gap, anchor.bottom() - panelSize.height() + 1));
+    candidates.append(makeRect(anchor.left() - gap - panelSize.width(),
+                               anchor.bottom() - panelSize.height() + 1));
+    candidates.append(makeRect(anchor.right() - panelSize.width() + 1,
+                               anchor.bottom() + 1 + gap));
+    candidates.append(makeRect(anchor.right() - panelSize.width() + 1,
+                               anchor.top() - gap - panelSize.height()));
+    candidates.append(makeRect(bounds.right() - panelSize.width() - kPanelMargin + 1,
+                               bounds.top() + kPanelMargin));
+    candidates.append(makeRect(bounds.left() + kPanelMargin, bounds.top() + kPanelMargin));
+    candidates.append(makeRect(bounds.right() - panelSize.width() - kPanelMargin + 1,
+                               bounds.bottom() - panelSize.height() - kPanelMargin + 1));
+    candidates.append(makeRect(bounds.left() + kPanelMargin,
+                               bounds.bottom() - panelSize.height() - kPanelMargin + 1));
+
+    if (anchor.isEmpty()) {
+        return {candidates.first(), true};
+    }
+
+    for (const QRect &candidate : std::as_const(candidates)) {
+        if (!candidate.intersects(anchor)) {
+            return {candidate, true};
+        }
+    }
+
+    auto intersectionArea = [&](const QRect &candidate) {
+        const QRect overlap = candidate.intersected(anchor);
+        return overlap.isEmpty() ? 0 : overlap.width() * overlap.height();
+    };
+    const QRect *best = &candidates.first();
+    for (const QRect &candidate : std::as_const(candidates)) {
+        if (intersectionArea(candidate) < intersectionArea(*best)) {
+            best = &candidate;
+        }
+    }
+    return {*best, false};
 }
 
 QIcon makeControlIcon(ControlIcon icon)
@@ -278,6 +372,18 @@ QIcon makeControlIcon(ControlIcon icon)
         p.setPen(iconPen(ink, 1.8));
         p.drawRoundedRect(QRectF(7.5, 11.5, 13, 14), 2.5, 2.5);
         break;
+    case ControlIcon::HidePreview: {
+        QPainterPath eye;
+        eye.moveTo(6.5, 16);
+        eye.cubicTo(9.0, 10.5, 23.0, 10.5, 25.5, 16);
+        eye.cubicTo(23.0, 21.5, 9.0, 21.5, 6.5, 16);
+        p.setPen(iconPen(ink, 1.5));
+        p.drawPath(eye);
+        p.drawEllipse(QPointF(16, 16), 3.0, 3.0);
+        p.setPen(iconPen(ink, 2.0));
+        p.drawLine(QPointF(8.5, 23.5), QPointF(23.5, 8.5));
+        break;
+    }
     case ControlIcon::Cancel:
         p.setPen(iconPen(ink, 1.8));
         p.drawLine(QPointF(10, 10), QPointF(22, 22));
@@ -303,24 +409,30 @@ void configureIconButton(QPushButton *button, const QIcon &icon, const QString &
 ScrollSessionWindow::ScrollSessionWindow(QRect globalGeometry,
                                          QString outputName,
                                          QScreen *screen,
+                                         ScrollSessionUiConfig uiConfig,
                                          QWidget *parent)
     : QWidget(parent)
     , m_geometry(globalGeometry)
     , m_outputName(std::move(outputName))
+    , m_uiConfig(uiConfig)
     , m_sessionId(QDateTime::currentMSecsSinceEpoch())
     , m_stitcher(defaultConfig())
 {
     setWindowTitle(MS_TR("Scroll Capture"));
     setAttribute(Qt::WA_DeleteOnClose);
     setAttribute(Qt::WA_TranslucentBackground);
+    setAttribute(Qt::WA_ShowWithoutActivating);
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
     setObjectName(QStringLiteral("scrollSessionWindow"));
     setMouseTracking(true);
-    setFocusPolicy(Qt::StrongFocus);
+    setFocusPolicy(Qt::NoFocus);
 
     auto *cancelShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
     cancelShortcut->setContext(Qt::ApplicationShortcut);
     connect(cancelShortcut, &QShortcut::activated, this, [this] { close(); });
+    auto *togglePreviewShortcut = new QShortcut(QKeySequence(Qt::Key_V), this);
+    togglePreviewShortcut->setContext(Qt::ApplicationShortcut);
+    connect(togglePreviewShortcut, &QShortcut::activated, this, [this] { togglePreviewPanel(); });
 
     if (!screen) {
         screen = QGuiApplication::screenAt(m_geometry.center());
@@ -346,8 +458,9 @@ ScrollSessionWindow::ScrollSessionWindow(QRect globalGeometry,
     m_panelOnlyWindow = !m_layerShell && isWaylandPlatform();
     if (!m_layerShell && screen) {
         setScreen(screen);
+        syncPreviewPanelDefaultVisibility();
         if (m_panelOnlyWindow) {
-            setGeometry(floatingPanelGlobalRect());
+            updatePanelWindowGeometry();
         } else {
             setGeometry(screen->geometry());
         }
@@ -384,7 +497,8 @@ bool ScrollSessionWindow::configureLayerShell(QScreen *screen)
         {QStringLiteral("mark-shot-scroll"),
          markshot::layershell::KeyboardInteractivity::OnDemand,
          false,
-         true});
+         true,
+         false});
 }
 
 bool ScrollSessionWindow::layerShellActive() const
@@ -439,11 +553,34 @@ void ScrollSessionWindow::buildControlBar()
     m_copyButton = makeButton(makeControlIcon(ControlIcon::Copy), MS_TR("Copy"));
     m_cancelButton = makeButton(makeControlIcon(ControlIcon::Cancel), MS_TR("Cancel"), QStringLiteral("danger"));
 
+    m_hidePreviewButton = new QPushButton(this);
+    m_hidePreviewButton->setProperty("role", QStringLiteral("secondary"));
+    configureIconButton(m_hidePreviewButton,
+                        makeControlIcon(ControlIcon::HidePreview),
+                        MS_TR("Hide Preview"));
+    m_hidePreviewButton->setIconSize(QSize(16, 16));
+    m_hidePreviewButton->setFixedSize(QSize(kHidePreviewButtonSize, kHidePreviewButtonSize));
+    m_hidePreviewButton->setFocusPolicy(Qt::NoFocus);
+    m_hidePreviewButton->setCursor(Qt::PointingHandCursor);
+    m_hidePreviewButton->setStyleSheet(QStringLiteral(
+        "QPushButton {"
+        " color: #E5E7EB; background: rgba(255,255,255,16);"
+        " border: 1px solid rgba(255,255,255,24); border-radius: 7px;"
+        " padding: 0; min-width: 22px; max-width: 22px;"
+        " min-height: 22px; max-height: 22px; }"
+        "QPushButton:hover { background: rgba(45,212,191,30);"
+        " border-color: rgba(45,212,191,90); }"
+        "QPushButton:focus { border-color: rgba(94,234,212,180); }"));
+    m_hidePreviewButton->hide();
+
     connect(m_axisButton, &QPushButton::clicked, this, [this] { toggleAxis(); });
     connect(m_pauseButton, &QPushButton::clicked, this, [this] { togglePause(); });
     connect(m_annotateButton, &QPushButton::clicked, this, [this] { annotateResult(); });
     connect(m_saveButton, &QPushButton::clicked, this, [this] { saveResult(); });
     connect(m_copyButton, &QPushButton::clicked, this, [this] { copyResult(); });
+    connect(m_hidePreviewButton, &QPushButton::clicked, this, [this] {
+        setPreviewPanelVisible(false, true);
+    });
     connect(m_cancelButton, &QPushButton::clicked, this, [this] { close(); });
 
     refreshControlLabels();
@@ -454,39 +591,54 @@ QRect ScrollSessionWindow::regionLocalRect() const
     return m_geometry.translated(-m_screenOrigin);
 }
 
+QRect ScrollSessionWindow::frameOuterLocalRect() const
+{
+    const QRect region = regionLocalRect();
+    return m_uiConfig.frameEnabled
+        ? captureFrameOuterRect(region, m_uiConfig.frameGap)
+        : region;
+}
+
+QRect ScrollSessionWindow::previewAnchorLocalRect() const
+{
+    return frameOuterLocalRect();
+}
+
+QRect ScrollSessionWindow::previewAnchorGlobalRect() const
+{
+    const QRect region = m_geometry.normalized();
+    return m_uiConfig.frameEnabled
+        ? captureFrameOuterRect(region, m_uiConfig.frameGap)
+        : region;
+}
+
 QRect ScrollSessionWindow::previewPanelRect() const
 {
     if (m_panelOnlyWindow) {
         return QRect(QPoint(0, 0), size());
     }
 
-    const QRect region = regionLocalRect();
+    const QRect anchor = previewAnchorLocalRect();
     const QRect bounds(QPoint(0, 0), size());
+    const QSize panelSize = previewPanelSizeForAnchor(anchor, bounds);
+    return choosePreviewPanelPlacement(anchor, bounds, panelSize, m_uiConfig.previewGap).rect;
+}
 
-    // Preview height matches the region but is clamped to the overlay bounds and
-    // a sensible minimum so the controls always fit.
-    const int minHeight = kControlBarHeight + kStatusHeight + kPanelPadding * 3 + 120;
-    int panelHeight = std::max(minHeight, region.height());
-    panelHeight = std::min(panelHeight, bounds.height() - 8);
-
-    int top = region.top();
-    top = std::clamp(top, 4, std::max(4, bounds.height() - panelHeight - 4));
-
-    // Prefer the right side of the region; fall back to the left when there is
-    // not enough room.
-    const int panelGap = m_layerShell ? kPanelGap : kNoLayerPanelGap;
-    int left = region.right() + panelGap;
-    if (left + kPanelWidth > bounds.right() - 4) {
-        const int leftAlt = region.left() - panelGap - kPanelWidth;
-        if (leftAlt >= 4) {
-            left = leftAlt;
-        } else {
-            left = std::max(4, bounds.right() - kPanelWidth - 4);
-        }
+bool ScrollSessionWindow::previewPanelFitsAvailableSpace() const
+{
+    if (m_panelOnlyWindow || m_gnomeShellPreview) {
+        const QRect bounds = captureBoundsGlobal();
+        const QRect anchor = previewAnchorGlobalRect();
+        const QSize panelSize = previewPanelSizeForAnchor(anchor, bounds);
+        return choosePreviewPanelPlacement(anchor, bounds, panelSize, m_uiConfig.previewGap)
+            .fitsWithoutOverlap;
     }
-    left = std::clamp(left, 4, std::max(4, bounds.width() - kPanelWidth - 4));
 
-    return QRect(left, top, kPanelWidth, panelHeight);
+    const QRect anchor = previewAnchorLocalRect();
+    const QRect bounds(QPoint(0, 0), size());
+    const QSize panelSize = previewPanelSizeForAnchor(anchor, bounds);
+    return choosePreviewPanelPlacement(anchor, bounds, panelSize, m_uiConfig.previewGap)
+        .fitsWithoutOverlap;
 }
 
 QRect ScrollSessionWindow::captureBoundsGlobal() const
@@ -508,56 +660,9 @@ QRect ScrollSessionWindow::floatingPanelGlobalRect() const
         return QRect(QPoint(0, 0), QSize(kPanelWidth, 360));
     }
 
-    const QRect region = m_geometry.normalized();
-    const int minHeight = kControlBarHeight + kStatusHeight + kPanelPadding * 3 + 120;
-    int panelHeight = std::max(minHeight, region.height());
-    panelHeight = std::min(panelHeight, std::max(minHeight, bounds.height() - 8));
-    const QSize panelSize(kPanelWidth, panelHeight);
-    const int margin = 4;
-    const int gap = kNoLayerPanelGap;
-
-    auto clampTop = [&](int top) {
-        return std::clamp(top, bounds.top() + margin,
-                          std::max(bounds.top() + margin,
-                                   bounds.bottom() - panelSize.height() - margin + 1));
-    };
-    auto clampLeft = [&](int left) {
-        return std::clamp(left, bounds.left() + margin,
-                          std::max(bounds.left() + margin,
-                                   bounds.right() - panelSize.width() - margin + 1));
-    };
-    auto makeRect = [&](int left, int top) {
-        return QRect(QPoint(clampLeft(left), clampTop(top)), panelSize);
-    };
-
-    QVector<QRect> candidates;
-    candidates.reserve(8);
-    candidates.append(makeRect(region.right() + 1 + gap, region.top()));
-    candidates.append(makeRect(region.left() - gap - panelSize.width(), region.top()));
-    candidates.append(makeRect(region.left(), region.bottom() + 1 + gap));
-    candidates.append(makeRect(region.left(), region.top() - gap - panelSize.height()));
-    candidates.append(makeRect(bounds.right() - panelSize.width() - margin + 1,
-                               bounds.top() + margin));
-    candidates.append(makeRect(bounds.left() + margin, bounds.top() + margin));
-    candidates.append(makeRect(bounds.right() - panelSize.width() - margin + 1,
-                               bounds.bottom() - panelSize.height() - margin + 1));
-    candidates.append(makeRect(bounds.left() + margin,
-                               bounds.bottom() - panelSize.height() - margin + 1));
-
-    const QRect avoid = region.adjusted(-8, -8, 8, 8);
-    for (const QRect &candidate : std::as_const(candidates)) {
-        if (!candidate.intersects(avoid)) {
-            return candidate;
-        }
-    }
-
-    auto intersectionArea = [&](const QRect &candidate) {
-        const QRect overlap = candidate.intersected(avoid);
-        return overlap.isEmpty() ? 0 : overlap.width() * overlap.height();
-    };
-    return *std::min_element(candidates.begin(), candidates.end(), [&](const QRect &a, const QRect &b) {
-        return intersectionArea(a) < intersectionArea(b);
-    });
+    const QRect anchor = previewAnchorGlobalRect();
+    const QSize panelSize = previewPanelSizeForAnchor(anchor, bounds);
+    return choosePreviewPanelPlacement(anchor, bounds, panelSize, m_uiConfig.previewGap).rect;
 }
 
 void ScrollSessionWindow::updatePanelWindowGeometry()
@@ -565,7 +670,12 @@ void ScrollSessionWindow::updatePanelWindowGeometry()
     if (!m_panelOnlyWindow) {
         return;
     }
-    const QRect panel = floatingPanelGlobalRect();
+    const QRect bounds = captureBoundsGlobal();
+    const QPoint hiddenPoint = bounds.isEmpty() ? QPoint(0, 0) : bounds.bottomRight();
+    const QRect panel = m_previewPanelVisible
+        ? floatingPanelGlobalRect()
+        : QRect(hiddenPoint, QSize(1, 1));
+    setWindowOpacity(m_previewPanelVisible ? 1.0 : 0.0);
     if (geometry() != panel) {
         setGeometry(panel);
     }
@@ -579,20 +689,30 @@ QRegion ScrollSessionWindow::overlayPaintRegion() const
         return {};
     }
     if (m_panelOnlyWindow) {
-        return QRegion(bounds);
+        return m_previewPanelVisible ? QRegion(bounds) : QRegion();
     }
 
-    const QRect region = regionLocalRect();
     constexpr int kAntialiasPad = 2;
-    const int outerPad = kBorderGap + kBorderWidth + kAntialiasPad;
-    const int innerPad = std::max(0, kBorderGap - kAntialiasPad);
-
-    QRegion painted(region.adjusted(-outerPad, -outerPad, outerPad, outerPad));
-    painted -= QRegion(region.adjusted(-innerPad, -innerPad, innerPad, innerPad));
-    painted += QRegion(previewPanelRect().adjusted(-kAntialiasPad,
-                                                   -kAntialiasPad,
-                                                   kAntialiasPad,
-                                                   kAntialiasPad));
+    QRegion painted;
+    if (m_uiConfig.frameEnabled) {
+        const QRect region = regionLocalRect();
+        painted += QRegion(captureFrameOuterRect(region, m_uiConfig.frameGap)
+                               .adjusted(-kAntialiasPad,
+                                         -kAntialiasPad,
+                                         kAntialiasPad,
+                                         kAntialiasPad));
+        painted -= QRegion(captureFrameInnerRect(region, m_uiConfig.frameGap)
+                               .adjusted(kAntialiasPad,
+                                         kAntialiasPad,
+                                         -kAntialiasPad,
+                                         -kAntialiasPad));
+    }
+    if (m_previewPanelVisible) {
+        painted += QRegion(previewPanelRect().adjusted(-kAntialiasPad,
+                                                       -kAntialiasPad,
+                                                       kAntialiasPad,
+                                                       kAntialiasPad));
+    }
     return painted.intersected(QRegion(bounds));
 }
 
@@ -605,6 +725,7 @@ void ScrollSessionWindow::setRegionGeometry(QRect geometry)
 
     const QRegion oldPaint = overlayPaintRegion();
     m_geometry = geometry;
+    syncPreviewPanelDefaultVisibility();
     if (m_panelOnlyWindow && !m_axisDragging) {
         updatePanelWindowGeometry();
     }
@@ -623,9 +744,26 @@ void ScrollSessionWindow::setRegionGeometry(QRect geometry)
 
 void ScrollSessionWindow::layoutOverlay()
 {
+    if (m_layerShell && !m_gnomeShellPreview) {
+        setWindowOpacity(m_previewPanelVisible ? 1.0 : 0.0);
+    }
+
     if (m_gnomeShellPreview) {
         if (m_controlBar) {
             m_controlBar->hide();
+        }
+        if (m_hidePreviewButton) {
+            m_hidePreviewButton->hide();
+        }
+        return;
+    }
+
+    if (!m_previewPanelVisible) {
+        if (m_controlBar) {
+            m_controlBar->hide();
+        }
+        if (m_hidePreviewButton) {
+            m_hidePreviewButton->hide();
         }
         return;
     }
@@ -640,6 +778,13 @@ void ScrollSessionWindow::layoutOverlay()
                               barTop,
                               barWidth,
                               kControlBarHeight);
+    if (m_hidePreviewButton && !m_panelTransparentForCapture) {
+        m_hidePreviewButton->show();
+        m_hidePreviewButton->setGeometry(panel.right() - kPanelPadding - kHidePreviewButtonSize + 1,
+                                         panel.top() + kPanelPadding,
+                                         kHidePreviewButtonSize,
+                                         kHidePreviewButtonSize);
+    }
 }
 
 void ScrollSessionWindow::updateInputMask()
@@ -654,7 +799,7 @@ void ScrollSessionWindow::updateInputMask()
     }
 
     if (m_panelOnlyWindow) {
-        const QRegion mask(rect());
+        const QRegion mask = m_previewPanelVisible ? QRegion(rect()) : QRegion();
         setMask(mask);
         if (QWindow *nativeWindow = windowHandle()) {
             nativeWindow->setMask(mask);
@@ -669,7 +814,9 @@ void ScrollSessionWindow::updateInputMask()
     // a drag, old paint locations stay in the mask until one cleanup paint
     // has been submitted.
     QRegion mask;
-    mask += QRegion(previewPanelRect());
+    if (m_previewPanelVisible) {
+        mask += QRegion(previewPanelRect());
+    }
     mask += m_transientPaintMask;
     setMask(mask);
     if (QWindow *nativeWindow = windowHandle()) {
@@ -680,6 +827,7 @@ void ScrollSessionWindow::updateInputMask()
 void ScrollSessionWindow::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
+    syncPreviewPanelDefaultVisibility();
     if (m_panelOnlyWindow) {
         updatePanelWindowGeometry();
     } else if (!m_layerShell) {
@@ -695,7 +843,7 @@ void ScrollSessionWindow::showEvent(QShowEvent *event)
                    m_screenOrigin.x(), m_screenOrigin.y(),
                    region.x(), region.y(), region.width(), region.height(),
                    panel.x(), panel.y(), panel.width(), panel.height(),
-                   m_layerShell ? kPanelGap : kNoLayerPanelGap,
+                   m_uiConfig.previewGap,
                    panel.intersects(region) ? 1 : 0, m_layerShell ? 1 : 0,
                    m_panelOnlyWindow ? 1 : 0);
     updateGnomeShellPreview(true);
@@ -708,16 +856,19 @@ void ScrollSessionWindow::showEvent(QShowEvent *event)
             }
         });
     }
-    raise();
-    activateWindow();
-    setFocus(Qt::ActiveWindowFocusReason);
 }
 
 void ScrollSessionWindow::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
+    const QRegion oldPaint = overlayPaintRegion();
+    syncPreviewPanelDefaultVisibility();
     layoutOverlay();
     updateInputMask();
+    const QRegion repaintRegion = oldPaint + overlayPaintRegion();
+    if (!repaintRegion.isEmpty()) {
+        update(repaintRegion);
+    }
 }
 
 void ScrollSessionWindow::captureTick()
@@ -737,24 +888,26 @@ void ScrollSessionWindow::captureTick()
         request.allowPortalScreenshotFallback = false;
 
         const bool makePanelTransparentForCapture =
-            !m_gnomeShellPreview && m_panelOnlyWindow && isVisible();
+            !m_gnomeShellPreview && m_panelOnlyWindow && m_previewPanelVisible && isVisible();
         if (makePanelTransparentForCapture) {
             m_panelTransparentForCapture = true;
             if (m_controlBar) {
                 m_controlBar->hide();
             }
-            repaint();
+            if (m_hidePreviewButton) {
+                m_hidePreviewButton->hide();
+            }
+            repaint(overlayPaintRegion());
             QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
             request.minimumFrameTimeMs = QDateTime::currentMSecsSinceEpoch() + 1;
         }
         const CaptureResult result = captureScreenFrame(request);
         if (makePanelTransparentForCapture) {
             m_panelTransparentForCapture = false;
-            if (m_controlBar) {
-                m_controlBar->show();
+            if (m_controlBar || m_hidePreviewButton) {
                 layoutOverlay();
             }
-            repaint();
+            repaint(overlayPaintRegion());
             QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
         }
         if (result.image.isNull()) {
@@ -858,6 +1011,7 @@ void ScrollSessionWindow::dumpDebugFrame(const QImage &frame, const char *tag)
 void ScrollSessionWindow::togglePause()
 {
     m_paused = !m_paused;
+    m_previewPanelPausedCapture = false;
     if (!m_paused) {
         m_lastSignature.clear();
     }
@@ -879,6 +1033,69 @@ void ScrollSessionWindow::toggleAxis()
     refreshControlLabels();
     updateGnomeShellPreview(true);
     update();
+}
+
+void ScrollSessionWindow::togglePreviewPanel()
+{
+    setPreviewPanelVisible(!m_previewPanelVisible, true);
+}
+
+void ScrollSessionWindow::setPreviewPanelVisible(bool visible, bool userRequested)
+{
+    if (userRequested) {
+        m_previewPanelUserSet = true;
+    }
+
+    bool captureStateChanged = false;
+    if (visible && !previewPanelFitsAvailableSpace() && !m_paused) {
+        m_paused = true;
+        m_previewPanelPausedCapture = true;
+        captureStateChanged = true;
+        m_lastSignature.clear();
+        refreshControlLabels();
+    } else if (!visible && m_previewPanelPausedCapture) {
+        m_previewPanelPausedCapture = false;
+        if (m_paused) {
+            m_paused = false;
+            captureStateChanged = true;
+            m_lastSignature.clear();
+            refreshControlLabels();
+            if (m_timer && !m_timer->isActive()) {
+                m_timer->start();
+            }
+        }
+    }
+
+    if (m_previewPanelVisible == visible) {
+        if (captureStateChanged) {
+            updateGnomeShellPreview(true);
+            update();
+        }
+        return;
+    }
+
+    const QRegion oldPaint = overlayPaintRegion();
+    m_previewPanelVisible = visible;
+    if (m_panelOnlyWindow) {
+        updatePanelWindowGeometry();
+    }
+    layoutOverlay();
+    updateInputMask();
+    updateGnomeShellPreview(true);
+    const QRegion repaintRegion = oldPaint + overlayPaintRegion();
+    if (!repaintRegion.isEmpty()) {
+        update(repaintRegion);
+    } else {
+        update();
+    }
+}
+
+void ScrollSessionWindow::syncPreviewPanelDefaultVisibility()
+{
+    if (m_previewPanelUserSet) {
+        return;
+    }
+    m_previewPanelVisible = previewPanelFitsAvailableSpace();
 }
 
 QRect ScrollSessionWindow::imageAreaRect() const
@@ -1306,46 +1523,49 @@ void ScrollSessionWindow::paintEvent(QPaintEvent *)
         return;
     }
 
-    // 1. Capture border, drawn just outside the captured region so grim
-    //    never records it.
-    const QRect region = regionLocalRect();
-    if (!m_panelOnlyWindow) {
-        const QRect borderRect = region.adjusted(-(kBorderGap + kBorderWidth / 2),
-                                                 -(kBorderGap + kBorderWidth / 2),
-                                                 kBorderGap + kBorderWidth / 2,
-                                                 kBorderGap + kBorderWidth / 2);
-        const QColor borderColor = m_paused
-            ? QColor(250, 204, 21, 235)                       // amber while paused
+    if (m_uiConfig.frameEnabled && !m_panelOnlyWindow) {
+        const QRect region = regionLocalRect();
+        QPainterPath framePath;
+        framePath.setFillRule(Qt::OddEvenFill);
+        framePath.addRect(QRectF(captureFrameOuterRect(region, m_uiConfig.frameGap)));
+        framePath.addRect(QRectF(captureFrameInnerRect(region, m_uiConfig.frameGap)));
+
+        const QColor frameColor = m_paused
+            ? QColor(250, 204, 21, 235)
             : QColor(45, 212, 191, 255);
-        painter.setPen(QPen(borderColor, kBorderWidth));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawRect(borderRect);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(frameColor);
+        painter.drawPath(framePath);
     }
 
-    // 2. Preview panel.
-    const QRect panel = previewPanelRect();
-    QPainterPath panelPath;
-    panelPath.addRoundedRect(panel, 12, 12);
-    painter.fillPath(panelPath, QColor(15, 17, 23, 242));
-    painter.setPen(QPen(QColor(255, 255, 255, 28), 1));
-    painter.drawPath(panelPath);
+    if (m_previewPanelVisible) {
+        const QRect panel = previewPanelRect();
+        QPainterPath panelPath;
+        panelPath.addRoundedRect(panel, 12, 12);
+        painter.fillPath(panelPath, QColor(15, 17, 23, 242));
+        painter.setPen(QPen(QColor(255, 255, 255, 28), 1));
+        painter.drawPath(panelPath);
 
-    // Status text along the top of the panel.
-    const QRect statusRect(panel.left() + kPanelPadding,
-                           panel.top() + kPanelPadding,
-                           panel.width() - kPanelPadding * 2,
-                           kStatusHeight);
-    painter.setPen(QColor(204, 251, 241, 240));
-    QFont statusFont = painter.font();
-    statusFont.setPointSize(10);
-    statusFont.setBold(true);
-    painter.setFont(statusFont);
-    painter.drawText(statusRect, Qt::AlignVCenter | Qt::AlignLeft,
-                     m_statusText.isEmpty() ? MS_TR("Scroll down to capture") : m_statusText);
+        // Status text along the top of the panel.
+        const int statusRightInset = m_hidePreviewButton && m_hidePreviewButton->isVisible()
+            ? kPanelPadding + kHidePreviewButtonSize + 6
+            : kPanelPadding;
+        const QRect statusRect(panel.left() + kPanelPadding,
+                               panel.top() + kPanelPadding,
+                               panel.width() - kPanelPadding - statusRightInset,
+                               kStatusHeight);
+        painter.setPen(QColor(204, 251, 241, 240));
+        QFont statusFont = painter.font();
+        statusFont.setPointSize(10);
+        statusFont.setBold(true);
+        painter.setFont(statusFont);
+        painter.drawText(statusRect, Qt::AlignVCenter | Qt::AlignLeft,
+                         m_statusText.isEmpty() ? MS_TR("Scroll down to capture") : m_statusText);
 
-    // Preview image area: between the status row and the control bar.
-    const QRect imageArea = imageAreaRect();
-    drawPreviewContent(painter, imageArea);
+        // Preview image area: between the status row and the control bar.
+        const QRect imageArea = imageAreaRect();
+        drawPreviewContent(painter, imageArea);
+    }
 
     if (m_restoreMaskAfterPaint && !m_axisDragging) {
         m_restoreMaskAfterPaint = false;
@@ -1368,6 +1588,11 @@ void ScrollSessionWindow::keyPressEvent(QKeyEvent *event)
     }
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
         annotateResult();
+        event->accept();
+        return;
+    }
+    if (event->key() == Qt::Key_V && event->modifiers() == Qt::NoModifier) {
+        togglePreviewPanel();
         event->accept();
         return;
     }
@@ -1412,7 +1637,7 @@ void ScrollSessionWindow::mouseReleaseEvent(QMouseEvent *event)
 
 void ScrollSessionWindow::wheelEvent(QWheelEvent *event)
 {
-    if (!previewPanelRect().contains(event->position().toPoint())) {
+    if (!m_previewPanelVisible || !previewPanelRect().contains(event->position().toPoint())) {
         QWidget::wheelEvent(event);
         return;
     }
@@ -1544,7 +1769,7 @@ bool ScrollSessionWindow::eventFilter(QObject *watched, QEvent *event)
         m_restoreMaskAfterPaint = !m_transientPaintMask.isEmpty();
         // Keep the temporary paint mask active for one cleanup repaint. If it
         // is dropped immediately, coalesced mouse-move damage can leave old
-        // border or panel pixels on the compositor surface.
+        // frame or panel pixels on the compositor surface.
         updateInputMask();
         if (!m_transientPaintMask.isEmpty()) {
             update(m_transientPaintMask);
@@ -1569,11 +1794,8 @@ bool ScrollSessionWindow::gnomeShellPreviewActive() const
 QSize ScrollSessionWindow::gnomePreviewImageSize() const
 {
     const QRect bounds = captureBoundsGlobal();
-    const int minHeight = kControlBarHeight + kStatusHeight + kPanelPadding * 3 + 120;
-    int panelHeight = std::max(minHeight, m_geometry.height());
-    if (!bounds.isEmpty()) {
-        panelHeight = std::min(panelHeight, std::max(minHeight, bounds.height() - 8));
-    }
+    const QRect anchor = previewAnchorGlobalRect();
+    const int panelHeight = previewPanelSizeForAnchor(anchor, bounds).height();
 
     const int width = std::max(64, kPanelWidth - kPanelPadding * 2);
     const int height = std::max(96, panelHeight - kStatusHeight - kControlBarHeight - kPanelPadding * 4);
@@ -1600,6 +1822,12 @@ QImage ScrollSessionWindow::renderGnomePreviewImage(const QSize &size) const
 void ScrollSessionWindow::updateGnomeShellPreview(bool force)
 {
     if (!gnomeShellPreviewActive()) {
+        return;
+    }
+    if (!m_previewPanelVisible) {
+        if (m_gnomePreviewVisible) {
+            hideGnomeShellPreview();
+        }
         return;
     }
 
@@ -1641,11 +1869,12 @@ void ScrollSessionWindow::updateGnomeShellPreview(bool force)
         QString::fromLatin1(kGnomeHelperInterface),
         QStringLiteral("ShowScrollPreview")
     );
+    const QRect previewAnchor = previewAnchorGlobalRect();
     message << m_gnomePreviewSessionId
-            << m_geometry.x()
-            << m_geometry.y()
-            << m_geometry.width()
-            << m_geometry.height()
+            << previewAnchor.x()
+            << previewAnchor.y()
+            << previewAnchor.width()
+            << previewAnchor.height()
             << previewPath
             << status
             << (horizontal ? QStringLiteral("horizontal") : QStringLiteral("vertical"))
@@ -1653,8 +1882,10 @@ void ScrollSessionWindow::updateGnomeShellPreview(bool force)
             << m_captureLen
             << totalLen
             << m_paused
-            << m_stitcher.axisLocked();
+            << m_stitcher.axisLocked()
+            << std::max(0, m_uiConfig.previewGap);
     QDBusConnection::sessionBus().call(message, QDBus::NoBlock);
+    m_gnomePreviewVisible = true;
 }
 
 void ScrollSessionWindow::hideGnomeShellPreview()
@@ -1671,6 +1902,7 @@ void ScrollSessionWindow::hideGnomeShellPreview()
     );
     message << m_gnomePreviewSessionId;
     QDBusConnection::sessionBus().call(message, QDBus::NoBlock);
+    m_gnomePreviewVisible = false;
     cleanupGnomePreviewFiles(0);
 }
 
@@ -1694,6 +1926,8 @@ void ScrollSessionWindow::handleGnomePreviewAction(const QString &sessionId, con
         if (!m_stitcher.axisLocked()) {
             toggleAxis();
         }
+    } else if (action == QStringLiteral("hide")) {
+        setPreviewPanelVisible(false, true);
     } else if (action == QStringLiteral("annotate")) {
         annotateResult();
     } else if (action == QStringLiteral("save")) {
