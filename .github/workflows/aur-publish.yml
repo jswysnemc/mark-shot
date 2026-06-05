@@ -10,6 +10,11 @@ on:
         description: 'Release tag, for example v0.1.0'
         required: true
         type: string
+      pkgrel:
+        description: 'AUR package release number'
+        required: false
+        default: '1'
+        type: string
 
 permissions:
   contents: read
@@ -32,22 +37,48 @@ jobs:
             exit 1
           fi
           VERSION="${TAG#v}"
+          PKGREL="${{ github.event.inputs.pkgrel }}"
+          if [ -z "$PKGREL" ]; then
+            PKGREL=1
+          fi
+          case "$PKGREL" in
+            ''|*[!0-9]*|0)
+              echo "pkgrel must be a positive integer" >&2
+              exit 1
+              ;;
+          esac
+          REPO_URL="${{ github.server_url }}/${{ github.repository }}.git"
+          COMMIT="$(git ls-remote --tags "$REPO_URL" "refs/tags/${TAG}^{}" | awk '{print $1}' | head -n 1)"
+          if [ -z "$COMMIT" ]; then
+            COMMIT="$(git ls-remote --tags "$REPO_URL" "refs/tags/${TAG}" | awk '{print $1}' | head -n 1)"
+          fi
+          if [ -z "$COMMIT" ]; then
+            echo "No commit was found for release tag $TAG" >&2
+            exit 1
+          fi
           {
             echo "tag=$TAG"
             echo "version=$VERSION"
+            echo "pkgrel=$PKGREL"
+            echo "commit=$COMMIT"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Checkout release source
+      - name: Checkout packaging files
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.version.outputs.tag }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || steps.version.outputs.tag }}
 
       - name: Prepare AUR files
         run: |
           mkdir -p aur-work
           cp packaging/aur/PKGBUILD aur-work/PKGBUILD
           sed -i "s/^pkgver=.*/pkgver=${{ steps.version.outputs.version }}/" aur-work/PKGBUILD
-          sed -i "s/^pkgrel=.*/pkgrel=1/" aur-work/PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=${{ steps.version.outputs.pkgrel }}/" aur-work/PKGBUILD
+          if ! grep -q '^_commit=' aur-work/PKGBUILD; then
+            echo "PKGBUILD does not define _commit" >&2
+            exit 1
+          fi
+          sed -i "s/^_commit=.*/_commit=${{ steps.version.outputs.commit }}/" aur-work/PKGBUILD
 
       - name: Generate checksums and .SRCINFO
         run: |
@@ -94,5 +125,5 @@ jobs:
             exit 0
           fi
 
-          git -C aur-repo commit -m "Update to ${{ steps.version.outputs.version }}"
+          git -C aur-repo commit -m "Update to ${{ steps.version.outputs.version }}-${{ steps.version.outputs.pkgrel }}"
           git -C aur-repo push origin master
