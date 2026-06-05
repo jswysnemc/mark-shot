@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.20 - 2026-06-05
+
+### Features & Enhancements
+
+- **Scroll Capture Idle Pause**: Added an idle pause mechanism (1000ms delay) during scrolling capture when preview panel space is constrained. It automatically pauses capture, reveals the progress preview, and changes the action label to "Continue Capture" so the user can easily review the progress.
+- **Scroll Capture Config Support**: Added full configuration integration for scrolling screenshots in the setup window, allowing users to configure scrolling parameters directly via the UI.
+
+### Bug Fixes
+
+- **Physical Pixel Preservation**: Fixed a regression in cropping arithmetic to ensure raw physical pixels are correctly preserved without scaling distortion.
+- **Scroll Capture UI Polish**: Refactored the scrolling preview window and GNOME shell helper extension to remove the manual 'hide' action, simplify the extension D-Bus event handlers, standardise button layouts, and prevent background outline rendering artifacts when preview panels are hidden.
+
+### Release Artifacts
+
+- `mark-shot-v0.1.20-linux-x86_64.tar.gz`
+- `mark-shot-v0.1.20-linux-arm64.tar.gz`
+- `mark-shot_0.1.20_amd64.deb`
+- `mark-shot_0.1.20_arm64.deb`
+- `mark-shot_0.1.20_fedora_x86_64.rpm`
+- `mark-shot_0.1.20_fedora_aarch64.rpm`
+- `mark-shot-v0.1.20-linux-x86_64.AppImage`
+
 ## 0.1.19 - 2026-06-05
 
 ### Features & Enhancements

@@ -82,9 +82,14 @@ private:
     void updateInputMask();
     void refreshControlLabels();
     void dumpDebugFrame(const QImage &frame, const char *tag);
-    void togglePreviewPanel();
-    void setPreviewPanelVisible(bool visible, bool userRequested);
-    void syncPreviewPanelDefaultVisibility();
+    void setPreviewPanelVisible(bool visible);
+    void updatePreviewPanelVisibility();
+    void syncPreviewWindowVisibility();
+    void scheduleScrollIdlePause();
+    void cancelScrollIdlePause();
+    void handleScrollIdleTimeout();
+    void resumeAutoPausedCapture();
+    bool shouldHidePreviewWhileCapturing() const;
     QImage currentResult() const;
     QRect captureBoundsGlobal() const;
     QRect floatingPanelGlobalRect() const;
@@ -148,6 +153,7 @@ private:
     qint64 m_sessionId = 0;
     Stitcher m_stitcher;
     QTimer *m_timer = nullptr;
+    QTimer *m_scrollIdleTimer = nullptr;
     bool m_paused = false;
     bool m_layerShell = false;
     bool m_panelOnlyWindow = false;
@@ -176,8 +182,7 @@ private:
     bool m_restoreMaskAfterPaint = false;
     bool m_panelTransparentForCapture = false;
     bool m_previewPanelVisible = true;
-    bool m_previewPanelUserSet = false;
-    bool m_previewPanelPausedCapture = false;
+    bool m_autoPausedForPreview = false;
     bool m_overviewDragging = false;
     int m_overviewDragOffsetPx = 0;
     bool m_gnomeShellPreview = false;
@@ -194,7 +199,6 @@ private:
     QPushButton *m_annotateButton = nullptr;
     QPushButton *m_saveButton = nullptr;
     QPushButton *m_copyButton = nullptr;
-    QPushButton *m_hidePreviewButton = nullptr;
     QPushButton *m_cancelButton = nullptr;
 };
 

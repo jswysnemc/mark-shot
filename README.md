@@ -571,14 +571,21 @@ The expected result is `('2',)`. On GNOME Wayland, restart `mark-shot` after ena
 
 ## Release Notes
 
+### 0.1.20
+
+- **Scroll Capture Idle Pause**: Added an idle pause mechanism (1000ms delay) during scrolling capture when preview panel space is constrained. It automatically pauses capture, reveals the progress preview, and changes the action label to "Continue Capture" so the user can easily review the progress.
+- **Scroll Capture Config Support**: Added full configuration integration for scrolling screenshots in the setup window, allowing users to configure scrolling parameters directly via the UI.
+- **Physical Pixel Preservation**: Fixed a regression in cropping arithmetic to ensure raw physical pixels are correctly preserved without scaling distortion.
+- **Scroll Capture UI Polish**: Refactored the scrolling preview window and GNOME shell helper extension to remove the manual 'hide' action, simplify the extension D-Bus event handlers, standardise button layouts, and prevent background outline rendering artifacts when preview panels are hidden.
+
+<details>
+<summary>Older Release Notes</summary>
+
 ### 0.1.19
 
 - **GNOME Wayland Scrolling Capture**: Supported scrolling screenshot capture on GNOME Wayland by introducing the bundled `mark-shot-scroll-helper@snemc.org` GNOME Shell extension.
 - **On-Demand and Configurable Pinned OCR/Translation**: Added config option `pinnedWindow.autoOcr` (defaults to `false`) to control background text recognition on pin, allowing on-demand triggering via context menu. Added `translation.autoAfterOcr` (defaults to `false`) to automatically perform translation after background OCR.
 - **Improved Context Menu Copy**: Choosing "Copy Image Text" on a pinned sticker window will now automatically trigger OCR in the background if no text is currently recognized, copying to clipboard upon completion.
-
-<details>
-<summary>Older Release Notes</summary>
 
 ### 0.1.18
 

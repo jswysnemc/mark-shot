@@ -25,7 +25,6 @@ const ACTION_ICONS = {
     annotate: 'document-edit-symbolic',
     save: 'document-save-symbolic',
     copy: 'edit-copy-symbolic',
-    hide: 'view-hidden-symbolic',
     cancel: 'window-close-symbolic',
 };
 
@@ -249,31 +248,15 @@ export default class MarkShotScrollHelper extends Extension {
             ].join(' '),
         });
 
-        const statusRow = new St.BoxLayout({
-            vertical: false,
-            x_expand: true,
-            style: 'spacing: 8px;',
-        });
         this._previewStatus = new St.Label({
             text: 'Scroll down to capture',
-            x_expand: true,
             style: [
                 'color: rgb(204, 251, 241);',
                 'font-weight: 700;',
                 'font-size: 10pt;',
             ].join(' '),
         });
-        statusRow.add_child(this._previewStatus);
-
-        const hideButton = this._makeButton('hide', ACTION_ICONS.hide, 'Hide Preview', {
-            width: 22,
-            height: 22,
-            iconSize: 16,
-            radius: 7,
-        });
-        statusRow.add_child(hideButton);
-        this._previewButtons.set('hide', hideButton);
-        this._previewRoot.add_child(statusRow);
+        this._previewRoot.add_child(this._previewStatus);
 
         this._previewImageBin = new St.Bin({
             style: 'background-color: rgba(8, 13, 19, 220);',
@@ -305,11 +288,7 @@ export default class MarkShotScrollHelper extends Extension {
         this._previewRoot.hide();
     }
 
-    _makeButton(action, iconName, label, options = {}) {
-        const width = options.width ?? 40;
-        const height = options.height ?? 36;
-        const iconSize = options.iconSize ?? ICON_SIZE;
-        const radius = options.radius ?? 10;
+    _makeButton(action, iconName, label) {
         const roleStyle = action === 'save'
             ? 'background-color: rgba(45, 212, 191, 92); border-color: rgba(94, 234, 212, 150);'
             : action === 'cancel'
@@ -325,17 +304,17 @@ export default class MarkShotScrollHelper extends Extension {
                 roleStyle,
                 'border-width: 1px;',
                 'border-style: solid;',
-                `border-radius: ${radius}px;`,
-                `min-width: ${width}px;`,
-                `max-width: ${width}px;`,
-                `min-height: ${height}px;`,
-                `max-height: ${height}px;`,
+                'border-radius: 10px;',
+                'min-width: 40px;',
+                'max-width: 40px;',
+                'min-height: 36px;',
+                'max-height: 36px;',
                 'padding: 0;',
             ].join(' '),
         });
         button.set_child(new St.Icon({
             icon_name: iconName,
-            icon_size: iconSize,
+            icon_size: ICON_SIZE,
             style: 'color: rgb(229, 231, 235);',
         }));
         button.connect('clicked', () => {
@@ -524,9 +503,6 @@ export default class MarkShotScrollHelper extends Extension {
             'PreviewAction',
             new GLib.Variant('(ss)', [sessionId, action])
         );
-        if (action === 'hide') {
-            this._hideScrollPreview(sessionId);
-        }
     }
 
     _hideScrollPreview(sessionId) {

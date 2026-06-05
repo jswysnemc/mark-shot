@@ -63,9 +63,9 @@ constexpr int kPanelWidth = 340;      // preview panel width
 constexpr int kPanelPadding = 12;
 constexpr int kControlBarHeight = 54;   // single row of icon actions
 constexpr int kStatusHeight = 22;
-constexpr int kHidePreviewButtonSize = 22;
 constexpr int kPanelMargin = 4;
 constexpr int kGnomePreviewIntervalMs = 140;
+constexpr int kScrollIdlePauseMs = 1000;
 
 constexpr auto kGnomeShellService = "org.gnome.Shell";
 constexpr auto kGnomeHelperPath = "/org/gnome/Shell/Extensions/MarkShotScrollHelper";
@@ -194,7 +194,6 @@ enum class ControlIcon {
     Annotate,
     Save,
     Copy,
-    HidePreview,
     Cancel,
 };
 
@@ -372,18 +371,6 @@ QIcon makeControlIcon(ControlIcon icon)
         p.setPen(iconPen(ink, 1.8));
         p.drawRoundedRect(QRectF(7.5, 11.5, 13, 14), 2.5, 2.5);
         break;
-    case ControlIcon::HidePreview: {
-        QPainterPath eye;
-        eye.moveTo(6.5, 16);
-        eye.cubicTo(9.0, 10.5, 23.0, 10.5, 25.5, 16);
-        eye.cubicTo(23.0, 21.5, 9.0, 21.5, 6.5, 16);
-        p.setPen(iconPen(ink, 1.5));
-        p.drawPath(eye);
-        p.drawEllipse(QPointF(16, 16), 3.0, 3.0);
-        p.setPen(iconPen(ink, 2.0));
-        p.drawLine(QPointF(8.5, 23.5), QPointF(23.5, 8.5));
-        break;
-    }
     case ControlIcon::Cancel:
         p.setPen(iconPen(ink, 1.8));
         p.drawLine(QPointF(10, 10), QPointF(22, 22));
@@ -430,9 +417,6 @@ ScrollSessionWindow::ScrollSessionWindow(QRect globalGeometry,
     auto *cancelShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
     cancelShortcut->setContext(Qt::ApplicationShortcut);
     connect(cancelShortcut, &QShortcut::activated, this, [this] { close(); });
-    auto *togglePreviewShortcut = new QShortcut(QKeySequence(Qt::Key_V), this);
-    togglePreviewShortcut->setContext(Qt::ApplicationShortcut);
-    connect(togglePreviewShortcut, &QShortcut::activated, this, [this] { togglePreviewPanel(); });
 
     if (!screen) {
         screen = QGuiApplication::screenAt(m_geometry.center());
@@ -458,7 +442,7 @@ ScrollSessionWindow::ScrollSessionWindow(QRect globalGeometry,
     m_panelOnlyWindow = !m_layerShell && isWaylandPlatform();
     if (!m_layerShell && screen) {
         setScreen(screen);
-        syncPreviewPanelDefaultVisibility();
+        updatePreviewPanelVisibility();
         if (m_panelOnlyWindow) {
             updatePanelWindowGeometry();
         } else {
@@ -469,6 +453,11 @@ ScrollSessionWindow::ScrollSessionWindow(QRect globalGeometry,
     m_timer = new QTimer(this);
     m_timer->setInterval(kCaptureIntervalMs);
     connect(m_timer, &QTimer::timeout, this, [this] { captureTick(); });
+
+    m_scrollIdleTimer = new QTimer(this);
+    m_scrollIdleTimer->setSingleShot(true);
+    m_scrollIdleTimer->setInterval(kScrollIdlePauseMs);
+    connect(m_scrollIdleTimer, &QTimer::timeout, this, [this] { handleScrollIdleTimeout(); });
 
     logScrollDebug("start time=%lld geom=%d,%d %dx%d output=%s algorithm=%s",
                    m_sessionId,
@@ -553,34 +542,11 @@ void ScrollSessionWindow::buildControlBar()
     m_copyButton = makeButton(makeControlIcon(ControlIcon::Copy), MS_TR("Copy"));
     m_cancelButton = makeButton(makeControlIcon(ControlIcon::Cancel), MS_TR("Cancel"), QStringLiteral("danger"));
 
-    m_hidePreviewButton = new QPushButton(this);
-    m_hidePreviewButton->setProperty("role", QStringLiteral("secondary"));
-    configureIconButton(m_hidePreviewButton,
-                        makeControlIcon(ControlIcon::HidePreview),
-                        MS_TR("Hide Preview"));
-    m_hidePreviewButton->setIconSize(QSize(16, 16));
-    m_hidePreviewButton->setFixedSize(QSize(kHidePreviewButtonSize, kHidePreviewButtonSize));
-    m_hidePreviewButton->setFocusPolicy(Qt::NoFocus);
-    m_hidePreviewButton->setCursor(Qt::PointingHandCursor);
-    m_hidePreviewButton->setStyleSheet(QStringLiteral(
-        "QPushButton {"
-        " color: #E5E7EB; background: rgba(255,255,255,16);"
-        " border: 1px solid rgba(255,255,255,24); border-radius: 7px;"
-        " padding: 0; min-width: 22px; max-width: 22px;"
-        " min-height: 22px; max-height: 22px; }"
-        "QPushButton:hover { background: rgba(45,212,191,30);"
-        " border-color: rgba(45,212,191,90); }"
-        "QPushButton:focus { border-color: rgba(94,234,212,180); }"));
-    m_hidePreviewButton->hide();
-
     connect(m_axisButton, &QPushButton::clicked, this, [this] { toggleAxis(); });
     connect(m_pauseButton, &QPushButton::clicked, this, [this] { togglePause(); });
     connect(m_annotateButton, &QPushButton::clicked, this, [this] { annotateResult(); });
     connect(m_saveButton, &QPushButton::clicked, this, [this] { saveResult(); });
     connect(m_copyButton, &QPushButton::clicked, this, [this] { copyResult(); });
-    connect(m_hidePreviewButton, &QPushButton::clicked, this, [this] {
-        setPreviewPanelVisible(false, true);
-    });
     connect(m_cancelButton, &QPushButton::clicked, this, [this] { close(); });
 
     refreshControlLabels();
@@ -675,7 +641,6 @@ void ScrollSessionWindow::updatePanelWindowGeometry()
     const QRect panel = m_previewPanelVisible
         ? floatingPanelGlobalRect()
         : QRect(hiddenPoint, QSize(1, 1));
-    setWindowOpacity(m_previewPanelVisible ? 1.0 : 0.0);
     if (geometry() != panel) {
         setGeometry(panel);
     }
@@ -690,6 +655,9 @@ QRegion ScrollSessionWindow::overlayPaintRegion() const
     }
     if (m_panelOnlyWindow) {
         return m_previewPanelVisible ? QRegion(bounds) : QRegion();
+    }
+    if (!m_previewPanelVisible) {
+        return {};
     }
 
     constexpr int kAntialiasPad = 2;
@@ -725,7 +693,7 @@ void ScrollSessionWindow::setRegionGeometry(QRect geometry)
 
     const QRegion oldPaint = overlayPaintRegion();
     m_geometry = geometry;
-    syncPreviewPanelDefaultVisibility();
+    updatePreviewPanelVisibility();
     if (m_panelOnlyWindow && !m_axisDragging) {
         updatePanelWindowGeometry();
     }
@@ -733,6 +701,7 @@ void ScrollSessionWindow::setRegionGeometry(QRect geometry)
     m_transientPaintMask += oldPaint;
     m_transientPaintMask += overlayPaintRegion();
     updateInputMask();
+    syncPreviewWindowVisibility();
     if (!m_transientPaintMask.isEmpty()) {
         update(m_transientPaintMask);
     } else {
@@ -744,16 +713,9 @@ void ScrollSessionWindow::setRegionGeometry(QRect geometry)
 
 void ScrollSessionWindow::layoutOverlay()
 {
-    if (m_layerShell && !m_gnomeShellPreview) {
-        setWindowOpacity(m_previewPanelVisible ? 1.0 : 0.0);
-    }
-
     if (m_gnomeShellPreview) {
         if (m_controlBar) {
             m_controlBar->hide();
-        }
-        if (m_hidePreviewButton) {
-            m_hidePreviewButton->hide();
         }
         return;
     }
@@ -761,9 +723,6 @@ void ScrollSessionWindow::layoutOverlay()
     if (!m_previewPanelVisible) {
         if (m_controlBar) {
             m_controlBar->hide();
-        }
-        if (m_hidePreviewButton) {
-            m_hidePreviewButton->hide();
         }
         return;
     }
@@ -778,13 +737,6 @@ void ScrollSessionWindow::layoutOverlay()
                               barTop,
                               barWidth,
                               kControlBarHeight);
-    if (m_hidePreviewButton && !m_panelTransparentForCapture) {
-        m_hidePreviewButton->show();
-        m_hidePreviewButton->setGeometry(panel.right() - kPanelPadding - kHidePreviewButtonSize + 1,
-                                         panel.top() + kPanelPadding,
-                                         kHidePreviewButtonSize,
-                                         kHidePreviewButtonSize);
-    }
 }
 
 void ScrollSessionWindow::updateInputMask()
@@ -827,7 +779,7 @@ void ScrollSessionWindow::updateInputMask()
 void ScrollSessionWindow::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
-    syncPreviewPanelDefaultVisibility();
+    updatePreviewPanelVisibility();
     if (m_panelOnlyWindow) {
         updatePanelWindowGeometry();
     } else if (!m_layerShell) {
@@ -835,6 +787,7 @@ void ScrollSessionWindow::showEvent(QShowEvent *event)
     }
     layoutOverlay();
     updateInputMask();
+    syncPreviewWindowVisibility();
     const QRect region = regionLocalRect();
     const QRect panel = previewPanelRect();
     logScrollDebug("layout window=%d,%d %dx%d screen_origin=%d,%d region=%d,%d %dx%d "
@@ -856,15 +809,17 @@ void ScrollSessionWindow::showEvent(QShowEvent *event)
             }
         });
     }
+    syncPreviewWindowVisibility();
 }
 
 void ScrollSessionWindow::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
     const QRegion oldPaint = overlayPaintRegion();
-    syncPreviewPanelDefaultVisibility();
+    updatePreviewPanelVisibility();
     layoutOverlay();
     updateInputMask();
+    syncPreviewWindowVisibility();
     const QRegion repaintRegion = oldPaint + overlayPaintRegion();
     if (!repaintRegion.isEmpty()) {
         update(repaintRegion);
@@ -894,9 +849,6 @@ void ScrollSessionWindow::captureTick()
             if (m_controlBar) {
                 m_controlBar->hide();
             }
-            if (m_hidePreviewButton) {
-                m_hidePreviewButton->hide();
-            }
             repaint(overlayPaintRegion());
             QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
             request.minimumFrameTimeMs = QDateTime::currentMSecsSinceEpoch() + 1;
@@ -904,7 +856,7 @@ void ScrollSessionWindow::captureTick()
         const CaptureResult result = captureScreenFrame(request);
         if (makePanelTransparentForCapture) {
             m_panelTransparentForCapture = false;
-            if (m_controlBar || m_hidePreviewButton) {
+            if (m_controlBar) {
                 layoutOverlay();
             }
             repaint(overlayPaintRegion());
@@ -912,8 +864,11 @@ void ScrollSessionWindow::captureTick()
         }
         if (result.image.isNull()) {
             m_paused = true;
+            m_autoPausedForPreview = false;
+            cancelScrollIdlePause();
             stopActiveScreencastCapture();
             m_statusText = MS_TR("Capture error");
+            updatePreviewPanelVisibility();
             refreshControlLabels();
             updateGnomeShellPreview(true);
             logScrollDebug("%s-capture-error geom=%d,%d %dx%d output=%s error=%s",
@@ -941,10 +896,14 @@ void ScrollSessionWindow::captureTick()
         logScrollDebug("skip-duplicate frame=%dx%d axis=%s",
                        frame.width(), frame.height(),
                        axisDebugName(m_stitcher.axis()));
+        if (shouldHidePreviewWhileCapturing()) {
+            scheduleScrollIdlePause();
+        }
         updateGnomeShellPreview();
         update();
         return;
     }
+    cancelScrollIdlePause();
     m_lastSignature = signature;
     dumpDebugFrame(frame, "candidate");
 
@@ -1010,11 +969,19 @@ void ScrollSessionWindow::dumpDebugFrame(const QImage &frame, const char *tag)
 
 void ScrollSessionWindow::togglePause()
 {
+    if (m_autoPausedForPreview) {
+        resumeAutoPausedCapture();
+        return;
+    }
+
     m_paused = !m_paused;
-    m_previewPanelPausedCapture = false;
     if (!m_paused) {
         m_lastSignature.clear();
+    } else {
+        cancelScrollIdlePause();
     }
+    m_autoPausedForPreview = false;
+    updatePreviewPanelVisibility();
     refreshControlLabels();
     updateGnomeShellPreview(true);
     update();
@@ -1035,42 +1002,9 @@ void ScrollSessionWindow::toggleAxis()
     update();
 }
 
-void ScrollSessionWindow::togglePreviewPanel()
+void ScrollSessionWindow::setPreviewPanelVisible(bool visible)
 {
-    setPreviewPanelVisible(!m_previewPanelVisible, true);
-}
-
-void ScrollSessionWindow::setPreviewPanelVisible(bool visible, bool userRequested)
-{
-    if (userRequested) {
-        m_previewPanelUserSet = true;
-    }
-
-    bool captureStateChanged = false;
-    if (visible && !previewPanelFitsAvailableSpace() && !m_paused) {
-        m_paused = true;
-        m_previewPanelPausedCapture = true;
-        captureStateChanged = true;
-        m_lastSignature.clear();
-        refreshControlLabels();
-    } else if (!visible && m_previewPanelPausedCapture) {
-        m_previewPanelPausedCapture = false;
-        if (m_paused) {
-            m_paused = false;
-            captureStateChanged = true;
-            m_lastSignature.clear();
-            refreshControlLabels();
-            if (m_timer && !m_timer->isActive()) {
-                m_timer->start();
-            }
-        }
-    }
-
     if (m_previewPanelVisible == visible) {
-        if (captureStateChanged) {
-            updateGnomeShellPreview(true);
-            update();
-        }
         return;
     }
 
@@ -1082,6 +1016,7 @@ void ScrollSessionWindow::setPreviewPanelVisible(bool visible, bool userRequeste
     layoutOverlay();
     updateInputMask();
     updateGnomeShellPreview(true);
+    syncPreviewWindowVisibility();
     const QRegion repaintRegion = oldPaint + overlayPaintRegion();
     if (!repaintRegion.isEmpty()) {
         update(repaintRegion);
@@ -1090,12 +1025,91 @@ void ScrollSessionWindow::setPreviewPanelVisible(bool visible, bool userRequeste
     }
 }
 
-void ScrollSessionWindow::syncPreviewPanelDefaultVisibility()
+bool ScrollSessionWindow::shouldHidePreviewWhileCapturing() const
 {
-    if (m_previewPanelUserSet) {
+    return !m_paused && !previewPanelFitsAvailableSpace();
+}
+
+void ScrollSessionWindow::updatePreviewPanelVisibility()
+{
+    setPreviewPanelVisible(!shouldHidePreviewWhileCapturing());
+    syncPreviewWindowVisibility();
+}
+
+void ScrollSessionWindow::syncPreviewWindowVisibility()
+{
+    if (m_gnomeShellPreview || !m_layerShell) {
         return;
     }
-    m_previewPanelVisible = previewPanelFitsAvailableSpace();
+
+    if (m_previewPanelVisible) {
+        if (!isVisible()) {
+            logScrollDebug("preview-window-show paused=%d auto_paused=%d",
+                           m_paused ? 1 : 0,
+                           m_autoPausedForPreview ? 1 : 0);
+            show();
+            raise();
+        }
+        return;
+    }
+
+    if (isVisible()) {
+        logScrollDebug("preview-window-hide paused=%d auto_paused=%d",
+                       m_paused ? 1 : 0,
+                       m_autoPausedForPreview ? 1 : 0);
+        hide();
+    }
+}
+
+void ScrollSessionWindow::scheduleScrollIdlePause()
+{
+    if (!m_scrollIdleTimer || m_paused || !shouldHidePreviewWhileCapturing()) {
+        return;
+    }
+    if (m_scrollIdleTimer->isActive()) {
+        return;
+    }
+    logScrollDebug("idle-preview-timer-start timeout_ms=%d", kScrollIdlePauseMs);
+    m_scrollIdleTimer->start(kScrollIdlePauseMs);
+}
+
+void ScrollSessionWindow::cancelScrollIdlePause()
+{
+    if (m_scrollIdleTimer) {
+        m_scrollIdleTimer->stop();
+    }
+}
+
+void ScrollSessionWindow::handleScrollIdleTimeout()
+{
+    if (m_paused || !shouldHidePreviewWhileCapturing()) {
+        return;
+    }
+
+    m_paused = true;
+    m_autoPausedForPreview = true;
+    m_lastSignature.clear();
+    m_statusText = MS_TR("Capture paused");
+    logScrollDebug("idle-preview-timeout show_preview=1");
+    updatePreviewPanelVisibility();
+    refreshControlLabels();
+    updateGnomeShellPreview(true);
+    update();
+}
+
+void ScrollSessionWindow::resumeAutoPausedCapture()
+{
+    m_paused = false;
+    m_autoPausedForPreview = false;
+    m_lastSignature.clear();
+    m_statusText = MS_TR("Capturing");
+    updatePreviewPanelVisibility();
+    refreshControlLabels();
+    updateGnomeShellPreview(true);
+    if (m_timer && !m_timer->isActive()) {
+        m_timer->start();
+    }
+    update();
 }
 
 QRect ScrollSessionWindow::imageAreaRect() const
@@ -1432,9 +1446,12 @@ void ScrollSessionWindow::updateOverviewDrag(const QPoint &point)
 void ScrollSessionWindow::refreshControlLabels()
 {
     if (m_pauseButton) {
+        const QString pauseLabel = m_autoPausedForPreview
+            ? MS_TR("Continue Capture")
+            : (m_paused ? MS_TR("Resume") : MS_TR("Pause"));
         configureIconButton(m_pauseButton,
                             makeControlIcon(m_paused ? ControlIcon::Resume : ControlIcon::Pause),
-                            m_paused ? MS_TR("Resume") : MS_TR("Pause"));
+                            pauseLabel);
     }
     if (m_axisButton) {
         const bool horizontal = m_stitcher.axis() == ScrollAxis::Horizontal;
@@ -1473,6 +1490,10 @@ void ScrollSessionWindow::saveResult()
         return;
     }
     m_paused = true;
+    m_autoPausedForPreview = false;
+    cancelScrollIdlePause();
+    updatePreviewPanelVisibility();
+    refreshControlLabels();
 
     auto *dialog = new QFileDialog(nullptr, MS_TR("Save Scrolling Screenshot"));
     dialog->setAttribute(Qt::WA_DeleteOnClose);
@@ -1490,8 +1511,14 @@ void ScrollSessionWindow::saveResult()
             return;
         }
         m_paused = false;
+        updatePreviewPanelVisibility();
+        refreshControlLabels();
     });
-    connect(dialog, &QFileDialog::rejected, this, [this] { m_paused = false; });
+    connect(dialog, &QFileDialog::rejected, this, [this] {
+        m_paused = false;
+        updatePreviewPanelVisibility();
+        refreshControlLabels();
+    });
     dialog->open();
 }
 
@@ -1523,7 +1550,7 @@ void ScrollSessionWindow::paintEvent(QPaintEvent *)
         return;
     }
 
-    if (m_uiConfig.frameEnabled && !m_panelOnlyWindow) {
+    if (m_previewPanelVisible && m_uiConfig.frameEnabled && !m_panelOnlyWindow) {
         const QRect region = regionLocalRect();
         QPainterPath framePath;
         framePath.setFillRule(Qt::OddEvenFill);
@@ -1547,12 +1574,9 @@ void ScrollSessionWindow::paintEvent(QPaintEvent *)
         painter.drawPath(panelPath);
 
         // Status text along the top of the panel.
-        const int statusRightInset = m_hidePreviewButton && m_hidePreviewButton->isVisible()
-            ? kPanelPadding + kHidePreviewButtonSize + 6
-            : kPanelPadding;
         const QRect statusRect(panel.left() + kPanelPadding,
                                panel.top() + kPanelPadding,
-                               panel.width() - kPanelPadding - statusRightInset,
+                               panel.width() - kPanelPadding * 2,
                                kStatusHeight);
         painter.setPen(QColor(204, 251, 241, 240));
         QFont statusFont = painter.font();
@@ -1588,11 +1612,6 @@ void ScrollSessionWindow::keyPressEvent(QKeyEvent *event)
     }
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
         annotateResult();
-        event->accept();
-        return;
-    }
-    if (event->key() == Qt::Key_V && event->modifiers() == Qt::NoModifier) {
-        togglePreviewPanel();
         event->accept();
         return;
     }
@@ -1926,8 +1945,6 @@ void ScrollSessionWindow::handleGnomePreviewAction(const QString &sessionId, con
         if (!m_stitcher.axisLocked()) {
             toggleAxis();
         }
-    } else if (action == QStringLiteral("hide")) {
-        setPreviewPanelVisible(false, true);
     } else if (action == QStringLiteral("annotate")) {
         annotateResult();
     } else if (action == QStringLiteral("save")) {
@@ -1945,6 +1962,7 @@ void ScrollSessionWindow::closeEvent(QCloseEvent *event)
     if (m_timer) {
         m_timer->stop();
     }
+    cancelScrollIdlePause();
     hideGnomeShellPreview();
     if (m_gnomeShellPreview) {
         QDBusConnection::sessionBus().disconnect(QString::fromLatin1(kGnomeShellService),
