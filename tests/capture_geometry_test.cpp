@@ -69,17 +69,17 @@ private slots:
         QCOMPARE(cropped.pixelColor(cropped.width() - 1, cropped.height() - 1), QColor(Qt::blue));
     }
 
-    void normalizeCropToLogicalSizeDownscalesPhysicalPixels()
+    void cropFrameToRequestKeepsPhysicalPixelsForScaledOutput()
     {
         QImage image(400, 200, QImage::Format_ARGB32_Premultiplied);
         image.fill(Qt::black);
 
-        const QImage normalized = markshot::capture::normalizeCropToLogicalSize(image,
-                                                                               QRect(0, 0, 200, 100),
-                                                                               QRect(0, 0, 200, 100));
+        const QImage cropped = markshot::capture::cropFrameToRequest(image,
+                                                                     QRect(0, 0, 200, 100),
+                                                                     QRect(0, 0, 200, 100));
 
-        QCOMPARE(normalized.size(), QSize(200, 100));
-        QCOMPARE(normalized.devicePixelRatio(), 1.0);
+        QCOMPARE(cropped.size(), QSize(400, 200));
+        QCOMPARE(cropped.devicePixelRatio(), 1.0);
     }
 
     void imageRectAndGeometryRoundTrip()

@@ -41,27 +41,6 @@ QImage cropFrameToRequest(const QImage &frame, QRect streamGeometry, QRect reque
     return crop.isEmpty() ? QImage() : frame.copy(crop);
 }
 
-QImage normalizeCropToLogicalSize(QImage image, QRect streamGeometry, QRect requestedGeometry)
-{
-    if (image.isNull() || requestedGeometry.isEmpty()) {
-        return image;
-    }
-
-    if (streamGeometry.isNull() || streamGeometry.isEmpty()) {
-        return image;
-    }
-
-    const QRect overlap = requestedGeometry.normalized().intersected(streamGeometry.normalized());
-    const QSize targetSize = overlap.size();
-    if (targetSize.isEmpty() || image.size() == targetSize) {
-        return image;
-    }
-
-    image = image.scaled(targetSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    image.setDevicePixelRatio(1.0);
-    return image;
-}
-
 QRect imageRectFromGeometry(QRect geometry, QRect sourceGeometry, QSize imageSize)
 {
     if (geometry.isEmpty() || imageSize.isEmpty()) {

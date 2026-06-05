@@ -386,19 +386,15 @@ CaptureResult cropGrimFrameToRequest(CaptureResult capture, QRect frameGeometry,
     capture.image = cropped.convertToFormat(QImage::Format_ARGB32_Premultiplied);
     const QSize croppedSize = capture.image.size();
     capture.sourceGeometry = overlap;
-    capture.image = markshot::capture::normalizeCropToLogicalSize(std::move(capture.image),
-                                                                  capture.sourceGeometry,
-                                                                  requested);
     markshot::debugLog("capture",
                        "grim-local-crop frame=%dx%d frame_geom=%d,%d %dx%d "
-                       "requested=%d,%d %dx%d overlap=%d,%d %dx%d cropped=%dx%d normalized=%dx%d",
+                       "requested=%d,%d %dx%d overlap=%d,%d %dx%d result=%dx%d",
                        frameSize.width(), frameSize.height(),
                        frameGeometry.x(), frameGeometry.y(),
                        frameGeometry.width(), frameGeometry.height(),
                        requested.x(), requested.y(), requested.width(), requested.height(),
                        overlap.x(), overlap.y(), overlap.width(), overlap.height(),
-                       croppedSize.width(), croppedSize.height(),
-                       capture.image.width(), capture.image.height());
+                       croppedSize.width(), croppedSize.height());
     return capture;
 }
 
@@ -657,18 +653,16 @@ CaptureResult captureWithPortalScreenshot(const CaptureRequest &request)
             image = image.copy(cropRect);
         }
         const QSize croppedSize = image.size();
-        image = markshot::capture::normalizeCropToLogicalSize(std::move(image), coverage, overlap);
         sourceGeometry = overlap;
         markshot::debugLog("capture",
                            "portal-screenshot raw=%dx%d coverage=%d,%d %dx%d requested=%d,%d %dx%d "
-                           "crop=%d,%d %dx%d cropped=%dx%d display_logical=%dx%d normalized=%dx%d",
+                           "crop=%d,%d %dx%d result=%dx%d display_logical=%dx%d",
                            rawSize.width(), rawSize.height(),
                            coverage.x(), coverage.y(), coverage.width(), coverage.height(),
                            requested.x(), requested.y(), requested.width(), requested.height(),
                            cropRect.x(), cropRect.y(), cropRect.width(), cropRect.height(),
                            croppedSize.width(), croppedSize.height(),
-                           overlap.width(), overlap.height(),
-                           image.width(), image.height());
+                           overlap.width(), overlap.height());
     }
 
     return {image, {}, request.allOutputs ? QString() : request.preferredOutputName, sourceGeometry};
@@ -1201,21 +1195,15 @@ public:
             ? markshot::capture::cropFrameToRequest(frame, streamGeometry, requested)
             : frame;
         const QSize croppedSize = image.size();
-        if (wantCrop) {
-            image = markshot::capture::normalizeCropToLogicalSize(std::move(image),
-                                                                  streamGeometry,
-                                                                  requested);
-        }
         markshot::debugLog("screencast",
                            "frame raw=%dx%d stream_geom=%d,%d %dx%d requested=%d,%d %dx%d "
-                           "want_crop=%d cropped=%dx%d normalized=%dx%d frame_time=%lld minimum_time=%lld",
+                           "want_crop=%d result=%dx%d frame_time=%lld minimum_time=%lld",
                            frame.width(), frame.height(),
                            streamGeometry.x(), streamGeometry.y(),
                            streamGeometry.width(), streamGeometry.height(),
                            requested.x(), requested.y(), requested.width(), requested.height(),
                            wantCrop ? 1 : 0,
                            croppedSize.width(), croppedSize.height(),
-                           image.width(), image.height(),
                            frameTimeMs, minimumFrameTimeMs);
         if (image.isNull()) {
             markshot::debugLog("screencast",
