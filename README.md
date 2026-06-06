@@ -594,15 +594,21 @@ The expected result is `('2',)`. On GNOME Wayland, restart `mark-shot` after ena
 
 ## Release Notes
 
+### 0.1.21
+
+- **Magnifier Annotation Tool**: Added a magnifier annotation tool supporting independent positioning of the magnification source and the lens. Once placed, users can drag the source circle and lens circle separately to precisely adjust magnification parameters.
+- **Editable OCR Result Window**: Enabled an editable floating result panel by default for main selection OCR. Users can edit, copy, or translate the recognized text within the panel, or drag the panel to move it.
+- **OCR Result Config & Environment Variables**: Integrated config option `ocr.resultPanel` (boolean or object) and environment variables `MARK_SHOT_OCR_RESULT_PANEL` / `MARK_SHOT_OCR_RESULT_WINDOW` to toggle the result panel. Users can disable this option to restore direct clipboard copy behavior.
+
+<details>
+<summary>Older Release Notes</summary>
+
 ### 0.1.20
 
 - **Scroll Capture Idle Pause**: Added an idle pause mechanism (1000ms delay) during scrolling capture when preview panel space is constrained. It automatically pauses capture, reveals the progress preview, and changes the action label to "Continue Capture" so the user can easily review the progress.
 - **Scroll Capture Config Support**: Added full configuration integration for scrolling screenshots in the setup window, allowing users to configure scrolling parameters directly via the UI.
 - **Physical Pixel Preservation**: Fixed a regression in cropping arithmetic to ensure raw physical pixels are correctly preserved without scaling distortion.
 - **Scroll Capture UI Polish**: Refactored the scrolling preview window and GNOME shell helper extension to remove the manual 'hide' action, simplify the extension D-Bus event handlers, standardise button layouts, and prevent background outline rendering artifacts when preview panels are hidden.
-
-<details>
-<summary>Older Release Notes</summary>
 
 ### 0.1.19
 

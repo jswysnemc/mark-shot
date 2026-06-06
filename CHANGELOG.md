@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.21 - 2026-06-06
+
+### Features & Enhancements
+
+- **Magnifier Annotation Tool**: Added a magnifier annotation tool supporting independent positioning of the magnification source and the lens. Once placed, users can drag the source circle and lens circle separately to precisely adjust magnification parameters.
+- **Editable OCR Result Window**: Enabled an editable floating result panel by default for main selection OCR. Users can edit, copy, or translate the recognized text within the panel, or drag the panel to move it.
+- **OCR Result Config & Environment Variables**: Integrated config option `ocr.resultPanel` (boolean or object) and environment variables `MARK_SHOT_OCR_RESULT_PANEL` / `MARK_SHOT_OCR_RESULT_WINDOW` to toggle the result panel. Users can disable this option to restore direct clipboard copy behavior.
+
+### Release Artifacts
+
+- `mark-shot-v0.1.21-linux-x86_64.tar.gz`
+- `mark-shot-v0.1.21-linux-arm64.tar.gz`
+- `mark-shot_0.1.21_amd64.deb`
+- `mark-shot_0.1.21_arm64.deb`
+- `mark-shot_0.1.21_fedora_x86_64.rpm`
+- `mark-shot_0.1.21_fedora_aarch64.rpm`
+- `mark-shot-v0.1.21-linux-x86_64.AppImage`
+- `mark-shot-v0.1.21-linux-x86_64.flatpak`
+
 ## 0.1.20 - 2026-06-05
 
 ### Features & Enhancements
