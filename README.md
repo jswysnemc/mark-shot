@@ -208,7 +208,7 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json`. Pin
 | Configuration Key | Data Type | Default Value | Description |
 | :--- | :---: | :---: | :--- |
 | `env` | Object | `{}` | Environment variables applied to the process before `QApplication` creation (e.g., `"QT_FONT_DPI": 96` to normalize high-DPI scaling). Alias: `environment`. |
-| `annotation.defaultTool` | String | `"move"` | The default annotation tool active after selecting a region. Supported values: `move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, `laser`. Overridden by CLI `--default-tool`. |
+| `annotation.defaultTool` | String | `"move"` | The default annotation tool active after selecting a region. Supported values: `move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, `magnifier`, `laser`. Overridden by CLI `--default-tool`. |
 | `annotation.fullscreenDefaultTool` | String | `"laser"` | The default tool active in fullscreen annotation mode. Overridden by CLI `--fullscreen-default-tool`. If configured as `move` in fullscreen, the program defaults to `select`. |
 | `annotation.defaultColor` | String | `"#FF4D4D"` | Initial annotation color. Supports `#RRGGBB` (opaque) or `#RRGGBBAA` (with alpha). Overridden by CLI `--default-color`. |
 | `shortcuts` | Object | - | Customizable keyboard shortcuts. Alias: `hotkeys` (or under `annotation.shortcuts`/`annotation.hotkeys`). See details below. |
@@ -217,37 +217,37 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json`. Pin
 | `scrollCapture.frame` | Boolean/Number/Object | `5` | Outer frame offset for scrolling capture. A number sets the pixel gap between the captured region and the frame; `false` disables the frame. Object form supports `enabled` and `gap`. Aliases: `captureFrame`, `border`, `outline`, plus flat `frameEnabled`/`frameGap`. |
 | `scrollCapture.previewGap` | Number/Object | `5` | Pixel gap between the outer frame and the scrolling preview panel. The panel is placed around the frame using the first available non-overlapping position. Aliases: `previewDistance`, `previewOffset`, `panelGap`; object form supports `gap`. |
 | `ocr.enabled` | Boolean | `true` | Controls whether OCR features are available. Does not enable pinned-window background OCR by itself. |
+| `ocr.resultPanel` | Boolean/Object | `true` | Controls whether the main selection OCR flow opens an editable result window. Object form supports `enabled`, `show`, `visible`, or `use`. Aliases include `resultWindow`, `ocrResultPanel`, and `ocrResultWindow`. Environment variables `MARK_SHOT_OCR_RESULT_PANEL` and `MARK_SHOT_OCR_RESULT_WINDOW` override this config. |
 | `translation.autoAfterOcr` | Boolean | `false` | Controls whether translation starts automatically after a successful pinned-window OCR result. If enabled, choosing Translate later displays the cached translation instantly. |
 | `windowDetection.env` | Object | `{}` | Environment variables passed to the window boundary detection script. Alias: `environment`. <br>• **Niri Script**: Supports `MARK_SHOT_NIRI_PANEL_EDGE` (`top`/`bottom`/`left`/`right`/`none`) and pixel offsets `MARK_SHOT_NIRI_OFFSET_X/Y/WIDTH/HEIGHT`.<br>• **Hyprland Script**: Supports `MARK_SHOT_HYPRLAND_INCLUDE_INACTIVE` (`1`/`0`) and pixel offsets `MARK_SHOT_HYPRLAND_OFFSET_X/Y/WIDTH/HEIGHT`. |
 
 ### OCR Result Panel Toggle
 
-The main selection OCR flow still copies recognized text to the clipboard by default.
+The main selection OCR flow opens an editable OCR result window by default.
 
-If you prefer an editable OCR side panel instead, add it to `~/.config/mark-shot/config.json`:
+To disable it and copy recognized text directly, add this to `~/.config/mark-shot/config.json`:
 
 ```json
 {
-  "env": {
-    "QT_FONT_DPI": 96,
-    "MARK_SHOT_OCR_RESULT_PANEL": 1
+  "ocr": {
+    "resultPanel": false
   }
 }
 ```
 
-You can also set it in the shell before launch:
+You can also override the config from the shell before launch:
 
 ```bash
-MARK_SHOT_OCR_RESULT_PANEL=1 mark-shot
+MARK_SHOT_OCR_RESULT_PANEL=0 mark-shot
 ```
 
-Accepted truthy values are `1`, `true`, `yes`, and `on`. When enabled, main-window OCR opens a side panel with edit, copy, translate, and drag-to-move behavior instead of copying immediately.
+Accepted truthy values are `1`, `true`, `yes`, and `on`; accepted falsy values are `0`, `false`, `no`, and `off`. Environment variables have higher priority than the config file.
 
 <details>
 <summary>Keyboard Shortcut Config Details</summary>
 
 The `shortcuts` node supports the following sub-nodes:
-- **`tools`** (alias: `tool`, `toolShortcuts`): Keyboard shortcuts for switching tools (`move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, `laser`).
+- **`tools`** (alias: `tool`, `toolShortcuts`): Keyboard shortcuts for switching tools (`move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, `magnifier`, `laser`).
 - **`actions`** (alias: `action`, `actionShortcuts`): Keyboard shortcuts for global actions (`copy`, `save`, `pin`, `undo`, `redo`, `cancel`, `openWith`, `extensions`, `scrollCapture`, `ocrCopy`, `clear`, `toggleCaptureScope`, `toggleToolbarLayout`).
 - **`startup`** (alias: `startupTools`, `selection`): Keyboard shortcuts for selection-phase tools (`colorPicker`, `ruler`).
 

@@ -21,7 +21,6 @@ class QComboBox;
 class QKeyEvent;
 class QLabel;
 class QListWidget;
-class QProcess;
 class QPushButton;
 class QScrollBar;
 class QScreen;
@@ -50,6 +49,7 @@ public:
         ToolText,
         ToolNumber,
         ToolMosaic,
+        ToolMagnifier,
         ToolLaser,
         ToggleCaptureScope,
         ToggleToolbarLayout,
@@ -78,6 +78,7 @@ public:
         Text,
         Number,
         Mosaic,
+        Magnifier,
         Laser,
     };
 
@@ -200,6 +201,7 @@ private:
     QString slurpSelectionGeometry() const;
     QRect selectionGlobalRect() const;
     QRectF imageRectToWidget(QRectF rect) const;
+    QRectF magnifierSourceRect(const Annotation &annotation) const;
     QRectF textContentRect(const Annotation &annotation, bool widgetCoordinates) const;
     QString defaultSavePath() const;
     Tool defaultEditingTool() const;
@@ -244,7 +246,14 @@ private:
     void drawAnnotation(QPainter &painter, const Annotation &annotation, bool widgetCoordinates) const;
     void drawArrow(QPainter &painter, QPointF start, QPointF end, qreal width, ArrowStyle style) const;
     void drawMosaic(QPainter &painter, QRectF imageRect, qreal blockSize, bool widgetCoordinates) const;
-    void drawNumber(QPainter &painter, QPointF imagePoint, int number, QColor color, qreal width, bool widgetCoordinates) const;
+    void drawMagnifier(QPainter &painter, const Annotation &annotation, bool widgetCoordinates) const;
+    void drawNumber(QPainter &painter,
+                    QPointF tipPoint,
+                    QPointF bubblePoint,
+                    int number,
+                    QColor color,
+                    qreal width,
+                    bool widgetCoordinates) const;
     void drawWheelPreview(QPainter &painter);
     void drawLaserStroke(QPainter &painter, const LaserStroke &stroke, bool widgetCoordinates, qreal opacity) const;
     void beginTextAnnotation(QPointF imagePoint);
@@ -258,12 +267,6 @@ private:
     void pinSelection();
     void startScrollCapture();
     void ocrCopySelection();
-    void showOcrResultPanel(const QString &text);
-    void hideOcrResultPanel();
-    void updateOcrResultPanelGeometry();
-    void startOcrResultTranslation();
-    void finishOcrResultTranslation(QProcess *process, const QByteArray &output);
-    void cancelOcrResultTranslation();
     void showToast(const QString &text, int durationMs = 2000);
     QString saveSelectionToTempFile() const;
     void setCurrentColor(QColor color);
@@ -440,27 +443,17 @@ private:
     bool m_propertyColorEditingTextBackground = false;
     QWidget *m_openWithPanel = nullptr;
     QWidget *m_extensionPanel = nullptr;
-    QWidget *m_ocrResultPanel = nullptr;
     QWidget *m_startupColorPanel = nullptr;
     QWidget *m_colorPalette = nullptr;
     QWidget *m_colorPalettePreview = nullptr;
     QPoint m_colorPaletteAnchor;
     QPoint m_toolbarDragStart;
     QRect m_toolbarBeforeDrag;
-    QPoint m_ocrResultPanelDragStart;
-    QRect m_ocrResultPanelBeforeDrag;
     std::optional<QRectF> m_selectionBeforeFullscreenAnnotation;
     QVector<QPushButton *> m_fullscreenActionButtons;
     bool m_toolbarVerticalLayout = false;
-    bool m_ocrResultPanelDragging = false;
-    bool m_ocrResultPanelUserPlaced = false;
     QTimer *m_laserTimer = nullptr;
     QTextEdit *m_textEditor = nullptr;
-    QTextEdit *m_ocrResultEditor = nullptr;
-    QLabel *m_ocrResultHintLabel = nullptr;
-    QPushButton *m_ocrTranslateButton = nullptr;
-    QProcess *m_ocrResultTranslationProcess = nullptr;
-    QString m_ocrResultTranslationInputPath;
     QPointF m_textEditorImagePoint;
     std::optional<int> m_editingTextAnnotationId;
     QVector<HistorySnapshot> m_undoStack;

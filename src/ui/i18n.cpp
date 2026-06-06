@@ -76,6 +76,7 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Text"), QStringLiteral("文字")},
         {QStringLiteral("Number"), QStringLiteral("序号")},
         {QStringLiteral("Mosaic"), QStringLiteral("马赛克")},
+        {QStringLiteral("Magnifier"), QStringLiteral("放大镜")},
         {QStringLiteral("Laser"), QStringLiteral("激光笔")},
         {QStringLiteral("Scope"), QStringLiteral("范围")},
         {QStringLiteral("Layout"), QStringLiteral("布局")},
@@ -116,6 +117,10 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Type text"), QStringLiteral("输入文字")},
         {QStringLiteral("Enter inserts newline, click outside commits, Esc cancels"),
          QStringLiteral("回车换行，点击外部确认，Esc 取消")},
+        {QStringLiteral("Cut"), QStringLiteral("剪切")},
+        {QStringLiteral("Paste"), QStringLiteral("粘贴")},
+        {QStringLiteral("Delete"), QStringLiteral("删除")},
+        {QStringLiteral("Select All"), QStringLiteral("全选")},
 
         // Selection overlay hint.
         {QStringLiteral("Drag to select   Middle switches   Right/Esc cancels"),

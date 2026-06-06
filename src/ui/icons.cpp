@@ -61,6 +61,8 @@ QString actionName(ShotWindow::Action action)
         return QStringLiteral("Number");
     case ShotWindow::Action::ToolMosaic:
         return QStringLiteral("Mosaic");
+    case ShotWindow::Action::ToolMagnifier:
+        return QStringLiteral("Magnifier");
     case ShotWindow::Action::ToolLaser:
         return QStringLiteral("Laser");
     case ShotWindow::Action::ToggleCaptureScope:
@@ -260,6 +262,15 @@ QIcon makeToolIcon(ShotWindow::Action action)
                 p.drawRoundedRect(QRectF(x, y, tile, tile), 1.0, 1.0);
             }
         }
+        break;
+    }
+    case ShotWindow::Action::ToolMagnifier: {
+        p.setPen(makePen(kInk, 1.9));
+        p.drawEllipse(QRectF(6.5, 6.5, 15.0, 15.0));
+        p.drawLine(QPointF(19.0, 19.0), QPointF(25.0, 25.0));
+        p.setPen(makePen(kInkSoft, 1.3));
+        p.drawLine(QPointF(10.5, 14.0), QPointF(17.5, 14.0));
+        p.drawLine(QPointF(14.0, 10.5), QPointF(14.0, 17.5));
         break;
     }
     case ShotWindow::Action::ToolLaser: {
