@@ -266,6 +266,21 @@ QRectF normalizedRect(QPointF a, QPointF b)
     return QRectF(a, b).normalized();
 }
 
+bool ellipseContainsPoint(QRectF ellipse, QPointF point, qreal tolerance)
+{
+    ellipse = ellipse.normalized().adjusted(-tolerance, -tolerance, tolerance, tolerance);
+    if (ellipse.width() <= 0.0 || ellipse.height() <= 0.0) {
+        return false;
+    }
+
+    const QPointF center = ellipse.center();
+    const qreal radiusX = ellipse.width() / 2.0;
+    const qreal radiusY = ellipse.height() / 2.0;
+    const qreal dx = (point.x() - center.x()) / radiusX;
+    const qreal dy = (point.y() - center.y()) / radiusY;
+    return dx * dx + dy * dy <= 1.0;
+}
+
 QRect windowGeometryToImageRect(QRect windowGeometry, QRect sourceGeometry, QSize imageSize)
 {
     return markshot::capture::imageRectFromGeometry(windowGeometry, sourceGeometry, imageSize);
@@ -5381,6 +5396,10 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
     if (m_mode == Mode::Editing && m_tool == Tool::Move && !m_fullscreenAnnotation && !m_dragging) {
         const SelectionDrag hoverDrag = selectionDragAt(imagePoint);
         switch (hoverDrag) {
+        case SelectionDrag::MagnifierSource:
+        case SelectionDrag::MagnifierLens:
+            setCursor(Qt::SizeAllCursor);
+            break;
         case SelectionDrag::Left:
         case SelectionDrag::Right:
             setCursor(Qt::SizeHorCursor);
@@ -5482,23 +5501,7 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
         const qreal diameter = std::clamp(dragDistance * kMagnifierDragScale,
                                           minDiameter,
                                           maxDiameter);
-        QRectF lensRect(clamped.x() - diameter / 2.0,
-                        clamped.y() - diameter / 2.0,
-                        diameter,
-                        diameter);
-        const QRectF imageBounds(QPointF(0.0, 0.0), QSizeF(m_frozenFrame.size()));
-        if (lensRect.left() < imageBounds.left()) {
-            lensRect.moveLeft(imageBounds.left());
-        }
-        if (lensRect.right() > imageBounds.right()) {
-            lensRect.moveRight(imageBounds.right());
-        }
-        if (lensRect.top() < imageBounds.top()) {
-            lensRect.moveTop(imageBounds.top());
-        }
-        if (lensRect.bottom() > imageBounds.bottom()) {
-            lensRect.moveBottom(imageBounds.bottom());
-        }
+        const QRectF lensRect = magnifierCircleRect(clamped, diameter);
         m_draft->rect = lensRect;
         m_draft->points[1] = lensRect.center();
     } else if (m_draft->tool == Tool::Number) {
@@ -6033,6 +6036,10 @@ void ShotWindow::updateCursor()
 
     if (m_tool == Tool::Move && !m_fullscreenAnnotation) {
         switch (m_selectionDrag) {
+        case SelectionDrag::MagnifierSource:
+        case SelectionDrag::MagnifierLens:
+            setCursor(Qt::SizeAllCursor);
+            return;
         case SelectionDrag::Left:
         case SelectionDrag::Right:
             setCursor(Qt::SizeHorCursor);
@@ -6060,6 +6067,10 @@ void ShotWindow::updateCursor()
 
     if (m_tool == Tool::Select) {
         switch (m_annotationDrag) {
+        case SelectionDrag::MagnifierSource:
+        case SelectionDrag::MagnifierLens:
+            setCursor(Qt::SizeAllCursor);
+            return;
         case SelectionDrag::Left:
         case SelectionDrag::Right:
             setCursor(Qt::SizeHorCursor);
@@ -6358,6 +6369,28 @@ ShotWindow::SelectionDrag ShotWindow::annotationBoundsDragAt(QPointF imagePoint,
         : SelectionDrag::None;
 }
 
+ShotWindow::SelectionDrag ShotWindow::magnifierDragAt(const Annotation &annotation, QPointF imagePoint) const
+{
+    if (annotation.tool != Tool::Magnifier) {
+        return SelectionDrag::None;
+    }
+
+    const QRectF lensRect = annotation.rect.normalized();
+    const QRectF sourceRect = magnifierSourceRect(annotation);
+    if (lensRect.isEmpty() || sourceRect.isEmpty()) {
+        return SelectionDrag::None;
+    }
+
+    const qreal imageTolerance = 8.0 * m_frozenFrame.width() / std::max<qreal>(1.0, m_frozenImageRect.width());
+    if (ellipseContainsPoint(sourceRect, imagePoint, imageTolerance)) {
+        return SelectionDrag::MagnifierSource;
+    }
+    if (ellipseContainsPoint(lensRect, imagePoint, imageTolerance)) {
+        return SelectionDrag::MagnifierLens;
+    }
+    return SelectionDrag::None;
+}
+
 QVector<QPointF> ShotWindow::selectionHandlePoints(QRectF rect) const
 {
     rect = rect.normalized();
@@ -6454,6 +6487,8 @@ QRectF ShotWindow::resizedBounds(QRectF start, SelectionDrag drag, QPointF image
             return rectFromVerticalEdge(start.bottom(), -1.0, start.center().x());
         case SelectionDrag::Bottom:
             return rectFromVerticalEdge(start.top(), 1.0, start.center().x());
+        case SelectionDrag::MagnifierSource:
+        case SelectionDrag::MagnifierLens:
         case SelectionDrag::Move:
         case SelectionDrag::None:
             break;
@@ -6483,6 +6518,13 @@ ShotWindow::SelectionDrag ShotWindow::annotationDragAt(QPointF imagePoint, int a
         return SelectionDrag::None;
     }
 
+    if (annotation->tool == Tool::Magnifier) {
+        const SelectionDrag magnifierDrag = magnifierDragAt(*annotation, imagePoint);
+        if (magnifierDrag != SelectionDrag::None) {
+            return magnifierDrag;
+        }
+    }
+
     const QRectF bounds = annotationBounds(*annotation);
     if (bounds.isEmpty()) {
         return SelectionDrag::None;
@@ -6496,6 +6538,12 @@ std::optional<int> ShotWindow::annotationAt(QPointF imagePoint) const
     const qreal imageTolerance = 8.0 * m_frozenFrame.width() / std::max<qreal>(1.0, m_frozenImageRect.width());
     for (int i = m_annotations.size() - 1; i >= 0; --i) {
         const Annotation &annotation = m_annotations.at(i);
+        if (annotation.tool == Tool::Magnifier) {
+            if (magnifierDragAt(annotation, imagePoint) != SelectionDrag::None) {
+                return annotation.id;
+            }
+            continue;
+        }
         const QRectF bounds = annotationBounds(annotation).adjusted(-imageTolerance, -imageTolerance, imageTolerance, imageTolerance);
         if (bounds.contains(imagePoint)) {
             return annotation.id;
@@ -6541,6 +6589,25 @@ void ShotWindow::drawSelectedAnnotationFrame(QPainter &painter) const
     painter.setBrush(QColor(251, 146, 60));
     for (const QPointF &handle : selectionHandlePoints(bounds)) {
         painter.drawRoundedRect(QRectF(handle.x() - 4.5, handle.y() - 4.5, 9.0, 9.0), 2.0, 2.0);
+    }
+    if (selectedIds.size() == 1) {
+        if (const Annotation *annotation = annotationById(selectedIds.first());
+            annotation && annotation->tool == Tool::Magnifier) {
+            const QRectF sourceRect = imageRectToWidget(magnifierSourceRect(*annotation));
+            const QRectF lensRect = imageRectToWidget(annotation->rect.normalized());
+            painter.setPen(QPen(QColor(251, 146, 60), 2.0, Qt::DashLine));
+            painter.setBrush(Qt::NoBrush);
+            painter.drawEllipse(sourceRect);
+            painter.drawEllipse(lensRect);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(251, 146, 60));
+            for (const QPointF &center : {sourceRect.center(), lensRect.center()}) {
+                painter.drawEllipse(QRectF(center.x() - 5.0,
+                                           center.y() - 5.0,
+                                           10.0,
+                                           10.0));
+            }
+        }
     }
     const QRectF deleteButton = selectedAnnotationDeleteButtonRect();
     if (!deleteButton.isEmpty()) {
@@ -6672,7 +6739,49 @@ void ShotWindow::updateAnnotationDrag(QPointF imagePoint, bool keepAspectRatio)
         }
     }
 
-    if (m_annotationDrag == SelectionDrag::Move) {
+    if (selectedIds.size() == 1
+        && (m_annotationDrag == SelectionDrag::MagnifierSource
+            || m_annotationDrag == SelectionDrag::MagnifierLens)) {
+        Annotation *annotation = annotationById(selectedIds.first());
+        if (!annotation || annotation->tool != Tool::Magnifier
+            || m_annotationBeforeDrag.tool != Tool::Magnifier) {
+            return;
+        }
+
+        const QRectF beforeLensRect = m_annotationBeforeDrag.rect.normalized();
+        if (beforeLensRect.isEmpty()) {
+            return;
+        }
+
+        const qreal lensDiameter = std::min(beforeLensRect.width(), beforeLensRect.height());
+        const QRectF beforeSourceRect = magnifierSourceRect(m_annotationBeforeDrag);
+        const QPointF delta = clampImagePoint(imagePoint) - m_dragStart;
+        if (m_annotationDrag == SelectionDrag::MagnifierSource) {
+            const qreal sourceDiameter = lensDiameter / kMagnifierScale;
+            const QPointF sourceCenter =
+                clampedMagnifierCircleCenter(beforeSourceRect.center() + delta, sourceDiameter);
+            if (annotation->points.isEmpty()) {
+                annotation->points.append(sourceCenter);
+            } else {
+                annotation->points[0] = sourceCenter;
+            }
+            if (annotation->points.size() < 2) {
+                annotation->points.append(beforeLensRect.center());
+            }
+        } else {
+            const QRectF lensRect = magnifierCircleRect(beforeLensRect.center() + delta,
+                                                       lensDiameter);
+            annotation->rect = lensRect;
+            if (annotation->points.isEmpty()) {
+                annotation->points.append(beforeSourceRect.center());
+            }
+            if (annotation->points.size() < 2) {
+                annotation->points.append(lensRect.center());
+            } else {
+                annotation->points[1] = lensRect.center();
+            }
+        }
+    } else if (m_annotationDrag == SelectionDrag::Move) {
         const QRectF startBounds = m_annotationBoundsBeforeDrag;
         QPointF delta = clampImagePoint(imagePoint) - m_dragStart;
         delta.setX(std::clamp(delta.x(), -startBounds.left(), m_frozenFrame.width() - startBounds.right()));
@@ -7049,6 +7158,33 @@ QRectF ShotWindow::imageRectToWidget(QRectF rect) const
     return QRectF(topLeft, bottomRight).normalized();
 }
 
+QPointF ShotWindow::clampedMagnifierCircleCenter(QPointF center, qreal diameter) const
+{
+    const qreal radius = std::max<qreal>(0.0, diameter / 2.0);
+    const qreal frameWidth = m_frozenFrame.width();
+    const qreal frameHeight = m_frozenFrame.height();
+    if (frameWidth <= diameter) {
+        center.setX(frameWidth / 2.0);
+    } else {
+        center.setX(std::clamp(center.x(), radius, frameWidth - radius));
+    }
+    if (frameHeight <= diameter) {
+        center.setY(frameHeight / 2.0);
+    } else {
+        center.setY(std::clamp(center.y(), radius, frameHeight - radius));
+    }
+    return center;
+}
+
+QRectF ShotWindow::magnifierCircleRect(QPointF center, qreal diameter) const
+{
+    const QPointF clampedCenter = clampedMagnifierCircleCenter(center, diameter);
+    return QRectF(clampedCenter.x() - diameter / 2.0,
+                  clampedCenter.y() - diameter / 2.0,
+                  diameter,
+                  diameter);
+}
+
 QRectF ShotWindow::magnifierSourceRect(const Annotation &annotation) const
 {
     const QRectF lensRect = annotation.rect.normalized();
@@ -7060,24 +7196,7 @@ QRectF ShotWindow::magnifierSourceRect(const Annotation &annotation) const
     const QPointF requestedCenter = annotation.points.isEmpty()
         ? lensRect.center()
         : annotation.points.first();
-    QRectF sourceRect(requestedCenter.x() - diameter / 2.0,
-                      requestedCenter.y() - diameter / 2.0,
-                      diameter,
-                      diameter);
-    const QRectF imageBounds(QPointF(0.0, 0.0), QSizeF(m_frozenFrame.size()));
-    if (sourceRect.left() < imageBounds.left()) {
-        sourceRect.moveLeft(imageBounds.left());
-    }
-    if (sourceRect.right() > imageBounds.right()) {
-        sourceRect.moveRight(imageBounds.right());
-    }
-    if (sourceRect.top() < imageBounds.top()) {
-        sourceRect.moveTop(imageBounds.top());
-    }
-    if (sourceRect.bottom() > imageBounds.bottom()) {
-        sourceRect.moveBottom(imageBounds.bottom());
-    }
-    return sourceRect;
+    return magnifierCircleRect(requestedCenter, diameter);
 }
 
 QRectF ShotWindow::textContentRect(const Annotation &annotation, bool widgetCoordinates) const

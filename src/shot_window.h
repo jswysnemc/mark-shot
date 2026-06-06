@@ -147,6 +147,8 @@ private:
     enum class SelectionDrag {
         None,
         Move,
+        MagnifierSource,
+        MagnifierLens,
         Left,
         Right,
         Top,
@@ -201,6 +203,8 @@ private:
     QString slurpSelectionGeometry() const;
     QRect selectionGlobalRect() const;
     QRectF imageRectToWidget(QRectF rect) const;
+    QPointF clampedMagnifierCircleCenter(QPointF center, qreal diameter) const;
+    QRectF magnifierCircleRect(QPointF center, qreal diameter) const;
     QRectF magnifierSourceRect(const Annotation &annotation) const;
     QRectF textContentRect(const Annotation &annotation, bool widgetCoordinates) const;
     QString defaultSavePath() const;
@@ -221,6 +225,7 @@ private:
     QRectF selectedAnnotationsBounds() const;
     QVector<int> annotationsInRect(QRectF imageRect) const;
     SelectionDrag annotationBoundsDragAt(QPointF imagePoint, QRectF bounds) const;
+    SelectionDrag magnifierDragAt(const Annotation &annotation, QPointF imagePoint) const;
     QRectF resizedBounds(QRectF start, SelectionDrag drag, QPointF imagePoint, bool keepAspectRatio) const;
     QVector<QPointF> selectionHandlePoints(QRectF rect) const;
     QRectF selectedAnnotationDeleteButtonRect() const;
