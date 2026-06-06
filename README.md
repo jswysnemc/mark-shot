@@ -110,7 +110,23 @@ binds {
 }
 ```
 
-**GNOME** (via custom keyboard shortcut in Settings → Keyboard → Custom Shortcuts).
+**Hyprland** (`~/.config/hypr/hyprland.conf`):
+```ini
+# Bind Super+Shift+S to start mark-shot selection
+bind = SUPER SHIFT, S, exec, mark-shot
+# Bind Print key to start mark-shot selection
+bind = , Print, exec, mark-shot
+```
+
+**Sway / i3** (`~/.config/sway/config` or `~/.config/i3/config`):
+```ini
+# Bind Super+Shift+S to start mark-shot selection
+bindsym Mod4+Shift+S exec mark-shot
+# Bind Print key to start mark-shot selection
+bindsym Print exec mark-shot
+```
+
+**GNOME** (via custom keyboard shortcut in Settings → Keyboard → Keyboard Shortcuts → Custom Shortcuts).
 
 ### Extension Commands
 

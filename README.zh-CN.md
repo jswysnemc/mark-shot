@@ -108,7 +108,23 @@ binds {
 }
 ```
 
-**GNOME**：在系统设置 → 键盘 → 自定义快捷键中添加。
+**Hyprland**（修改 `~/.config/hypr/hyprland.conf`）：
+```ini
+# 绑定 Super+Shift+S 启动 mark-shot 选区截图
+bind = SUPER SHIFT, S, exec, mark-shot
+# 绑定 Print 按键启动 mark-shot 选区截图
+bind = , Print, exec, mark-shot
+```
+
+**Sway / i3**（修改 `~/.config/sway/config` 或 `~/.config/i3/config`）：
+```ini
+# 绑定 Super+Shift+S 启动 mark-shot 选区截图
+bindsym Mod4+Shift+S exec mark-shot
+# 绑定 Print 按键启动 mark-shot 选区截图
+bindsym Print exec mark-shot
+```
+
+**GNOME**：在系统设置 → 键盘 → 键盘快捷键 → 自定义快捷键中添加。
 
 ### 拓展命令
 
