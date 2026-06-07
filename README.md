@@ -9,7 +9,7 @@
 </p>
 </details>
 
-`mark-shot` is a high-performance screenshot and annotation tool built with Qt 6. It was originally designed for Wayland compositors such as `niri`, and it also supports standard screenshot and annotation workflows on X11/GNOME desktops.
+`mark-shot` is a high-performance screenshot and annotation tool built with Qt 6. Originally designed for Wayland compositors such as `niri`, it now supports standard screenshot and annotation workflows on Linux (X11, GNOME, and wlroots/Wayland desktops) as well as Windows environments.
 
 It captures screen frames instantly and opens an interactive fullscreen overlay, providing region cropping, rich annotation, clipboard copying, saving, and desktop pinning features.
 
@@ -660,6 +660,9 @@ The expected result is `('2',)`. On GNOME Wayland, restart `mark-shot` after ena
 - **Supporting Documentation & Code Comments**: Added detailed in-code documentation and comments for core modules to make the system architecture clearer.
 - **Source Code Restructuring**: Split oversized source files (such as `shot_window.cpp` and `screen_capture.cpp`) into cohesive submodules to improve maintainability and testability.
 
+<details>
+<summary>Older Release Notes</summary>
+
 ### 0.1.22
 
 - **Annotation Rotation & Curved Arrow**: Added rotation handle to annotation items (rectangles, ellipses, text, etc.) allowing arbitrary angle adjustments. Upgraded arrow annotations to support curvature adjustment via Bezier curve control points.
@@ -674,9 +677,6 @@ The expected result is `('2',)`. On GNOME Wayland, restart `mark-shot` after ena
 - **Magnifier Annotation Tool**: Added a magnifier annotation tool supporting independent positioning of the magnification source and the lens. Once placed, users can drag the source circle and lens circle separately to precisely adjust magnification parameters.
 - **Editable OCR Result Window**: Enabled an editable floating result panel by default for main selection OCR. Users can edit, copy, or translate the recognized text within the panel, or drag the panel to move it.
 - **OCR Result Config & Environment Variables**: Integrated config option `ocr.resultPanel` (boolean or object) and environment variables `MARK_SHOT_OCR_RESULT_PANEL` / `MARK_SHOT_OCR_RESULT_WINDOW` to toggle the result panel. Users can disable this option to restore direct clipboard copy behavior.
-
-<details>
-<summary>Older Release Notes</summary>
 
 ### 0.1.20
 
