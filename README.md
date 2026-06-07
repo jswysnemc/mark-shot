@@ -653,6 +653,13 @@ The expected result is `('2',)`. On GNOME Wayland, restart `mark-shot` after ena
 
 ## Release Notes
 
+### 0.1.23
+
+- **Windows Build Support & Tray Integration**: Added support for compiling on Windows (MSYS2/UCRT64) with Qt 6. Implemented system tray icon support, global hotkey registration, native system fonts, and virtual screen geometry calculations for multi-monitor Windows setups.
+- **App Icon & Tray Default Configuration**: Added application icon `mark-shot.ico` and updated default tray settings.
+- **Supporting Documentation & Code Comments**: Added detailed in-code documentation and comments for core modules to make the system architecture clearer.
+- **Source Code Restructuring**: Split oversized source files (such as `shot_window.cpp` and `screen_capture.cpp`) into cohesive submodules to improve maintainability and testability.
+
 ### 0.1.22
 
 - **Annotation Rotation & Curved Arrow**: Added rotation handle to annotation items (rectangles, ellipses, text, etc.) allowing arbitrary angle adjustments. Upgraded arrow annotations to support curvature adjustment via Bezier curve control points.

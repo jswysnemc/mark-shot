@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.1.23 - 2026-06-08
+
+### Features & Enhancements
+
+- **Windows Build Support & Tray Integration**: Added support for compiling on Windows (MSYS2/UCRT64) with Qt 6. Implemented system tray icon support, global hotkey registration, native system fonts, and virtual screen geometry calculations for multi-monitor Windows setups.
+- **App Icon & Tray Default Configuration**: Added application icon `mark-shot.ico` and updated default tray settings.
+- **Supporting Documentation & Code Comments**: Added detailed in-code documentation and comments for core modules to make the system architecture clearer.
+
+### Bug Fixes
+
+- **Windows Screen Capture Configuration**: Expose virtual screen geometries on Windows builds and ensure default config creation at startup to avoid runtime launch issues.
+
+### Refactoring
+
+- **Source Code Restructuring**: Split oversized source files (such as `shot_window.cpp` and `screen_capture.cpp`) into cohesive submodules to improve maintainability and testability.
+
+### Release Artifacts
+
+- `mark-shot-v0.1.23-linux-x86_64.tar.gz`
+- `mark-shot-v0.1.23-linux-arm64.tar.gz`
+- `mark-shot_0.1.23_amd64.deb`
+- `mark-shot_0.1.23_arm64.deb`
+- `mark-shot_0.1.23_fedora_x86_64.rpm`
+- `mark-shot_0.1.23_fedora_aarch64.rpm`
+- `mark-shot-v0.1.23-linux-x86_64.AppImage`
+- `mark-shot-v0.1.23-linux-x86_64.flatpak`
+
 ## 0.1.22 - 2026-06-07
 
 ### Features & Enhancements
