@@ -73,6 +73,8 @@ qt_add_executable(mark-shot
     src/window_detection.h
     src/windows_integration.cpp
     src/windows_integration.h
+    src/windows_tray_controller.cpp
+    src/windows_tray_controller.h
     src/screen_capture.cpp
     src/screen_capture.h
     src/shot_window.cpp

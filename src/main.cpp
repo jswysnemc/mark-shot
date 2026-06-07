@@ -4,6 +4,7 @@
 #include "ui/i18n.h"
 #include "ui/theme.h"
 #include "window_detection.h"
+#include "windows_tray_controller.h"
 
 #include <QApplication>
 #include <QByteArray>
@@ -30,6 +31,7 @@
 #include <QVector>
 
 #include <algorithm>
+#include <memory>
 #include <optional>
 
 namespace {
@@ -550,6 +552,79 @@ ShotWindow *showCaptureWindow(QScreen *screen,
     return window;
 }
 
+QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
+                                                 bool allOutputs,
+                                                 bool useRegularWindow,
+                                                 bool fullscreenAnnotation,
+                                                 const DefaultTools &defaultTools,
+                                                 QString *error)
+{
+    QVector<QPointer<ShotWindow>> windows;
+    QScreen *screen = focusedScreen();
+    const QList<QScreen *> screens = QGuiApplication::screens();
+    if (!allOutputs && !fullscreenAnnotation && screens.size() > 1) {
+        for (QScreen *candidate : screens) {
+            if (!candidate || candidate->geometry().isEmpty()) {
+                continue;
+            }
+            ShotWindow *window =
+                showCaptureWindow(candidate, false, useRegularWindow, fullscreenAnnotation, defaultTools, error);
+            if (!window) {
+                for (const QPointer<ShotWindow> &existingWindow : std::as_const(windows)) {
+                    if (existingWindow) {
+                        existingWindow->close();
+                    }
+                }
+                windows.clear();
+                return windows;
+            }
+            windows.append(window);
+        }
+
+        if (!windows.isEmpty()) {
+            auto closingSession = std::make_shared<bool>(false);
+            for (const QPointer<ShotWindow> &candidateWindow : std::as_const(windows)) {
+                ShotWindow *window = candidateWindow.data();
+                if (!window) {
+                    continue;
+                }
+                QObject::connect(window, &ShotWindow::selectionActivated, app, [windows, closingSession](ShotWindow *activeWindow) {
+                    if (*closingSession) {
+                        return;
+                    }
+                    *closingSession = true;
+                    for (const QPointer<ShotWindow> &peerWindow : std::as_const(windows)) {
+                        if (peerWindow && peerWindow.data() != activeWindow) {
+                            peerWindow->close();
+                        }
+                    }
+                    *closingSession = false;
+                });
+                QObject::connect(window, &ShotWindow::sessionCancelRequested, app, [windows, closingSession] {
+                    if (*closingSession) {
+                        return;
+                    }
+                    *closingSession = true;
+                    for (const QPointer<ShotWindow> &peerWindow : std::as_const(windows)) {
+                        if (peerWindow) {
+                            peerWindow->close();
+                        }
+                    }
+                    *closingSession = false;
+                });
+            }
+        }
+        return windows;
+    }
+
+    ShotWindow *window =
+        showCaptureWindow(allOutputs ? nullptr : screen, allOutputs, useRegularWindow, fullscreenAnnotation, defaultTools, error);
+    if (window) {
+        windows.append(window);
+    }
+    return windows;
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -578,6 +653,10 @@ int main(int argc, char *argv[])
     QCommandLineOption xdgWindowOption(QStringLiteral("xdg-window"), QStringLiteral("Use a regular fullscreen xdg window instead of layer-shell."));
     QCommandLineOption fullscreenAnnotationOption({QStringLiteral("fullscreen"), QStringLiteral("full-screen")},
                                                   QStringLiteral("Skip region selection and annotate the full captured frame."));
+    QCommandLineOption trayOption(QStringLiteral("tray"),
+                                  QStringLiteral("Keep running in the Windows system tray and register global hotkeys."));
+    QCommandLineOption captureOption(QStringLiteral("capture"),
+                                     QStringLiteral("Capture once even when Windows tray autostart is enabled."));
     QCommandLineOption defaultToolOption(QStringLiteral("default-tool"),
                                          QStringLiteral("Set the default annotation tool after a selected region. Also seeds fullscreen mode unless overridden. Supported: %1.")
                                              .arg(ShotWindow::supportedToolNames().join(QStringLiteral(", "))),
@@ -592,6 +671,8 @@ int main(int argc, char *argv[])
     parser.addOption(allOutputsOption);
     parser.addOption(xdgWindowOption);
     parser.addOption(fullscreenAnnotationOption);
+    parser.addOption(trayOption);
+    parser.addOption(captureOption);
     parser.addOption(defaultToolOption);
     parser.addOption(fullscreenDefaultToolOption);
     parser.addOption(defaultColorOption);
@@ -650,7 +731,6 @@ int main(int argc, char *argv[])
         QMessageBox::warning(nullptr, QStringLiteral("Mark Shot"), configDefaultToolWarning);
     }
 
-    QScreen *screen = focusedScreen();
     const QString imagePath = positionalArguments.isEmpty() ? QString() : positionalArguments.first();
     const bool fileMode = !imagePath.isEmpty();
     if (fileMode) {
@@ -673,6 +753,7 @@ int main(int argc, char *argv[])
         ShotWindow *window = new ShotWindow(image, imageFile.fileName());
         window->setDefaultTools(defaultTools.normal, defaultTools.fullscreen);
         window->setDefaultColor(defaultTools.color);
+        QScreen *screen = focusedScreen();
         if (screen) {
             window->setScreen(screen);
         }
@@ -694,68 +775,66 @@ int main(int argc, char *argv[])
     const bool allOutputs = parser.isSet(allOutputsOption);
     const bool useRegularWindow = parser.isSet(xdgWindowOption);
     const bool fullscreenAnnotation = parser.isSet(fullscreenAnnotationOption);
-    const QList<QScreen *> screens = QGuiApplication::screens();
-    if (!allOutputs && !fullscreenAnnotation && screens.size() > 1) {
-        QVector<QPointer<ShotWindow>> windows;
-        QString captureError;
-        for (QScreen *candidate : screens) {
-            if (!candidate || candidate->geometry().isEmpty()) {
-                continue;
-            }
-            ShotWindow *window =
-                showCaptureWindow(candidate, false, useRegularWindow, fullscreenAnnotation, defaultTools, &captureError);
-            if (!window) {
-                for (const QPointer<ShotWindow> &existingWindow : std::as_const(windows)) {
-                    if (existingWindow) {
-                        existingWindow->close();
-                    }
-                }
-                QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), captureError);
-                return 1;
-            }
-            windows.append(window);
+    const markshot::WindowsTrayController::Config trayConfig = markshot::WindowsTrayController::readConfig();
+    const bool trayMode = !parser.isSet(captureOption) && (parser.isSet(trayOption) || trayConfig.autoStart);
+    if (trayMode) {
+        if (!markshot::WindowsTrayController::isSupported()) {
+            QMessageBox::critical(nullptr,
+                                  QStringLiteral("Mark Shot"),
+                                  MS_TR("Windows tray mode is not supported on this platform."));
+            return 1;
         }
 
-        if (!windows.isEmpty()) {
-            bool closingSession = false;
-            for (const QPointer<ShotWindow> &candidateWindow : std::as_const(windows)) {
-                ShotWindow *window = candidateWindow.data();
+        auto *trayController = new markshot::WindowsTrayController(&app, trayConfig, &app);
+        bool captureActive = false;
+        auto launchCapture = [&app, &captureActive, allOutputs, useRegularWindow, defaultTools](bool startFullscreen) {
+            if (captureActive) {
+                return;
+            }
+
+            QString captureError;
+            QVector<QPointer<ShotWindow>> windows =
+                showCaptureSession(&app, allOutputs, useRegularWindow, startFullscreen, defaultTools, &captureError);
+            if (windows.isEmpty()) {
+                if (!captureError.isEmpty()) {
+                    QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), captureError);
+                }
+                return;
+            }
+
+            captureActive = true;
+            auto remainingWindows = std::make_shared<int>(0);
+            for (const QPointer<ShotWindow> &window : std::as_const(windows)) {
+                if (window) {
+                    ++(*remainingWindows);
+                }
+            }
+            for (const QPointer<ShotWindow> &window : std::as_const(windows)) {
                 if (!window) {
                     continue;
                 }
-                QObject::connect(window, &ShotWindow::selectionActivated, &app, [&windows, &closingSession](ShotWindow *activeWindow) {
-                    if (closingSession) {
-                        return;
+                QObject::connect(window, &QObject::destroyed, &app, [&captureActive, remainingWindows] {
+                    --(*remainingWindows);
+                    if (*remainingWindows <= 0) {
+                        captureActive = false;
                     }
-                    closingSession = true;
-                    for (const QPointer<ShotWindow> &peerWindow : std::as_const(windows)) {
-                        if (peerWindow && peerWindow.data() != activeWindow) {
-                            peerWindow->close();
-                        }
-                    }
-                    closingSession = false;
-                });
-                QObject::connect(window, &ShotWindow::sessionCancelRequested, &app, [&windows, &closingSession] {
-                    if (closingSession) {
-                        return;
-                    }
-                    closingSession = true;
-                    for (const QPointer<ShotWindow> &peerWindow : std::as_const(windows)) {
-                        if (peerWindow) {
-                            peerWindow->close();
-                        }
-                    }
-                    closingSession = false;
                 });
             }
-            return QApplication::exec();
+        };
+
+        trayController->setCaptureCallbacks([launchCapture] { launchCapture(false); },
+                                            [launchCapture] { launchCapture(true); });
+        if (!trayController->start()) {
+            QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), trayController->errorString());
+            return 1;
         }
+        return QApplication::exec();
     }
 
     QString captureError;
-    ShotWindow *window =
-        showCaptureWindow(allOutputs ? nullptr : screen, allOutputs, useRegularWindow, fullscreenAnnotation, defaultTools, &captureError);
-    if (!window) {
+    QVector<QPointer<ShotWindow>> windows =
+        showCaptureSession(&app, allOutputs, useRegularWindow, fullscreenAnnotation, defaultTools, &captureError);
+    if (windows.isEmpty()) {
         QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), captureError);
         return 1;
     }

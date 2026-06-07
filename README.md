@@ -99,6 +99,8 @@ mark-shot --xdg-window
 | `--all-outputs` | Captures all screens on the virtual display environment instead of only the active one. |
 | `--xdg-window` | Forces the use of a standard XDG fullscreen window (xdg-shell) instead of layer-shell. |
 | `--fullscreen` | Skips region selection and opens annotation mode on the full screen frame directly. |
+| `--tray` | Windows only: keeps Mark Shot running in the system tray and registers global capture hotkeys. |
+| `--capture` | Forces one-shot capture when Windows tray autostart is enabled in the config. |
 | `--default-tool <tool>` | Sets the annotation tool selected after region selection. Also seeds fullscreen mode unless `--fullscreen-default-tool` is set. |
 | `--fullscreen-default-tool <tool>` | Sets the annotation tool selected in fullscreen annotation mode. |
 | `--default-color <color>` | Sets the default annotation color. Supports `#RRGGBB` and `#RRGGBBAA`. |
@@ -106,6 +108,17 @@ mark-shot --xdg-window
 ### Compositor / Desktop Hotkey Integration
 
 To bind `mark-shot` to a system screenshot shortcut, configure your compositor or desktop environment.
+
+**Windows tray mode**:
+```powershell
+mark-shot --tray
+```
+
+Tray mode registers these global hotkeys by default:
+- `Ctrl+Alt+A`: start region capture.
+- `Ctrl+Alt+F`: capture the focused screen directly in fullscreen annotation mode.
+
+The tray menu also provides Capture, Fullscreen Capture, and Quit actions.
 
 **niri** (`~/.config/niri/config.kdl`):
 ```kdl
@@ -185,6 +198,15 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
       "ruler": "R"
     }
   },
+  "windows": {
+    "tray": {
+      "enabled": false
+    },
+    "hotkeys": {
+      "capture": "Ctrl+Alt+A",
+      "fullscreen": "Ctrl+Alt+F"
+    }
+  },
   "pinnedWindow": {
     "autoOcr": false,
     "border": false,
@@ -234,6 +256,9 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
 | `annotation.fullscreenDefaultTool` | String | `"laser"` | The default tool active in fullscreen annotation mode. Overridden by CLI `--fullscreen-default-tool`. If configured as `move` in fullscreen, the program defaults to `select`. |
 | `annotation.defaultColor` | String | `"#FF4D4D"` | Initial annotation color. Supports `#RRGGBB` (opaque) or `#RRGGBBAA` (with alpha). Overridden by CLI `--default-color`. |
 | `shortcuts` | Object | - | Customizable keyboard shortcuts. Alias: `hotkeys` (or under `annotation.shortcuts`/`annotation.hotkeys`). See details below. |
+| `windows.tray.enabled` | Boolean | `false` | Starts the Windows system tray controller automatically. Use `mark-shot --tray` to start tray mode without changing config, or `mark-shot --capture` to force one-shot capture when autostart is enabled. |
+| `windows.hotkeys.capture` | String | `"Ctrl+Alt+A"` | Windows global hotkey for region capture while tray mode is running. Aliases include `hotkey`, `captureHotkey`, and `screenshot`. |
+| `windows.hotkeys.fullscreen` | String | `"Ctrl+Alt+F"` | Windows global hotkey for fullscreen annotation capture while tray mode is running. Alias: `fullscreenHotkey`. |
 | `pinnedWindow.autoOcr` | Boolean | `false` | Controls whether a pinned sticker window starts OCR text recognition in the background immediately on creation. If disabled, OCR runs on demand when Copy Image Text or Translate is chosen. Alias: `pinned`, `pin`. |
 | `pinnedWindow.border` | Boolean/Object | `false` | Outer border configuration for pinned sticker windows. Can be a boolean, or an object containing `enabled` (bool), `color` (name/hex/RGBA object), and `width` (float, `1.0` to `12.0`). Also flat configs like `borderEnabled`, `borderColor`, and `borderWidth` are supported. |
 | `scrollCapture.frame` | Boolean/Number/Object | `5` | Outer frame offset for scrolling capture. A number sets the pixel gap between the captured region and the frame; `false` disables the frame. Object form supports `enabled` and `gap`. Aliases: `captureFrame`, `border`, `outline`, plus flat `frameEnabled`/`frameGap`. |
