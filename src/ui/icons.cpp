@@ -97,6 +97,12 @@ QString actionName(ShotWindow::Action action)
     return {};
 }
 
+QIcon applicationIcon()
+{
+    const QIcon icon(QStringLiteral(":/icons/mark-shot.ico"));
+    return icon.isNull() ? makeToolIcon(ShotWindow::Action::ToolSelect) : icon;
+}
+
 QIcon makeToolIcon(ShotWindow::Action action)
 {
     QPixmap pixmap(kIconSize, kIconSize);

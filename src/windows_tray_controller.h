@@ -16,10 +16,14 @@ namespace markshot {
 class WindowsTrayController final : public QObject, public QAbstractNativeEventFilter {
 public:
     struct Config {
+#if defined(Q_OS_WIN)
+        bool autoStart = true;
+#else
         bool autoStart = false;
+#endif
         bool hotkeysEnabled = true;
-        QKeySequence captureHotkey = QKeySequence(QStringLiteral("Ctrl+Alt+A"));
-        QKeySequence fullscreenHotkey = QKeySequence(QStringLiteral("Ctrl+Alt+F"));
+        QKeySequence captureHotkey = QKeySequence(QStringLiteral("Ctrl+Alt+S"));
+        QKeySequence fullscreenHotkey;
     };
 
     using Callback = std::function<void()>;

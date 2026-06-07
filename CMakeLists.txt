@@ -14,6 +14,10 @@ option(MARK_SHOT_REQUIRE_LAYER_SHELL "Fail configuration when the optional Layer
 option(MARK_SHOT_WITH_LIBPORTAL "Enable libportal screencast negotiation when available" OFF)
 option(MARK_SHOT_REQUIRE_LIBPORTAL "Fail configuration when libportal support is requested but unavailable" OFF)
 
+if(WIN32)
+    enable_language(RC)
+endif()
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(MARK_SHOT_LINUX TRUE)
 else()
@@ -59,6 +63,7 @@ else()
 endif()
 
 qt_add_executable(mark-shot
+    resources.qrc
     src/main.cpp
     src/clipboard_image.cpp
     src/clipboard_image.h
@@ -98,6 +103,9 @@ qt_add_executable(mark-shot
 target_include_directories(mark-shot PRIVATE src)
 target_compile_definitions(mark-shot PRIVATE MARK_SHOT_VERSION="${PROJECT_VERSION}")
 if(WIN32)
+    set(MARK_SHOT_WINDOWS_ICON "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/mark-shot.ico")
+    configure_file(packaging/windows/mark-shot.rc.in "${CMAKE_CURRENT_BINARY_DIR}/mark-shot.rc" @ONLY)
+    target_sources(mark-shot PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/mark-shot.rc")
     set_target_properties(mark-shot PROPERTIES WIN32_EXECUTABLE TRUE)
     target_link_libraries(mark-shot PRIVATE dwmapi user32)
 endif()

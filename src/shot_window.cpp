@@ -925,8 +925,8 @@ struct PinnedWindowConfig {
     QString translationTargetLanguage = QStringLiteral("Simplified Chinese");
     int translationTimeoutMs = kPinnedTranslationTimeoutMs;
     bool autoTranslateAfterOcr = false;
-    bool borderEnabled = false;
-    QColor borderColor = QColor(94, 234, 212);
+    bool borderEnabled = true;
+    QColor borderColor = markshot::theme::kAccent;
     qreal borderWidth = 2.0;
 };
 

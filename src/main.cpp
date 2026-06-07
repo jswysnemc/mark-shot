@@ -1,6 +1,7 @@
 #include "screen_capture.h"
 #include "shot_window.h"
 #include "debug_log.h"
+#include "ui/icons.h"
 #include "ui/i18n.h"
 #include "ui/theme.h"
 #include "window_detection.h"
@@ -648,6 +649,7 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(QStringLiteral("mark-shot"));
     QApplication::setApplicationDisplayName(QStringLiteral("Mark Shot"));
     QApplication::setApplicationVersion(QStringLiteral(MARK_SHOT_VERSION));
+    QApplication::setWindowIcon(markshot::ui::applicationIcon());
     QFont applicationFont = app.font();
     applicationFont.setFamily(markshot::theme::uiFontFamily());
     app.setFont(applicationFont);

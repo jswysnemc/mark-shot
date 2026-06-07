@@ -115,8 +115,7 @@ mark-shot --tray
 ```
 
 Tray mode registers these global hotkeys by default:
-- `Ctrl+Alt+A`: start region capture.
-- `Ctrl+Alt+F`: capture the focused screen directly in fullscreen annotation mode.
+- `Ctrl+Alt+S`: start region capture.
 
 The tray menu also provides Capture, Fullscreen Capture, and Quit actions.
 
@@ -200,17 +199,16 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
   },
   "windows": {
     "tray": {
-      "enabled": false
+      "enabled": true
     },
     "hotkeys": {
-      "capture": "Ctrl+Alt+A",
-      "fullscreen": "Ctrl+Alt+F"
+      "capture": "Ctrl+Alt+S"
     }
   },
   "pinnedWindow": {
     "autoOcr": false,
-    "border": false,
-    "borderColor": "#2DD4BF",
+    "border": true,
+    "borderColor": "#5EEAD4",
     "borderWidth": 2
   },
   "scrollCapture": {
@@ -256,11 +254,11 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
 | `annotation.fullscreenDefaultTool` | String | `"laser"` | The default tool active in fullscreen annotation mode. Overridden by CLI `--fullscreen-default-tool`. If configured as `move` in fullscreen, the program defaults to `select`. |
 | `annotation.defaultColor` | String | `"#FF4D4D"` | Initial annotation color. Supports `#RRGGBB` (opaque) or `#RRGGBBAA` (with alpha). Overridden by CLI `--default-color`. |
 | `shortcuts` | Object | - | Customizable keyboard shortcuts. Alias: `hotkeys` (or under `annotation.shortcuts`/`annotation.hotkeys`). See details below. |
-| `windows.tray.enabled` | Boolean | `false` | Starts the Windows system tray controller automatically. Use `mark-shot --tray` to start tray mode without changing config, or `mark-shot --capture` to force one-shot capture when autostart is enabled. |
-| `windows.hotkeys.capture` | String | `"Ctrl+Alt+A"` | Windows global hotkey for region capture while tray mode is running. Aliases include `hotkey`, `captureHotkey`, and `screenshot`. |
-| `windows.hotkeys.fullscreen` | String | `"Ctrl+Alt+F"` | Windows global hotkey for fullscreen annotation capture while tray mode is running. Alias: `fullscreenHotkey`. |
+| `windows.tray.enabled` | Boolean | `true` on Windows, `false` elsewhere | Starts the Windows system tray controller automatically. Use `mark-shot --tray` to start tray mode without changing config, or `mark-shot --capture` to force one-shot capture when autostart is enabled. |
+| `windows.hotkeys.capture` | String | `"Ctrl+Alt+S"` | Windows global hotkey for region capture while tray mode is running. Aliases include `hotkey`, `captureHotkey`, and `screenshot`. |
+| `windows.hotkeys.fullscreen` | String | `""` | Optional Windows global hotkey for fullscreen annotation capture while tray mode is running. Alias: `fullscreenHotkey`. The generated default config only writes the region capture hotkey. |
 | `pinnedWindow.autoOcr` | Boolean | `false` | Controls whether a pinned sticker window starts OCR text recognition in the background immediately on creation. If disabled, OCR runs on demand when Copy Image Text or Translate is chosen. Alias: `pinned`, `pin`. |
-| `pinnedWindow.border` | Boolean/Object | `false` | Outer border configuration for pinned sticker windows. Can be a boolean, or an object containing `enabled` (bool), `color` (name/hex/RGBA object), and `width` (float, `1.0` to `12.0`). Also flat configs like `borderEnabled`, `borderColor`, and `borderWidth` are supported. |
+| `pinnedWindow.border` | Boolean/Object | `true` | Outer border configuration for pinned sticker windows. Can be a boolean, or an object containing `enabled` (bool), `color` (name/hex/RGBA object), and `width` (float, `1.0` to `12.0`). Also flat configs like `borderEnabled`, `borderColor`, and `borderWidth` are supported. |
 | `scrollCapture.frame` | Boolean/Number/Object | `5` | Outer frame offset for scrolling capture. A number sets the pixel gap between the captured region and the frame; `false` disables the frame. Object form supports `enabled` and `gap`. Aliases: `captureFrame`, `border`, `outline`, plus flat `frameEnabled`/`frameGap`. |
 | `scrollCapture.previewGap` | Number/Object | `5` | Pixel gap between the outer frame and the scrolling preview panel. The panel is placed around the frame using the first available non-overlapping position. Aliases: `previewDistance`, `previewOffset`, `panelGap`; object form supports `gap`. |
 | `scrollCapture.hidePreviewDuringCapture` | Boolean | `false` | Hides the scrolling preview panel while capture is running even when the panel would fit, showing the floating drag handle instead. Pausing still reveals the preview panel. Aliases: `hidePreviewWhileCapturing`, `hidePanelDuringCapture`, `hideUiDuringCapture`; nested `scrollCapture.preview.hideWhileCapturing` is also supported. |

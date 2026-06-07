@@ -330,7 +330,7 @@ bool WindowsTrayController::start()
 
     m_application->setQuitOnLastWindowClosed(false);
 
-    const QIcon icon = markshot::ui::makeToolIcon(ShotWindow::Action::ToolSelect);
+    const QIcon icon = markshot::ui::applicationIcon();
     m_application->setWindowIcon(icon);
 
     m_menu = new QMenu;

@@ -1,6 +1,7 @@
 #include "window_detection.h"
 
 #include "debug_log.h"
+#include "ui/theme.h"
 
 #include <QDir>
 #include <QFile>
@@ -119,11 +120,14 @@ QJsonObject defaultAppConfigRoot()
     root.insert(QStringLiteral("shortcuts"), shortcuts);
 
     QJsonObject tray;
+#if defined(Q_OS_WIN)
+    tray.insert(QStringLiteral("enabled"), true);
+#else
     tray.insert(QStringLiteral("enabled"), false);
+#endif
 
     QJsonObject hotkeys;
-    hotkeys.insert(QStringLiteral("capture"), QStringLiteral("Ctrl+Alt+A"));
-    hotkeys.insert(QStringLiteral("fullscreen"), QStringLiteral("Ctrl+Alt+F"));
+    hotkeys.insert(QStringLiteral("capture"), QStringLiteral("Ctrl+Alt+S"));
 
     QJsonObject windows;
     windows.insert(QStringLiteral("tray"), tray);
@@ -132,8 +136,8 @@ QJsonObject defaultAppConfigRoot()
 
     QJsonObject pinnedWindow;
     pinnedWindow.insert(QStringLiteral("autoOcr"), false);
-    pinnedWindow.insert(QStringLiteral("border"), false);
-    pinnedWindow.insert(QStringLiteral("borderColor"), QStringLiteral("#2DD4BF"));
+    pinnedWindow.insert(QStringLiteral("border"), true);
+    pinnedWindow.insert(QStringLiteral("borderColor"), markshot::theme::kAccent.name(QColor::HexRgb).toUpper());
     pinnedWindow.insert(QStringLiteral("borderWidth"), 2);
     root.insert(QStringLiteral("pinnedWindow"), pinnedWindow);
 

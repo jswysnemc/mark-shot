@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/icons">
+    <file alias="mark-shot.ico">packaging/windows/mark-shot.ico</file>
+  </qresource>
+</RCC>

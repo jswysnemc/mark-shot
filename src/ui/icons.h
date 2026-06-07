@@ -12,6 +12,9 @@ namespace markshot::ui {
 // runtime tool-name display).
 QString actionName(ShotWindow::Action action);
 
+// Application icon embedded in the executable, with a painted fallback.
+QIcon applicationIcon();
+
 // Generates a 32x32 pixmap-backed QIcon for the given action. All icons are
 // drawn with QPainter so the binary stays free of image assets.
 QIcon makeToolIcon(ShotWindow::Action action);
