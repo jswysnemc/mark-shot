@@ -55,41 +55,51 @@ QJsonObject objectValue(const QJsonObject &object, const QString &key)
     return value.isObject() ? value.toObject() : QJsonObject();
 }
 
-QString preApplicationConfigPath()
+QStringList preApplicationConfigPathCandidates()
 {
+    QStringList candidates;
 #if defined(Q_OS_WIN)
     const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     const QString localAppData = env.value(QStringLiteral("LOCALAPPDATA"));
     if (!localAppData.isEmpty()) {
-        return QDir(localAppData)
-            .filePath(QStringLiteral("mark-shot/config.json"));
+        candidates.append(QDir(localAppData).filePath(QStringLiteral("mark-shot/config.json")));
     }
 
     const QString appData = env.value(QStringLiteral("APPDATA"));
     if (!appData.isEmpty()) {
-        return QDir(appData)
-            .filePath(QStringLiteral("mark-shot/config.json"));
+        candidates.append(QDir(appData).filePath(QStringLiteral("mark-shot/config.json")));
     }
 
     const QString userProfile = env.value(QStringLiteral("USERPROFILE"));
     if (!userProfile.isEmpty()) {
-        return QDir(userProfile)
-            .filePath(QStringLiteral("AppData/Local/mark-shot/config.json"));
+        candidates.append(QDir(userProfile).filePath(QStringLiteral("AppData/Local/mark-shot/config.json")));
     }
-    return {};
 #else
     const QByteArray xdgConfigHome = qgetenv("XDG_CONFIG_HOME");
     if (!xdgConfigHome.isEmpty()) {
-        return QDir(QString::fromLocal8Bit(xdgConfigHome))
-            .filePath(QStringLiteral("mark-shot/config.json"));
+        candidates.append(QDir(QString::fromLocal8Bit(xdgConfigHome))
+                              .filePath(QStringLiteral("mark-shot/config.json")));
     }
 
     const QByteArray home = qgetenv("HOME");
     if (!home.isEmpty()) {
-        return QDir(QString::fromLocal8Bit(home)).filePath(QStringLiteral(".config/mark-shot/config.json"));
+        candidates.append(QDir(QString::fromLocal8Bit(home)).filePath(QStringLiteral(".config/mark-shot/config.json")));
     }
-    return {};
 #endif
+    candidates.removeAll(QString());
+    candidates.removeDuplicates();
+    return candidates;
+}
+
+QString preApplicationConfigPath()
+{
+    const QStringList candidates = preApplicationConfigPathCandidates();
+    for (const QString &path : candidates) {
+        if (QFileInfo::exists(path)) {
+            return path;
+        }
+    }
+    return candidates.isEmpty() ? QString() : candidates.first();
 }
 
 std::optional<QString> environmentStringValue(const QJsonValue &value)
@@ -683,6 +693,8 @@ int main(int argc, char *argv[])
         QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), MS_TR("Only one image file can be opened at a time."));
         return 1;
     }
+
+    markshot::ensureAppConfigFile();
 
     QString configDefaultToolWarning;
     DefaultTools defaultTools = configuredDefaultTools(&configDefaultToolWarning);

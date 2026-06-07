@@ -4,6 +4,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -20,24 +21,207 @@
 #include <optional>
 
 namespace markshot {
+namespace {
+
+#if defined(Q_OS_WIN)
+QString envConfigDir(const QString &name, const QString &relativePath = QStringLiteral("mark-shot"))
+{
+    const QString root = QProcessEnvironment::systemEnvironment().value(name).trimmed();
+    return root.isEmpty() ? QString() : QDir(root).filePath(relativePath);
+}
+#endif
+
+QStringList appConfigDirCandidates()
+{
+    QStringList candidates;
+#if defined(Q_OS_WIN)
+    const QString localAppData = envConfigDir(QStringLiteral("LOCALAPPDATA"));
+    if (!localAppData.isEmpty()) {
+        candidates.append(localAppData);
+    }
+
+    const QString appData = envConfigDir(QStringLiteral("APPDATA"));
+    if (!appData.isEmpty()) {
+        candidates.append(appData);
+    }
+
+    const QString userProfile = envConfigDir(QStringLiteral("USERPROFILE"),
+                                             QStringLiteral("AppData/Local/mark-shot"));
+    if (!userProfile.isEmpty()) {
+        candidates.append(userProfile);
+    }
+#endif
+
+    const QString appConfig = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    if (!appConfig.isEmpty()) {
+        candidates.append(appConfig);
+    }
+
+    const QString genericConfig = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
+    if (!genericConfig.isEmpty()) {
+        candidates.append(QDir(genericConfig).filePath(QStringLiteral("mark-shot")));
+    }
+
+    candidates.append(QDir::home().filePath(QStringLiteral(".config/mark-shot")));
+    candidates.removeAll(QString());
+    candidates.removeDuplicates();
+    return candidates;
+}
+
+QString defaultAppConfigDir()
+{
+    const QStringList candidates = appConfigDirCandidates();
+    return candidates.isEmpty()
+        ? QDir::home().filePath(QStringLiteral(".config/mark-shot"))
+        : candidates.first();
+}
+
+QString existingAppConfigPath()
+{
+    const QStringList candidates = appConfigDirCandidates();
+    for (const QString &dir : candidates) {
+        const QString path = QDir(dir).filePath(QStringLiteral("config.json"));
+        if (QFileInfo::exists(path)) {
+            return path;
+        }
+    }
+    return {};
+}
+
+QJsonObject defaultAppConfigRoot()
+{
+    QJsonObject root;
+    root.insert(QStringLiteral("env"), QJsonObject());
+
+    QJsonObject annotation;
+    annotation.insert(QStringLiteral("defaultTool"), QStringLiteral("pen"));
+    annotation.insert(QStringLiteral("fullscreenDefaultTool"), QStringLiteral("pen"));
+    annotation.insert(QStringLiteral("defaultColor"), QStringLiteral("#FF4D4D"));
+    root.insert(QStringLiteral("annotation"), annotation);
+
+    QJsonObject shortcutTools;
+    shortcutTools.insert(QStringLiteral("pen"), QStringLiteral("P"));
+    shortcutTools.insert(QStringLiteral("rectangle"), QStringLiteral("R"));
+
+    QJsonObject shortcutActions;
+    shortcutActions.insert(QStringLiteral("copy"), QStringLiteral("Ctrl+C"));
+    shortcutActions.insert(QStringLiteral("save"), QStringLiteral("Ctrl+S"));
+    shortcutActions.insert(QStringLiteral("pin"), QStringLiteral("Ctrl+P"));
+
+    QJsonObject startupShortcuts;
+    startupShortcuts.insert(QStringLiteral("colorPicker"), QStringLiteral("C"));
+    startupShortcuts.insert(QStringLiteral("ruler"), QStringLiteral("R"));
+
+    QJsonObject shortcuts;
+    shortcuts.insert(QStringLiteral("tools"), shortcutTools);
+    shortcuts.insert(QStringLiteral("actions"), shortcutActions);
+    shortcuts.insert(QStringLiteral("startup"), startupShortcuts);
+    root.insert(QStringLiteral("shortcuts"), shortcuts);
+
+    QJsonObject tray;
+    tray.insert(QStringLiteral("enabled"), false);
+
+    QJsonObject hotkeys;
+    hotkeys.insert(QStringLiteral("capture"), QStringLiteral("Ctrl+Alt+A"));
+    hotkeys.insert(QStringLiteral("fullscreen"), QStringLiteral("Ctrl+Alt+F"));
+
+    QJsonObject windows;
+    windows.insert(QStringLiteral("tray"), tray);
+    windows.insert(QStringLiteral("hotkeys"), hotkeys);
+    root.insert(QStringLiteral("windows"), windows);
+
+    QJsonObject pinnedWindow;
+    pinnedWindow.insert(QStringLiteral("autoOcr"), false);
+    pinnedWindow.insert(QStringLiteral("border"), false);
+    pinnedWindow.insert(QStringLiteral("borderColor"), QStringLiteral("#2DD4BF"));
+    pinnedWindow.insert(QStringLiteral("borderWidth"), 2);
+    root.insert(QStringLiteral("pinnedWindow"), pinnedWindow);
+
+    QJsonObject scrollCapture;
+    scrollCapture.insert(QStringLiteral("frame"), 5);
+    scrollCapture.insert(QStringLiteral("previewGap"), 5);
+    scrollCapture.insert(QStringLiteral("hidePreviewDuringCapture"), false);
+    root.insert(QStringLiteral("scrollCapture"), scrollCapture);
+
+    QJsonObject windowDetection;
+    windowDetection.insert(QStringLiteral("enabled"), true);
+#if defined(Q_OS_WIN)
+    windowDetection.insert(QStringLiteral("command"), QString());
+#else
+    windowDetection.insert(QStringLiteral("command"), QStringLiteral("mark-shot-window-detection-niri"));
+#endif
+    windowDetection.insert(QStringLiteral("env"), QJsonObject());
+    windowDetection.insert(QStringLiteral("timeoutMs"), 1000);
+    root.insert(QStringLiteral("windowDetection"), windowDetection);
+
+    QJsonObject ocr;
+    ocr.insert(QStringLiteral("enabled"), true);
+    ocr.insert(QStringLiteral("backend"), QStringLiteral("rapidocr"));
+    ocr.insert(QStringLiteral("command"), QString());
+    ocr.insert(QStringLiteral("timeoutMs"), 30000);
+    root.insert(QStringLiteral("ocr"), ocr);
+
+    QJsonObject translation;
+    translation.insert(QStringLiteral("autoAfterOcr"), false);
+    translation.insert(QStringLiteral("targetLanguage"), QStringLiteral("Simplified Chinese"));
+    translation.insert(QStringLiteral("apiBase"), QStringLiteral("https://api.openai.com/v1"));
+    translation.insert(QStringLiteral("apiKeyEnv"), QStringLiteral("OPENAI_API_KEY"));
+    translation.insert(QStringLiteral("apiKey"), QString());
+    translation.insert(QStringLiteral("model"), QStringLiteral("gpt-4o-mini"));
+    translation.insert(QStringLiteral("temperature"), 0.2);
+    translation.insert(QStringLiteral("timeoutMs"), 60000);
+    translation.insert(QStringLiteral("timeoutSeconds"), 60);
+    translation.insert(QStringLiteral("systemPrompt"), QString());
+    translation.insert(QStringLiteral("command"), QString());
+    root.insert(QStringLiteral("translation"), translation);
+
+    return root;
+}
+
+}  // namespace
 
 QString markShotConfigDir()
 {
-    QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    if (!configDir.isEmpty()) {
-        return configDir;
+    const QString existingPath = existingAppConfigPath();
+    if (!existingPath.isEmpty()) {
+        return QFileInfo(existingPath).absolutePath();
     }
-
-    const QString genericConfigDir = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
-    if (!genericConfigDir.isEmpty()) {
-        return QDir(genericConfigDir).filePath(QStringLiteral("mark-shot"));
-    }
-    return QDir::home().filePath(QStringLiteral(".config/mark-shot"));
+    return defaultAppConfigDir();
 }
 
 QString appConfigPath()
 {
-    return QDir(markShotConfigDir()).filePath(QStringLiteral("config.json"));
+    const QString existingPath = existingAppConfigPath();
+    if (!existingPath.isEmpty()) {
+        return existingPath;
+    }
+    return QDir(defaultAppConfigDir()).filePath(QStringLiteral("config.json"));
+}
+
+bool ensureAppConfigFile()
+{
+    const QString path = appConfigPath();
+    if (QFileInfo::exists(path)) {
+        return true;
+    }
+
+    QDir dir(QFileInfo(path).absolutePath());
+    if (!dir.exists() && !dir.mkpath(QStringLiteral("."))) {
+        markshot::debugLog("config", "cannot create config dir path=%s", dir.absolutePath().toUtf8().constData());
+        return false;
+    }
+
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::NewOnly)) {
+        markshot::debugLog("config", "cannot create config path=%s", path.toUtf8().constData());
+        return false;
+    }
+
+    const QJsonDocument document(defaultAppConfigRoot());
+    file.write(document.toJson(QJsonDocument::Indented));
+    file.write("\n");
+    markshot::debugLog("config", "created default config path=%s", path.toUtf8().constData());
+    return true;
 }
 
 namespace {

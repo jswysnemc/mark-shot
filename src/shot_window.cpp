@@ -10,6 +10,7 @@
 #include "ui/i18n.h"
 #include "ui/icons.h"
 #include "ui/theme.h"
+#include "window_detection.h"
 #include "windows_integration.h"
 
 #include <QAbstractItemView>
@@ -658,16 +659,7 @@ QString markShotPicturesDir()
 
 QString markShotConfigDir()
 {
-    QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    if (!configDir.isEmpty()) {
-        return configDir;
-    }
-
-    const QString genericConfigDir = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
-    if (!genericConfigDir.isEmpty()) {
-        return QDir(genericConfigDir).filePath(QStringLiteral("mark-shot"));
-    }
-    return QDir::home().filePath(QStringLiteral(".config/mark-shot"));
+    return markshot::markShotConfigDir();
 }
 
 QString extensionCommandsConfigPath()
@@ -677,7 +669,7 @@ QString extensionCommandsConfigPath()
 
 QString appConfigPath()
 {
-    return QDir(markShotConfigDir()).filePath(QStringLiteral("config.json"));
+    return markshot::appConfigPath();
 }
 
 QString markShotDataDir()

@@ -8,6 +8,7 @@ namespace markshot {
 
 QString markShotConfigDir();
 QString appConfigPath();
+bool ensureAppConfigFile();
 bool windowDetectionEnabled();
 
 QVector<QRect> collectConfiguredWindowGeometries(const QRect &captureGeometry,
