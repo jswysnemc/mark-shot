@@ -207,7 +207,15 @@ bool isKdePlasma()
     return desktop.contains(QStringLiteral("kde")) || desktop.contains(QStringLiteral("plasma"));
 }
 
-QRect virtualScreensGeometry();
+QRect virtualScreensGeometry()
+{
+    QRect geometry;
+    const QList<QScreen *> screens = QGuiApplication::screens();
+    for (QScreen *screen : screens) {
+        geometry = geometry.isNull() ? screen->geometry() : geometry.united(screen->geometry());
+    }
+    return geometry;
+}
 
 QImage normalizeCaptureImage(QImage image)
 {
@@ -512,16 +520,6 @@ void disconnectPortalResponse(const QString &signalPath, PortalResponseReceiver 
                                              QStringLiteral("Response"),
                                              receiver,
                                              SLOT(handleResponse(uint,QVariantMap)));
-}
-
-QRect virtualScreensGeometry()
-{
-    QRect geometry;
-    const QList<QScreen *> screens = QGuiApplication::screens();
-    for (QScreen *screen : screens) {
-        geometry = geometry.isNull() ? screen->geometry() : geometry.united(screen->geometry());
-    }
-    return geometry;
 }
 
 QString portalScreenshotParentWindow(QWidget *parentDummy)
