@@ -167,7 +167,6 @@ jobs:
 
           "$windeployqt_path" --release --compiler-runtime --dir "$app_bin" "$exe"
 
-          ucrt_bin="$(cygpath -am /ucrt64/bin)"
           declare -A seen
           mapfile -t queue < <(find "$app_bin" -type f \( -name "*.exe" -o -name "*.dll" \))
           while ((${#queue[@]})); do
@@ -179,25 +178,18 @@ jobs:
             fi
             seen["$current_key"]=1
 
-            while IFS= read -r dep; do
-              dep_unix="$(cygpath -u "$dep" 2>/dev/null || printf '%s' "$dep")"
-              dep_win="$(cygpath -am "$dep_unix" 2>/dev/null || printf '%s' "$dep")"
-              case "$dep_win" in
-                "$ucrt_bin"/*.dll|"$ucrt_bin"/*.DLL)
-                  dest="$app_bin/$(basename "$dep_unix")"
-                  if [ ! -f "$dest" ]; then
-                    cp "$dep_unix" "$dest"
-                  fi
-                  queue+=("$dest")
-                  ;;
-              esac
-            done < <(ldd "$current" | awk '{
-              for (i = 1; i <= NF; ++i) {
-                if ($i ~ /(^\/|^[A-Za-z]:\\).*[.][dD][lL][lL]$/) {
-                  print $i
-                }
-              }
-            }')
+            while IFS= read -r dep_name; do
+              dep_path="/ucrt64/bin/$dep_name"
+              if [ ! -f "$dep_path" ]; then
+                continue
+              fi
+
+              dest="$app_bin/$(basename "$dep_path")"
+              if [ ! -f "$dest" ]; then
+                cp "$dep_path" "$dest"
+              fi
+              queue+=("$dest")
+            done < <(objdump -p "$current" | awk '/DLL Name:/ { print $3 }')
           done
 
           find "$app_bin" -maxdepth 1 -type f -name "*.dll" -printf "%f\n" | sort
