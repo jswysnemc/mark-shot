@@ -254,7 +254,6 @@ void setExcludedFromCapture(QWidget *widget, bool excluded)
                        compositionEnabled ? 1 : 0,
                        static_cast<unsigned long long>(style),
                        static_cast<unsigned long long>(exStyle));
-    }
 #else
     Q_UNUSED(widget);
     Q_UNUSED(excluded);
