@@ -206,6 +206,12 @@ CaptureResult captureWithQScreen(const CaptureRequest &request);
 QRect screenGeometryForOutputName(const QString &outputName);
 QRect screenGeometryForRequest(const CaptureRequest &request);
 
+#if defined(Q_OS_WIN)
+// Windows Graphics Capture path. It avoids recording windows excluded with
+// SetWindowDisplayAffinity and falls back to QScreen when unavailable.
+CaptureResult captureWithWindowsGraphicsCapture(const CaptureRequest &request);
+#endif
+
 // grim captures full output frames and then crops them to CaptureRequest when a
 // compositor supports grim but not direct rectangle capture.
 QRect fullGrimSourceGeometry(const CaptureRequest &request);

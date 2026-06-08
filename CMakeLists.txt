@@ -93,6 +93,7 @@ qt_add_executable(mark-shot
     src/screen_capture_pipewire_libportal.cpp
     src/screen_capture_pipewire_libportal.h
     src/screen_capture_platform_api.cpp
+    src/screen_capture_windows_wgc.cpp
     src/screen_capture_x11.cpp
     src/shell_command.cpp
     src/shell_command.h
@@ -149,7 +150,7 @@ if(WIN32)
     configure_file(packaging/windows/mark-shot.rc.in "${CMAKE_CURRENT_BINARY_DIR}/mark-shot.rc" @ONLY)
     target_sources(mark-shot PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/mark-shot.rc")
     set_target_properties(mark-shot PROPERTIES WIN32_EXECUTABLE TRUE)
-    target_link_libraries(mark-shot PRIVATE dwmapi user32)
+    target_link_libraries(mark-shot PRIVATE d3d11 dwmapi dxgi user32 windowsapp)
 endif()
 
 target_link_libraries(mark-shot
