@@ -24,6 +24,29 @@ QString magnifierScaleText(qreal scale)
     return QStringLiteral("%1x").arg(QString::number(clampedMagnifierScale(scale), 'f', 2));
 }
 
+/// @brief Creates the high-contrast cross cursor used during capture.
+/// @return Cursor used for selection and annotation drawing modes.
+QCursor captureCrossCursor()
+{
+    QPixmap pixmap(33, 33);
+    pixmap.fill(Qt::transparent);
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setPen(QPen(QColor(15, 23, 42, 235), 5, Qt::SolidLine, Qt::SquareCap));
+    painter.drawLine(16, 0, 16, 32);
+    painter.drawLine(0, 16, 32, 16);
+    painter.setPen(QPen(QColor(255, 255, 255, 245), 3, Qt::SolidLine, Qt::SquareCap));
+    painter.drawLine(16, 0, 16, 32);
+    painter.drawLine(0, 16, 32, 16);
+    painter.setPen(QPen(QColor(45, 212, 191, 255), 1, Qt::SolidLine, Qt::SquareCap));
+    painter.drawLine(16, 0, 16, 32);
+    painter.drawLine(0, 16, 32, 16);
+    painter.end();
+
+    return QCursor(pixmap, 16, 16);
+}
+
 qreal normalizedRotationDegrees(qreal degrees)
 {
     degrees = std::fmod(degrees, 360.0);

@@ -36,18 +36,25 @@ void ScrollSessionWindow::captureTick()
         request.allowPortalScreenshotFallback = false;
 
         const bool makePanelTransparentForCapture =
-            !m_gnomeShellPreview && m_panelOnlyWindow && m_previewPanelVisible && isVisible();
+            !m_gnomeShellPreview
+            && !m_layerShell
+            && isVisible()
+            && (m_previewPanelVisible || floatingDragHandleActive() || !framePaintRegion().isEmpty());
         if (makePanelTransparentForCapture) {
             // Plain Wayland fallback windows can overlap the capture rectangle.
             // Hide their controls for one compositor frame so the next backend
             // frame contains only the user-selected page area.
+            const QRegion transparentRegion = overlayPaintRegion();
             m_panelTransparentForCapture = true;
             if (m_controlBar) {
                 m_controlBar->hide();
             }
-            repaint(overlayPaintRegion());
+            updateInputMask();
+            repaint(transparentRegion);
             QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-            request.minimumFrameTimeMs = QDateTime::currentMSecsSinceEpoch() + 1;
+            QThread::msleep(16);
+            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+            request.minimumFrameTimeMs = QDateTime::currentMSecsSinceEpoch() + 16;
         }
         const CaptureResult result = captureScreenFrame(request);
         if (makePanelTransparentForCapture) {
@@ -56,6 +63,7 @@ void ScrollSessionWindow::captureTick()
             if (m_controlBar) {
                 layoutOverlay();
             }
+            updateInputMask();
             repaint(overlayPaintRegion());
             QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
         }

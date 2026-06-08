@@ -31,6 +31,35 @@ void ShotWindow::drawSelectedAnnotationFrame(QPainter &painter) const
         : nullptr;
     const bool rotatedSingleSelection =
         singleSelectedAnnotation && annotationSupportsRotation(*singleSelectedAnnotation);
+    auto drawNumberPointHandles = [this, &painter](const Annotation &annotation,
+                                                   QPointF center,
+                                                   qreal angle,
+                                                   bool rotateHandles) {
+        if (annotation.tool != Tool::Number || annotation.points.isEmpty()) {
+            return;
+        }
+        auto handlePoint = [this, center, angle, rotateHandles](QPointF imagePoint) {
+            QPointF widgetPoint = imageToWidget(imagePoint);
+            return rotateHandles ? rotatedPoint(widgetPoint, center, angle) : widgetPoint;
+        };
+        const QPointF tip = handlePoint(annotation.points.first());
+        const QPointF bubble = handlePoint(annotation.points.size() >= 2 ? annotation.points.last() : annotation.points.first());
+        painter.save();
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(QPen(QColor(255, 255, 255), 2.0));
+        painter.setBrush(QColor(251, 146, 60));
+        painter.drawEllipse(QRectF(bubble.x() - 6.0,
+                                   bubble.y() - 6.0,
+                                   12.0,
+                                   12.0));
+        painter.setPen(QPen(QColor(251, 146, 60), 2.0));
+        painter.setBrush(QColor(255, 255, 255));
+        painter.drawEllipse(QRectF(tip.x() - 5.5,
+                                   tip.y() - 5.5,
+                                   11.0,
+                                   11.0));
+        painter.restore();
+    };
     if (selectedIds.size() > 1) {
         painter.setBrush(Qt::NoBrush);
         painter.setPen(QPen(QColor(255, 255, 255, 190), 3.0, Qt::DashLine));
@@ -90,6 +119,7 @@ void ShotWindow::drawSelectedAnnotationFrame(QPainter &painter) const
             painter.setPen(Qt::NoPen);
             painter.setBrush(QColor(251, 146, 60));
         }
+        drawNumberPointHandles(*singleSelectedAnnotation, center, angle, true);
 
         const QPointF topCenter =
             rotatedPoint(QPointF(localBounds.center().x(), localBounds.top()), center, angle);
@@ -153,6 +183,8 @@ void ShotWindow::drawSelectedAnnotationFrame(QPainter &painter) const
                                            10.0,
                                            10.0));
             }
+        } else if (annotation && annotation->tool == Tool::Number) {
+            drawNumberPointHandles(*annotation, {}, 0.0, false);
         }
     }
     const QRectF deleteButton = selectedAnnotationDeleteButtonRect();
@@ -380,6 +412,30 @@ void ShotWindow::updateAnnotationDrag(QPointF imagePoint, bool keepAspectRatio)
             annotation->points.append(annotationLineControlPoint(m_annotationBeforeDrag));
         }
         annotation->points[2] = clampImagePoint(localPoint);
+        annotation->rotationDegrees = m_annotationBeforeDrag.rotationDegrees;
+    } else if (selectedIds.size() == 1
+        && (m_annotationDrag == SelectionDrag::NumberTip
+            || m_annotationDrag == SelectionDrag::NumberBubble)) {
+        Annotation *annotation = annotationById(selectedIds.first());
+        if (!annotation || annotation->tool != Tool::Number
+            || m_annotationBeforeDrag.tool != Tool::Number
+            || m_annotationBeforeDrag.points.isEmpty()) {
+            return;
+        }
+        const QRectF beforeBounds = annotationUnrotatedBounds(m_annotationBeforeDrag);
+        const QPointF localPoint = beforeBounds.isEmpty()
+            ? clampImagePoint(imagePoint)
+            : rotatedPoint(clampImagePoint(imagePoint),
+                           beforeBounds.center(),
+                           -m_annotationBeforeDrag.rotationDegrees);
+        while (annotation->points.size() < 2) {
+            annotation->points.append(m_annotationBeforeDrag.points.last());
+        }
+        if (m_annotationDrag == SelectionDrag::NumberTip) {
+            annotation->points[0] = clampImagePoint(localPoint);
+        } else {
+            annotation->points[1] = clampImagePoint(localPoint);
+        }
         annotation->rotationDegrees = m_annotationBeforeDrag.rotationDegrees;
     } else if (m_annotationDrag == SelectionDrag::Move) {
         const QRectF startBounds = m_annotationBoundsBeforeDrag;

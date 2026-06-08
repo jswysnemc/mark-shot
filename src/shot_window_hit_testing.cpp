@@ -27,6 +27,8 @@ void ShotWindow::updateCursor()
         case SelectionDrag::MagnifierLens:
         case SelectionDrag::Rotate:
         case SelectionDrag::LineControl:
+        case SelectionDrag::NumberTip:
+        case SelectionDrag::NumberBubble:
             setCursor(Qt::SizeAllCursor);
             return;
         case SelectionDrag::Left:
@@ -49,7 +51,7 @@ void ShotWindow::updateCursor()
             setCursor(Qt::SizeAllCursor);
             return;
         case SelectionDrag::None:
-            setCursor(Qt::CrossCursor);
+            setCursor(captureCrossCursor());
             return;
         }
     }
@@ -60,6 +62,8 @@ void ShotWindow::updateCursor()
         case SelectionDrag::MagnifierLens:
         case SelectionDrag::Rotate:
         case SelectionDrag::LineControl:
+        case SelectionDrag::NumberTip:
+        case SelectionDrag::NumberBubble:
             setCursor(Qt::SizeAllCursor);
             return;
         case SelectionDrag::Left:
@@ -87,7 +91,7 @@ void ShotWindow::updateCursor()
         }
     }
 
-    setCursor(m_tool == Tool::Text ? Qt::IBeamCursor : Qt::CrossCursor);
+    setCursor(m_tool == Tool::Text ? Qt::IBeamCursor : captureCrossCursor());
 }
 
 void ShotWindow::clearWheelPreview()
@@ -234,6 +238,94 @@ QPointF ShotWindow::annotationLineControlPoint(const Annotation &annotation) con
     return (annotation.points.first() + annotation.points.at(1)) / 2.0;
 }
 
+QString ShotWindow::numberLabelText(int number, NumberStyle style) const
+{
+    if (number <= 0) {
+        return QString::number(number);
+    }
+
+    auto alphaLabel = [](int value, bool uppercase) {
+        QString label;
+        while (value > 0) {
+            --value;
+            const ushort base = uppercase ? QLatin1Char('A').unicode() : QLatin1Char('a').unicode();
+            label.prepend(QChar(base + value % 26));
+            value /= 26;
+        }
+        return label;
+    };
+
+    auto romanLabel = [](int value, bool uppercase) {
+        struct RomanPart {
+            int value;
+            const char *text;
+        };
+        static constexpr std::array<RomanPart, 13> parts = {{
+            {1000, "M"}, {900, "CM"}, {500, "D"}, {400, "CD"},
+            {100, "C"}, {90, "XC"}, {50, "L"}, {40, "XL"},
+            {10, "X"}, {9, "IX"}, {5, "V"}, {4, "IV"}, {1, "I"},
+        }};
+
+        QString label;
+        for (const RomanPart &part : parts) {
+            while (value >= part.value) {
+                label += QString::fromLatin1(part.text);
+                value -= part.value;
+            }
+        }
+        return uppercase ? label : label.toLower();
+    };
+
+    auto chineseLabel = [](int value) {
+        if (value <= 0 || value > 9999) {
+            return QString::number(value);
+        }
+
+        const QString digits = QStringLiteral("零一二三四五六七八九");
+        const QStringList units = {QStringLiteral("千"), QStringLiteral("百"), QStringLiteral("十"), QString()};
+        QString label;
+        bool pendingZero = false;
+        int divisor = 1000;
+        for (int unitIndex = 0; divisor >= 1; divisor /= 10, ++unitIndex) {
+            const int digit = (value / divisor) % 10;
+            if (digit == 0) {
+                pendingZero = !label.isEmpty();
+                continue;
+            }
+            if (pendingZero) {
+                label += digits.mid(0, 1);
+                pendingZero = false;
+            }
+            if (!(digit == 1 && divisor == 10 && label.isEmpty())) {
+                label += digits.mid(digit, 1);
+            }
+            label += units.at(unitIndex);
+        }
+        return label;
+    };
+
+    switch (style) {
+    case NumberStyle::Arabic:
+        return QString::number(number);
+    case NumberStyle::UpperAlpha:
+        return alphaLabel(number, true);
+    case NumberStyle::LowerAlpha:
+        return alphaLabel(number, false);
+    case NumberStyle::UpperRoman:
+        return romanLabel(number, true);
+    case NumberStyle::LowerRoman:
+        return romanLabel(number, false);
+    case NumberStyle::HeavenlyStem: {
+        const QString stems = QStringLiteral("甲乙丙丁戊己庚辛壬癸");
+        return stems.mid((number - 1) % stems.size(), 1);
+    }
+    case NumberStyle::Chinese:
+        return chineseLabel(number);
+    }
+
+    return QString::number(number);
+}
+
 QPointF ShotWindow::rotatedPoint(QPointF point, QPointF center, qreal degrees) const
 {
     const qreal radians = degrees * M_PI / 180.0;
@@ -331,8 +423,8 @@ QRectF ShotWindow::annotationUnrotatedBounds(const Annotation &annotation) const
             return {};
         }
         const qreal radius = std::max<qreal>(13.0, 13.0 + annotation.width * 1.35);
-        const QPointF center = annotation.points.first();
-        const QPointF tip = annotation.points.size() >= 2 ? annotation.points.last() : center;
+        const QPointF tip = annotation.points.first();
+        const QPointF center = annotation.points.size() >= 2 ? annotation.points.last() : tip;
         bounds = QRectF(center.x() - radius, center.y() - radius, radius * 2.0, radius * 2.0);
         bounds = bounds.united(QRectF(tip, QSizeF(0.0, 0.0)));
         break;
@@ -553,6 +645,26 @@ ShotWindow::SelectionDrag ShotWindow::magnifierDragAt(const Annotation &annotati
     return SelectionDrag::None;
 }
 
+ShotWindow::SelectionDrag ShotWindow::numberDragAt(const Annotation &annotation, QPointF imagePoint) const
+{
+    if (annotation.tool != Tool::Number || annotation.points.isEmpty()) {
+        return SelectionDrag::None;
+    }
+
+    const qreal imageTolerance = 8.0 * m_frozenFrame.width() / std::max<qreal>(1.0, m_frozenImageRect.width());
+    const qreal radius = std::max<qreal>(13.0, 13.0 + annotation.width * 1.35);
+    const QPointF tip = annotation.points.first();
+    const QPointF bubble = annotation.points.size() >= 2 ? annotation.points.last() : tip;
+    const QRectF bubbleRect(bubble.x() - radius, bubble.y() - radius, radius * 2.0, radius * 2.0);
+    if (ellipseContainsPoint(bubbleRect, imagePoint, imageTolerance)) {
+        return SelectionDrag::NumberBubble;
+    }
+    if (QLineF(imagePoint, tip).length() <= imageTolerance * 1.6) {
+        return SelectionDrag::NumberTip;
+    }
+    return SelectionDrag::None;
+}
+
 QVector<QPointF> ShotWindow::selectionHandlePoints(QRectF rect) const
 {
     rect = rect.normalized();
@@ -682,6 +794,8 @@ QRectF ShotWindow::resizedBounds(QRectF start, SelectionDrag drag, QPointF image
         case SelectionDrag::MagnifierLens:
         case SelectionDrag::Rotate:
         case SelectionDrag::LineControl:
+        case SelectionDrag::NumberTip:
+        case SelectionDrag::NumberBubble:
         case SelectionDrag::Move:
         case SelectionDrag::None:
             break;
@@ -735,6 +849,13 @@ ShotWindow::SelectionDrag ShotWindow::annotationDragAt(QPointF imagePoint, int a
         }
     }
 
+    if (annotation->tool == Tool::Number) {
+        const SelectionDrag numberDrag = numberDragAt(*annotation, localPoint);
+        if (numberDrag != SelectionDrag::None) {
+            return numberDrag;
+        }
+    }
+
     if (annotationSupportsLineControl(*annotation) && annotation->points.size() >= 2) {
         const QPointF controlPoint = annotationLineControlPoint(*annotation);
         if (QLineF(localPoint, controlPoint).length() <= imageTolerance * 1.4) {
@@ -768,6 +889,11 @@ std::optional<int> ShotWindow::annotationAt(QPointF imagePoint) const
         }
         if (annotation.tool == Tool::Magnifier) {
             if (magnifierDragAt(annotation, localPoint) != SelectionDrag::None) {
+                return annotation.id;
+            }
+        }
+        if (annotation.tool == Tool::Number) {
+            if (numberDragAt(annotation, localPoint) != SelectionDrag::None) {
                 return annotation.id;
             }
         }

@@ -20,21 +20,27 @@ public:
     explicit PinnedImageWindow(QImage image)
         : m_pixmap(QPixmap::fromImage(std::move(image)))
         , m_imageSize(m_pixmap.size())
+        , m_displayBaseSize(displayBaseSizeForPixmap())
         , m_config(pinnedWindowConfig())
     {
         setWindowTitle(MS_TR("Pinned Mark Shot"));
         setAttribute(Qt::WA_DeleteOnClose);
+        setAttribute(Qt::WA_ShowWithoutActivating);
         setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
         setFocusPolicy(Qt::StrongFocus);
         setMouseTracking(true);
         setCursor(Qt::OpenHandCursor);
-        QSize targetSize = m_imageSize;
-        if (QScreen *screen = QApplication::primaryScreen()) {
+        QSize targetSize = m_displayBaseSize;
+        QScreen *screen = QGuiApplication::screenAt(QCursor::pos());
+        if (!screen) {
+            screen = QApplication::primaryScreen();
+        }
+        if (screen) {
             const QSize maxSize = screen->availableGeometry().size() * 0.9;
             if (targetSize.width() > maxSize.width() || targetSize.height() > maxSize.height()) {
                 targetSize.scale(maxSize, Qt::KeepAspectRatio);
             }
-            m_scale = static_cast<qreal>(targetSize.width()) / std::max(1, m_imageSize.width());
+            m_scale = static_cast<qreal>(targetSize.width()) / std::max(1, m_displayBaseSize.width());
             setFixedSize(targetSize);
             move(screen->availableGeometry().center() - rect().center());
         } else {
@@ -50,6 +56,20 @@ public:
         cancelOcr();
     }
 protected:
+    /// @brief Handles window state changes and raises the pinned window after focus changes.
+    /// @param event Current window event.
+    /// @return Whether QWidget handled the event.
+    bool event(QEvent *event) override
+    {
+        const bool shouldRaise = event->type() == QEvent::WindowDeactivate
+            || event->type() == QEvent::ActivationChange
+            || event->type() == QEvent::Show;
+        const bool handled = QWidget::event(event);
+        if (shouldRaise) {
+            QTimer::singleShot(0, this, [this] { raisePinnedWindow(); });
+        }
+        return handled;
+    }
     void paintEvent(QPaintEvent *) override
     {
         QPainter painter(this);
@@ -150,11 +170,16 @@ protected:
     void wheelEvent(QWheelEvent *event) override
     {
         const QPoint delta = event->angleDelta();
-        if (delta.y() == 0) {
+        const QPoint pixelDelta = event->pixelDelta();
+        if (delta.y() == 0 && pixelDelta.y() == 0) {
             QWidget::wheelEvent(event);
             return;
         }
-        const qreal factor = std::pow(1.12, static_cast<qreal>(delta.y()) / 120.0);
+        qreal wheelSteps = static_cast<qreal>(delta.y()) / 120.0;
+        if (qFuzzyIsNull(wheelSteps) && pixelDelta.y() != 0) {
+            wheelSteps = static_cast<qreal>(pixelDelta.y()) / 80.0;
+        }
+        const qreal factor = std::pow(1.08, wheelSteps);
         resizeByScale(m_scale * factor, event->globalPosition().toPoint(), event->position());
         event->accept();
     }
@@ -255,6 +280,7 @@ private:
         const QPoint center = frameGeometry().center();
         m_pixmap = m_pixmap.transformed(QTransform().rotate(degrees), Qt::SmoothTransformation);
         m_imageSize = m_pixmap.size();
+        m_displayBaseSize = displayBaseSizeForPixmap();
         clearTextSelection();
         m_ocrTokens.clear();
         m_translatedTokens.clear();
@@ -280,19 +306,38 @@ private:
             m_pixmap.save(path, "PNG");
         }
     }
+    /// @brief Computes the device-independent base display size for the pinned window.
+    /// @return Logical display size for the current image.
+    QSize displayBaseSizeForPixmap() const
+    {
+        const QSizeF logicalSize = m_pixmap.deviceIndependentSize();
+        return QSize(std::max(1, qRound(logicalSize.width())),
+                     std::max(1, qRound(logicalSize.height())));
+    }
+    /// @brief Raises the pinned window to the top of the current window stack.
+    /// @return Nothing.
+    void raisePinnedWindow()
+    {
+        raise();
+        if (QWindow *window = windowHandle()) {
+            window->raise();
+        }
+    }
     void resizeByScale(qreal scale, QPoint globalAnchor, QPointF localAnchor)
     {
         scale = std::clamp(scale, 0.1, 6.0);
-        QSize targetSize(qMax(24, qRound(m_imageSize.width() * scale)),
-                         qMax(24, qRound(m_imageSize.height() * scale)));
+        QSize targetSize(qMax(24, qRound(m_displayBaseSize.width() * scale)),
+                         qMax(24, qRound(m_displayBaseSize.height() * scale)));
         targetSize.scale(targetSize, Qt::KeepAspectRatio);
         const qreal xRatio = width() > 0 ? localAnchor.x() / width() : 0.5;
         const qreal yRatio = height() > 0 ? localAnchor.y() / height() : 0.5;
         const QPoint topLeft(globalAnchor.x() - qRound(targetSize.width() * xRatio),
                              globalAnchor.y() - qRound(targetSize.height() * yRatio));
-        m_scale = static_cast<qreal>(targetSize.width()) / std::max(1, m_imageSize.width());
+        m_scale = static_cast<qreal>(targetSize.width()) / std::max(1, m_displayBaseSize.width());
+        setMinimumSize(QSize(24, 24));
+        setMaximumSize(QSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX));
+        setGeometry(QRect(topLeft, targetSize));
         setFixedSize(targetSize);
-        move(topLeft);
     }
     void startOcr()
     {
@@ -886,6 +931,8 @@ private:
     QPixmap m_pixmap;
     /// @brief Size of the original pinned image.
     QSize m_imageSize;
+    /// @brief Device-independent base size used for pinned window scaling.
+    QSize m_displayBaseSize;
     /// @brief Current zoom/scale factor of the pinned window.
     qreal m_scale = 1.0;
     /// @brief Offset for dragging the window.

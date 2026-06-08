@@ -117,9 +117,16 @@ void ShotWindow::pinSelection()
         return;
     }
 
-    const QImage output = renderedSelection();
+    QImage output = renderedSelection();
     if (output.isNull()) {
         return;
+    }
+    const QRect logicalSelection = selectionGlobalRect();
+    if (!logicalSelection.isEmpty()) {
+        const qreal dprX = static_cast<qreal>(output.width()) / std::max(1, logicalSelection.width());
+        const qreal dprY = static_cast<qreal>(output.height()) / std::max(1, logicalSelection.height());
+        const qreal dpr = std::max<qreal>(1.0, (dprX + dprY) / 2.0);
+        output.setDevicePixelRatio(dpr);
     }
 
     auto *window = createPinnedImageWindow(output);

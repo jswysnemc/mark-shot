@@ -497,7 +497,7 @@ void ShotWindow::setStartupTool(StartupTool tool)
     if (m_startupColorPanel) {
         m_startupColorPanel->hide();
     }
-    setCursor(tool == StartupTool::ColorPicker ? Qt::CrossCursor : Qt::SizeAllCursor);
+    setCursor(tool == StartupTool::ColorPicker ? captureCrossCursor() : QCursor(Qt::SizeAllCursor));
     update();
 }
 
@@ -511,7 +511,7 @@ void ShotWindow::leaveStartupTool()
     if (m_startupColorPanel) {
         m_startupColorPanel->hide();
     }
-    setCursor(Qt::CrossCursor);
+    setCursor(captureCrossCursor());
     update();
 }
 

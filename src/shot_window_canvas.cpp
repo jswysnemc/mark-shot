@@ -543,10 +543,11 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
         annotation.points.append(clampImagePoint(imagePoint));
         annotation.points.append(clampImagePoint(imagePoint));
         annotation.number = m_nextNumber;
+        annotation.numberStyle = m_numberStyle;
         annotation.color = m_currentColor;
         annotation.width = m_numberWidth;
         m_dragging = true;
-        m_dragStart = annotation.points.first();
+        m_dragStart = annotation.points.last();
         m_draft = annotation;
         update();
         return;

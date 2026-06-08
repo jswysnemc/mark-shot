@@ -42,6 +42,7 @@
 #include <QSize>
 #include <QShowEvent>
 #include <QStandardPaths>
+#include <QThread>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWheelEvent>

@@ -4,6 +4,7 @@
 #include "scroll/scroll_session_window.h"
 
 #include <QColor>
+#include <QCursor>
 #include <QImage>
 #include <QJsonValue>
 #include <QKeySequence>
@@ -16,6 +17,7 @@
 #include <QStringList>
 #include <QVector>
 
+#include <array>
 #include <optional>
 
 class QPainter;
@@ -76,6 +78,9 @@ qreal clampedMagnifierScale(qreal scale);
 int magnifierScaleSliderValue(qreal scale);
 qreal magnifierScaleFromSliderValue(int value);
 QString magnifierScaleText(qreal scale);
+/// @brief Creates the high-contrast cross cursor used during capture.
+/// @return Cursor used for selection and annotation drawing modes.
+QCursor captureCrossCursor();
 qreal normalizedRotationDegrees(qreal degrees);
 std::optional<bool> boolFromText(QString value);
 std::optional<bool> boolFromConfigValue(const QJsonValue &value);
@@ -124,6 +129,8 @@ bool ocrOutputReportsMissingBackend(const QByteArray &stdoutData,
                                     const QByteArray &stderrData,
                                     const QString &configuredBackend);
 bool ocrResultPanelEnabled();
+bool annotationAutoSelectAfterDrawEnabled();
+std::array<bool, static_cast<int>(ShotWindow::Tool::Laser) + 1> annotationAutoSelectAfterDrawTools();
 markshot::scroll::ScrollSessionUiConfig scrollSessionUiConfig();
 QWidget *createOcrResultWindow(QString text);
 QWidget *createPinnedImageWindow(QImage image);

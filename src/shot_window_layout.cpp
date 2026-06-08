@@ -412,6 +412,10 @@ void ShotWindow::updateAnnotationPropertyPanel()
         annotation && annotation->tool == Tool::Highlighter
             ? annotation->highlighterStyle
             : m_highlighterStyle;
+    const NumberStyle panelNumberStyle =
+        annotation && annotation->tool == Tool::Number
+            ? annotation->numberStyle
+            : m_numberStyle;
     const QString panelFontFamily = annotation ? annotation->fontFamily : m_textFontFamily;
 
     switch (panelTool) {
@@ -515,6 +519,23 @@ void ShotWindow::updateAnnotationPropertyPanel()
             m_propertyHighlighterStyleCombo->setCurrentIndex(
                 panelHighlighterStyle == HighlighterStyle::StraightLine ? 1 : 0);
         }
+    }
+    if (m_propertyNumberStyleCombo) {
+        const bool supportsNumberStyle = !groupSelection && panelTool == Tool::Number;
+        m_propertyNumberStyleCombo->setVisible(supportsNumberStyle);
+        if (supportsNumberStyle) {
+            const QSignalBlocker blocker(m_propertyNumberStyleCombo);
+            const int numberStyleValue = static_cast<int>(panelNumberStyle);
+            for (int i = 0; i < m_propertyNumberStyleCombo->count(); ++i) {
+                if (m_propertyNumberStyleCombo->itemData(i).toInt() == numberStyleValue) {
+                    m_propertyNumberStyleCombo->setCurrentIndex(i);
+                    break;
+                }
+            }
+        }
+    }
+    if (m_propertyResetNumberButton) {
+        m_propertyResetNumberButton->setVisible(!groupSelection && panelTool == Tool::Number);
     }
     const bool supportsMagnifierScale = !groupSelection && panelTool == Tool::Magnifier;
     if (m_propertyMagnifierScaleGlyphLabel) {

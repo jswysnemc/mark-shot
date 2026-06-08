@@ -141,9 +141,15 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
     }
     case Tool::Number:
         if (!annotation.points.isEmpty()) {
-            const QPointF bubblePoint = annotation.points.first();
-            const QPointF tipPoint = annotation.points.size() >= 2 ? annotation.points.last() : bubblePoint;
-            drawNumber(painter, tipPoint, bubblePoint, annotation.number, annotation.color, annotation.width, widgetCoordinates);
+            const QPointF tipPoint = annotation.points.first();
+            const QPointF bubblePoint = annotation.points.size() >= 2 ? annotation.points.last() : tipPoint;
+            drawNumber(painter,
+                       tipPoint,
+                       bubblePoint,
+                       numberLabelText(annotation.number, annotation.numberStyle),
+                       annotation.color,
+                       annotation.width,
+                       widgetCoordinates);
         }
         break;
     case Tool::Mosaic:
@@ -398,10 +404,12 @@ void ShotWindow::drawLaserStroke(QPainter &painter, const LaserStroke &stroke, b
     const qreal scale = annotationSizeScale(widgetCoordinates);
     const qreal width = std::max<qreal>(3.0, stroke.width * scale);
 
-    QPainterPath path(mapPoint(stroke.points.first()));
-    for (int i = 1; i < stroke.points.size(); ++i) {
-        path.lineTo(mapPoint(stroke.points.at(i)));
+    QVector<QPointF> mappedPoints;
+    mappedPoints.reserve(stroke.points.size());
+    for (const QPointF &point : stroke.points) {
+        mappedPoints.append(mapPoint(point));
     }
+    const QPainterPath path = smoothedStrokePath(mappedPoints);
 
     const qreal configuredOpacity = stroke.color.alphaF();
     QColor glow = stroke.color;
@@ -439,7 +447,26 @@ void ShotWindow::updateLaserStroke(QPointF imagePoint)
     if (!m_laserDraft.has_value()) {
         return;
     }
-    m_laserDraft->points.append(clampImagePoint(imagePoint));
+    const QPointF nextPoint = clampImagePoint(imagePoint);
+    if (m_laserDraft->points.isEmpty()) {
+        m_laserDraft->points.append(nextPoint);
+        update();
+        return;
+    }
+
+    const QPointF lastPoint = m_laserDraft->points.last();
+    const qreal distance = QLineF(lastPoint, nextPoint).length();
+    const qreal step = std::max<qreal>(2.0, m_laserWidth * 0.38);
+    if (distance < step * 0.35) {
+        return;
+    }
+
+    const int inserts = std::clamp(static_cast<int>(std::floor(distance / step)), 0, 24);
+    for (int i = 1; i <= inserts; ++i) {
+        const qreal t = static_cast<qreal>(i) / static_cast<qreal>(inserts + 1);
+        m_laserDraft->points.append(lastPoint + (nextPoint - lastPoint) * t);
+    }
+    m_laserDraft->points.append(nextPoint);
     update();
 }
 
@@ -476,7 +503,7 @@ void ShotWindow::cleanupLaserStrokes()
 void ShotWindow::drawNumber(QPainter &painter,
                             QPointF tipPoint,
                             QPointF bubblePoint,
-                            int number,
+                            const QString &label,
                             QColor color,
                             qreal width,
                             bool widgetCoordinates) const
@@ -510,10 +537,14 @@ void ShotWindow::drawNumber(QPainter &painter,
     painter.setBrush(color);
     painter.drawEllipse(bubble);
 
-    QFont font = markshot::theme::uiFont(qRound(std::clamp(radius * 0.92, 12.0, 54.0)), QFont::Black);
+    int fontSize = qRound(std::clamp(radius * 0.92, 12.0, 54.0));
+    QFont font = markshot::theme::uiFont(fontSize, QFont::Black);
+    while (fontSize > 8 && QFontMetrics(font).horizontalAdvance(label) > radius * 1.58) {
+        font.setPointSize(--fontSize);
+    }
     painter.setFont(font);
     painter.setPen(Qt::white);
-    painter.drawText(bubble, Qt::AlignCenter, QString::number(number));
+    painter.drawText(bubble, Qt::AlignCenter, label);
     painter.restore();
 }
 

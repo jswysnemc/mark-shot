@@ -305,6 +305,8 @@ struct DefaultTools {
     ShotWindow::Tool normal = ShotWindow::Tool::Pen;
     /// @brief Default tool for fullscreen capture mode.
     ShotWindow::Tool fullscreen = ShotWindow::Tool::Pen;
+    /// @brief Default tool for annotating an existing image file.
+    ShotWindow::Tool file = ShotWindow::Tool::Pen;
     /// @brief Default annotation color.
     QColor color = markshot::theme::kDefaultAnnotationColor;
 };
@@ -428,6 +430,7 @@ DefaultTools configuredDefaultTools(QString *warning)
             parseTool(commonDefault, QStringLiteral("annotation.defaultTool"))) {
         tools.normal = *tool;
         tools.fullscreen = *tool;
+        tools.file = *tool;
     }
 
     const QString normalDefault = firstStringValue({
@@ -466,6 +469,26 @@ DefaultTools configuredDefaultTools(QString *warning)
     if (const std::optional<ShotWindow::Tool> tool =
             parseTool(fullscreenDefault, QStringLiteral("annotation.fullscreenDefaultTool"))) {
         tools.fullscreen = *tool;
+        tools.file = *tool;
+    }
+
+    const QString fileDefault = firstStringValue({
+        stringValue(annotation,
+                    {QStringLiteral("fileDefaultTool"),
+                     QStringLiteral("imageDefaultTool"),
+                     QStringLiteral("openFileDefaultTool")}),
+        stringValue(root,
+                    {QStringLiteral("fileDefaultTool"),
+                     QStringLiteral("imageDefaultTool"),
+                     QStringLiteral("openFileDefaultTool")}),
+        stringValue(defaultTools,
+                    {QStringLiteral("file"), QStringLiteral("image"), QStringLiteral("openFile")}),
+        stringValue(rootDefaultTools,
+                    {QStringLiteral("file"), QStringLiteral("image"), QStringLiteral("openFile")}),
+    });
+    if (const std::optional<ShotWindow::Tool> tool =
+            parseTool(fileDefault, QStringLiteral("annotation.fileDefaultTool"))) {
+        tools.file = *tool;
     }
 
     const QJsonValue defaultColor = jsonValue(annotation,
@@ -707,6 +730,10 @@ int main(int argc, char *argv[])
                                                    QStringLiteral("Set the default annotation tool for fullscreen annotation mode. Supported: %1.")
                                                        .arg(ShotWindow::supportedToolNames().join(QStringLiteral(", "))),
                                                    QStringLiteral("tool"));
+    QCommandLineOption fileDefaultToolOption(QStringLiteral("file-default-tool"),
+                                             QStringLiteral("Set the default annotation tool when opening an existing image file. Supported: %1.")
+                                                 .arg(ShotWindow::supportedToolNames().join(QStringLiteral(", "))),
+                                             QStringLiteral("tool"));
     QCommandLineOption defaultColorOption(QStringLiteral("default-color"),
                                           QStringLiteral("Set the default annotation color. Supported formats: #RRGGBB or #RRGGBBAA."),
                                           QStringLiteral("color"));
@@ -724,6 +751,7 @@ int main(int argc, char *argv[])
     parser.addOption(captureOption);
     parser.addOption(defaultToolOption);
     parser.addOption(fullscreenDefaultToolOption);
+    parser.addOption(fileDefaultToolOption);
     parser.addOption(defaultColorOption);
     parser.addOption(debugOption);
     parser.addOption(noDebugOption);
@@ -783,6 +811,7 @@ int main(int argc, char *argv[])
         }
         defaultTools.normal = *parsedTool;
         defaultTools.fullscreen = *parsedTool;
+        defaultTools.file = *parsedTool;
         configDefaultToolWarning.clear();
     }
     if (parser.isSet(fullscreenDefaultToolOption)) {
@@ -796,6 +825,19 @@ int main(int argc, char *argv[])
             return 1;
         }
         defaultTools.fullscreen = *parsedTool;
+        defaultTools.file = *parsedTool;
+    }
+    if (parser.isSet(fileDefaultToolOption)) {
+        const QString optionValue = parser.value(fileDefaultToolOption);
+        const std::optional<ShotWindow::Tool> parsedTool = parseRuntimeTool(optionValue);
+        if (!parsedTool.has_value()) {
+            QMessageBox::critical(nullptr,
+                                  QStringLiteral("Mark Shot"),
+                                  MS_TR("Unsupported file default tool: %1\nSupported tools: %2")
+                                      .arg(optionValue, ShotWindow::supportedToolNames().join(QStringLiteral(", "))));
+            return 1;
+        }
+        defaultTools.file = *parsedTool;
     }
     if (parser.isSet(defaultColorOption)) {
         const QString optionValue = parser.value(defaultColorOption);
@@ -833,7 +875,7 @@ int main(int argc, char *argv[])
         }
 
         ShotWindow *window = new ShotWindow(image, imageFile.fileName());
-        window->setDefaultTools(defaultTools.normal, defaultTools.fullscreen);
+        window->setDefaultTools(defaultTools.normal, defaultTools.file);
         window->setDefaultColor(defaultTools.color);
         QScreen *screen = markshot::focusedScreen();
         if (screen) {

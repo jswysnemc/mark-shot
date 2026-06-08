@@ -112,6 +112,8 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
         case SelectionDrag::MagnifierLens:
         case SelectionDrag::Rotate:
         case SelectionDrag::LineControl:
+        case SelectionDrag::NumberTip:
+        case SelectionDrag::NumberBubble:
             setCursor(Qt::SizeAllCursor);
             break;
         case SelectionDrag::Left:
@@ -134,7 +136,7 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
             setCursor(Qt::SizeAllCursor);
             break;
         case SelectionDrag::None:
-            setCursor(Qt::CrossCursor);
+            setCursor(captureCrossCursor());
             break;
         }
         return;
@@ -222,10 +224,11 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
         m_draft->points[1] = lensRect.center();
     } else if (m_draft->tool == Tool::Number) {
         if (m_draft->points.size() < 2) {
-            m_draft->points.append(clamped);
+            m_draft->points.append(m_dragStart);
         } else {
-            m_draft->points[1] = clamped;
+            m_draft->points[1] = m_dragStart;
         }
+        m_draft->points[0] = clamped;
         m_draft->rect = QRectF(m_dragStart, clamped).normalized();
     } else {
         if ((m_draft->tool == Tool::Rectangle || m_draft->tool == Tool::Ellipse || m_draft->tool == Tool::Magnifier)
@@ -706,6 +709,8 @@ void ShotWindow::commitDraft()
     if (m_draft->id == 0) {
         m_draft->id = m_nextAnnotationId++;
     }
+    const int committedId = m_draft->id;
+    const Tool committedTool = m_draft->tool;
     if (m_draft->tool == Tool::Number) {
         if (m_draft->number <= 0) {
             m_draft->number = m_nextNumber;
@@ -714,6 +719,28 @@ void ShotWindow::commitDraft()
     }
     m_annotations.append(*m_draft);
     m_draft.reset();
+    if (m_autoSelectAfterDrawByTool.at(static_cast<int>(committedTool))) {
+        switch (committedTool) {
+        case Tool::Line:
+        case Tool::Rectangle:
+        case Tool::Ellipse:
+        case Tool::Arrow:
+        case Tool::Number:
+        case Tool::Magnifier:
+            setTool(Tool::Select);
+            setSelectedAnnotations({committedId});
+            updateAnnotationPropertyPanel();
+            break;
+        case Tool::Move:
+        case Tool::Select:
+        case Tool::Pen:
+        case Tool::Highlighter:
+        case Tool::Text:
+        case Tool::Mosaic:
+        case Tool::Laser:
+            break;
+        }
+    }
     update();
 }
 

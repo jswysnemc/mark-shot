@@ -146,6 +146,58 @@ void ShotWindow::setSelectedHighlighterStyle(HighlighterStyle style)
     update();
 }
 
+void ShotWindow::setSelectedNumberStyle(NumberStyle style)
+{
+    const QVector<int> selectedIds = selectedAnnotationIds();
+    if (!selectedIds.isEmpty()) {
+        bool changed = false;
+        for (int id : selectedIds) {
+            const Annotation *annotation = annotationById(id);
+            if (annotation && annotation->tool == Tool::Number
+                && annotation->numberStyle != style) {
+                changed = true;
+                break;
+            }
+        }
+        if (!changed) {
+            return;
+        }
+        pushHistorySnapshot();
+        for (int id : selectedIds) {
+            if (Annotation *annotation = annotationById(id);
+                annotation && annotation->tool == Tool::Number) {
+                annotation->numberStyle = style;
+            }
+        }
+    } else {
+        if (m_tool != Tool::Number || m_numberStyle == style) {
+            return;
+        }
+        m_numberStyle = style;
+    }
+
+    if (m_draft.has_value() && m_draft->tool == Tool::Number) {
+        m_draft->numberStyle = style;
+    }
+    updateAnnotationPropertyPanel();
+    update();
+}
+
+void ShotWindow::resetNumberSequence()
+{
+    if (m_nextNumber == 1) {
+        return;
+    }
+
+    pushHistorySnapshot();
+    m_nextNumber = 1;
+    if (m_draft.has_value() && m_draft->tool == Tool::Number) {
+        m_draft->number = m_nextNumber;
+    }
+    updateAnnotationPropertyPanel();
+    update();
+}
+
 void ShotWindow::setSelectedMagnifierScale(int scaleValue)
 {
     const qreal scale = magnifierScaleFromSliderValue(scaleValue);
@@ -745,12 +797,20 @@ void ShotWindow::updateTextEditorGeometry()
     if (!m_textEditor || !m_textEditor->isVisible()) {
         return;
     }
+    auto keepEditorInsideWindow = [this](QRect editorRect) {
+        const int minLeft = 8;
+        const int minTop = 8;
+        const int maxLeft = std::max(minLeft, width() - editorRect.width() - 8);
+        const int maxTop = std::max(minTop, height() - editorRect.height() - 8);
+        editorRect.moveLeft(std::clamp(editorRect.left(), minLeft, maxLeft));
+        editorRect.moveTop(std::clamp(editorRect.top(), minTop, maxTop));
+        return editorRect;
+    };
+
     if (m_editingTextAnnotationId.has_value()) {
         if (const Annotation *annotation = annotationById(*m_editingTextAnnotationId)) {
             QRect editorRect = textContentRect(*annotation, true).toAlignedRect().adjusted(0, 0, 1, 1);
-            editorRect.moveLeft(std::clamp(editorRect.left(), 8, std::max(8, width() - editorRect.width() - 8)));
-            editorRect.moveTop(std::clamp(editorRect.top(), 8, std::max(8, height() - editorRect.height() - 8)));
-            m_textEditor->setGeometry(editorRect);
+            m_textEditor->setGeometry(keepEditorInsideWindow(editorRect));
         }
         return;
     }
@@ -759,14 +819,23 @@ void ShotWindow::updateTextEditorGeometry()
     const QRectF selection = imageRectToWidget(normalizedSelection());
     constexpr int kMinTextEditorWidth = 96;
     constexpr int kMinTextEditorHeight = 38;
-    const int availableRight = std::max(kMinTextEditorWidth, qRound(selection.right() - topLeft.x() - 12));
-    const int availableBottom = std::max(kMinTextEditorHeight, qRound(selection.bottom() - topLeft.y() - 12));
+    const int spaceRight = qRound(selection.right() - topLeft.x() - 12);
+    const int spaceLeft = qRound(topLeft.x() - selection.left() - 12);
+    const int spaceBottom = qRound(selection.bottom() - topLeft.y() - 12);
+    const int spaceTop = qRound(topLeft.y() - selection.top() - 12);
+    const int availableRight = std::max(kMinTextEditorWidth, std::max(spaceRight, spaceLeft));
+    const int availableBottom = std::max(kMinTextEditorHeight, std::max(spaceBottom, spaceTop));
     const int editorWidth = std::clamp(220, kMinTextEditorWidth, availableRight);
     const int editorHeight = std::clamp(m_textEditor->fontMetrics().height() + 18, kMinTextEditorHeight, availableBottom);
-    QRect editorRect(qRound(topLeft.x()), qRound(topLeft.y()), editorWidth, editorHeight);
-    editorRect.moveLeft(std::clamp(editorRect.left(), 8, std::max(8, width() - editorRect.width() - 8)));
-    editorRect.moveTop(std::clamp(editorRect.top(), 8, std::max(8, height() - editorRect.height() - 8)));
-    m_textEditor->setGeometry(editorRect);
+    QPoint editorTopLeft = topLeft.toPoint();
+    if (spaceRight < kMinTextEditorWidth && spaceLeft > spaceRight) {
+        editorTopLeft.setX(qRound(topLeft.x()) - editorWidth);
+    }
+    if (spaceBottom < kMinTextEditorHeight && spaceTop > spaceBottom) {
+        editorTopLeft.setY(qRound(topLeft.y()) - editorHeight);
+    }
+    m_textEditor->setGeometry(keepEditorInsideWindow(QRect(editorTopLeft, QSize(editorWidth, editorHeight))));
+    m_textEditor->ensureCursorVisible();
 }
 
 void ShotWindow::redoAnnotation()

@@ -88,9 +88,10 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     m_toolShortcuts = shortcutConfig.tools;
     m_startupColorPickerShortcut = shortcutConfig.startupColorPicker;
     m_startupRulerShortcut = shortcutConfig.startupRuler;
+    m_autoSelectAfterDrawByTool = annotationAutoSelectAfterDrawTools();
 
     setWindowTitle(MS_TR("Mark Shot"));
-    setCursor(Qt::CrossCursor);
+    setCursor(captureCrossCursor());
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
     setAttribute(Qt::WA_DeleteOnClose);
@@ -227,6 +228,32 @@ ShotWindow::ShotWindow(QImage frozenFrame,
             static_cast<HighlighterStyle>(m_propertyHighlighterStyleCombo->itemData(index).toInt()));
     });
     propertyLayout->addWidget(m_propertyHighlighterStyleCombo);
+    m_propertyNumberStyleCombo = new QComboBox(m_annotationPropertyPanel);
+    m_propertyNumberStyleCombo->setFocusPolicy(Qt::NoFocus);
+    m_propertyNumberStyleCombo->addItem(MS_TR("1, 2, 3"), static_cast<int>(NumberStyle::Arabic));
+    m_propertyNumberStyleCombo->addItem(MS_TR("A, B, C"), static_cast<int>(NumberStyle::UpperAlpha));
+    m_propertyNumberStyleCombo->addItem(MS_TR("a, b, c"), static_cast<int>(NumberStyle::LowerAlpha));
+    m_propertyNumberStyleCombo->addItem(MS_TR("I, II, III"), static_cast<int>(NumberStyle::UpperRoman));
+    m_propertyNumberStyleCombo->addItem(MS_TR("i, ii, iii"), static_cast<int>(NumberStyle::LowerRoman));
+    m_propertyNumberStyleCombo->addItem(MS_TR("甲, 乙, 丙"), static_cast<int>(NumberStyle::HeavenlyStem));
+    m_propertyNumberStyleCombo->addItem(MS_TR("一, 二, 三"), static_cast<int>(NumberStyle::Chinese));
+    m_propertyNumberStyleCombo->setToolTip(MS_TR("Number style"));
+    m_propertyNumberStyleCombo->setAccessibleName(MS_TR("Number style"));
+    connect(m_propertyNumberStyleCombo, QOverload<int>::of(&QComboBox::activated), this, [this](int index) {
+        if (index < 0 || !m_propertyNumberStyleCombo) {
+            return;
+        }
+        setSelectedNumberStyle(static_cast<NumberStyle>(m_propertyNumberStyleCombo->itemData(index).toInt()));
+    });
+    propertyLayout->addWidget(m_propertyNumberStyleCombo);
+    m_propertyResetNumberButton = new QPushButton(m_annotationPropertyPanel);
+    m_propertyResetNumberButton->setFocusPolicy(Qt::NoFocus);
+    m_propertyResetNumberButton->setIcon(markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::ResetNumber));
+    m_propertyResetNumberButton->setIconSize(QSize(20, 20));
+    m_propertyResetNumberButton->setToolTip(MS_TR("Reset number sequence"));
+    m_propertyResetNumberButton->setAccessibleName(MS_TR("Reset number sequence"));
+    connect(m_propertyResetNumberButton, &QPushButton::clicked, this, [this] { resetNumberSequence(); });
+    propertyLayout->addWidget(m_propertyResetNumberButton);
     m_propertyMagnifierScaleGlyphLabel =
         addPropertyGlyph(markshot::ui::PropertyIcon::MagnifierScale, MS_TR("Magnifier scale"));
     m_propertyMagnifierScaleLabel = new QLabel(magnifierScaleText(kDefaultMagnifierScale), m_annotationPropertyPanel);
@@ -574,6 +601,7 @@ void ShotWindow::initializeTextEditor()
     m_textEditor->setFrameShape(QFrame::NoFrame);
     m_textEditor->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_textEditor->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_textEditor->setAttribute(Qt::WA_InputMethodEnabled, true);
     m_textEditor->viewport()->setAutoFillBackground(false);
     m_textEditor->setToolTip(MS_TR("Enter inserts newline, click outside commits, Esc cancels"));
     m_textEditor->hide();

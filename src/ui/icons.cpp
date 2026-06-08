@@ -631,6 +631,23 @@ QIcon makePropertyIcon(PropertyIcon icon, QColor ink)
         p.drawLine(QPointF(22.9, 12.7), QPointF(26.5, 16.3));
         break;
     }
+    case PropertyIcon::ResetNumber: {
+        QFont font = p.font();
+        font.setPointSizeF(9.0);
+        font.setBold(true);
+        p.setFont(font);
+        p.setPen(makePen(iconInk, 1.0));
+        p.drawText(QRectF(6.5, 5.5, 10.0, 10.0), Qt::AlignCenter, QStringLiteral("1"));
+        p.setPen(makePen(iconSoft, 1.4));
+        p.drawArc(QRectF(8.0, 8.0, 16.0, 16.0), 35 * 16, 285 * 16);
+        p.setPen(makePen(iconInk, 1.5));
+        QPainterPath arrow;
+        arrow.moveTo(21.5, 8.5);
+        arrow.lineTo(24.5, 8.5);
+        arrow.lineTo(23.8, 11.5);
+        p.drawPath(arrow);
+        break;
+    }
     }
 
     p.end();

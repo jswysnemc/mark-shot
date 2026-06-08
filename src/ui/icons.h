@@ -28,6 +28,7 @@ enum class PropertyIcon {
     MagnifierScale,
     Font,
     EditText,
+    ResetNumber,
 };
 
 // Generates a 32x32 pixmap-backed QIcon for compact controls in the

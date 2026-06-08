@@ -173,6 +173,18 @@ private:
         StraightLine,
     };
 
+    // Number badge display styles. Existing annotations keep their own style so
+    // changing the active tool default does not rewrite old markers.
+    enum class NumberStyle {
+        Arabic,
+        UpperAlpha,
+        LowerAlpha,
+        UpperRoman,
+        LowerRoman,
+        HeavenlyStem,
+        Chinese,
+    };
+
     // Active drag target for selected annotations. Line and magnifier controls
     // live beside the usual resize/move handles.
     enum class SelectionDrag {
@@ -182,6 +194,8 @@ private:
         LineControl,
         MagnifierSource,
         MagnifierLens,
+        NumberTip,
+        NumberBubble,
         Left,
         Right,
         Top,
@@ -212,6 +226,7 @@ private:
         HighlighterStyle highlighterStyle = HighlighterStyle::StraightLine;
         qreal rotationDegrees = 0.0;
         qreal magnifierScale = 2.75;
+        NumberStyle numberStyle = NumberStyle::Arabic;
         QString fontFamily = markshot::theme::textFontFamily();
     };
 
@@ -274,6 +289,8 @@ private:
     bool annotationSupportsRotation(const Annotation &annotation) const;
     bool annotationSupportsLineControl(const Annotation &annotation) const;
     QPointF annotationLineControlPoint(const Annotation &annotation) const;
+    QString numberLabelText(int number, NumberStyle style) const;
+    SelectionDrag numberDragAt(const Annotation &annotation, QPointF imagePoint) const;
     QPointF rotatedPoint(QPointF point, QPointF center, qreal degrees) const;
     QRectF rotatedRectBounds(QRectF rect, qreal degrees) const;
     QRectF annotationUnrotatedBounds(const Annotation &annotation) const;
@@ -322,7 +339,7 @@ private:
     void drawNumber(QPainter &painter,
                     QPointF tipPoint,
                     QPointF bubblePoint,
-                    int number,
+                    const QString &label,
                     QColor color,
                     qreal width,
                     bool widgetCoordinates) const;
@@ -375,6 +392,8 @@ private:
     void setSelectedAnnotationCornerRadius(int radius);
     void setSelectedAnnotationArrowStyle(ArrowStyle style);
     void setSelectedHighlighterStyle(HighlighterStyle style);
+    void setSelectedNumberStyle(NumberStyle style);
+    void resetNumberSequence();
     void setSelectedMagnifierScale(int scaleValue);
     void setSelectedTextFontFamily(const QString &fontFamily);
     void applyPropertyColor(QColor color);
@@ -483,12 +502,14 @@ private:
     qreal m_shapeWidth = 3.0;
     qreal m_numberWidth = 3.0;
     qreal m_mosaicBlockSize = 14.0;
-    qreal m_laserWidth = 10.0;
+    qreal m_laserWidth = 6.0;
     qreal m_magnifierScale = 2.75;
     bool m_shapeFilled = false;
+    std::array<bool, static_cast<int>(Tool::Laser) + 1> m_autoSelectAfterDrawByTool = {};
     qreal m_rectangleCornerRadius = 0.0;
     ArrowStyle m_arrowStyle = ArrowStyle::Fletched;
     HighlighterStyle m_highlighterStyle = HighlighterStyle::StraightLine;
+    NumberStyle m_numberStyle = NumberStyle::Arabic;
     QString m_textFontFamily = markshot::theme::textFontFamily();
     QColor m_textBackgroundColor = QColor(0, 0, 0, 0);
     int m_nextNumber = 1;
@@ -522,6 +543,8 @@ private:
     QLabel *m_propertyArrowStyleLabel = nullptr;
     QComboBox *m_propertyArrowStyleCombo = nullptr;
     QComboBox *m_propertyHighlighterStyleCombo = nullptr;
+    QComboBox *m_propertyNumberStyleCombo = nullptr;
+    QPushButton *m_propertyResetNumberButton = nullptr;
     QLabel *m_propertyMagnifierScaleGlyphLabel = nullptr;
     QLabel *m_propertyMagnifierScaleLabel = nullptr;
     QSlider *m_propertyMagnifierScaleSlider = nullptr;

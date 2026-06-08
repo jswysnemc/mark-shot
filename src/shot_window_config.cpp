@@ -403,6 +403,123 @@ bool ocrResultPanelEnabled()
     return true;
 }
 
+using AutoSelectTools = std::array<bool, static_cast<int>(ShotWindow::Tool::Laser) + 1>;
+
+bool isAutoSelectDefaultKey(const QString &key)
+{
+    const QString normalized = cfg::normalizedKey(key);
+    return normalized == QStringLiteral("default")
+        || normalized == QStringLiteral("all")
+        || normalized == QStringLiteral("enabled")
+        || normalized == QStringLiteral("value");
+}
+
+void applyAutoSelectAfterDrawValue(const QJsonValue &value, AutoSelectTools *tools)
+{
+    if (!tools || value.isUndefined() || value.isNull()) {
+        return;
+    }
+
+    if (value.isObject()) {
+        const QJsonObject object = value.toObject();
+        if (const std::optional<bool> defaultValue =
+                cfg::boolValue(cfg::valueForKeys(object,
+                                                 {QStringLiteral("default"),
+                                                  QStringLiteral("all"),
+                                                  QStringLiteral("enabled"),
+                                                  QStringLiteral("value")}))) {
+            tools->fill(*defaultValue);
+        }
+        for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
+            if (isAutoSelectDefaultKey(it.key())) {
+                continue;
+            }
+            const std::optional<ShotWindow::Tool> tool = ShotWindow::toolFromName(it.key());
+            if (!tool.has_value()) {
+                continue;
+            }
+            if (const std::optional<bool> enabled = cfg::boolValue(it.value())) {
+                tools->at(static_cast<int>(*tool)) = *enabled;
+            }
+        }
+        return;
+    }
+
+    if (const std::optional<bool> enabled = cfg::boolValue(value)) {
+        tools->fill(*enabled);
+    }
+}
+
+void applyAutoSelectAfterDrawEnvironment(AutoSelectTools *tools)
+{
+    if (!tools) {
+        return;
+    }
+
+    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    if (const std::optional<bool> envValue =
+            envFlagValue(env,
+                         {QStringLiteral("MARK_SHOT_AUTO_SELECT_AFTER_DRAW"),
+                          QStringLiteral("MARK_SHOT_SELECT_AFTER_DRAW")})) {
+        tools->fill(*envValue);
+    }
+
+    for (const QString &toolName : ShotWindow::supportedToolNames()) {
+        const std::optional<ShotWindow::Tool> tool = ShotWindow::toolFromName(toolName);
+        if (!tool.has_value()) {
+            continue;
+        }
+        QString envToolName = toolName.toUpper();
+        envToolName.replace(QLatin1Char('-'), QLatin1Char('_'));
+        if (const std::optional<bool> toolValue =
+                envFlagValue(env,
+                             {QStringLiteral("MARK_SHOT_AUTO_SELECT_AFTER_DRAW_%1").arg(envToolName),
+                              QStringLiteral("MARK_SHOT_SELECT_AFTER_DRAW_%1").arg(envToolName)})) {
+            tools->at(static_cast<int>(*tool)) = *toolValue;
+        }
+    }
+}
+
+AutoSelectTools annotationAutoSelectAfterDrawTools()
+{
+    AutoSelectTools tools = {};
+
+    QFile file(appConfigPath());
+    if (file.exists() && file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+        if (parseError.error == QJsonParseError::NoError && document.isObject()) {
+            const QJsonObject root = document.object();
+            const QStringList keys = {
+                QStringLiteral("autoSelectAfterDraw"),
+                QStringLiteral("selectAfterDraw"),
+                QStringLiteral("autoSelectAfterCommit"),
+                QStringLiteral("selectAfterCommit"),
+                QStringLiteral("autoSelectAfterAnnotation"),
+                QStringLiteral("selectAfterAnnotation"),
+            };
+            applyAutoSelectAfterDrawValue(cfg::valueForKeys(root, keys), &tools);
+
+            const QJsonObject annotations =
+                cfg::firstObjectValue(root,
+                                      {QStringLiteral("annotations"),
+                                       QStringLiteral("annotation"),
+                                       QStringLiteral("drawing"),
+                                       QStringLiteral("tools")});
+            applyAutoSelectAfterDrawValue(cfg::valueForKeys(annotations, keys), &tools);
+        }
+    }
+
+    applyAutoSelectAfterDrawEnvironment(&tools);
+    return tools;
+}
+
+bool annotationAutoSelectAfterDrawEnabled()
+{
+    const AutoSelectTools tools = annotationAutoSelectAfterDrawTools();
+    return std::any_of(tools.cbegin(), tools.cend(), [](bool enabled) { return enabled; });
+}
+
 /// @brief Applies frame configuration from a JSON value to a scroll session UI configuration.
 /// @param value The JSON value containing the frame configuration.
 /// @param config Pointer to the scroll session UI config to be updated.
