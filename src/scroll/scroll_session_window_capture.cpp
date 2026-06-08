@@ -271,7 +271,7 @@ void ScrollSessionWindow::syncPreviewWindowVisibility()
         return;
     }
 
-    if (m_previewPanelVisible || floatingDragHandleActive()) {
+    if (m_previewPanelVisible || floatingDragHandleActive() || !framePaintRegion().isEmpty()) {
         if (!isVisible()) {
             logScrollDebug("preview-window-show paused=%d auto_paused=%d",
                            m_paused ? 1 : 0,

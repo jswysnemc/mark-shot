@@ -1,6 +1,7 @@
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
 
@@ -8,7 +9,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 const IFACE = 'org.gnome.Shell.Extensions.MarkShotScrollHelper';
 const OBJECT_PATH = '/org/gnome/Shell/Extensions/MarkShotScrollHelper';
-const VERSION = '3';
+const API_VERSION = '4.2';
 
 const PANEL_WIDTH = 340;
 const DEFAULT_PREVIEW_GAP = 5;
@@ -62,6 +63,14 @@ const DBUS_XML = `
     <method name="HideScrollPreview">
       <arg type="s" name="session_id" direction="in"/>
     </method>
+    <method name="WindowGeometries">
+      <arg type="s" name="json" direction="out"/>
+    </method>
+    <method name="SetWindowsAbove">
+      <arg type="s" name="title" direction="in"/>
+      <arg type="b" name="above" direction="in"/>
+      <arg type="i" name="changed" direction="out"/>
+    </method>
     <signal name="PreviewAction">
       <arg type="s" name="session_id"/>
       <arg type="s" name="action"/>
@@ -72,6 +81,94 @@ const DBUS_XML = `
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
+}
+
+function allowedWindowType(metaWindow) {
+    if (!metaWindow?.get_window_type) {
+        return true;
+    }
+
+    const type = metaWindow.get_window_type();
+    return type === Meta.WindowType.NORMAL
+        || type === Meta.WindowType.DIALOG
+        || type === Meta.WindowType.MODAL_DIALOG
+        || type === Meta.WindowType.UTILITY;
+}
+
+function windowRect(metaWindow) {
+    const rect = metaWindow?.get_frame_rect?.() ?? metaWindow?.get_buffer_rect?.();
+    if (!rect || rect.width <= 1 || rect.height <= 1) {
+        return null;
+    }
+    return {
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+    };
+}
+
+function windowVisibleOnCurrentWorkspace(metaWindow, actor) {
+    if (!metaWindow) {
+        return false;
+    }
+    if (metaWindow.minimized) {
+        return false;
+    }
+    if (actor && actor.visible === false) {
+        return false;
+    }
+    if (metaWindow.showing_on_its_workspace && !metaWindow.showing_on_its_workspace()) {
+        return false;
+    }
+    if (metaWindow.is_hidden && metaWindow.is_hidden()) {
+        return false;
+    }
+    return true;
+}
+
+function windowTitleMatches(metaWindow, title) {
+    if (typeof title !== 'string' || title.trim() === '') {
+        return false;
+    }
+    return metaWindow?.get_title?.() === title;
+}
+
+function textMatchesMarkShot(text) {
+    if (typeof text !== 'string') {
+        return false;
+    }
+    const normalized = text.trim().toLowerCase();
+    return normalized === 'mark-shot'
+        || normalized === 'mark shot'
+        || normalized === 'markshot'
+        || normalized.includes('mark shot')
+        || normalized.includes('mark-shot');
+}
+
+function windowMatchesPinnedRequest(metaWindow, title) {
+    if (windowTitleMatches(metaWindow, title)) {
+        return true;
+    }
+
+    return textMatchesMarkShot(metaWindow?.get_title?.())
+        || textMatchesMarkShot(metaWindow?.get_wm_class?.())
+        || textMatchesMarkShot(metaWindow?.get_wm_class_instance?.());
+}
+
+function setWindowAbove(metaWindow, above) {
+    if (!metaWindow) {
+        return false;
+    }
+    if (above && typeof metaWindow.make_above === 'function') {
+        metaWindow.make_above();
+        return true;
+    }
+    if (!above && typeof metaWindow.unmake_above === 'function') {
+        metaWindow.unmake_above();
+        return true;
+    }
+    return false;
 }
 
 function finishScreenshotArea(source, result, stream, filename, invocation) {
@@ -135,7 +232,7 @@ export default class MarkShotScrollHelper extends Extension {
     _handleMethod(methodName, parameters, invocation) {
         try {
             if (methodName === 'Version') {
-                invocation.return_value(new GLib.Variant('(s)', [VERSION]));
+                invocation.return_value(new GLib.Variant('(s)', [API_VERSION]));
                 return;
             }
 
@@ -154,6 +251,24 @@ export default class MarkShotScrollHelper extends Extension {
                 const [sessionId] = parameters.deepUnpack();
                 this._hideScrollPreview(sessionId);
                 invocation.return_value(null);
+                return;
+            }
+
+            if (methodName === 'WindowGeometries') {
+                invocation.return_value(new GLib.Variant('(s)', [
+                    JSON.stringify({
+                        compositor: 'gnome',
+                        windows: this._windowGeometries(),
+                    }),
+                ]));
+                return;
+            }
+
+            if (methodName === 'SetWindowsAbove') {
+                const [title, above] = parameters.deepUnpack();
+                invocation.return_value(new GLib.Variant('(i)', [
+                    this._setWindowsAbove(title, above),
+                ]));
                 return;
             }
 
@@ -196,6 +311,72 @@ export default class MarkShotScrollHelper extends Extension {
                 invocation.return_dbus_error(`${IFACE}.Error`, legacyError.message || e.message);
             }
         }
+    }
+
+    _windowGeometries() {
+        const windows = [];
+        const seen = new Set();
+        const actors = global.get_window_actors?.() ?? [];
+
+        for (const actor of actors) {
+            const metaWindow = actor?.meta_window;
+            if (!windowVisibleOnCurrentWorkspace(metaWindow, actor) || !allowedWindowType(metaWindow)) {
+                continue;
+            }
+
+            const rect = windowRect(metaWindow);
+            if (!rect) {
+                continue;
+            }
+
+            const key = `${rect.x},${rect.y},${rect.width},${rect.height}`;
+            if (seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+
+            const item = {...rect};
+            const title = metaWindow.get_title?.();
+            const wmClass = metaWindow.get_wm_class?.();
+            const wmClassInstance = metaWindow.get_wm_class_instance?.();
+            const monitor = metaWindow.get_monitor?.();
+            const workspace = metaWindow.get_workspace?.();
+            if (typeof title === 'string' && title) {
+                item.title = title;
+            }
+            if (typeof wmClass === 'string' && wmClass) {
+                item.class = wmClass;
+            }
+            if (typeof wmClassInstance === 'string' && wmClassInstance) {
+                item.instance = wmClassInstance;
+            }
+            if (Number.isInteger(monitor)) {
+                item.monitor = monitor;
+            }
+            if (typeof workspace?.index === 'function') {
+                item.workspace = workspace.index();
+            }
+            windows.push(item);
+        }
+
+        return windows;
+    }
+
+    _setWindowsAbove(title, above) {
+        let changed = 0;
+        const actors = global.get_window_actors?.() ?? [];
+
+        for (const actor of actors) {
+            const metaWindow = actor?.meta_window;
+            if (!windowMatchesPinnedRequest(metaWindow, title) || !allowedWindowType(metaWindow)) {
+                continue;
+            }
+            if (setWindowAbove(metaWindow, above)) {
+                changed += 1;
+            }
+        }
+
+        return changed;
     }
 
     _handleShowScrollPreview(parameters) {

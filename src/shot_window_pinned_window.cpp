@@ -1,3 +1,6 @@
+#include "app_config_store.h"
+#include "debug_log.h"
+#include "pinned_window_top.h"
 #include "shot_window_module.h"
 namespace {
 using namespace markshot::shot;
@@ -26,7 +29,11 @@ public:
         setWindowTitle(MS_TR("Pinned Mark Shot"));
         setAttribute(Qt::WA_DeleteOnClose);
         setAttribute(Qt::WA_ShowWithoutActivating);
-        setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+        Qt::WindowFlags flags = Qt::Window | Qt::FramelessWindowHint;
+        if (m_config.alwaysOnTop) {
+            flags |= Qt::WindowStaysOnTopHint;
+        }
+        setWindowFlags(flags);
         setFocusPolicy(Qt::StrongFocus);
         setMouseTracking(true);
         setCursor(Qt::OpenHandCursor);
@@ -46,6 +53,9 @@ public:
         } else {
             setFixedSize(targetSize);
         }
+        m_logicalGeometry = QRect(pos(), size());
+        setProperty("markShotPinnedGeometry", m_logicalGeometry);
+        applyPinnedWindowTopState(this, m_config.alwaysOnTop);
         if (m_config.autoOcr) {
             QTimer::singleShot(0, this, [this] { startOcr(); });
         }
@@ -65,8 +75,8 @@ protected:
             || event->type() == QEvent::ActivationChange
             || event->type() == QEvent::Show;
         const bool handled = QWidget::event(event);
-        if (shouldRaise) {
-            QTimer::singleShot(0, this, [this] { raisePinnedWindow(); });
+        if (shouldRaise && m_config.alwaysOnTop) {
+            schedulePinnedWindowRaise();
         }
         return handled;
     }
@@ -117,8 +127,12 @@ protected:
                 return;
             }
             clearTextSelection();
-            m_dragOffset = event->globalPosition().toPoint() - frameGeometry().topLeft();
+            m_dragOffset = event->globalPosition().toPoint() - pinnedTopLeft();
             setCursor(Qt::ClosedHandCursor);
+            if (m_config.alwaysOnTop && pinnedWindowHasLayerShellTop(this)) {
+                event->accept();
+                return;
+            }
             if (QWindow *window = windowHandle()) {
                 if (window->startSystemMove()) {
                     event->accept();
@@ -145,7 +159,13 @@ protected:
             return;
         }
         if (event->buttons().testFlag(Qt::LeftButton)) {
-            move(event->globalPosition().toPoint() - m_dragOffset);
+            const QPoint topLeft = event->globalPosition().toPoint() - m_dragOffset;
+            if (m_config.alwaysOnTop && pinnedWindowHasLayerShellTop(this)) {
+                setPinnedGeometry(QRect(topLeft, size()), false);
+            } else {
+                move(topLeft);
+                setPinnedGeometry(QRect(topLeft, size()), true);
+            }
             event->accept();
             return;
         }
@@ -180,7 +200,9 @@ protected:
             wheelSteps = static_cast<qreal>(pixelDelta.y()) / 80.0;
         }
         const qreal factor = std::pow(1.08, wheelSteps);
-        resizeByScale(m_scale * factor, event->globalPosition().toPoint(), event->position());
+        resizeByScale(m_scale * factor,
+                      logicalGlobalPointForLocalAnchor(event->position(), event->globalPosition().toPoint()),
+                      event->position());
         event->accept();
     }
     void mouseDoubleClickEvent(QMouseEvent *event) override
@@ -227,13 +249,25 @@ protected:
         menu.addAction(MS_TR("Rotate Right"), this, [this] { rotateImage(90); });
         menu.addSeparator();
         menu.addAction(MS_TR("Zoom In"), this, [this, event] {
-            resizeByScale(m_scale * 1.18, event->globalPos(), rect().center());
+            resizeByScale(m_scale * 1.18,
+                          logicalGlobalPointForLocalAnchor(rect().center(), event->globalPos()),
+                          rect().center());
         });
         menu.addAction(MS_TR("Zoom Out"), this, [this, event] {
-            resizeByScale(m_scale / 1.18, event->globalPos(), rect().center());
+            resizeByScale(m_scale / 1.18,
+                          logicalGlobalPointForLocalAnchor(rect().center(), event->globalPos()),
+                          rect().center());
         });
         menu.addAction(MS_TR("Reset Size"), this, [this] {
-            resizeByScale(1.0, frameGeometry().center(), QPointF(width() / 2.0, height() / 2.0));
+            const QPointF localCenter(width() / 2.0, height() / 2.0);
+            resizeByScale(1.0, logicalGlobalPointForLocalAnchor(localCenter, frameGeometry().center()), localCenter);
+        });
+        menu.addSeparator();
+        QAction *alwaysOnTopAction = menu.addAction(MS_TR("Always on Top"));
+        alwaysOnTopAction->setCheckable(true);
+        alwaysOnTopAction->setChecked(m_config.alwaysOnTop);
+        connect(alwaysOnTopAction, &QAction::toggled, this, [this](bool checked) {
+            setAlwaysOnTop(checked);
         });
         menu.addSeparator();
         menu.addAction(MS_TR("Copy"), this, [this] {
@@ -318,9 +352,88 @@ private:
     /// @return Nothing.
     void raisePinnedWindow()
     {
-        raise();
-        if (QWindow *window = windowHandle()) {
-            window->raise();
+        if (!m_config.alwaysOnTop) {
+            return;
+        }
+        raisePinnedWindowOnPlatform(this);
+    }
+    /// @brief Persists and applies the pinned-window topmost preference.
+    /// @param alwaysOnTop Whether pinned image windows should stay above normal windows.
+    /// @return Nothing.
+    void setAlwaysOnTop(bool alwaysOnTop)
+    {
+        if (m_config.alwaysOnTop == alwaysOnTop) {
+            return;
+        }
+
+        const bool previous = m_config.alwaysOnTop;
+        m_config.alwaysOnTop = alwaysOnTop;
+        QString error;
+        if (!markshot::writeAppConfigValue(
+                {QStringLiteral("pinnedWindow"), QStringLiteral("alwaysOnTop")},
+                QJsonValue(alwaysOnTop),
+                &error)) {
+            m_config.alwaysOnTop = previous;
+            sendDesktopNotification(QStringLiteral("Mark Shot"),
+                                    MS_TR("Failed to save pinned window setting."));
+            if (!error.isEmpty()) {
+                markshot::debugLog("config",
+                                   "cannot save pinnedWindow.alwaysOnTop: %s",
+                                   error.toUtf8().constData());
+            }
+            return;
+        }
+
+        if (pinnedWindowHasLayerShellTop(this) || (alwaysOnTop && pinnedWindowUsesLayerShellTop())) {
+            recreateWithCurrentImage();
+            return;
+        }
+
+        applyPinnedWindowTopState(this, m_config.alwaysOnTop);
+        if (m_config.alwaysOnTop) {
+            schedulePinnedWindowRaise();
+        }
+    }
+    /// @brief Recreates the pinned window after a protocol role change.
+    /// @return Nothing.
+    void recreateWithCurrentImage()
+    {
+        if (m_recreating) {
+            return;
+        }
+        m_recreating = true;
+        auto *replacement = new PinnedImageWindow(m_pixmap.toImage());
+        replacement->restorePinnedState(m_logicalGeometry, m_scale);
+        replacement->show();
+        if (replacement->m_config.alwaysOnTop) {
+            replacement->schedulePinnedWindowRaise();
+        }
+        close();
+    }
+    /// @brief Restores geometry and scale on a recreated pinned window.
+    /// @param geometry Global logical geometry to restore.
+    /// @param scale Current image scale factor to restore.
+    /// @return Nothing.
+    void restorePinnedState(QRect geometry, qreal scale)
+    {
+        if (!geometry.isValid() || geometry.isEmpty()) {
+            return;
+        }
+        m_scale = scale;
+        setFixedSize(geometry.size());
+        setPinnedGeometry(geometry, true);
+        applyPinnedWindowTopState(this, m_config.alwaysOnTop);
+    }
+    /// @brief Schedules repeated topmost requests while the compositor registers the new window.
+    /// @return Nothing.
+    void schedulePinnedWindowRaise()
+    {
+        for (int delayMs : {0, 80, 250, 600}) {
+            QTimer::singleShot(delayMs, this, [this] {
+                if (m_config.alwaysOnTop) {
+                    raisePinnedWindow();
+                }
+            });
         }
     }
     void resizeByScale(qreal scale, QPoint globalAnchor, QPointF localAnchor)
@@ -336,8 +449,43 @@ private:
         m_scale = static_cast<qreal>(targetSize.width()) / std::max(1, m_displayBaseSize.width());
         setMinimumSize(QSize(24, 24));
         setMaximumSize(QSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX));
-        setGeometry(QRect(topLeft, targetSize));
         setFixedSize(targetSize);
+        setPinnedGeometry(QRect(topLeft, targetSize), !pinnedWindowHasLayerShellTop(this));
+    }
+    /// @brief Returns the tracked global top-left position for the pinned window.
+    /// @return Global logical top-left point.
+    QPoint pinnedTopLeft() const
+    {
+        return m_logicalGeometry.isValid() ? m_logicalGeometry.topLeft() : frameGeometry().topLeft();
+    }
+    /// @brief Converts a widget-local point into tracked global coordinates for layer-shell windows.
+    /// @param localAnchor Widget-local anchor point.
+    /// @param fallbackGlobal Platform-provided global point for normal windows.
+    /// @return Logical global point for geometry calculations.
+    QPoint logicalGlobalPointForLocalAnchor(QPointF localAnchor, QPoint fallbackGlobal)
+    {
+        if (!m_config.alwaysOnTop || !pinnedWindowHasLayerShellTop(this)) {
+            return fallbackGlobal;
+        }
+        return pinnedTopLeft() + localAnchor.toPoint();
+    }
+    /// @brief Updates widget and protocol geometry for the pinned window.
+    /// @param geometry Global logical geometry to apply.
+    /// @param moveWidget Whether QWidget geometry should also be updated.
+    /// @return Nothing.
+    void setPinnedGeometry(QRect geometry, bool moveWidget)
+    {
+        if (!geometry.isValid() || geometry.isEmpty()) {
+            return;
+        }
+        m_logicalGeometry = geometry;
+        setProperty("markShotPinnedGeometry", m_logicalGeometry);
+        if (moveWidget) {
+            setGeometry(m_logicalGeometry);
+        }
+        if (m_config.alwaysOnTop) {
+            syncPinnedWindowTopGeometry(this, m_logicalGeometry);
+        }
     }
     void startOcr()
     {
@@ -935,6 +1083,8 @@ private:
     QSize m_displayBaseSize;
     /// @brief Current zoom/scale factor of the pinned window.
     qreal m_scale = 1.0;
+    /// @brief Logical global geometry used by layer-shell placement.
+    QRect m_logicalGeometry;
     /// @brief Offset for dragging the window.
     QPoint m_dragOffset;
     /// @brief Configuration settings for the pinned window.
@@ -971,6 +1121,8 @@ private:
     bool m_activateTranslationWhenFinished = true;
     /// @brief Flag indicating if the OCR backend warning has been shown.
     bool m_ocrBackendWarningShown = false;
+    /// @brief Flag indicating if the window is being replaced for a protocol role change.
+    bool m_recreating = false;
 };
 }  // namespace
 

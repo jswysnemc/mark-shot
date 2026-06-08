@@ -60,6 +60,7 @@ inline constexpr qreal kMagnifierDragScale = 1.05;
 inline constexpr qreal kMinMagnifierDragDistance = 64.0;
 
 struct PinnedWindowConfig {
+    bool alwaysOnTop = true;
     bool ocrEnabled = true;
     bool autoOcr = false;
     QString ocrBackend = QStringLiteral("auto");

@@ -245,6 +245,15 @@ PinnedWindowConfig pinnedWindowConfig()
                                                     QStringLiteral("pinned"),
                                                     QStringLiteral("pin")});
             if (!pinned.isEmpty()) {
+                if (const std::optional<bool> alwaysOnTop =
+                        cfg::boolValue(pinned,
+                                  {QStringLiteral("alwaysOnTop"),
+                                   QStringLiteral("stayOnTop"),
+                                   QStringLiteral("topmost"),
+                                   QStringLiteral("above")});
+                    alwaysOnTop.has_value()) {
+                    config.alwaysOnTop = *alwaysOnTop;
+                }
                 if (const std::optional<bool> autoOcr =
                         cfg::boolValue(pinned,
                                   {QStringLiteral("autoOcr"),

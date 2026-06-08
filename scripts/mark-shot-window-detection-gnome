@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+import ast
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+
+IFACE = "org.gnome.Shell.Extensions.MarkShotScrollHelper"
+OBJECT_PATH = "/org/gnome/Shell/Extensions/MarkShotScrollHelper"
+
+
+def env_int(name):
+    value = os.environ.get(name)
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def capture_rect():
+    x = env_int("MARK_SHOT_CAPTURE_X")
+    y = env_int("MARK_SHOT_CAPTURE_Y")
+    width = env_int("MARK_SHOT_CAPTURE_WIDTH")
+    height = env_int("MARK_SHOT_CAPTURE_HEIGHT")
+    if x is None or y is None or width is None or height is None:
+        return None
+    if width <= 0 or height <= 0:
+        return None
+    return x, y, width, height
+
+
+def intersects(left, right):
+    ax, ay, aw, ah = left
+    bx, by, bw, bh = right
+    return ax < bx + bw and bx < ax + aw and ay < by + bh and by < ay + ah
+
+
+def rect_adjustment():
+    return (
+        env_int("MARK_SHOT_GNOME_OFFSET_X") or 0,
+        env_int("MARK_SHOT_GNOME_OFFSET_Y") or 0,
+        env_int("MARK_SHOT_GNOME_OFFSET_WIDTH") or 0,
+        env_int("MARK_SHOT_GNOME_OFFSET_HEIGHT") or 0,
+    )
+
+
+def adjusted_rect(window):
+    dx, dy, dw, dh = rect_adjustment()
+    x = int(round(window.get("x", 0))) + dx
+    y = int(round(window.get("y", 0))) + dy
+    width = int(round(window.get("width", 0))) + dw
+    height = int(round(window.get("height", 0))) + dh
+    if width <= 1 or height <= 1:
+        return None
+    return x, y, width, height
+
+
+def gnome_window_json():
+    gdbus = shutil.which("gdbus")
+    if not gdbus:
+        raise RuntimeError("gdbus command not found")
+
+    result = subprocess.run(
+        [
+            gdbus,
+            "call",
+            "--session",
+            "--dest",
+            "org.gnome.Shell",
+            "--object-path",
+            OBJECT_PATH,
+            "--method",
+            f"{IFACE}.WindowGeometries",
+        ],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=1.0,
+    )
+    variant = ast.literal_eval(result.stdout.strip())
+    payload = variant[0] if isinstance(variant, tuple) and variant else variant
+    if not isinstance(payload, str):
+        raise RuntimeError("unexpected gdbus result shape")
+    return json.loads(payload)
+
+
+def main():
+    data = gnome_window_json()
+    capture = capture_rect()
+    result = []
+    seen = set()
+
+    for window in data.get("windows", []):
+        if not isinstance(window, dict):
+            continue
+        rect = adjusted_rect(window)
+        if rect is None:
+            continue
+        if capture is not None and not intersects(rect, capture):
+            continue
+        if rect in seen:
+            continue
+        seen.add(rect)
+        item = {
+            "x": rect[0],
+            "y": rect[1],
+            "width": rect[2],
+            "height": rect[3],
+        }
+        for key in ("title", "class", "instance", "monitor", "workspace"):
+            if key in window:
+                item[key] = window[key]
+        result.append(item)
+
+    print(json.dumps({"compositor": "gnome", "windows": result}, separators=(",", ":")))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(1)

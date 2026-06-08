@@ -26,6 +26,22 @@ bool isGnomeDesktop()
     return desktop.contains(QStringLiteral("gnome"));
 }
 
+/// @brief Forces updated layer-shell state to be committed during interactive movement.
+/// @param widget Widget whose backing store should commit the pending protocol state.
+/// @param nativeWindow Native window used to request a platform update.
+/// @param createIfNeeded Whether this is the initial role setup path.
+void commitInteractiveLayerState(QWidget *widget, QWindow *nativeWindow, bool createIfNeeded)
+{
+    if (createIfNeeded || !widget || !widget->isVisible()) {
+        return;
+    }
+
+    widget->repaint();
+    if (nativeWindow) {
+        nativeWindow->requestUpdate();
+    }
+}
+
 }  // namespace
 
 /// @brief Plugin implementation for Wayland layer-shell integration.
@@ -108,7 +124,80 @@ public:
         return true;
     }
 
+    bool configureFloatingOverlay(QWidget *widget,
+                                  QScreen *screen,
+                                  const markshot::layershell::FloatingOverlayConfig &config) override
+    {
+        return configureFloatingOverlayInternal(widget, screen, config, true);
+    }
+
+    bool updateFloatingOverlay(QWidget *widget,
+                               QScreen *screen,
+                               const markshot::layershell::FloatingOverlayConfig &config) override
+    {
+        return configureFloatingOverlayInternal(widget, screen, config, false);
+    }
+
 private:
+    static bool configureFloatingOverlayInternal(
+        QWidget *widget,
+        QScreen *screen,
+        const markshot::layershell::FloatingOverlayConfig &config,
+        bool createIfNeeded)
+    {
+        if (!widget) {
+            markshot::debugLog("layershell", "floating configure failed: widget is null");
+            return false;
+        }
+        if (isGnomeDesktop()) {
+            markshot::debugLog("layershell",
+                               "floating configure skipped: GNOME does not support layer-shell");
+            return false;
+        }
+
+        if (screen) {
+            widget->setScreen(screen);
+        }
+        if (createIfNeeded) {
+            widget->setAttribute(Qt::WA_NativeWindow);
+            widget->winId();
+        }
+
+        QWindow *nativeWindow = widget->windowHandle();
+        if (!nativeWindow) {
+            markshot::debugLog("layershell", "floating configure failed: no native QWindow");
+            return false;
+        }
+        if (screen) {
+            nativeWindow->setScreen(screen);
+        }
+
+        LayerShellQt::Window *layerWindow = LayerShellQt::Window::get(nativeWindow);
+        if (!layerWindow) {
+            markshot::debugLog("layershell", "floating configure failed: no layer window");
+            return false;
+        }
+
+        layerWindow->setScope(config.scope);
+        layerWindow->setLayer(LayerShellQt::Window::LayerOverlay);
+        LayerShellQt::Window::Anchors anchors = LayerShellQt::Window::AnchorTop;
+        anchors |= LayerShellQt::Window::AnchorLeft;
+        layerWindow->setAnchors(anchors);
+        layerWindow->setMargins(config.margins);
+        layerWindow->setExclusiveZone(-1);
+        layerWindow->setKeyboardInteractivity(keyboardInteractivity(config.keyboardInteractivity));
+        layerWindow->setActivateOnShow(config.activateOnShow);
+        layerWindow->setCloseOnDismissed(config.closeOnDismissed);
+        if (screen) {
+            layerWindow->setScreen(screen);
+        } else if (config.wantsActiveScreenWhenNoScreen) {
+            layerWindow->setWantsToBeOnActiveScreen(true);
+        }
+        layerWindow->setDesiredSize(config.desiredSize.isEmpty() ? widget->size() : config.desiredSize);
+        commitInteractiveLayerState(widget, nativeWindow, createIfNeeded);
+        return true;
+    }
+
     static LayerShellQt::Window::KeyboardInteractivity keyboardInteractivity(
         markshot::layershell::KeyboardInteractivity value)
     {

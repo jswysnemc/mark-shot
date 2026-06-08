@@ -83,9 +83,7 @@ ScrollSessionWindow::ScrollSessionWindow(QRect globalGeometry,
 
 bool ScrollSessionWindow::configureLayerShell(QScreen *screen)
 {
-    const QSize desiredSize = m_geometry.isValid() && !m_geometry.isEmpty()
-        ? m_geometry.size()
-        : (screen ? screen->geometry().size() : QSize());
+    const QSize desiredSize = screen ? screen->geometry().size() : m_geometry.size();
     if (!desiredSize.isEmpty()) {
         resize(desiredSize);
     }
@@ -96,14 +94,15 @@ bool ScrollSessionWindow::configureLayerShell(QScreen *screen)
 
     // Do not hold exclusive keyboard focus; the page below should keep receiving
     // keyboard and wheel input while the panel can still take focus when clicked.
-    return markshot::layershell::configureOverlay(
-        this,
-        screen,
-        {QStringLiteral("mark-shot-scroll"),
-         markshot::layershell::KeyboardInteractivity::OnDemand,
-         false,
-         true,
-         false});
+    markshot::layershell::FloatingOverlayConfig config;
+    config.scope = QStringLiteral("mark-shot-scroll");
+    config.keyboardInteractivity = markshot::layershell::KeyboardInteractivity::OnDemand;
+    config.closeOnDismissed = false;
+    config.wantsActiveScreenWhenNoScreen = true;
+    config.activateOnShow = false;
+    config.desiredSize = desiredSize;
+    config.margins = {};
+    return markshot::layershell::configureFloatingOverlay(this, screen, config);
 }
 
 bool ScrollSessionWindow::layerShellActive() const

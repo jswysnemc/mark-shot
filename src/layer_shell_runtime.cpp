@@ -125,4 +125,16 @@ bool configureOverlay(QWidget *widget, QScreen *screen, const OverlayConfig &con
     return plugin && plugin->configureOverlay(widget, screen, config);
 }
 
+bool configureFloatingOverlay(QWidget *widget, QScreen *screen, const FloatingOverlayConfig &config)
+{
+    PluginInterface *plugin = loadPlugin();
+    return plugin && plugin->configureFloatingOverlay(widget, screen, config);
+}
+
+bool updateFloatingOverlay(QWidget *widget, QScreen *screen, const FloatingOverlayConfig &config)
+{
+    PluginInterface *plugin = loadPlugin();
+    return plugin && plugin->updateFloatingOverlay(widget, screen, config);
+}
+
 } // namespace markshot::layershell

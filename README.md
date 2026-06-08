@@ -214,6 +214,7 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
   },
   "pinnedWindow": {
     "autoOcr": false,
+    "alwaysOnTop": true,
     "border": true,
     "borderColor": "#5EEAD4",
     "borderWidth": 2
@@ -267,6 +268,7 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
 | `windows.hotkeys.capture` | String | `"Ctrl+Alt+S"` | Windows global hotkey for region capture while tray mode is running. Aliases include `hotkey`, `captureHotkey`, and `screenshot`. |
 | `windows.hotkeys.fullscreen` | String | `""` | Optional Windows global hotkey for fullscreen annotation capture while tray mode is running. Alias: `fullscreenHotkey`. The generated default config only writes the region capture hotkey. |
 | `pinnedWindow.autoOcr` | Boolean | `false` | Controls whether a pinned sticker window starts OCR text recognition in the background immediately on creation. If disabled, OCR runs on demand when Copy Image Text or Translate is chosen. Alias: `pinned`, `pin`. |
+| `pinnedWindow.alwaysOnTop` | Boolean | `true` | Controls whether pinned sticker windows stay above normal windows. The pinned-window context menu can toggle this value and writes it back to `config.json`. Aliases: `stayOnTop`, `topmost`, `above`. On GNOME Wayland, the bundled helper extension is used when available. |
 | `pinnedWindow.border` | Boolean/Object | `true` | Outer border configuration for pinned sticker windows. Can be a boolean, or an object containing `enabled` (bool), `color` (name/hex/RGBA object), and `width` (float, `1.0` to `12.0`). Also flat configs like `borderEnabled`, `borderColor`, and `borderWidth` are supported. |
 | `scrollCapture.frame` | Boolean/Number/Object | `5` | Outer frame offset for scrolling capture. A number sets the pixel gap between the captured region and the frame; `false` disables the frame. Object form supports `enabled` and `gap`. Aliases: `captureFrame`, `border`, `outline`, plus flat `frameEnabled`/`frameGap`. |
 | `scrollCapture.previewGap` | Number/Object | `5` | Pixel gap between the outer frame and the scrolling preview panel. The panel is placed around the frame using the first available non-overlapping position. Aliases: `previewDistance`, `previewOffset`, `panelGap`; object form supports `gap`. |
@@ -275,7 +277,7 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
 | `ocr.resultPanel` | Boolean/Object | `true` | Controls whether the main selection OCR flow opens an editable result window. Object form supports `enabled`, `show`, `visible`, or `use`. Aliases include `resultWindow`, `ocrResultPanel`, and `ocrResultWindow`. Environment variables `MARK_SHOT_OCR_RESULT_PANEL` and `MARK_SHOT_OCR_RESULT_WINDOW` override this config. |
 | `translation.autoAfterOcr` | Boolean | `false` | Controls whether translation starts automatically after a successful pinned-window OCR result. If enabled, choosing Translate later displays the cached translation instantly. |
 | `windowDetection.enabled` | Boolean | `true` | Controls window boundary recognition. Set to `false` to disable both built-in X11 window detection and configured external detection scripts. |
-| `windowDetection.env` | Object | `{}` | Environment variables passed to the window boundary detection script. Alias: `environment`. <br>• **Niri Script**: Supports `MARK_SHOT_NIRI_PANEL_EDGE` (`top`/`bottom`/`left`/`right`/`none`) and pixel offsets `MARK_SHOT_NIRI_OFFSET_X/Y/WIDTH/HEIGHT`.<br>• **Hyprland Script**: Supports `MARK_SHOT_HYPRLAND_INCLUDE_INACTIVE` (`1`/`0`) and pixel offsets `MARK_SHOT_HYPRLAND_OFFSET_X/Y/WIDTH/HEIGHT`. |
+| `windowDetection.env` | Object | `{}` | Environment variables passed to the window boundary detection script. Alias: `environment`. <br>• **Niri Script**: Supports `MARK_SHOT_NIRI_PANEL_EDGE` (`top`/`bottom`/`left`/`right`/`none`) and pixel offsets `MARK_SHOT_NIRI_OFFSET_X/Y/WIDTH/HEIGHT`.<br>• **Hyprland Script**: Supports `MARK_SHOT_HYPRLAND_INCLUDE_INACTIVE` (`1`/`0`) and pixel offsets `MARK_SHOT_HYPRLAND_OFFSET_X/Y/WIDTH/HEIGHT`.<br>• **GNOME Script**: Supports pixel offsets `MARK_SHOT_GNOME_OFFSET_X/Y/WIDTH/HEIGHT`. |
 
 ### OCR Result Panel Toggle
 
@@ -317,6 +319,7 @@ To ensure precise window boundary detection across different Wayland compositors
 The project bundles default window detection scripts for the following window managers:
 - **Niri**: `mark-shot-window-detection-niri`
 - **Hyprland**: `mark-shot-window-detection-hyprland`
+- **GNOME Wayland**: `mark-shot-window-detection-gnome` (requires the bundled GNOME Shell helper extension)
 
 ##### How to Use & Configure:
 1. Copy the script corresponding to your compositor from the `scripts/` directory in the repository to a folder in your system `$PATH` (e.g. `~/.local/bin/` or `/usr/local/bin/`).
@@ -325,11 +328,13 @@ The project bundles default window detection scripts for the following window ma
    chmod +x ~/.local/bin/mark-shot-window-detection-niri
    # or
    chmod +x ~/.local/bin/mark-shot-window-detection-hyprland
+   # or
+   chmod +x ~/.local/bin/mark-shot-window-detection-gnome
    ```
 3. Update your `~/.config/mark-shot/config.json` configuration file, specifying the script name or its absolute path in the `windowDetection.command` field:
    ```json
    "windowDetection": {
-     "command": "mark-shot-window-detection-niri"
+     "command": "mark-shot-window-detection-gnome"
    }
    ```
 
@@ -421,13 +426,13 @@ Each element in the array (or the root object itself) can take one of the follow
 
 #### 3. How to Contribute Adapters
 
-Currently, the repository only ships an adapter script for the niri window manager: `mark-shot-window-detection-niri`.
+Currently, the repository ships adapter scripts for niri, Hyprland, and GNOME Wayland.
 
 If you run Mark Shot on Hyprland, Sway, KDE (KWin Wayland), or GNOME (Mutter Wayland) and have configured a working script, please submit a Pull Request to share it with the community. Here are implementation guidelines for different environments:
 - **Hyprland**: Use `hyprctl clients -j` and parse the output JSON.
 - **Sway**: Use `swaymsg -t get_tree` to fetch the layout tree.
 - **KDE / KWin**: Implement a simple KWin Script, or query KWin's D-Bus interfaces.
-- **GNOME**: Since GNOME Wayland lacks an official client-side shell command to query window geometry, you typically need to write a GNOME Shell extension that exports Mutter's window geometry over D-Bus, then query that D-Bus interface in your script.
+- **GNOME**: Use the bundled `mark-shot-window-detection-gnome` script together with the `mark-shot-scroll-helper@snemc.org` GNOME Shell extension, which exports Mutter window geometry over D-Bus.
 
 If the script fails to execute or times out (default: `1000ms`), Mark Shot will proceed with screenshot capture normally and fall back to its internal X11-based window detector where applicable.
 
@@ -596,7 +601,7 @@ gdbus call --session \
   --method org.gnome.Shell.Extensions.MarkShotScrollHelper.Version
 ```
 
-The expected result is `('2',)`. On GNOME Wayland, restart `mark-shot` after enabling the extension.
+The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after enabling the extension.
 
 ---
 
@@ -655,7 +660,7 @@ The expected result is `('2',)`. On GNOME Wayland, restart `mark-shot` after ena
 | **Scroll Wheel Up / Down** | Scales the floating window size proportionally. |
 | **Double Left Click** | Closes the pinned window immediately. |
 | **Double Tap Ctrl Key** | Resets the window size to original aspect ratio. |
-| **Right Click** | Opens the context menu (Rotate, Opacity, Copy Image Text, Translate, Save, Copy, Close). |
+| **Right Click** | Opens the context menu (Rotate, Zoom, Always on Top, Copy Image Text, Translate, Save, Copy, Close). |
 | **Esc Key** | Closes the currently active pinned window. |
 
 ---

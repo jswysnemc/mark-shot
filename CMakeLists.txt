@@ -67,6 +67,8 @@ qt_add_executable(mark-shot
     src/main.cpp
     src/clipboard_image.cpp
     src/clipboard_image.h
+    src/app_config_store.cpp
+    src/app_config_store.h
     src/debug_log.cpp
     src/debug_log.h
     src/config_value.cpp
@@ -119,6 +121,8 @@ qt_add_executable(mark-shot
     src/shot_window_property_panels.cpp
     src/shot_window_setup.cpp
     src/shot_window_pinned_window.cpp
+    src/pinned_window_top.cpp
+    src/pinned_window_top.h
     src/annotation_launch.cpp
     src/annotation_launch.h
     src/scroll/stitcher.cpp
@@ -173,7 +177,9 @@ if(MARK_SHOT_LINUX AND X11_xcb_FOUND)
 endif()
 
 if(MARK_SHOT_WITH_LAYER_SHELL AND MARK_SHOT_LINUX AND LayerShellQt_FOUND)
-    qt_add_plugin(mark-shot-layer-shell MODULE
+    qt_add_plugin(mark-shot-layer-shell MODULE)
+    target_sources(mark-shot-layer-shell
+        PRIVATE
         src/debug_log.cpp
         src/debug_log.h
         src/layer_shell_plugin.cpp
@@ -299,6 +305,7 @@ if(MARK_SHOT_LINUX)
         scripts/mark-shot-translate
         scripts/mark-shot-window-detection-niri
         scripts/mark-shot-window-detection-hyprland
+        scripts/mark-shot-window-detection-gnome
         DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
     install(FILES
