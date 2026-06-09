@@ -24,7 +24,7 @@ else()
     set(MARK_SHOT_LINUX FALSE)
 endif()
 
-set(MARK_SHOT_QT_COMPONENTS Core Gui Widgets Concurrent)
+set(MARK_SHOT_QT_COMPONENTS Core Gui Widgets Concurrent Network)
 if(MARK_SHOT_LINUX)
     list(APPEND MARK_SHOT_QT_COMPONENTS DBus)
 endif()
@@ -163,6 +163,7 @@ target_link_libraries(mark-shot
         Qt6::Core
         Qt6::Concurrent
         Qt6::Gui
+        Qt6::Network
         Qt6::Widgets
 )
 

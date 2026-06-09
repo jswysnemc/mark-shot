@@ -2,6 +2,9 @@
 
 #include "ui/theme.h"
 
+#include <QCoreApplication>
+#include <QFileIconProvider>
+#include <QFileInfo>
 #include <QFont>
 #include <QPainter>
 #include <QPainterPath>
@@ -112,6 +115,16 @@ QString actionName(ShotWindow::Action action)
 
 QIcon applicationIcon()
 {
+#if defined(Q_OS_WIN)
+    const QString applicationPath = QCoreApplication::applicationFilePath();
+    if (!applicationPath.isEmpty()) {
+        QFileIconProvider provider;
+        const QIcon executableIcon = provider.icon(QFileInfo(applicationPath));
+        if (!executableIcon.isNull()) {
+            return executableIcon;
+        }
+    }
+#endif
     const QIcon icon(QStringLiteral(":/icons/mark-shot.ico"));
     return icon.isNull() ? makeToolIcon(ShotWindow::Action::ToolSelect) : icon;
 }

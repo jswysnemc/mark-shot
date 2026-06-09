@@ -24,6 +24,11 @@
 #include <QJsonObject>
 #include <QJsonParseError>
 #include <QJsonValue>
+#include <QIODevice>
+#if defined(Q_OS_WIN)
+#include <QLocalServer>
+#include <QLocalSocket>
+#endif
 #include <QMessageBox>
 #include <QPointer>
 #include <QProcessEnvironment>
@@ -33,8 +38,10 @@
 #include <QVector>
 
 #include <algorithm>
+#include <functional>
 #include <memory>
 #include <optional>
+#include <utility>
 
 namespace {
 
@@ -316,6 +323,140 @@ struct DebugRuntimeConfig {
     bool enabled = markshot::debugEnabled();
     QString logPath = markshot::debugLogPath();
 };
+
+#if defined(Q_OS_WIN)
+
+struct SingleInstanceCommand {
+    bool capture = false;
+    bool fullscreen = false;
+    bool allOutputs = false;
+};
+
+QString singleInstanceServerName()
+{
+    return QStringLiteral("mark-shot-single-instance");
+}
+
+QByteArray encodeSingleInstanceCommand(const SingleInstanceCommand &command)
+{
+    QJsonObject object;
+    object.insert(QStringLiteral("capture"), command.capture);
+    object.insert(QStringLiteral("fullscreen"), command.fullscreen);
+    object.insert(QStringLiteral("allOutputs"), command.allOutputs);
+    return QJsonDocument(object).toJson(QJsonDocument::Compact) + '\n';
+}
+
+std::optional<SingleInstanceCommand> decodeSingleInstanceCommand(const QByteArray &payload)
+{
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload.trimmed(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        markshot::debugLog("single-instance",
+                           "invalid ipc command: %s",
+                           parseError.errorString().toUtf8().constData());
+        return std::nullopt;
+    }
+
+    const QJsonObject object = document.object();
+    SingleInstanceCommand command;
+    command.capture = object.value(QStringLiteral("capture")).toBool(false);
+    command.fullscreen = object.value(QStringLiteral("fullscreen")).toBool(false);
+    command.allOutputs = object.value(QStringLiteral("allOutputs")).toBool(false);
+    return command;
+}
+
+bool forwardSingleInstanceCommand(const SingleInstanceCommand &command, QString *error)
+{
+    if (error) {
+        error->clear();
+    }
+
+    QLocalSocket socket;
+    socket.connectToServer(singleInstanceServerName(), QIODevice::WriteOnly);
+    if (!socket.waitForConnected(250)) {
+        if (error) {
+            *error = socket.errorString();
+        }
+        markshot::debugLog("single-instance",
+                           "connect failed: %s",
+                           socket.errorString().toUtf8().constData());
+        return false;
+    }
+
+    const QByteArray payload = encodeSingleInstanceCommand(command);
+    if (socket.write(payload) != payload.size() || !socket.waitForBytesWritten(500)) {
+        if (error) {
+            *error = socket.errorString();
+        }
+        markshot::debugLog("single-instance",
+                           "write failed: %s",
+                           socket.errorString().toUtf8().constData());
+        return false;
+    }
+
+    socket.disconnectFromServer();
+    socket.waitForDisconnected(100);
+    markshot::debugLog("single-instance",
+                       "forwarded capture=%d fullscreen=%d allOutputs=%d",
+                       command.capture ? 1 : 0,
+                       command.fullscreen ? 1 : 0,
+                       command.allOutputs ? 1 : 0);
+    return true;
+}
+
+std::unique_ptr<QLocalServer> listenForSingleInstanceCommands(QString *error)
+{
+    if (error) {
+        error->clear();
+    }
+
+    auto server = std::make_unique<QLocalServer>();
+    server->setSocketOptions(QLocalServer::UserAccessOption);
+    if (server->listen(singleInstanceServerName())) {
+        markshot::debugLog("single-instance",
+                           "listening on %s",
+                           singleInstanceServerName().toUtf8().constData());
+        return server;
+    }
+
+    if (error) {
+        *error = server->errorString();
+    }
+    markshot::debugLog("single-instance",
+                       "listen failed: %s",
+                       server->errorString().toUtf8().constData());
+    return nullptr;
+}
+
+void installSingleInstanceCommandHandler(
+    QLocalServer *server,
+    QObject *context,
+    std::function<void(const SingleInstanceCommand &)> handler)
+{
+    if (!server || !context || !handler) {
+        return;
+    }
+
+    QObject::connect(server, &QLocalServer::newConnection, context, [server, handler = std::move(handler)] {
+        while (QLocalSocket *socket = server->nextPendingConnection()) {
+            QObject::connect(socket, &QLocalSocket::disconnected, socket, [socket, handler] {
+                const QByteArray payload = socket->readAll();
+                const std::optional<SingleInstanceCommand> command = decodeSingleInstanceCommand(payload);
+                if (command.has_value()) {
+                    markshot::debugLog("single-instance",
+                                       "received capture=%d fullscreen=%d allOutputs=%d",
+                                       command->capture ? 1 : 0,
+                                       command->fullscreen ? 1 : 0,
+                                       command->allOutputs ? 1 : 0);
+                    handler(*command);
+                }
+                socket->deleteLater();
+            });
+        }
+    });
+}
+
+#endif
 
 QString expandedConfigPath(QString path)
 {
@@ -715,7 +856,8 @@ int main(int argc, char *argv[])
     parser.addHelpOption();
     parser.addVersionOption();
     parser.addPositionalArgument(QStringLiteral("file"), QStringLiteral("Open an existing image file for annotation instead of capturing the screen."), QStringLiteral("[file]"));
-    QCommandLineOption allOutputsOption(QStringLiteral("all-outputs"), QStringLiteral("Capture all outputs instead of the current Qt screen."));
+    QCommandLineOption allOutputsOption({QStringLiteral("all-outputs"), QStringLiteral("all-output")},
+                                        QStringLiteral("Capture all outputs instead of the current Qt screen."));
     QCommandLineOption xdgWindowOption(QStringLiteral("xdg-window"), QStringLiteral("Use a regular fullscreen xdg window instead of layer-shell."));
     QCommandLineOption fullscreenAnnotationOption({QStringLiteral("fullscreen"), QStringLiteral("full-screen")},
                                                   QStringLiteral("Skip region selection and annotate the full captured frame."));
@@ -901,7 +1043,24 @@ int main(int argc, char *argv[])
     const bool useRegularWindow = parser.isSet(xdgWindowOption);
     const bool fullscreenAnnotation = parser.isSet(fullscreenAnnotationOption);
     const markshot::WindowsTrayController::Config trayConfig = markshot::WindowsTrayController::readConfig();
-    const bool trayMode = !parser.isSet(captureOption) && (parser.isSet(trayOption) || trayConfig.autoStart);
+    const bool explicitCaptureRequest =
+        parser.isSet(captureOption) || parser.isSet(allOutputsOption) || parser.isSet(fullscreenAnnotationOption);
+    const bool trayMode = !explicitCaptureRequest && (parser.isSet(trayOption) || trayConfig.autoStart);
+
+#if defined(Q_OS_WIN)
+    const bool explicitTrayOnly = parser.isSet(trayOption)
+        && !parser.isSet(captureOption)
+        && !parser.isSet(allOutputsOption)
+        && !parser.isSet(fullscreenAnnotationOption);
+    SingleInstanceCommand duplicateCommand;
+    duplicateCommand.capture = !explicitTrayOnly;
+    duplicateCommand.fullscreen = fullscreenAnnotation;
+    duplicateCommand.allOutputs = allOutputs;
+    if (forwardSingleInstanceCommand(duplicateCommand, nullptr)) {
+        return 0;
+    }
+#endif
+
     if (trayMode) {
         if (!markshot::WindowsTrayController::isSupported()) {
             QMessageBox::critical(nullptr,
@@ -910,16 +1069,35 @@ int main(int argc, char *argv[])
             return 1;
         }
 
+#if defined(Q_OS_WIN)
+        QString singleInstanceError;
+        std::unique_ptr<QLocalServer> singleInstanceServer =
+            listenForSingleInstanceCommands(&singleInstanceError);
+        if (!singleInstanceServer) {
+            if (forwardSingleInstanceCommand(duplicateCommand, nullptr)) {
+                return 0;
+            }
+            QLocalServer::removeServer(singleInstanceServerName());
+            singleInstanceServer = listenForSingleInstanceCommands(&singleInstanceError);
+        }
+        if (!singleInstanceServer) {
+            QMessageBox::critical(nullptr,
+                                  QStringLiteral("Mark Shot"),
+                                  MS_TR("Failed to start single-instance guard: %1").arg(singleInstanceError));
+            return 1;
+        }
+#endif
+
         auto *trayController = new markshot::WindowsTrayController(&app, trayConfig, &app);
         bool captureActive = false;
-        auto launchCapture = [&app, &captureActive, allOutputs, useRegularWindow, defaultTools](bool startFullscreen) {
+        auto launchCapture = [&app, &captureActive, useRegularWindow, defaultTools](bool startFullscreen, bool requestAllOutputs) {
             if (captureActive) {
                 return;
             }
 
             QString captureError;
             QVector<QPointer<ShotWindow>> windows =
-                showCaptureSession(&app, allOutputs, useRegularWindow, startFullscreen, defaultTools, &captureError);
+                showCaptureSession(&app, requestAllOutputs, useRegularWindow, startFullscreen, defaultTools, &captureError);
             if (windows.isEmpty()) {
                 if (!captureError.isEmpty()) {
                     QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), captureError);
@@ -947,8 +1125,18 @@ int main(int argc, char *argv[])
             }
         };
 
-        trayController->setCaptureCallbacks([launchCapture] { launchCapture(false); },
-                                            [launchCapture] { launchCapture(true); });
+        trayController->setCaptureCallbacks([launchCapture, allOutputs] { launchCapture(false, allOutputs); },
+                                            [launchCapture, allOutputs] { launchCapture(true, allOutputs); });
+#if defined(Q_OS_WIN)
+        installSingleInstanceCommandHandler(singleInstanceServer.get(), &app, [&app, launchCapture](const SingleInstanceCommand &command) {
+            if (!command.capture) {
+                return;
+            }
+            QTimer::singleShot(0, &app, [launchCapture, command] {
+                launchCapture(command.fullscreen, command.allOutputs);
+            });
+        });
+#endif
         if (!trayController->start()) {
             QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), trayController->errorString());
             return 1;
