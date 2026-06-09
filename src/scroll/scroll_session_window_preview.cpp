@@ -382,6 +382,11 @@ void ScrollSessionWindow::paintEvent(QPaintEvent *)
 
     if (m_uiConfig.frameEnabled && !m_panelOnlyWindow) {
         const QRect region = regionLocalRect();
+#if defined(Q_OS_WIN)
+        painter.setPen(QPen(QColor(94, 234, 212), 2.0));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRoundedRect(QRectF(region).adjusted(-1.0, -1.0, 1.0, 1.0), 3.0, 3.0);
+#else
         QPainterPath framePath;
         framePath.setFillRule(Qt::OddEvenFill);
         framePath.addRect(QRectF(captureFrameOuterRect(region, m_uiConfig.frameGap)));
@@ -393,6 +398,7 @@ void ScrollSessionWindow::paintEvent(QPaintEvent *)
         painter.setPen(Qt::NoPen);
         painter.setBrush(frameColor);
         painter.drawPath(framePath);
+#endif
     }
 
     if (m_previewPanelVisible) {

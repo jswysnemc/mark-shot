@@ -15,13 +15,17 @@ ScrollSessionWindow::ScrollSessionWindow(QRect globalGeometry,
     , m_sessionId(QDateTime::currentMSecsSinceEpoch())
     , m_stitcher(defaultConfig())
 {
+#if defined(Q_OS_WIN)
+    // 1. 【Windows捕获】【滚动选区】WGC 已排除覆盖层，边框贴合选区避免实际框大于捕获框
+    m_uiConfig.frameGap = 0;
+#endif
     setWindowTitle(MS_TR("Scroll Capture"));
     setAttribute(Qt::WA_DeleteOnClose);
-#if !defined(Q_OS_WIN)
     setAttribute(Qt::WA_TranslucentBackground);
-#endif
+    setAttribute(Qt::WA_NoSystemBackground);
     setAttribute(Qt::WA_ShowWithoutActivating);
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+    markshot::windows::setExcludedFromCapture(this);
     setObjectName(QStringLiteral("scrollSessionWindow"));
     setMouseTracking(true);
     setFocusPolicy(Qt::NoFocus);

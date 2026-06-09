@@ -93,12 +93,7 @@ void ShotWindow::startScrollCapture()
     QScreen *targetScreen = screen();
     QPointer<ShotWindow> self(this);
 
-    // On X11, QScreen::grabWindow captures visible top-level windows. Hide the
-    // selection UI and give the compositor one repaint before seeding the scroll
-    // stitcher, otherwise the first frame can contain our own toolbar/overlay.
-    hide();
-    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-    QTimer::singleShot(120, qApp, [self, geometry, outputName, targetScreen, uiConfig] {
+    auto launchScrollWindow = [self, geometry, outputName, targetScreen, uiConfig] {
         auto *window =
             new markshot::scroll::ScrollSessionWindow(geometry, outputName, targetScreen, uiConfig);
         window->show();
@@ -107,7 +102,20 @@ void ShotWindow::startScrollCapture()
         if (self) {
             self->close();
         }
-    });
+    };
+
+#if defined(Q_OS_WIN)
+    // WGC honors WDA_EXCLUDEFROMCAPTURE on both windows, so switch overlays
+    // directly instead of blanking the desktop for the X11 compositor delay.
+    launchScrollWindow();
+#else
+    // On X11, QScreen::grabWindow captures visible top-level windows. Hide the
+    // selection UI and give the compositor one repaint before seeding the scroll
+    // stitcher, otherwise the first frame can contain our own toolbar/overlay.
+    hide();
+    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    QTimer::singleShot(120, qApp, std::move(launchScrollWindow));
+#endif
 }
 
 void ShotWindow::pinSelection()

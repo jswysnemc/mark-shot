@@ -35,11 +35,15 @@ void ScrollSessionWindow::captureTick()
         request.allowInteractivePortal = false;
         request.allowPortalScreenshotFallback = false;
 
+#if defined(Q_OS_WIN)
+        const bool makePanelTransparentForCapture = false;
+#else
         const bool makePanelTransparentForCapture =
             !m_gnomeShellPreview
             && !m_layerShell
             && isVisible()
             && (m_previewPanelVisible || floatingDragHandleActive() || !framePaintRegion().isEmpty());
+#endif
         if (makePanelTransparentForCapture) {
             // Plain Wayland fallback windows can overlap the capture rectangle.
             // Hide their controls for one compositor frame so the next backend

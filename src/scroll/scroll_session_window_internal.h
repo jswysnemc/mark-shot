@@ -69,7 +69,11 @@ inline constexpr int kDuplicateMaxDiff = 4;
 
 // Overlay and preview chrome dimensions. The frame is drawn outside the capture
 // rectangle so it can be excluded from captured pixels.
+#if defined(Q_OS_WIN)
+inline constexpr int kCaptureFrameWidth = 2;
+#else
 inline constexpr int kCaptureFrameWidth = 3;
+#endif
 inline constexpr int kPanelWidth = 340;
 inline constexpr int kPanelPadding = 12;
 inline constexpr int kControlBarHeight = 54;
