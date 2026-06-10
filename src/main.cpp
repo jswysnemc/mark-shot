@@ -1,4 +1,5 @@
 #include "annotation_launch.h"
+#include "capture_cursor_policy.h"
 #include "capture_freeze_scope.h"
 #include "capture_session_launcher.h"
 #include "debug_log.h"
@@ -389,6 +390,7 @@ int main(int argc, char *argv[])
 
     const bool allOutputs = parser.isSet(allOutputsOption);
     const markshot::CaptureFreezeScope freezeScope = markshot::configuredCaptureFreezeScope();
+    const bool includeCursor = markshot::configuredCaptureIncludeCursor();
     const bool useRegularWindow = parser.isSet(xdgWindowOption);
     const bool fullscreenAnnotation = parser.isSet(fullscreenAnnotationOption);
     const markshot::WindowsTrayController::Config trayConfig = markshot::WindowsTrayController::readConfig();
@@ -439,7 +441,7 @@ int main(int argc, char *argv[])
 
         auto *trayController = new markshot::WindowsTrayController(&app, trayConfig, &app);
         bool captureActive = false;
-        auto launchCapture = [&app, &captureActive, freezeScope, useRegularWindow, defaultTools](bool startFullscreen, bool requestAllOutputs) {
+        auto launchCapture = [&app, &captureActive, freezeScope, includeCursor, useRegularWindow, defaultTools](bool startFullscreen, bool requestAllOutputs) {
             if (captureActive) {
                 return;
             }
@@ -449,6 +451,7 @@ int main(int argc, char *argv[])
                 markshot::showCaptureSession(&app,
                                              requestAllOutputs,
                                              freezeScope,
+                                             includeCursor,
                                              useRegularWindow,
                                              startFullscreen,
                                              defaultTools,
@@ -504,6 +507,7 @@ int main(int argc, char *argv[])
         markshot::showCaptureSession(&app,
                                      allOutputs,
                                      freezeScope,
+                                     includeCursor,
                                      useRegularWindow,
                                      fullscreenAnnotation,
                                      defaultTools,

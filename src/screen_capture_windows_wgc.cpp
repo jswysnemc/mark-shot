@@ -158,6 +158,19 @@ bool windowsGraphicsCaptureBorderControlAvailable()
     return available;
 }
 
+bool windowsGraphicsCaptureCursorControlAvailable()
+{
+    static const bool available = [] {
+        try {
+            ensureWinrtApartment();
+            return Metadata::ApiInformation::IsPropertyPresent(L"Windows.Graphics.Capture.GraphicsCaptureSession",
+                                                               L"IsCursorCaptureEnabled");
+        } catch (const winrt::hresult_error &) {}
+        return false;
+    }();
+    return available;
+}
+
 void requestBorderlessWindowsGraphicsCapture(const Capture::GraphicsCaptureSession &session)
 {
     if (!windowsGraphicsCaptureBorderControlAvailable()) {
@@ -177,6 +190,35 @@ void requestBorderlessWindowsGraphicsCapture(const Capture::GraphicsCaptureSessi
                                .toUtf8()
                                .constData());
     }
+}
+
+bool configureWindowsGraphicsCaptureCursor(const Capture::GraphicsCaptureSession &session,
+                                           bool includeCursor,
+                                           QString *error)
+{
+    if (!windowsGraphicsCaptureCursorControlAvailable()) {
+        if (error) { *error = QStringLiteral("Windows Graphics Capture cursor control is not available"); }
+        markshot::debugLog("capture", "windows-graphics-capture-cursor unsupported");
+        return false;
+    }
+
+    try {
+        session.IsCursorCaptureEnabled(includeCursor);
+        const bool effective = session.IsCursorCaptureEnabled();
+        markshot::debugLog("capture", "windows-graphics-capture-cursor requested=%d effective=%d",
+                           includeCursor ? 1 : 0, effective ? 1 : 0);
+        if (effective != includeCursor) {
+            if (error) { *error = QStringLiteral("Windows Graphics Capture cursor setting was not applied"); }
+            return false;
+        }
+        return true;
+    } catch (const winrt::hresult_error &exception) {
+        const QString message = winrtError(QStringLiteral("setting cursor capture failed"), exception);
+        if (error) { *error = message; }
+        markshot::debugLog("capture", "windows-graphics-capture-cursor failed error=%s",
+                           message.toUtf8().constData());
+    }
+    return false;
 }
 
 HRESULT createD3DDeviceWithDriver(D3D_DRIVER_TYPE driverType,
@@ -426,6 +468,7 @@ QImage imageFromFrame(const Capture::Direct3D11CaptureFrame &frame,
 
 QImage captureItemFrame(const Capture::GraphicsCaptureItem &item,
                         const D3DDeviceBundle &bundle,
+                        bool includeCursor,
                         QString *error)
 {
     const auto size = item.Size();
@@ -469,6 +512,12 @@ QImage captureItemFrame(const Capture::GraphicsCaptureItem &item,
                 state->condition.notify_one();
             });
 
+        if (!configureWindowsGraphicsCaptureCursor(session, includeCursor, error)) {
+            framePool.FrameArrived(token);
+            session.Close();
+            framePool.Close();
+            return {};
+        }
         requestBorderlessWindowsGraphicsCapture(session);
         session.StartCapture();
 
@@ -509,10 +558,11 @@ QImage captureItemFrame(const Capture::GraphicsCaptureItem &item,
 }
 
 CaptureResult captureMonitorWithWindowsGraphicsCapture(QScreen *screen,
-                                                       const D3DDeviceBundle &bundle)
+                                                       const D3DDeviceBundle &bundle,
+                                                       const CaptureRequest &request)
 {
     if (!screen) {
-        return {{}, QStringLiteral("no screen available for Windows Graphics Capture"), {}, {}};
+        return {{}, QStringLiteral("no screen available for Windows Graphics Capture"), {}, request.sourceGeometry};
     }
 
     HMONITOR monitor = monitorForScreen(screen);
@@ -523,7 +573,7 @@ CaptureResult captureMonitorWithWindowsGraphicsCapture(QScreen *screen,
     try {
         const Capture::GraphicsCaptureItem item = graphicsCaptureItemForMonitor(monitor);
         QString error;
-        QImage image = captureItemFrame(item, bundle, &error);
+        QImage image = captureItemFrame(item, bundle, request.includeCursor, &error);
         if (image.isNull()) {
             return {{},
                     error.isEmpty() ? QStringLiteral("Windows Graphics Capture returned no frame") : error,
@@ -540,7 +590,8 @@ CaptureResult captureMonitorWithWindowsGraphicsCapture(QScreen *screen,
         return {image.convertToFormat(QImage::Format_ARGB32_Premultiplied),
                 {},
                 screen->name(),
-                screen->geometry()};
+                screen->geometry(),
+                request.includeCursor};
     } catch (const winrt::hresult_error &exception) {
         return {{},
                 winrtError(QStringLiteral("failed to create Windows Graphics Capture item"), exception),
@@ -579,7 +630,7 @@ CaptureResult captureAllScreensWithWindowsGraphicsCapture(const CaptureRequest &
             continue;
         }
 
-        CaptureResult capture = captureMonitorWithWindowsGraphicsCapture(screen, bundle);
+        CaptureResult capture = captureMonitorWithWindowsGraphicsCapture(screen, bundle, request);
         if (capture.image.isNull()) {
             if (!capture.error.isEmpty()) {
                 errors.append(QStringLiteral("%1: %2").arg(screen->name(), capture.error));
@@ -613,7 +664,7 @@ CaptureResult captureAllScreensWithWindowsGraphicsCapture(const CaptureRequest &
                        frameGeometry.x(), frameGeometry.y(),
                        frameGeometry.width(), frameGeometry.height(),
                        combined.width(), combined.height());
-    return {combined, {}, {}, frameGeometry};
+    return {combined, {}, {}, frameGeometry, request.includeCursor};
 }
 
 CaptureResult cropWindowsGraphicsCaptureFrame(CaptureResult capture,
@@ -691,7 +742,7 @@ CaptureResult captureWithWindowsGraphicsCapture(const CaptureRequest &request)
     }
 
     QScreen *screen = screenForCaptureRequest(request);
-    CaptureResult capture = captureMonitorWithWindowsGraphicsCapture(screen, *bundle);
+    CaptureResult capture = captureMonitorWithWindowsGraphicsCapture(screen, *bundle, request);
     return cropWindowsGraphicsCaptureFrame(std::move(capture), request);
 }
 

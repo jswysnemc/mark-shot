@@ -1,4 +1,5 @@
 #include "screen_capture_internal.h"
+#include "screen_capture_cursor.h"
 
 CaptureResult captureScreenFrame(const CaptureRequest &request)
 {
@@ -24,6 +25,9 @@ CaptureResult captureScreenFrame(const CaptureRequest &request)
     // Downstream selection, annotation, and stitching code works in raw image
     // pixels, so normalize format/device-pixel-ratio at the backend boundary.
     result.image = normalizeCaptureImage(result.image);
+    if (request.includeCursor && !result.cursorIncluded) {
+        result.cursorIncluded = markshot::capture::paintCurrentCursorIntoCapture(&result);
+    }
     return result;
 }
 

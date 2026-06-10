@@ -34,6 +34,7 @@ QRect virtualScreensGeometry()
 /// @brief 捕获一个显示器并显示截图窗口。
 /// @param screen 要捕获的显示器。
 /// @param allOutputs 是否捕获全部输出为一张图片。
+/// @param includeCursor 冻结图是否包含鼠标。
 /// @param useRegularWindow 是否使用普通窗口。
 /// @param fullscreenAnnotation 是否直接进入全屏标注。
 /// @param defaultTools 默认工具配置。
@@ -41,6 +42,7 @@ QRect virtualScreensGeometry()
 /// @return 创建出的截图窗口。
 ShotWindow *showCaptureWindow(QScreen *screen,
                               bool allOutputs,
+                              bool includeCursor,
                               bool useRegularWindow,
                               bool fullscreenAnnotation,
                               const markshot::DefaultTools &defaultTools,
@@ -52,7 +54,12 @@ ShotWindow *showCaptureWindow(QScreen *screen,
     const QVector<QRect> windowGeometries = detectWindows
         ? markshot::collectConfiguredWindowGeometries(captureGeometry, outputName, allOutputs)
         : QVector<QRect>();
-    CaptureResult capture = captureScreenFrame({outputName, captureGeometry, allOutputs});
+    CaptureRequest request;
+    request.preferredOutputName = outputName;
+    request.sourceGeometry = captureGeometry;
+    request.allOutputs = allOutputs;
+    request.includeCursor = includeCursor;
+    CaptureResult capture = captureScreenFrame(request);
     if (capture.image.isNull()) {
         if (error) {
             *error = capture.error;
@@ -120,6 +127,7 @@ namespace markshot {
 QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
                                                  bool allOutputs,
                                                  CaptureFreezeScope freezeScope,
+                                                 bool includeCursor,
                                                  bool useRegularWindow,
                                                  bool fullscreenAnnotation,
                                                  const DefaultTools &defaultTools,
@@ -134,7 +142,7 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
                 continue;
             }
             ShotWindow *window =
-                showCaptureWindow(candidate, false, useRegularWindow, fullscreenAnnotation, defaultTools, error);
+                showCaptureWindow(candidate, false, includeCursor, useRegularWindow, fullscreenAnnotation, defaultTools, error);
             if (!window) {
                 for (const QPointer<ShotWindow> &existingWindow : std::as_const(windows)) {
                     if (existingWindow) {
@@ -184,7 +192,7 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
     }
 
     ShotWindow *window =
-        showCaptureWindow(allOutputs ? nullptr : screen, allOutputs, useRegularWindow, fullscreenAnnotation, defaultTools, error);
+        showCaptureWindow(allOutputs ? nullptr : screen, allOutputs, includeCursor, useRegularWindow, fullscreenAnnotation, defaultTools, error);
     if (window) {
         windows.append(window);
     }

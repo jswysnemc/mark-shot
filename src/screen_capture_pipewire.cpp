@@ -15,7 +15,7 @@ public:
         const bool firstStart = !m_started;
         if (!m_started) {
             QString error;
-            if (!start(&error)) {
+            if (!start(request.includeCursor, &error)) {
                 markshot::debugLog("screencast", "start failed: %s",
                                    error.toUtf8().constData());
                 stop();
@@ -102,7 +102,11 @@ public:
                                requested.width(), requested.height());
             return {{}, QStringLiteral("portal screencast frame does not cover requested geometry"), {}, request.sourceGeometry};
         }
-        return {image.convertToFormat(QImage::Format_ARGB32_Premultiplied), {}, request.preferredOutputName, request.sourceGeometry};
+        return {image.convertToFormat(QImage::Format_ARGB32_Premultiplied),
+                {},
+                request.preferredOutputName,
+                request.sourceGeometry,
+                m_cursorIncluded};
     }
 
     void stop()
@@ -168,6 +172,7 @@ public:
         m_started = false;
         m_nodeId = 0;
         m_targetObject.clear();
+        m_cursorIncluded = false;
         m_frameCount = 0;
         QMutexLocker locker(&m_frameMutex);
         m_latestFrame = {};
@@ -176,11 +181,11 @@ public:
     }
 
 private:
-    bool start(QString *error)
+    bool start(bool includeCursor, QString *error)
     {
 #ifdef HAVE_LIBPORTAL
         QString libportalError;
-        if (startWithLibportal(&libportalError)) {
+        if (startWithLibportal(includeCursor, &libportalError)) {
             m_started = true;
             return true;
         }
@@ -190,7 +195,7 @@ private:
 #endif
 
         QString dbusError;
-        if (!startWithDbusPortal(&dbusError)) {
+        if (!startWithDbusPortal(includeCursor, &dbusError)) {
             if (error) {
 #ifdef HAVE_LIBPORTAL
                 *error = libportalError.isEmpty()
@@ -208,7 +213,7 @@ private:
     }
 
 #ifdef HAVE_LIBPORTAL
-    bool startWithLibportal(QString *error)
+    bool startWithLibportal(bool includeCursor, QString *error)
     {
         registerHostPortalApplication();
 
@@ -239,10 +244,11 @@ private:
         const uint availableCursorModes =
             portalUintProperty(QStringLiteral("org.freedesktop.portal.ScreenCast"),
                                QStringLiteral("AvailableCursorModes"));
-        uint cursorMode = preferredPortalCursorMode(availableCursorModes);
+        uint cursorMode = preferredPortalCursorMode(availableCursorModes, includeCursor);
         if (cursorMode == 0) {
             cursorMode = XDP_CURSOR_MODE_HIDDEN;
         }
+        m_cursorIncluded = includeCursor && cursorMode == kPortalCursorEmbedded;
         markshot::debugLog("screencast",
                            "libportal-start source=monitor cursor_modes=0x%x chosen_cursor=%u",
                            availableCursorModes, cursorMode);
@@ -377,7 +383,7 @@ private:
     }
 #endif
 
-    bool startWithDbusPortal(QString *error)
+    bool startWithDbusPortal(bool includeCursor, QString *error)
     {
         static bool dbusTypesRegistered = [] {
             qRegisterMetaType<PortalStream>("PortalStream");
@@ -471,10 +477,11 @@ private:
         selectOptions.insert(QStringLiteral("multiple"), false);
         const uint availableCursorModes =
             portalUintProperty(screenCastInterface, QStringLiteral("AvailableCursorModes"));
-        const uint cursorMode = preferredPortalCursorMode(availableCursorModes);
+        const uint cursorMode = preferredPortalCursorMode(availableCursorModes, includeCursor);
         if (cursorMode != 0) {
             selectOptions.insert(QStringLiteral("cursor_mode"), cursorMode);
         }
+        m_cursorIncluded = includeCursor && cursorMode == kPortalCursorEmbedded;
         markshot::debugLog("capture",
                            "screencast negotiate source_types=0x%x cursor_modes=0x%x chosen_cursor=%u",
                            sourceTypes, availableCursorModes, cursorMode);
@@ -914,6 +921,7 @@ private:
     QString m_targetObject;
     QString m_sessionHandle;
     bool m_ownsDbusSessionHandle = false;
+    bool m_cursorIncluded = false;
 #ifdef HAVE_LIBPORTAL
     XdpPortal *m_libportalPortal = nullptr;
     XdpSession *m_libportalSession = nullptr;

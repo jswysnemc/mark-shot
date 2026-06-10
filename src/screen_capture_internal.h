@@ -215,7 +215,7 @@ CaptureResult captureWithWindowsGraphicsCapture(const CaptureRequest &request);
 // grim captures full output frames and then crops them to CaptureRequest when a
 // compositor supports grim but not direct rectangle capture.
 QRect fullGrimSourceGeometry(const CaptureRequest &request);
-CaptureResult runGrim(const QStringList &arguments, const QString &outputName, QRect sourceGeometry);
+CaptureResult runGrim(const QStringList &arguments, const QString &outputName, QRect sourceGeometry, bool cursorIncluded = false);
 CaptureResult cropGrimFrameToRequest(CaptureResult capture, QRect frameGeometry, const CaptureRequest &request);
 
 #ifdef MARK_SHOT_WITH_DBUS
@@ -239,7 +239,7 @@ QVariantMap callPortalRequest(QDBusInterface *portal,
 bool readPairVariant(const QVariant &value, int *first, int *second);
 QVariant unwrappedVariant(QVariant value);
 uint portalUintProperty(const QString &interfaceName, const QString &propertyName);
-uint preferredPortalCursorMode(uint availableModes);
+uint preferredPortalCursorMode(uint availableModes, bool includeCursor);
 QRect streamGeometryFromProperties(const QVariantMap &properties, const QSize &frameSize);
 
 // Wayland backend cascade: compositor helpers first when available, then portal

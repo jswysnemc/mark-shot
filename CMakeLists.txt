@@ -73,6 +73,9 @@ qt_add_executable(mark-shot
     src/debug_log.h
     src/config_value.cpp
     src/config_value.h
+    src/capture_cursor_policy.cpp
+    src/capture_cursor_policy.h
+    src/capture_cursor_policy_config.cpp
     src/capture_freeze_scope.cpp
     src/capture_freeze_scope.h
     src/capture_freeze_scope_config.cpp
@@ -95,6 +98,8 @@ qt_add_executable(mark-shot
     src/screen_capture.h
     src/screen_capture_api.cpp
     src/screen_capture_core_helpers.cpp
+    src/screen_capture_cursor.cpp
+    src/screen_capture_cursor.h
     src/screen_capture_dbus_portal.cpp
     src/screen_capture_dbus_wayland.cpp
     src/screen_capture_internal.h
@@ -289,6 +294,37 @@ if(BUILD_TESTING)
             Qt6::Test
     )
     add_test(NAME capture-freeze-scope COMMAND mark-shot-capture-freeze-scope-test)
+
+    qt_add_executable(mark-shot-capture-cursor-policy-test
+        tests/capture_cursor_policy_test.cpp
+        src/capture_cursor_policy.cpp
+        src/capture_cursor_policy.h
+        src/config_value.cpp
+        src/config_value.h
+    )
+    target_include_directories(mark-shot-capture-cursor-policy-test PRIVATE src)
+    target_link_libraries(mark-shot-capture-cursor-policy-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+    )
+    add_test(NAME capture-cursor-policy COMMAND mark-shot-capture-cursor-policy-test)
+
+    qt_add_executable(mark-shot-screen-capture-cursor-test
+        tests/screen_capture_cursor_test.cpp
+        src/screen_capture_cursor.cpp
+        src/screen_capture_cursor.h
+        src/screen_capture.h
+    )
+    target_include_directories(mark-shot-screen-capture-cursor-test PRIVATE src)
+    target_link_libraries(mark-shot-screen-capture-cursor-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+    )
+    add_test(NAME screen-capture-cursor COMMAND mark-shot-screen-capture-cursor-test)
 
     qt_add_executable(mark-shot-ocr-result-test
         tests/ocr_result_test.cpp

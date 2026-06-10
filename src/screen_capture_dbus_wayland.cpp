@@ -6,12 +6,19 @@
 CaptureResult captureWithGrim(const CaptureRequest &request)
 {
     const QStringList baseArguments{QStringLiteral("-t"), QStringLiteral("ppm")};
+    auto grimArguments = [&request, &baseArguments] {
+        QStringList arguments = baseArguments;
+        if (request.includeCursor) {
+            arguments << QStringLiteral("-c");
+        }
+        return arguments;
+    };
 
     if (!request.allOutputs && !request.preferredOutputName.isEmpty()) {
         const QRect outputGeometry = screenGeometryForRequest(request);
-        QStringList arguments = baseArguments;
+        QStringList arguments = grimArguments();
         arguments << QStringLiteral("-o") << request.preferredOutputName << QStringLiteral("-");
-        CaptureResult outputCapture = runGrim(arguments, request.preferredOutputName, outputGeometry);
+        CaptureResult outputCapture = runGrim(arguments, request.preferredOutputName, outputGeometry, request.includeCursor);
         if (!outputCapture.image.isNull()) {
             if (!outputGeometry.isEmpty()) {
                 return cropGrimFrameToRequest(std::move(outputCapture), outputGeometry, request);
@@ -23,9 +30,9 @@ CaptureResult captureWithGrim(const CaptureRequest &request)
 
         const QString outputError = outputCapture.error;
         const QRect fullGeometry = fullGrimSourceGeometry(request);
-        QStringList fullArguments = baseArguments;
+        QStringList fullArguments = grimArguments();
         fullArguments << QStringLiteral("-");
-        CaptureResult fullCapture = runGrim(fullArguments, {}, fullGeometry);
+        CaptureResult fullCapture = runGrim(fullArguments, {}, fullGeometry, request.includeCursor);
         if (!fullCapture.image.isNull()) {
             fullCapture.outputName = request.preferredOutputName;
             return cropGrimFrameToRequest(std::move(fullCapture), fullGeometry, request);
@@ -52,9 +59,9 @@ CaptureResult captureWithGrim(const CaptureRequest &request)
     }
 
     const QRect frameGeometry = fullGrimSourceGeometry(request);
-    QStringList arguments = baseArguments;
+    QStringList arguments = grimArguments();
     arguments << QStringLiteral("-");
-    CaptureResult fullCapture = runGrim(arguments, {}, frameGeometry);
+    CaptureResult fullCapture = runGrim(arguments, {}, frameGeometry, request.includeCursor);
     return cropGrimFrameToRequest(std::move(fullCapture), frameGeometry, request);
 }
 
@@ -89,7 +96,7 @@ CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
     }
 
     QVariantMap options;
-    options.insert(QStringLiteral("include-cursor"), false);
+    options.insert(QStringLiteral("include-cursor"), request.includeCursor);
     // native-resolution keeps device pixels on HiDPI instead of downscaling to
     // logical size, so the stitched result stays sharp.
     options.insert(QStringLiteral("native-resolution"), true);
@@ -174,7 +181,8 @@ CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
     return {view.copy().convertToFormat(QImage::Format_ARGB32_Premultiplied),
             {},
             request.allOutputs ? QString() : request.preferredOutputName,
-            request.sourceGeometry};
+            request.sourceGeometry,
+            request.includeCursor};
 }
 
 CaptureResult captureWaylandFrame(const CaptureRequest &request)

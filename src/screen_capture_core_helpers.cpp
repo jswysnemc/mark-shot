@@ -227,7 +227,7 @@ QRect fullGrimSourceGeometry(const CaptureRequest &request)
     return {};
 }
 
-CaptureResult runGrim(const QStringList &arguments, const QString &outputName, QRect sourceGeometry)
+CaptureResult runGrim(const QStringList &arguments, const QString &outputName, QRect sourceGeometry, bool cursorIncluded)
 {
     QProcess grim;
     grim.setProgram(QStringLiteral("grim"));
@@ -235,13 +235,13 @@ CaptureResult runGrim(const QStringList &arguments, const QString &outputName, Q
     grim.start(QIODevice::ReadOnly);
 
     if (!grim.waitForStarted(3000)) {
-        return {{}, QStringLiteral("failed to start grim; install grim and run under a Wayland compositor that supports screencopy"), outputName, sourceGeometry};
+        return {{}, QStringLiteral("failed to start grim; install grim and run under a Wayland compositor that supports screencopy"), outputName, sourceGeometry, false};
     }
 
     if (!grim.waitForFinished(8000)) {
         grim.kill();
         grim.waitForFinished(1000);
-        return {{}, QStringLiteral("grim timed out while capturing the screen"), outputName, sourceGeometry};
+        return {{}, QStringLiteral("grim timed out while capturing the screen"), outputName, sourceGeometry, false};
     }
 
     const QByteArray png = grim.readAllStandardOutput();
@@ -252,15 +252,15 @@ CaptureResult runGrim(const QStringList &arguments, const QString &outputName, Q
         if (error.isEmpty()) {
             error = QStringLiteral("grim failed with exit code %1").arg(grim.exitCode());
         }
-        return {{}, error, outputName, sourceGeometry};
+        return {{}, error, outputName, sourceGeometry, false};
     }
 
     QImage image;
     if (!image.loadFromData(png, "PPM") || image.isNull()) {
-        return {{}, QStringLiteral("grim returned invalid PPM data"), outputName, sourceGeometry};
+        return {{}, QStringLiteral("grim returned invalid PPM data"), outputName, sourceGeometry, false};
     }
 
-    return {image.convertToFormat(QImage::Format_ARGB32_Premultiplied), {}, outputName, sourceGeometry};
+    return {image.convertToFormat(QImage::Format_ARGB32_Premultiplied), {}, outputName, sourceGeometry, cursorIncluded};
 }
 
 CaptureResult cropGrimFrameToRequest(CaptureResult capture, QRect frameGeometry, const CaptureRequest &request)

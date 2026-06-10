@@ -13,6 +13,8 @@ struct CaptureResult {
     QString error;
     QString outputName;
     QRect sourceGeometry;
+    // 后端已经把鼠标写入 image 时为 true
+    bool cursorIncluded = false;
 };
 
 // Backend-independent capture request. Callers can ask for all outputs, one
@@ -26,6 +28,8 @@ struct CaptureRequest {
     bool allowInteractivePortal = true; // Permit user-facing portal prompts for one-shot capture.
     bool allowPortalScreenshotFallback = true; // Allow slower portal screenshots if streaming fails.
     qint64 minimumFrameTimeMs = 0; // Ignore stale stream frames captured before this timestamp.
+    // 捕获冻结图时是否包含鼠标
+    bool includeCursor = false;
 };
 
 // Captures one frame and normalizes the image for downstream painting/stitching.

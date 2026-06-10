@@ -414,8 +414,17 @@ uint portalUintProperty(const QString &interfaceName, const QString &propertyNam
     return ok ? value : 0;
 }
 
-uint preferredPortalCursorMode(uint availableModes)
+uint preferredPortalCursorMode(uint availableModes, bool includeCursor)
 {
+    if (includeCursor) {
+        if (availableModes & kPortalCursorEmbedded) {
+            return kPortalCursorEmbedded;
+        }
+        if (availableModes & kPortalCursorHidden) {
+            return kPortalCursorHidden;
+        }
+        return 0;
+    }
     if (availableModes & kPortalCursorHidden) {
         return kPortalCursorHidden;
     }
