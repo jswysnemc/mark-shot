@@ -97,6 +97,8 @@ jobs:
           install -Dm644 LICENSE "$APPDIR/usr/share/licenses/mark-shot/LICENSE"
           install -Dm644 README.md "$APPDIR/usr/share/doc/mark-shot/README.md"
           install -Dm644 README.zh-CN.md "$APPDIR/usr/share/doc/mark-shot/README.zh-CN.md"
+          sed -i -E 's#^Exec=[^ ]*/mark-shot( |$)#Exec=mark-shot\1#' \
+            "$APPDIR"/usr/share/applications/*.desktop
 
       - name: Assert LayerShellQt packaging
         shell: bash
