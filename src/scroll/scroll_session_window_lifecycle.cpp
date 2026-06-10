@@ -44,6 +44,7 @@ ScrollSessionWindow::ScrollSessionWindow(QRect globalGeometry,
 
     buildControlBar();
     m_gnomeShellPreview = isGnomeWaylandSession() && hasGnomeScrollPreviewHelper();
+    m_gnomeShellOverlay = isGnomeWaylandSession() && hasGnomeScrollOverlayHelper();
     m_gnomePreviewSessionId = QString::number(m_sessionId);
 #ifdef MARK_SHOT_WITH_DBUS
     if (m_gnomeShellPreview) {

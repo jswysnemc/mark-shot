@@ -40,6 +40,7 @@ void ScrollSessionWindow::captureTick()
 #else
         const bool makePanelTransparentForCapture =
             !m_gnomeShellPreview
+            && isWaylandPlatform()
             && !m_layerShell
             && isVisible()
             && (m_previewPanelVisible || floatingDragHandleActive() || !framePaintRegion().isEmpty());
@@ -271,7 +272,14 @@ void ScrollSessionWindow::updatePreviewPanelVisibility()
 
 void ScrollSessionWindow::syncPreviewWindowVisibility()
 {
-    if (m_gnomeShellPreview || !m_layerShell) {
+    if (m_gnomeShellPreview) {
+        if (isVisible()) {
+            hide();
+        }
+        return;
+    }
+
+    if (!m_layerShell) {
         return;
     }
 

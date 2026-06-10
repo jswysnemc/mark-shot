@@ -4,12 +4,11 @@ import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
-
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-
+import { ScrollPreviewOverlay } from './scroll-preview-overlay.js';
 const IFACE = 'org.gnome.Shell.Extensions.MarkShotScrollHelper';
 const OBJECT_PATH = '/org/gnome/Shell/Extensions/MarkShotScrollHelper';
-const API_VERSION = '4.2';
+const API_VERSION = '5';
 
 const PANEL_WIDTH = 340;
 const DEFAULT_PREVIEW_GAP = 5;
@@ -205,6 +204,9 @@ export default class MarkShotScrollHelper extends Extension {
         this._pendingPreviewTexture = null;
         this._pendingPreviewSignalId = 0;
         this._previewImageSerial = 0;
+        this._previewPanelKey = '';
+        this._buttonIcons = new Map();
+        this._scrollOverlay = new ScrollPreviewOverlay((action) => this._emitPreviewAction(action));
 
         this._dbusId = Gio.DBus.session.register_object(
             OBJECT_PATH,
@@ -226,6 +228,7 @@ export default class MarkShotScrollHelper extends Extension {
             this._dbusId = 0;
         }
         this._screenshot = null;
+        this._scrollOverlay = null;
         console.log('[MarkShotScrollHelper] Extension disabled.');
     }
 
@@ -575,19 +578,33 @@ export default class MarkShotScrollHelper extends Extension {
     }
 
     _showScrollPreview(state) {
-        this._ensurePreview();
         this._previewSessionId = state.sessionId;
+        const handleMode = state.previewGap < 0;
+        const previewGap = handleMode ? Math.max(0, -state.previewGap - 1) : state.previewGap;
 
-        const panel = this._panelRectForCapture(state.rect, state.previewGap);
-        this._previewRoot.set_position(panel.x, panel.y);
-        this._previewRoot.set_size(panel.width, panel.height);
+        this._scrollOverlay?.showFrame(state.rect);
+        if (handleMode) {
+            this._hidePreviewPanel();
+            this._scrollOverlay?.showHandle(state.rect, this._findMonitor(state.rect), state.axis);
+            return;
+        }
 
+        this._scrollOverlay?.hideHandle();
+        this._ensurePreview();
+
+        const panel = this._panelRectForCapture(state.rect, previewGap);
         const imageWidth = panel.width - PANEL_PADDING * 2;
         const imageHeight = Math.max(
             96,
             panel.height - STATUS_HEIGHT - CONTROL_BAR_HEIGHT - PANEL_PADDING * 4
         );
-        this._previewImageBin.set_size(imageWidth, imageHeight);
+        const panelKey = `${panel.x},${panel.y},${panel.width},${panel.height},${imageWidth},${imageHeight}`;
+        if (panelKey !== this._previewPanelKey) {
+            this._previewPanelKey = panelKey;
+            this._previewRoot.set_position(panel.x, panel.y);
+            this._previewRoot.set_size(panel.width, panel.height);
+            this._previewImageBin.set_size(imageWidth, imageHeight);
+        }
 
         this._previewStatus.set_text(state.status || 'Scroll down to capture');
         this._setButtonIcon(
@@ -610,11 +627,27 @@ export default class MarkShotScrollHelper extends Extension {
         this._previewRoot.show();
     }
 
+    _hidePreviewPanel() {
+        if (!this._previewRoot) {
+            return;
+        }
+        this._previewRoot.hide();
+        this._previewPanelKey = '';
+        this._disconnectPendingPreviewLoad();
+        ++this._previewImageSerial;
+        this._previewImageBin?.set_child(null);
+    }
+
     _setButtonIcon(action, iconName, label) {
         const button = this._previewButtons.get(action);
         if (!button) {
             return;
         }
+        const key = `${iconName}:${label}`;
+        if (this._buttonIcons.get(action) === key) {
+            return;
+        }
+        this._buttonIcons.set(action, key);
         button.accessible_name = label;
         button.set_child(new St.Icon({
             icon_name: iconName,
@@ -691,11 +724,10 @@ export default class MarkShotScrollHelper extends Extension {
             return;
         }
         if (this._previewRoot) {
-            this._previewRoot.hide();
-            this._disconnectPendingPreviewLoad();
-            ++this._previewImageSerial;
-            this._previewImageBin.set_child(null);
+            this._hidePreviewPanel();
         }
+        this._scrollOverlay?.hideFrame();
+        this._scrollOverlay?.hideHandle();
         this._previewSessionId = '';
     }
 
@@ -707,7 +739,10 @@ export default class MarkShotScrollHelper extends Extension {
         this._previewStatus = null;
         this._previewImageBin = null;
         this._previewButtons = new Map();
+        this._buttonIcons = new Map();
+        this._previewPanelKey = '';
         this._disconnectPendingPreviewLoad();
+        this._scrollOverlay?.destroy();
         ++this._previewImageSerial;
         this._previewSessionId = '';
     }

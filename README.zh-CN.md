@@ -61,6 +61,46 @@
   - `mark-shot-edit.desktop`：注册为独立的图像编辑器，可集成到文件管理器（如 Dolphin、Nautilus）的右键"打开方式"菜单中。
 - 附带高分辨率的 `mark-shot.svg` 与 `mark-shot-edit.svg` 系统矢量图标。
 
+### KDE KWin ScreenShot2 授权
+
+在 KDE Wayland 中，Mark Shot 可以使用 KWin 的 `org.kde.KWin.ScreenShot2` 接口执行精确区域截图。KWin 将该接口视为受限 D-Bus 接口，因此应用对应的桌面文件必须声明授权字段：
+
+```ini
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2
+```
+
+发行版安装包和 `cmake --install` 会自动安装所需桌面文件。如果直接运行本地构建产物而没有安装项目，请创建或更新 `~/.local/share/applications/mark-shot.desktop`：
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Mark Shot
+Comment=Wayland screenshot selection and annotation tool
+Exec=/absolute/path/to/mark-shot
+Icon=mark-shot
+Terminal=false
+Categories=Graphics;Utility;
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2
+```
+
+如果通过 KDE 的命令快捷键服务绑定 Mark Shot，还需要创建 `~/.local/share/applications/net.local.mark-shot.desktop`：
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Mark Shot Shortcut Service
+Exec=/absolute/path/to/mark-shot
+Icon=mark-shot
+Terminal=false
+NoDisplay=true
+StartupNotify=false
+Categories=Utility;
+X-KDE-GlobalAccel-CommandShortcut=true
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2
+```
+
+修改桌面文件后，建议注销并重新登录，让 KDE 重新读取桌面文件缓存。如果当前 KDE 会话仍返回 `NoAuthorized`，请重启 KWin 或重启系统一次。
+
 ---
 
 ## 命令行接口 (CLI)

@@ -203,7 +203,8 @@ void ScrollSessionWindow::updateGnomeShellPreview(bool force)
     if (!gnomeShellPreviewActive()) {
         return;
     }
-    if (!m_previewPanelVisible) {
+    const bool showHandle = m_gnomeShellOverlay && !m_previewPanelVisible && floatingDragHandleActive();
+    if (!m_previewPanelVisible && !showHandle) {
         if (m_gnomePreviewVisible) {
             hideGnomeShellPreview();
         }
@@ -217,7 +218,7 @@ void ScrollSessionWindow::updateGnomeShellPreview(bool force)
     m_lastGnomePreviewUpdateMs = now;
 
     QString previewPath;
-    if (force || m_gnomePreviewImageDirty) {
+    if (!showHandle && (force || m_gnomePreviewImageDirty)) {
         const QSize previewSize = gnomePreviewImageSize();
         const QImage preview = renderGnomePreviewImage(previewSize);
         if (!preview.isNull()) {
@@ -262,7 +263,9 @@ void ScrollSessionWindow::updateGnomeShellPreview(bool force)
             << totalLen
             << m_paused
             << m_stitcher.axisLocked()
-            << std::max(0, m_uiConfig.previewGap);
+            << (showHandle
+                    ? -std::max(1, m_uiConfig.previewGap + 1)
+                    : std::max(0, m_uiConfig.previewGap));
     QDBusConnection::sessionBus().call(message, QDBus::NoBlock);
     m_gnomePreviewVisible = true;
 #endif

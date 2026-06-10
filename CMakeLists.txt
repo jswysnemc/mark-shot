@@ -79,6 +79,8 @@ qt_add_executable(mark-shot
     src/capture_freeze_scope.cpp
     src/capture_freeze_scope.h
     src/capture_freeze_scope_config.cpp
+    src/kde_capture_config.cpp
+    src/kde_capture_config.h
     src/capture_geometry.cpp
     src/capture_geometry.h
     src/capture_session_launcher.cpp
@@ -317,6 +319,30 @@ if(BUILD_TESTING)
     )
     add_test(NAME capture-cursor-policy COMMAND mark-shot-capture-cursor-policy-test)
 
+    qt_add_executable(mark-shot-kde-capture-config-test
+        tests/kde_capture_config_test.cpp
+        src/kde_capture_config.cpp
+        src/kde_capture_config.h
+        src/app_config_store.cpp
+        src/app_config_store.h
+        src/config_value.cpp
+        src/config_value.h
+        src/debug_log.cpp
+        src/debug_log.h
+        src/shell_command.cpp
+        src/shell_command.h
+        src/window_detection.cpp
+        src/window_detection.h
+    )
+    target_include_directories(mark-shot-kde-capture-config-test PRIVATE src)
+    target_link_libraries(mark-shot-kde-capture-config-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+    )
+    add_test(NAME kde-capture-config COMMAND mark-shot-kde-capture-config-test)
+
     qt_add_executable(mark-shot-save-path-config-test
         tests/save_path_config_test.cpp
         src/save_path_config.cpp
@@ -404,6 +430,11 @@ if(TARGET mark-shot-layer-shell)
     )
 endif()
 if(MARK_SHOT_LINUX)
+    set(MARK_SHOT_DESKTOP_EXEC "${CMAKE_INSTALL_FULL_BINDIR}/mark-shot")
+    configure_file(data/mark-shot.desktop.in "${CMAKE_CURRENT_BINARY_DIR}/mark-shot.desktop" @ONLY)
+    configure_file(data/mark-shot-edit.desktop.in "${CMAKE_CURRENT_BINARY_DIR}/mark-shot-edit.desktop" @ONLY)
+    configure_file(data/net.local.mark-shot.desktop.in "${CMAKE_CURRENT_BINARY_DIR}/net.local.mark-shot.desktop" @ONLY)
+
     install(PROGRAMS
         scripts/mark-shot-ocr
         scripts/mark-shot-translate
@@ -413,8 +444,9 @@ if(MARK_SHOT_LINUX)
         DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
     install(FILES
-        data/mark-shot.desktop
-        data/mark-shot-edit.desktop
+        "${CMAKE_CURRENT_BINARY_DIR}/mark-shot.desktop"
+        "${CMAKE_CURRENT_BINARY_DIR}/mark-shot-edit.desktop"
+        "${CMAKE_CURRENT_BINARY_DIR}/net.local.mark-shot.desktop"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
     )
     install(FILES
@@ -427,6 +459,6 @@ if(MARK_SHOT_LINUX)
         DESTINATION ${CMAKE_INSTALL_DATADIR}/gnome-shell/extensions/mark-shot-scroll-helper@snemc.org
         FILES_MATCHING
             PATTERN "metadata.json"
-            PATTERN "extension.js"
+            PATTERN "*.js"
     )
 endif()

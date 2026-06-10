@@ -198,6 +198,7 @@ private:
     bool m_overviewDragging = false;
     int m_overviewDragOffsetPx = 0;
     bool m_gnomeShellPreview = false;
+    bool m_gnomeShellOverlay = false;
     bool m_gnomePreviewVisible = false;
     QString m_gnomePreviewSessionId;
     QStringList m_gnomePreviewFiles;

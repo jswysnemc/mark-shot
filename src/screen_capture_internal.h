@@ -245,6 +245,7 @@ QRect streamGeometryFromProperties(const QVariantMap &properties, const QSize &f
 // Wayland backend cascade: compositor helpers first when available, then portal
 // screencast/screenshot or command-line fallback depending on request flags.
 CaptureResult captureWithGrim(const CaptureRequest &request);
+bool isKWinScreenShotAvailable();
 CaptureResult captureWithKWinScreenShot(const CaptureRequest &request);
 CaptureResult captureWaylandFrame(const CaptureRequest &request);
 CaptureResult captureWithPortalScreencast(const CaptureRequest &request);

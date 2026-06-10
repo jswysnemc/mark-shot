@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Mark Shot Shortcut Service
+Comment=KDE command shortcut service for Mark Shot
+Exec=@MARK_SHOT_DESKTOP_EXEC@
+Icon=mark-shot
+Terminal=false
+NoDisplay=true
+StartupNotify=false
+Categories=Utility;
+X-KDE-GlobalAccel-CommandShortcut=true
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2

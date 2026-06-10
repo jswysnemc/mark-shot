@@ -14,7 +14,7 @@ namespace {
 markshot::SavePathContext testContext()
 {
     markshot::SavePathContext context;
-    context.timestamp = QDateTime(QDate(2026, 6, 10), QTime(14, 5, 6, 7), QTimeZone::UTC);
+    context.timestamp = QDateTime(QDate(2026, 6, 10), QTime(14, 5, 6, 7), QTimeZone(QByteArrayLiteral("UTC")));
     context.selectionRect = QRect(12, 34, 560, 780);
     context.sourceGeometry = QRect(1, 2, 1920, 1080);
     context.imageSize = QSize(1920, 1080);

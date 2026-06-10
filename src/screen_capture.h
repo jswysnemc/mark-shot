@@ -41,3 +41,4 @@ QVector<QRect> enumerateX11WindowGeometries();
 bool isGnomeWaylandSession();
 bool hasGnomeScrollHelper();
 bool hasGnomeScrollPreviewHelper();
+bool hasGnomeScrollOverlayHelper();

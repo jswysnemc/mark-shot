@@ -63,6 +63,46 @@ It captures screen frames instantly and opens an interactive fullscreen overlay,
   - `mark-shot-edit.desktop`: Registers as an image editor, enabling users to right-click local files in file managers (Dolphin, Nautilus, etc.) and open them directly in annotation mode.
 - Ships with scalable vector icons (`mark-shot.svg` and `mark-shot-edit.svg`).
 
+### KDE KWin ScreenShot2 Authorization
+
+On KDE Wayland, Mark Shot can use KWin's `org.kde.KWin.ScreenShot2` interface for exact area capture. KWin treats this as a restricted D-Bus interface, so the application must have a desktop entry that declares the permission:
+
+```ini
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2
+```
+
+Distribution packages and `cmake --install` install the required desktop entries automatically. If you run a locally built binary without installing the project, create or update `~/.local/share/applications/mark-shot.desktop`:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Mark Shot
+Comment=Wayland screenshot selection and annotation tool
+Exec=/absolute/path/to/mark-shot
+Icon=mark-shot
+Terminal=false
+Categories=Graphics;Utility;
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2
+```
+
+If you bind Mark Shot through KDE's command shortcut service, also create `~/.local/share/applications/net.local.mark-shot.desktop`:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Mark Shot Shortcut Service
+Exec=/absolute/path/to/mark-shot
+Icon=mark-shot
+Terminal=false
+NoDisplay=true
+StartupNotify=false
+Categories=Utility;
+X-KDE-GlobalAccel-CommandShortcut=true
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2
+```
+
+After changing desktop entries, refresh KDE's desktop file cache by logging out and back in. If the current KDE session still returns `NoAuthorized`, restart KWin or reboot once.
+
 ---
 
 ## Usage

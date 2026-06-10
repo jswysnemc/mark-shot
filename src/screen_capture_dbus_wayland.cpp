@@ -1,5 +1,7 @@
 #include "screen_capture_internal.h"
 
+#include "kde_capture_config.h"
+
 /// @brief Captures the screen using the grim utility.
 /// @param request The capture request details such as source geometry and output name.
 /// @return The result of the screen capture operation.
@@ -67,14 +69,20 @@ CaptureResult captureWithGrim(const CaptureRequest &request)
 
 #ifdef MARK_SHOT_WITH_DBUS
 
-// KWin's own org.kde.KWin.ScreenShot2.CaptureArea renders the exact requested
-// rectangle server-side and streams the raw pixels back over a pipe fd. Unlike
-// the xdg-desktop-portal ScreenCast path it needs no source-selection dialog,
-// keeps no session, and returns a frame whose size already matches the request
-// (so there is no virtual-geometry scaling to get wrong). It requires the
-// caller's .desktop file to list org.kde.KWin.ScreenShot2 in
-// X-KDE-DBUS-Restricted-Interfaces; without that KWin replies NoAuthorized and
-// this returns a null image so the caller can fall back to the portal path.
+/// @brief 判断 KWin ScreenShot2 DBus 接口是否可用。
+/// @return 接口存在时返回 true。
+bool isKWinScreenShotAvailable()
+{
+    QDBusInterface kwin(QStringLiteral("org.kde.KWin.ScreenShot2"),
+                        QStringLiteral("/org/kde/KWin/ScreenShot2"),
+                        QStringLiteral("org.kde.KWin.ScreenShot2"),
+                        QDBusConnection::sessionBus());
+    return kwin.isValid();
+}
+
+/// @brief 使用 KWin ScreenShot2 接口截取指定 Wayland 区域。
+/// @param request 捕获请求，包含源区域、输出名称和鼠标包含策略。
+/// @return 捕获成功时返回图像，失败时返回错误信息供后续回退链路使用。
 CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
 {
     const QRect geometry = request.sourceGeometry.normalized();
@@ -188,16 +196,21 @@ CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
 CaptureResult captureWaylandFrame(const CaptureRequest &request)
 {
     const bool grimPreferred = prefersGrim();
+    const bool kdeSession = isKdePlasma();
+    const bool kwinConfigured = markshot::configuredKdeKWinScreenshotEnabled();
+    const bool kwinAvailable = kwinConfigured ? isKWinScreenShotAvailable() : false;
     markshot::debugLog("capture",
                        "wayland-frame geom=%d,%d %dx%d output=%s all_outputs=%d "
                        "prefer_screencast=%d allow_interactive=%d allow_screenshot_fallback=%d "
-                       "prefers_grim=%d desktop=%s",
+                       "prefers_grim=%d kde=%d kwin=%d kwin_configured=%d desktop_file=%s desktop=%s",
                        request.sourceGeometry.x(), request.sourceGeometry.y(),
                        request.sourceGeometry.width(), request.sourceGeometry.height(),
                        request.preferredOutputName.toUtf8().constData(),
                        request.allOutputs ? 1 : 0, request.preferScreencast ? 1 : 0,
                        request.allowInteractivePortal ? 1 : 0,
                        request.allowPortalScreenshotFallback ? 1 : 0, grimPreferred ? 1 : 0,
+                       kdeSession ? 1 : 0, kwinAvailable ? 1 : 0, kwinConfigured ? 1 : 0,
+                       QGuiApplication::desktopFileName().toUtf8().constData(),
                        desktopEnvironmentText().toUtf8().constData());
 
     if (isGnomeWaylandSession() && hasGnomeScrollHelper() && request.sourceGeometry.isValid()
@@ -213,13 +226,12 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
                            gnomeCapture.error.toUtf8().constData());
     }
 
-    // On KDE, ScreenShot2.CaptureArea can capture the exact requested region
-    // without an interactive portal dialog. Prefer it for both the initial
-    // single-output screenshot and live scrolling frames; failures fall back to
-    // the existing portal/grim routes.
-    if (isKdePlasma() && request.sourceGeometry.isValid()
-        && !request.sourceGeometry.isEmpty() && !request.allOutputs) {
-        markshot::debugLog("capture", "route=kwin-screenshot (KDE Plasma)");
+    // KDE 使用 ScreenShot2.CaptureArea 截取精确区域，失败后继续进入现有回退链路
+    if (kwinConfigured && (kdeSession || kwinAvailable) && request.sourceGeometry.isValid()
+        && !request.sourceGeometry.isEmpty()) {
+        markshot::debugLog("capture", "route=kwin-screenshot kde=%d kwin=%d all_outputs=%d",
+                           kdeSession ? 1 : 0, kwinAvailable ? 1 : 0,
+                           request.allOutputs ? 1 : 0);
         CaptureResult kwinCapture = captureWithKWinScreenShot(request);
         if (!kwinCapture.image.isNull()) {
             markshot::debugLog("capture", "kwin-screenshot-ok frame=%dx%d",
@@ -228,6 +240,8 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
         }
         markshot::debugLog("capture", "kwin-screenshot-failed (falling back) error=%s",
                            kwinCapture.error.toUtf8().constData());
+    } else if (!kwinConfigured && (kdeSession || kwinAvailable)) {
+        markshot::debugLog("capture", "kwin-screenshot-disabled-by-config");
     }
 
     if (request.preferScreencast && !grimPreferred) {

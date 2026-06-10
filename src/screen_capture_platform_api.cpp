@@ -140,7 +140,9 @@ bool hasGnomeScrollHelper()
 #endif
 }
 
-bool hasGnomeScrollPreviewHelper()
+/// @brief 读取 GNOME Shell 滚动截图扩展的主版本号。
+/// @return 扩展不可用时返回 0，否则返回语义版本中的主版本号。
+int gnomeScrollHelperMajorVersion()
 {
 #ifdef MARK_SHOT_WITH_DBUS
     QDBusInterface helper(QStringLiteral("org.gnome.Shell"),
@@ -148,17 +150,36 @@ bool hasGnomeScrollPreviewHelper()
                           QStringLiteral("org.gnome.Shell.Extensions.MarkShotScrollHelper"),
                           QDBusConnection::sessionBus());
     if (!helper.isValid()) {
-        return false;
+        return 0;
     }
 
     QDBusMessage reply = helper.call(QStringLiteral("Version"));
     if (reply.type() == QDBusMessage::ErrorMessage || reply.arguments().isEmpty()) {
-        return false;
+        return 0;
     }
 
+    const QString version = reply.arguments().first().toString();
     bool ok = false;
-    const int version = reply.arguments().first().toString().toInt(&ok);
-    return ok && version >= 3;
+    const int major = version.section(QLatin1Char('.'), 0, 0).toInt(&ok);
+    return ok ? major : 0;
+#else
+    return 0;
+#endif
+}
+
+bool hasGnomeScrollPreviewHelper()
+{
+#ifdef MARK_SHOT_WITH_DBUS
+    return gnomeScrollHelperMajorVersion() >= 3;
+#else
+    return false;
+#endif
+}
+
+bool hasGnomeScrollOverlayHelper()
+{
+#ifdef MARK_SHOT_WITH_DBUS
+    return gnomeScrollHelperMajorVersion() >= 5;
 #else
     return false;
 #endif

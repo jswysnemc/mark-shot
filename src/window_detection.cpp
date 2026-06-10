@@ -119,6 +119,19 @@ QJsonObject defaultAppConfigRoot()
     save.insert(QStringLiteral("pathTemplate"), QStringLiteral("{pictures}/mark-shot/mark-shot-{datetime}.png"));
     root.insert(QStringLiteral("save"), save);
 
+    QJsonObject kwinScreenshot;
+    kwinScreenshot.insert(QStringLiteral("enabled"), true);
+
+    QJsonObject kde;
+    kde.insert(QStringLiteral("kwinScreenshot"), kwinScreenshot);
+
+    QJsonObject wayland;
+    wayland.insert(QStringLiteral("kde"), kde);
+
+    QJsonObject capture;
+    capture.insert(QStringLiteral("wayland"), wayland);
+    root.insert(QStringLiteral("capture"), capture);
+
     QJsonObject shortcutTools;
     shortcutTools.insert(QStringLiteral("pen"), QStringLiteral("P"));
     shortcutTools.insert(QStringLiteral("rectangle"), QStringLiteral("R"));
