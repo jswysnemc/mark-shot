@@ -2,9 +2,9 @@
 
 namespace markshot::shot {
 
-QWidget *createPinnedImageWindow(QImage image)
+QWidget *createPinnedImageWindow(QImage image, std::optional<QPoint> initialTopLeft)
 {
-    return new PinnedImageWindow(std::move(image));
+    return new PinnedImageWindow(std::move(image), initialTopLeft);
 }
 
 }  // namespace markshot::shot

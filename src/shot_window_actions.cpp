@@ -140,7 +140,10 @@ void ShotWindow::pinSelection()
         output.setDevicePixelRatio(dpr);
     }
 
-    auto *window = createPinnedImageWindow(output);
+    const std::optional<QPoint> pinnedTopLeft = logicalSelection.isEmpty()
+        ? std::nullopt
+        : std::optional<QPoint>(logicalSelection.topLeft());
+    auto *window = createPinnedImageWindow(output, pinnedTopLeft);
     window->show();
     window->raise();
     window->activateWindow();

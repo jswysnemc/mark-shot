@@ -134,6 +134,6 @@ bool annotationAutoSelectAfterDrawEnabled();
 std::array<bool, static_cast<int>(ShotWindow::Tool::Laser) + 1> annotationAutoSelectAfterDrawTools();
 markshot::scroll::ScrollSessionUiConfig scrollSessionUiConfig();
 QWidget *createOcrResultWindow(QString text);
-QWidget *createPinnedImageWindow(QImage image);
+QWidget *createPinnedImageWindow(QImage image, std::optional<QPoint> initialTopLeft = std::nullopt);
 
 }  // namespace markshot::shot

@@ -53,7 +53,8 @@ public:
 
     /// @brief 创建置顶图片窗口。
     /// @param image 要显示和处理的图片。
-    explicit PinnedImageWindow(QImage image);
+    /// @param initialTopLeft 初始全局左上角位置，未提供时居中显示。
+    explicit PinnedImageWindow(QImage image, std::optional<QPoint> initialTopLeft = std::nullopt);
 
     /// @brief 释放 OCR 和翻译子进程资源。
     ~PinnedImageWindow() override;

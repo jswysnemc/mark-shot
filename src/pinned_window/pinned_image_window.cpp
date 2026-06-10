@@ -61,11 +61,31 @@ protected:
     }
 };
 
+/**
+ * 将贴图窗口初始位置限制在目标屏幕可用区域内。
+ * @param desiredTopLeft 期望的全局左上角。
+ * @param windowSize 贴图窗口尺寸。
+ * @param screen 目标屏幕。
+ * @return 修正后的全局左上角。
+ */
+QPoint clampedInitialTopLeft(QPoint desiredTopLeft, QSize windowSize, QScreen *screen)
+{
+    if (!screen || windowSize.isEmpty()) {
+        return desiredTopLeft;
+    }
+
+    const QRect available = screen->availableGeometry();
+    const int maxX = available.left() + std::max(0, available.width() - windowSize.width());
+    const int maxY = available.top() + std::max(0, available.height() - windowSize.height());
+    return QPoint(std::clamp(desiredTopLeft.x(), available.left(), maxX),
+                  std::clamp(desiredTopLeft.y(), available.top(), maxY));
+}
+
 }  // namespace
 
 namespace markshot::shot {
 
-PinnedImageWindow::PinnedImageWindow(QImage image)
+PinnedImageWindow::PinnedImageWindow(QImage image, std::optional<QPoint> initialTopLeft)
     : m_pixmap(QPixmap::fromImage(std::move(image)))
     , m_imageSize(m_pixmap.size())
     , m_displayBaseSize(displayBaseSizeForPixmap())
@@ -83,7 +103,9 @@ PinnedImageWindow::PinnedImageWindow(QImage image)
     setMouseTracking(true);
     setCursor(Qt::OpenHandCursor);
     QSize targetSize = m_displayBaseSize;
-    QScreen *screen = QGuiApplication::screenAt(QCursor::pos());
+    QScreen *screen = initialTopLeft.has_value()
+        ? QGuiApplication::screenAt(*initialTopLeft)
+        : QGuiApplication::screenAt(QCursor::pos());
     if (!screen) {
         screen = QApplication::primaryScreen();
     }
@@ -94,9 +116,13 @@ PinnedImageWindow::PinnedImageWindow(QImage image)
         }
         m_scale = static_cast<qreal>(targetSize.width()) / std::max(1, m_displayBaseSize.width());
         setFixedSize(targetSize);
-        move(screen->availableGeometry().center() - rect().center());
+        const QPoint centeredTopLeft = screen->availableGeometry().center() - rect().center();
+        move(clampedInitialTopLeft(initialTopLeft.value_or(centeredTopLeft), targetSize, screen));
     } else {
         setFixedSize(targetSize);
+        if (initialTopLeft.has_value()) {
+            move(*initialTopLeft);
+        }
     }
     m_logicalGeometry = QRect(pos(), size());
     setProperty("markShotPinnedGeometry", m_logicalGeometry);
