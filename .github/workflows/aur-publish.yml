@@ -77,11 +77,9 @@ jobs:
           cp packaging/aur/PKGBUILD aur-work/PKGBUILD
           sed -i "s/^pkgver=.*/pkgver=${{ steps.version.outputs.version }}/" aur-work/PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=${{ steps.version.outputs.pkgrel }}/" aur-work/PKGBUILD
-          if ! grep -q '^_commit=' aur-work/PKGBUILD; then
-            echo "PKGBUILD does not define _commit" >&2
-            exit 1
+          if grep -q '^_commit=' aur-work/PKGBUILD; then
+            sed -i "s/^_commit=.*/_commit=${{ steps.version.outputs.commit }}/" aur-work/PKGBUILD
           fi
-          sed -i "s/^_commit=.*/_commit=${{ steps.version.outputs.commit }}/" aur-work/PKGBUILD
 
       - name: Generate .SRCINFO
         run: |
