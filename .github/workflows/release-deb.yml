@@ -1,6 +1,9 @@
 name: Release DEB
 
 on:
+  push:
+    tags:
+      - 'v*'
   release:
     types:
       - published
@@ -10,6 +13,15 @@ on:
         description: 'Package version for test runs, for example 0.1.10+test1'
         required: true
         type: string
+      checkout_ref:
+        description: 'Optional source ref for manual runs, for example v0.1.27'
+        required: false
+        type: string
+      upload_to_release:
+        description: 'Attach manual-run deb assets to the GitHub Release matching tag'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -37,14 +49,17 @@ jobs:
         id: version
         shell: bash
         run: |
-          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          TAG="${{ github.event.release.tag_name || inputs.tag || github.ref_name }}"
           if [ -z "$TAG" ]; then
             echo "No package version was provided" >&2
             exit 1
           fi
           VERSION="${TAG#v}"
-          if [ "${{ github.event_name }}" = "release" ]; then
+          CHECKOUT_INPUT="${{ inputs.checkout_ref }}"
+          if [ "${{ github.event_name }}" = "release" ] || [ "${{ github.event_name }}" = "push" ]; then
             CHECKOUT_REF="$TAG"
+          elif [ -n "$CHECKOUT_INPUT" ]; then
+            CHECKOUT_REF="$CHECKOUT_INPUT"
           else
             CHECKOUT_REF="${{ github.ref_name }}"
           fi
@@ -184,7 +199,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload deb to release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || github.event_name == 'push' || inputs.upload_to_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}

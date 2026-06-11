@@ -1,6 +1,9 @@
 name: Release RPM
 
 on:
+  push:
+    tags:
+      - 'v*'
   release:
     types:
       - published
@@ -45,14 +48,14 @@ jobs:
         id: version
         shell: bash
         run: |
-          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          TAG="${{ github.event.release.tag_name || inputs.tag || github.ref_name }}"
           if [ -z "$TAG" ]; then
             echo "No release tag or package version was provided" >&2
             exit 1
           fi
           VERSION="${TAG#v}"
           CHECKOUT_INPUT="${{ inputs.checkout_ref }}"
-          if [ "${{ github.event_name }}" = "release" ]; then
+          if [ "${{ github.event_name }}" = "release" ] || [ "${{ github.event_name }}" = "push" ]; then
             CHECKOUT_REF="$TAG"
           elif [ -n "$CHECKOUT_INPUT" ]; then
             CHECKOUT_REF="$CHECKOUT_INPUT"
@@ -147,7 +150,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload rpm to release
-        if: github.event_name == 'release' || inputs.upload_to_release
+        if: github.event_name == 'release' || github.event_name == 'push' || inputs.upload_to_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}

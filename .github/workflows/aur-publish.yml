@@ -1,6 +1,9 @@
 name: Publish AUR
 
 on:
+  push:
+    tags:
+      - 'v*'
   release:
     types:
       - published
@@ -31,7 +34,7 @@ jobs:
       - name: Resolve tag
         id: version
         run: |
-          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          TAG="${{ github.event.release.tag_name || inputs.tag || github.ref_name }}"
           if [ -z "$TAG" ]; then
             echo "No release tag was provided" >&2
             exit 1

@@ -1,6 +1,9 @@
 name: Release Binaries
 
 on:
+  push:
+    tags:
+      - 'v*'
   release:
     types:
       - published
@@ -10,6 +13,11 @@ on:
         description: 'Release tag, for example v0.1.2'
         required: true
         type: string
+      upload_to_release:
+        description: 'Attach manual-run binary assets to the GitHub Release matching tag'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -28,7 +36,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          TAG="${{ github.event.release.tag_name || inputs.tag || github.ref_name }}"
           if [ -z "$TAG" ]; then
             echo "No release tag was provided" >&2
             exit 1
@@ -78,7 +86,7 @@ jobs:
           sha256sum "$ASSET" > "$ASSET.sha256"
 
       - name: Upload binaries to release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || github.event_name == 'push' || inputs.upload_to_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
@@ -105,7 +113,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          TAG="${{ github.event.release.tag_name || inputs.tag || github.ref_name }}"
           if [ -z "$TAG" ]; then
             echo "No release tag was provided" >&2
             exit 1
@@ -158,7 +166,7 @@ jobs:
           sha256sum "$ASSET" > "$ASSET.sha256"
 
       - name: Upload binaries to release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || github.event_name == 'push' || inputs.upload_to_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
@@ -189,7 +197,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          TAG="${{ github.event.release.tag_name || inputs.tag || github.ref_name }}"
           if [ -z "$TAG" ]; then
             echo "No release tag was provided" >&2
             exit 1
@@ -299,7 +307,7 @@ jobs:
           sha256sum "$ASSET" > "$ASSET.sha256"
 
       - name: Upload binaries to release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || github.event_name == 'push' || inputs.upload_to_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
