@@ -90,6 +90,8 @@ qt_add_executable(mark-shot
     src/layer_shell_plugin_interface.h
     src/layer_shell_runtime.cpp
     src/layer_shell_runtime.h
+    src/line_skeleton_path.cpp
+    src/line_skeleton_path.h
     src/startup_config.cpp
     src/startup_config.h
     src/window_detection.cpp
@@ -135,6 +137,7 @@ qt_add_executable(mark-shot
     src/shot_window_canvas.cpp
     src/shot_window_hit_testing.cpp
     src/shot_window_input.cpp
+    src/shot_window_input_shortcuts.cpp
     src/shot_window_layout.cpp
     src/shot_window_line_anchors.cpp
     src/shot_window_modes.cpp
@@ -274,6 +277,20 @@ if(BUILD_TESTING)
             Qt6::Test
     )
     add_test(NAME capture-geometry COMMAND mark-shot-capture-geometry-test)
+
+    qt_add_executable(mark-shot-line-skeleton-path-test
+        tests/line_skeleton_path_test.cpp
+        src/line_skeleton_path.cpp
+        src/line_skeleton_path.h
+    )
+    target_include_directories(mark-shot-line-skeleton-path-test PRIVATE src)
+    target_link_libraries(mark-shot-line-skeleton-path-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+    )
+    add_test(NAME line-skeleton-path COMMAND mark-shot-line-skeleton-path-test)
 
     qt_add_executable(mark-shot-config-value-test
         tests/config_value_test.cpp

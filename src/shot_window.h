@@ -295,6 +295,7 @@ private:
     bool annotationSupportsLineControl(const Annotation &annotation) const;
     bool annotationSupportsLineAnchors(const Annotation &annotation) const;
     QPointF annotationLineControlPoint(const Annotation &annotation) const;
+    int lineAnchorPointIndexAt(const Annotation &annotation, QPointF imagePoint) const;
     SelectionDrag lineAnchorDragAt(const Annotation &annotation, QPointF imagePoint) const;
     QString numberLabelText(int number, NumberStyle style) const;
     SelectionDrag numberDragAt(const Annotation &annotation, QPointF imagePoint) const;
@@ -328,6 +329,8 @@ private:
     void beginAnnotationDrag(int annotationId, SelectionDrag drag, QPointF imagePoint);
     void updateAnnotationDrag(QPointF imagePoint, bool keepAspectRatio);
     bool updateLineAnchorDrag(QPointF imagePoint);
+    bool insertLineSkeletonPointAt(int annotationId, QPointF imagePoint);
+    bool removeSelectedLineSkeletonPoint();
     void beginAnnotationSelectionBox(QPointF imagePoint);
     void updateAnnotationSelectionBox(QPointF imagePoint);
     void commitAnnotationSelectionBox();
@@ -342,11 +345,9 @@ private:
     void redoAnnotation();
     void drawAnnotation(QPainter &painter, const Annotation &annotation, bool widgetCoordinates) const;
     void drawArrow(QPainter &painter,
-                   QPointF start,
-                   QPointF end,
+                   const QVector<QPointF> &points,
                    qreal width,
-                   ArrowStyle style,
-                   std::optional<QPointF> controlPoint = std::nullopt) const;
+                   ArrowStyle style) const;
     void drawMosaic(QPainter &painter, QRectF imageRect, qreal blockSize, bool widgetCoordinates) const;
     void drawMagnifier(QPainter &painter, const Annotation &annotation, bool widgetCoordinates) const;
     void drawNumber(QPainter &painter,
@@ -485,6 +486,7 @@ private:
     QRectF m_annotationSelectionBox;
     SelectionDrag m_selectionDrag = SelectionDrag::None;
     SelectionDrag m_annotationDrag = SelectionDrag::None;
+    int m_lineSkeletonDragPointIndex = -1;
     Mode m_mode = Mode::Selecting;
     Tool m_tool = Tool::Pen;
     Tool m_defaultTool = Tool::Pen;

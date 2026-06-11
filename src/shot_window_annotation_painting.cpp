@@ -33,13 +33,12 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
         if (lineAnnotation.points.size() < 2) {
             return;
         }
-        QPainterPath path(mapPoint(lineAnnotation.points.first()));
-        if (annotationSupportsLineControl(lineAnnotation) && lineAnnotation.points.size() >= 3) {
-            path.quadTo(mapPoint(lineAnnotation.points.at(2)), mapPoint(lineAnnotation.points.at(1)));
-        } else {
-            path.lineTo(mapPoint(lineAnnotation.points.at(1)));
+        QVector<QPointF> mappedPoints;
+        mappedPoints.reserve(lineAnnotation.points.size());
+        for (const QPointF &point : lineAnnotation.points) {
+            mappedPoints.append(mapPoint(point));
         }
-        painter.drawPath(path);
+        painter.drawPath(lineSkeletonPath(mappedPoints));
     };
 
     switch (annotation.tool) {
@@ -103,15 +102,15 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
         break;
     case Tool::Arrow:
         if (annotation.points.size() >= 2) {
-            const std::optional<QPointF> controlPoint = annotation.points.size() >= 3
-                ? std::optional<QPointF>(mapPoint(annotation.points.at(2)))
-                : std::nullopt;
+            QVector<QPointF> mappedPoints;
+            mappedPoints.reserve(annotation.points.size());
+            for (const QPointF &point : annotation.points) {
+                mappedPoints.append(mapPoint(point));
+            }
             drawArrow(painter,
-                      mapPoint(annotation.points.first()),
-                      mapPoint(annotation.points.at(1)),
+                      mappedPoints,
                       penWidth,
-                      annotation.arrowStyle,
-                      controlPoint);
+                      annotation.arrowStyle);
         }
         break;
     case Tool::Text: {

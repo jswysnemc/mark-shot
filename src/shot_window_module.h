@@ -4,6 +4,7 @@
 #include "clipboard_image.h"
 #include "config_value.h"
 #include "layer_shell_runtime.h"
+#include "line_skeleton_path.h"
 #include "ocr_result.h"
 #include "screen_capture.h"
 #include "scroll/scroll_session_window.h"

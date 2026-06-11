@@ -1,8 +1,9 @@
 #include "shot_window_module.h"
 
+using namespace markshot::shot;
+
 namespace {
 
-constexpr int kCurveSampleCount = 64;
 constexpr qreal kMinimumVectorLength = 0.001;
 constexpr qreal kDistinctPointDistance = 0.01;
 
@@ -65,44 +66,6 @@ void appendDistinctPoint(QVector<QPointF> *points, QPointF point)
         return;
     }
     points->append(point);
-}
-
-/**
- * 计算二次贝塞尔曲线上的点。
- * @param start 曲线起点。
- * @param control 曲线控制点。
- * @param end 曲线终点。
- * @param t 曲线参数，范围为 0 到 1。
- * @return 指定参数位置的曲线点。
- */
-QPointF quadraticPoint(QPointF start, QPointF control, QPointF end, qreal t)
-{
-    const qreal u = 1.0 - t;
-    return start * (u * u) + control * (2.0 * u * t) + end * (t * t);
-}
-
-/**
- * 采样箭头中心线。
- * @param start 箭头起点。
- * @param end 箭头终点。
- * @param controlPoint 可选曲线控制点。
- * @return 按绘制方向排列的中心线采样点。
- */
-QVector<QPointF> sampledCenterLine(QPointF start, QPointF end, std::optional<QPointF> controlPoint)
-{
-    QVector<QPointF> points;
-    if (!controlPoint.has_value()) {
-        points.append(start);
-        points.append(end);
-        return points;
-    }
-
-    points.reserve(kCurveSampleCount + 1);
-    for (int i = 0; i <= kCurveSampleCount; ++i) {
-        const qreal t = static_cast<qreal>(i) / static_cast<qreal>(kCurveSampleCount);
-        points.append(quadraticPoint(start, *controlPoint, end, t));
-    }
-    return points;
 }
 
 /**
@@ -385,33 +348,29 @@ QPainterPath bidirectionalFletchedArrowPath(const QVector<QPointF> &centerLine,
 /**
  * 绘制 KDE 开口箭头。
  * @param painter 当前绘制器。
- * @param start 箭头起点。
- * @param end 箭头终点。
+ * @param points 箭头骨架点列表。
  * @param width 当前标注线宽。
  * @param bidirectional 是否为双向箭头。
- * @param controlPoint 可选曲线控制点。
  * @param centerLine 箭头中心线采样点。
  * @return 无返回值。
  */
 void drawKdeArrow(QPainter &painter,
-                  QPointF start,
-                  QPointF end,
+                  const QVector<QPointF> &points,
                   qreal width,
                   bool bidirectional,
-                  std::optional<QPointF> controlPoint,
                   const QVector<QPointF> &centerLine)
 {
+    if (centerLine.size() < 2) {
+        return;
+    }
+
     const qreal totalLength = polylineLength(centerLine);
     const qreal headLength = kdeHeadLength(totalLength, width, bidirectional);
     const qreal headHalfWidth = headLength * 0.62;
     const QColor color = painter.pen().color();
-
-    QPainterPath shaft(start);
-    if (controlPoint.has_value()) {
-        shaft.quadTo(*controlPoint, end);
-    } else {
-        shaft.lineTo(end);
-    }
+    const QPointF start = centerLine.first();
+    const QPointF end = centerLine.last();
+    const QPainterPath shaft = lineSkeletonPath(points);
 
     QPainterPath head;
     appendOpenArrowHead(&head, end, tangentAtDistance(centerLine, totalLength), headLength, headHalfWidth);
@@ -467,13 +426,11 @@ void drawFletchedArrow(QPainter &painter,
 } // namespace
 
 void ShotWindow::drawArrow(QPainter &painter,
-                           QPointF start,
-                           QPointF end,
+                           const QVector<QPointF> &points,
                            qreal width,
-                           ArrowStyle style,
-                           std::optional<QPointF> controlPoint) const
+                           ArrowStyle style) const
 {
-    const QVector<QPointF> centerLine = sampledCenterLine(start, end, controlPoint);
+    const QVector<QPointF> centerLine = sampledLineSkeletonCenterLine(points);
     if (polylineLength(centerLine) < 1.0) {
         return;
     }
@@ -481,7 +438,7 @@ void ShotWindow::drawArrow(QPainter &painter,
     const bool kdeStyle = style == ArrowStyle::Kde || style == ArrowStyle::BidirectionalKde;
     const bool bidirectional = style == ArrowStyle::BidirectionalFletched || style == ArrowStyle::BidirectionalKde;
     if (kdeStyle) {
-        drawKdeArrow(painter, start, end, width, bidirectional, controlPoint, centerLine);
+        drawKdeArrow(painter, points, width, bidirectional, centerLine);
         return;
     }
 

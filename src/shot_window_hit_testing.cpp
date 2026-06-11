@@ -527,6 +527,9 @@ void ShotWindow::setSelectedAnnotations(QVector<int> annotationIds)
             validIds.append(id);
         }
     }
+    if (validIds != selectedAnnotationIds()) {
+        m_lineSkeletonDragPointIndex = -1;
+    }
     m_selectedAnnotationIds = validIds;
     m_selectedAnnotationId = validIds.size() == 1
         ? std::optional<int>(validIds.first())
@@ -690,6 +693,13 @@ std::optional<int> ShotWindow::annotationAt(QPointF imagePoint) const
             if (numberDragAt(annotation, localPoint) != SelectionDrag::None) {
                 return annotation.id;
             }
+        }
+        if (annotationSupportsLineControl(annotation) && annotation.points.size() >= 2) {
+            const qreal pathTolerance = std::max(imageTolerance, annotation.width * 0.5 + imageTolerance);
+            if (lineSkeletonContainsPoint(annotation.points, localPoint, pathTolerance)) {
+                return annotation.id;
+            }
+            continue;
         }
         const QRectF bounds = annotationBounds(annotation).adjusted(-imageTolerance, -imageTolerance, imageTolerance, imageTolerance);
         if (bounds.contains(imagePoint)) {

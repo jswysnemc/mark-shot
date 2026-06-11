@@ -90,6 +90,18 @@ void ShotWindow::beginAnnotationDrag(int annotationId, SelectionDrag drag, QPoin
         setSelectedAnnotations({annotationId});
     }
     m_annotationDrag = drag;
+    m_lineSkeletonDragPointIndex = -1;
+    if (drag == SelectionDrag::LineStart) {
+        m_lineSkeletonDragPointIndex = 0;
+    } else if (drag == SelectionDrag::LineEnd) {
+        m_lineSkeletonDragPointIndex = 1;
+    } else if (drag == SelectionDrag::LineControl && annotationSupportsLineAnchors(*annotation)) {
+        const QRectF beforeBounds = annotationUnrotatedBounds(*annotation);
+        const QPointF localPoint = beforeBounds.isEmpty()
+            ? clampImagePoint(imagePoint)
+            : rotatedPoint(clampImagePoint(imagePoint), beforeBounds.center(), -annotation->rotationDegrees);
+        m_lineSkeletonDragPointIndex = lineAnchorPointIndexAt(*annotation, localPoint);
+    }
     m_annotationBeforeDrag = *annotation;
     m_annotationsBeforeDrag.clear();
     for (int id : selectedAnnotationIds()) {
@@ -316,6 +328,7 @@ void ShotWindow::restoreHistorySnapshot(const HistorySnapshot &snapshot)
     m_nextAnnotationId = snapshot.nextAnnotationId;
     m_draft.reset();
     m_annotationDrag = SelectionDrag::None;
+    m_lineSkeletonDragPointIndex = -1;
     m_annotationSelectionBoxActive = false;
     m_annotationHistoryCaptured = false;
     updateAnnotationPropertyPanel();
