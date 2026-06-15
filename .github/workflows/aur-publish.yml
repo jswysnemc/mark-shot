@@ -22,6 +22,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: aur-${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -109,12 +113,17 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          if git clone ssh://aur@aur.archlinux.org/mark-shot.git aur-repo; then
-            :
-          else
-            mkdir aur-repo
-            git -C aur-repo init
-            git -C aur-repo remote add origin ssh://aur@aur.archlinux.org/mark-shot.git
+          for attempt in 1 2 3; do
+            if git clone ssh://aur@aur.archlinux.org/mark-shot.git aur-repo; then
+              break
+            fi
+            echo "AUR clone failed on attempt ${attempt}" >&2
+            rm -rf aur-repo
+            sleep $((attempt * 10))
+          done
+          if [ ! -d aur-repo/.git ]; then
+            echo "Failed to clone AUR repository" >&2
+            exit 1
           fi
 
           cp aur-work/PKGBUILD aur-work/.SRCINFO aur-repo/
@@ -127,4 +136,14 @@ jobs:
           fi
 
           git -C aur-repo commit -m "Update to ${{ steps.version.outputs.version }}-${{ steps.version.outputs.pkgrel }}"
-          git -C aur-repo push origin master
+          for attempt in 1 2 3; do
+            if git -C aur-repo push origin master; then
+              exit 0
+            fi
+            echo "AUR push failed on attempt ${attempt}; rebasing and retrying" >&2
+            git -C aur-repo fetch origin master
+            git -C aur-repo rebase origin/master
+            sleep $((attempt * 10))
+          done
+          echo "Failed to push AUR package" >&2
+          exit 1
