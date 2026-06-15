@@ -5,7 +5,7 @@
 <details>
 <summary>演示视频</summary>
 <p align="center">
-  <video src="https://github.com/user-attachments/assets/c2298867-06b4-404d-87bc-62ab8d81088b" width="100%" controls></video>
+  <video src="https://github.com/user-attachments/assets/4f86fcee-fef9-409e-98ba-1491ecee06c7" width="100%" controls></video>
 </p>
 </details>
 
@@ -740,6 +740,12 @@ gdbus call --session \
 ---
 
 ## 发版说明
+
+### 0.1.28
+
+- **可配置图片剪贴板策略**：新增 `clipboard.image.mode` 配置，支持 `image/png`、`url` 与 `threshold` 三种模式。默认使用直接 `image/png` 剪贴板数据，以改善办公套件和浏览器输入框的贴图兼容性，同时仍可通过 `thresholdM` 将大图切换为文件 URL 模式。
+- **运行时默认配置创建**：程序启动时如果缺少 `config.json`，会自动创建默认配置文件，并写入新的剪贴板默认配置。
+- **Shift 约束直线绘制**：绘制直线、箭头或直线模式荧光笔时，按住 `Shift` 会将线条吸附到水平、垂直或 45 度方向。
 
 ### 0.1.27
 

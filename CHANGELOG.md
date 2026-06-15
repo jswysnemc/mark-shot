@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.28 - 2026-06-16
+
+### Features & Enhancements
+
+- **Configurable Clipboard Image Policy**: Added `clipboard.image.mode` with `image/png`, `url`, and `threshold` modes, plus `thresholdM` size control in megabytes. The default now keeps direct `image/png` clipboard data for better paste compatibility.
+- **Shift-Constrained Line Drawing**: Holding `Shift` while drawing Line, Arrow, or straight Highlighter annotations now snaps strokes to horizontal, vertical, or 45-degree directions.
+- **Updated Demo Video**: Replaced the README demo video with the latest GitHub user-attachments asset.
+
+### Bug Fixes
+
+- **Default Config Creation**: Ensured startup creates a default `config.json` when missing and includes clipboard defaults.
+
 ## 0.1.27 - 2026-06-11
 
 ### Features & Enhancements

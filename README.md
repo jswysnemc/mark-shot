@@ -5,7 +5,7 @@
 <details>
 <summary>Video Demo</summary>
 <p align="center">
-  <video src="https://github.com/user-attachments/assets/c2298867-06b4-404d-87bc-62ab8d81088b" width="100%" controls></video>
+  <video src="https://github.com/user-attachments/assets/4f86fcee-fef9-409e-98ba-1491ecee06c7" width="100%" controls></video>
 </p>
 </details>
 
@@ -729,6 +729,12 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 ---
 
 ## Release Notes
+
+### 0.1.28
+
+- **Configurable Clipboard Image Policy**: Added `clipboard.image.mode` with `image/png`, `url`, and `threshold` modes. The default now keeps direct `image/png` clipboard data for better compatibility with office suites and browser input fields, while `thresholdM` can still switch large images to file URL mode.
+- **Default Runtime Config Creation**: Ensured runtime startup creates a default `config.json` when the file is missing, including the new clipboard defaults.
+- **Shift-Constrained Line Drawing**: Holding `Shift` while drawing Line, Arrow, or straight Highlighter annotations now snaps the stroke to horizontal, vertical, or 45-degree directions.
 
 ### 0.1.27
 
