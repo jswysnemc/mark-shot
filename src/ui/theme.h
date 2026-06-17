@@ -48,6 +48,14 @@ QString openWithPanelStyleSheet();
 // Stylesheet overrides for OCR result panel action buttons.
 QString ocrPanelButtonStyleSheet();
 
+// Stylesheet for the OCR result editor. Makes the recognized-text area the
+// visual focus of the panel with a teal border and high-contrast selection.
+QString ocrEditorStyleSheet();
+
+// Stylesheet for the always-on-top toggle button in the OCR result title bar.
+// The glyph alone communicates state, so the rule keeps the button frameless.
+QString ocrPinButtonStyleSheet();
+
 // Stylesheet for the inline color dialog panel docked next to the property
 // panel.
 QString propertyColorDialogPanelStyleSheet();

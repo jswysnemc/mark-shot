@@ -1,5 +1,9 @@
 #include "shot_window_module.h"
 
+#include "app_config_store.h"
+#include "debug_log.h"
+#include "pinned_window_top.h"
+
 namespace {
 
 using namespace markshot::shot;
@@ -12,39 +16,56 @@ public:
     {
         setWindowTitle(MS_TR("OCR Result"));
         setAttribute(Qt::WA_DeleteOnClose);
-        setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+        // 置顶状态由配置驱动,构造末尾统一通过 applyPinnedWindowTopState 应用
+        setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
         setFocusPolicy(Qt::StrongFocus);
         setMouseTracking(true);
         setObjectName(QStringLiteral("extensionPanel"));
         setStyleSheet(markshot::theme::openWithPanelStyleSheet());
 
         auto *layout = new QVBoxLayout(this);
-        layout->setContentsMargins(12, 12, 12, 12);
-        layout->setSpacing(10);
+        layout->setContentsMargins(10, 10, 10, 10);
+        layout->setSpacing(6);
 
         m_titleBar = new QWidget(this);
         m_titleBar->setCursor(Qt::SizeAllCursor);
-        m_titleBar->setMinimumHeight(30);
+        m_titleBar->setMinimumHeight(26);
         auto *titleLayout = new QHBoxLayout(m_titleBar);
         titleLayout->setContentsMargins(0, 0, 0, 0);
-        titleLayout->setSpacing(0);
+        titleLayout->setSpacing(6);
         m_titleLabel = new QLabel(MS_TR("OCR Result"), m_titleBar);
         m_titleLabel->setObjectName(QStringLiteral("ocrResultTitle"));
         m_titleLabel->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
         m_titleLabel->setCursor(Qt::SizeAllCursor);
         titleLayout->addWidget(m_titleLabel);
+        titleLayout->addStretch();
+
+        // 置顶切换按钮:与贴图窗口同款,复用 Pin 工具图标
+        m_pinButton = new QPushButton(m_titleBar);
+        m_pinButton->setObjectName(QStringLiteral("ocrPinButton"));
+        m_pinButton->setCheckable(true);
+        m_pinButton->setChecked(m_config.alwaysOnTop);
+        m_pinButton->setIcon(markshot::ui::makeToolIcon(ShotWindow::Action::Pin));
+        m_pinButton->setIconSize(QSize(16, 16));
+        m_pinButton->setFixedSize(24, 24);
+        m_pinButton->setStyleSheet(markshot::theme::ocrPinButtonStyleSheet());
+        m_pinButton->setToolTip(MS_TR("Always on Top"));
+        m_pinButton->setFocusPolicy(Qt::NoFocus);
+        connect(m_pinButton, &QPushButton::toggled, this, [this](bool checked) {
+            setAlwaysOnTop(checked);
+        });
+        titleLayout->addWidget(m_pinButton);
+
         m_titleBar->installEventFilter(this);
         m_titleLabel->installEventFilter(this);
         layout->addWidget(m_titleBar);
 
-        m_hintLabel = new QLabel(MS_TR("Review or edit the recognized text before copying."), this);
-        m_hintLabel->setWordWrap(true);
-        layout->addWidget(m_hintLabel);
-
         m_editor = new QTextEdit(this);
+        m_editor->setObjectName(QStringLiteral("ocrEditor"));
         m_editor->setAcceptRichText(false);
         m_editor->setPlaceholderText(MS_TR("OCR text appears here"));
-        m_editor->setMinimumHeight(220);
+        m_editor->setStyleSheet(markshot::theme::ocrEditorStyleSheet());
+        m_editor->setMinimumHeight(200);
         m_editor->setPlainText(std::move(text));
         m_editor->setContextMenuPolicy(Qt::CustomContextMenu);
         connect(m_editor, &QTextEdit::customContextMenuRequested, this, [this](const QPoint &position) {
@@ -53,7 +74,7 @@ public:
         layout->addWidget(m_editor);
 
         auto *actions = new QHBoxLayout();
-        actions->setSpacing(8);
+        actions->setSpacing(6);
         auto *copyButton = new QPushButton(MS_TR("Copy"), this);
         m_translateButton = new QPushButton(MS_TR("Translate"), this);
         auto *closeButton = new QPushButton(MS_TR("Close"), this);
@@ -71,11 +92,14 @@ public:
         connect(closeButton, &QPushButton::clicked, this, &QWidget::close);
         actions->addWidget(copyButton);
         actions->addWidget(m_translateButton);
+        actions->addStretch();
         actions->addWidget(closeButton);
         layout->addLayout(actions);
 
         resize(initialWindowSize());
         centerOnPrimaryScreen();
+        // 统一应用置顶状态,与贴图窗口共用 pinnedWindow.alwaysOnTop 配置
+        applyPinnedWindowTopState(this, m_config.alwaysOnTop);
         m_editor->setFocus(Qt::MouseFocusReason);
     }
 
@@ -379,7 +403,6 @@ private:
                                    appConfigPath()});
         }
 
-        m_hintLabel->setText(MS_TR("Translating edited OCR text. Keep this window open."));
         m_translateButton->setEnabled(false);
         m_translateButton->setText(MS_TR("Translating..."));
 
@@ -478,8 +501,55 @@ private:
             m_translateButton->setEnabled(true);
             m_translateButton->setText(MS_TR("Translate"));
         }
-        if (m_hintLabel) {
-            m_hintLabel->setText(MS_TR("Review or edit the recognized text before copying."));
+    }
+
+    /// @brief 切换置顶状态,与贴图窗口共用 pinnedWindow.alwaysOnTop 配置。
+    /// @param alwaysOnTop 是否保持窗口置顶。
+    void setAlwaysOnTop(bool alwaysOnTop)
+    {
+        if (m_alwaysOnTop == alwaysOnTop) {
+            return;
+        }
+
+        const bool previous = m_alwaysOnTop;
+        m_alwaysOnTop = alwaysOnTop;
+        m_config.alwaysOnTop = alwaysOnTop;
+
+        // 1. 持久化到 pinnedWindow.alwaysOnTop,与贴图窗口共享同一开关
+        QString error;
+        if (!markshot::writeAppConfigValue(
+                {QStringLiteral("pinnedWindow"), QStringLiteral("alwaysOnTop")},
+                QJsonValue(alwaysOnTop),
+                &error)) {
+            m_alwaysOnTop = previous;
+            m_config.alwaysOnTop = previous;
+            if (m_pinButton) {
+                QSignalBlocker blocker(m_pinButton);
+                m_pinButton->setChecked(previous);
+            }
+            if (!error.isEmpty()) {
+                markshot::debugLog("config",
+                                   "cannot save pinnedWindow.alwaysOnTop: %s",
+                                   error.toUtf8().constData());
+            }
+            return;
+        }
+
+        // 2. 应用平台置顶状态:Qt hint / layer-shell / GNOME DBus / Windows API 全链路
+        applyPinnedWindowTopState(this, alwaysOnTop);
+        if (alwaysOnTop) {
+            // 3. 置顶时多次延迟抬升,规避合成器时序导致的层级丢失
+            for (int delayMs : {0, 80, 250, 600}) {
+                QTimer::singleShot(delayMs, this, [this] {
+                    if (m_alwaysOnTop) {
+                        raisePinnedWindowOnPlatform(this);
+                    }
+                });
+            }
+        }
+        if (m_pinButton) {
+            m_pinButton->setToolTip(alwaysOnTop ? MS_TR("Always on Top: On")
+                                                : MS_TR("Always on Top: Off"));
         }
     }
 
@@ -489,10 +559,10 @@ private:
     QLabel *m_titleLabel = nullptr;
     /// @brief Text editor containing the recognized OCR text.
     QTextEdit *m_editor = nullptr;
-    /// @brief Label showing helper/informational messages.
-    QLabel *m_hintLabel = nullptr;
     /// @brief Button to trigger text translation.
     QPushButton *m_translateButton = nullptr;
+    /// @brief Toggle button controlling always-on-top in the title bar.
+    QPushButton *m_pinButton = nullptr;
     /// @brief Subprocess used for running translation tasks.
     QProcess *m_translationProcess = nullptr;
     /// @brief Path to the temporary translation input text file.
@@ -501,6 +571,8 @@ private:
     QPoint m_dragOffset;
     /// @brief Configuration settings for the OCR result window.
     PinnedWindowConfig m_config;
+    /// @brief Current always-on-top state mirrored from m_config for fast checks.
+    bool m_alwaysOnTop = true;
     /// @brief Flag indicating if the window is currently being dragged.
     bool m_dragging = false;
 };

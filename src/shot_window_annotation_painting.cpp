@@ -62,10 +62,11 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
         if (annotation.points.size() < 2) {
             break;
         }
+        // 荧光笔采用乘法混合模拟真实高亮笔:白底着色、深色文字保留可读性、笔画重叠不泛白
         QColor color = annotation.color;
-        color.setAlpha(qRound(annotation.color.alphaF() * 120.0));
+        color.setAlpha(qRound(annotation.color.alphaF() * 200.0));
         painter.save();
-        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        painter.setCompositionMode(QPainter::CompositionMode_Multiply);
         painter.setPen(QPen(color, std::max<qreal>(6.0, penWidth), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         if (annotation.highlighterStyle == HighlighterStyle::StraightLine) {
             drawLinePath(annotation);

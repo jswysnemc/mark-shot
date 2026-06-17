@@ -361,6 +361,54 @@ QString ocrPanelButtonStyleSheet()
         "}");
 }
 
+QString ocrEditorStyleSheet()
+{
+    return QStringLiteral(
+        "QTextEdit#ocrEditor {"
+        " color: #F9FAFB;"
+        " background: rgba(2, 6, 12, 200);"
+        " border: 1px solid rgba(45, 212, 191, 120);"
+        " border-radius: 8px;"
+        " padding: 8px 10px;"
+        " font-size: 13px;"
+        " font-weight: 500;"
+        " selection-background-color: #2DD4BF;"
+        " selection-color: #042F2E;"
+        "}"
+        "QTextEdit#ocrEditor:focus {"
+        " border: 1px solid rgba(94, 234, 212, 220);"
+        "}"
+        "QTextEdit#ocrEditor QAbstractScrollArea { background: transparent; }"
+        "QScrollBar:vertical { background: transparent; width: 8px; margin: 0; }"
+        "QScrollBar::handle:vertical {"
+        " background: rgba(94, 234, 212, 90);"
+        " border-radius: 4px;"
+        " min-height: 24px;"
+        "}"
+        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }");
+}
+
+QString ocrPinButtonStyleSheet()
+{
+    return QStringLiteral(
+        "QPushButton#ocrPinButton {"
+        " color: #9CA3AF;"
+        " background: transparent;"
+        " border: 1px solid transparent;"
+        " border-radius: 6px;"
+        " padding: 2px;"
+        "}"
+        "QPushButton#ocrPinButton:hover {"
+        " background: rgba(45, 212, 191, 28);"
+        " border-color: rgba(45, 212, 191, 80);"
+        "}"
+        "QPushButton#ocrPinButton:checked {"
+        " color: #5EEAD4;"
+        " background: rgba(45, 212, 191, 38);"
+        " border-color: rgba(45, 212, 191, 110);"
+        "}");
+}
+
 QString propertyColorDialogPanelStyleSheet()
 {
     // The panel now hosts the lightweight ColorPicker, which paints all of
