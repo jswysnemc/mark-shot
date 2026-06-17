@@ -199,7 +199,7 @@ QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcut
         button->setProperty("role", QStringLiteral("primary"));
     } else if (action == Action::Cancel) {
         button->setProperty("role", QStringLiteral("danger"));
-    } else if (action == Action::OpenWith || action == Action::Extensions || action == Action::Pin || action == Action::OcrCopy || action == Action::Copy || action == Action::ScrollCapture) {
+    } else if (action == Action::OpenWith || action == Action::Extensions || action == Action::Pin || action == Action::OcrCopy || action == Action::Copy || action == Action::ScrollCapture || action == Action::Upload) {
         button->setProperty("role", QStringLiteral("secondary"));
     }
 
@@ -253,6 +253,8 @@ QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcut
         connect(button, &QPushButton::clicked, this, [this] { copySelection(); });
     } else if (action == Action::Save) {
         connect(button, &QPushButton::clicked, this, [this] { saveSelectionAs(); });
+    } else if (action == Action::Upload) {
+        connect(button, &QPushButton::clicked, this, [this] { uploadSelection(); });
     } else if (action == Action::Cancel) {
         connect(button, &QPushButton::clicked, this, [this] { close(); });
     }

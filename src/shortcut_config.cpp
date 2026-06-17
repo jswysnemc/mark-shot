@@ -193,6 +193,10 @@ std::optional<ShotWindow::Action> actionFromConfigName(QString name)
     }
     if (key == QStringLiteral("copy")) return ShotWindow::Action::Copy;
     if (key == QStringLiteral("save") || key == QStringLiteral("saveas")) return ShotWindow::Action::Save;
+    if (key == QStringLiteral("upload") || key == QStringLiteral("imageupload")
+        || key == QStringLiteral("uploadimage") || key == QStringLiteral("host")) {
+        return ShotWindow::Action::Upload;
+    }
     if (key == QStringLiteral("cancel") || key == QStringLiteral("close") || key == QStringLiteral("escape")) {
         return ShotWindow::Action::Cancel;
     }

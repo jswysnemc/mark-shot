@@ -79,6 +79,7 @@ public:
         OcrCopy,
         Copy,
         Save,
+        Upload,
         Cancel,
     };
 
@@ -380,6 +381,7 @@ private:
     void startScrollCapture();
     void ocrCopySelection();
     void scanCodeSelection();
+    void uploadSelection();
     void showToast(const QString &text, int durationMs = 2000);
     QString saveSelectionToTempFile() const;
     void setCurrentColor(QColor color);

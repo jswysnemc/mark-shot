@@ -177,6 +177,10 @@ bool ShotWindow::handleConfiguredActionShortcut(QKeyEvent *event)
         ocrCopySelection();
         return true;
     }
+    if (eventMatchesShortcut(event, Action::Upload)) {
+        uploadSelection();
+        return true;
+    }
     if (eventMatchesShortcut(event, Action::Clear)) {
         clearAnnotations();
         return true;

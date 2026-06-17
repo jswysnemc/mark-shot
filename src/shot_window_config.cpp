@@ -387,6 +387,65 @@ CodeScanConfig codeScanConfig()
     return config;
 }
 
+/**
+ * 读取图床上传配置。
+ * @return 上传命令与超时时间配置。
+ */
+UploadConfig uploadConfig()
+{
+    UploadConfig config;
+
+    QFile file(appConfigPath());
+    if (file.exists() && file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+        if (parseError.error == QJsonParseError::NoError && document.isObject()) {
+            const QJsonObject root = document.object();
+            const QJsonObject upload =
+                cfg::firstObjectValue(root,
+                                      {QStringLiteral("upload"),
+                                       QStringLiteral("imageUpload"),
+                                       QStringLiteral("uploader"),
+                                       QStringLiteral("imageHost")});
+            config.command = upload.value(QStringLiteral("command"))
+                                 .toString(upload.value(QStringLiteral("path"))
+                                               .toString(upload.value(QStringLiteral("helper")).toString()))
+                                 .trimmed();
+            if (upload.value(QStringLiteral("timeoutMs")).isDouble()) {
+                config.timeoutMs = std::max(1000,
+                                            upload.value(QStringLiteral("timeoutMs")).toInt(config.timeoutMs));
+            }
+            // 读取 env 对象,合并到环境变量中(覆盖系统环境变量)。
+            const QJsonObject envObject =
+                cfg::firstObjectValue(upload,
+                                      {QStringLiteral("env"),
+                                       QStringLiteral("environment"),
+                                       QStringLiteral("envVars"),
+                                       QStringLiteral("variables")});
+            for (auto it = envObject.constBegin(); it != envObject.constEnd(); ++it) {
+                const QString key = it.key().trimmed();
+                const QJsonValue value = it.value();
+                if (key.isEmpty() || !value.isString()) {
+                    continue;
+                }
+                config.env.insert(key, value.toString());
+            }
+        }
+    }
+
+    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    const QString envCommand = env.value(QStringLiteral("MARK_SHOT_UPLOAD_COMMAND")).trimmed();
+    if (!envCommand.isEmpty()) {
+        config.command = envCommand;
+    }
+    bool timeoutOk = false;
+    const int envTimeout = env.value(QStringLiteral("MARK_SHOT_UPLOAD_TIMEOUT_MS")).trimmed().toInt(&timeoutOk);
+    if (timeoutOk) {
+        config.timeoutMs = std::max(1000, envTimeout);
+    }
+    return config;
+}
+
 /// @brief Parses a boolean value from the OCR result panel JSON configuration.
 /// @param value The JSON value to parse.
 /// @return An optional boolean value if parsing was successful, otherwise std::nullopt.

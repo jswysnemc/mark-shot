@@ -38,6 +38,7 @@ inline constexpr qreal kMinLaserWidth = 4.0;
 inline constexpr qreal kMaxLaserWidth = 48.0;
 inline constexpr qint64 kLaserLifetimeMs = 1800;
 inline constexpr int kCodeScanTimeoutMs = 15000;
+inline constexpr int kUploadTimeoutMs = 60000;
 inline constexpr qreal kTextBackgroundPaddingX = 6.0;
 inline constexpr qreal kTextBackgroundPaddingY = 4.0;
 inline constexpr qreal kMinImageZoom = 0.25;
@@ -79,6 +80,12 @@ struct PinnedWindowConfig {
 struct CodeScanConfig {
     QString command;
     int timeoutMs = kCodeScanTimeoutMs;
+};
+
+struct UploadConfig {
+    QString command;
+    int timeoutMs = kUploadTimeoutMs;
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
 };
 
 qreal clampedMagnifierScale(qreal scale);
@@ -133,6 +140,7 @@ QStringList expandDesktopExec(const ShotWindow::DesktopApp &app, const QString &
 QString helperProgramPath(const QString &programName);
 PinnedWindowConfig pinnedWindowConfig();
 CodeScanConfig codeScanConfig();
+UploadConfig uploadConfig();
 bool ocrOutputReportsMissingBackend(const QByteArray &stdoutData,
                                     const QByteArray &stderrData,
                                     const QString &configuredBackend);

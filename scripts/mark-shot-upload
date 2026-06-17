@@ -1,0 +1,210 @@
+#!/usr/bin/env python3
+"""Upload an image to a configurable image hosting service.
+
+The script reads its configuration from environment variables so it can be
+reused across providers (ImgURL, sm.ms, imgbb, custom endpoints, ...). It
+prints a JSON document on stdout that the mark-shot UI parses:
+
+    {"url": "https://...", "deleteUrl": "...", "errors": []}
+
+When the upload fails the JSON still contains an empty ``url`` and a list of
+human-readable error messages in ``errors``.
+"""
+
+import argparse
+import json
+import mimetypes
+import os
+import sys
+import urllib.error
+import urllib.request
+
+
+def env(name, default=""):
+    value = os.environ.get(name)
+    if value is None or value.strip() == "":
+        return default
+    return value.strip()
+
+
+def guess_mime_type(path):
+    mime, _ = mimetypes.guess_type(path)
+    return mime or "application/octet-stream"
+
+
+def build_multipart(fields, files):
+    """Build a multipart/form-data body. Returns (body, boundary)."""
+    boundary = "----mark-shot-upload-boundary"
+    body = bytearray()
+    for name, value in fields.items():
+        body.extend(f"--{boundary}\r\n".encode("utf-8"))
+        body.extend(
+            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode("utf-8")
+        )
+        body.extend(f"{value}\r\n".encode("utf-8"))
+    for name, (filename, filebody, mime) in files.items():
+        body.extend(f"--{boundary}\r\n".encode("utf-8"))
+        body.extend(
+            f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'.encode("utf-8")
+        )
+        body.extend(f"Content-Type: {mime}\r\n\r\n".encode("utf-8"))
+        body.extend(filebody)
+        body.extend(b"\r\n")
+    body.extend(f"--{boundary}--\r\n".encode("utf-8"))
+    return bytes(body), boundary
+
+
+def extract_url(response_json, path):
+    """Extract a URL from a nested JSON response using dotted path notation.
+
+    Example: ``data.link`` resolves ``response_json["data"]["link"]``.
+    Array indices are supported too, e.g. ``data.0.url``.
+    """
+    if not path:
+        return ""
+    current = response_json
+    for part in path.split("."):
+        if current is None:
+            return ""
+        if isinstance(current, list):
+            try:
+                index = int(part)
+            except ValueError:
+                return ""
+            if index < 0 or index >= len(current):
+                return ""
+            current = current[index]
+            continue
+        if not isinstance(current, dict):
+            return ""
+        current = current.get(part)
+    if isinstance(current, str):
+        return current
+    return ""
+
+
+def parse_response_text(text):
+    text = text.strip()
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+
+def upload(endpoint, field, file_path, headers, extra_fields, url_path, delete_url_path):
+    with open(file_path, "rb") as handle:
+        file_body = handle.read()
+    filename = os.path.basename(file_path)
+    mime = guess_mime_type(file_path)
+
+    body, boundary = build_multipart(extra_fields, {field: (filename, file_body, mime)})
+    request = urllib.request.Request(endpoint, data=body, method="POST")
+    request.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+    for key, value in headers.items():
+        request.add_header(key, value)
+
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            response_text = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else ""
+        raise RuntimeError(f"HTTP {exc.code}: {detail or exc.reason}")
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"network error: {exc.reason}")
+
+    parsed = parse_response_text(response_text)
+    if parsed is None:
+        # Some providers return the URL as plain text.
+        candidate = response_text.strip().splitlines()[0].strip() if response_text.strip() else ""
+        if candidate.startswith("http://") or candidate.startswith("https://"):
+            return {"url": candidate, "deleteUrl": "", "raw": response_text}
+        raise RuntimeError("response was not JSON and no URL was found")
+
+    if not isinstance(parsed, dict):
+        raise RuntimeError("unexpected JSON shape")
+
+    url = extract_url(parsed, url_path)
+    if not url:
+        # Fallbacks for common providers.
+        for fallback_path in ("url", "data.url", "data.link", "link", "image.url"):
+            url = extract_url(parsed, fallback_path)
+            if url:
+                break
+
+    delete_url = extract_url(parsed, delete_url_path)
+    if not delete_url:
+        for fallback_path in ("delete", "data.delete_url", "data.delete"):
+            delete_url = extract_url(parsed, fallback_path)
+            if delete_url:
+                break
+
+    if not url:
+        raise RuntimeError("could not find URL in response")
+
+    return {"url": url, "deleteUrl": delete_url, "raw": response_text}
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Upload an image to a hosting service.")
+    parser.add_argument("--format", choices=("json",), default="json")
+    parser.add_argument("image")
+    args = parser.parse_args()
+
+    if not os.path.exists(args.image):
+        print(json.dumps({"url": "", "deleteUrl": "", "errors": ["image file not found"]}, ensure_ascii=False))
+        return 1
+
+    endpoint = env("MARK_SHOT_UPLOAD_URL")
+    if not endpoint:
+        print(json.dumps({
+            "url": "",
+            "deleteUrl": "",
+            "errors": [
+                "MARK_SHOT_UPLOAD_URL is not set. Configure the upload endpoint "
+                "via the environment variable or the upload.command config option."
+            ],
+        }, ensure_ascii=False))
+        return 2
+
+    field = env("MARK_SHOT_UPLOAD_FIELD", "image")
+    url_path = env("MARK_SHOT_UPLOAD_URL_PATH", "")
+    delete_url_path = env("MARK_SHOT_UPLOAD_DELETE_URL_PATH", "")
+
+    headers = {}
+    api_key = env("MARK_SHOT_UPLOAD_API_KEY")
+    if api_key:
+        auth_header = env("MARK_SHOT_UPLOAD_AUTH_HEADER", "Authorization")
+        auth_scheme = env("MARK_SHOT_UPLOAD_AUTH_SCHEME", "Bearer")
+        if auth_scheme:
+            headers[auth_header] = f"{auth_scheme} {api_key}"
+        else:
+            headers[auth_header] = api_key
+    for key, value in os.environ.items():
+        if key.startswith("MARK_SHOT_UPLOAD_HEADER_"):
+            header_name = key[len("MARK_SHOT_UPLOAD_HEADER_"):]
+            headers[header_name] = value
+
+    extra_fields = {}
+    for key, value in os.environ.items():
+        if key.startswith("MARK_SHOT_UPLOAD_FIELD_"):
+            field_name = key[len("MARK_SHOT_UPLOAD_FIELD_"):]
+            extra_fields[field_name] = value
+
+    try:
+        result = upload(endpoint, field, args.image, headers, extra_fields, url_path, delete_url_path)
+    except Exception as exc:
+        print(json.dumps({"url": "", "deleteUrl": "", "errors": [str(exc)]}, ensure_ascii=False))
+        return 3
+
+    print(json.dumps({
+        "url": result["url"],
+        "deleteUrl": result["deleteUrl"],
+        "errors": [],
+    }, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -107,6 +107,8 @@ QString actionName(ShotWindow::Action action)
         return QStringLiteral("Copy");
     case ShotWindow::Action::Save:
         return QStringLiteral("Save As");
+    case ShotWindow::Action::Upload:
+        return QStringLiteral("Upload");
     case ShotWindow::Action::Cancel:
         return QStringLiteral("Cancel");
     }
@@ -499,6 +501,26 @@ QIcon makeToolIcon(ShotWindow::Action action)
         
         p.drawRoundedRect(QRectF(10.0, 15.5, 12.0, 9.0), 0.8, 0.8);
         p.drawLine(QPointF(12.5, 18.5), QPointF(19.5, 18.5));
+        break;
+    }
+    case ShotWindow::Action::Upload: {
+        // Cloud with an upward arrow, the canonical "upload to host" glyph.
+        p.setPen(makePen(kInk, 1.7));
+        QPainterPath cloud;
+        cloud.moveTo(8.5, 21.0);
+        cloud.cubicTo(5.5, 21.0, 5.5, 16.5, 9.0, 16.5);
+        cloud.cubicTo(9.0, 12.5, 14.5, 12.0, 15.5, 16.0);
+        cloud.cubicTo(20.0, 15.5, 21.5, 21.0, 17.5, 21.0);
+        cloud.closeSubpath();
+        p.drawPath(cloud);
+        // Upward arrow inside the cloud silhouette.
+        p.setPen(makePen(kInk, 1.8));
+        p.drawLine(QPointF(13.0, 19.5), QPointF(13.0, 9.5));
+        QPainterPath head;
+        head.moveTo(9.5, 12.5);
+        head.lineTo(13.0, 9.0);
+        head.lineTo(16.5, 12.5);
+        p.drawPath(head);
         break;
     }
     case ShotWindow::Action::Cancel: {

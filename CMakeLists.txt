@@ -165,6 +165,7 @@ qt_add_executable(mark-shot
     src/shot_window_shortcut_registration.cpp
     src/shot_window_shortcuts.cpp
     src/shot_window_pinned_window.cpp
+    src/shot_window_upload.cpp
     src/pinned_window/pinned_image_window.cpp
     src/pinned_window/pinned_image_window.h
     src/pinned_window/pinned_image_window_geometry.cpp
@@ -545,6 +546,7 @@ if(MARK_SHOT_LINUX)
         scripts/mark-shot-ocr
         scripts/mark-shot-code-scan
         scripts/mark-shot-translate
+        scripts/mark-shot-upload
         scripts/mark-shot-window-detection-niri
         scripts/mark-shot-window-detection-hyprland
         scripts/mark-shot-window-detection-gnome

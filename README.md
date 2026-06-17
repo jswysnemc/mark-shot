@@ -30,6 +30,7 @@ It captures screen frames instantly and opens an interactive fullscreen overlay,
 - **Mosaic**: Applies high-fidelity acrylic frost blur to obscure sensitive information.
 - **Startup Code Scan**: Press `Q` before selecting a region, drag around a QR code or barcode, and open the decoded result in a copyable window.
 - **Quick Display Capture**: Press `D` before selecting a region to instantly capture all outputs, crop them by display, and hover a thumbnail to copy, edit, or save that display image.
+- **Image Host Upload**: Press `Ctrl+U` or click the toolbar upload button after selecting a region to upload the screenshot to a custom image host (ImgURL, sm.ms, imgbb, litterbox, etc.). The returned URL is automatically copied to the clipboard. Configure the host via `upload.env`, or plug in any custom uploader via `upload.command`.
 
 ### Pinned Window Stickers
 - Pins any cropped region or annotated screenshot as an independent, frameless, and top-level floating window.
@@ -259,7 +260,8 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
     "actions": {
       "copy": "Ctrl+C",
       "save": "Ctrl+S",
-      "pin": "Ctrl+P"
+      "pin": "Ctrl+P",
+      "upload": "Ctrl+U"
     },
     "startup": {
       "colorPicker": "C",
@@ -279,6 +281,18 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
   "codeScan": {
     "command": "",
     "timeoutMs": 15000
+  },
+  "upload": {
+    "command": "",
+    "timeoutMs": 60000,
+    "env": {
+      "MARK_SHOT_UPLOAD_URL": "",
+      "MARK_SHOT_UPLOAD_FIELD": "image",
+      "MARK_SHOT_UPLOAD_API_KEY": "",
+      "MARK_SHOT_UPLOAD_AUTH_SCHEME": "Bearer",
+      "MARK_SHOT_UPLOAD_URL_PATH": "",
+      "MARK_SHOT_UPLOAD_DELETE_URL_PATH": ""
+    }
   },
   "pinnedWindow": {
     "autoOcr": false,
@@ -341,6 +355,9 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
 | `windows.hotkeys.fullscreen` | String | `""` | Optional Windows global hotkey for fullscreen annotation capture while tray mode is running. Alias: `fullscreenHotkey`. The generated default config only writes the region capture hotkey. |
 | `codeScan.command` | String | `""` | Custom QR/barcode scanner command. Supports `{image}`, `{imagePath}`, and `{imageUrl}` placeholders; if none is present, Mark Shot appends the temporary PNG path. The command must print the same JSON shape as `mark-shot-code-scan`. Aliases: `codeScanner.command`, `barcodeScanner.command`, `barcode.command`. |
 | `codeScan.timeoutMs` | Number | `15000` | Timeout for the code scanner command. Environment variable `MARK_SHOT_CODE_SCAN_TIMEOUT_MS` can override it. |
+| `upload.command` | String | `""` | Custom image-host upload command. Supports `{image}`, `{imagePath}`, and `{imageUrl}` placeholders; if none is present, Mark Shot appends the temporary PNG path. The command must print a URL (JSON `{"url": "..."}` or plain text starting with `http`). Aliases: `imageUpload.command`, `uploader.command`, `imageHost.command`. Environment variable `MARK_SHOT_UPLOAD_COMMAND` can override it. |
+| `upload.timeoutMs` | Number | `60000` | Timeout for the upload command. Environment variable `MARK_SHOT_UPLOAD_TIMEOUT_MS` can override it. |
+| `upload.env` | Object | `{}` | Environment variables passed to the upload helper (built-in `mark-shot-upload` or custom `command`). Merges over the system environment. Aliases: `environment`, `envVars`, `variables`. See below for supported keys. |
 | `pinnedWindow.autoOcr` | Boolean | `false` | Controls whether a pinned sticker window starts OCR text recognition in the background immediately on creation. If disabled, OCR runs on demand when Copy Image Text or Translate is chosen. Alias: `pinned`, `pin`. |
 | `pinnedWindow.alwaysOnTop` | Boolean | `true` | Controls whether pinned sticker windows stay above normal windows. The pinned-window context menu can toggle this value and writes it back to `config.json`. Aliases: `stayOnTop`, `topmost`, `above`. On GNOME Wayland, the bundled helper extension is used when available. |
 | `pinnedWindow.border` | Boolean/Object | `true` | Outer border configuration for pinned sticker windows. Can be a boolean, or an object containing `enabled` (bool), `color` (name/hex/RGBA object), and `width` (float, `1.0` to `12.0`). Also flat configs like `borderEnabled`, `borderColor`, and `borderWidth` are supported. |
@@ -360,12 +377,95 @@ Path values: `{home}` (user home), `{pictures}` (pictures directory), `{desktop}
 
 The `shortcuts` node supports the following sub-nodes:
 - **`tools`** (alias: `tool`, `toolShortcuts`): Keyboard shortcuts for switching tools (`move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, `magnifier`, `laser`).
-- **`actions`** (alias: `action`, `actionShortcuts`): Keyboard shortcuts for global actions (`copy`, `save`, `pin`, `undo`, `redo`, `cancel`, `openWith`, `extensions`, `scrollCapture`, `ocrCopy`, `clear`, `toggleCaptureScope`, `toggleToolbarLayout`).
+- **`actions`** (alias: `action`, `actionShortcuts`): Keyboard shortcuts for global actions (`copy`, `save`, `pin`, `upload`, `undo`, `redo`, `cancel`, `openWith`, `extensions`, `scrollCapture`, `ocrCopy`, `clear`, `toggleCaptureScope`, `toggleToolbarLayout`).
 - **`startup`** (alias: `startupTools`, `selection`): Keyboard shortcuts for selection-phase tools (`colorPicker`, `ruler`, `codeScanner`, `displayCapture`).
 
 *Shortcut values use Qt key-sequence text (e.g. `Ctrl+C`, `Ctrl+Shift+Z`, or `Alt+R`). Shortcut keys can also be specified directly at the root of `shortcuts`.*
 
 </details>
+
+### Image Upload Configuration
+
+The `upload` section configures the sidebar upload action. When `upload.command` is empty, Mark Shot uses the bundled `mark-shot-upload` helper, which reads its behavior entirely from environment variables in `upload.env`. This keeps the config clean—no long shell commands needed.
+
+**Example: ImgURL V3**
+
+```json
+{
+  "upload": {
+    "timeoutMs": 60000,
+    "env": {
+      "MARK_SHOT_UPLOAD_URL": "https://www.imgurl.org/api/v3/upload",
+      "MARK_SHOT_UPLOAD_FIELD": "file",
+      "MARK_SHOT_UPLOAD_API_KEY": "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "MARK_SHOT_UPLOAD_URL_PATH": "data.url"
+    }
+  }
+}
+```
+
+ImgURL V3 uses `Authorization: Bearer <token>` authentication (`AUTH_SCHEME` defaults to `Bearer`, no need to change).
+```
+
+**Example: sm.ms**
+
+```json
+{
+  "upload": {
+    "env": {
+      "MARK_SHOT_UPLOAD_URL": "https://sm.ms/api/v2/upload",
+      "MARK_SHOT_UPLOAD_FIELD": "smfile",
+      "MARK_SHOT_UPLOAD_API_KEY": "your-token",
+      "MARK_SHOT_UPLOAD_AUTH_SCHEME": "",
+      "MARK_SHOT_UPLOAD_URL_PATH": "data.url"
+    }
+  }
+}
+```
+
+**Example: imgbb**
+
+```json
+{
+  "upload": {
+    "env": {
+      "MARK_SHOT_UPLOAD_URL": "https://api.imgbb.com/1/upload?key=YOUR_API_KEY",
+      "MARK_SHOT_UPLOAD_FIELD": "image",
+      "MARK_SHOT_UPLOAD_URL_PATH": "data.url",
+      "MARK_SHOT_UPLOAD_DELETE_URL_PATH": "data.delete_url"
+    }
+  }
+}
+```
+
+**Example: litterbox (temporary host, no API key)**
+
+```json
+{
+  "upload": {
+    "command": "curl -sf --max-time 30 -A 'Mozilla/5.0' -F reqtype=fileupload -F time=72h -F fileToUpload=@{image} https://litterbox.catbox.moe/resources/internals/api.php",
+    "timeoutMs": 35000
+  }
+}
+```
+
+litterbox returns a plain-text URL (not JSON); Mark Shot auto-detects any stdout line starting with `http://` or `https://` as the upload result.
+
+**Supported `upload.env` keys** (consumed by the bundled `mark-shot-upload` helper):
+
+| Key | Required | Default | Description |
+|-----|----------|---------|-------------|
+| `MARK_SHOT_UPLOAD_URL` | Yes | — | Upload endpoint URL. |
+| `MARK_SHOT_UPLOAD_FIELD` | No | `image` | Multipart form field name for the file. |
+| `MARK_SHOT_UPLOAD_API_KEY` | No | — | API key/token sent via the auth header. |
+| `MARK_SHOT_UPLOAD_AUTH_HEADER` | No | `Authorization` | Header name for authentication. |
+| `MARK_SHOT_UPLOAD_AUTH_SCHEME` | No | `Bearer` | Auth scheme prefix. Set to empty string to send the raw API key as the header value (sm.ms / ImgURL style). |
+| `MARK_SHOT_UPLOAD_URL_PATH` | No | auto-detect | Dotted JSON path to the uploaded URL (e.g. `data.url`, `data.link`). |
+| `MARK_SHOT_UPLOAD_DELETE_URL_PATH` | No | auto-detect | Dotted JSON path to the delete URL. |
+| `MARK_SHOT_UPLOAD_HEADER_<Name>` | No | — | Extra HTTP request headers. Example: `MARK_SHOT_UPLOAD_HEADER_X-Custom: foo`. |
+| `MARK_SHOT_UPLOAD_FIELD_<Name>` | No | — | Extra multipart form fields. Example: `MARK_SHOT_UPLOAD_FIELD_album: 123`. |
+
+**Custom command output format**: If you set `upload.command` to a custom script, it must print the URL to stdout. Both JSON (`{"url": "https://..."}`) and plain text (a line starting with `http://` or `https://`) are accepted.
 
 ### Pre-Capture Window Detection & Script Contribution Guide
 
@@ -496,7 +596,7 @@ Each element in the array (or the root object itself) can take one of the follow
 
 </details>
 
-When installing manually, install `mark-shot`, `mark-shot-ocr`, `mark-shot-code-scan`, and `mark-shot-translate` together. Otherwise OCR, code scanning, or translation cannot call the backend helpers.
+When installing manually, install `mark-shot`, `mark-shot-ocr`, `mark-shot-code-scan`, `mark-shot-translate`, and `mark-shot-upload` together. Otherwise OCR, code scanning, translation, or image upload cannot call the backend helpers.
 
 ---
 
@@ -584,6 +684,12 @@ python3 -m venv ~/.local/share/mark-shot/code-scan-venv
 
 The code scanner helper prefers `zxing-cpp` for QR Code, Data Matrix, Aztec, PDF417, EAN, UPC, Code 39, Code 93, Code 128, and other common formats. It can also fall back to `pyzbar` or OpenCV QR detection when those packages are available.
 
+#### Image Upload Backend (optional)
+
+The image upload feature uses the bundled `mark-shot-upload` Python script by default. It has no third-party dependencies (Python 3 standard library only) and is configured entirely through environment variables in `upload.env`. See the [Image Upload Configuration](#image-upload-configuration) section above for supported keys and provider examples.
+
+For providers that return a plain-text URL instead of JSON (e.g. litterbox), set `upload.command` to a custom `curl` invocation—Mark Shot auto-detects any stdout line starting with `http://` or `https://` as the upload result.
+
 #### Windows
 
 Install Qt 6 for your compiler toolchain, CMake, Ninja, and a C++17 compiler such as MSVC or MinGW. The Windows build does not require Qt DBus, PipeWire, X11/XCB, LayerShellQt, `grim`, `wl-copy`, or `xclip`.
@@ -618,7 +724,7 @@ LayerShellQt is detected automatically. When found, full Wayland layer-shell sup
 cmake --install build --prefix "$HOME/.local"
 ```
 
-This installs the binary, helper scripts (`mark-shot-ocr`, `mark-shot-code-scan`, `mark-shot-translate`), desktop entries, and icons.
+This installs the binary, helper scripts (`mark-shot-ocr`, `mark-shot-code-scan`, `mark-shot-translate`, `mark-shot-upload`), desktop entries, and icons.
 
 ### GNOME Wayland Scrolling Capture Extension
 
@@ -703,6 +809,7 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 | **Ctrl + C** | Confirms pending text edits and copies selection to system clipboard. |
 | **Ctrl + S** or **Enter** | Confirms pending text edits and saves selection to a file. |
 | **Ctrl + P** | Pins the current selection as a floating sticker window. |
+| **Ctrl + U** | Uploads the current screenshot to the configured image host; the returned URL is copied to the clipboard. |
 | **Ctrl + Z** | Undoes the last annotation. |
 | **Ctrl + Y** or **Ctrl + Shift + Z** | Redoes the last undone annotation. |
 | **Backspace** or **Delete** | Deletes the selected annotation object (under Select tool). |

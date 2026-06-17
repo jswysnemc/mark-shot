@@ -98,6 +98,7 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("OCR Copy"), QStringLiteral("OCR 复制")},
         {QStringLiteral("Copy"), QStringLiteral("复制")},
         {QStringLiteral("Save"), QStringLiteral("保存")},
+        {QStringLiteral("Upload"), QStringLiteral("上传")},
         {QStringLiteral("Cancel"), QStringLiteral("取消")},
 
         // Property panel.
@@ -168,6 +169,10 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("No text recognized"), QStringLiteral("未识别到文字")},
         {QStringLiteral("OCR text copied"), QStringLiteral("已复制 OCR 文字")},
         {QStringLiteral("Display image copied"), QStringLiteral("已复制显示器截图")},
+        {QStringLiteral("Image URL copied"), QStringLiteral("已复制图片链接")},
+        {QStringLiteral("Upload helper not found"), QStringLiteral("未找到上传辅助程序")},
+        {QStringLiteral("Upload failed"), QStringLiteral("上传失败")},
+        {QStringLiteral("Upload timed out"), QStringLiteral("上传超时")},
         {QStringLiteral("Copy failed"), QStringLiteral("复制失败")},
         {QStringLiteral("OCR Result"), QStringLiteral("OCR 结果")},
         {QStringLiteral("Review or edit the recognized text before copying."),

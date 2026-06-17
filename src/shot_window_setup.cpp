@@ -397,6 +397,7 @@ void ShotWindow::initializeToolbar()
                           Action::OcrCopy,
                           Action::Copy,
                           Action::Save,
+                          Action::Upload,
                           Action::Cancel}) {
         const QString shortcut = action == Action::OpenWith ? shortcutText(action, QStringLiteral("Open"))
             : action == Action::Extensions           ? shortcutText(action, QStringLiteral("Ext"))
@@ -405,6 +406,7 @@ void ShotWindow::initializeToolbar()
             : action == Action::OcrCopy              ? shortcutText(action, QStringLiteral("OCR"))
             : action == Action::Copy                 ? shortcutText(action)
             : action == Action::Save                 ? shortcutText(action, QStringLiteral("Save As"))
+            : action == Action::Upload               ? shortcutText(action, QStringLiteral("Upload"))
             : action == Action::ToggleToolbarLayout  ? shortcutText(action, QStringLiteral("Layout"))
             : action == Action::ToggleCaptureScope   ? shortcutText(action)
                                                      : shortcutText(action);
@@ -468,6 +470,7 @@ void ShotWindow::initializeActionToolbar()
              addToolbarButton(Action::OcrCopy, shortcutText(Action::OcrCopy, QStringLiteral("OCR")), m_actionToolbar),
              addToolbarButton(Action::Copy, shortcutText(Action::Copy), m_actionToolbar),
              addToolbarButton(Action::Save, shortcutText(Action::Save, QStringLiteral("Save As")), m_actionToolbar),
+             addToolbarButton(Action::Upload, shortcutText(Action::Upload, QStringLiteral("Upload")), m_actionToolbar),
              addToolbarButton(Action::Cancel, shortcutText(Action::Cancel), m_actionToolbar),
          }) {
         const int iconSize = m_toolbarAppearance.actionToolbarIconSize;
