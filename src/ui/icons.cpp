@@ -126,9 +126,23 @@ QIcon applicationIcon()
             return executableIcon;
         }
     }
-#endif
     const QIcon icon(QStringLiteral(":/icons/mark-shot.ico"));
     return icon.isNull() ? makeToolIcon(ShotWindow::Action::ToolSelect) : icon;
+#else
+    // Linux/BSD: prefer the system icon theme (set up by cmake install / distro
+    // packages), fall back to the bundled SVG, then the legacy ICO, and finally
+    // a generated glyph so the tray never shows a blank icon.
+    if (const QIcon themed = QIcon::fromTheme(QStringLiteral("mark-shot")); !themed.isNull()) {
+        return themed;
+    }
+    if (const QIcon svg(QStringLiteral(":/icons/mark-shot.svg")); !svg.isNull()) {
+        return svg;
+    }
+    if (const QIcon ico(QStringLiteral(":/icons/mark-shot.ico")); !ico.isNull()) {
+        return ico;
+    }
+    return makeToolIcon(ShotWindow::Action::ToolSelect);
+#endif
 }
 
 QIcon makeToolIcon(ShotWindow::Action action)

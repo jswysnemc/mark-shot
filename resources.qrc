@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="/icons">
     <file alias="mark-shot.ico">packaging/windows/mark-shot.ico</file>
+    <file alias="mark-shot.svg">data/icons/hicolor/scalable/apps/mark-shot.svg</file>
   </qresource>
 </RCC>
