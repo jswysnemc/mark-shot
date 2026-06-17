@@ -50,7 +50,9 @@ stickers, and provides OCR and translation helpers for pinned image text.
 %cmake_install
 sed -i '1s|^#!/usr/bin/env python3$|#!/usr/bin/python3|' \
     %{buildroot}%{_bindir}/mark-shot-ocr \
+    %{buildroot}%{_bindir}/mark-shot-code-scan \
     %{buildroot}%{_bindir}/mark-shot-translate \
+    %{buildroot}%{_bindir}/mark-shot-upload \
     %{buildroot}%{_bindir}/mark-shot-window-detection-niri \
     %{buildroot}%{_bindir}/mark-shot-window-detection-hyprland \
     %{buildroot}%{_bindir}/mark-shot-window-detection-gnome \
@@ -63,6 +65,7 @@ sed -i '1s|^#!/usr/bin/env python3$|#!/usr/bin/python3|' \
 %{_bindir}/mark-shot-ocr
 %{_bindir}/mark-shot-code-scan
 %{_bindir}/mark-shot-translate
+%{_bindir}/mark-shot-upload
 %{_bindir}/mark-shot-window-detection-niri
 %{_bindir}/mark-shot-window-detection-hyprland
 %{_bindir}/mark-shot-window-detection-gnome
