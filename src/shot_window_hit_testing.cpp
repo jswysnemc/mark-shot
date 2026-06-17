@@ -35,18 +35,26 @@ void ShotWindow::updateCursor()
             return;
         case SelectionDrag::Left:
         case SelectionDrag::Right:
+        case SelectionDrag::MagnifierSourceLeft:
+        case SelectionDrag::MagnifierSourceRight:
             setCursor(Qt::SizeHorCursor);
             return;
         case SelectionDrag::Top:
         case SelectionDrag::Bottom:
+        case SelectionDrag::MagnifierSourceTop:
+        case SelectionDrag::MagnifierSourceBottom:
             setCursor(Qt::SizeVerCursor);
             return;
         case SelectionDrag::TopLeft:
         case SelectionDrag::BottomRight:
+        case SelectionDrag::MagnifierSourceTopLeft:
+        case SelectionDrag::MagnifierSourceBottomRight:
             setCursor(Qt::SizeFDiagCursor);
             return;
         case SelectionDrag::TopRight:
         case SelectionDrag::BottomLeft:
+        case SelectionDrag::MagnifierSourceTopRight:
+        case SelectionDrag::MagnifierSourceBottomLeft:
             setCursor(Qt::SizeBDiagCursor);
             return;
         case SelectionDrag::Move:
@@ -72,18 +80,26 @@ void ShotWindow::updateCursor()
             return;
         case SelectionDrag::Left:
         case SelectionDrag::Right:
+        case SelectionDrag::MagnifierSourceLeft:
+        case SelectionDrag::MagnifierSourceRight:
             setCursor(Qt::SizeHorCursor);
             return;
         case SelectionDrag::Top:
         case SelectionDrag::Bottom:
+        case SelectionDrag::MagnifierSourceTop:
+        case SelectionDrag::MagnifierSourceBottom:
             setCursor(Qt::SizeVerCursor);
             return;
         case SelectionDrag::TopLeft:
         case SelectionDrag::BottomRight:
+        case SelectionDrag::MagnifierSourceTopLeft:
+        case SelectionDrag::MagnifierSourceBottomRight:
             setCursor(Qt::SizeFDiagCursor);
             return;
         case SelectionDrag::TopRight:
         case SelectionDrag::BottomLeft:
+        case SelectionDrag::MagnifierSourceTopRight:
+        case SelectionDrag::MagnifierSourceBottomLeft:
             setCursor(Qt::SizeBDiagCursor);
             return;
         case SelectionDrag::Move:

@@ -226,6 +226,16 @@ private:
         TopRight,
         BottomLeft,
         BottomRight,
+        // 放大镜小框(source 取景框)的 8 向 resize 把手,与 lens 大框的把手区分开,
+        // 以便交互层独立处理小框/大框的尺寸调整。
+        MagnifierSourceLeft,
+        MagnifierSourceRight,
+        MagnifierSourceTop,
+        MagnifierSourceBottom,
+        MagnifierSourceTopLeft,
+        MagnifierSourceTopRight,
+        MagnifierSourceBottomLeft,
+        MagnifierSourceBottomRight,
     };
 
     // Canonical annotation record. Geometry is stored in image pixels, not
@@ -334,6 +344,16 @@ private:
     SelectionDrag annotationBoundsDragAt(QPointF imagePoint, QRectF bounds) const;
     SelectionDrag selectedAnnotationsDragAt(QPointF imagePoint) const;
     SelectionDrag magnifierDragAt(const Annotation &annotation, QPointF imagePoint) const;
+    bool isMagnifierResizeOrMoveDrag() const;
+    void updateMagnifierDrag(QPointF imagePoint);
+    static bool isMagnifierLensCornerHandle(SelectionDrag drag);
+    static bool isMagnifierSourceCornerHandle(SelectionDrag drag);
+    static SelectionDrag magnifierSourceHandleToGenericHandle(SelectionDrag handle);
+    static QRectF magnifierResizeRectWithHandle(const QRectF &before,
+                                                SelectionDrag handle,
+                                                QPointF point,
+                                                qreal minSize,
+                                                bool keepSquare);
     QRectF resizedBounds(QRectF start, SelectionDrag drag, QPointF imagePoint, bool keepAspectRatio) const;
     QVector<QPointF> selectionHandlePoints(QRectF rect) const;
     QRectF selectedAnnotationDeleteButtonRect() const;

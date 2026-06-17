@@ -179,22 +179,37 @@ void ShotWindow::drawSelectedAnnotationFrame(QPainter &painter) const
                                            10.0,
                                            10.0));
             }
-            if (annotation->magnifierShape == MagnifierShape::Rectangle) {
-                painter.setBrush(QColor(251, 146, 60));
-                painter.setPen(QPen(QColor(255, 255, 255), 1.5));
-                const qreal handleSize = 8.0;
-                for (const QPointF &corner : {lensRect.topLeft(), lensRect.topRight(),
-                                              lensRect.bottomLeft(), lensRect.bottomRight(),
-                                              QPointF(lensRect.center().x(), lensRect.top()),
-                                              QPointF(lensRect.center().x(), lensRect.bottom()),
-                                              QPointF(lensRect.left(), lensRect.center().y()),
-                                              QPointF(lensRect.right(), lensRect.center().y())}) {
+            // 矩形放大镜:source 小框与 lens 大框各自绘制 8 个 resize 把手
+            // 圆形放大镜:source 小框与 lens 大框各自绘制 4 个 resize 把手(上下左右)
+            painter.setBrush(QColor(251, 146, 60));
+            painter.setPen(QPen(QColor(255, 255, 255), 1.5));
+            const qreal handleSize = 8.0;
+            auto drawHandles = [&](const QRectF &rect, bool eightHandles) {
+                QVector<QPointF> handles;
+                if (eightHandles) {
+                    handles = {rect.topLeft(), rect.topRight(),
+                               rect.bottomLeft(), rect.bottomRight(),
+                               QPointF(rect.center().x(), rect.top()),
+                               QPointF(rect.center().x(), rect.bottom()),
+                               QPointF(rect.left(), rect.center().y()),
+                               QPointF(rect.right(), rect.center().y())};
+                } else {
+                    handles = {QPointF(rect.center().x(), rect.top()),
+                               QPointF(rect.center().x(), rect.bottom()),
+                               QPointF(rect.left(), rect.center().y()),
+                               QPointF(rect.right(), rect.center().y())};
+                }
+                for (const QPointF &corner : handles) {
                     painter.drawRect(QRectF(corner.x() - handleSize / 2.0,
                                             corner.y() - handleSize / 2.0,
                                             handleSize,
                                             handleSize));
                 }
-            }
+            };
+            const bool eightHandles =
+                annotation->magnifierShape == MagnifierShape::Rectangle;
+            drawHandles(lensRect, eightHandles);
+            drawHandles(sourceRect, eightHandles);
         } else if (annotation && annotation->tool == Tool::Number) {
             drawNumberPointHandles(*annotation, {}, 0.0, false);
         }
@@ -238,12 +253,13 @@ ShotWindow::SelectionDrag ShotWindow::magnifierDragAt(const Annotation &annotati
     }
 
     const qreal imageTolerance = 8.0 * m_frozenFrame.width() / std::max<qreal>(1.0, m_frozenImageRect.width());
+    const qreal handleTolerance = imageTolerance * 1.2;
+    const auto cornerHit = [imagePoint, handleTolerance](QPointF handle) {
+        return QLineF(imagePoint, handle).length() <= handleTolerance;
+    };
 
     if (annotation.magnifierShape == MagnifierShape::Rectangle) {
-        const qreal handleTolerance = imageTolerance * 1.2;
-        const auto cornerHit = [imagePoint, handleTolerance](QPointF handle) {
-            return QLineF(imagePoint, handle).length() <= handleTolerance;
-        };
+        // 1. 矩形放大镜:lens 大框 8 把手优先匹配
         if (cornerHit(lensRect.topLeft())) return SelectionDrag::TopLeft;
         if (cornerHit(lensRect.topRight())) return SelectionDrag::TopRight;
         if (cornerHit(lensRect.bottomLeft())) return SelectionDrag::BottomLeft;
@@ -252,6 +268,16 @@ ShotWindow::SelectionDrag ShotWindow::magnifierDragAt(const Annotation &annotati
         if (cornerHit(QPointF(lensRect.center().x(), lensRect.bottom()))) return SelectionDrag::Bottom;
         if (cornerHit(QPointF(lensRect.left(), lensRect.center().y()))) return SelectionDrag::Left;
         if (cornerHit(QPointF(lensRect.right(), lensRect.center().y()))) return SelectionDrag::Right;
+        // 2. source 小框 8 把手次之
+        if (cornerHit(sourceRect.topLeft())) return SelectionDrag::MagnifierSourceTopLeft;
+        if (cornerHit(sourceRect.topRight())) return SelectionDrag::MagnifierSourceTopRight;
+        if (cornerHit(sourceRect.bottomLeft())) return SelectionDrag::MagnifierSourceBottomLeft;
+        if (cornerHit(sourceRect.bottomRight())) return SelectionDrag::MagnifierSourceBottomRight;
+        if (cornerHit(QPointF(sourceRect.center().x(), sourceRect.top()))) return SelectionDrag::MagnifierSourceTop;
+        if (cornerHit(QPointF(sourceRect.center().x(), sourceRect.bottom()))) return SelectionDrag::MagnifierSourceBottom;
+        if (cornerHit(QPointF(sourceRect.left(), sourceRect.center().y()))) return SelectionDrag::MagnifierSourceLeft;
+        if (cornerHit(QPointF(sourceRect.right(), sourceRect.center().y()))) return SelectionDrag::MagnifierSourceRight;
+        // 3. 内部命中:source 在内层,优先于 lens
         if (sourceRect.contains(imagePoint)) {
             return SelectionDrag::MagnifierSource;
         }
@@ -261,6 +287,18 @@ ShotWindow::SelectionDrag ShotWindow::magnifierDragAt(const Annotation &annotati
         return SelectionDrag::None;
     }
 
+    // 圆形放大镜:lens 与 source 各 4 把手(上下左右),用同一套优先级
+    // 1. lens 4 把手
+    if (cornerHit(QPointF(lensRect.center().x(), lensRect.top()))) return SelectionDrag::Top;
+    if (cornerHit(QPointF(lensRect.center().x(), lensRect.bottom()))) return SelectionDrag::Bottom;
+    if (cornerHit(QPointF(lensRect.left(), lensRect.center().y()))) return SelectionDrag::Left;
+    if (cornerHit(QPointF(lensRect.right(), lensRect.center().y()))) return SelectionDrag::Right;
+    // 2. source 4 把手
+    if (cornerHit(QPointF(sourceRect.center().x(), sourceRect.top()))) return SelectionDrag::MagnifierSourceTop;
+    if (cornerHit(QPointF(sourceRect.center().x(), sourceRect.bottom()))) return SelectionDrag::MagnifierSourceBottom;
+    if (cornerHit(QPointF(sourceRect.left(), sourceRect.center().y()))) return SelectionDrag::MagnifierSourceLeft;
+    if (cornerHit(QPointF(sourceRect.right(), sourceRect.center().y()))) return SelectionDrag::MagnifierSourceRight;
+    // 3. 区域命中
     if (ellipseContainsPoint(sourceRect, imagePoint, imageTolerance)) {
         return SelectionDrag::MagnifierSource;
     }
@@ -417,6 +455,14 @@ QRectF ShotWindow::resizedBounds(QRectF start, SelectionDrag drag, QPointF image
             return rectFromVerticalEdge(start.top(), 1.0, start.center().x());
         case SelectionDrag::MagnifierSource:
         case SelectionDrag::MagnifierLens:
+        case SelectionDrag::MagnifierSourceLeft:
+        case SelectionDrag::MagnifierSourceRight:
+        case SelectionDrag::MagnifierSourceTop:
+        case SelectionDrag::MagnifierSourceBottom:
+        case SelectionDrag::MagnifierSourceTopLeft:
+        case SelectionDrag::MagnifierSourceTopRight:
+        case SelectionDrag::MagnifierSourceBottomLeft:
+        case SelectionDrag::MagnifierSourceBottomRight:
         case SelectionDrag::Rotate:
         case SelectionDrag::LineControl:
         case SelectionDrag::LineStart:
