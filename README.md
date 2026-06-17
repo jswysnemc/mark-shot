@@ -409,7 +409,25 @@ Writes go through `QSaveFile` for atomic commits and are triggered immediately a
 
 The `upload` section configures the sidebar upload action. When `upload.command` is empty, Mark Shot uses the bundled `mark-shot-upload` helper, which reads its behavior entirely from environment variables in `upload.env`. This keeps the config clean—no long shell commands needed.
 
-**Example: ImgURL V3**
+<details>
+<summary><b>Supported <code>upload.env</code> keys</b> (consumed by the bundled helper):</summary>
+
+| Key | Required | Default | Description |
+|-----|----------|---------|-------------|
+| `MARK_SHOT_UPLOAD_URL` | Yes | — | Upload endpoint URL. |
+| `MARK_SHOT_UPLOAD_FIELD` | No | `image` | Multipart form field name for the file. |
+| `MARK_SHOT_UPLOAD_API_KEY` | No | — | API key/token sent via the auth header. |
+| `MARK_SHOT_UPLOAD_AUTH_HEADER` | No | `Authorization` | Header name for authentication. |
+| `MARK_SHOT_UPLOAD_AUTH_SCHEME` | No | `Bearer` | Auth scheme prefix. Set to empty string to send the raw API key as the header value (sm.ms / ImgURL style). |
+| `MARK_SHOT_UPLOAD_URL_PATH` | No | auto-detect | Dotted JSON path to the uploaded URL (e.g. `data.url`, `data.link`). |
+| `MARK_SHOT_UPLOAD_DELETE_URL_PATH` | No | auto-detect | Dotted JSON path to the delete URL. |
+| `MARK_SHOT_UPLOAD_HEADER_<Name>` | No | — | Extra HTTP request headers. Example: `MARK_SHOT_UPLOAD_HEADER_X-Custom: foo`. |
+| `MARK_SHOT_UPLOAD_FIELD_<Name>` | No | — | Extra multipart form fields. Example: `MARK_SHOT_UPLOAD_FIELD_album: 123`. |
+
+</details>
+
+<details>
+<summary>Example: ImgURL V3</summary>
 
 ```json
 {
@@ -426,9 +444,11 @@ The `upload` section configures the sidebar upload action. When `upload.command`
 ```
 
 ImgURL V3 uses `Authorization: Bearer <token>` authentication (`AUTH_SCHEME` defaults to `Bearer`, no need to change).
-```
 
-**Example: sm.ms**
+</details>
+
+<details>
+<summary>Example: sm.ms</summary>
 
 ```json
 {
@@ -444,7 +464,10 @@ ImgURL V3 uses `Authorization: Bearer <token>` authentication (`AUTH_SCHEME` def
 }
 ```
 
-**Example: imgbb**
+</details>
+
+<details>
+<summary>Example: imgbb</summary>
 
 ```json
 {
@@ -459,7 +482,10 @@ ImgURL V3 uses `Authorization: Bearer <token>` authentication (`AUTH_SCHEME` def
 }
 ```
 
-**Example: litterbox (temporary host, no API key)**
+</details>
+
+<details>
+<summary>Example: litterbox (temporary host, no API key)</summary>
 
 ```json
 {
@@ -472,19 +498,7 @@ ImgURL V3 uses `Authorization: Bearer <token>` authentication (`AUTH_SCHEME` def
 
 litterbox returns a plain-text URL (not JSON); Mark Shot auto-detects any stdout line starting with `http://` or `https://` as the upload result.
 
-**Supported `upload.env` keys** (consumed by the bundled `mark-shot-upload` helper):
-
-| Key | Required | Default | Description |
-|-----|----------|---------|-------------|
-| `MARK_SHOT_UPLOAD_URL` | Yes | — | Upload endpoint URL. |
-| `MARK_SHOT_UPLOAD_FIELD` | No | `image` | Multipart form field name for the file. |
-| `MARK_SHOT_UPLOAD_API_KEY` | No | — | API key/token sent via the auth header. |
-| `MARK_SHOT_UPLOAD_AUTH_HEADER` | No | `Authorization` | Header name for authentication. |
-| `MARK_SHOT_UPLOAD_AUTH_SCHEME` | No | `Bearer` | Auth scheme prefix. Set to empty string to send the raw API key as the header value (sm.ms / ImgURL style). |
-| `MARK_SHOT_UPLOAD_URL_PATH` | No | auto-detect | Dotted JSON path to the uploaded URL (e.g. `data.url`, `data.link`). |
-| `MARK_SHOT_UPLOAD_DELETE_URL_PATH` | No | auto-detect | Dotted JSON path to the delete URL. |
-| `MARK_SHOT_UPLOAD_HEADER_<Name>` | No | — | Extra HTTP request headers. Example: `MARK_SHOT_UPLOAD_HEADER_X-Custom: foo`. |
-| `MARK_SHOT_UPLOAD_FIELD_<Name>` | No | — | Extra multipart form fields. Example: `MARK_SHOT_UPLOAD_FIELD_album: 123`. |
+</details>
 
 **Custom command output format**: If you set `upload.command` to a custom script, it must print the URL to stdout. Both JSON (`{"url": "https://..."}`) and plain text (a line starting with `http://` or `https://`) are accepted.
 
