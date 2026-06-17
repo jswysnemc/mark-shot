@@ -345,7 +345,7 @@ void ShotWindow::beginLaserStroke(QPointF imagePoint)
     LaserStroke stroke;
     stroke.points.append(clampImagePoint(imagePoint));
     stroke.color = m_currentColor;
-    stroke.width = m_laserWidth;
+    stroke.width = m_strokeWidth;
     stroke.expiresAt = m_laserClock.elapsed() + kLaserLifetimeMs;
     m_laserDraft = stroke;
     update();
@@ -365,7 +365,7 @@ void ShotWindow::updateLaserStroke(QPointF imagePoint)
 
     const QPointF lastPoint = m_laserDraft->points.last();
     const qreal distance = QLineF(lastPoint, nextPoint).length();
-    const qreal step = std::max<qreal>(2.0, m_laserWidth * 0.38);
+    const qreal step = std::max<qreal>(2.0, m_strokeWidth * 0.38);
     if (distance < step * 0.35) {
         return;
     }
@@ -571,8 +571,8 @@ void ShotWindow::beginTextAnnotation(QPointF imagePoint)
     m_textEditorImagePoint = imagePoint;
     m_draft.reset();
     m_textEditor->clear();
-    m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(m_currentColor, m_textBackgroundColor, qRound(20.0 + m_shapeWidth)));
-    m_textEditor->setFont(markshot::theme::textFont(qRound(20.0 + m_shapeWidth),
+    m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(m_currentColor, m_textBackgroundColor, qRound(20.0 + m_textSize)));
+    m_textEditor->setFont(markshot::theme::textFont(qRound(20.0 + m_textSize),
                                                     QFont::DemiBold,
                                                     m_textFontFamily));
     m_textEditor->show();
@@ -660,7 +660,7 @@ void ShotWindow::commitTextEditor()
         annotation.text = text;
         annotation.color = m_currentColor;
         annotation.backgroundColor = m_textBackgroundColor;
-        annotation.width = m_shapeWidth;
+        annotation.width = m_textSize;
         annotation.fontFamily = m_textEditor->font().family();
         annotation.rect = textContentRect(annotation, false);
         m_textFontFamily = annotation.fontFamily;

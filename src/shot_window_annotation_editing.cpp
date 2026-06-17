@@ -296,17 +296,64 @@ void ShotWindow::restoreHistorySnapshot(const HistorySnapshot &snapshot)
     update();
 }
 
-void ShotWindow::pushHistorySnapshot()
+/// @brief 把指定快照追加到撤销栈
+/// @param snapshot 要作为撤销目标保存的历史快照
+/// @return 无返回值
+void ShotWindow::appendHistorySnapshot(const HistorySnapshot &snapshot)
 {
-    m_undoStack.append(currentHistorySnapshot());
+    m_undoStack.append(snapshot);
     if (m_undoStack.size() > 100) {
         m_undoStack.removeFirst();
     }
     m_redoStack.clear();
 }
 
+/// @brief 把当前标注状态追加到撤销栈
+/// @return 无返回值
+void ShotWindow::pushHistorySnapshot()
+{
+    commitAnnotationWidthWheelHistory();
+    appendHistorySnapshot(currentHistorySnapshot());
+}
+
+/// @brief 记录一次滚轮改宽开始前的快照,并用防抖合并后续滚轮事件
+/// @param context 当前滚轮改宽上下文,包含目标工具和选中标注
+/// @param snapshot 第一次改动前的历史快照
+/// @return 无返回值
+void ShotWindow::queueAnnotationWidthWheelHistory(int context, const HistorySnapshot &snapshot)
+{
+    if (m_annotationWidthWheelHistoryContext != context) {
+        commitAnnotationWidthWheelHistory();
+        m_annotationWidthWheelHistoryContext = context;
+        m_annotationWidthWheelHistorySnapshot = snapshot;
+    } else if (!m_annotationWidthWheelHistorySnapshot.has_value()) {
+        m_annotationWidthWheelHistorySnapshot = snapshot;
+    }
+
+    if (m_annotationWidthWheelHistoryTimer) {
+        m_annotationWidthWheelHistoryTimer->start();
+    }
+}
+
+/// @brief 提交挂起的滚轮改宽历史快照
+/// @return 无返回值
+void ShotWindow::commitAnnotationWidthWheelHistory()
+{
+    if (m_annotationWidthWheelHistoryTimer) {
+        m_annotationWidthWheelHistoryTimer->stop();
+    }
+    if (!m_annotationWidthWheelHistorySnapshot.has_value()) {
+        return;
+    }
+
+    appendHistorySnapshot(*m_annotationWidthWheelHistorySnapshot);
+    m_annotationWidthWheelHistorySnapshot.reset();
+    m_annotationWidthWheelHistoryContext = 0;
+}
+
 void ShotWindow::undoAnnotationEdit()
 {
+    commitAnnotationWidthWheelHistory();
     if (m_undoStack.isEmpty()) {
         return;
     }
@@ -316,62 +363,19 @@ void ShotWindow::undoAnnotationEdit()
     restoreHistorySnapshot(previous);
 }
 
-qreal ShotWindow::currentToolWidth() const
+/// @brief 重做最近一次被撤销的标注编辑
+/// @return 无返回值
+void ShotWindow::redoAnnotation()
 {
-    switch (m_tool) {
-    case Tool::Move:
-    case Tool::Select:
-        return m_shapeWidth;
-    case Tool::Pen:
-        return m_penWidth;
-    case Tool::Highlighter:
-        return m_penWidth * 2.0;
-    case Tool::Line:
-    case Tool::Arrow:
-    case Tool::Rectangle:
-    case Tool::Ellipse:
-    case Tool::Text:
-    case Tool::Magnifier:
-        return m_shapeWidth;
-    case Tool::Number:
-        return m_numberWidth;
-    case Tool::Mosaic:
-        return m_mosaicBlockSize;
-    case Tool::Laser:
-        return m_laserWidth;
+    commitAnnotationWidthWheelHistory();
+    if (m_redoStack.isEmpty()) {
+        return;
     }
 
-    return m_shapeWidth;
-}
-
-qreal ShotWindow::currentToolPreviewSize() const
-{
-    const qreal scale = annotationSizeScale(true);
-
-    switch (m_tool) {
-    case Tool::Move:
-    case Tool::Select:
-        return 8.0;
-    case Tool::Pen:
-    case Tool::Line:
-    case Tool::Arrow:
-    case Tool::Rectangle:
-    case Tool::Ellipse:
-    case Tool::Magnifier:
-        return std::max<qreal>(1.5, currentToolWidth() * scale);
-    case Tool::Highlighter:
-        return std::max<qreal>(6.0, currentToolWidth() * scale);
-    case Tool::Text:
-        return std::max<qreal>(10.0, (19.0 + currentToolWidth()) * scale);
-    case Tool::Number:
-        return std::max<qreal>(26.0, (13.0 + currentToolWidth() * 1.35) * scale * 2.0);
-    case Tool::Mosaic:
-        return std::max<qreal>(2.0, currentToolWidth() * scale);
-    case Tool::Laser:
-        return std::max<qreal>(8.0, currentToolWidth() * scale);
-    }
-
-    return std::max<qreal>(1.5, currentToolWidth() * scale);
+    const HistorySnapshot current = currentHistorySnapshot();
+    const HistorySnapshot next = m_redoStack.takeLast();
+    m_undoStack.append(current);
+    restoreHistorySnapshot(next);
 }
 
 void ShotWindow::setCurrentColor(QColor color)
@@ -398,7 +402,7 @@ void ShotWindow::setCurrentColor(QColor color)
         m_colorPalette->hide();
     }
     if (m_textEditor && m_textEditor->isVisible() && !m_editingTextAnnotationId.has_value()) {
-        m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(m_currentColor, m_textBackgroundColor, qRound(20.0 + m_shapeWidth)));
+        m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(m_currentColor, m_textBackgroundColor, qRound(20.0 + m_textSize)));
     }
     updateColorPalettePreview();
     updateAnnotationPropertyPanel();

@@ -23,6 +23,7 @@ class QShowEvent;
 class QByteArray;
 class QBoxLayout;
 class QComboBox;
+class QCloseEvent;
 class QKeyEvent;
 class QLabel;
 class QListWidget;
@@ -153,6 +154,7 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
     void showEvent(QShowEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
 
 private:
     // High-level interaction mode: first pick a capture region, then edit the
@@ -368,6 +370,7 @@ private:
                                                 bool keepSquare);
     void loadAnnotationStateFromDisk();
     void persistAnnotationState();
+    void flushAnnotationStateNow();
     QRectF resizedBounds(QRectF start, SelectionDrag drag, QPointF imagePoint, bool keepAspectRatio) const;
     QVector<QPointF> selectionHandlePoints(QRectF rect) const;
     QRectF selectedAnnotationDeleteButtonRect() const;
@@ -391,7 +394,10 @@ private:
     void commitAnnotationSelectionBox();
     HistorySnapshot currentHistorySnapshot() const;
     void restoreHistorySnapshot(const HistorySnapshot &snapshot);
+    void appendHistorySnapshot(const HistorySnapshot &snapshot);
     void pushHistorySnapshot();
+    void queueAnnotationWidthWheelHistory(int context, const HistorySnapshot &snapshot);
+    void commitAnnotationWidthWheelHistory();
     void undoAnnotationEdit();
     void beginSelection(QPointF imagePoint);
     void commitDraft();
@@ -457,8 +463,8 @@ private:
     void updateAnnotationPropertyPanelGeometry();
     void updatePropertyColorDialogGeometry();
     void updatePropertyFontPanelGeometry();
-    void adjustSelectedAnnotationWidth(qreal delta);
-    void setSelectedAnnotationWidth(int width);
+    bool setSelectedAnnotationWidth(int width);
+    bool setSelectedAnnotationWidth(int width, bool captureHistory);
     void setSelectedAnnotationOpacity(int opacity);
     void setSelectedAnnotationFilled(bool filled);
     void setSelectedAnnotationCornerRadius(int radius);
@@ -581,17 +587,19 @@ private:
     QElapsedTimer m_ctrlTapTimer;
     QPointF m_wheelPreviewPosition;
     QElapsedTimer m_wheelPreviewTimer;
+    qreal m_annotationWidthWheelRemainder = 0.0;
+    int m_annotationWidthWheelContext = 0;
     QElapsedTimer m_laserClock;
 
     // Current tool defaults and styling. These seed new Annotation records and
     // are updated by tool panels, shortcuts, and config/CLI defaults.
     markshot::ToolbarAppearanceConfig m_toolbarAppearance;
     QColor m_currentColor = QColor(255, 77, 77);
-    qreal m_penWidth = 2.0;
-    qreal m_shapeWidth = 3.0;
+    qreal m_strokeWidth = 3.0;
+    qreal m_highlighterWidth = 6.0;
     qreal m_numberWidth = 3.0;
+    qreal m_textSize = 3.0;
     qreal m_mosaicBlockSize = 14.0;
-    qreal m_laserWidth = 6.0;
     qreal m_magnifierScale = 2.75;
     MagnifierShape m_magnifierShape = MagnifierShape::Circle;
     bool m_shapeFilled = false;
@@ -665,6 +673,17 @@ private:
 
     // Editor, history, and window-detection auxiliaries.
     QTimer *m_laserTimer = nullptr;
+    // 标注工具默认值持久化的写盘节流:写盘走 QSaveFile 同步 IO,在拖动滑块
+    // 等高频改动场景里直接写会阻塞主线程绘制,因此每次改动都重启
+    // single-shot 定时器,把连续改动合并成一次写入。
+    // m_annotationStateDirty 表示自上次写盘以来还有挂起的改动。
+    QTimer *m_annotationStateTimer = nullptr;
+    bool m_annotationStateDirty = false;
+    // 选中标注通过滚轮连续改粗细时,先保存第一次改动前的快照,停止滚轮后
+    // 再合并成一条撤销历史,避免每个滚轮 tick 都进入历史栈。
+    QTimer *m_annotationWidthWheelHistoryTimer = nullptr;
+    std::optional<HistorySnapshot> m_annotationWidthWheelHistorySnapshot;
+    int m_annotationWidthWheelHistoryContext = 0;
     QTextEdit *m_textEditor = nullptr;
     QPointF m_textEditorImagePoint;
     std::optional<int> m_editingTextAnnotationId;

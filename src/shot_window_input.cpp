@@ -624,6 +624,7 @@ void ShotWindow::commitDraft()
 void ShotWindow::setTool(Tool tool)
 {
     clearWheelPreview();
+    commitAnnotationWidthWheelHistory();
     commitTextEditor();
     m_selectionDrag = SelectionDrag::None;
     m_annotationDrag = SelectionDrag::None;

@@ -103,6 +103,21 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     // 不会触碰任何尚未构造完成的控件
     loadAnnotationStateFromDisk();
 
+    // 节流定时器:把高频改动(如拖动滑块)合并成一次磁盘写入,避免主线程
+    // 在 QSaveFile 写盘期间无法及时刷新滑块和画布
+    m_annotationStateTimer = new QTimer(this);
+    m_annotationStateTimer->setSingleShot(true);
+    m_annotationStateTimer->setInterval(250);
+    connect(m_annotationStateTimer, &QTimer::timeout, this, [this] { flushAnnotationStateNow(); });
+
+    // 选中标注的滚轮改粗细需要进入撤销历史,但连续滚轮只应对应一次撤销
+    m_annotationWidthWheelHistoryTimer = new QTimer(this);
+    m_annotationWidthWheelHistoryTimer->setSingleShot(true);
+    m_annotationWidthWheelHistoryTimer->setInterval(350);
+    connect(m_annotationWidthWheelHistoryTimer, &QTimer::timeout, this, [this] {
+        commitAnnotationWidthWheelHistory();
+    });
+
     setWindowTitle(MS_TR("Mark Shot"));
     setCursor(captureCrossCursor());
     setMouseTracking(true);

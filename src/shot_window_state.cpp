@@ -24,12 +24,12 @@ void ShotWindow::loadAnnotationStateFromDisk()
     }
     m_textBackgroundColor = state.textBackgroundColor;
 
-    // 3. 各工具笔宽
-    m_penWidth = state.penWidth;
-    m_shapeWidth = state.shapeWidth;
+    // 3. 各类工具笔宽
+    m_strokeWidth = state.strokeWidth;
+    m_highlighterWidth = state.highlighterWidth;
     m_numberWidth = state.numberWidth;
+    m_textSize = state.textSize;
     m_mosaicBlockSize = state.mosaicBlockSize;
-    m_laserWidth = state.laserWidth;
 
     // 4. 矩形相关
     m_shapeFilled = state.shapeFilled;
@@ -51,22 +51,52 @@ void ShotWindow::loadAnnotationStateFromDisk()
     }
 }
 
-/// @brief 把当前工具默认值快照写回磁盘
+/// @brief 调度一次工具默认值的持久化写盘
 ///
-/// 任意改变 m_currentColor / m_penWidth / m_shapeWidth / m_numberWidth /
-/// m_mosaicBlockSize / m_laserWidth / m_shapeFilled / m_rectangleCornerRadius /
+/// 写盘走 QSaveFile 的同步 IO,在拖动滑块这类高频改动场景中直接写会让
+/// 主线程绘制掉帧、滑块响应"看起来没生效"。这里只把 dirty 标志立起来,
+/// 真正的磁盘写入交给 m_annotationStateTimer 在用户停止连续调整后执行,
+/// 多次连续调用会通过重启 single-shot 定时器合并成一次写入。
+///
+/// 任意改变 m_currentColor / m_strokeWidth / m_highlighterWidth / m_numberWidth /
+/// m_textSize / m_mosaicBlockSize / m_shapeFilled / m_rectangleCornerRadius /
 /// m_rectangleStyle / m_magnifierScale / m_magnifierShape / m_arrowStyle /
 /// m_highlighterStyle / m_numberStyle / m_textFontFamily / m_textBackgroundColor
-/// 的入口写入完成后都应调用本函数,以保持磁盘文件与内存状态同步。
+/// 的入口写入完成后都应调用本函数。窗口关闭等退出路径需要
+/// 调用 flushAnnotationStateNow 立即落盘,以避免崩溃丢失最后一次改动。
+///
+/// @return 无返回值
 void ShotWindow::persistAnnotationState()
 {
+    m_annotationStateDirty = true;
+    if (m_annotationStateTimer) {
+        m_annotationStateTimer->start();
+    }
+}
+
+/// @brief 立即把内存中的工具默认值写回磁盘
+///
+/// 用于关键退出路径或需要确认落盘的场景。无挂起改动时直接返回,有则取消
+/// 节流定时器并同步执行 QSaveFile 的写入。
+///
+/// @return 无返回值
+void ShotWindow::flushAnnotationStateNow()
+{
+    if (!m_annotationStateDirty) {
+        return;
+    }
+    if (m_annotationStateTimer) {
+        m_annotationStateTimer->stop();
+    }
+    m_annotationStateDirty = false;
+
     markshot::AnnotationState state;
     state.currentColor = m_currentColor;
-    state.penWidth = m_penWidth;
-    state.shapeWidth = m_shapeWidth;
+    state.strokeWidth = m_strokeWidth;
+    state.highlighterWidth = m_highlighterWidth;
     state.numberWidth = m_numberWidth;
+    state.textSize = m_textSize;
     state.mosaicBlockSize = m_mosaicBlockSize;
-    state.laserWidth = m_laserWidth;
     state.shapeFilled = m_shapeFilled;
     state.rectangleCornerRadius = m_rectangleCornerRadius;
     state.rectangleStyle = m_rectangleStyle;
@@ -78,7 +108,7 @@ void ShotWindow::persistAnnotationState()
     state.textFontFamily = m_textFontFamily;
     state.textBackgroundColor = m_textBackgroundColor;
 
-    // 写入失败仅记录日志,不影响交互;下次任意修改会再次尝试
+    // 写入失败仅记录日志,不影响交互;dirty 已清,等待下次任意修改再次尝试
     if (!markshot::saveAnnotationState(state)) {
         markshot::debugLog("annotation_state",
                            "failed to persist annotation state to %s",

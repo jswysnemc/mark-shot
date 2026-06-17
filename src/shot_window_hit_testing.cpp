@@ -543,7 +543,9 @@ void ShotWindow::setSelectedAnnotations(QVector<int> annotationIds)
             validIds.append(id);
         }
     }
-    if (validIds != selectedAnnotationIds()) {
+    const QVector<int> currentIds = selectedAnnotationIds();
+    if (validIds != currentIds) {
+        commitAnnotationWidthWheelHistory();
         m_lineSkeletonDragPointIndex = -1;
     }
     m_selectedAnnotationIds = validIds;

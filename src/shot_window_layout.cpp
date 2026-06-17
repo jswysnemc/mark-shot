@@ -594,10 +594,10 @@ void ShotWindow::updateAnnotationPropertyPanel()
             m_propertyWidthSlider->setRange(qRound(kMinMosaicBlockSize), qRound(kMaxMosaicBlockSize));
         } else if (panelTool == Tool::Number) {
             m_propertyWidthSlider->setRange(qRound(kMinNumberWidth), qRound(kMaxNumberWidth));
-        } else if (panelTool == Tool::Laser) {
-            m_propertyWidthSlider->setRange(qRound(kMinLaserWidth), qRound(kMaxLaserWidth));
         } else if (panelTool == Tool::Text) {
             m_propertyWidthSlider->setRange(1, 1000);
+        } else if (panelTool == Tool::Highlighter) {
+            m_propertyWidthSlider->setRange(qRound(kMinStrokeWidth), qRound(kMaxHighlighterWidth));
         } else {
             m_propertyWidthSlider->setRange(qRound(kMinStrokeWidth), qRound(kMaxStrokeWidth));
         }
@@ -737,99 +737,4 @@ void ShotWindow::updatePropertyFontPanelGeometry()
     }
     m_propertyFontPanel->setFixedSize(panelSize);
     m_propertyFontPanel->setGeometry(x, y, panelSize.width(), panelSize.height());
-}
-
-void ShotWindow::adjustSelectedAnnotationWidth(qreal delta)
-{
-    const QVector<int> selectedIds = selectedAnnotationIds();
-    if (selectedIds.isEmpty()) {
-        return;
-    }
-
-    pushHistorySnapshot();
-    for (int id : selectedIds) {
-        if (Annotation *annotation = annotationById(id)) {
-            if (annotation->tool == Tool::Mosaic) {
-                annotation->width = std::clamp(annotation->width + delta * 2.0, kMinMosaicBlockSize, kMaxMosaicBlockSize);
-            } else if (annotation->tool == Tool::Number) {
-                annotation->width = std::clamp(annotation->width + delta * 2.0, kMinNumberWidth, kMaxNumberWidth);
-            } else {
-                annotation->width = std::clamp(annotation->width + delta, kMinStrokeWidth, kMaxStrokeWidth);
-            }
-        }
-    }
-    updateAnnotationPropertyPanel();
-    update();
-}
-
-void ShotWindow::setSelectedAnnotationWidth(int width)
-{
-    const QVector<int> selectedIds = selectedAnnotationIds();
-    if (!selectedIds.isEmpty()) {
-        bool changed = false;
-        for (int id : selectedIds) {
-            const Annotation *annotation = annotationById(id);
-            if (annotation && qRound(annotation->width) != width) {
-                changed = true;
-                break;
-            }
-        }
-        if (!changed) {
-            return;
-        }
-        pushHistorySnapshot();
-        for (int id : selectedIds) {
-            if (Annotation *annotation = annotationById(id)) {
-                if (annotation->tool == Tool::Mosaic) {
-                    annotation->width = std::clamp<qreal>(width, kMinMosaicBlockSize, kMaxMosaicBlockSize);
-                } else if (annotation->tool == Tool::Number) {
-                    annotation->width = std::clamp<qreal>(width, kMinNumberWidth, kMaxNumberWidth);
-                } else if (annotation->tool == Tool::Text) {
-                    const qreal oldWidth = annotation->width;
-                    annotation->width = std::clamp<qreal>(width, 1.0, 1000.0);
-                    const qreal factor = ((19.0 + annotation->width) / (19.0 + oldWidth)) * 1.05;
-                    annotation->rect.setWidth(annotation->rect.width() * factor);
-                    annotation->rect = textContentRect(*annotation, false);
-                    if (!annotation->points.isEmpty()) {
-                        annotation->points[0] = annotation->rect.topLeft();
-                    }
-                } else {
-                    annotation->width = std::clamp<qreal>(width, kMinStrokeWidth, kMaxStrokeWidth);
-                }
-            }
-        }
-    } else {
-        switch (m_tool) {
-        case Tool::Pen:
-        case Tool::Highlighter:
-            m_penWidth = width;
-            break;
-        case Tool::Mosaic:
-            m_mosaicBlockSize = width;
-            break;
-        case Tool::Laser:
-            m_laserWidth = std::clamp<qreal>(width, kMinLaserWidth, kMaxLaserWidth);
-            break;
-        case Tool::Move:
-        case Tool::Select:
-            return;
-        case Tool::Line:
-        case Tool::Rectangle:
-        case Tool::Ellipse:
-        case Tool::Arrow:
-        case Tool::Magnifier:
-            m_shapeWidth = width;
-            break;
-        case Tool::Text:
-            m_shapeWidth = std::clamp<qreal>(width, 1.0, 1000.0);
-            break;
-        case Tool::Number:
-            m_numberWidth = std::clamp<qreal>(width, kMinNumberWidth, kMaxNumberWidth);
-            break;
-        }
-    }
-    updateAnnotationPropertyPanel();
-    updateColorPalettePreview();
-    update();
-    persistAnnotationState();
 }

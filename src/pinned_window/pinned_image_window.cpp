@@ -4,6 +4,7 @@
 #include "clipboard_image.h"
 #include "debug_log.h"
 #include "pinned_window_top.h"
+#include "translation_language_options.h"
 #include "ui/i18n.h"
 
 #include <QAction>
@@ -364,6 +365,14 @@ void PinnedImageWindow::contextMenuEvent(QContextMenuEvent *event)
         requestTranslation();
     });
     translateAction->setEnabled(canRequestTranslation());
+    QMenu *targetLanguageMenu = menu.addMenu(MS_TR("Target Language"));
+    for (const markshot::TranslationLanguageOption &language : markshot::translationLanguageOptions()) {
+        QAction *languageAction = targetLanguageMenu->addAction(language.label, this, [this, value = language.value] {
+            setTranslationTargetLanguage(value);
+        });
+        languageAction->setCheckable(true);
+        languageAction->setChecked(language.value == m_config.translationTargetLanguage);
+    }
     QAction *toggleTranslationAction = menu.addAction(
         m_translationActive ? MS_TR("Show Original Text") : MS_TR("Show Translated Text"),
         this,
@@ -464,6 +473,37 @@ void PinnedImageWindow::setAlwaysOnTop(bool alwaysOnTop)
     if (m_config.alwaysOnTop) {
         schedulePinnedWindowRaise();
     }
+}
+
+/// @brief 设置并保存翻译目标语言
+/// @param targetLanguage 实际传给翻译器的目标语言名称
+void PinnedImageWindow::setTranslationTargetLanguage(QString targetLanguage)
+{
+    targetLanguage = markshot::translationLanguageValueFromText(targetLanguage).trimmed();
+    if (targetLanguage.isEmpty() || targetLanguage == m_config.translationTargetLanguage) {
+        return;
+    }
+
+    const QString previousTargetLanguage = m_config.translationTargetLanguage;
+    m_config.translationTargetLanguage = targetLanguage;
+
+    QString error;
+    if (!markshot::saveTranslationTargetLanguage(targetLanguage, &error)) {
+        m_config.translationTargetLanguage = previousTargetLanguage;
+        if (!error.isEmpty()) {
+            markshot::debugLog("config",
+                               "cannot save translation.targetLanguage: %s",
+                               error.toUtf8().constData());
+        }
+        return;
+    }
+
+    // 目标语言变化后旧译文不再可信,清空缓存并等待用户再次请求翻译
+    cancelTranslation();
+    m_translationOverlayTokens.clear();
+    m_translatedTokens.clear();
+    m_translationActive = false;
+    update();
 }
 
 void PinnedImageWindow::recreateWithCurrentImage()

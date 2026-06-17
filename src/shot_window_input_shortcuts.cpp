@@ -2,6 +2,55 @@
 
 using namespace markshot::shot;
 
+namespace {
+
+/// @brief 计算标注粗细调整使用的滚轮步进
+/// @param event 滚轮事件
+/// @return 标准滚轮每一格返回 1.0,触控板按像素增量换算为近似步进
+qreal annotationWidthWheelSteps(const QWheelEvent *event)
+{
+    const int angleY = event->angleDelta().y();
+    if (angleY != 0) {
+        return static_cast<qreal>(angleY) / 120.0;
+    }
+
+    const int pixelY = event->pixelDelta().y();
+    if (pixelY != 0) {
+        return static_cast<qreal>(pixelY) / 80.0;
+    }
+
+    return 0.0;
+}
+
+/// @brief 判断当前工具或选中标注的滚轮粗细调整粒度
+/// @param tool 要调整的工具类型
+/// @return 每一格滚轮对应的粗细变化值
+qreal annotationWidthWheelStepSize(ShotWindow::Tool tool)
+{
+    switch (tool) {
+    case ShotWindow::Tool::Mosaic:
+    case ShotWindow::Tool::Number:
+        return 2.0;
+    case ShotWindow::Tool::Text:
+        return 1.5;
+    case ShotWindow::Tool::Move:
+    case ShotWindow::Tool::Select:
+    case ShotWindow::Tool::Pen:
+    case ShotWindow::Tool::Line:
+    case ShotWindow::Tool::Highlighter:
+    case ShotWindow::Tool::Rectangle:
+    case ShotWindow::Tool::Ellipse:
+    case ShotWindow::Tool::Arrow:
+    case ShotWindow::Tool::Magnifier:
+    case ShotWindow::Tool::Laser:
+        return 1.0;
+    }
+
+    return 1.0;
+}
+
+}  // namespace
+
 /**
  * 处理滚轮输入。
  * @param event 滚轮事件。
@@ -29,42 +78,16 @@ void ShotWindow::wheelEvent(QWheelEvent *event)
         return;
     }
 
-    const int steps = event->angleDelta().y() / 120;
-    if (steps == 0 || m_mode != Mode::Editing) {
+    const qreal steps = annotationWidthWheelSteps(event);
+    if (qFuzzyIsNull(steps) || m_mode != Mode::Editing) {
         QWidget::wheelEvent(event);
         return;
     }
 
-    if (m_tool == Tool::Select && !selectedAnnotationIds().isEmpty()) {
-        pushHistorySnapshot();
-        for (int id : selectedAnnotationIds()) {
-            if (Annotation *annotation = annotationById(id)) {
-                if (annotation->tool == Tool::Mosaic) {
-                    annotation->width = std::clamp(annotation->width + steps * 2.0, kMinMosaicBlockSize, kMaxMosaicBlockSize);
-                } else if (annotation->tool == Tool::Number) {
-                    annotation->width = std::clamp(annotation->width + steps * 2.0, kMinNumberWidth, kMaxNumberWidth);
-                } else if (annotation->tool == Tool::Text) {
-                    const qreal oldWidth = annotation->width;
-                    annotation->width = std::clamp(annotation->width + steps * 1.5, 1.0, 1000.0);
-                    const qreal factor = ((19.0 + annotation->width) / (19.0 + oldWidth)) * 1.05;
-                    annotation->rect.setWidth(annotation->rect.width() * factor);
-                    annotation->rect = textContentRect(*annotation, false);
-                    if (!annotation->points.isEmpty()) {
-                        annotation->points[0] = annotation->rect.topLeft();
-                    }
-                } else {
-                    annotation->width = std::clamp(annotation->width + steps * 1.0, kMinStrokeWidth, kMaxStrokeWidth);
-                }
-            }
-        }
-        updateColorPalettePreview();
-        updateAnnotationPropertyPanel();
-        event->accept();
-        update();
-        return;
-    }
+    const QVector<int> selectedIds = selectedAnnotationIds();
+    const bool editingAnnotationWidth = m_tool == Tool::Select && !selectedIds.isEmpty();
 
-    if (wheelZoomsImage()) {
+    if (!editingAnnotationWidth && wheelZoomsImage()) {
         const qreal factor = imageNavigationWheelFactor(event);
         if (qFuzzyCompare(factor, 1.0)) {
             QWidget::wheelEvent(event);
@@ -80,32 +103,42 @@ void ShotWindow::wheelEvent(QWheelEvent *event)
         return;
     }
 
-    if (m_tool == Tool::Mosaic) {
-        m_mosaicBlockSize = std::clamp(m_mosaicBlockSize + steps * 2.0, kMinMosaicBlockSize, kMaxMosaicBlockSize);
-    } else if (m_tool == Tool::Number) {
-        m_numberWidth = std::clamp(m_numberWidth + steps * 2.0, kMinNumberWidth, kMaxNumberWidth);
-    } else if (m_tool == Tool::Laser) {
-        m_laserWidth = std::clamp(m_laserWidth + steps * 2.0, kMinLaserWidth, kMaxLaserWidth);
-    } else if (m_tool == Tool::Pen || m_tool == Tool::Highlighter) {
-        m_penWidth = std::clamp(m_penWidth + steps * 1.0, kMinStrokeWidth, kMaxStrokeWidth);
-    } else if (m_tool == Tool::Text) {
-        m_shapeWidth = std::clamp(m_shapeWidth + steps * 1.5, 1.0, 1000.0);
-    } else {
-        m_shapeWidth = std::clamp(m_shapeWidth + steps * 1.0, kMinStrokeWidth, kMaxStrokeWidth);
+    const Annotation *firstSelectedAnnotation = editingAnnotationWidth ? annotationById(selectedIds.first()) : nullptr;
+    const Tool widthTool = firstSelectedAnnotation ? firstSelectedAnnotation->tool : m_tool;
+    const int wheelContext = static_cast<int>(widthTool) * 4096
+        + (editingAnnotationWidth && firstSelectedAnnotation ? firstSelectedAnnotation->id : 0);
+    if (m_annotationWidthWheelContext != wheelContext) {
+        m_annotationWidthWheelContext = wheelContext;
+        m_annotationWidthWheelRemainder = 0.0;
     }
 
-    if (m_draft.has_value()) {
-        m_draft->width = currentToolWidth();
+    const qreal currentWidth = firstSelectedAnnotation ? firstSelectedAnnotation->width : currentToolWidth();
+    const qreal rawDelta = steps * annotationWidthWheelStepSize(widthTool) + m_annotationWidthWheelRemainder;
+    const int delta = rawDelta > 0.0 ? static_cast<int>(std::floor(rawDelta)) : static_cast<int>(std::ceil(rawDelta));
+    m_annotationWidthWheelRemainder = rawDelta - delta;
+    if (delta == 0) {
+        event->accept();
+        return;
     }
+
+    const HistorySnapshot historyBeforeChange = editingAnnotationWidth
+        ? currentHistorySnapshot()
+        : HistorySnapshot{};
+    const bool changed = setSelectedAnnotationWidth(qRound(currentWidth) + delta, false);
+    if (!changed) {
+        event->accept();
+        return;
+    }
+    if (editingAnnotationWidth) {
+        queueAnnotationWidthWheelHistory(wheelContext, historyBeforeChange);
+    }
+
     m_showWheelPreview = true;
     m_wheelPreviewPosition = event->position();
     m_wheelPreviewTimer.restart();
     updateCursor();
-    updateColorPalettePreview();
-    updateAnnotationPropertyPanel();
     event->accept();
     update();
-    persistAnnotationState();
 }
 
 /**

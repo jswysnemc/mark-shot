@@ -79,6 +79,8 @@ qt_add_executable(mark-shot
     src/config_value.h
     src/toolbar_appearance_config.cpp
     src/toolbar_appearance_config.h
+    src/translation_language_options.cpp
+    src/translation_language_options.h
     src/capture_cursor_policy.cpp
     src/capture_cursor_policy.h
     src/display_capture/display_capture_card.cpp
@@ -142,6 +144,9 @@ qt_add_executable(mark-shot
     src/shot_window_internal.cpp
     src/shot_window_internal.h
     src/shot_window_module.h
+    src/ocr_result_window.cpp
+    src/ocr_result_window.h
+    src/ocr_result_window_translation.cpp
     src/shot_window_ocr_result_window.cpp
     src/shot_window_code_scan.cpp
     src/shot_window_code_scan_result_window.cpp
@@ -158,7 +163,9 @@ qt_add_executable(mark-shot
     src/shot_window_line_constraint.cpp
     src/shot_window_line_constraint.h
     src/shot_window_line_anchors.cpp
+    src/shot_window_lifecycle.cpp
     src/shot_window_magnifier_drag.cpp
+    src/shot_window_overlay_panels.cpp
     src/shot_window_state.cpp
     src/annotation_state_store.cpp
     src/annotation_state_store.h
@@ -166,8 +173,10 @@ qt_add_executable(mark-shot
     src/shot_window_property_panels.cpp
     src/shot_window_selection_frame.cpp
     src/shot_window_setup.cpp
+    src/shot_window_side_panels.cpp
     src/shot_window_shortcut_registration.cpp
     src/shot_window_shortcuts.cpp
+    src/shot_window_width_state.cpp
     src/shot_window_pinned_window.cpp
     src/shot_window_upload.cpp
     src/pinned_window/pinned_image_window.cpp

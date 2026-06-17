@@ -9,19 +9,20 @@ namespace markshot {
 
 /// @brief 截图标注的工具默认值快照,用于跨会话保留用户上次使用的样式
 ///
-/// 该结构覆盖所有可被用户调节的工具默认值:画笔/形状/数字/马赛克/激光的笔宽,
+/// 该结构覆盖所有可被用户调节的工具默认值:通用描边/荧光笔/数字/文字/
+/// 马赛克的笔宽或尺寸,
 /// 当前颜色与不透明度,矩形圆角与风格,放大镜倍率与形状,箭头/荧光笔/数字风格,
 /// 文本字体与文字背景色等。
 struct AnnotationState {
     // 颜色与不透明度(alpha 体现在 currentColor.alpha 中)
     QColor currentColor = QColor(255, 77, 77);
 
-    // 各工具的笔宽/尺寸默认值
-    qreal penWidth = 2.0;
-    qreal shapeWidth = 3.0;
+    // 各类工具的笔宽/尺寸默认值
+    qreal strokeWidth = 3.0;
+    qreal highlighterWidth = 6.0;
     qreal numberWidth = 3.0;
+    qreal textSize = 3.0;
     qreal mosaicBlockSize = 14.0;
-    qreal laserWidth = 6.0;
 
     // 矩形相关
     bool shapeFilled = false;

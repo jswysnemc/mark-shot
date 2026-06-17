@@ -18,11 +18,13 @@ namespace {
 constexpr const char *kFileName = "annotation-state.json";
 
 constexpr const char *kKeyCurrentColor = "currentColor";
+constexpr const char *kKeyStrokeWidth = "strokeWidth";
+constexpr const char *kKeyHighlighterWidth = "highlighterWidth";
+constexpr const char *kKeyTextSize = "textSize";
 constexpr const char *kKeyPenWidth = "penWidth";
 constexpr const char *kKeyShapeWidth = "shapeWidth";
 constexpr const char *kKeyNumberWidth = "numberWidth";
 constexpr const char *kKeyMosaicBlockSize = "mosaicBlockSize";
-constexpr const char *kKeyLaserWidth = "laserWidth";
 constexpr const char *kKeyShapeFilled = "shapeFilled";
 constexpr const char *kKeyRectangleCornerRadius = "rectangleCornerRadius";
 constexpr const char *kKeyRectangleStyle = "rectangleStyle";
@@ -117,12 +119,18 @@ AnnotationState loadAnnotationState()
         colorFromJson(root.value(QString::fromLatin1(kKeyTextBackgroundColor)), state.textBackgroundColor);
 
     // 2. 笔宽与尺寸字段(范围与 shot_window_internal.h 中常量保持一致)
-    state.penWidth = clampedDouble(root.value(QString::fromLatin1(kKeyPenWidth)), state.penWidth, 1.0, 24.0);
-    state.shapeWidth = clampedDouble(root.value(QString::fromLatin1(kKeyShapeWidth)), state.shapeWidth, 1.0, 24.0);
+    const qreal legacyPenWidth =
+        clampedDouble(root.value(QString::fromLatin1(kKeyPenWidth)), 2.0, 1.0, 24.0);
+    const qreal legacyShapeWidth =
+        clampedDouble(root.value(QString::fromLatin1(kKeyShapeWidth)), 3.0, 1.0, 24.0);
+    state.strokeWidth =
+        clampedDouble(root.value(QString::fromLatin1(kKeyStrokeWidth)), legacyShapeWidth, 1.0, 24.0);
+    state.highlighterWidth =
+        clampedDouble(root.value(QString::fromLatin1(kKeyHighlighterWidth)), legacyPenWidth * 2.0, 1.0, 48.0);
     state.numberWidth = clampedDouble(root.value(QString::fromLatin1(kKeyNumberWidth)), state.numberWidth, 1.0, 72.0);
+    state.textSize = clampedDouble(root.value(QString::fromLatin1(kKeyTextSize)), state.textSize, 1.0, 1000.0);
     state.mosaicBlockSize =
         clampedDouble(root.value(QString::fromLatin1(kKeyMosaicBlockSize)), state.mosaicBlockSize, 4.0, 48.0);
-    state.laserWidth = clampedDouble(root.value(QString::fromLatin1(kKeyLaserWidth)), state.laserWidth, 4.0, 48.0);
 
     // 3. 矩形相关
     const QJsonValue filledValue = root.value(QString::fromLatin1(kKeyShapeFilled));
@@ -187,11 +195,11 @@ bool saveAnnotationState(const AnnotationState &state)
     // 1. 组装 JSON 根对象
     QJsonObject root;
     root.insert(QString::fromLatin1(kKeyCurrentColor), colorToJson(state.currentColor));
-    root.insert(QString::fromLatin1(kKeyPenWidth), state.penWidth);
-    root.insert(QString::fromLatin1(kKeyShapeWidth), state.shapeWidth);
+    root.insert(QString::fromLatin1(kKeyStrokeWidth), state.strokeWidth);
+    root.insert(QString::fromLatin1(kKeyHighlighterWidth), state.highlighterWidth);
     root.insert(QString::fromLatin1(kKeyNumberWidth), state.numberWidth);
+    root.insert(QString::fromLatin1(kKeyTextSize), state.textSize);
     root.insert(QString::fromLatin1(kKeyMosaicBlockSize), state.mosaicBlockSize);
-    root.insert(QString::fromLatin1(kKeyLaserWidth), state.laserWidth);
     root.insert(QString::fromLatin1(kKeyShapeFilled), state.shapeFilled);
     root.insert(QString::fromLatin1(kKeyRectangleCornerRadius), state.rectangleCornerRadius);
     root.insert(QString::fromLatin1(kKeyRectangleStyle), static_cast<int>(state.rectangleStyle));

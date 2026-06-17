@@ -118,6 +118,10 @@ private:
     /// @param alwaysOnTop 是否保持置顶。
     void setAlwaysOnTop(bool alwaysOnTop);
 
+    /// @brief 设置并保存翻译目标语言。
+    /// @param targetLanguage 实际传给翻译器的目标语言名称。
+    void setTranslationTargetLanguage(QString targetLanguage);
+
     /// @brief 在协议角色需要变化时重新创建窗口。
     /// @return 无返回值。
     void recreateWithCurrentImage();
