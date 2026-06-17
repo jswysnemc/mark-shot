@@ -518,22 +518,15 @@ QIcon makeToolIcon(ShotWindow::Action action)
         break;
     }
     case ShotWindow::Action::Upload: {
-        // Cloud with an upward arrow, the canonical "upload to host" glyph.
+        // 与 Ricelin rishot/Icon.qml 一致：托盘横线 + 居中上箭头（24 视口映射到 32 画布）
         p.setPen(makePen(kInk, 1.7));
-        QPainterPath cloud;
-        cloud.moveTo(8.5, 21.0);
-        cloud.cubicTo(5.5, 21.0, 5.5, 16.5, 9.0, 16.5);
-        cloud.cubicTo(9.0, 12.5, 14.5, 12.0, 15.5, 16.0);
-        cloud.cubicTo(20.0, 15.5, 21.5, 21.0, 17.5, 21.0);
-        cloud.closeSubpath();
-        p.drawPath(cloud);
-        // Upward arrow inside the cloud silhouette.
+        p.drawLine(QPointF(9.0, 24.0), QPointF(23.0, 24.0));
         p.setPen(makePen(kInk, 1.8));
-        p.drawLine(QPointF(13.0, 19.5), QPointF(13.0, 9.5));
+        p.drawLine(QPointF(16.0, 20.0), QPointF(16.0, 8.0));
         QPainterPath head;
-        head.moveTo(9.5, 12.5);
-        head.lineTo(13.0, 9.0);
-        head.lineTo(16.5, 12.5);
+        head.moveTo(11.0, 13.0);
+        head.lineTo(16.0, 8.0);
+        head.lineTo(21.0, 13.0);
         p.drawPath(head);
         break;
     }
