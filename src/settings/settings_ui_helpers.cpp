@@ -114,7 +114,6 @@ QComboBox *addComboRow(QFormLayout *form, const QString &label)
 QKeySequenceEdit *addShortcutRow(QFormLayout *form, const QString &label)
 {
     auto *edit = new QKeySequenceEdit;
-    edit->setClearButtonEnabled(true);
     form->addRow(label, edit);
     return edit;
 }
