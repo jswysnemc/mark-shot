@@ -2,6 +2,9 @@
 
 #include "config_value.h"
 #include "debug_log.h"
+#if defined(MARK_SHOT_WITH_DBUS)
+#include "global_shortcut_portal.h"
+#endif
 #include "shot_window.h"
 #include "ui/i18n.h"
 #include "ui/icons.h"
@@ -248,6 +251,8 @@ bool WindowsTrayController::hotkeysSupported()
 {
 #if defined(Q_OS_WIN)
     return true;
+#elif defined(MARK_SHOT_WITH_DBUS)
+    return GlobalShortcutPortal::isAvailable();
 #else
     return false;
 #endif
@@ -319,21 +324,9 @@ bool WindowsTrayController::start()
     });
     m_tray->show();
 
-#if defined(Q_OS_WIN)
     if (m_config.hotkeysEnabled) {
         registerHotkeys();
     }
-#else
-    if (m_config.hotkeysEnabled) {
-        m_errorString = MS_TR("Global hotkeys are not supported on this platform. "
-                              "Use the tray menu or bind a desktop shortcut instead.");
-        markshot::debugLog("tray", "%s", m_errorString.toUtf8().constData());
-        if (m_tray) {
-            m_tray->showMessage(QStringLiteral("Mark Shot"), m_errorString,
-                                QSystemTrayIcon::Information, 4000);
-        }
-    }
-#endif
     return true;
 }
 
@@ -420,6 +413,49 @@ void WindowsTrayController::registerHotkeys()
     if (m_config.fullscreenHotkey != m_config.captureHotkey) {
         registerSequence(kFullscreenHotkeyId, m_config.fullscreenHotkey, &m_fullscreenHotkeyRegistered);
     }
+#elif defined(MARK_SHOT_WITH_DBUS)
+    QList<GlobalShortcutPortal::Shortcut> shortcuts;
+    if (!m_config.captureHotkey.isEmpty()) {
+        shortcuts.append({QStringLiteral("capture"),
+                          MS_TR("Capture"),
+                          m_config.captureHotkey,
+                          [this] { triggerCapture(); }});
+    }
+    if (!m_config.fullscreenHotkey.isEmpty() && m_config.fullscreenHotkey != m_config.captureHotkey) {
+        shortcuts.append({QStringLiteral("fullscreen"),
+                          MS_TR("Fullscreen Capture"),
+                          m_config.fullscreenHotkey,
+                          [this] { triggerFullscreenCapture(); }});
+    }
+
+    if (!m_globalShortcutPortal) {
+        m_globalShortcutPortal = new GlobalShortcutPortal(this);
+    }
+    if (m_globalShortcutPortal->registerShortcuts(shortcuts)) {
+        markshot::debugLog("tray", "【托盘】【全局快捷键】registered through xdg-desktop-portal");
+        return;
+    }
+
+    m_errorString = m_globalShortcutPortal->errorString();
+    if (m_errorString.isEmpty()) {
+        m_errorString = MS_TR("Global hotkeys are not supported on this platform. "
+                              "Use the tray menu or bind a desktop shortcut instead.");
+    }
+    markshot::debugLog("tray",
+                       "【托盘】【全局快捷键】registration failed: %s",
+                       m_errorString.toUtf8().constData());
+    if (m_tray) {
+        m_tray->showMessage(QStringLiteral("Mark Shot"), m_errorString, QSystemTrayIcon::Information, 5000);
+    }
+#else
+    m_errorString = MS_TR("Global hotkeys are not supported on this platform. "
+                          "Use the tray menu or bind a desktop shortcut instead.");
+    markshot::debugLog("tray",
+                       "【托盘】【全局快捷键】registration failed: %s",
+                       m_errorString.toUtf8().constData());
+    if (m_tray) {
+        m_tray->showMessage(QStringLiteral("Mark Shot"), m_errorString, QSystemTrayIcon::Information, 4000);
+    }
 #endif
 }
 
@@ -437,6 +473,10 @@ void WindowsTrayController::unregisterHotkeys()
     if (m_application && m_nativeEventFilterInstalled) {
         m_application->removeNativeEventFilter(this);
         m_nativeEventFilterInstalled = false;
+    }
+#elif defined(MARK_SHOT_WITH_DBUS)
+    if (m_globalShortcutPortal) {
+        m_globalShortcutPortal->unregisterShortcuts();
     }
 #endif
 }

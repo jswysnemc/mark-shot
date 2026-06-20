@@ -13,6 +13,8 @@ class QSystemTrayIcon;
 
 namespace markshot {
 
+class GlobalShortcutPortal;
+
 class WindowsTrayController final : public QObject, public QAbstractNativeEventFilter {
 public:
     struct Config {
@@ -57,6 +59,7 @@ private:
     bool m_nativeEventFilterInstalled = false;
     bool m_captureHotkeyRegistered = false;
     bool m_fullscreenHotkeyRegistered = false;
+    GlobalShortcutPortal *m_globalShortcutPortal = nullptr;
 };
 
 }  // namespace markshot

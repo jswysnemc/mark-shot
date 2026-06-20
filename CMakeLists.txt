@@ -237,6 +237,11 @@ target_link_libraries(mark-shot
 )
 
 if(MARK_SHOT_LINUX)
+    target_sources(mark-shot
+        PRIVATE
+            src/global_shortcut_portal.cpp
+            src/global_shortcut_portal.h
+    )
     target_link_libraries(mark-shot PRIVATE Qt6::DBus)
     target_compile_definitions(mark-shot PRIVATE MARK_SHOT_WITH_DBUS)
 endif()
