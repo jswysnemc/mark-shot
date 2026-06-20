@@ -181,6 +181,7 @@ QJsonObject defaultAppConfigRoot()
     QJsonObject pinnedWindow;
     pinnedWindow.insert(QStringLiteral("autoOcr"), false);
     pinnedWindow.insert(QStringLiteral("alwaysOnTop"), true);
+    pinnedWindow.insert(QStringLiteral("textSelectionCopyEnabled"), true);
     pinnedWindow.insert(QStringLiteral("border"), true);
     pinnedWindow.insert(QStringLiteral("borderColor"), markshot::theme::kAccent.name(QColor::HexRgb).toUpper());
     pinnedWindow.insert(QStringLiteral("borderWidth"), 2);

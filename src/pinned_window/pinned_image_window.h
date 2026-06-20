@@ -118,6 +118,10 @@ private:
     /// @param alwaysOnTop 是否保持置顶。
     void setAlwaysOnTop(bool alwaysOnTop);
 
+    /// @brief 保存并应用文本拖选复制权限。
+    /// @param enabled 是否允许通过鼠标拖选复制 OCR 或翻译文本。
+    void setTextSelectionCopyEnabled(bool enabled);
+
     /// @brief 设置并保存翻译目标语言。
     /// @param targetLanguage 实际传给翻译器的目标语言名称。
     void setTranslationTargetLanguage(QString targetLanguage);
@@ -298,6 +302,10 @@ private:
     /// @brief 返回当前选中文本。
     /// @return 选中文本。
     QString selectedText() const;
+
+    /// @brief 复制当前选中文本。
+    /// @return 无返回值。
+    void copySelectedText();
 
     /// @brief 返回当前全部 OCR 或翻译文本。
     /// @return 全部文本。

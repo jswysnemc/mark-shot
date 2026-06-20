@@ -80,7 +80,7 @@ void PinnedImageWindow::updateCursorForPosition(QPointF widgetPoint)
         return;
     }
 
-    if (tokenAt(widgetToImage(widgetPoint))) {
+    if (m_config.textSelectionCopyEnabled && tokenAt(widgetToImage(widgetPoint))) {
         setCursor(Qt::IBeamCursor);
     } else {
         setCursor(Qt::OpenHandCursor);
@@ -120,6 +120,14 @@ QString PinnedImageWindow::selectedText() const
     }
     const auto [first, last] = selectionRange();
     return tokenRangeText(first, last);
+}
+
+void PinnedImageWindow::copySelectedText()
+{
+    if (!hasTextSelection()) {
+        return;
+    }
+    markshot::copyTextToClipboard(selectedText());
 }
 
 QString PinnedImageWindow::allText() const

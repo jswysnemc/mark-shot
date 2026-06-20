@@ -138,6 +138,7 @@ qt_add_executable(mark-shot
     src/save_path_config.h
     src/shortcut_config.cpp
     src/shortcut_config.h
+    src/pinned_window_config.cpp
     src/shot_window.cpp
     src/shot_window.h
     src/shot_window_config.cpp
@@ -522,6 +523,22 @@ if(BUILD_TESTING)
             Qt6::Test
     )
     add_test(NAME code-scan-result COMMAND mark-shot-code-scan-result-test)
+
+    qt_add_executable(mark-shot-pinned-window-config-test
+        tests/pinned_window_config_test.cpp
+        src/pinned_window_config.cpp
+        src/config_value.cpp
+        src/config_value.h
+    )
+    target_include_directories(mark-shot-pinned-window-config-test PRIVATE src)
+    target_link_libraries(mark-shot-pinned-window-config-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+            Qt6::Widgets
+    )
+    add_test(NAME pinned-window-config COMMAND mark-shot-pinned-window-config-test)
 
     qt_add_executable(mark-shot-pinned-layer-shell-geometry-test
         tests/pinned_layer_shell_geometry_test.cpp

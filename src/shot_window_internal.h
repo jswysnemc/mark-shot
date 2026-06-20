@@ -63,6 +63,7 @@ inline constexpr qreal kMinMagnifierDragDistance = 64.0;
 struct PinnedWindowConfig {
     bool alwaysOnTop = true;
     bool ocrEnabled = true;
+    bool textSelectionCopyEnabled = true;
     bool autoOcr = false;
     QString ocrBackend = QStringLiteral("auto");
     QString ocrCommand;
@@ -75,6 +76,11 @@ struct PinnedWindowConfig {
     QColor borderColor = markshot::theme::kAccent;
     qreal borderWidth = 2.0;
 };
+
+/// @brief 从应用配置根对象解析置顶图片窗口配置。
+/// @param root 应用配置根对象。
+/// @return 置顶图片窗口配置。
+PinnedWindowConfig pinnedWindowConfigFromRoot(const QJsonObject &root);
 
 struct CodeScanConfig {
     QString command;
@@ -98,6 +104,8 @@ qreal normalizedRotationDegrees(qreal degrees);
 std::optional<bool> boolFromText(QString value);
 std::optional<bool> boolFromConfigValue(const QJsonValue &value);
 std::optional<bool> envFlagValue(const QProcessEnvironment &env, const QStringList &names);
+std::optional<QColor> colorFromConfigValue(const QJsonValue &value);
+std::optional<qreal> realFromConfigValue(const QJsonValue &value);
 bool sendDesktopNotification(const QString &summary, const QString &body, int timeoutMs = 2500);
 QColor propertyIconInkForFill(const QColor &fillColor);
 QString colorHexRgb(QColor color);

@@ -201,7 +201,10 @@ void PinnedImageWindow::mousePressEvent(QMouseEvent *event)
             return;
         }
 
-        if (const std::optional<int> token = tokenAt(widgetToImage(event->position()))) {
+        const std::optional<int> token = m_config.textSelectionCopyEnabled
+            ? tokenAt(widgetToImage(event->position()))
+            : std::nullopt;
+        if (token) {
             m_selectingText = true;
             m_selectionAnchor = *token;
             m_selectionFocus = *token;
@@ -310,7 +313,10 @@ void PinnedImageWindow::wheelEvent(QWheelEvent *event)
 void PinnedImageWindow::mouseDoubleClickEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
-        if (const std::optional<int> token = tokenAt(widgetToImage(event->position()))) {
+        const std::optional<int> token = m_config.textSelectionCopyEnabled
+            ? tokenAt(widgetToImage(event->position()))
+            : std::nullopt;
+        if (token) {
             m_selectionAnchor = *token;
             m_selectionFocus = *token;
             update();
@@ -358,13 +364,19 @@ void PinnedImageWindow::contextMenuEvent(QContextMenuEvent *event)
         markshot::copyImageToClipboard(m_pixmap.toImage());
     });
     QAction *copySelectedTextAction = menu.addAction(MS_TR("Copy Selected Text"), this, [this] {
-        markshot::copyTextToClipboard(selectedText());
+        copySelectedText();
     });
     copySelectedTextAction->setEnabled(hasTextSelection());
     QAction *copyTextAction = menu.addAction(MS_TR("Copy Image Text"), this, [this] {
         copyImageText();
     });
     copyTextAction->setEnabled(m_config.ocrEnabled);
+    QAction *textSelectionCopyAction = menu.addAction(MS_TR("Text Selection Copy"));
+    textSelectionCopyAction->setCheckable(true);
+    textSelectionCopyAction->setChecked(m_config.textSelectionCopyEnabled);
+    connect(textSelectionCopyAction, &QAction::toggled, this, [this](bool checked) {
+        setTextSelectionCopyEnabled(checked);
+    });
     QAction *translateAction = menu.addAction(MS_TR("Translate"), this, [this] {
         requestTranslation();
     });
@@ -391,7 +403,7 @@ void PinnedImageWindow::contextMenuEvent(QContextMenuEvent *event)
 void PinnedImageWindow::keyPressEvent(QKeyEvent *event)
 {
     if (event->matches(QKeySequence::Copy) && hasTextSelection()) {
-        markshot::copyTextToClipboard(selectedText());
+        copySelectedText();
         event->accept();
         return;
     }
@@ -477,6 +489,34 @@ void PinnedImageWindow::setAlwaysOnTop(bool alwaysOnTop)
     if (m_config.alwaysOnTop) {
         schedulePinnedWindowRaise();
     }
+}
+
+void PinnedImageWindow::setTextSelectionCopyEnabled(bool enabled)
+{
+    if (m_config.textSelectionCopyEnabled == enabled) {
+        return;
+    }
+
+    QString error;
+    if (!markshot::writeAppConfigValue(
+            {QStringLiteral("pinnedWindow"), QStringLiteral("textSelectionCopyEnabled")},
+            QJsonValue(enabled),
+            &error)) {
+        sendDesktopNotification(QStringLiteral("Mark Shot"),
+                                MS_TR("Failed to save pinned text selection setting."));
+        if (!error.isEmpty()) {
+            markshot::debugLog("config",
+                               "【置顶图片】【拖选复制】cannot save pinnedWindow.textSelectionCopyEnabled: %s",
+                               error.toUtf8().constData());
+        }
+        return;
+    }
+
+    m_config.textSelectionCopyEnabled = enabled;
+    if (!enabled) {
+        clearTextSelection();
+    }
+    updateCursorForPosition(mapFromGlobal(QCursor::pos()));
 }
 
 /// @brief 设置并保存翻译目标语言
