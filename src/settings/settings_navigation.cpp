@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QListWidgetItem>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPen>
 #include <QPixmap>
 #include <QPolygonF>
@@ -42,21 +43,27 @@ QPen navPen(const QColor &ink, qreal width = 1.8)
 /// @brief 绘制齿轮图标（General）。
 void drawGear(QPainter &p, const QColor &ink)
 {
-    p.setPen(navPen(ink, 1.7));
-    p.setBrush(Qt::NoBrush);
-    p.drawEllipse(QPointF(9, 9), 4.0, 4.0);
-    // 1. 画 8 个齿，从外圆向外辐射
-    for (int i = 0; i < 8; ++i) {
-        const qreal a = qDegreesToRadians(static_cast<qreal>(i) * 45.0);
-        const QPointF c(9, 9);
-        const QPointF p1(c.x() + 4.0 * qCos(a), c.y() + 4.0 * qSin(a));
-        const QPointF p2(c.x() + 6.0 * qCos(a), c.y() + 6.0 * qSin(a));
-        p.drawLine(p1, p2);
+    const QPointF center(9, 9);
+    QPainterPath gear;
+    // 1. 用交替半径绘制 8 齿外轮廓，避免放射线看起来像太阳
+    for (int i = 0; i < 32; ++i) {
+        const qreal angle = qDegreesToRadians(-90.0 + static_cast<qreal>(i) * 11.25);
+        const bool toothTop = (i % 4 == 0) || (i % 4 == 1);
+        const qreal radius = toothTop ? 7.0 : 5.4;
+        const QPointF point(center.x() + radius * qCos(angle), center.y() + radius * qSin(angle));
+        if (i == 0) {
+            gear.moveTo(point);
+        } else {
+            gear.lineTo(point);
+        }
     }
-    // 2. 中心轴
-    p.setBrush(ink);
-    p.setPen(Qt::NoPen);
-    p.drawEllipse(QPointF(9, 9), 1.5, 1.5);
+    gear.closeSubpath();
+
+    p.setPen(navPen(ink, 1.35));
+    p.setBrush(Qt::NoBrush);
+    p.drawPath(gear);
+    // 2. 中心孔强化齿轮识别度
+    p.drawEllipse(center, 2.55, 2.55);
 }
 
 /// @brief 绘制相机图标（Capture）。
