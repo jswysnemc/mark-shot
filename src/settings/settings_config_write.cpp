@@ -2,6 +2,7 @@
 
 #include "annotation_state_store.h"
 #include "app_config_store.h"
+#include "autostart/autostart_manager.h"
 #include "capture_cursor_policy.h"
 #include "config_value.h"
 #include "ui/i18n.h"
@@ -131,6 +132,8 @@ void writeGeneralSettings(QJsonObject *root, const GeneralSettings &settings)
                    sequenceText(settings.captureHotkey));
     setNestedValue(root, {QStringLiteral("globalHotkeys"), QStringLiteral("fullscreen")},
                    sequenceText(settings.fullscreenHotkey));
+    setNestedValue(root, {QStringLiteral("startup"), QStringLiteral("launchOnStartup")},
+                   settings.launchOnStartup);
 }
 
 /// @brief 写入截图行为设置。
@@ -342,7 +345,12 @@ bool writeSettingsConfig(const SettingsConfig &config, QString *error)
         return false;
     }
 
-    // 2. 同步标注状态中的当前颜色，确保重启后默认颜色不回退
+    // 2. 同步系统开机启动项，失败时保留错误给设置弹窗展示
+    if (!autostart::setEnabled(config.general.launchOnStartup, error)) {
+        return false;
+    }
+
+    // 3. 同步标注状态中的当前颜色，确保重启后默认颜色不回退
     AnnotationState annotationState = loadAnnotationState();
     annotationState.currentColor = config.annotation.defaultColor;
     if (!saveAnnotationState(annotationState)) {

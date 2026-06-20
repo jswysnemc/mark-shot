@@ -14,6 +14,7 @@ namespace markshot::settings {
 
 struct GeneralSettings {
     bool trayEnabled = false;
+    bool launchOnStartup = false;
     bool hotkeysEnabled = true;
     QKeySequence captureHotkey = QKeySequence(QStringLiteral("Ctrl+Alt+S"));
     QKeySequence fullscreenHotkey;

@@ -107,6 +107,10 @@ qt_add_executable(mark-shot
     src/layer_shell_runtime.h
     src/line_skeleton_path.cpp
     src/line_skeleton_path.h
+    src/autostart/autostart_linux.cpp
+    src/autostart/autostart_manager.cpp
+    src/autostart/autostart_manager.h
+    src/autostart/autostart_windows.cpp
     src/startup_config.cpp
     src/startup_config.h
     src/window_detection.cpp

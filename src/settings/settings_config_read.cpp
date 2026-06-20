@@ -1,6 +1,7 @@
 #include "settings/settings_config.h"
 
 #include "app_config_store.h"
+#include "autostart/autostart_manager.h"
 #include "capture_cursor_policy.h"
 #include "config_value.h"
 #include "kde_capture_config.h"
@@ -528,6 +529,7 @@ SettingsConfig readSettingsConfig(QString *error)
     SettingsConfig settings;
     const WindowsTrayController::Config tray = WindowsTrayController::readConfig();
     settings.general.trayEnabled = tray.autoStart;
+    settings.general.launchOnStartup = autostart::isEnabled();
     settings.general.hotkeysEnabled = tray.hotkeysEnabled;
     settings.general.captureHotkey = tray.captureHotkey;
     settings.general.fullscreenHotkey = tray.fullscreenHotkey;

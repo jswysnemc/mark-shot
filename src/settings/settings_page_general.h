@@ -25,6 +25,7 @@ public:
 
 private:
     QCheckBox *m_trayEnabled = nullptr;
+    QCheckBox *m_launchOnStartup = nullptr;
     QCheckBox *m_hotkeysEnabled = nullptr;
     QKeySequenceEdit *m_captureHotkey = nullptr;
     QKeySequenceEdit *m_fullscreenHotkey = nullptr;

@@ -1,5 +1,6 @@
 #include "settings/settings_page_general.h"
 
+#include "autostart/autostart_manager.h"
 #include "settings/settings_ui_helpers.h"
 #include "ui/i18n.h"
 
@@ -23,6 +24,9 @@ SettingsPageGeneral::SettingsPageGeneral(QWidget *parent)
     m_trayEnabled = addSwitchRow(startupForm,
                                  MS_TR("Start in Tray"),
                                  MS_TR("Launch Mark Shot directly into the system tray."));
+    m_launchOnStartup = addSwitchRow(startupForm,
+                                     MS_TR("Launch on Startup"),
+                                     MS_TR("Start Mark Shot automatically after signing in."));
     m_hotkeysEnabled = addSwitchRow(startupForm,
                                     MS_TR("Global Hotkeys"),
                                     MS_TR("Register global capture shortcuts when the tray starts."));
@@ -41,6 +45,8 @@ SettingsPageGeneral::SettingsPageGeneral(QWidget *parent)
 void SettingsPageGeneral::setConfig(const SettingsConfig &config)
 {
     m_trayEnabled->setChecked(config.general.trayEnabled);
+    m_launchOnStartup->setEnabled(autostart::isSupported());
+    m_launchOnStartup->setChecked(m_launchOnStartup->isEnabled() && config.general.launchOnStartup);
     m_hotkeysEnabled->setChecked(config.general.hotkeysEnabled);
     m_captureHotkey->setKeySequence(config.general.captureHotkey);
     m_fullscreenHotkey->setKeySequence(config.general.fullscreenHotkey);
@@ -53,6 +59,7 @@ void SettingsPageGeneral::updateConfig(SettingsConfig *config) const
     }
 
     config->general.trayEnabled = m_trayEnabled->isChecked();
+    config->general.launchOnStartup = m_launchOnStartup->isEnabled() && m_launchOnStartup->isChecked();
     config->general.hotkeysEnabled = m_hotkeysEnabled->isChecked();
     config->general.captureHotkey = m_captureHotkey->keySequence();
     config->general.fullscreenHotkey = m_fullscreenHotkey->keySequence();
