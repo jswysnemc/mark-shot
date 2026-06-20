@@ -175,7 +175,9 @@ ShotWindow *showCapturedWindow(QScreen *screen,
     ShotWindow *window =
         new ShotWindow(std::move(image), std::move(outputName), sourceGeometry, std::move(windowGeometries), detectWindows);
     window->setDefaultTools(defaultTools.normal, defaultTools.fullscreen);
-    window->setDefaultColor(defaultTools.color);
+    if (markshot::shouldApplyDefaultColor(defaultTools)) {
+        window->setDefaultColor(defaultTools.color);
+    }
     if (screen && !allOutputs) {
         window->setScreen(screen);
     }

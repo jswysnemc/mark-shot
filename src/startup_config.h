@@ -11,11 +11,18 @@
 
 namespace markshot {
 
+enum class DefaultColorSource {
+    BuiltIn,
+    Config,
+    CommandLine,
+};
+
 struct DefaultTools {
     ShotWindow::Tool normal = ShotWindow::Tool::Pen;
     ShotWindow::Tool fullscreen = ShotWindow::Tool::Pen;
     ShotWindow::Tool file = ShotWindow::Tool::Pen;
     QColor color = markshot::theme::kDefaultAnnotationColor;
+    DefaultColorSource colorSource = DefaultColorSource::BuiltIn;
 };
 
 struct DebugRuntimeConfig {
@@ -45,6 +52,21 @@ DebugRuntimeConfig configuredDebugRuntimeConfig();
 /// @param warning 输出配置警告。
 /// @return 默认工具配置。
 DefaultTools configuredDefaultTools(QString *warning);
+
+/// @brief 判断指定来源的默认颜色是否应覆盖持久化颜色。
+/// @param colorSource 默认颜色来源。
+/// @param annotationStateExists 标注状态文件是否存在。
+/// @return 需要应用默认颜色时返回 true。
+constexpr bool shouldApplyDefaultColor(DefaultColorSource colorSource, bool annotationStateExists)
+{
+    return colorSource == DefaultColorSource::CommandLine
+        || (colorSource == DefaultColorSource::Config && !annotationStateExists);
+}
+
+/// @brief 判断默认颜色是否应覆盖窗口中已经加载的持久化颜色。
+/// @param tools 默认工具配置。
+/// @return 需要应用默认颜色时返回 true。
+bool shouldApplyDefaultColor(const DefaultTools &tools);
 
 /// @brief 禁用 Qt 默认门户服务以便应用自行注册门户会话。
 /// @return 无返回值。

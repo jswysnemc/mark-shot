@@ -336,6 +336,7 @@ int main(int argc, char *argv[])
             return 1;
         }
         defaultTools.color = *parsedColor;
+        defaultTools.colorSource = markshot::DefaultColorSource::CommandLine;
     }
     if (!configDefaultToolWarning.isEmpty()) {
         QMessageBox::warning(nullptr, QStringLiteral("Mark Shot"), configDefaultToolWarning);
@@ -362,7 +363,9 @@ int main(int argc, char *argv[])
 
         ShotWindow *window = new ShotWindow(image, imageFile.fileName());
         window->setDefaultTools(defaultTools.normal, defaultTools.file);
-        window->setDefaultColor(defaultTools.color);
+        if (markshot::shouldApplyDefaultColor(defaultTools)) {
+            window->setDefaultColor(defaultTools.color);
+        }
         QScreen *screen = markshot::focusedScreen();
         if (screen) {
             window->setScreen(screen);

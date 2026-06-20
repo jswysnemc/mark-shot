@@ -1,5 +1,6 @@
 #include "startup_config.h"
 
+#include "annotation_state_store.h"
 #include "config_value.h"
 #include "debug_log.h"
 #include "ui/i18n.h"
@@ -444,6 +445,7 @@ DefaultTools configuredDefaultTools(QString *warning)
     if (!configuredColor.isUndefined()) {
         if (const std::optional<QColor> color = colorFromValue(configuredColor)) {
             tools.color = *color;
+            tools.colorSource = DefaultColorSource::Config;
         } else {
             markshot::debugLog("config",
                                "unsupported default color in annotation.defaultColor; using built-in default");
@@ -461,6 +463,12 @@ DefaultTools configuredDefaultTools(QString *warning)
         }
     }
     return tools;
+}
+
+bool shouldApplyDefaultColor(const DefaultTools &tools)
+{
+    const bool annotationStateExists = QFileInfo::exists(markshot::annotationStateFilePath());
+    return shouldApplyDefaultColor(tools.colorSource, annotationStateExists);
 }
 
 void disableQtPortalServicesForHostApp()

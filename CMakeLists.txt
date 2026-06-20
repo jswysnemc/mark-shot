@@ -339,6 +339,19 @@ if(BUILD_TESTING)
     )
     add_test(NAME config-value COMMAND mark-shot-config-value-test)
 
+    qt_add_executable(mark-shot-startup-default-color-test
+        tests/startup_default_color_test.cpp
+    )
+    target_include_directories(mark-shot-startup-default-color-test PRIVATE src)
+    target_link_libraries(mark-shot-startup-default-color-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Widgets
+            Qt6::Test
+    )
+    add_test(NAME startup-default-color COMMAND mark-shot-startup-default-color-test)
+
     qt_add_executable(mark-shot-toolbar-appearance-config-test
         tests/toolbar_appearance_config_test.cpp
         src/toolbar_appearance_config.cpp
