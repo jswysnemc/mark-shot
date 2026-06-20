@@ -891,6 +891,15 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 
 ## Release Notes
 
+### 0.1.30
+
+- **Settings Configuration Dialog**: Added a dedicated settings window with pages for General, Capture, Annotation, Pinned, Scroll, Shortcuts, Storage, Integrations, and Advanced. Every previously file-only option is now editable in one place, backed by the same `config.json` store, with shared design tokens and a custom navigation sidebar.
+- **Launch on Startup**: Added a `Launch on Startup` switch on the General page. Linux writes an XDG `autostart` desktop entry; Windows writes the current user's `Run` registry key. The switch disables itself on unsupported platforms.
+- **Portal Global Shortcut Support**: Added an `xdg-desktop-portal` `GlobalShortcuts` backend so global capture hotkeys work on Wayland without X11.
+- **Pinned Text Selection Toggle**: The pinned image window now exposes a configurable text-selection toggle, with `pinned_window_config` split into its own module.
+- **Settings Entry During Capture**: Opening settings from the toolbar or shortcut now closes the frozen capture session first and defers the dialog to the next event-loop tick, avoiding conflicts with the layer-shell capture window.
+- **Pinned Window Placement on Wayland**: Extracted layer-shell geometry computation and improved the resize controller, fixing off-screen and multi-monitor placement of pinned windows.
+
 ### 0.1.29
 
 - **Independent Magnifier Frame Resize**: The magnifier annotation now exposes resize handles on both the inner source viewfinder and the outer lens. Rectangle lenses get 8 corner/edge handles per frame, circular lenses get 4. Resizing either frame keeps `magnifierScale` constant by scaling the other frame proportionally, so the loupe ratio stays consistent regardless of which side the user grabs.

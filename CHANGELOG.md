@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.30 - 2026-06-20
+
+### Features & Enhancements
+
+- **Settings Configuration Dialog**: Introduced a dedicated settings dialog that consolidates every previously file-only option into a single window. Pages cover General, Capture, Annotation, Pinned, Scroll, Shortcuts, Storage, Integrations, and Advanced, each reading from and writing to the same `config.json`-backed store. The dialog ships with extracted design tokens and a custom navigation sidebar with hand-drawn vector icons, so the look stays consistent across pages and screen sizes.
+- **Launch on Startup**: Added cross-platform autostart support behind a new `Launch on Startup` switch on the General settings page. On Linux it writes an XDG `autostart/mark-shot.desktop` entry that starts Mark Shot with `--tray`; on Windows it writes the current user's `Run` registry key. The switch is disabled automatically on platforms where autostart is unavailable, and applying settings syncs the system entry through the new `autostart` module (`src/autostart/`) atomically with `config.json` updates.
+- **Portal Global Shortcut Support**: Added an `xdg-desktop-portal` based `GlobalShortcuts` backend (`src/global_shortcut_portal.cpp`) so global capture hotkeys work on Wayland compositors without X11. The tray controller now wires the portal backend alongside the existing register path, broadening hotkey compatibility across desktops.
+- **Pinned Text Selection Toggle**: The pinned image window now exposes a configurable text-selection toggle. `pinned_window_config` was split out of `shot_window_config` into its own module, letting users control whether OCR text in pinned windows is selectable, with a matching unit test (`tests/pinned_window_config_test.cpp`).
+
+### Bug Fixes
+
+- **Settings Entry During Capture**: Opening settings from the annotation toolbar or the settings shortcut now closes the frozen capture session first and defers the dialog to the next event-loop tick via `openSettingsAfterClosingCapture`. This prevents the settings dialog from fighting the layer-shell capture window and avoids leaving frozen frames on screen.
+- **Navigation Gear Icon**: Redrew the General navigation icon with an alternating-radius 8-tooth outline and a centered bore, replacing the radial-spoke look that read as a sun rather than a gear.
+- **Pinned Window Placement on Wayland**: Extracted layer-shell geometry computation into `pinned_layer_shell_geometry` and taught the resize controller about Wayland-specific constraints, fixing off-screen and multi-monitor placement of pinned windows. Covered by `tests/pinned_layer_shell_geometry_test.cpp` and updated resize-controller tests.
+- **Layer-Shell Window Animations**: Suppressed entry/exit animations on layer-shell windows for pinned, scroll, and capture surfaces so they appear and disappear instantly.
+- **Persisted Annotation Color**: Ensured the persisted default annotation color is applied at startup before UI construction, preventing the color from briefly reverting to the built-in default on launch.
+
 ## 0.1.29 - 2026-06-18
 
 ### Features & Enhancements
