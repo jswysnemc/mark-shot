@@ -134,7 +134,7 @@ markshot::layershell::FloatingOverlayConfig floatingOverlayConfig(QWidget *windo
     const int top = geometry.top() - screenGeometry.top();
 
     markshot::layershell::FloatingOverlayConfig config;
-    config.scope = QStringLiteral("mark-shot-pin");
+    config.scope = QStringLiteral("dock");
     config.keyboardInteractivity = markshot::layershell::KeyboardInteractivity::OnDemand;
     config.activateOnShow = true;
     config.closeOnDismissed = false;

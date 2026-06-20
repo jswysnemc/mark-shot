@@ -623,7 +623,7 @@ bool ShotWindow::configureLayerShell(QScreen *screen)
     return markshot::layershell::configureOverlay(
         this,
         screen,
-        {QStringLiteral("mark-shot"),
+        {QStringLiteral("dock"),
          markshot::layershell::KeyboardInteractivity::Exclusive,
          true,
          true});

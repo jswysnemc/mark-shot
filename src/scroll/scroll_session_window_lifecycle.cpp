@@ -100,7 +100,7 @@ bool ScrollSessionWindow::configureLayerShell(QScreen *screen)
     // Do not hold exclusive keyboard focus; the page below should keep receiving
     // keyboard and wheel input while the panel can still take focus when clicked.
     markshot::layershell::FloatingOverlayConfig config;
-    config.scope = QStringLiteral("mark-shot-scroll");
+    config.scope = QStringLiteral("dock");
     config.keyboardInteractivity = markshot::layershell::KeyboardInteractivity::OnDemand;
     config.closeOnDismissed = false;
     config.wantsActiveScreenWhenNoScreen = true;
