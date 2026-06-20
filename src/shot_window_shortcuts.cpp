@@ -1,7 +1,5 @@
 #include "shot_window_module.h"
 
-#include "settings/settings_dialog.h"
-
 namespace shortcuts = markshot::shortcut;
 using namespace markshot::shot;
 
@@ -184,7 +182,7 @@ bool ShotWindow::handleConfiguredActionShortcut(QKeyEvent *event)
         return true;
     }
     if (eventMatchesShortcut(event, Action::Settings)) {
-        markshot::settings::showSettingsDialog(this);
+        openSettingsAfterClosingCapture();
         return true;
     }
     if (eventMatchesShortcut(event, Action::Clear)) {

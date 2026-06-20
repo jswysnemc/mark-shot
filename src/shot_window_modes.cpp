@@ -258,12 +258,24 @@ QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcut
     } else if (action == Action::Upload) {
         connect(button, &QPushButton::clicked, this, [this] { uploadSelection(); });
     } else if (action == Action::Settings) {
-        connect(button, &QPushButton::clicked, this, [this] { markshot::settings::showSettingsDialog(this); });
+        connect(button, &QPushButton::clicked, this, [this] { openSettingsAfterClosingCapture(); });
     } else if (action == Action::Cancel) {
         connect(button, &QPushButton::clicked, this, [this] { close(); });
     }
 
     return button;
+}
+
+void ShotWindow::openSettingsAfterClosingCapture()
+{
+    // 1. 下一轮事件循环打开设置，确保冻结窗口先完成关闭
+    QTimer::singleShot(0, [] { markshot::settings::showSettingsDialog(); });
+    // 2. 通知同一截图会话关闭所有冻结窗口；无会话管理器时关闭当前窗口
+    if (receivers(SIGNAL(sessionCancelRequested())) > 0) {
+        emit sessionCancelRequested();
+    } else {
+        close();
+    }
 }
 
 QVector<ShotWindow::DesktopApp> ShotWindow::imageDesktopApps() const

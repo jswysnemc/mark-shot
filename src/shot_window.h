@@ -441,6 +441,7 @@ private:
     void saveSelectionAs();
     void saveSelection();
     void revealSelectionInfo();
+    void openSettingsAfterClosingCapture();
     void setTool(Tool tool);
     void toggleCaptureScope();
     void toggleToolbarLayout();
