@@ -33,6 +33,35 @@ struct PinnedResizeDragState {
 /// @return 命中边界时返回 true。
 bool isPinnedResizeDirection(PinnedResizeDirection direction);
 
+/// @brief 判断缩放方向是否包含左边界。
+/// @param direction 缩放方向。
+/// @return 包含左边界时返回 true。
+bool pinnedResizeDirectionIncludesLeft(PinnedResizeDirection direction);
+
+/// @brief 判断缩放方向是否包含右边界。
+/// @param direction 缩放方向。
+/// @return 包含右边界时返回 true。
+bool pinnedResizeDirectionIncludesRight(PinnedResizeDirection direction);
+
+/// @brief 判断缩放方向是否包含上边界。
+/// @param direction 缩放方向。
+/// @return 包含上边界时返回 true。
+bool pinnedResizeDirectionIncludesTop(PinnedResizeDirection direction);
+
+/// @brief 判断缩放方向是否包含下边界。
+/// @param direction 缩放方向。
+/// @return 包含下边界时返回 true。
+bool pinnedResizeDirectionIncludesBottom(PinnedResizeDirection direction);
+
+/// @brief 判断贴边窗口的缩放方向是否应让位给移动。
+/// @param direction 缩放方向。
+/// @param geometry 窗口全局逻辑几何。
+/// @param screenGeometry 屏幕全局逻辑几何。
+/// @return 命中贴边边缘时返回 true。
+bool pinnedResizeDirectionTouchesScreenEdge(PinnedResizeDirection direction,
+                                            QRect geometry,
+                                            QRect screenGeometry);
+
 /// @brief 根据鼠标位置判断置顶图片窗口的边界命中方向。
 /// @param localRect 窗口本地矩形。
 /// @param localPoint 鼠标在窗口内的位置。

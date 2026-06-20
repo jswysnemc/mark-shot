@@ -185,6 +185,8 @@ qt_add_executable(mark-shot
     src/pinned_window/pinned_image_window_ocr.cpp
     src/pinned_window/pinned_image_window_text_selection.cpp
     src/pinned_window/pinned_image_window_translation.cpp
+    src/pinned_window/pinned_layer_shell_geometry.cpp
+    src/pinned_window/pinned_layer_shell_geometry.h
     src/pinned_window/pinned_resize_controller.cpp
     src/pinned_window/pinned_resize_controller.h
     src/pinned_window_top.cpp
@@ -520,6 +522,20 @@ if(BUILD_TESTING)
             Qt6::Test
     )
     add_test(NAME code-scan-result COMMAND mark-shot-code-scan-result-test)
+
+    qt_add_executable(mark-shot-pinned-layer-shell-geometry-test
+        tests/pinned_layer_shell_geometry_test.cpp
+        src/pinned_window/pinned_layer_shell_geometry.cpp
+        src/pinned_window/pinned_layer_shell_geometry.h
+    )
+    target_include_directories(mark-shot-pinned-layer-shell-geometry-test PRIVATE src)
+    target_link_libraries(mark-shot-pinned-layer-shell-geometry-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+    )
+    add_test(NAME pinned-layer-shell-geometry COMMAND mark-shot-pinned-layer-shell-geometry-test)
 
     qt_add_executable(mark-shot-pinned-resize-controller-test
         tests/pinned_resize_controller_test.cpp

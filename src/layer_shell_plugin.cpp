@@ -36,7 +36,7 @@ void commitInteractiveLayerState(QWidget *widget, QWindow *nativeWindow, bool cr
         return;
     }
 
-    widget->repaint();
+    widget->update();
     if (nativeWindow) {
         nativeWindow->requestUpdate();
     }
@@ -155,7 +155,7 @@ private:
             return false;
         }
 
-        if (screen) {
+        if (screen && widget->screen() != screen) {
             widget->setScreen(screen);
         }
         if (createIfNeeded) {
@@ -168,7 +168,7 @@ private:
             markshot::debugLog("layershell", "floating configure failed: no native QWindow");
             return false;
         }
-        if (screen) {
+        if (screen && nativeWindow->screen() != screen) {
             nativeWindow->setScreen(screen);
         }
 
@@ -178,19 +178,24 @@ private:
             return false;
         }
 
-        layerWindow->setScope(config.scope);
-        layerWindow->setLayer(LayerShellQt::Window::LayerOverlay);
-        LayerShellQt::Window::Anchors anchors = LayerShellQt::Window::AnchorTop;
-        anchors |= LayerShellQt::Window::AnchorLeft;
-        layerWindow->setAnchors(anchors);
+        // 1. 静态 layer-shell 属性只在首次配置时写入,避免拖动时触发 KWin 重新管理窗口
+        if (createIfNeeded) {
+            layerWindow->setScope(config.scope);
+            layerWindow->setLayer(LayerShellQt::Window::LayerOverlay);
+            LayerShellQt::Window::Anchors anchors = LayerShellQt::Window::AnchorTop;
+            anchors |= LayerShellQt::Window::AnchorLeft;
+            layerWindow->setAnchors(anchors);
+            layerWindow->setExclusiveZone(-1);
+            layerWindow->setKeyboardInteractivity(keyboardInteractivity(config.keyboardInteractivity));
+            layerWindow->setActivateOnShow(config.activateOnShow);
+            layerWindow->setCloseOnDismissed(config.closeOnDismissed);
+        }
+
+        // 2. 拖动和缩放阶段只同步动态位置与尺寸
         layerWindow->setMargins(config.margins);
-        layerWindow->setExclusiveZone(-1);
-        layerWindow->setKeyboardInteractivity(keyboardInteractivity(config.keyboardInteractivity));
-        layerWindow->setActivateOnShow(config.activateOnShow);
-        layerWindow->setCloseOnDismissed(config.closeOnDismissed);
-        if (screen) {
+        if (screen && layerWindow->screen() != screen) {
             layerWindow->setScreen(screen);
-        } else if (config.wantsActiveScreenWhenNoScreen) {
+        } else if (createIfNeeded && config.wantsActiveScreenWhenNoScreen) {
             layerWindow->setWantsToBeOnActiveScreen(true);
         }
         layerWindow->setDesiredSize(config.desiredSize.isEmpty() ? widget->size() : config.desiredSize);

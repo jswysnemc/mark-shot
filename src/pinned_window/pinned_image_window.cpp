@@ -128,6 +128,9 @@ PinnedImageWindow::PinnedImageWindow(QImage image, std::optional<QPoint> initial
     m_logicalGeometry = QRect(pos(), size());
     setProperty("markShotPinnedGeometry", m_logicalGeometry);
     applyPinnedWindowTopState(this, m_config.alwaysOnTop);
+    if (pinnedWindowHasLayerShellTop(this)) {
+        setPinnedGeometry(m_logicalGeometry, false);
+    }
     if (m_config.autoOcr) {
         QTimer::singleShot(0, this, [this] { startOcr(); });
     }
@@ -155,12 +158,13 @@ void PinnedImageWindow::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    painter.drawPixmap(rect(), m_pixmap);
+    const QRectF imageRect = displayedImageRect();
+    painter.drawPixmap(imageRect, m_pixmap, QRectF(QPointF(0.0, 0.0), QSizeF(m_pixmap.size())));
     if (m_translationActive) {
         drawTranslationOverlay(painter);
     }
 
-    auto drawBorder = [this, &painter] {
+    auto drawBorder = [this, &painter, &imageRect] {
         if (!m_config.borderEnabled || !m_config.borderColor.isValid() || m_config.borderWidth <= 0.0) {
             return;
         }
@@ -169,7 +173,7 @@ void PinnedImageWindow::paintEvent(QPaintEvent *)
         painter.setBrush(Qt::NoBrush);
         painter.setPen(QPen(m_config.borderColor, m_config.borderWidth));
         const qreal inset = m_config.borderWidth / 2.0;
-        painter.drawRect(QRectF(rect()).adjusted(inset, inset, -inset, -inset));
+        painter.drawRect(imageRect.adjusted(inset, inset, -inset, -inset));
         painter.restore();
     };
 
@@ -249,7 +253,7 @@ void PinnedImageWindow::mouseMoveEvent(QMouseEvent *event)
     if (event->buttons().testFlag(Qt::LeftButton)) {
         const QPoint topLeft = event->globalPosition().toPoint() - m_dragOffset;
         if (m_config.alwaysOnTop && pinnedWindowHasLayerShellTop(this)) {
-            setPinnedGeometry(QRect(topLeft, size()), false);
+            setPinnedGeometry(QRect(topLeft, logicalPinnedSize()), false);
         } else {
             move(topLeft);
             setPinnedGeometry(QRect(topLeft, size()), true);
@@ -530,6 +534,9 @@ void PinnedImageWindow::restorePinnedState(QRect geometry, qreal scale)
     setFixedSize(geometry.size());
     setPinnedGeometry(geometry, true);
     applyPinnedWindowTopState(this, m_config.alwaysOnTop);
+    if (pinnedWindowHasLayerShellTop(this)) {
+        setPinnedGeometry(m_logicalGeometry, false);
+    }
 }
 
 void PinnedImageWindow::schedulePinnedWindowRaise()

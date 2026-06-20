@@ -141,6 +141,14 @@ private:
     /// @param localAnchor 窗口内锚点。
     void resizeByScale(qreal scale, QPoint globalAnchor, QPointF localAnchor);
 
+    /// @brief 返回完整贴图的逻辑显示尺寸。
+    /// @return 逻辑显示尺寸。
+    QSize logicalPinnedSize() const;
+
+    /// @brief 返回完整图片在当前 QWidget 内的绘制矩形。
+    /// @return 图片绘制矩形。
+    QRectF displayedImageRect() const;
+
     /// @brief 返回记录的全局左上角位置。
     /// @return 全局逻辑左上角。
     QPoint pinnedTopLeft() const;
@@ -160,6 +168,11 @@ private:
     /// @param widgetPoint 鼠标在窗口内的位置。
     /// @return 缩放边界方向。
     PinnedResizeDirection resizeDirectionAt(QPointF widgetPoint) const;
+
+    /// @brief 判断贴边状态下是否应屏蔽指定缩放方向。
+    /// @param direction 缩放方向。
+    /// @return 应让位给窗口移动时返回 true。
+    bool shouldBlockResizeAtEmbeddedEdge(PinnedResizeDirection direction) const;
 
     /// @brief 开始边界拖拽缩放。
     /// @param event 鼠标按下事件。
@@ -349,6 +362,8 @@ private:
     QSize m_displayBaseSize;
     qreal m_scale = 1.0;
     QRect m_logicalGeometry;
+    QRect m_layerShellVisibleGeometry;
+    QPoint m_layerShellContentOffset;
     QPoint m_dragOffset;
     PinnedResizeDragState m_resizeDrag;
     PinnedWindowConfig m_config;

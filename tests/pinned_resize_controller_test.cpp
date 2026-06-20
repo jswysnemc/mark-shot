@@ -36,6 +36,34 @@ private slots:
                  markshot::shot::PinnedResizeDirection::None);
     }
 
+    void directionEdgeFlagsMatchCorners()
+    {
+        QCOMPARE(markshot::shot::pinnedResizeDirectionIncludesLeft(markshot::shot::PinnedResizeDirection::TopLeft), true);
+        QCOMPARE(markshot::shot::pinnedResizeDirectionIncludesTop(markshot::shot::PinnedResizeDirection::TopLeft), true);
+        QCOMPARE(markshot::shot::pinnedResizeDirectionIncludesRight(markshot::shot::PinnedResizeDirection::TopLeft), false);
+        QCOMPARE(markshot::shot::pinnedResizeDirectionIncludesBottom(markshot::shot::PinnedResizeDirection::TopLeft), false);
+
+        QCOMPARE(markshot::shot::pinnedResizeDirectionIncludesRight(markshot::shot::PinnedResizeDirection::BottomRight), true);
+        QCOMPARE(markshot::shot::pinnedResizeDirectionIncludesBottom(markshot::shot::PinnedResizeDirection::BottomRight), true);
+        QCOMPARE(markshot::shot::pinnedResizeDirectionIncludesLeft(markshot::shot::PinnedResizeDirection::BottomRight), false);
+        QCOMPARE(markshot::shot::pinnedResizeDirectionIncludesTop(markshot::shot::PinnedResizeDirection::BottomRight), false);
+    }
+
+    void screenEdgeDirectionLetsMoveTakePriority()
+    {
+        const QRect screen(0, 0, 1920, 1080);
+
+        QCOMPARE(markshot::shot::pinnedResizeDirectionTouchesScreenEdge(
+                     markshot::shot::PinnedResizeDirection::Left, QRect(-30, 100, 240, 120), screen),
+                 true);
+        QCOMPARE(markshot::shot::pinnedResizeDirectionTouchesScreenEdge(
+                     markshot::shot::PinnedResizeDirection::Top, QRect(100, -20, 240, 120), screen),
+                 true);
+        QCOMPARE(markshot::shot::pinnedResizeDirectionTouchesScreenEdge(
+                     markshot::shot::PinnedResizeDirection::Right, QRect(100, 100, 240, 120), screen),
+                 false);
+    }
+
     void rightEdgeDragPreservesAspectRatio()
     {
         const QRect start(100, 80, 200, 100);

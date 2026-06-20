@@ -2,10 +2,10 @@
 
 #include "debug_log.h"
 #include "layer_shell_runtime.h"
+#include "pinned_window/pinned_layer_shell_geometry.h"
 #include "windows_integration.h"
 
 #include <QGuiApplication>
-#include <QMargins>
 #include <QProcessEnvironment>
 #include <QRect>
 #include <QScreen>
@@ -13,8 +13,7 @@
 #include <QVariant>
 #include <QWidget>
 #include <QWindow>
-
-#include <algorithm>
+#include <QVector>
 
 #ifdef MARK_SHOT_WITH_DBUS
 #include <QDBusConnection>
@@ -24,10 +23,13 @@
 
 namespace {
 
+constexpr int kPinnedLayerShellMinimumVisibleExtent = 24;
+
 #ifdef MARK_SHOT_WITH_DBUS
 constexpr const char *kGnomeShellService = "org.gnome.Shell";
 constexpr const char *kGnomeHelperPath = "/org/gnome/Shell/Extensions/MarkShotScrollHelper";
 constexpr const char *kGnomeHelperInterface = "org.gnome.Shell.Extensions.MarkShotScrollHelper";
+#endif
 
 /// @brief Checks whether the current process appears to run in GNOME.
 /// @return True when GNOME-specific D-Bus helpers should be attempted.
@@ -41,6 +43,21 @@ bool isGnomeSession()
         || env.contains(QStringLiteral("GNOME_DESKTOP_SESSION_ID"));
 }
 
+/// @brief 判断当前进程是否运行在 KDE/Plasma 会话。
+/// @return KDE/Plasma 会话返回 true。
+bool isKdeSession()
+{
+    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    const QString desktop =
+        (env.value(QStringLiteral("XDG_CURRENT_DESKTOP")) + QLatin1Char(':')
+         + env.value(QStringLiteral("XDG_SESSION_DESKTOP")) + QLatin1Char(':')
+         + env.value(QStringLiteral("DESKTOP_SESSION")))
+            .toLower();
+    return desktop.contains(QStringLiteral("kde"))
+        || desktop.contains(QStringLiteral("plasma"));
+}
+
+#ifdef MARK_SHOT_WITH_DBUS
 /// @brief Requests the GNOME Shell helper extension to set matching windows above or normal.
 /// @param title Window title used to locate pinned image windows.
 /// @param alwaysOnTop Whether matching windows should be kept above normal windows.
@@ -78,9 +95,32 @@ bool isWaylandSession()
         || env.contains(QStringLiteral("WAYLAND_DISPLAY"));
 }
 
+/// @brief 根据窗口几何选择最合适的屏幕。
+/// @param geometry 窗口全局逻辑几何。
+/// @return 匹配屏幕,没有候选屏幕时返回 nullptr。
+QScreen *screenForGeometry(QRect geometry)
+{
+    if (!geometry.isValid() || geometry.isEmpty()) {
+        return nullptr;
+    }
+
+    const QList<QScreen *> screens = QGuiApplication::screens();
+    QVector<QRect> screenGeometries;
+    screenGeometries.reserve(screens.size());
+    for (QScreen *screen : screens) {
+        screenGeometries.append(screen ? screen->geometry() : QRect());
+    }
+
+    const int screenIndex = markshot::shot::bestPinnedLayerShellScreenIndex(geometry, screenGeometries);
+    if (screenIndex >= 0 && screenIndex < screens.size()) {
+        return screens.at(screenIndex);
+    }
+    return nullptr;
+}
+
 /// @brief Resolves the best screen for a pinned window.
 /// @param window Pinned image window.
-/// @return Screen containing the window center, or the window screen.
+/// @return 与窗口可见部分相交最多的屏幕,或窗口自身屏幕。
 QScreen *screenForWindow(QWidget *window)
 {
     if (!window) {
@@ -89,15 +129,12 @@ QScreen *screenForWindow(QWidget *window)
 
     const QVariant value = window->property("markShotPinnedGeometry");
     if (value.canConvert<QRect>()) {
-        const QRect geometry = value.toRect();
-        if (geometry.isValid() && !geometry.isEmpty()) {
-            if (QScreen *screen = QGuiApplication::screenAt(geometry.center())) {
-                return screen;
-            }
+        if (QScreen *screen = screenForGeometry(value.toRect())) {
+            return screen;
         }
     }
 
-    if (QScreen *screen = QGuiApplication::screenAt(window->frameGeometry().center())) {
+    if (QScreen *screen = screenForGeometry(window->frameGeometry())) {
         return screen;
     }
     return window->screen();
@@ -130,8 +167,11 @@ markshot::layershell::FloatingOverlayConfig floatingOverlayConfig(QWidget *windo
 {
     const QRect screenGeometry = screen ? screen->geometry() : QRect();
     const QRect geometry = pinnedWindowGeometry(window);
-    const int left = geometry.left() - screenGeometry.left();
-    const int top = geometry.top() - screenGeometry.top();
+    const markshot::shot::PinnedLayerShellPlacement placement =
+        markshot::shot::pinnedLayerShellPlacement(
+            geometry,
+            screenGeometry,
+            QSize(kPinnedLayerShellMinimumVisibleExtent, kPinnedLayerShellMinimumVisibleExtent));
 
     markshot::layershell::FloatingOverlayConfig config;
     config.scope = QStringLiteral("dock");
@@ -139,8 +179,8 @@ markshot::layershell::FloatingOverlayConfig floatingOverlayConfig(QWidget *windo
     config.activateOnShow = true;
     config.closeOnDismissed = false;
     config.wantsActiveScreenWhenNoScreen = false;
-    config.desiredSize = geometry.size();
-    config.margins = QMargins(std::max(0, left), std::max(0, top), 0, 0);
+    config.desiredSize = placement.desiredSize.isEmpty() ? geometry.size() : placement.desiredSize;
+    config.margins = placement.margins;
     return config;
 }
 
@@ -151,11 +191,12 @@ bool shouldUseLayerShellTop()
     if (!isWaylandSession()) {
         return false;
     }
-#ifdef MARK_SHOT_WITH_DBUS
     if (isGnomeSession()) {
         return false;
     }
-#endif
+    if (isKdeSession()) {
+        return false;
+    }
     return true;
 }
 

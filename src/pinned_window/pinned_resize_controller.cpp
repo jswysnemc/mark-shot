@@ -98,6 +98,40 @@ bool isPinnedResizeDirection(PinnedResizeDirection direction)
     return direction != PinnedResizeDirection::None;
 }
 
+bool pinnedResizeDirectionIncludesLeft(PinnedResizeDirection direction)
+{
+    return hasLeft(direction);
+}
+
+bool pinnedResizeDirectionIncludesRight(PinnedResizeDirection direction)
+{
+    return hasRight(direction);
+}
+
+bool pinnedResizeDirectionIncludesTop(PinnedResizeDirection direction)
+{
+    return hasTop(direction);
+}
+
+bool pinnedResizeDirectionIncludesBottom(PinnedResizeDirection direction)
+{
+    return hasBottom(direction);
+}
+
+bool pinnedResizeDirectionTouchesScreenEdge(PinnedResizeDirection direction,
+                                            QRect geometry,
+                                            QRect screenGeometry)
+{
+    if (!isPinnedResizeDirection(direction) || !geometry.isValid() || !screenGeometry.isValid()) {
+        return false;
+    }
+
+    return (hasLeft(direction) && geometry.left() <= screenGeometry.left())
+        || (hasRight(direction) && geometry.right() >= screenGeometry.right())
+        || (hasTop(direction) && geometry.top() <= screenGeometry.top())
+        || (hasBottom(direction) && geometry.bottom() >= screenGeometry.bottom());
+}
+
 PinnedResizeDirection pinnedResizeDirectionAt(QRectF localRect, QPointF localPoint, qreal margin)
 {
     if (localRect.isEmpty() || margin <= 0.0) {

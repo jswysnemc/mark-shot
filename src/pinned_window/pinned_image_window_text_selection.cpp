@@ -12,11 +12,12 @@ namespace markshot::shot {
 
 QPointF PinnedImageWindow::widgetToImage(QPointF point) const
 {
-    if (width() <= 0 || height() <= 0 || m_imageSize.isEmpty()) {
+    const QRectF imageRect = displayedImageRect();
+    if (imageRect.width() <= 0.0 || imageRect.height() <= 0.0 || m_imageSize.isEmpty()) {
         return {};
     }
-    return QPointF(point.x() * static_cast<qreal>(m_imageSize.width()) / static_cast<qreal>(width()),
-                   point.y() * static_cast<qreal>(m_imageSize.height()) / static_cast<qreal>(height()));
+    return QPointF((point.x() - imageRect.left()) * static_cast<qreal>(m_imageSize.width()) / imageRect.width(),
+                   (point.y() - imageRect.top()) * static_cast<qreal>(m_imageSize.height()) / imageRect.height());
 }
 
 QRectF PinnedImageWindow::imageToWidget(QRectF imageRect) const
@@ -24,10 +25,11 @@ QRectF PinnedImageWindow::imageToWidget(QRectF imageRect) const
     if (m_imageSize.isEmpty()) {
         return {};
     }
-    const qreal sx = static_cast<qreal>(width()) / static_cast<qreal>(m_imageSize.width());
-    const qreal sy = static_cast<qreal>(height()) / static_cast<qreal>(m_imageSize.height());
-    return QRectF(imageRect.left() * sx,
-                  imageRect.top() * sy,
+    const QRectF displayRect = displayedImageRect();
+    const qreal sx = displayRect.width() / static_cast<qreal>(m_imageSize.width());
+    const qreal sy = displayRect.height() / static_cast<qreal>(m_imageSize.height());
+    return QRectF(displayRect.left() + imageRect.left() * sx,
+                  displayRect.top() + imageRect.top() * sy,
                   imageRect.width() * sx,
                   imageRect.height() * sy);
 }

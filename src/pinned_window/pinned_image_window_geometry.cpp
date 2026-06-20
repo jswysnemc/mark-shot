@@ -1,8 +1,11 @@
 #include "pinned_window/pinned_image_window.h"
 
+#include "pinned_window/pinned_layer_shell_geometry.h"
 #include "pinned_window_top.h"
 
+#include <QGuiApplication>
 #include <QMouseEvent>
+#include <QScreen>
 #include <QVariant>
 
 #include <algorithm>
@@ -11,6 +14,19 @@ namespace {
 
 constexpr int kPinnedMinimumExtent = 24;
 constexpr qreal kPinnedResizeMargin = 8.0;
+
+/// @brief 收集当前屏幕全局逻辑几何。
+/// @return 屏幕几何列表。
+QVector<QRect> currentScreenGeometries()
+{
+    const QList<QScreen *> screens = QGuiApplication::screens();
+    QVector<QRect> screenGeometries;
+    screenGeometries.reserve(screens.size());
+    for (QScreen *screen : screens) {
+        screenGeometries.append(screen ? screen->geometry() : QRect());
+    }
+    return screenGeometries;
+}
 
 }  // namespace
 
@@ -29,15 +45,26 @@ void PinnedImageWindow::resizeByScale(qreal scale, QPoint globalAnchor, QPointF 
     QSize targetSize(qMax(kPinnedMinimumExtent, qRound(m_displayBaseSize.width() * scale)),
                      qMax(kPinnedMinimumExtent, qRound(m_displayBaseSize.height() * scale)));
     targetSize.scale(targetSize, Qt::KeepAspectRatio);
-    const qreal xRatio = width() > 0 ? localAnchor.x() / width() : 0.5;
-    const qreal yRatio = height() > 0 ? localAnchor.y() / height() : 0.5;
+
+    const QRectF imageRect = displayedImageRect();
+    const qreal xRatio = imageRect.width() > 0.0 ? (localAnchor.x() - imageRect.left()) / imageRect.width() : 0.5;
+    const qreal yRatio = imageRect.height() > 0.0 ? (localAnchor.y() - imageRect.top()) / imageRect.height() : 0.5;
     const QPoint topLeft(globalAnchor.x() - qRound(targetSize.width() * xRatio),
                          globalAnchor.y() - qRound(targetSize.height() * yRatio));
     m_scale = static_cast<qreal>(targetSize.width()) / std::max(1, m_displayBaseSize.width());
-    setMinimumSize(QSize(kPinnedMinimumExtent, kPinnedMinimumExtent));
-    setMaximumSize(QSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX));
-    setFixedSize(targetSize);
     setPinnedGeometry(QRect(topLeft, targetSize), !pinnedWindowHasLayerShellTop(this));
+}
+
+QSize PinnedImageWindow::logicalPinnedSize() const
+{
+    return m_logicalGeometry.isValid() && !m_logicalGeometry.isEmpty()
+        ? m_logicalGeometry.size()
+        : size();
+}
+
+QRectF PinnedImageWindow::displayedImageRect() const
+{
+    return QRectF(QPointF(m_layerShellContentOffset), QSizeF(logicalPinnedSize()));
 }
 
 QPoint PinnedImageWindow::pinnedTopLeft() const
@@ -50,6 +77,9 @@ QPoint PinnedImageWindow::logicalGlobalPointForLocalAnchor(QPointF localAnchor, 
     if (!m_config.alwaysOnTop || !pinnedWindowHasLayerShellTop(this)) {
         return fallbackGlobal;
     }
+    if (m_layerShellVisibleGeometry.isValid() && !m_layerShellVisibleGeometry.isEmpty()) {
+        return m_layerShellVisibleGeometry.topLeft() + localAnchor.toPoint();
+    }
     return pinnedTopLeft() + localAnchor.toPoint();
 }
 
@@ -58,9 +88,39 @@ void PinnedImageWindow::setPinnedGeometry(QRect geometry, bool moveWidget)
     if (!geometry.isValid() || geometry.isEmpty()) {
         return;
     }
+
+    if (pinnedWindowHasLayerShellTop(this)) {
+        const QVector<QRect> screenGeometries = currentScreenGeometries();
+        const int screenIndex = bestPinnedLayerShellScreenIndex(geometry, screenGeometries);
+        if (screenIndex >= 0 && screenIndex < screenGeometries.size()) {
+            const PinnedLayerShellPlacement placement = pinnedLayerShellPlacement(
+                geometry,
+                screenGeometries.at(screenIndex),
+                QSize(kPinnedMinimumExtent, kPinnedMinimumExtent));
+
+            // 1. 记录完整图片逻辑几何,但 QWidget 只保留屏幕内可见 surface
+            m_logicalGeometry = placement.logicalGeometry;
+            m_layerShellVisibleGeometry = placement.visibleGeometry;
+            m_layerShellContentOffset = placement.contentOffset;
+            setProperty("markShotPinnedGeometry", m_logicalGeometry);
+            setMinimumSize(QSize(kPinnedMinimumExtent, kPinnedMinimumExtent));
+            setMaximumSize(QSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX));
+            if (size() != placement.desiredSize) {
+                setFixedSize(placement.desiredSize);
+            }
+            syncPinnedWindowTopGeometry(this, m_logicalGeometry);
+            update();
+            return;
+        }
+    }
+
     m_logicalGeometry = geometry;
+    m_layerShellVisibleGeometry = {};
+    m_layerShellContentOffset = {};
     setProperty("markShotPinnedGeometry", m_logicalGeometry);
     if (moveWidget) {
+        setMinimumSize(QSize(kPinnedMinimumExtent, kPinnedMinimumExtent));
+        setMaximumSize(QSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX));
         setGeometry(m_logicalGeometry);
     }
     if (m_config.alwaysOnTop) {
@@ -74,15 +134,34 @@ PinnedResizeDirection PinnedImageWindow::resizeDirectionAt(QPointF widgetPoint) 
     return pinnedResizeDirectionAt(QRectF(rect()), widgetPoint, margin);
 }
 
+bool PinnedImageWindow::shouldBlockResizeAtEmbeddedEdge(PinnedResizeDirection direction) const
+{
+    if (!isPinnedResizeDirection(direction) || !property("markShotPinnedLayerShellActive").toBool()) {
+        return false;
+    }
+
+    const QRect geometry(pinnedTopLeft(), logicalPinnedSize());
+    const QVector<QRect> screenGeometries = currentScreenGeometries();
+    const int screenIndex = bestPinnedLayerShellScreenIndex(geometry, screenGeometries);
+    if (screenIndex < 0 || screenIndex >= screenGeometries.size()) {
+        return false;
+    }
+
+    const QRect screenGeometry = screenGeometries.at(screenIndex);
+
+    // 1. 贴住或越过屏幕边缘时,对应边缘拖拽优先作为移动处理
+    return pinnedResizeDirectionTouchesScreenEdge(direction, geometry, screenGeometry);
+}
+
 bool PinnedImageWindow::startResizeDrag(QMouseEvent *event)
 {
     const PinnedResizeDirection direction = resizeDirectionAt(event->position());
-    if (!isPinnedResizeDirection(direction)) {
+    if (!isPinnedResizeDirection(direction) || shouldBlockResizeAtEmbeddedEdge(direction)) {
         return false;
     }
 
     clearTextSelection();
-    const QRect startGeometry(pinnedTopLeft(), size());
+    const QRect startGeometry(pinnedTopLeft(), logicalPinnedSize());
     m_resizeDrag = beginPinnedResizeDrag(direction, startGeometry, event->globalPosition().toPoint());
     setCursor(cursorForPinnedResizeDirection(direction));
     return true;
@@ -118,15 +197,10 @@ void PinnedImageWindow::applyResizeGeometry(QRect geometry)
         return;
     }
 
-    // 1. 先解除固定尺寸限制，再按拖拽几何设置固定大小
-    setMinimumSize(QSize(kPinnedMinimumExtent, kPinnedMinimumExtent));
-    setMaximumSize(QSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX));
-    setFixedSize(geometry.size());
-
-    // 2. 更新缩放比例，保持滚轮缩放和菜单缩放从当前尺寸继续计算
+    // 1. 更新缩放比例，保持滚轮缩放和菜单缩放从当前尺寸继续计算
     m_scale = static_cast<qreal>(geometry.width()) / std::max(1, m_displayBaseSize.width());
 
-    // 3. 根据平台协议同步窗口位置，layer-shell 场景只更新逻辑几何
+    // 2. 根据平台协议同步窗口位置，layer-shell 场景会裁剪出可见 surface
     setPinnedGeometry(geometry, !pinnedWindowHasLayerShellTop(this));
 }
 
