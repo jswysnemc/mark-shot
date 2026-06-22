@@ -19,6 +19,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
+#include <QPalette>
 #include <QPointer>
 #include <QPushButton>
 #include <QScreen>
@@ -52,6 +53,23 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     setWindowIcon(markshot::ui::applicationIcon());
     setMinimumSize(820, 600);
     resize(900, 640);
+
+    QPalette pal;
+    pal.setColor(QPalette::Window, tokens::kWindowBackground);
+    pal.setColor(QPalette::WindowText, tokens::kTextPrimary);
+    pal.setColor(QPalette::Base, tokens::kInputBackground);
+    pal.setColor(QPalette::AlternateBase, tokens::kCardSurface);
+    pal.setColor(QPalette::Text, tokens::kTextPrimary);
+    pal.setColor(QPalette::Button, tokens::kCardSurface);
+    pal.setColor(QPalette::ButtonText, tokens::kTextPrimary);
+    pal.setColor(QPalette::ToolTipBase, tokens::kCardSurface);
+    pal.setColor(QPalette::ToolTipText, tokens::kTextPrimary);
+    pal.setColor(QPalette::BrightText, tokens::kAccent);
+    pal.setColor(QPalette::Link, tokens::kAccent);
+    pal.setColor(QPalette::Highlight, tokens::kAccent);
+    pal.setColor(QPalette::HighlightedText, tokens::kAccentInk);
+    qApp->setPalette(pal);
+
     setStyleSheet(tokens::settingsStyleSheet());
 
     auto *rootLayout = new QVBoxLayout(this);
