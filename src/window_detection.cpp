@@ -97,6 +97,51 @@ QString existingAppConfigPath()
     return {};
 }
 
+/// @brief Detects the Wayland session type based on environment variables.
+/// @return "gnome", "kde", "hyprland", "niri" for known Wayland sessions, empty string for X11 or unknown.
+QString detectWaylandSessionType()
+{
+    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    const QString sessionType = env.value(QStringLiteral("XDG_SESSION_TYPE")).toLower();
+    if (sessionType != QStringLiteral("wayland")) {
+        return {};
+    }
+
+    const QString desktop = (env.value(QStringLiteral("XDG_CURRENT_DESKTOP"))
+        + QLatin1Char(':') + env.value(QStringLiteral("XDG_SESSION_DESKTOP"))
+        + QLatin1Char(':') + env.value(QStringLiteral("DESKTOP_SESSION")))
+        .toLower();
+
+    if (desktop.contains(QStringLiteral("gnome"))) {
+        return QStringLiteral("gnome");
+    }
+    if (desktop.contains(QStringLiteral("kde")) || desktop.contains(QStringLiteral("plasma"))) {
+        return QStringLiteral("kde");
+    }
+    if (desktop.contains(QStringLiteral("hyprland"))) {
+        return QStringLiteral("hyprland");
+    }
+    if (desktop.contains(QStringLiteral("niri"))) {
+        return QStringLiteral("niri");
+    }
+
+    return QStringLiteral("niri");
+}
+
+/// @brief Returns the appropriate window detection command for the current desktop environment.
+QString defaultWindowDetectionCommand()
+{
+#if defined(Q_OS_WIN)
+    return QString();
+#else
+    const QString sessionType = detectWaylandSessionType();
+    if (sessionType.isEmpty()) {
+        return QString();
+    }
+    return QStringLiteral("mark-shot-window-detection-") + sessionType;
+#endif
+}
+
 /// @brief Generates the default configuration JSON object structure.
 /// @return The default QJsonObject configuration root.
 QJsonObject defaultAppConfigRoot()
@@ -203,11 +248,7 @@ QJsonObject defaultAppConfigRoot()
 
     QJsonObject windowDetection;
     windowDetection.insert(QStringLiteral("enabled"), true);
-#if defined(Q_OS_WIN)
-    windowDetection.insert(QStringLiteral("command"), QString());
-#else
-    windowDetection.insert(QStringLiteral("command"), QStringLiteral("mark-shot-window-detection-niri"));
-#endif
+    windowDetection.insert(QStringLiteral("command"), defaultWindowDetectionCommand());
     windowDetection.insert(QStringLiteral("env"), QJsonObject());
     windowDetection.insert(QStringLiteral("timeoutMs"), 1000);
     root.insert(QStringLiteral("windowDetection"), windowDetection);
@@ -553,6 +594,24 @@ std::optional<bool> configuredWindowDetectionEnabled(const QJsonObject &root)
     return config::boolValue(value.toObject().value(QStringLiteral("enabled")));
 }
 
+/// @brief Checks if the configured command matches the current desktop environment.
+bool commandMatchesEnvironment(const QString &command)
+{
+#if defined(Q_OS_WIN)
+    Q_UNUSED(command);
+    return true;
+#else
+    if (command.isEmpty()) {
+        return false;
+    }
+    const QString sessionType = detectWaylandSessionType();
+    if (sessionType.isEmpty()) {
+        return !command.contains(QStringLiteral("wayland-detection"));
+    }
+    return command.contains(sessionType);
+#endif
+}
+
 /// @brief Reads and parses the window detection configuration from the application settings.
 /// @return A WindowDetectionConfig struct if configured and enabled, std::nullopt otherwise.
 std::optional<WindowDetectionConfig> readWindowDetectionConfig()
@@ -578,6 +637,9 @@ std::optional<WindowDetectionConfig> readWindowDetectionConfig()
         config.timeoutMs = std::clamp(*timeoutMs, kMinWindowDetectionTimeoutMs, kMaxWindowDetectionTimeoutMs);
     }
 
+    if (!commandMatchesEnvironment(config.command)) {
+        config.command = defaultWindowDetectionCommand();
+    }
     if (config.command.isEmpty()) {
         return std::nullopt;
     }
