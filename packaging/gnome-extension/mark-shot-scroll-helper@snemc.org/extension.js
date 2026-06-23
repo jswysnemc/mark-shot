@@ -107,6 +107,48 @@ function windowRect(metaWindow) {
     };
 }
 
+function rectangleDifference(a, b) {
+    const ix = Math.max(a.x, b.x);
+    const iy = Math.max(a.y, b.y);
+    const ix2 = Math.min(a.x + a.width, b.x + b.width);
+    const iy2 = Math.min(a.y + a.height, b.y + b.height);
+
+    if (ix >= ix2 || iy >= iy2) {
+        return [a];
+    }
+
+    const pieces = [];
+    if (ix > a.x) {
+        pieces.push({x: a.x, y: a.y, width: ix - a.x, height: a.height});
+    }
+    if (ix2 < a.x + a.width) {
+        pieces.push({x: ix2, y: a.y, width: a.x + a.width - ix2, height: a.height});
+    }
+    if (iy > a.y) {
+        pieces.push({x: ix, y: a.y, width: ix2 - ix, height: iy - a.y});
+    }
+    if (iy2 < a.y + a.height) {
+        pieces.push({x: ix, y: iy2, width: ix2 - ix, height: a.y + a.height - iy2});
+    }
+    return pieces;
+}
+
+function isFullyOccluded(rect, occluders) {
+    let remaining = [rect];
+
+    for (const occluder of occluders) {
+        const next = [];
+        for (const piece of remaining) {
+            next.push(...rectangleDifference(piece, occluder));
+        }
+        remaining = next;
+        if (remaining.length === 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function windowVisibleOnCurrentWorkspace(metaWindow, actor) {
     if (!metaWindow) {
         return false;
@@ -317,10 +359,10 @@ export default class MarkShotScrollHelper extends Extension {
     }
 
     _windowGeometries() {
-        const windows = [];
-        const seen = new Set();
         const actors = global.get_window_actors?.() ?? [];
+        const candidates = [];
 
+        // First pass: collect all visible windows
         for (const actor of actors) {
             const metaWindow = actor?.meta_window;
             if (!windowVisibleOnCurrentWorkspace(metaWindow, actor) || !allowedWindowType(metaWindow)) {
@@ -331,12 +373,6 @@ export default class MarkShotScrollHelper extends Extension {
             if (!rect) {
                 continue;
             }
-
-            const key = `${rect.x},${rect.y},${rect.width},${rect.height}`;
-            if (seen.has(key)) {
-                continue;
-            }
-            seen.add(key);
 
             const item = {...rect};
             const title = metaWindow.get_title?.();
@@ -359,7 +395,27 @@ export default class MarkShotScrollHelper extends Extension {
             if (typeof workspace?.index === 'function') {
                 item.workspace = workspace.index();
             }
-            windows.push(item);
+            candidates.push({rect, item});
+        }
+
+        // Second pass: check occlusion back-to-front, keep only partially visible windows
+        const windows = [];
+        const seen = new Set();
+        const occluders = [];
+
+        for (let i = candidates.length - 1; i >= 0; i--) {
+            const {rect, item} = candidates[i];
+            const key = `${rect.x},${rect.y},${rect.width},${rect.height}`;
+
+            if (seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+
+            if (!isFullyOccluded(rect, occluders)) {
+                windows.push(item);
+                occluders.push(rect);
+            }
         }
 
         return windows;
