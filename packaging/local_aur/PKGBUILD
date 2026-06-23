@@ -12,8 +12,10 @@ makedepends=('cmake' 'ninja' 'pkgconf' 'git')
 optdepends=(
     'xdg-desktop-portal: portal-based screenshot and screencast backend'
     'xclip: X11 clipboard backend'
+    'python-rapidocr: preferred OCR backend'
+    'python-pillow: image processing for code scanning'
+    'python-zxing-cpp: preferred QR/barcode scanning backend'
     'tesseract: fallback OCR backend'
-    'tesseract-data-chi_sim: simplified Chinese OCR data for tesseract'
     'libxcb: optional X11 integration when built with xcb'
 )
 source=("mark-shot-${pkgver}.tar.gz")

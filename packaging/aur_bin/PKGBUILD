@@ -15,8 +15,10 @@ depends_x86_64=('layer-shell-qt')
 optdepends=(
     'xdg-desktop-portal: portal-based screenshot and screencast backend'
     'xclip: X11 clipboard backend'
+    'python-rapidocr: preferred OCR backend'
+    'python-pillow: image processing for code scanning'
+    'python-zxing-cpp: preferred QR/barcode scanning backend'
     'tesseract: fallback OCR backend'
-    'tesseract-data-chi_sim: simplified Chinese OCR data for tesseract'
 )
 provides=('mark-shot')
 conflicts=('mark-shot')
