@@ -29,7 +29,7 @@ struct CapturedScreenFrame {
     QImage image;
     QString outputName;
     QRect sourceGeometry;
-    QVector<QRect> windowGeometries;
+    QVector<markshot::WindowInfo> windowInfos;
     bool detectWindows = false;
 };
 
@@ -165,7 +165,7 @@ ShotWindow *showCapturedWindow(QScreen *screen,
                                QImage image,
                                QString outputName,
                                QRect sourceGeometry,
-                               QVector<QRect> windowGeometries,
+                               QVector<markshot::WindowInfo> windowInfos,
                                bool detectWindows,
                                bool allOutputs,
                                bool useRegularWindow,
@@ -173,7 +173,7 @@ ShotWindow *showCapturedWindow(QScreen *screen,
                                const markshot::DefaultTools &defaultTools)
 {
     ShotWindow *window =
-        new ShotWindow(std::move(image), std::move(outputName), sourceGeometry, std::move(windowGeometries), detectWindows);
+        new ShotWindow(std::move(image), std::move(outputName), sourceGeometry, std::move(windowInfos), detectWindows);
     window->setDefaultTools(defaultTools.normal, defaultTools.fullscreen);
     if (markshot::shouldApplyDefaultColor(defaultTools)) {
         window->setDefaultColor(defaultTools.color);
@@ -227,9 +227,9 @@ ShotWindow *showCaptureWindow(QScreen *screen,
     const QRect captureGeometry = allOutputs ? virtualScreensGeometry() : (screen ? screen->geometry() : QRect());
     const QString outputName = (!allOutputs && screen) ? screen->name() : QString();
     const bool detectWindows = markshot::windowDetectionEnabled();
-    const QVector<QRect> windowGeometries = detectWindows
-        ? markshot::collectConfiguredWindowGeometries(captureGeometry, outputName, allOutputs)
-        : QVector<QRect>();
+    const QVector<markshot::WindowInfo> windowInfos = detectWindows
+        ? markshot::collectConfiguredWindowInfos(captureGeometry, outputName, allOutputs)
+        : QVector<markshot::WindowInfo>();
     CaptureRequest request;
     request.preferredOutputName = outputName;
     request.sourceGeometry = captureGeometry;
@@ -251,7 +251,7 @@ ShotWindow *showCaptureWindow(QScreen *screen,
                               std::move(capture.image),
                               capturedOutputName,
                               sourceGeometry,
-                              windowGeometries,
+                              windowInfos,
                               detectWindows,
                               allOutputs,
                               useRegularWindow,
@@ -328,14 +328,14 @@ ShotWindow *showDisplayCaptureTarget(const markshot::display_capture::Target &ta
     }
 
     const bool detectWindows = markshot::windowDetectionEnabled();
-    const QVector<QRect> windowGeometries = detectWindows
-        ? markshot::collectConfiguredWindowGeometries(target.geometry, target.outputName, target.allOutputs)
-        : QVector<QRect>();
+    const QVector<markshot::WindowInfo> windowInfos = detectWindows
+        ? markshot::collectConfiguredWindowInfos(target.geometry, target.outputName, target.allOutputs)
+        : QVector<markshot::WindowInfo>();
     return showCapturedWindow(screen,
                               target.image,
                               target.outputName,
                               target.geometry,
-                              windowGeometries,
+                              windowInfos,
                               detectWindows,
                               target.allOutputs,
                               useRegularWindow,
@@ -472,9 +472,9 @@ QVector<CapturedScreenFrame> captureScreensIndividually(const QList<QScreen *> &
 
         const QRect captureGeometry = screen->geometry();
         const QString outputName = screen->name();
-        const QVector<QRect> windowGeometries = detectWindows
-            ? markshot::collectConfiguredWindowGeometries(captureGeometry, outputName, false)
-            : QVector<QRect>();
+        const QVector<markshot::WindowInfo> windowInfos = detectWindows
+            ? markshot::collectConfiguredWindowInfos(captureGeometry, outputName, false)
+            : QVector<markshot::WindowInfo>();
 
         CaptureRequest request;
         request.preferredOutputName = outputName;
@@ -507,7 +507,7 @@ QVector<CapturedScreenFrame> captureScreensIndividually(const QList<QScreen *> &
         frame.sourceGeometry = capture.sourceGeometry.isValid() && !capture.sourceGeometry.isEmpty()
             ? capture.sourceGeometry
             : captureGeometry;
-        frame.windowGeometries = windowGeometries;
+        frame.windowInfos = windowInfos;
         frame.detectWindows = detectWindows;
         markshot::debugLog("capture-session",
                            "【截图会话】【缩放诊断】individual-result screen=%s output=%s "
@@ -556,7 +556,7 @@ QVector<QPointer<ShotWindow>> showCaptureWindowsFromIndividualFrames(const QList
                                                 std::move(frame.image),
                                                 std::move(frame.outputName),
                                                 frame.sourceGeometry,
-                                                std::move(frame.windowGeometries),
+                                                std::move(frame.windowInfos),
                                                 frame.detectWindows,
                                                 false,
                                                 useRegularWindow,
@@ -649,14 +649,14 @@ QVector<QPointer<ShotWindow>> showCaptureWindowsFromSingleFrame(const QList<QScr
                            static_cast<qreal>(screenImage.width()) / std::max(1, screenGeometry.width()),
                            static_cast<qreal>(screenImage.height()) / std::max(1, screenGeometry.height()));
 
-        const QVector<QRect> windowGeometries = detectWindows
-            ? markshot::collectConfiguredWindowGeometries(screenGeometry, screen->name(), false)
-            : QVector<QRect>();
+        const QVector<markshot::WindowInfo> windowInfos = detectWindows
+            ? markshot::collectConfiguredWindowInfos(screenGeometry, screen->name(), false)
+            : QVector<markshot::WindowInfo>();
         ShotWindow *window = showCapturedWindow(screen,
                                                 std::move(screenImage),
                                                 screen->name(),
                                                 screenGeometry,
-                                                windowGeometries,
+                                                windowInfos,
                                                 detectWindows,
                                                 false,
                                                 useRegularWindow,

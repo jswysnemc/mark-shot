@@ -110,6 +110,19 @@ QVector<QRect> enumerateX11WindowGeometries()
     return results;
 }
 
+/// @brief Enumerates the info of all open X11 windows.
+/// @return A vector of WindowInfo representing the window geometries (without z-order for X11).
+QVector<markshot::WindowInfo> enumerateX11WindowInfos()
+{
+    QVector<markshot::WindowInfo> results;
+    const QVector<QRect> geometries = enumerateX11WindowGeometries();
+    results.reserve(geometries.size());
+    for (const QRect &rect : geometries) {
+        results.append(markshot::WindowInfo{rect, std::nullopt});
+    }
+    return results;
+}
+
 bool isGnomeWaylandSession()
 {
 #ifdef MARK_SHOT_WITH_DBUS

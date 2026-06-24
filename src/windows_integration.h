@@ -1,5 +1,7 @@
 #pragma once
 
+#include "window_detection.h"
+
 #include <QRect>
 #include <QVector>
 
@@ -9,6 +11,7 @@ class QScreen;
 namespace markshot::windows {
 
 QVector<QRect> enumerateWindowGeometries();
+QVector<markshot::WindowInfo> enumerateWindowInfos();
 void setExcludedFromCapture(QWidget *widget, bool excluded = true);
 void showFullScreenOnScreen(QWidget *widget, QScreen *screen);
 /// @brief 将窗口切换为 Windows 原生置顶或取消置顶。

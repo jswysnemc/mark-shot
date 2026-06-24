@@ -484,6 +484,27 @@ std::optional<QRect> rectFromWindowObject(const QJsonObject &object)
     return QRect(*x, *y, *width, *height);
 }
 
+/// @brief Attempts to extract a WindowInfo from a JSON window object.
+/// @param object The JSON object representing a window's metadata.
+/// @return A WindowInfo if a geometry was successfully extracted, std::nullopt otherwise.
+std::optional<WindowInfo> windowInfoFromWindowObject(const QJsonObject &object)
+{
+    std::optional<QRect> rect = rectFromWindowObject(object);
+    if (!rect.has_value()) {
+        return std::nullopt;
+    }
+
+    WindowInfo info;
+    info.rect = *rect;
+
+    const QJsonValue zOrderValue = object.value(QStringLiteral("zOrder"));
+    if (zOrderValue.isDouble()) {
+        info.zOrder = static_cast<int>(zOrderValue.toDouble());
+    }
+
+    return info;
+}
+
 /// @brief Normalizes a rectangle and appends it to the list of geometries if valid and not a duplicate.
 /// @param rects Pointer to the destination vector of rectangles.
 /// @param rect The rectangle geometry to add.
@@ -501,12 +522,32 @@ void appendValidRect(QVector<QRect> *rects, QRect rect)
     }
 }
 
+/// @brief Normalizes a WindowInfo and appends it to the list if valid and not a duplicate.
+/// @param infos Pointer to the destination vector of WindowInfo.
+/// @param info The WindowInfo to add.
+void appendValidWindowInfo(QVector<WindowInfo> *infos, WindowInfo info)
+{
+    if (!infos) {
+        return;
+    }
+    info.rect = info.rect.normalized();
+    if (info.rect.width() <= 1 || info.rect.height() <= 1) {
+        return;
+    }
+    for (const WindowInfo &existing : *infos) {
+        if (existing.rect == info.rect) {
+            return;
+        }
+    }
+    infos->append(info);
+}
+
 /// @brief Parses the standard output of the window detection script.
 /// @param output The raw byte array output from the script.
-/// @return A vector of parsed window bounding rectangles.
-QVector<QRect> parseWindowDetectionOutput(const QByteArray &output)
+/// @return A vector of parsed window info with optional z-order.
+QVector<WindowInfo> parseWindowDetectionOutput(const QByteArray &output)
 {
-    QVector<QRect> results;
+    QVector<WindowInfo> results;
 
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(output, &parseError);
@@ -527,23 +568,29 @@ QVector<QRect> parseWindowDetectionOutput(const QByteArray &output)
             windows = root.value(QStringLiteral("windows")).toArray();
         } else if (root.value(QStringLiteral("windowGeometries")).isArray()) {
             windows = root.value(QStringLiteral("windowGeometries")).toArray();
-        } else if (const std::optional<QRect> rect = rectFromWindowObject(root)) {
-            appendValidRect(&results, *rect);
+        } else if (const std::optional<WindowInfo> info = windowInfoFromWindowObject(root)) {
+            appendValidWindowInfo(&results, *info);
             return results;
         }
     }
 
     for (const QJsonValue &value : windows) {
-        std::optional<QRect> rect;
+        std::optional<WindowInfo> info;
         if (value.isObject()) {
-            rect = rectFromWindowObject(value.toObject());
+            info = windowInfoFromWindowObject(value.toObject());
         } else if (value.isArray()) {
-            rect = rectFromArray(value.toArray());
+            std::optional<QRect> rect = rectFromArray(value.toArray());
+            if (rect.has_value()) {
+                info = WindowInfo{*rect, std::nullopt};
+            }
         } else if (value.isString()) {
-            rect = rectFromGeometryText(value.toString());
+            std::optional<QRect> rect = rectFromGeometryText(value.toString());
+            if (rect.has_value()) {
+                info = WindowInfo{*rect, std::nullopt};
+            }
         }
-        if (rect.has_value()) {
-            appendValidRect(&results, *rect);
+        if (info.has_value()) {
+            appendValidWindowInfo(&results, *info);
         }
     }
 
@@ -687,12 +734,12 @@ bool windowDetectionEnabled()
     return configuredWindowDetectionEnabled(*root).value_or(true);
 }
 
-/// @brief Collects the window geometries detected by running the configured external script/command.
+/// @brief Collects the window info detected by running the configured external script/command.
 /// @param captureGeometry The current screen or capture area geometry.
 /// @param outputName The name of the preferred display output.
 /// @param allOutputs Flag indicating whether capturing should target all outputs.
-/// @return A vector of detected window bounding rectangles.
-QVector<QRect> collectConfiguredWindowGeometries(const QRect &captureGeometry,
+/// @return A vector of detected window info with optional z-order.
+QVector<WindowInfo> collectConfiguredWindowInfos(const QRect &captureGeometry,
                                                  const QString &outputName,
                                                  bool allOutputs)
 {
@@ -734,7 +781,7 @@ QVector<QRect> collectConfiguredWindowGeometries(const QRect &captureGeometry,
         return {};
     }
 
-    const QVector<QRect> windows = parseWindowDetectionOutput(process.readAllStandardOutput());
+    const QVector<WindowInfo> windows = parseWindowDetectionOutput(process.readAllStandardOutput());
     markshot::debugLog("window-detection", "script returned windows=%d", static_cast<int>(windows.size()));
     return windows;
 }

@@ -77,7 +77,7 @@ QStringList ShotWindow::supportedToolNames()
 ShotWindow::ShotWindow(QImage frozenFrame,
                        QString outputName,
                        QRect sourceGeometry,
-                       QVector<QRect> windowGeometries,
+                       QVector<markshot::WindowInfo> windowInfos,
                        bool windowDetectionEnabled,
                        QWidget *parent)
     : QWidget(parent)
@@ -401,7 +401,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     initializeTransientPanels();
     initializeTextEditor();
     initializeLaserTimer();
-    initializeWindowDetection(std::move(windowGeometries), windowDetectionEnabled);
+    initializeWindowDetection(std::move(windowInfos), windowDetectionEnabled);
 }
 
 void ShotWindow::initializeToolbar()
@@ -587,25 +587,28 @@ void ShotWindow::initializeLaserTimer()
     connect(m_laserTimer, &QTimer::timeout, this, [this] { cleanupLaserStrokes(); });
 }
 
-void ShotWindow::initializeWindowDetection(QVector<QRect> windowGeometries, bool enabled)
+void ShotWindow::initializeWindowDetection(QVector<markshot::WindowInfo> windowInfos, bool enabled)
 {
     if (!enabled) {
         return;
     }
 
-    if (windowGeometries.isEmpty()) {
+    if (windowInfos.isEmpty()) {
 #if defined(Q_OS_WIN)
-        windowGeometries = markshot::windows::enumerateWindowGeometries();
+        windowInfos = markshot::windows::enumerateWindowInfos();
 #else
-        windowGeometries = enumerateX11WindowGeometries();
+        windowInfos = enumerateX11WindowInfos();
 #endif
     }
-    for (const QRect &windowGeometry : std::as_const(windowGeometries)) {
-        const QRect imageRect = windowGeometryToImageRect(windowGeometry,
+    for (const markshot::WindowInfo &info : std::as_const(windowInfos)) {
+        const QRect imageRect = windowGeometryToImageRect(info.rect,
                                                           m_sourceGeometry,
                                                           m_frozenFrame.size());
         if (imageRect.width() > 1 && imageRect.height() > 1) {
-            m_windowRects.append(imageRect);
+            markshot::WindowInfo converted;
+            converted.rect = imageRect;
+            converted.zOrder = info.zOrder;
+            m_windowInfos.append(converted);
         }
     }
 }

@@ -14,6 +14,7 @@
 #include "display_capture/display_capture_target.h"
 #include "toolbar_appearance_config.h"
 #include "ui/theme.h"
+#include "window_detection.h"
 
 #include <array>
 #include <optional>
@@ -125,7 +126,7 @@ public:
     explicit ShotWindow(QImage frozenFrame,
                         QString outputName,
                         QRect sourceGeometry = {},
-                        QVector<QRect> windowGeometries = {},
+                        QVector<markshot::WindowInfo> windowInfos = {},
                         bool windowDetectionEnabled = true,
                         QWidget *parent = nullptr);
     static std::optional<Tool> toolFromName(QString name);
@@ -304,7 +305,7 @@ private:
     void initializeTransientPanels();
     void initializeTextEditor();
     void initializeLaserTimer();
-    void initializeWindowDetection(QVector<QRect> windowGeometries, bool enabled);
+    void initializeWindowDetection(QVector<markshot::WindowInfo> windowInfos, bool enabled);
     QPushButton *addToolbarButton(Action action, const QString &shortcutText, QWidget *parentToolbar = nullptr);
     QVector<DesktopApp> imageDesktopApps() const;
     QVector<ExtensionCommand> extensionCommands(QString *errorMessage = nullptr) const;
@@ -691,7 +692,7 @@ private:
     std::optional<int> m_editingTextAnnotationId;
     QVector<HistorySnapshot> m_undoStack;
     QVector<HistorySnapshot> m_redoStack;
-    QVector<QRect> m_windowRects;
+    QVector<markshot::WindowInfo> m_windowInfos;
     std::optional<QRect> m_hoveredWindowRect;
     QPointF m_selectionClickStart;
 };

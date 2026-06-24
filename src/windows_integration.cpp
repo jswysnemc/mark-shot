@@ -230,6 +230,19 @@ QVector<QRect> enumerateWindowGeometries()
     return windows;
 }
 
+/// @brief Enumerates the info of all visible windows.
+/// @return A vector of WindowInfo representing the window geometries (without z-order for Windows).
+QVector<markshot::WindowInfo> enumerateWindowInfos()
+{
+    QVector<markshot::WindowInfo> results;
+    const QVector<QRect> geometries = enumerateWindowGeometries();
+    results.reserve(geometries.size());
+    for (const QRect &rect : geometries) {
+        results.append(markshot::WindowInfo{rect, std::nullopt});
+    }
+    return results;
+}
+
 void setExcludedFromCapture(QWidget *widget, bool excluded)
 {
 #if defined(Q_OS_WIN)

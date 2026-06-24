@@ -1,5 +1,7 @@
 #pragma once
 
+#include "window_detection.h"
+
 #include <QImage>
 #include <QRect>
 #include <QString>
@@ -38,6 +40,7 @@ CaptureResult captureScreenFrame(const CaptureRequest &request);
 void stopActiveScreencastCapture();
 // Returns visible X11 window frames for selection snapping/highlighting.
 QVector<QRect> enumerateX11WindowGeometries();
+QVector<markshot::WindowInfo> enumerateX11WindowInfos();
 bool isGnomeWaylandSession();
 bool hasGnomeScrollHelper();
 bool hasGnomeScrollPreviewHelper();

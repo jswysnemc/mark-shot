@@ -92,10 +92,12 @@ def gnome_window_json():
 def main():
     data = gnome_window_json()
     capture = capture_rect()
+    windows = data.get("windows", [])
+    total = len(windows)
     result = []
     seen = set()
 
-    for window in data.get("windows", []):
+    for idx, window in enumerate(windows):
         if not isinstance(window, dict):
             continue
         rect = adjusted_rect(window)
@@ -111,6 +113,7 @@ def main():
             "y": rect[1],
             "width": rect[2],
             "height": rect[3],
+            "zOrder": total - 1 - idx,
         }
         for key in ("title", "class", "instance", "monitor", "workspace"):
             if key in window:

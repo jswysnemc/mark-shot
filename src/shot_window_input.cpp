@@ -40,20 +40,37 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
     }
 
     if (m_mode == Mode::Selecting && !m_dragging) {
-        std::optional<QRect> best;
-        qint64 bestArea = std::numeric_limits<qint64>::max();
+        std::optional<markshot::WindowInfo> best;
         const QPoint imgPt = imagePoint.toPoint();
-        for (const QRect &r : std::as_const(m_windowRects)) {
-            if (r.contains(imgPt)) {
-                qint64 area = static_cast<qint64>(r.width()) * r.height();
+        bool useZOrder = false;
+
+        for (const markshot::WindowInfo &info : std::as_const(m_windowInfos)) {
+            if (!info.rect.contains(imgPt)) {
+                continue;
+            }
+
+            if (!best.has_value()) {
+                useZOrder = info.zOrder.has_value();
+                best = info;
+                continue;
+            }
+
+            if (useZOrder) {
+                if (info.zOrder > best->zOrder) {
+                    best = info;
+                }
+            } else {
+                qint64 area = static_cast<qint64>(info.rect.width()) * info.rect.height();
+                qint64 bestArea = static_cast<qint64>(best->rect.width()) * best->rect.height();
                 if (area < bestArea) {
-                    bestArea = area;
-                    best = r;
+                    best = info;
                 }
             }
         }
-        if (best != m_hoveredWindowRect) {
-            m_hoveredWindowRect = best;
+
+        const std::optional<QRect> bestRect = best ? std::optional(best->rect) : std::nullopt;
+        if (bestRect != m_hoveredWindowRect) {
+            m_hoveredWindowRect = bestRect;
             update();
         }
     }
