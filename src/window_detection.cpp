@@ -594,19 +594,20 @@ std::optional<bool> configuredWindowDetectionEnabled(const QJsonObject &root)
     return config::boolValue(value.toObject().value(QStringLiteral("enabled")));
 }
 
-/// @brief Checks if the configured command matches the current desktop environment.
+/// @brief 判断已配置的窗口检测命令是否匹配当前桌面环境。
+/// @param command 用户配置中的窗口检测命令。
+/// @return 匹配当前桌面环境时返回 true，否则返回 false。
 bool commandMatchesEnvironment(const QString &command)
 {
 #if defined(Q_OS_WIN)
-    Q_UNUSED(command);
-    return true;
+    return command.isEmpty();
 #else
-    if (command.isEmpty()) {
-        return false;
-    }
     const QString sessionType = detectWaylandSessionType();
     if (sessionType.isEmpty()) {
-        return !command.contains(QStringLiteral("wayland-detection"));
+        return command.isEmpty();
+    }
+    if (command.isEmpty()) {
+        return false;
     }
     return command.contains(sessionType);
 #endif
