@@ -156,6 +156,9 @@ mark-shot --default-tool move --fullscreen-default-tool laser --default-color '#
 # Open and annotate an existing local image file
 mark-shot path/to/image.png
 
+# Open an existing image directly as a pinned sticker window
+mark-shot --pin-image path/to/image.png
+
 # Force standard XDG window instead of Wayland layer-shell
 mark-shot --xdg-window
 ```
@@ -172,6 +175,7 @@ mark-shot --xdg-window
 | `--fullscreen` | Skips region selection and opens annotation mode on the full screen frame directly. |
 | `--tray` | Windows only: keeps Mark Shot running in the system tray and registers global capture hotkeys. |
 | `--capture` | Forces one-shot capture when Windows tray autostart is enabled in the config. |
+| `--pin-image <path>` | Opens an existing local image directly as a pinned sticker window, skipping capture and region selection. |
 | `--default-tool <tool>` | Sets the annotation tool selected after region selection. Also seeds fullscreen mode unless `--fullscreen-default-tool` is set. |
 | `--fullscreen-default-tool <tool>` | Sets the annotation tool selected in fullscreen annotation mode. |
 | `--default-color <color>` | Sets the default annotation color. Supports `#RRGGBB` and `#RRGGBBAA`. |
@@ -363,6 +367,7 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
 | Configuration Key | Data Type | Default Value | Description |
 | :--- | :---: | :---: | :--- |
 | `env` | Object | `{}` | Environment variables applied to the process before `QApplication` creation (e.g., `"QT_FONT_DPI": 96` to normalize high-DPI scaling). Alias: `environment`. |
+| `ui.language` | String | `"system"` | Interface language. Supported values: `system` (follow system locale), `english`, `chinese`. Also accepts `en`/`zh`/`zh_cn`/`cn` variants. Supersedes the legacy root-level `language` key. Configurable from the General settings page. |
 | `capture.freezeScope` | String | `"all-screens"` | Scope of displays frozen during region screenshot session. Only effective in multi-monitor setups when not capturing all outputs explicitly. Supported values: `all-screens` (freeze all monitors) and `cursor-screen` (freeze only the monitor containing the mouse cursor). Aliases: `freezeScope`, `freezeDisplayScope`, etc. |
 | `capture.wayland.kde.kwinScreenshot.enabled` | Boolean | `true` | Whether to enable KWin `org.kde.KWin.ScreenShot2` restricted D-Bus interface screenshot capture on KDE Wayland. If disabled, fallback to standard Portal capture. |
 | `debug.enabled` | Boolean | `false` | Enables debug logging on Linux and Windows. CLI `--debug` / `--no-debug` override this value; `DEBUG=1` still enables logging unless `--no-debug` is set. |
@@ -376,6 +381,7 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
 | `windows.tray.enabled` | Boolean | `true` on Windows, `false` elsewhere | Starts the Windows system tray controller automatically. Use `mark-shot --tray` to start tray mode without changing config, or `mark-shot --capture` to force one-shot capture when autostart is enabled. |
 | `windows.hotkeys.capture` | String | `"Ctrl+Alt+S"` | Windows global hotkey for region capture while tray mode is running. Aliases include `hotkey`, `captureHotkey`, and `screenshot`. |
 | `windows.hotkeys.fullscreen` | String | `""` | Optional Windows global hotkey for fullscreen annotation capture while tray mode is running. Alias: `fullscreenHotkey`. The generated default config only writes the region capture hotkey. |
+| `colorPicker.history` | Array | `[]` | Recent colors picked by the startup Color Picker tool. Stored as `#RRGGBBAA` strings, capped at 7 entries. Updated automatically whenever a color is confirmed in the color panel. |
 | `codeScan.command` | String | `""` | Custom QR/barcode scanner command. Supports `{image}`, `{imagePath}`, and `{imageUrl}` placeholders; if none is present, Mark Shot appends the temporary PNG path. The command must print the same JSON shape as `mark-shot-code-scan`. Aliases: `codeScanner.command`, `barcodeScanner.command`, `barcode.command`. |
 | `codeScan.timeoutMs` | Number | `15000` | Timeout for the code scanner command. Environment variable `MARK_SHOT_CODE_SCAN_TIMEOUT_MS` can override it. |
 | `upload.command` | String | `""` | Custom image-host upload command. Supports `{image}`, `{imagePath}`, and `{imageUrl}` placeholders; if none is present, Mark Shot appends the temporary PNG path. The command must print a URL (JSON `{"url": "..."}` or plain text starting with `http`). Aliases: `imageUpload.command`, `uploader.command`, `imageHost.command`. Environment variable `MARK_SHOT_UPLOAD_COMMAND` can override it. |
@@ -525,6 +531,8 @@ litterbox returns a plain-text URL (not JSON); Mark Shot auto-detects any stdout
 
 To ensure precise window boundary detection across different Wayland compositors, Mark Shot uses a flexible external script invocation mechanism. Users can configure a detection script via `windowDetection.command`. The script is responsible for querying window geometries from the compositor and outputting the data in a unified format for Mark Shot to consume.
 
+Mark Shot also auto-selects the matching detection script at runtime by probing the current desktop environment (`XDG_SESSION_TYPE`, `XDG_CURRENT_DESKTOP`, etc.). Supported environments are GNOME, KDE Plasma, Hyprland, and Niri; other Wayland sessions fall back to the niri script, and X11 sessions use the built-in native X11 detector (empty command). If the configured `windowDetection.command` does not match the current environment, Mark Shot corrects it in memory without modifying your `config.json`, so manual configuration is optional.
+
 The project bundles default window detection scripts for the following window managers:
 - **Niri**: `mark-shot-window-detection-niri`
 - **Hyprland**: `mark-shot-window-detection-hyprland`
@@ -661,10 +669,18 @@ When installing manually, install `mark-shot`, `mark-shot-ocr`, `mark-shot-code-
 ##### Arch Linux (AUR)
 Arch Linux users can install directly from the AUR using helpers like `paru` or `yay`:
 ```bash
+# Build from source
 paru -S mark-shot
 # or
 yay -S mark-shot
+
+# Install the prebuilt binary package instead
+paru -S mark-shot-bin
+# or
+yay -S mark-shot-bin
 ```
+
+`mark-shot` compiles from source; `mark-shot-bin` downloads the prebuilt pacman package from GitHub Releases.
 
 ##### Other Distributions (Pre-built Packages)
 For other distributions (such as Debian, Ubuntu, or Fedora), download the compiled package from the Releases page and install it via:
@@ -891,6 +907,20 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 
 ## Release Notes
 
+### 0.1.31
+
+- **CLI Image Pinning**: Added `--pin-image <path>` to open an existing local image directly as a pinned sticker window, skipping capture and selection.
+- **Color Picker History**: The startup Color Picker now remembers recently picked colors, persisted in `config.json` under `colorPicker.history` (capped at 7 `#RRGGBBAA` entries) and shown as swatches in the color panel.
+- **Interface Language Setting**: Added a configurable `ui.language` option (`system` / `english` / `chinese`) selectable from the General settings page; supersedes the legacy root-level `language` key.
+- **Desktop-Aware Window Detection**: Mark Shot now auto-selects the matching window detection script at runtime (GNOME, KDE Plasma, Hyprland, Niri), falling back to the niri script on other Wayland sessions and native X11 detection on X11. Mismatched configured commands are corrected in memory without touching `config.json`.
+- **GNOME Occluded Window Filtering**: The GNOME Shell scroll helper extension now filters fully occluded windows from detection results.
+- **Prebuilt AUR Package**: Added a `mark-shot-bin` AUR package installing prebuilt pacman packages from GitHub Releases, alongside the source-based `mark-shot` package.
+- **GNOME Adwaita Palette Fix**: Overrode the application palette at the `qApp` level so the dark palette fully replaces the libqtk3 base palette under GNOME Adwaita.
+- **AUR Optional Dependencies**: Added `python-rapidocr`, `python-pillow`, and `python-zxing-cpp` as preferred OCR/code-scan optdepends.
+
+<details>
+<summary>Previous versions</summary>
+
 ### 0.1.30
 
 - **Settings Configuration Dialog**: Added a dedicated settings window with pages for General, Capture, Annotation, Pinned, Scroll, Shortcuts, Storage, Integrations, and Advanced. Every previously file-only option is now editable in one place, backed by the same `config.json` store, with shared design tokens and a custom navigation sidebar.
@@ -923,6 +953,7 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 - **KDE KWin Screenshot Control Switch**: Added the `capture.wayland.kde.kwinScreenshot.enabled` option to enable or disable using KWin's restricted `org.kde.KWin.ScreenShot2` D-Bus interface, facilitating fallback debug routines.
 - **Document Layout Optimization & Details Collapsing**: Refactored the user guide to collapse long KDE DBus setup details and application configuration parameters, improving overall readability.
 
+</details>
 
 ---
 

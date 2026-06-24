@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.31 - 2026-06-24
+
+### Features & Enhancements
+
+- **CLI Image Pinning**: Added a `--pin-image <path>` CLI option that opens an existing local image directly as a pinned sticker window, skipping the capture and selection flow entirely.
+- **Color Picker History**: The startup Color Picker now remembers recently picked colors. History is persisted in `config.json` under `colorPicker.history` as `#RRGGBBAA` strings, capped at 7 entries, and rendered as swatches in the color panel.
+- **Interface Language Setting**: Added a configurable interface language option (`ui.language`) with `system`, `english`, and `chinese` modes, selectable from the General settings page. Supersedes the legacy root-level `language` key.
+- **Desktop-Aware Window Detection**: Mark Shot now detects the current desktop environment at runtime and auto-selects the matching window detection script (GNOME, KDE Plasma, Hyprland, Niri). Other Wayland sessions fall back to the niri script, and X11 sessions use native X11 detection. Mismatched configured commands are corrected in memory without modifying the config file.
+- **GNOME Occluded Window Filtering**: The GNOME Shell scroll helper extension now filters fully occluded windows from detection results.
+- **Prebuilt AUR Package**: Added a `mark-shot-bin` AUR package that installs prebuilt pacman packages downloaded from GitHub Releases, alongside the existing source-based `mark-shot` package.
+
+### Bug Fixes
+
+- **GNOME Adwaita Palette**: Overrode the application palette at the `qApp` level so the dark palette fully replaces the libqgtk3 base palette under GNOME Adwaita, fixing widget- and class-level `setPalette()` being merged away.
+- **Native Window Detection Fallback**: Corrected the native window detection fallback path.
+- **Color History Swatch Rendering**: Fixed rendering of color history swatches in the startup color dialog.
+- **AUR Optional Dependencies**: Added `python-rapidocr`, `python-pillow`, and `python-zxing-cpp` as preferred OCR/code-scan optdepends, and removed `tesseract-data-chi_sim` so users can choose their own tesseract language data.
+
 ## 0.1.30 - 2026-06-20
 
 ### Features & Enhancements
