@@ -579,6 +579,7 @@ void ShotWindow::beginTextAnnotation(QPointF imagePoint)
     m_textEditor->raise();
     updateTextEditorGeometry();
     m_textEditor->setFocus(Qt::MouseFocusReason);
+    updateLayerShellForIme();
     update();
 }
 
@@ -614,6 +615,7 @@ void ShotWindow::beginEditingSelectedTextAnnotation()
     const QRectF widgetRect = textContentRect(*annotation, true);
     m_textEditor->setGeometry(widgetRect.toAlignedRect().adjusted(0, 0, 1, 1));
     m_textEditor->setFocus(Qt::MouseFocusReason);
+    updateLayerShellForIme();
     update();
 }
 
@@ -629,6 +631,7 @@ void ShotWindow::commitTextEditor()
     m_textEditor->hide();
     m_textEditor->clear();
     setFocus(Qt::OtherFocusReason);
+    updateLayerShellForIme();
 
     if (m_editingTextAnnotationId.has_value()) {
         if (Annotation *annotation = annotationById(*m_editingTextAnnotationId)) {

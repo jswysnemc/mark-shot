@@ -137,4 +137,10 @@ bool updateFloatingOverlay(QWidget *widget, QScreen *screen, const FloatingOverl
     return plugin && plugin->updateFloatingOverlay(widget, screen, config);
 }
 
+bool setOverlayLayer(QWidget *widget, Layer layer)
+{
+    PluginInterface *plugin = loadPlugin();
+    return plugin && plugin->setLayer(widget, layer);
+}
+
 } // namespace markshot::layershell

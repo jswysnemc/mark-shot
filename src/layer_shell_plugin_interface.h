@@ -15,6 +15,11 @@ enum class KeyboardInteractivity {
     OnDemand,
 };
 
+enum class Layer {
+    Top,
+    Overlay,
+};
+
 struct OverlayConfig {
     QString scope;
     KeyboardInteractivity keyboardInteractivity = KeyboardInteractivity::Exclusive;
@@ -43,11 +48,12 @@ public:
     virtual bool updateFloatingOverlay(QWidget *widget,
                                        QScreen *screen,
                                        const FloatingOverlayConfig &config) = 0;
+    virtual bool setLayer(QWidget *widget, Layer layer) = 0;
 };
 
 } // namespace markshot::layershell
 
-#define MARK_SHOT_LAYER_SHELL_PLUGIN_IID "dev.mark-shot.LayerShellPlugin/1.1"
+#define MARK_SHOT_LAYER_SHELL_PLUGIN_IID "dev.mark-shot.LayerShellPlugin/1.2"
 
 /// @brief Declares the interface for the layer shell plugin.
 Q_DECLARE_INTERFACE(markshot::layershell::PluginInterface, MARK_SHOT_LAYER_SHELL_PLUGIN_IID)

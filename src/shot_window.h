@@ -131,6 +131,7 @@ public:
     static std::optional<Tool> toolFromName(QString name);
     static QStringList supportedToolNames();
     bool configureLayerShell(QScreen *screen);
+    void updateLayerShellForIme();
     void startFullscreenAnnotation();
     void setImageNavigationEnabled(bool enabled);
     void setDefaultTool(Tool tool);

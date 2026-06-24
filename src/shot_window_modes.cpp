@@ -476,6 +476,7 @@ bool ShotWindow::eventFilter(QObject *watched, QEvent *event)
             m_textEditor->hide();
             m_textEditor->clear();
             setFocus(Qt::OtherFocusReason);
+            updateLayerShellForIme();
             update();
             return true;
         }

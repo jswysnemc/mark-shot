@@ -138,6 +138,30 @@ public:
         return configureFloatingOverlayInternal(widget, screen, config, false);
     }
 
+    bool setLayer(QWidget *widget, markshot::layershell::Layer layer) override
+    {
+        if (!widget) {
+            markshot::debugLog("layershell", "setLayer failed: widget is null");
+            return false;
+        }
+        QWindow *nativeWindow = widget->windowHandle();
+        if (!nativeWindow) {
+            markshot::debugLog("layershell", "setLayer failed: no native QWindow");
+            return false;
+        }
+        LayerShellQt::Window *layerWindow = LayerShellQt::Window::get(nativeWindow);
+        if (!layerWindow) {
+            markshot::debugLog("layershell", "setLayer failed: no layer window");
+            return false;
+        }
+        layerWindow->setLayer(layer == markshot::layershell::Layer::Overlay
+                                  ? LayerShellQt::Window::LayerOverlay
+                                  : LayerShellQt::Window::LayerTop);
+        markshot::debugLog("layershell", "setLayer to %s",
+                           layer == markshot::layershell::Layer::Overlay ? "overlay" : "top");
+        return true;
+    }
+
 private:
     static bool configureFloatingOverlayInternal(
         QWidget *widget,

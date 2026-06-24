@@ -519,6 +519,7 @@ void ShotWindow::beginSelection(QPointF imagePoint)
     if (m_textEditor) {
         m_textEditor->hide();
         m_textEditor->clear();
+        updateLayerShellForIme();
     }
     if (m_openWithPanel) {
         m_openWithPanel->hide();

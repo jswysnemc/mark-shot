@@ -632,6 +632,22 @@ bool ShotWindow::configureLayerShell(QScreen *screen)
          true});
 }
 
+void ShotWindow::updateLayerShellForIme()
+{
+    const bool imeActive = m_textEditor && m_textEditor->isVisible();
+    markshot::layershell::setOverlayLayer(
+        this, imeActive ? markshot::layershell::Layer::Top : markshot::layershell::Layer::Overlay);
+    if (imeActive) {
+        QTimer::singleShot(0, this, [this]() {
+            if (m_textEditor && m_textEditor->isVisible()) {
+                if (QInputMethod *im = QGuiApplication::inputMethod()) {
+                    im->update(Qt::ImCursorRectangle);
+                }
+            }
+        });
+    }
+}
+
 void ShotWindow::startFullscreenAnnotation()
 {
     enterFullscreenAnnotation(true);

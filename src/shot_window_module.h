@@ -46,6 +46,7 @@
 #include <QFrame>
 #include <QGuiApplication>
 #include <QHBoxLayout>
+#include <QInputMethod>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
