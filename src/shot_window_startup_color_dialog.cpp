@@ -23,6 +23,18 @@ QVector<QColor> startupColorSwatches(const QColor &color)
     return swatches;
 }
 
+/// @brief 将颜色转换成 Qt stylesheet 稳定支持的 rgba() 文本。
+/// @param color 颜色。
+/// @return rgba(r,g,b,a) 样式文本。
+QString stylesheetRgba(const QColor &color)
+{
+    return QStringLiteral("rgba(%1,%2,%3,%4)")
+        .arg(color.red())
+        .arg(color.green())
+        .arg(color.blue())
+        .arg(color.alpha());
+}
+
 }  // namespace
 
 using namespace markshot::shot;
@@ -100,14 +112,14 @@ void ShotWindow::showStartupColorDialog(QColor color, QPoint anchor)
         button->setEnabled(hasColor && index > 0);
         button->setFixedSize(30, 24);
         button->setStyleSheet(QStringLiteral(
-            "QPushButton {"
+            "QPushButton, QPushButton:disabled {"
             " background: %1;"
             " border: 1px solid rgba(15, 23, 42, %2);"
             " border-radius: 7px;"
             " padding: 0;"
             "}"
             "QPushButton:hover { border-color: rgba(45, 212, 191, 210); }")
-                .arg(hasColor ? colorHexRgba(swatchColor) : QStringLiteral("rgba(15,23,42,38)"))
+                .arg(hasColor ? stylesheetRgba(swatchColor) : QStringLiteral("rgba(15,23,42,38)"))
                 .arg(index == 0 ? 180 : 80));
         if (hasColor && index > 0) {
             connect(button, &QPushButton::clicked, this, [this, swatchColor, anchor] {
