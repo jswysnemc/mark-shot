@@ -256,7 +256,7 @@ def script_source(token):
         return false;
     }}
 
-    function appendWindow(result, seen, window) {{
+    function appendWindow(result, seen, window, zOrder) {{
         if (!window || shouldSkip(window)) {{
             return;
         }}
@@ -274,6 +274,7 @@ def script_source(token):
             y: rect.y,
             width: rect.width,
             height: rect.height,
+            zOrder: zOrder,
         }};
         const title = value(window, "caption");
         const resourceClass = value(window, "resourceClass") || value(window, "windowClass");
@@ -308,7 +309,7 @@ def script_source(token):
     const seen = {{}};
     const windows = workspace.stackingOrder || [];
     for (let i = 0; i < windows.length; i += 1) {{
-        appendWindow(result, seen, windows[i]);
+        appendWindow(result, seen, windows[i], i);
     }}
     print("{MARKER} " + token + " " + JSON.stringify({{compositor: "kde", windows: result}}));
 }})();
