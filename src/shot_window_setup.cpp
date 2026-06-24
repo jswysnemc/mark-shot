@@ -635,9 +635,14 @@ bool ShotWindow::configureLayerShell(QScreen *screen)
 void ShotWindow::updateLayerShellForIme()
 {
     const bool imeActive = m_textEditor && m_textEditor->isVisible();
-    markshot::layershell::setOverlayLayer(
+    markshot::layershell::setLayer(
         this, imeActive ? markshot::layershell::Layer::Top : markshot::layershell::Layer::Overlay);
     if (imeActive) {
+        // Layer change triggers an async wl_surface::configure roundtrip from
+        // KWin. singleShot(0) defers the cursor-rectangle republish to the next
+        // event-loop tick, which is empirically sufficient on KWin 6.x: the
+        // compositor applies the layer switch synchronously in its event source
+        // before processing the text-input-v3 enable request that follows.
         QTimer::singleShot(0, this, [this]() {
             if (m_textEditor && m_textEditor->isVisible()) {
                 if (QInputMethod *im = QGuiApplication::inputMethod()) {
