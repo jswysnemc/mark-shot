@@ -1,5 +1,6 @@
 #include "ui/color_picker.h"
 
+#include "ui/color_history_store.h"
 #include "ui/theme.h"
 
 #include <QHBoxLayout>
@@ -30,6 +31,8 @@ constexpr int kSvHeight = 112;
 constexpr int kTrackHeight = 12;
 /// @brief The size of the color swatch in the color picker.
 constexpr int kSwatchSize = 26;
+/// @brief 颜色历史小色块数量，首个色块固定显示当前颜色。
+constexpr int kHistorySwatchCount = 8;
 /// @brief The radius of the handle in the color picker.
 constexpr qreal kHandleRadius = 6.0;
 
@@ -68,6 +71,15 @@ void drawHandle(QPainter &p, QPointF center, qreal radius, const QColor &innerFi
     p.setPen(Qt::NoPen);
     p.setBrush(innerFill);
     p.drawEllipse(center, radius - 2.5, radius - 2.5);
+}
+
+/// @brief 判断两个颜色是否为同一个 RGBA 值。
+/// @param left 左侧颜色。
+/// @param right 右侧颜色。
+/// @return RGBA 完全一致时返回 true。
+bool sameRgba(const QColor &left, const QColor &right)
+{
+    return left.rgba() == right.rgba();
 }
 
 }  // namespace
@@ -302,6 +314,7 @@ void AlphaSlider::selectAtPos(int x)
 ColorSwatch::ColorSwatch(QWidget *parent) : QWidget(parent)
 {
     setFixedSize(kSwatchSize, kSwatchSize);
+    setCursor(Qt::PointingHandCursor);
 }
 
 void ColorSwatch::setColor(const QColor &color)
@@ -326,6 +339,16 @@ void ColorSwatch::paintEvent(QPaintEvent *)
     p.setPen(QPen(QColor(255, 255, 255, 56), 1));
     p.setBrush(Qt::NoBrush);
     p.drawPath(path);
+}
+
+void ColorSwatch::mousePressEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton && isEnabled()) {
+        emit clicked();
+        event->accept();
+        return;
+    }
+    QWidget::mousePressEvent(event);
 }
 
 // ColorPicker =================================================================
@@ -371,6 +394,24 @@ ColorPicker::ColorPicker(QWidget *parent) : QWidget(parent)
             .arg(markshot::theme::uiFontFamilyCss()));
     bottom->addWidget(m_hex, 1);
     layout->addLayout(bottom);
+
+    auto *historyRow = new QHBoxLayout;
+    historyRow->setContentsMargins(0, 0, 0, 0);
+    historyRow->setSpacing(5);
+    for (int index = 0; index < kHistorySwatchCount; ++index) {
+        auto *swatch = new ColorSwatch(this);
+        m_historySwatches.push_back(swatch);
+        historyRow->addWidget(swatch);
+        connect(swatch, &ColorSwatch::clicked, this, [this, index] {
+            if (index <= 0 || index - 1 >= m_historyColors.size()) {
+                return;
+            }
+            const QColor color = m_historyColors.at(index - 1);
+            setColor(color);
+            emit colorChanged(color);
+        });
+    }
+    layout->addLayout(historyRow);
 
     setFixedWidth(kSvWidth);
 
@@ -422,6 +463,7 @@ void ColorPicker::setColor(const QColor &color)
     m_swatch->setColor(m_color);
     rebuildHex();
     m_settingColor = false;
+    refreshHistorySwatches();
 }
 
 void ColorPicker::emitColor()
@@ -433,6 +475,7 @@ void ColorPicker::emitColor()
     base.setAlpha(255);
     m_alphaSlider->setBaseColor(base);
     m_swatch->setColor(c);
+    updateCurrentHistorySwatch();
     rebuildHex();
     emit colorChanged(c);
 }
@@ -481,6 +524,42 @@ void ColorPicker::onHexEdited()
     parsed.setAlpha(alpha);
     setColor(parsed);
     emit colorChanged(parsed);
+}
+
+void ColorPicker::refreshHistorySwatches()
+{
+    m_historyColors.clear();
+    for (const QColor &item : readColorHistory()) {
+        if (!item.isValid() || sameRgba(item, m_color)) {
+            continue;
+        }
+        if (std::any_of(m_historyColors.cbegin(), m_historyColors.cend(), [&item](const QColor &existing) {
+                return sameRgba(existing, item);
+            })) {
+            continue;
+        }
+        m_historyColors.push_back(item);
+        if (m_historyColors.size() >= kHistorySwatchCount - 1) {
+            break;
+        }
+    }
+
+    updateCurrentHistorySwatch();
+    for (int index = 1; index < m_historySwatches.size(); ++index) {
+        const int historyIndex = index - 1;
+        const bool hasColor = historyIndex < m_historyColors.size();
+        m_historySwatches[index]->setEnabled(hasColor);
+        m_historySwatches[index]->setColor(hasColor ? m_historyColors.at(historyIndex) : QColor(0, 0, 0, 0));
+    }
+}
+
+void ColorPicker::updateCurrentHistorySwatch()
+{
+    if (m_historySwatches.isEmpty()) {
+        return;
+    }
+    m_historySwatches.first()->setEnabled(false);
+    m_historySwatches.first()->setColor(m_color);
 }
 
 }  // namespace markshot::ui

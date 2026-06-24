@@ -2,6 +2,7 @@
 #include "capture_cursor_policy.h"
 #include "capture_freeze_scope.h"
 #include "capture_session_launcher.h"
+#include "cli/image_pin_launch.h"
 #include "debug_log.h"
 #include "shot_window.h"
 #include "startup_config.h"
@@ -208,6 +209,9 @@ int main(int argc, char *argv[])
                                   QStringLiteral("Keep running in the Windows system tray and register global hotkeys."));
     QCommandLineOption captureOption(QStringLiteral("capture"),
                                      QStringLiteral("Capture once even when Windows tray autostart is enabled."));
+    QCommandLineOption pinImageOption(QStringLiteral("pin-image"),
+                                      QStringLiteral("Open an image file directly as a pinned sticker."),
+                                      QStringLiteral("path"));
     QCommandLineOption defaultToolOption(QStringLiteral("default-tool"),
                                          QStringLiteral("Set the default annotation tool after a selected region. Also seeds fullscreen mode unless overridden. Supported: %1.")
                                              .arg(ShotWindow::supportedToolNames().join(QStringLiteral(", "))),
@@ -235,6 +239,7 @@ int main(int argc, char *argv[])
     parser.addOption(fullscreenAnnotationOption);
     parser.addOption(trayOption);
     parser.addOption(captureOption);
+    parser.addOption(pinImageOption);
     parser.addOption(defaultToolOption);
     parser.addOption(fullscreenDefaultToolOption);
     parser.addOption(fileDefaultToolOption);
@@ -343,6 +348,23 @@ int main(int argc, char *argv[])
     }
 
     const QString imagePath = positionalArguments.isEmpty() ? QString() : positionalArguments.first();
+    if (parser.isSet(pinImageOption)) {
+        if (!positionalArguments.isEmpty()) {
+            QMessageBox::critical(nullptr,
+                                  QStringLiteral("Mark Shot"),
+                                  MS_TR("Only one image file can be opened at a time."));
+            return 1;
+        }
+
+        QString error;
+        QWidget *window = markshot::cli::launchPinnedImageFromPath(parser.value(pinImageOption), &error);
+        if (!window) {
+            QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), error);
+            return 1;
+        }
+        return QApplication::exec();
+    }
+
     const bool fileMode = !imagePath.isEmpty();
     if (fileMode) {
         QFileInfo imageFile(imagePath);

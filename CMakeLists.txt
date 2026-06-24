@@ -71,6 +71,8 @@ qt_add_executable(mark-shot
     src/clipboard_image_config.h
     src/code_scan_result.cpp
     src/code_scan_result.h
+    src/cli/image_pin_launch.cpp
+    src/cli/image_pin_launch.h
     src/app_config_store.cpp
     src/app_config_store.h
     src/debug_log.cpp
@@ -205,6 +207,7 @@ qt_add_executable(mark-shot
     src/annotation_state_store.cpp
     src/annotation_state_store.h
     src/shot_window_modes.cpp
+    src/shot_window_startup_color_dialog.cpp
     src/shot_window_property_panels.cpp
     src/shot_window_selection_frame.cpp
     src/shot_window_setup.cpp
@@ -242,6 +245,8 @@ qt_add_executable(mark-shot
     src/scroll/scroll_session_window_preview.cpp
     src/ui/color_picker.cpp
     src/ui/color_picker.h
+    src/ui/color_history_store.cpp
+    src/ui/color_history_store.h
     src/ui/icons.cpp
     src/ui/icons.h
     src/ui/i18n.cpp
@@ -577,6 +582,30 @@ if(BUILD_TESTING)
             Qt6::Test
     )
     add_test(NAME ui-language-config COMMAND mark-shot-ui-language-config-test)
+
+    qt_add_executable(mark-shot-color-history-store-test
+        tests/color_history_store_test.cpp
+        src/ui/color_history_store.cpp
+        src/ui/color_history_store.h
+        src/app_config_store.cpp
+        src/app_config_store.h
+        src/window_detection.cpp
+        src/window_detection.h
+        src/config_value.cpp
+        src/config_value.h
+        src/debug_log.cpp
+        src/debug_log.h
+        src/shell_command.cpp
+        src/shell_command.h
+    )
+    target_include_directories(mark-shot-color-history-store-test PRIVATE src)
+    target_link_libraries(mark-shot-color-history-store-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+    )
+    add_test(NAME color-history-store COMMAND mark-shot-color-history-store-test)
 
     qt_add_executable(mark-shot-pinned-window-config-test
         tests/pinned_window_config_test.cpp

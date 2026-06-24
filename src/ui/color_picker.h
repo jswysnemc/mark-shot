@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QColor>
+#include <QVector>
 #include <QWidget>
 
 class QLineEdit;
@@ -97,10 +98,15 @@ class ColorSwatch : public QWidget {
     Q_OBJECT
 public:
     explicit ColorSwatch(QWidget *parent = nullptr);
+    QColor color() const { return m_color; }
     void setColor(const QColor &color);
+
+signals:
+    void clicked();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
 
 private:
     QColor m_color{255, 255, 255};
@@ -124,6 +130,8 @@ private:
     void emitColor();
     void rebuildHex();
     void onHexEdited();
+    void refreshHistorySwatches();
+    void updateCurrentHistorySwatch();
 
     QColor m_color{255, 0, 0, 255};
     int m_hue = 0;
@@ -137,6 +145,8 @@ private:
     AlphaSlider *m_alphaSlider = nullptr;
     ColorSwatch *m_swatch = nullptr;
     QLineEdit *m_hex = nullptr;
+    QVector<ColorSwatch *> m_historySwatches;
+    QVector<QColor> m_historyColors;
 };
 
 }  // namespace markshot::ui
