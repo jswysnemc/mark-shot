@@ -188,7 +188,7 @@ def client_rect(client):
     return x, y, width, height
 
 
-def append_client(result, seen, client, capture, targets):
+def append_client(result, seen, client, capture, targets, z_order):
     if client.get("mapped") is False:
         return
     if client.get("hidden") is True:
@@ -218,6 +218,7 @@ def append_client(result, seen, client, capture, targets):
         "y": rect[1],
         "width": rect[2],
         "height": rect[3],
+        "zOrder": z_order,
     }
     for key_name in ("address", "class", "title", "initialClass", "initialTitle"):
         value = client.get(key_name)
@@ -248,9 +249,9 @@ def main():
     result = []
     seen = set()
 
-    for client in clients:
+    for idx, client in enumerate(clients):
         if isinstance(client, dict):
-            append_client(result, seen, client, capture, targets)
+            append_client(result, seen, client, capture, targets, idx)
 
     print(json.dumps({"compositor": "hyprland", "windows": result}, separators=(",", ":")))
 
