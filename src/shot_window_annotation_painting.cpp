@@ -634,8 +634,6 @@ void ShotWindow::commitTextEditor()
         if (Annotation *annotation = annotationById(*m_editingTextAnnotationId)) {
             pushHistorySnapshot();
             annotation->text = text;
-            annotation->rect = QRectF(widgetToImage(editorGeometry.topLeft()),
-                                      widgetToImage(editorGeometry.bottomRight())).normalized();
             annotation->fontFamily = m_textEditor->font().family();
             annotation->rect = textContentRect(*annotation, false);
             if (!annotation->points.isEmpty()) {
