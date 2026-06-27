@@ -243,11 +243,6 @@ WindowsTrayController::~WindowsTrayController()
     delete m_menu;
 }
 
-bool WindowsTrayController::isSupported()
-{
-    return QSystemTrayIcon::isSystemTrayAvailable();
-}
-
 bool WindowsTrayController::hotkeysSupported()
 {
 #if defined(Q_OS_WIN)
@@ -291,10 +286,6 @@ bool WindowsTrayController::start()
 {
     if (!m_application) {
         m_errorString = QStringLiteral("QApplication is not available");
-        return false;
-    }
-    if (!QSystemTrayIcon::isSystemTrayAvailable()) {
-        m_errorString = MS_TR("System tray is not available.");
         return false;
     }
 

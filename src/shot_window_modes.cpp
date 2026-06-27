@@ -518,6 +518,7 @@ void ShotWindow::setStartupTool(StartupTool tool)
     m_startupHoverValid = false;
     m_startupRulerDragging = false;
     m_startupRulerHasMeasure = false;
+    m_startupHintAnchor = markshot::startup_hint::PanelAnchor::BottomLeft;
     if (m_startupColorPanel) {
         m_startupColorPanel->hide();
     }
@@ -533,6 +534,7 @@ void ShotWindow::leaveStartupTool()
     m_startupRulerDragging = false;
     m_startupRulerHasMeasure = false;
     m_dragging = false;
+    m_startupHintAnchor = markshot::startup_hint::PanelAnchor::BottomLeft;
     if (m_startupColorPanel) {
         m_startupColorPanel->hide();
     }

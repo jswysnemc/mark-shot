@@ -7,13 +7,11 @@
 #include <QLabel>
 #include <QListWidgetItem>
 #include <QPainter>
-#include <QPainterPath>
 #include <QPen>
 #include <QPixmap>
 #include <QPolygonF>
 #include <QStringLiteral>
 #include <QVBoxLayout>
-#include <QtMath>
 
 namespace markshot::settings {
 
@@ -44,26 +42,22 @@ QPen navPen(const QColor &ink, qreal width = 1.8)
 void drawGear(QPainter &p, const QColor &ink)
 {
     const QPointF center(9, 9);
-    QPainterPath gear;
-    // 1. 用交替半径绘制 8 齿外轮廓，避免放射线看起来像太阳
-    for (int i = 0; i < 32; ++i) {
-        const qreal angle = qDegreesToRadians(-90.0 + static_cast<qreal>(i) * 11.25);
-        const bool toothTop = (i % 4 == 0) || (i % 4 == 1);
-        const qreal radius = toothTop ? 7.0 : 5.4;
-        const QPointF point(center.x() + radius * qCos(angle), center.y() + radius * qSin(angle));
-        if (i == 0) {
-            gear.moveTo(point);
-        } else {
-            gear.lineTo(point);
-        }
+    // 1. 先绘制短矩形齿，避免外轮廓在小尺寸下像太阳光芒
+    p.save();
+    p.translate(center);
+    p.setPen(Qt::NoPen);
+    p.setBrush(ink);
+    for (int i = 0; i < 8; ++i) {
+        p.drawRoundedRect(QRectF(-1.05, -7.8, 2.1, 2.55), 0.55, 0.55);
+        p.rotate(45.0);
     }
-    gear.closeSubpath();
+    p.restore();
 
-    p.setPen(navPen(ink, 1.35));
+    // 2. 外环和中心孔提供机械齿轮的主体轮廓
+    p.setPen(navPen(ink, 1.45));
     p.setBrush(Qt::NoBrush);
-    p.drawPath(gear);
-    // 2. 中心孔强化齿轮识别度
-    p.drawEllipse(center, 2.55, 2.55);
+    p.drawEllipse(center, 5.25, 5.25);
+    p.drawEllipse(center, 2.15, 2.15);
 }
 
 /// @brief 绘制相机图标（Capture）。

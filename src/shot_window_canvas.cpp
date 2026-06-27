@@ -4,6 +4,82 @@ namespace cfg = markshot::config;
 namespace shortcuts = markshot::shortcut;
 using namespace markshot::shot;
 
+/**
+ * 生成启动阶段快捷键提示项。
+ * @return 当前选区状态下需要显示的提示项列表。
+ */
+QVector<markshot::startup_hint::ShortcutHintItem> ShotWindow::startupShortcutHintItems() const
+{
+    if (m_mode != Mode::Selecting || hasUsableSelection()) {
+        return {};
+    }
+
+    if (m_startupTool == StartupTool::CodeScanner) {
+        return {
+            {MS_TR("Drag"), MS_TR("Select code region")},
+            {MS_TR("Right/Esc"), MS_TR("Return to selection")},
+        };
+    }
+
+    if (m_startupTool != StartupTool::None) {
+        return {};
+    }
+
+    auto shortcutTextOr = [](const QKeySequence &sequence, const QString &fallback) {
+        const QString text = sequence.toString(QKeySequence::NativeText);
+        return text.isEmpty() ? fallback : text;
+    };
+
+    return {
+        {MS_TR("Drag"), MS_TR("Select screenshot region")},
+        {shortcutTextOr(m_startupColorPickerShortcut, QStringLiteral("C")), MS_TR("Pick color")},
+        {shortcutTextOr(m_startupRulerShortcut, QStringLiteral("R")), MS_TR("Measure size")},
+        {shortcutTextOr(m_startupCodeScannerShortcut, QStringLiteral("Q")), MS_TR("Scan QR or barcode")},
+        {shortcutTextOr(m_startupDisplayCaptureShortcut, QStringLiteral("D")), MS_TR("Quick display capture")},
+        {MS_TR("Middle"), MS_TR("Toggle fullscreen annotation")},
+        {MS_TR("Right/Esc"), MS_TR("Cancel")},
+    };
+}
+
+/**
+ * 根据鼠标位置更新启动提示面板停靠位置。
+ * @param pointer 当前鼠标位置。
+ * @return 停靠位置发生变化时返回 true。
+ */
+bool ShotWindow::updateStartupShortcutHintAnchor(QPointF pointer)
+{
+    const QVector<markshot::startup_hint::ShortcutHintItem> items = startupShortcutHintItems();
+    if (items.isEmpty()) {
+        m_startupHintAnchor = markshot::startup_hint::PanelAnchor::BottomLeft;
+        return false;
+    }
+
+    const markshot::startup_hint::PanelAnchor nextAnchor =
+        markshot::startup_hint::preferredAnchor(pointer, items, size());
+    if (nextAnchor == m_startupHintAnchor) {
+        return false;
+    }
+
+    m_startupHintAnchor = nextAnchor;
+    return true;
+}
+
+/**
+ * 绘制启动阶段快捷键提示面板。
+ * @param painter 当前绘图对象。
+ */
+void ShotWindow::drawStartupShortcutHint(QPainter &painter) const
+{
+    const QVector<markshot::startup_hint::ShortcutHintItem> items = startupShortcutHintItems();
+    if (items.isEmpty()) {
+        return;
+    }
+
+    const markshot::startup_hint::PanelLayout layout =
+        markshot::startup_hint::layoutPanel(items, size(), m_startupHintAnchor);
+    markshot::startup_hint::drawPanel(painter, items, layout);
+}
+
 void ShotWindow::drawStartupRuler(QPainter &painter) const
 {
     if (!m_startupHoverValid && !m_startupRulerHasMeasure && !m_startupRulerDragging) {
@@ -321,24 +397,7 @@ void ShotWindow::paintEvent(QPaintEvent *)
     }
 
     drawStartupToolOverlay(painter);
-
-    if (!hasUsableSelection()
-        && (m_startupTool == StartupTool::None || m_startupTool == StartupTool::CodeScanner)) {
-        const QString hint = m_startupTool == StartupTool::CodeScanner
-            ? MS_TR("Code scanner: drag to select a code region   Right/Esc returns")
-            : MS_TR("Drag to select   C color picker   R ruler   Q scan   D display   Middle switches   Right/Esc cancels");
-        painter.setFont(markshot::theme::uiFont(15, QFont::DemiBold));
-        const QFontMetrics metrics(painter.font());
-        const QRectF hintRect((width() - metrics.horizontalAdvance(hint) - 44.0) / 2.0,
-                              (height() - metrics.height() - 24.0) / 2.0,
-                              metrics.horizontalAdvance(hint) + 44.0,
-                              metrics.height() + 24.0);
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor(8, 13, 19, 222));
-        painter.drawRoundedRect(hintRect, 18.0, 18.0);
-        painter.setPen(QColor(204, 251, 241, 240));
-        painter.drawText(hintRect, Qt::AlignCenter, hint);
-    }
+    drawStartupShortcutHint(painter);
 
     drawWheelPreview(painter);
 }

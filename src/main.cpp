@@ -206,9 +206,9 @@ int main(int argc, char *argv[])
     QCommandLineOption fullscreenAnnotationOption({QStringLiteral("fullscreen"), QStringLiteral("full-screen")},
                                                   QStringLiteral("Skip region selection and annotate the full captured frame."));
     QCommandLineOption trayOption(QStringLiteral("tray"),
-                                  QStringLiteral("Keep running in the Windows system tray and register global hotkeys."));
+                                  QStringLiteral("Keep running in the system tray and register global hotkeys when supported."));
     QCommandLineOption captureOption(QStringLiteral("capture"),
-                                     QStringLiteral("Capture once even when Windows tray autostart is enabled."));
+                                     QStringLiteral("Capture once even when tray autostart is enabled."));
     QCommandLineOption pinImageOption(QStringLiteral("pin-image"),
                                       QStringLiteral("Open an image file directly as a pinned sticker."),
                                       QStringLiteral("path"));
@@ -430,13 +430,6 @@ int main(int argc, char *argv[])
     }
 
     if (trayMode) {
-        if (!markshot::WindowsTrayController::isSupported()) {
-            QMessageBox::critical(nullptr,
-                                  QStringLiteral("Mark Shot"),
-                                  MS_TR("System tray is not available on this platform."));
-            return 1;
-        }
-
         QString singleInstanceError;
         std::unique_ptr<QLocalServer> singleInstanceServer =
             listenForSingleInstanceCommands(&singleInstanceError);

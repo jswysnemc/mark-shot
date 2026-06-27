@@ -115,6 +115,8 @@ qt_add_executable(mark-shot
     src/autostart/autostart_windows.cpp
     src/startup_config.cpp
     src/startup_config.h
+    src/startup_shortcut_hint.cpp
+    src/startup_shortcut_hint.h
     src/window_detection.cpp
     src/window_detection.h
     src/windows_integration.cpp

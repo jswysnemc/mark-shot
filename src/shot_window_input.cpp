@@ -21,6 +21,10 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
         update();
     }
 
+    if (updateStartupShortcutHintAnchor(event->position())) {
+        update();
+    }
+
     const QPointF imagePoint = widgetToImage(event->position());
     const bool startupPointerTool = m_startupTool == StartupTool::ColorPicker
         || m_startupTool == StartupTool::Ruler;

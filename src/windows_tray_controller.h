@@ -33,7 +33,6 @@ public:
     explicit WindowsTrayController(QApplication *application, Config config, QObject *parent = nullptr);
     ~WindowsTrayController() override;
 
-    static bool isSupported();
     static bool hotkeysSupported();
     static Config readConfig();
 

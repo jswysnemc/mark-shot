@@ -12,6 +12,7 @@
 #include <QWidget>
 
 #include "display_capture/display_capture_target.h"
+#include "startup_shortcut_hint.h"
 #include "toolbar_appearance_config.h"
 #include "ui/theme.h"
 #include "window_detection.h"
@@ -515,8 +516,11 @@ private:
     QColor sampledImageColor(QPointF imagePoint) const;
     void showStartupColorDialog(QColor color, QPoint anchor);
     void drawStartupToolOverlay(QPainter &painter);
+    void drawStartupShortcutHint(QPainter &painter) const;
     void drawStartupColorLoupe(QPainter &painter, QPointF imagePoint) const;
     void drawStartupRuler(QPainter &painter) const;
+    QVector<markshot::startup_hint::ShortcutHintItem> startupShortcutHintItems() const;
+    bool updateStartupShortcutHintAnchor(QPointF pointer);
     QKeySequence shortcutForAction(Action action) const;
     QKeySequence shortcutForTool(Tool tool) const;
     QString shortcutText(Action action, const QString &fallback = {}) const;
@@ -578,6 +582,7 @@ private:
     QKeySequence m_startupRulerShortcut;
     QKeySequence m_startupCodeScannerShortcut;
     QKeySequence m_startupDisplayCaptureShortcut;
+    markshot::startup_hint::PanelAnchor m_startupHintAnchor = markshot::startup_hint::PanelAnchor::BottomLeft;
     bool m_dragging = false;
     bool m_annotationHistoryCaptured = false;
     bool m_annotationSelectionBoxActive = false;

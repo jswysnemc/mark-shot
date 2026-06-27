@@ -173,8 +173,8 @@ mark-shot --xdg-window
 | `--all-outputs` | Captures all screens on the virtual display environment instead of only the active one. |
 | `--xdg-window` | Forces the use of a standard XDG fullscreen window (xdg-shell) instead of layer-shell. |
 | `--fullscreen` | Skips region selection and opens annotation mode on the full screen frame directly. |
-| `--tray` | Windows only: keeps Mark Shot running in the system tray and registers global capture hotkeys. |
-| `--capture` | Forces one-shot capture when Windows tray autostart is enabled in the config. |
+| `--tray` | Keeps Mark Shot running in the system tray and registers global capture hotkeys when supported. |
+| `--capture` | Forces one-shot capture when tray autostart is enabled in the config. |
 | `--pin-image <path>` | Opens an existing local image directly as a pinned sticker window, skipping capture and region selection. |
 | `--default-tool <tool>` | Sets the annotation tool selected after region selection. Also seeds fullscreen mode unless `--fullscreen-default-tool` is set. |
 | `--fullscreen-default-tool <tool>` | Sets the annotation tool selected in fullscreen annotation mode. |
@@ -187,7 +187,7 @@ mark-shot --xdg-window
 
 To bind `mark-shot` to a system screenshot shortcut, configure your compositor or desktop environment.
 
-**Windows tray mode**:
+**Tray mode**:
 ```powershell
 mark-shot --tray
 ```
@@ -378,9 +378,9 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
 | `save.pathTemplate` | String | `"{pictures}/mark-shot/mark-shot-{datetime}.png"` | Default PNG path used by Save and as the initial Save As filename. Parent directories are created before saving. Aliases include `save.path`, `save.location`, root `savePathTemplate`, and directory-only `save.directory`. |
 | `save.directoryTemplate` | String | `""` | Directory-only save template. If set, filename automatically uses `mark-shot-{datetime}.png`. Aliases: `save.directory`, `save.dir`, `save.folder`. |
 | `shortcuts` | Object | - | Customizable keyboard shortcuts. Alias: `hotkeys` (or under `annotation.shortcuts`/`annotation.hotkeys`). See details below. |
-| `windows.tray.enabled` | Boolean | `true` on Windows, `false` elsewhere | Starts the Windows system tray controller automatically. Use `mark-shot --tray` to start tray mode without changing config, or `mark-shot --capture` to force one-shot capture when autostart is enabled. |
-| `windows.hotkeys.capture` | String | `"Ctrl+Alt+S"` | Windows global hotkey for region capture while tray mode is running. Aliases include `hotkey`, `captureHotkey`, and `screenshot`. |
-| `windows.hotkeys.fullscreen` | String | `""` | Optional Windows global hotkey for fullscreen annotation capture while tray mode is running. Alias: `fullscreenHotkey`. The generated default config only writes the region capture hotkey. |
+| `windows.tray.enabled` | Boolean | `true` on Windows, `false` elsewhere | Starts tray mode automatically. The key name is kept for compatibility. Use `mark-shot --tray` to start tray mode without changing config, or `mark-shot --capture` to force one-shot capture when autostart is enabled. |
+| `windows.hotkeys.capture` | String | `"Ctrl+Alt+S"` | Global hotkey for region capture while tray mode is running. Windows uses RegisterHotKey; supported Linux desktops use the desktop portal. Aliases include `hotkey`, `captureHotkey`, and `screenshot`. |
+| `windows.hotkeys.fullscreen` | String | `""` | Optional global hotkey for fullscreen annotation capture while tray mode is running. Alias: `fullscreenHotkey`. The generated default config only writes the region capture hotkey. |
 | `colorPicker.history` | Array | `[]` | Recent colors picked by the startup Color Picker tool. Stored as `#RRGGBBAA` strings, capped at 7 entries. Updated automatically whenever a color is confirmed in the color panel. |
 | `codeScan.command` | String | `""` | Custom QR/barcode scanner command. Supports `{image}`, `{imagePath}`, and `{imageUrl}` placeholders; if none is present, Mark Shot appends the temporary PNG path. The command must print the same JSON shape as `mark-shot-code-scan`. Aliases: `codeScanner.command`, `barcodeScanner.command`, `barcode.command`. |
 | `codeScan.timeoutMs` | Number | `15000` | Timeout for the code scanner command. Environment variable `MARK_SHOT_CODE_SCAN_TIMEOUT_MS` can override it. |
