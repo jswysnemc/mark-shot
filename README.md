@@ -907,6 +907,19 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 
 ## Release Notes
 
+### 0.1.32
+
+- **Startup Shortcut Hint Panel**: Replaced the centered startup hint pill with a PixPin-style vertical shortcut panel that defaults to the left-bottom corner and moves to the left-top corner when the pointer approaches it.
+- **Input Device Hints**: Added keyboard, mouse, and mouse-wheel glyphs to the startup shortcut panel so shortcut rows communicate the expected input method more clearly.
+- **Window Z-Order Selection**: Improved window ordering across GNOME, KDE Plasma, Hyprland, X11, and Windows so region selection prefers the visually topmost matching window.
+- **Wayland Fcitx5 Candidate Support**: Adjusted layer-shell cursor-rectangle handling so fcitx5 candidate windows appear correctly under Wayland capture overlays.
+- **Settings Gear Icons**: Redrew the settings toolbar and General settings navigation icons as clearer gear glyphs instead of sun-like radial icons.
+- **Tray Mode Compatibility**: Fixed startup behavior when Mark Shot is launched directly into tray mode on environments without an immediately available system tray.
+- **Wayland Text Editor Width**: Prevented the annotation text editor from shrinking unexpectedly on fractional-scale Wayland displays.
+
+<details>
+<summary>Previous versions</summary>
+
 ### 0.1.31
 
 - **CLI Image Pinning**: Added `--pin-image <path>` to open an existing local image directly as a pinned sticker window, skipping capture and selection.
@@ -917,9 +930,6 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 - **Prebuilt AUR Package**: Added a `mark-shot-bin` AUR package installing prebuilt pacman packages from GitHub Releases, alongside the source-based `mark-shot` package.
 - **GNOME Adwaita Palette Fix**: Overrode the application palette at the `qApp` level so the dark palette fully replaces the libqtk3 base palette under GNOME Adwaita.
 - **AUR Optional Dependencies**: Added `python-rapidocr`, `python-pillow`, and `python-zxing-cpp` as preferred OCR/code-scan optdepends.
-
-<details>
-<summary>Previous versions</summary>
 
 ### 0.1.30
 

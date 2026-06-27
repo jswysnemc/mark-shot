@@ -10,14 +10,16 @@ using namespace markshot::shot;
  */
 QVector<markshot::startup_hint::ShortcutHintItem> ShotWindow::startupShortcutHintItems() const
 {
+    using markshot::startup_hint::InputIcon;
+
     if (m_mode != Mode::Selecting || hasUsableSelection()) {
         return {};
     }
 
     if (m_startupTool == StartupTool::CodeScanner) {
         return {
-            {MS_TR("Drag"), MS_TR("Select code region")},
-            {MS_TR("Right/Esc"), MS_TR("Return to selection")},
+            {MS_TR("Drag"), MS_TR("Select code region"), InputIcon::Mouse},
+            {MS_TR("Right/Esc"), MS_TR("Return to selection"), InputIcon::Mouse},
         };
     }
 
@@ -31,13 +33,13 @@ QVector<markshot::startup_hint::ShortcutHintItem> ShotWindow::startupShortcutHin
     };
 
     return {
-        {MS_TR("Drag"), MS_TR("Select screenshot region")},
-        {shortcutTextOr(m_startupColorPickerShortcut, QStringLiteral("C")), MS_TR("Pick color")},
-        {shortcutTextOr(m_startupRulerShortcut, QStringLiteral("R")), MS_TR("Measure size")},
-        {shortcutTextOr(m_startupCodeScannerShortcut, QStringLiteral("Q")), MS_TR("Scan QR or barcode")},
-        {shortcutTextOr(m_startupDisplayCaptureShortcut, QStringLiteral("D")), MS_TR("Quick display capture")},
-        {MS_TR("Middle"), MS_TR("Toggle fullscreen annotation")},
-        {MS_TR("Right/Esc"), MS_TR("Cancel")},
+        {MS_TR("Drag"), MS_TR("Select screenshot region"), InputIcon::Mouse},
+        {shortcutTextOr(m_startupColorPickerShortcut, QStringLiteral("C")), MS_TR("Pick color"), InputIcon::Keyboard},
+        {shortcutTextOr(m_startupRulerShortcut, QStringLiteral("R")), MS_TR("Measure size"), InputIcon::Keyboard},
+        {shortcutTextOr(m_startupCodeScannerShortcut, QStringLiteral("Q")), MS_TR("Scan QR or barcode"), InputIcon::Keyboard},
+        {shortcutTextOr(m_startupDisplayCaptureShortcut, QStringLiteral("D")), MS_TR("Quick display capture"), InputIcon::Keyboard},
+        {MS_TR("Middle"), MS_TR("Toggle fullscreen annotation"), InputIcon::Wheel},
+        {MS_TR("Right/Esc"), MS_TR("Cancel"), InputIcon::Mouse},
     };
 }
 

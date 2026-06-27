@@ -1,5 +1,5 @@
 Name:           mark-shot
-Version:        0.1.22
+Version:        0.1.32
 Release:        1%{?dist}
 Summary:        Qt 6 screenshot selection and annotation tool
 

@@ -20,8 +20,10 @@ constexpr qreal kPanelPaddingX = 18.0;
 constexpr qreal kPanelPaddingY = 16.0;
 constexpr qreal kRowGap = 10.0;
 constexpr qreal kColumnGap = 24.0;
-constexpr qreal kKeyMinWidth = 72.0;
+constexpr qreal kKeyMinWidth = 108.0;
 constexpr qreal kKeyHeight = 28.0;
+constexpr qreal kInputIconSize = 16.0;
+constexpr qreal kInputIconGap = 7.0;
 constexpr qreal kPanelRadius = 18.0;
 constexpr qreal kAvoidancePadding = 34.0;
 
@@ -53,7 +55,8 @@ qreal keyColumnWidth(const QVector<ShortcutHintItem> &items)
     const QFontMetrics metrics(keyFont());
     qreal width = kKeyMinWidth;
     for (const ShortcutHintItem &item : items) {
-        width = std::max<qreal>(width, metrics.horizontalAdvance(item.key) + 20.0);
+        width = std::max<qreal>(width,
+                                metrics.horizontalAdvance(item.key) + kInputIconSize + kInputIconGap + 24.0);
     }
     return width;
 }
@@ -71,6 +74,91 @@ qreal labelColumnWidth(const QVector<ShortcutHintItem> &items)
         width = std::max<qreal>(width, metrics.horizontalAdvance(item.label));
     }
     return width;
+}
+
+/**
+ * 绘制键盘输入图标。
+ * @param painter 当前绘图对象。
+ * @param rect 图标绘制区域。
+ * @param ink 图标颜色。
+ */
+void drawKeyboardIcon(QPainter &painter, QRectF rect, const QColor &ink)
+{
+    painter.setPen(QPen(ink, 1.25, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRoundedRect(rect.adjusted(1.5, 3.5, -1.5, -3.0), 2.0, 2.0);
+
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(ink);
+    constexpr qreal keyRadius = 0.9;
+    for (int row = 0; row < 2; ++row) {
+        for (int col = 0; col < 3; ++col) {
+            painter.drawEllipse(QPointF(rect.left() + 5.0 + col * 3.5,
+                                        rect.top() + 7.0 + row * 3.0),
+                                keyRadius,
+                                keyRadius);
+        }
+    }
+}
+
+/**
+ * 绘制鼠标输入图标。
+ * @param painter 当前绘图对象。
+ * @param rect 图标绘制区域。
+ * @param ink 图标颜色。
+ */
+void drawMouseIcon(QPainter &painter, QRectF rect, const QColor &ink)
+{
+    const QRectF body(rect.left() + 3.0, rect.top() + 1.5, rect.width() - 6.0, rect.height() - 3.0);
+    painter.setPen(QPen(ink, 1.35, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRoundedRect(body, body.width() / 2.0, body.width() / 2.0);
+    painter.drawLine(QPointF(body.center().x(), body.top() + 1.8),
+                     QPointF(body.center().x(), body.top() + 5.0));
+    painter.drawLine(QPointF(body.left() + 1.8, body.top() + 5.0),
+                     QPointF(body.right() - 1.8, body.top() + 5.0));
+}
+
+/**
+ * 绘制鼠标滚轮输入图标。
+ * @param painter 当前绘图对象。
+ * @param rect 图标绘制区域。
+ * @param ink 图标颜色。
+ */
+void drawWheelIcon(QPainter &painter, QRectF rect, const QColor &ink)
+{
+    const QRectF body(rect.left() + 3.0, rect.top() + 1.5, rect.width() - 6.0, rect.height() - 3.0);
+    painter.setPen(QPen(ink, 1.25, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRoundedRect(body, body.width() / 2.0, body.width() / 2.0);
+
+    painter.setPen(QPen(ink, 1.55, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.drawLine(QPointF(body.center().x(), body.top() + 4.0),
+                     QPointF(body.center().x(), body.top() + 8.8));
+    painter.drawLine(QPointF(body.center().x() - 2.2, body.top() + 6.4),
+                     QPointF(body.center().x() + 2.2, body.top() + 6.4));
+}
+
+/**
+ * 根据输入类型绘制键帽内的操作图标。
+ * @param painter 当前绘图对象。
+ * @param icon 输入图标类型。
+ * @param rect 图标绘制区域。
+ */
+void drawInputIcon(QPainter &painter, InputIcon icon, QRectF rect)
+{
+    const QColor ink(5, 14, 26, 218);
+    switch (icon) {
+    case InputIcon::Keyboard:
+        drawKeyboardIcon(painter, rect, ink);
+        break;
+    case InputIcon::Mouse:
+        drawMouseIcon(painter, rect, ink);
+        break;
+    case InputIcon::Wheel:
+        drawWheelIcon(painter, rect, ink);
+        break;
+    }
 }
 
 }  // namespace
@@ -164,10 +252,17 @@ void drawPanel(QPainter &painter, const QVector<ShortcutHintItem> &items, const 
         painter.setPen(QPen(QColor(11, 18, 32, 84), 1.0));
         painter.drawRoundedRect(keyRect, 7.0, 7.0);
 
+        const QRectF iconRect(keyRect.left() + 10.0,
+                              keyRect.center().y() - kInputIconSize / 2.0,
+                              kInputIconSize,
+                              kInputIconSize);
+        drawInputIcon(painter, items.at(i).icon, iconRect);
+
+        const QRectF textRect = keyRect.adjusted(10.0 + kInputIconSize + kInputIconGap, 0.0, -9.0, -1.0);
         painter.setPen(QColor(5, 14, 26, 242));
-        painter.drawText(keyRect.adjusted(0.0, 0.0, 0.0, -1.0),
-                         Qt::AlignCenter,
-                         keyMetrics.elidedText(items.at(i).key, Qt::ElideRight, qRound(keyRect.width() - 12.0)));
+        painter.drawText(textRect,
+                         Qt::AlignVCenter | Qt::AlignLeft,
+                         keyMetrics.elidedText(items.at(i).key, Qt::ElideRight, qRound(textRect.width())));
     }
 
     painter.setFont(labelFont());

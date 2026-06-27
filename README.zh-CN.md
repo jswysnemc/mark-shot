@@ -929,6 +929,19 @@ gdbus call --session \
 
 ## 发版说明
 
+### 0.1.32
+
+- **启动快捷提示面板**：将原先居中的启动提示条改为 PixPin 风格的左侧垂直快捷键面板，默认显示在左下角，鼠标接近时自动避让到左上角。
+- **输入设备提示**：在启动快捷提示面板中加入键盘、鼠标和滚轮图标，让每个操作对应的输入方式更直观。
+- **窗口层级选择**：改进 GNOME、KDE Plasma、Hyprland、X11 和 Windows 下的窗口排序，选区时优先匹配视觉上最上层的窗口。
+- **Wayland Fcitx5 候选窗支持**：调整 layer-shell 光标矩形处理，使 fcitx5 候选窗可以在 Wayland 截图覆盖层下正确显示。
+- **设置齿轮图标更新**：重绘工具栏设置按钮和设置页 General 导航图标，使用更清晰的齿轮图形，避免看起来像太阳。
+- **托盘模式兼容性**：修复直接以托盘模式启动时，在系统托盘暂不可用环境下的启动行为。
+- **Wayland 文本编辑器宽度修复**：修复分数缩放 Wayland 环境下标注文本编辑器异常变窄的问题。
+
+<details>
+<summary>历史版本</summary>
+
 ### 0.1.31
 
 - **命令行图片贴图**：新增 `--pin-image <path>` 参数，可直接将本地图片作为贴图窗口打开，跳过截图与选区流程。
@@ -939,9 +952,6 @@ gdbus call --session \
 - **预编译 AUR 包**：新增 `mark-shot-bin` AUR 包，从 GitHub Releases 下载预编译 pacman 包安装，与源码版 `mark-shot` 并存。
 - **GNOME Adwaita 配色修复**：在 `qApp` 层覆盖应用调色板，使深色配色在 GNOME Adwaita 下彻底替换 libqtk3 基础调色板。
 - **AUR 可选依赖**：新增 `python-rapidocr`、`python-pillow`、`python-zxing-cpp` 作为 OCR/扫码首选可选依赖。
-
-<details>
-<summary>历史版本</summary>
 
 ### 0.1.30
 

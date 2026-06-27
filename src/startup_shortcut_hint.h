@@ -15,9 +15,16 @@ enum class PanelAnchor {
     TopLeft,
 };
 
+enum class InputIcon {
+    Keyboard,
+    Mouse,
+    Wheel,
+};
+
 struct ShortcutHintItem {
     QString key;
     QString label;
+    InputIcon icon = InputIcon::Keyboard;
 };
 
 struct PanelLayout {

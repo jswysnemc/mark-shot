@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.32 - 2026-06-28
+
+### Features & Enhancements
+
+- **Startup Shortcut Hint Panel**: Replaced the centered startup hint pill with a PixPin-style vertical shortcut panel that stays near the left edge and moves from bottom-left to top-left when the pointer approaches it.
+- **Input Device Hints**: Added keyboard, mouse, and mouse-wheel glyphs to the startup shortcut panel so each action communicates its input method more clearly.
+- **Window Z-Order Selection**: Improved window detection ordering across GNOME, KDE Plasma, Hyprland, X11, and Windows so selection prefers the visually topmost matching window.
+- **Wayland Fcitx5 Candidate Support**: Adjusted layer-shell cursor-rectangle handling so fcitx5 candidate windows appear correctly under Wayland capture overlays.
+- **Settings Gear Icon Refresh**: Redrew the settings toolbar and General settings navigation icons as clear gear glyphs instead of sun-like radial icons.
+
+### Bug Fixes
+
+- **Tray Mode Compatibility**: Fixed startup behavior when Mark Shot is launched directly into tray mode on environments without an immediately available system tray.
+- **Wayland Text Editor Width**: Prevented the annotation text editor from shrinking unexpectedly on fractional-scale Wayland displays.
+
 ## 0.1.31 - 2026-06-24
 
 ### Features & Enhancements

@@ -533,16 +533,23 @@ QIcon makeToolIcon(ShotWindow::Action action)
         break;
     }
     case ShotWindow::Action::Settings: {
-        p.setPen(makePen(kInk, 1.6));
-        p.drawEllipse(QPointF(16.0, 16.0), 3.2, 3.2);
-        p.drawEllipse(QPointF(16.0, 16.0), 8.0, 8.0);
+        const QPointF center(16.0, 16.0);
+        // 1. 使用短矩形齿，和设置页 General 图标保持一致，避免看起来像太阳
+        p.save();
+        p.translate(center);
+        p.setPen(Qt::NoPen);
+        p.setBrush(kInk);
         for (int i = 0; i < 8; ++i) {
-            p.save();
-            p.translate(16.0, 16.0);
-            p.rotate(i * 45.0);
-            p.drawLine(QPointF(0.0, -11.5), QPointF(0.0, -14.0));
-            p.restore();
+            p.drawRoundedRect(QRectF(-1.7, -12.6, 3.4, 4.1), 0.9, 0.9);
+            p.rotate(45.0);
         }
+        p.restore();
+
+        // 2. 外环和中心孔强化齿轮识别度
+        p.setPen(makePen(kInk, 1.9));
+        p.setBrush(Qt::NoBrush);
+        p.drawEllipse(center, 8.5, 8.5);
+        p.drawEllipse(center, 3.45, 3.45);
         break;
     }
     case ShotWindow::Action::Cancel: {
