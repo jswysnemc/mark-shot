@@ -169,6 +169,18 @@ QJsonObject defaultAppConfigRoot()
     save.insert(QStringLiteral("pathTemplate"), QStringLiteral("{pictures}/mark-shot/mark-shot-{datetime}.png"));
     root.insert(QStringLiteral("save"), save);
 
+    QJsonObject imageFrame;
+    imageFrame.insert(QStringLiteral("enabled"), true);
+    imageFrame.insert(QStringLiteral("padding"), 112);
+    imageFrame.insert(QStringLiteral("cornerRadius"), 18);
+    imageFrame.insert(QStringLiteral("shadowRadius"), 72);
+    imageFrame.insert(QStringLiteral("shadowOffsetY"), 28);
+    imageFrame.insert(QStringLiteral("shadowOpacity"), 0.32);
+
+    QJsonObject exportObject;
+    exportObject.insert(QStringLiteral("imageFrame"), imageFrame);
+    root.insert(QStringLiteral("export"), exportObject);
+
     QJsonObject kwinScreenshot;
     kwinScreenshot.insert(QStringLiteral("enabled"), true);
 

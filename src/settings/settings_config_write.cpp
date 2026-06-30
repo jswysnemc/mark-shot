@@ -245,6 +245,18 @@ void writeStorageSettings(QJsonObject *root, const StorageSettings &settings)
                    clipboardImageModeName(settings.clipboardImageMode));
     setNestedValue(root, {QStringLiteral("clipboard"), QStringLiteral("image"), QStringLiteral("thresholdM")},
                    std::clamp(settings.clipboardThresholdM, kMinClipboardThresholdM, kMaxClipboardThresholdM));
+    setNestedValue(root, {QStringLiteral("export"), QStringLiteral("imageFrame"), QStringLiteral("enabled")},
+                   settings.exportImageEffect.enabled);
+    setNestedValue(root, {QStringLiteral("export"), QStringLiteral("imageFrame"), QStringLiteral("padding")},
+                   std::clamp(settings.exportImageEffect.padding, 0, 256));
+    setNestedValue(root, {QStringLiteral("export"), QStringLiteral("imageFrame"), QStringLiteral("cornerRadius")},
+                   std::clamp(settings.exportImageEffect.cornerRadius, 0.0, 128.0));
+    setNestedValue(root, {QStringLiteral("export"), QStringLiteral("imageFrame"), QStringLiteral("shadowRadius")},
+                   std::clamp(settings.exportImageEffect.shadowRadius, 0, 128));
+    setNestedValue(root, {QStringLiteral("export"), QStringLiteral("imageFrame"), QStringLiteral("shadowOffsetY")},
+                   std::clamp(settings.exportImageEffect.shadowOffsetY, 0, 128));
+    setNestedValue(root, {QStringLiteral("export"), QStringLiteral("imageFrame"), QStringLiteral("shadowOpacity")},
+                   std::clamp(settings.exportImageEffect.shadowOpacity, 0.0, 1.0));
 }
 
 /// @brief 写入滚动截图设置。

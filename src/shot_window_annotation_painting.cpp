@@ -673,13 +673,13 @@ void ShotWindow::commitTextEditor()
     persistAnnotationState();
 }
 
-QString ShotWindow::saveSelectionToTempFile() const
+QString ShotWindow::saveSelectionToTempFile(bool applyExportEffect) const
 {
     if (!hasUsableSelection()) {
         return {};
     }
 
-    const QImage output = renderedSelection();
+    const QImage output = applyExportEffect ? exportSelectionImage() : renderedSelection();
     if (output.isNull()) {
         return {};
     }
@@ -703,7 +703,7 @@ void ShotWindow::openSelectionWithDesktop(const DesktopApp &app)
         m_extensionPanel->hide();
     }
 
-    const QString imagePath = saveSelectionToTempFile();
+    const QString imagePath = saveSelectionToTempFile(true);
     if (imagePath.isEmpty()) {
         return;
     }

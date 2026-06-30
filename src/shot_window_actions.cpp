@@ -1,6 +1,7 @@
 #include "shot_window_module.h"
 
 #include "app_config_store.h"
+#include "export_image_effect.h"
 #include "save_path_config.h"
 
 namespace cfg = markshot::config;
@@ -29,7 +30,7 @@ void ShotWindow::runExtensionCommand(const ExtensionCommand &command)
     bool replacedImagePlaceholder = false;
     QString imagePath;
     if (command.saveImage) {
-        imagePath = saveSelectionToTempFile();
+        imagePath = saveSelectionToTempFile(true);
         if (imagePath.isEmpty()) {
             return;
         }
@@ -288,6 +289,22 @@ QImage ShotWindow::renderedSelection() const
     return output;
 }
 
+QImage ShotWindow::exportSelectionImage() const
+{
+    const QImage output = renderedSelection();
+    if (output.isNull()) {
+        return {};
+    }
+
+    bool ok = false;
+    const QJsonObject root = markshot::readAppConfigRoot(&ok);
+    if (!ok) {
+        return output;
+    }
+    return markshot::applyExportImageEffect(output,
+                                            markshot::exportImageEffectConfigFromRoot(root));
+}
+
 QString ShotWindow::defaultSavePath() const
 {
     const QRect sourceBounds(QPoint(0, 0), m_frozenFrame.size());
@@ -312,7 +329,7 @@ void ShotWindow::saveSelection()
         return;
     }
 
-    const QImage output = renderedSelection();
+    const QImage output = exportSelectionImage();
     if (output.isNull()) {
         return;
     }
@@ -339,7 +356,7 @@ void ShotWindow::saveSelectionAs()
         return;
     }
 
-    const QImage output = renderedSelection();
+    const QImage output = exportSelectionImage();
     if (output.isNull()) {
         return;
     }
@@ -414,7 +431,7 @@ void ShotWindow::copySelection()
         return;
     }
 
-    QImage output = renderedSelection();
+    QImage output = exportSelectionImage();
     if (output.isNull()) {
         return;
     }

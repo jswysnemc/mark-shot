@@ -13,7 +13,7 @@ void ShotWindow::uploadSelection()
         return;
     }
 
-    const QString tempPath = saveSelectionToTempFile();
+    const QString tempPath = saveSelectionToTempFile(true);
     if (tempPath.isEmpty()) {
         return;
     }

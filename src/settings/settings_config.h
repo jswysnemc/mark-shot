@@ -2,6 +2,7 @@
 
 #include "capture_freeze_scope.h"
 #include "clipboard_image_config.h"
+#include "export_image_effect.h"
 #include "shortcut_config.h"
 #include "shot_window.h"
 #include "ui/interface_language_config.h"
@@ -67,6 +68,7 @@ struct StorageSettings {
     QString savePathTemplate;
     ClipboardImageMode clipboardImageMode = ClipboardImageMode::ImagePng;
     int clipboardThresholdM = 4;
+    ExportImageEffectConfig exportImageEffect;
 };
 
 struct ScrollSettings {

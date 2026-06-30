@@ -5,6 +5,8 @@
 #include <QWidget>
 
 class QComboBox;
+class QCheckBox;
+class QDoubleSpinBox;
 class QLineEdit;
 class QSpinBox;
 
@@ -28,6 +30,12 @@ private:
     QLineEdit *m_savePathTemplate = nullptr;
     QComboBox *m_clipboardMode = nullptr;
     QSpinBox *m_clipboardThresholdM = nullptr;
+    QCheckBox *m_exportImageFrameEnabled = nullptr;
+    QSpinBox *m_exportPadding = nullptr;
+    QSpinBox *m_exportCornerRadius = nullptr;
+    QSpinBox *m_exportShadowRadius = nullptr;
+    QSpinBox *m_exportShadowOffsetY = nullptr;
+    QDoubleSpinBox *m_exportShadowOpacity = nullptr;
 };
 
 }  // namespace markshot::settings
