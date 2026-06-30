@@ -118,6 +118,145 @@ def waybar_settings():
     return settings
 
 
+def number(value, default=0.0):
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def dms_settings_path():
+    return os.path.join(config_home(), "DankMaterialShell", "settings.json")
+
+
+def dms_settings():
+    try:
+        with open(dms_settings_path(), "r", encoding="utf-8") as file:
+            payload = json.load(file)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def dms_layer_present(layers, output_name, namespace):
+    for layer in layers:
+        if not isinstance(layer, dict):
+            continue
+        if layer.get("namespace") != namespace:
+            continue
+        if output_name and layer.get("output") != output_name:
+            continue
+        return True
+    return False
+
+
+def dms_edge(position, default="top"):
+    if isinstance(position, str):
+        lowered = position.strip().lower()
+        if lowered in ("top", "bottom", "left", "right"):
+            return lowered
+        try:
+            position = int(lowered)
+        except ValueError:
+            return default
+    mapping = {0: "top", 1: "bottom", 2: "left", 3: "right"}
+    return mapping.get(position, default)
+
+
+def dms_screen_matches(preferences, output_name):
+    if not isinstance(preferences, list) or not preferences:
+        return True
+    if "all" in preferences:
+        return True
+    if not output_name:
+        return True
+    return output_name in preferences
+
+
+def add_inset(insets, edge, amount):
+    if edge not in insets:
+        return
+    if amount <= 0:
+        return
+    insets[edge] += amount
+
+
+def dms_bar_insets(settings, layers, output_name):
+    insets = {"top": 0.0, "bottom": 0.0, "left": 0.0, "right": 0.0}
+    if not dms_layer_present(layers, output_name, "dms:bar"):
+        return insets
+
+    configs = settings.get("barConfigs")
+    if not isinstance(configs, list):
+        configs = []
+    for config in configs:
+        if not isinstance(config, dict):
+            continue
+        if not config.get("enabled", True):
+            continue
+        if not config.get("visible", True):
+            continue
+        if config.get("autoHide", False):
+            continue
+        if not dms_screen_matches(config.get("screenPreferences"), output_name):
+            continue
+
+        inner_padding = number(config.get("innerPadding"), 4.0)
+        widget_thickness = max(20.0, 26.0 + inner_padding * 0.6)
+        bar_thickness = max(widget_thickness + inner_padding + 4.0,
+                            48.0 - 4.0 - (8.0 - inner_padding))
+        spacing = number(config.get("spacing"), 4.0)
+        bottom_gap = number(config.get("bottomGap"), 0.0)
+        add_inset(insets, dms_edge(config.get("position"), "top"),
+                  bar_thickness + spacing + bottom_gap)
+    return insets
+
+
+def dms_dock_insets(settings, layers, output_name, bar_insets):
+    insets = {"top": 0.0, "bottom": 0.0, "left": 0.0, "right": 0.0}
+    if not dms_layer_present(layers, output_name, "dms:dock"):
+        return insets
+    if not settings.get("showDock", True):
+        return insets
+    if settings.get("dockAutoHide", False) or settings.get("dockSmartAutoHide", False):
+        return insets
+
+    edge = dms_edge(settings.get("dockPosition", 1), "bottom")
+    # When DMS places the dock on the same edge as a visible bar, the dock layer
+    # does not reserve additional compositor space.
+    if bar_insets.get(edge, 0.0) > 0:
+        return insets
+
+    border = number(settings.get("dockBorderThickness"), 1.0) if settings.get("dockBorderEnabled", False) else 0.0
+    spacing = number(settings.get("dockSpacing"), 4.0)
+    icon_size = number(settings.get("dockIconSize"), 35.0)
+    bottom_gap = number(settings.get("dockBottomGap"), 0.0)
+    margin = number(settings.get("dockMargin"), 10.0)
+    effective_bar_height = icon_size + spacing * 2.0 + 10.0 + border * 2.0
+    add_inset(insets, edge, effective_bar_height + spacing + bottom_gap + margin)
+    return insets
+
+
+def dms_insets(layers, output_name):
+    if (not dms_layer_present(layers, output_name, "dms:bar")
+            and not dms_layer_present(layers, output_name, "dms:dock")):
+        return None
+
+    settings = dms_settings()
+    bar = dms_bar_insets(settings, layers, output_name)
+    dock = dms_dock_insets(settings, layers, output_name, bar)
+    return {
+        "top": bar["top"] + dock["top"],
+        "bottom": bar["bottom"] + dock["bottom"],
+        "left": bar["left"] + dock["left"],
+        "right": bar["right"] + dock["right"],
+    }
+
+
 def panel_info(layers, output_name):
     """判断指定输出上面板独占的屏幕边缘及其独占尺寸。
     参数 layers: niri layer-shell 表面列表; output_name: 输出名称
@@ -283,6 +422,20 @@ def intersects(left, right):
     return ax < bx + bw and bx < ax + aw and ay < by + bh and by < ay + ah
 
 
+def clipped_rect(rect, bounds):
+    ax, ay, aw, ah = rect
+    bx, by, bw, bh = bounds
+    x = max(ax, bx)
+    y = max(ay, by)
+    right = min(ax + aw, bx + bw)
+    bottom = min(ay + ah, by + bh)
+    width = right - x
+    height = bottom - y
+    if width <= 1 or height <= 1:
+        return None
+    return int(round(x)), int(round(y)), int(round(width)), int(round(height))
+
+
 def append_rect(result, seen, rect):
     if rect[2] <= 1 or rect[3] <= 1:
         return
@@ -320,8 +473,12 @@ def append_candidate(result, seen, rect, capture):
     rect = adjusted_rect(rect)
     if rect is None:
         return
-    if capture is not None and not intersects(rect, capture):
-        return
+    if capture is not None:
+        if not intersects(rect, capture):
+            return
+        rect = clipped_rect(rect, capture)
+        if rect is None:
+            return
     append_rect(result, seen, rect)
 
 
@@ -411,11 +568,14 @@ def window_rect(window, outputs, layers, layout_config, workspace_outputs, works
         return None
 
     offset = pair(layout.get("window_offset_in_tile")) or (0.0, 0.0)
-    columns = workspace_columns.get(workspace_id, {})
-    work_x, work_y, _work_width, _work_height = workspace_area_for_window(
-        outputs, layers, layout_config, workspace_outputs, workspace_id, columns)
-    x = int(round(work_x + tile_pos[0] + offset[0]))
-    y = int(round(work_y + tile_pos[1] + offset[1]))
+    workspace_info = workspace_outputs.get(workspace_id)
+    output_name = workspace_info["output"]
+    origin_x, origin_y = output_origin(outputs, output_name)
+    # niri's tile_pos_in_workspace_view is already relative to the output's
+    # workspace view. Adding the DMS/strut-adjusted work area would double
+    # apply top/left reserved space for floating windows.
+    x = int(round(origin_x + tile_pos[0] + offset[0]))
+    y = int(round(origin_y + tile_pos[1] + offset[1]))
     width = int(round(window_size[0]))
     height = int(round(window_size[1]))
     if width <= 1 or height <= 1:
@@ -432,6 +592,44 @@ def output_size(outputs, output_name):
     if not isinstance(logical, dict):
         return 0, 0
     return int(round(logical.get("width", 0))), int(round(logical.get("height", 0)))
+
+
+def output_rect(outputs, output_name):
+    width, height = output_size(outputs, output_name)
+    if width <= 0 or height <= 0:
+        return None
+    x, y = output_origin(outputs, output_name)
+    return x, y, width, height
+
+
+def union_rect(rects):
+    valid = [rect for rect in rects if rect is not None]
+    if not valid:
+        return None
+    left = min(rect[0] for rect in valid)
+    top = min(rect[1] for rect in valid)
+    right = max(rect[0] + rect[2] for rect in valid)
+    bottom = max(rect[1] + rect[3] for rect in valid)
+    return left, top, right - left, bottom - top
+
+
+def default_capture_rect(outputs, workspace_outputs):
+    all_outputs = os.environ.get("MARK_SHOT_CAPTURE_ALL_OUTPUTS") == "1"
+    target_output = os.environ.get("MARK_SHOT_CAPTURE_OUTPUT", "")
+    if all_outputs:
+        names = list(outputs.keys())
+    elif target_output:
+        names = [target_output]
+    else:
+        names = []
+        for workspace_info in workspace_outputs.values():
+            if not isinstance(workspace_info, dict):
+                continue
+            output = workspace_info.get("output", "")
+            if output and output not in names:
+                names.append(output)
+
+    return union_rect(output_rect(outputs, name) for name in names)
 
 
 def tiled_windows(windows, workspace_id):
@@ -513,25 +711,30 @@ def working_area_for_output(outputs, output_name, layers, layout_config, columns
     if output_width <= 0 or output_height <= 0:
         return None
 
-    edge, panel = panel_info(layers, output_name)
     gaps = layout_config["gaps"]
     strut_left = layout_config["strut_left"]
     strut_right = layout_config["strut_right"]
     strut_top = layout_config["strut_top"]
     strut_bottom = layout_config["strut_bottom"]
 
-    # 1. 水平面板尺寸未知时，用最高列的总占用反推面板独占高度
-    if edge in ("top", "bottom") and panel is None and columns:
-        tallest = max(column_extent(entries, gaps) for entries in columns.values())
-        panel = max(0.0, output_height - strut_top - strut_bottom - tallest)
-    if panel is None:
-        panel = 0.0
+    insets = dms_insets(layers, output_name)
+    if insets is None:
+        edge, panel = panel_info(layers, output_name)
+        # 1. 水平面板尺寸未知时，用最高列的总占用反推面板独占高度
+        if edge in ("top", "bottom") and panel is None and columns:
+            tallest = max(column_extent(entries, gaps) for entries in columns.values())
+            panel = max(0.0, output_height - strut_top - strut_bottom - tallest)
+        if panel is None:
+            panel = 0.0
+        insets = {"top": 0.0, "bottom": 0.0, "left": 0.0, "right": 0.0}
+        if edge in insets:
+            insets[edge] = panel
 
-    # 2. 按面板独占区与 struts 收缩输出矩形得到工作区
-    x = origin_x + strut_left + (panel if edge == "left" else 0.0)
-    y = origin_y + strut_top + (panel if edge == "top" else 0.0)
-    width = output_width - strut_left - strut_right - (panel if edge in ("left", "right") else 0.0)
-    height = output_height - strut_top - strut_bottom - (panel if edge in ("top", "bottom") else 0.0)
+    # 2. 按面板/DMS 独占区与 struts 收缩输出矩形得到工作区
+    x = origin_x + strut_left + insets["left"]
+    y = origin_y + strut_top + insets["top"]
+    width = output_width - strut_left - strut_right - insets["left"] - insets["right"]
+    height = output_height - strut_top - strut_bottom - insets["top"] - insets["bottom"]
     if width <= 0 or height <= 0:
         return None
     return x, y, width, height
@@ -594,12 +797,13 @@ def tiled_rects_for_workspace(windows, outputs, layers, layout_config,
             elif active_end + gaps > view_x + work_x_rel + work_width:
                 view_x = active_end + gaps - work_x_rel - work_width
 
-    # 3. 每列从工作区顶部加 gap 开始顶对齐堆叠，窗口矩形为 tile 起点加窗口在 tile 内的偏移
+    # 3. DMS/niri reserves the top edge before the first tile; the regular gap
+    # is applied between stacked tiles and at the bottom edge.
     result = []
     for column, column_entries in columns.items():
         ordered = sorted(column_entries, key=lambda entry: entry["row"])
         column_x = origin_x + column_starts[column] - view_x
-        y = work_y + gaps
+        y = work_y
         for entry in ordered:
             width = int(round(entry["window_size"][0]))
             height = int(round(entry["window_size"][1]))
@@ -637,6 +841,8 @@ def main():
     layout_config = niri_layout_config()
     workspace_outputs = workspace_targets(workspaces)
     capture = capture_rect()
+    if capture is None:
+        capture = default_capture_rect(outputs, workspace_outputs)
     result = []
     seen = set()
     emitted_ids = set()
