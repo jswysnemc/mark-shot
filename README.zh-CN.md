@@ -598,6 +598,22 @@ yay -S mark-shot-bin
 
 `mark-shot` 从源码编译；`mark-shot-bin` 从 GitHub Releases 下载预编译 pacman 包安装。
 
+##### NixOS
+NixOS 用户可以通过添加 Flake input 来进行安装
+```nix
+# flake.nix
+mark-shot = {
+  url = "github:jswysnemc/mark-shot";
+  inputs.nixpkgs.follows = "nixpkgs";
+};
+
+# home-manager
+home.packages = with pkgs; [
+  # 其他用户应用
+  inputs.mark-shot.packages.${pkgs.stdenv.hostPlatform.system}.default
+]
+```
+
 ##### 其他发行版 (预编译安装包)
 对于其他发行版（如 Ubuntu, Debian, Fedora），请在 Releases 页面下载编译好的安装包并运行以下命令安装：
 - **Debian / Ubuntu**:
@@ -874,6 +890,12 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
 
 # 执行编译
 cmake --build build
+```
+
+或者使用 nix
+
+```bash
+nix build
 ```
 
 LayerShellQt 会被自动检测。找到时启用完整 Wayland layer-shell 支持；未找到时编译照常成功，运行时自动降级为标准全屏窗口。

@@ -682,6 +682,22 @@ yay -S mark-shot-bin
 
 `mark-shot` compiles from source; `mark-shot-bin` downloads the prebuilt pacman package from GitHub Releases.
 
+##### NixOS
+NixOS users can install mark-shot by adding it as a Flake input:
+```nix
+# flake.nix
+mark-shot = {
+  url = "github:jswysnemc/mark-shot";
+  inputs.nixpkgs.follows = "nixpkgs";
+};
+
+# home-manager
+home.packages = with pkgs; [
+  # other user packages
+  inputs.mark-shot.packages.${pkgs.stdenv.hostPlatform.system}.default
+]
+```
+
 ##### Other Distributions (Pre-built Packages)
 For other distributions (such as Debian, Ubuntu, or Fedora), download the compiled package from the Releases page and install it via:
 - **Debian / Ubuntu**:
@@ -852,6 +868,12 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
 
 # Build
 cmake --build build
+```
+
+Or build with Nix:
+
+```bash
+nix build
 ```
 
 LayerShellQt is detected automatically. When found, full Wayland layer-shell support is enabled. When absent, the build succeeds and falls back to standard fullscreen windows at runtime.
