@@ -577,6 +577,7 @@ void ShotWindow::initializeTextEditor()
     m_textEditor->setToolTip(MS_TR("Enter inserts newline, click outside commits, Esc cancels"));
     m_textEditor->hide();
     m_textEditor->installEventFilter(this);
+    m_textEditor->viewport()->installEventFilter(this);
     m_textEditor->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_textEditor, &QTextEdit::customContextMenuRequested, this, [this](const QPoint &pos) {
         showTextEditorContextMenu(m_textEditor->mapToGlobal(pos));
