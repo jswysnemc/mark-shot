@@ -3,6 +3,7 @@
 #include "app_config_store.h"
 #include "clipboard_image.h"
 #include "debug_log.h"
+#include "notifications/app_notifications.h"
 #include "pinned_window_top.h"
 #include "translation_language_options.h"
 #include "ui/i18n.h"
@@ -444,7 +445,9 @@ void PinnedImageWindow::saveImageAs()
                                                       QDir(markShotPicturesDir()).filePath(filename),
                                                       MS_TR("PNG Images (*.png)"));
     if (!path.isEmpty()) {
-        m_pixmap.save(path, "PNG");
+        if (m_pixmap.save(path, "PNG")) {
+            markshot::notifications::notifyScreenshotSaved(path);
+        }
     }
 }
 

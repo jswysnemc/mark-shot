@@ -464,6 +464,9 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
                 scanCodeSelection();
                 return;
             }
+            if (handleStartupRecordingSelection()) {
+                return;
+            }
             m_mode = Mode::Editing;
             m_fullscreenAnnotation = false;
             m_toolbarUserPlaced = false;
@@ -487,6 +490,9 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
         }
         if (m_startupTool == StartupTool::CodeScanner) {
             scanCodeSelection();
+            return;
+        }
+        if (handleStartupRecordingSelection()) {
             return;
         }
         m_mode = Mode::Editing;

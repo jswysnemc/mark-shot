@@ -19,6 +19,8 @@ struct ShortcutConfig {
     QKeySequence startupRuler;
     QKeySequence startupCodeScanner;
     QKeySequence startupDisplayCapture;
+    QKeySequence startupGifRecorder;
+    QKeySequence startupVideoRecorder;
 };
 
 int actionIndex(ShotWindow::Action action);

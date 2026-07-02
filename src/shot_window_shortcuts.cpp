@@ -106,6 +106,12 @@ bool ShotWindow::eventMatchesStartupShortcut(const QKeyEvent *event, StartupTool
     if (tool == StartupTool::CodeScanner) {
         return shortcutMatchesEvent(m_startupCodeScannerShortcut, event);
     }
+    if (tool == StartupTool::GifRecorder) {
+        return shortcutMatchesEvent(m_startupGifRecorderShortcut, event);
+    }
+    if (tool == StartupTool::VideoRecorder) {
+        return shortcutMatchesEvent(m_startupVideoRecorderShortcut, event);
+    }
     return false;
 }
 

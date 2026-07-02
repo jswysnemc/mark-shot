@@ -92,6 +92,8 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     m_startupRulerShortcut = shortcutConfig.startupRuler;
     m_startupCodeScannerShortcut = shortcutConfig.startupCodeScanner;
     m_startupDisplayCaptureShortcut = shortcutConfig.startupDisplayCapture;
+    m_startupGifRecorderShortcut = shortcutConfig.startupGifRecorder;
+    m_startupVideoRecorderShortcut = shortcutConfig.startupVideoRecorder;
     m_autoSelectAfterDrawByTool = annotationAutoSelectAfterDrawTools();
     bool appConfigOk = false;
     const QJsonObject appConfigRoot = markshot::readAppConfigRoot(&appConfigOk);
@@ -137,6 +139,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     initializeImageScrollBars();
     initializeActionToolbar();
     initializeShortcuts();
+    initializeActiveRecordingOverlay();
 
     m_annotationPropertyPanel = new QWidget(this);
     m_annotationPropertyPanel->setObjectName(QStringLiteral("annotationPropertyPanel"));

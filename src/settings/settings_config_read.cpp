@@ -5,6 +5,7 @@
 #include "capture_cursor_policy.h"
 #include "config_value.h"
 #include "kde_capture_config.h"
+#include "recording/recording_storage_config.h"
 #include "save_path_config.h"
 #include "startup_config.h"
 #include "toolbar_appearance_config.h"
@@ -279,6 +280,10 @@ StorageSettings readStorageSettings(const QJsonObject &root)
         settings.savePathTemplate = defaultSavePathTemplate();
     }
 
+    const recording::RecordingStorageConfig recordingStorage = recording::recordingStorageConfigFromRoot(root);
+    settings.recordingVideoDirectory = recordingStorage.videoDirectory;
+    settings.recordingGifDirectory = recordingStorage.gifDirectory;
+
     const ClipboardImageConfig clipboard = clipboardImageConfigFromRoot(root);
     settings.clipboardImageMode = clipboard.mode;
     settings.clipboardThresholdM = clipboard.thresholdM;
@@ -298,6 +303,8 @@ ShortcutSettings readShortcutSettings()
     settings.startupRuler = shortcuts.startupRuler;
     settings.startupCodeScanner = shortcuts.startupCodeScanner;
     settings.startupDisplayCapture = shortcuts.startupDisplayCapture;
+    settings.startupGifRecorder = shortcuts.startupGifRecorder;
+    settings.startupVideoRecorder = shortcuts.startupVideoRecorder;
     return settings;
 }
 

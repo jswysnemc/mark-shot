@@ -53,6 +53,7 @@ It captures screen frames instantly and opens an interactive fullscreen overlay,
 - **Magnifier with Independent Frames**: The magnifier loupe exposes resize handles on both the inner source viewfinder and the outer lens. Rectangle lenses get 8 corner/edge handles per frame, circular lenses get 4. Resizing either frame keeps the magnification ratio constant by scaling the other frame proportionally; translating one frame leaves the other untouched.
 - **Startup Code Scan**: Press `Q` before selecting a region, drag around a QR code or barcode, and open the decoded result in a copyable window.
 - **Quick Display Capture**: Press `D` before selecting a region to instantly capture all outputs, crop them by display, and hover a thumbnail to copy, edit, or save that display image.
+- **GIF and Video Recording**: Press the configured startup recording shortcuts or use the tray menu to record a selected display or a custom region as GIF or MP4. Active recordings show tray and frozen-frame status, can be stopped with `S`, the overlay button, the tray menu, or `--stop-recording`, and send desktop notifications when recording starts or saves.
 - **Image Host Upload**: Press `Ctrl+U` or click the toolbar upload button after selecting a region to upload the screenshot to a custom image host (ImgURL, sm.ms, imgbb, litterbox, etc.). The returned URL is automatically copied to the clipboard. Configure the host via `upload.env`, or plug in any custom uploader via `upload.command`.
 - **Mac-style Export Frame**: Adds transparent padding, rounded corners, and a soft shadow to saved, copied, uploaded, Open With, and extension-command images.
 
@@ -177,6 +178,8 @@ mark-shot --xdg-window
 | `--tray` | Keeps Mark Shot running in the system tray and registers global capture hotkeys when supported. |
 | `--capture` | Forces one-shot capture when tray autostart is enabled in the config. |
 | `--pin-image <path>` | Opens an existing local image directly as a pinned sticker window, skipping capture and region selection. |
+| `--recording-status` | Prints the current recording status as JSON through the running instance. |
+| `--stop-recording` | Requests the running instance to stop the active recording. |
 | `--default-tool <tool>` | Sets the annotation tool selected after region selection. Also seeds fullscreen mode unless `--fullscreen-default-tool` is set. |
 | `--fullscreen-default-tool <tool>` | Sets the annotation tool selected in fullscreen annotation mode. |
 | `--default-color <color>` | Sets the default annotation color. Supports `#RRGGBB` and `#RRGGBBAA`. |
@@ -196,7 +199,7 @@ mark-shot --tray
 Tray mode registers these global hotkeys by default:
 - `Ctrl+Alt+S`: start region capture.
 
-The tray menu also provides Capture, Fullscreen Capture, and Quit actions.
+The tray menu also provides Capture, Fullscreen Capture, Start Recording, live recording status, Stop Recording, Settings, and Quit actions.
 
 **niri** (`~/.config/niri/config.kdl`):
 ```kdl
@@ -388,6 +391,8 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
 | `annotation.defaultColor` | String | `"#FF4D4D"` | Initial annotation color. Supports `#RRGGBB` (opaque) or `#RRGGBBAA` (with alpha). Overridden by CLI `--default-color`. |
 | `save.pathTemplate` | String | `"{pictures}/mark-shot/mark-shot-{datetime}.png"` | Default PNG path used by Save and as the initial Save As filename. Parent directories are created before saving. Aliases include `save.path`, `save.location`, root `savePathTemplate`, and directory-only `save.directory`. |
 | `save.directoryTemplate` | String | `""` | Directory-only save template. If set, filename automatically uses `mark-shot-{datetime}.png`. Aliases: `save.directory`, `save.dir`, `save.folder`. |
+| `recording.storage.videoDirectory` | String | `"{pictures}/mark-shot/videos"` | Default output directory for MP4 recordings. Aliases include `recording.storage.videos`, `recording.storage.videoDir`, and `recording.output.videoDirectory`. |
+| `recording.storage.gifDirectory` | String | `"{pictures}/mark-shot/gifs"` | Default output directory for GIF recordings. Aliases include `recording.storage.gifs`, `recording.storage.gifDir`, and `recording.output.gifDirectory`. |
 | `export.imageFrame` | Boolean/Object | `true` | Mac-style image frame for user-facing exports. Object form supports `enabled`, `padding` (`0`-`256`, default `112`), `cornerRadius` (`0`-`128`, default `18`), `shadowRadius` (`0`-`128`, default `72`), `shadowOffsetY` (`0`-`128`, default `28`), and `shadowOpacity` (`0.0`-`1.0`, default `0.32`). Applies to Save, Save As, Copy, Upload, Open With, and extension-command images; OCR, code scan, pinned windows, quick display capture, and scrolling capture keep the raw image. Set `enabled` to `false` to export the raw selection size. |
 | `shortcuts` | Object | - | Customizable keyboard shortcuts. Alias: `hotkeys` (or under `annotation.shortcuts`/`annotation.hotkeys`). See details below. |
 | `windows.tray.enabled` | Boolean | `true` on Windows, `false` elsewhere | Starts tray mode automatically. The key name is kept for compatibility. Use `mark-shot --tray` to start tray mode without changing config, or `mark-shot --capture` to force one-shot capture when autostart is enabled. |
@@ -1009,6 +1014,18 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 
 ## Release Notes
 
+### 0.1.33
+
+- **GIF and Video Recording**: Added GIF and MP4 recording with stepped frame rates, display or region capture, optional video audio input, and configurable output directories.
+- **Tray and CLI Recording Controls**: Added tray Start Recording and Stop Recording actions, live tray status, `--recording-status`, and `--stop-recording`.
+- **Recording-Aware Capture Overlay**: Active recordings now show status in the frozen-frame overlay and can be stopped with `S` or the overlay button without blocking normal screenshots.
+- **Save and Recording Notifications**: Added desktop notifications for recording start/save/failure and screenshot save completion.
+- **Recording Dialog Updates**: The recording dialog now switches between GIF and video modes, defaults to the current display, and updates frame rate, audio, and output path controls as the mode changes.
+- **Wayland and Text Selection Fixes**: Improved mixed-DPI Wayland capture placement and fixed right-click context menus so editable text selections are preserved.
+
+<details>
+<summary>Previous versions</summary>
+
 ### 0.1.32
 
 - **Startup Shortcut Hint Panel**: Replaced the centered startup hint pill with a PixPin-style vertical shortcut panel that defaults to the left-bottom corner and moves to the left-top corner when the pointer approaches it.
@@ -1018,9 +1035,6 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 - **Settings Gear Icons**: Redrew the settings toolbar and General settings navigation icons as clearer gear glyphs instead of sun-like radial icons.
 - **Tray Mode Compatibility**: Fixed startup behavior when Mark Shot is launched directly into tray mode on environments without an immediately available system tray.
 - **Wayland Text Editor Width**: Prevented the annotation text editor from shrinking unexpectedly on fractional-scale Wayland displays.
-
-<details>
-<summary>Previous versions</summary>
 
 ### 0.1.31
 

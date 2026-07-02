@@ -521,6 +521,10 @@ void ShotWindow::setStartupTool(StartupTool tool)
         return;
     }
 
+    if (recordingModeForStartupTool(m_startupTool).has_value()
+        && !recordingModeForStartupTool(tool).has_value()) {
+        m_pendingRecordingOptions.reset();
+    }
     m_startupTool = tool;
     m_dragging = false;
     m_hoveredWindowRect.reset();
@@ -538,6 +542,9 @@ void ShotWindow::setStartupTool(StartupTool tool)
 
 void ShotWindow::leaveStartupTool()
 {
+    if (recordingModeForStartupTool(m_startupTool).has_value()) {
+        m_pendingRecordingOptions.reset();
+    }
     m_startupTool = StartupTool::None;
     hideDisplayCapturePicker();
     m_startupHoverValid = false;

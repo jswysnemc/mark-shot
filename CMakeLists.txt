@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(mark-shot VERSION 0.1.32 LANGUAGES CXX)
+project(mark-shot VERSION 0.1.33 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -62,8 +62,19 @@ else()
     set(CMAKE_AUTORCC ON)
 endif()
 
+include(cmake/ipc_sources.cmake)
+include(cmake/cli_sources.cmake)
+include(cmake/notification_sources.cmake)
+include(cmake/recording_sources.cmake)
+include(cmake/shot_window_sources.cmake)
+
 qt_add_executable(mark-shot
     resources.qrc
+    ${MARK_SHOT_IPC_SOURCES}
+    ${MARK_SHOT_CLI_SOURCES}
+    ${MARK_SHOT_NOTIFICATION_SOURCES}
+    ${MARK_SHOT_RECORDING_SOURCES}
+    ${MARK_SHOT_WINDOW_SOURCES}
     src/main.cpp
     src/clipboard_image.cpp
     src/clipboard_image.h
@@ -179,48 +190,6 @@ qt_add_executable(mark-shot
     src/shortcut_config.cpp
     src/shortcut_config.h
     src/pinned_window_config.cpp
-    src/shot_window.cpp
-    src/shot_window.h
-    src/shot_window_config.cpp
-    src/shot_window_internal.cpp
-    src/shot_window_internal.h
-    src/shot_window_module.h
-    src/ocr_result_window.cpp
-    src/ocr_result_window.h
-    src/ocr_result_window_translation.cpp
-    src/shot_window_ocr_result_window.cpp
-    src/shot_window_code_scan.cpp
-    src/shot_window_code_scan_result_window.cpp
-    src/shot_window_display_capture.cpp
-    src/shot_window_actions.cpp
-    src/shot_window_annotation_editing.cpp
-    src/shot_window_annotation_painting.cpp
-    src/shot_window_arrow_rendering.cpp
-    src/shot_window_canvas.cpp
-    src/shot_window_hit_testing.cpp
-    src/shot_window_input.cpp
-    src/shot_window_input_shortcuts.cpp
-    src/shot_window_layout.cpp
-    src/shot_window_line_constraint.cpp
-    src/shot_window_line_constraint.h
-    src/shot_window_line_anchors.cpp
-    src/shot_window_lifecycle.cpp
-    src/shot_window_magnifier_drag.cpp
-    src/shot_window_overlay_panels.cpp
-    src/shot_window_state.cpp
-    src/annotation_state_store.cpp
-    src/annotation_state_store.h
-    src/shot_window_modes.cpp
-    src/shot_window_startup_color_dialog.cpp
-    src/shot_window_property_panels.cpp
-    src/shot_window_selection_frame.cpp
-    src/shot_window_setup.cpp
-    src/shot_window_side_panels.cpp
-    src/shot_window_shortcut_registration.cpp
-    src/shot_window_shortcuts.cpp
-    src/shot_window_width_state.cpp
-    src/shot_window_pinned_window.cpp
-    src/shot_window_upload.cpp
     src/pinned_window/pinned_image_window.cpp
     src/pinned_window/pinned_image_window.h
     src/pinned_window/pinned_image_window_geometry.cpp
@@ -260,6 +229,8 @@ qt_add_executable(mark-shot
     src/ui/theme.cpp
     src/ui/theme.h
 )
+
+include(cmake/capture_session_sources.cmake)
 
 target_include_directories(mark-shot PRIVATE src)
 target_compile_definitions(mark-shot PRIVATE MARK_SHOT_VERSION="${PROJECT_VERSION}")

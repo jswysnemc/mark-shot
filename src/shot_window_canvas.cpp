@@ -25,6 +25,13 @@ QVector<markshot::startup_hint::ShortcutHintItem> ShotWindow::startupShortcutHin
         };
     }
 
+    if (recordingModeForStartupTool(m_startupTool).has_value()) {
+        return {
+            {MS_TR("Drag"), MS_TR("Select recording region"), InputIcon::Mouse},
+            {MS_TR("Right/Esc"), MS_TR("Return to selection"), InputIcon::Mouse},
+        };
+    }
+
     if (m_startupTool != StartupTool::None) {
         return {};
     }
@@ -34,15 +41,24 @@ QVector<markshot::startup_hint::ShortcutHintItem> ShotWindow::startupShortcutHin
         return text.isEmpty() ? fallback : text;
     };
 
-    return {
+    QVector<markshot::startup_hint::ShortcutHintItem> items = {
         {MS_TR("Drag"), MS_TR("Select screenshot region"), InputIcon::Mouse},
         {shortcutTextOr(m_startupColorPickerShortcut, QStringLiteral("C")), MS_TR("Pick color"), InputIcon::Keyboard},
         {shortcutTextOr(m_startupRulerShortcut, QStringLiteral("R")), MS_TR("Measure size"), InputIcon::Keyboard},
         {shortcutTextOr(m_startupCodeScannerShortcut, QStringLiteral("Q")), MS_TR("Scan QR or barcode"), InputIcon::Keyboard},
         {shortcutTextOr(m_startupDisplayCaptureShortcut, QStringLiteral("D")), MS_TR("Quick display capture"), InputIcon::Keyboard},
-        {MS_TR("Middle"), MS_TR("Toggle fullscreen annotation"), InputIcon::Wheel},
-        {MS_TR("Right/Esc"), MS_TR("Cancel"), InputIcon::Mouse},
     };
+    if (!activeRecordingAvailable()) {
+        items.append({shortcutTextOr(m_startupGifRecorderShortcut, QStringLiteral("G")),
+                      MS_TR("Record GIF"),
+                      InputIcon::Keyboard});
+        items.append({shortcutTextOr(m_startupVideoRecorderShortcut, QStringLiteral("V")),
+                      MS_TR("Record video"),
+                      InputIcon::Keyboard});
+    }
+    items.append({MS_TR("Middle"), MS_TR("Toggle fullscreen annotation"), InputIcon::Wheel});
+    items.append({MS_TR("Right/Esc"), MS_TR("Cancel"), InputIcon::Mouse});
+    return items;
 }
 
 /**
@@ -393,7 +409,9 @@ void ShotWindow::paintEvent(QPaintEvent *)
 
     if (m_hoveredWindowRect.has_value()
         && m_mode == Mode::Selecting
-        && (m_startupTool == StartupTool::None || m_startupTool == StartupTool::CodeScanner)) {
+        && (m_startupTool == StartupTool::None
+            || m_startupTool == StartupTool::CodeScanner
+            || recordingModeForStartupTool(m_startupTool).has_value())) {
         const QRectF hoverWidget = imageRectToWidget(QRectF(*m_hoveredWindowRect));
         painter.setPen(QPen(QColor(94, 234, 212), 2.0));
         painter.setBrush(QColor(94, 234, 212, 32));
@@ -402,6 +420,7 @@ void ShotWindow::paintEvent(QPaintEvent *)
 
     drawStartupToolOverlay(painter);
     drawStartupShortcutHint(painter);
+    drawActiveRecordingStatus(painter);
 
     drawWheelPreview(painter);
 }
@@ -448,6 +467,15 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
         && !displayCapturePickerContains(event->pos())) {
         hideDisplayCapturePicker();
         update();
+    }
+
+    if (m_mode == Mode::Selecting
+        && activeRecordingAvailable()
+        && event->button() == Qt::LeftButton
+        && activeRecordingStopButtonRect().contains(event->position())) {
+        stopActiveRecordingFromOverlay();
+        event->accept();
+        return;
     }
 
     if (m_mode == Mode::Selecting

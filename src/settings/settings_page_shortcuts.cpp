@@ -127,6 +127,8 @@ SettingsPageShortcuts::SettingsPageShortcuts(QWidget *parent)
     m_startupRuler = addShortcutRow(startupForm, MS_TR("Ruler"));
     m_startupCodeScanner = addShortcutRow(startupForm, MS_TR("Code Scanner"));
     m_startupDisplayCapture = addShortcutRow(startupForm, MS_TR("Display Capture"));
+    m_startupGifRecorder = addShortcutRow(startupForm, MS_TR("GIF Recording"));
+    m_startupVideoRecorder = addShortcutRow(startupForm, MS_TR("Video Recording"));
     layout->addWidget(startupCard);
     layout->addStretch();
 }
@@ -149,6 +151,8 @@ void SettingsPageShortcuts::setConfig(const SettingsConfig &config)
     m_startupRuler->setKeySequence(config.shortcuts.startupRuler);
     m_startupCodeScanner->setKeySequence(config.shortcuts.startupCodeScanner);
     m_startupDisplayCapture->setKeySequence(config.shortcuts.startupDisplayCapture);
+    m_startupGifRecorder->setKeySequence(config.shortcuts.startupGifRecorder);
+    m_startupVideoRecorder->setKeySequence(config.shortcuts.startupVideoRecorder);
 }
 
 void SettingsPageShortcuts::updateConfig(SettingsConfig *config) const
@@ -173,6 +177,8 @@ void SettingsPageShortcuts::updateConfig(SettingsConfig *config) const
     config->shortcuts.startupRuler = m_startupRuler->keySequence();
     config->shortcuts.startupCodeScanner = m_startupCodeScanner->keySequence();
     config->shortcuts.startupDisplayCapture = m_startupDisplayCapture->keySequence();
+    config->shortcuts.startupGifRecorder = m_startupGifRecorder->keySequence();
+    config->shortcuts.startupVideoRecorder = m_startupVideoRecorder->keySequence();
 }
 
 void SettingsPageShortcuts::addToolShortcutRows(QFormLayout *form)

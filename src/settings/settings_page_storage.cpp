@@ -6,13 +6,51 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QFileDialog>
 #include <QFormLayout>
 #include <QFrame>
+#include <QHBoxLayout>
 #include <QLineEdit>
+#include <QPushButton>
 #include <QSpinBox>
+#include <QWidget>
 #include <QVBoxLayout>
 
 namespace markshot::settings {
+namespace {
+
+/**
+ * 添加目录选择表单项。
+ * @param form 表单布局。
+ * @param label 标签文本。
+ * @param parent 父控件。
+ * @return 目录输入控件。
+ */
+QLineEdit *addDirectoryRow(QFormLayout *form, const QString &label, QWidget *parent)
+{
+    auto *row = new QWidget(parent);
+    auto *layout = new QHBoxLayout(row);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(8);
+
+    auto *edit = new QLineEdit(row);
+    auto *browse = new QPushButton(MS_TR("Browse"), row);
+    layout->addWidget(edit, 1);
+    layout->addWidget(browse);
+    form->addRow(label, row);
+
+    QObject::connect(browse, &QPushButton::clicked, row, [edit, parent] {
+        const QString directory = QFileDialog::getExistingDirectory(parent,
+                                                                    MS_TR("Select Folder"),
+                                                                    edit->text().trimmed());
+        if (!directory.isEmpty()) {
+            edit->setText(directory);
+        }
+    });
+    return edit;
+}
+
+}  // namespace
 
 SettingsPageStorage::SettingsPageStorage(QWidget *parent)
     : QWidget(parent)
@@ -27,6 +65,14 @@ SettingsPageStorage::SettingsPageStorage(QWidget *parent)
                                     MS_TR("Path Template"),
                                     QStringLiteral("{pictures}/mark-shot/mark-shot-{datetime}.png"));
     layout->addWidget(saveCard);
+
+    QFrame *recordingCard = createSettingsCard(MS_TR("Recording Output"),
+                                               MS_TR("Configure where video and GIF recordings are saved."),
+                                               this);
+    QFormLayout *recordingForm = settingsCardForm(recordingCard);
+    m_recordingVideoDirectory = addDirectoryRow(recordingForm, MS_TR("Video Directory"), recordingCard);
+    m_recordingGifDirectory = addDirectoryRow(recordingForm, MS_TR("GIF Directory"), recordingCard);
+    layout->addWidget(recordingCard);
 
     QFrame *clipboardCard = createSettingsCard(MS_TR("Clipboard Image"),
                                                MS_TR("Choose how copied images are placed into the clipboard."),
@@ -59,6 +105,8 @@ SettingsPageStorage::SettingsPageStorage(QWidget *parent)
 void SettingsPageStorage::setConfig(const SettingsConfig &config)
 {
     m_savePathTemplate->setText(config.storage.savePathTemplate);
+    m_recordingVideoDirectory->setText(config.storage.recordingVideoDirectory);
+    m_recordingGifDirectory->setText(config.storage.recordingGifDirectory);
     const int modeIndex = m_clipboardMode->findData(static_cast<int>(config.storage.clipboardImageMode));
     m_clipboardMode->setCurrentIndex(modeIndex >= 0 ? modeIndex : 0);
     m_clipboardThresholdM->setValue(config.storage.clipboardThresholdM);
@@ -77,6 +125,8 @@ void SettingsPageStorage::updateConfig(SettingsConfig *config) const
     }
 
     config->storage.savePathTemplate = m_savePathTemplate->text().trimmed();
+    config->storage.recordingVideoDirectory = m_recordingVideoDirectory->text().trimmed();
+    config->storage.recordingGifDirectory = m_recordingGifDirectory->text().trimmed();
     config->storage.clipboardImageMode =
         static_cast<ClipboardImageMode>(m_clipboardMode->currentData().toInt());
     config->storage.clipboardThresholdM = m_clipboardThresholdM->value();

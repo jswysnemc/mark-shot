@@ -12,6 +12,7 @@
 #include <QWidget>
 
 #include "display_capture/display_capture_target.h"
+#include "recording/recording_options.h"
 #include "startup_shortcut_hint.h"
 #include "toolbar_appearance_config.h"
 #include "ui/theme.h"
@@ -140,6 +141,12 @@ public:
     void setDefaultTools(Tool tool, Tool fullscreenTool);
     void setDefaultColor(QColor color);
     void showDisplayCaptureTargets(QVector<markshot::display_capture::Target> targets);
+    /**
+     * 使用已确认录制配置进入区域录制选区状态。
+     * @param options 已确认的录制配置。
+     * @return 无返回值。
+     */
+    void beginRegionRecordingSelection(markshot::recording::RecordingOptions options);
 
 signals:
     void selectionActivated(ShotWindow *window);
@@ -174,6 +181,8 @@ private:
         ColorPicker,
         Ruler,
         CodeScanner,
+        GifRecorder,
+        VideoRecorder,
     };
 
 public:
@@ -506,6 +515,10 @@ private:
     QRect clampedToolbarGeometry(QRect toolbarGeometry) const;
     void setStartupTool(StartupTool tool);
     void leaveStartupTool();
+    void beginStartupRecording(markshot::recording::RecordingMode mode);
+    bool handleStartupRecordingSelection();
+    void startRecording(markshot::recording::RecordingOptions options);
+    std::optional<markshot::recording::RecordingMode> recordingModeForStartupTool(StartupTool tool) const;
     void toggleDisplayCapturePicker();
     void hideDisplayCapturePicker();
     bool displayCapturePickerVisible() const;
@@ -519,6 +532,17 @@ private:
     void showStartupColorDialog(QColor color, QPoint anchor);
     void drawStartupToolOverlay(QPainter &painter);
     void drawStartupShortcutHint(QPainter &painter) const;
+
+    /// 绘制录制中状态提示组件。@param painter 当前绘图对象。@return 无返回值。
+    void drawActiveRecordingStatus(QPainter &painter);
+    /// 初始化录制中状态提示刷新逻辑。@return 无返回值。
+    void initializeActiveRecordingOverlay();
+    /// 判断当前是否存在活动录制。@return 存在活动录制时返回 true。
+    bool activeRecordingAvailable() const;
+    /// 从冻结帧提示组件请求停止录制。@return 停止请求已提交时返回 true。
+    bool stopActiveRecordingFromOverlay();
+    /// 计算录制中提示组件的停止按钮区域。@return 停止按钮矩形。
+    QRectF activeRecordingStopButtonRect() const;
     void drawStartupColorLoupe(QPainter &painter, QPointF imagePoint) const;
     void drawStartupRuler(QPainter &painter) const;
     QVector<markshot::startup_hint::ShortcutHintItem> startupShortcutHintItems() const;
@@ -584,6 +608,11 @@ private:
     QKeySequence m_startupRulerShortcut;
     QKeySequence m_startupCodeScannerShortcut;
     QKeySequence m_startupDisplayCaptureShortcut;
+    QKeySequence m_startupGifRecorderShortcut;
+    QKeySequence m_startupVideoRecorderShortcut;
+    std::optional<markshot::recording::RecordingOptions> m_pendingRecordingOptions;
+    bool m_recordingConfigDialogOpen = false;
+    QTimer *m_activeRecordingOverlayTimer = nullptr;
     markshot::startup_hint::PanelAnchor m_startupHintAnchor = markshot::startup_hint::PanelAnchor::BottomLeft;
     bool m_dragging = false;
     bool m_annotationHistoryCaptured = false;

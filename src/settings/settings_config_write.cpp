@@ -5,6 +5,7 @@
 #include "autostart/autostart_manager.h"
 #include "capture_cursor_policy.h"
 #include "config_value.h"
+#include "recording/recording_storage_config.h"
 #include "ui/i18n.h"
 #include "ui/interface_language_config.h"
 
@@ -177,6 +178,8 @@ void writeShortcutSettings(QJsonObject *root, const ShortcutSettings &settings)
     startup.insert(QStringLiteral("ruler"), sequenceText(settings.startupRuler));
     startup.insert(QStringLiteral("codeScanner"), sequenceText(settings.startupCodeScanner));
     startup.insert(QStringLiteral("displayCapture"), sequenceText(settings.startupDisplayCapture));
+    startup.insert(QStringLiteral("gifRecorder"), sequenceText(settings.startupGifRecorder));
+    startup.insert(QStringLiteral("videoRecorder"), sequenceText(settings.startupVideoRecorder));
 
     setNestedValue(root, {QStringLiteral("shortcuts"), QStringLiteral("tools")}, tools);
     setNestedValue(root, {QStringLiteral("shortcuts"), QStringLiteral("actions")}, actions);
@@ -241,6 +244,15 @@ void writeStorageSettings(QJsonObject *root, const StorageSettings &settings)
 {
     setNestedValue(root, {QStringLiteral("save"), QStringLiteral("pathTemplate")},
                    settings.savePathTemplate.trimmed());
+    const recording::RecordingStorageConfig defaults = recording::defaultRecordingStorageConfig();
+    setNestedValue(root,
+                   {QStringLiteral("recording"), QStringLiteral("storage"), QStringLiteral("videoDirectory")},
+                   recording::normalizedRecordingDirectory(settings.recordingVideoDirectory,
+                                                           defaults.videoDirectory));
+    setNestedValue(root,
+                   {QStringLiteral("recording"), QStringLiteral("storage"), QStringLiteral("gifDirectory")},
+                   recording::normalizedRecordingDirectory(settings.recordingGifDirectory,
+                                                           defaults.gifDirectory));
     setNestedValue(root, {QStringLiteral("clipboard"), QStringLiteral("image"), QStringLiteral("mode")},
                    clipboardImageModeName(settings.clipboardImageMode));
     setNestedValue(root, {QStringLiteral("clipboard"), QStringLiteral("image"), QStringLiteral("thresholdM")},

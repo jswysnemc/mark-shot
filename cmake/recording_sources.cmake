@@ -1,0 +1,32 @@
+set(MARK_SHOT_RECORDING_SOURCES
+    src/recording/audio_capture_options.cpp
+    src/recording/audio_capture_options.h
+    src/recording/ffmpeg_recording_process.cpp
+    src/recording/ffmpeg_recording_process.h
+    src/recording/gif_recording_writer.cpp
+    src/recording/gif_recording_writer.h
+    src/recording/recording_config_dialog.cpp
+    src/recording/recording_config_dialog.h
+    src/recording/recording_controller.cpp
+    src/recording/recording_controller.h
+    src/recording/recording_display_source.cpp
+    src/recording/recording_display_source.h
+    src/recording/recording_file_naming.cpp
+    src/recording/recording_file_naming.h
+    src/recording/recording_frame_grabber.cpp
+    src/recording/recording_frame_grabber.h
+    src/recording/recording_options.h
+    src/recording/recording_session_manager.cpp
+    src/recording/recording_session_manager.h
+    src/recording/recording_start_flow.cpp
+    src/recording/recording_start_flow.h
+    src/recording/recording_status.cpp
+    src/recording/recording_status.h
+    src/recording/recording_storage_config.cpp
+    src/recording/recording_storage_config.h
+    src/recording/recording_writer.h
+    src/recording/video_recording_writer.cpp
+    src/recording/video_recording_writer.h
+    src/shot_window_recording.cpp
+    src/shot_window_recording_status_overlay.cpp
+)

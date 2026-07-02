@@ -2,6 +2,7 @@
 
 #include "display_capture/display_capture_picker.h"
 #include "display_capture/display_capture_save.h"
+#include "notifications/app_notifications.h"
 
 using namespace markshot::shot;
 
@@ -149,7 +150,7 @@ void ShotWindow::saveDisplayCaptureTarget(int index)
     QString path;
     if (markshot::display_capture::saveDisplayCaptureTarget(m_displayCaptureTargets.at(index), &path)) {
         const QString message = MS_TR("Saved to %1").arg(path);
-        if (!sendDesktopNotification(QStringLiteral("Mark Shot"), message, 3000)) {
+        if (!markshot::notifications::notifyScreenshotSaved(path)) {
             showToast(message, 2500);
         }
         return;

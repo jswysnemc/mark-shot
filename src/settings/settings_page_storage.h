@@ -28,6 +28,8 @@ public:
 
 private:
     QLineEdit *m_savePathTemplate = nullptr;
+    QLineEdit *m_recordingVideoDirectory = nullptr;
+    QLineEdit *m_recordingGifDirectory = nullptr;
     QComboBox *m_clipboardMode = nullptr;
     QSpinBox *m_clipboardThresholdM = nullptr;
     QCheckBox *m_exportImageFrameEnabled = nullptr;

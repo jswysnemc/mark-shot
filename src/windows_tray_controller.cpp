@@ -5,6 +5,9 @@
 #if defined(MARK_SHOT_WITH_DBUS)
 #include "global_shortcut_portal.h"
 #endif
+#include "recording/recording_session_manager.h"
+#include "recording/recording_start_flow.h"
+#include "recording/recording_status.h"
 #include "settings/settings_dialog.h"
 #include "shot_window.h"
 #include "ui/i18n.h"
@@ -22,7 +25,9 @@
 #include <QJsonValue>
 #include <QMenu>
 #include <QSystemTrayIcon>
+#include <QTimer>
 
+#include <algorithm>
 #include <optional>
 
 #if defined(Q_OS_WIN)
@@ -135,6 +140,54 @@ void applyWindowsConfig(const QJsonObject &object, WindowsTrayController::Config
     if (const std::optional<QKeySequence> fullscreenHotkey = config::keySequenceValue(object.value(QStringLiteral("fullscreenHotkey")))) {
         config->fullscreenHotkey = *fullscreenHotkey;
     }
+}
+
+/**
+ * 格式化录制持续时间。
+ * @param elapsedMs 已录制毫秒数。
+ * @return 录制持续时间文本。
+ */
+QString formatRecordingElapsed(qint64 elapsedMs)
+{
+    const qint64 totalSeconds = std::max<qint64>(0, elapsedMs / 1000);
+    const qint64 hours = totalSeconds / 3600;
+    const qint64 minutes = (totalSeconds % 3600) / 60;
+    const qint64 seconds = totalSeconds % 60;
+    if (hours > 0) {
+        return QStringLiteral("%1:%2:%3")
+            .arg(hours, 2, 10, QChar(QLatin1Char('0')))
+            .arg(minutes, 2, 10, QChar(QLatin1Char('0')))
+            .arg(seconds, 2, 10, QChar(QLatin1Char('0')));
+    }
+    return QStringLiteral("%1:%2")
+        .arg(minutes, 2, 10, QChar(QLatin1Char('0')))
+        .arg(seconds, 2, 10, QChar(QLatin1Char('0')));
+}
+
+/**
+ * 返回录制模式在托盘中的显示名称。
+ * @param mode 录制模式。
+ * @return 录制模式显示名称。
+ */
+QString recordingModeLabel(markshot::recording::RecordingMode mode)
+{
+    return mode == markshot::recording::RecordingMode::Gif
+        ? QStringLiteral("GIF")
+        : MS_TR("Video");
+}
+
+/**
+ * 创建托盘录制状态文本。
+ * @param status 录制状态。
+ * @return 托盘状态文本。
+ */
+QString recordingStatusText(const markshot::recording::RecordingStatus &status)
+{
+    if (!status.active) {
+        return MS_TR("Recording: idle");
+    }
+    return MS_TR("Recording: %1 %2")
+        .arg(recordingModeLabel(status.mode), formatRecordingElapsed(status.elapsedMs));
 }
 
 #if defined(Q_OS_WIN)
@@ -282,6 +335,11 @@ void WindowsTrayController::setCaptureCallbacks(Callback capture, Callback fulls
     m_fullscreenCaptureCallback = std::move(fullscreen);
 }
 
+void WindowsTrayController::setRecordingRegionCallback(RecordingRegionCallback callback)
+{
+    m_recordingRegionCallback = std::move(callback);
+}
+
 bool WindowsTrayController::start()
 {
     if (!m_application) {
@@ -297,7 +355,15 @@ bool WindowsTrayController::start()
     m_menu = new QMenu;
     m_menu->addAction(MS_TR("Capture"), this, [this] { triggerCapture(); });
     m_menu->addAction(MS_TR("Fullscreen Capture"), this, [this] { triggerFullscreenCapture(); });
+    m_startRecordingAction = m_menu->addAction(MS_TR("Start Recording"), this, [this] {
+        startRecordingFromTray();
+    });
     m_menu->addAction(MS_TR("Settings"), this, [] { settings::showSettingsDialog(); });
+    m_menu->addSeparator();
+    m_recordingStatusAction = m_menu->addAction(MS_TR("Recording: idle"));
+    m_recordingStatusAction->setEnabled(false);
+    m_stopRecordingAction = m_menu->addAction(MS_TR("Stop Recording"), this, [this] { stopRecordingFromTray(); });
+    m_stopRecordingAction->setEnabled(false);
     m_menu->addSeparator();
     m_menu->addAction(MS_TR("Quit"), m_application, [this] {
         unregisterHotkeys();
@@ -316,6 +382,15 @@ bool WindowsTrayController::start()
         }
     });
     m_tray->show();
+
+    m_recordingStatusTimer = new QTimer(this);
+    m_recordingStatusTimer->setInterval(1000);
+    connect(m_recordingStatusTimer, &QTimer::timeout, this, &WindowsTrayController::updateRecordingState);
+    connect(&recording::RecordingSessionManager::instance(),
+            &recording::RecordingSessionManager::statusChanged,
+            this,
+            &WindowsTrayController::updateRecordingState);
+    updateRecordingState();
 
     if (m_config.hotkeysEnabled) {
         registerHotkeys();
@@ -364,6 +439,92 @@ void WindowsTrayController::triggerFullscreenCapture()
 {
     if (m_fullscreenCaptureCallback) {
         m_fullscreenCaptureCallback();
+    }
+}
+
+void WindowsTrayController::startRecordingFromTray()
+{
+    auto &manager = recording::RecordingSessionManager::instance();
+    if (manager.status().active) {
+        updateRecordingState();
+        return;
+    }
+
+    recording::RecordingStartFlowRequest request;
+    request.initialMode = recording::RecordingMode::Video;
+    request.stayOnTop = true;
+    request.startDisplayRecording = [this, &manager](recording::RecordingOptions options) {
+        QString error;
+        if (!manager.start(options, m_application, &error)) {
+            if (m_tray) {
+                m_tray->showMessage(QStringLiteral("Mark Shot"),
+                                    error.isEmpty() ? MS_TR("Recording failed to start") : error,
+                                    QSystemTrayIcon::Warning,
+                                    3000);
+            }
+            return;
+        }
+        updateRecordingState();
+    };
+    request.selectRegionRecording = [this](recording::RecordingOptions options) {
+        if (m_recordingRegionCallback) {
+            m_recordingRegionCallback(std::move(options));
+            return;
+        }
+        if (m_tray) {
+            m_tray->showMessage(QStringLiteral("Mark Shot"),
+                                MS_TR("Failed to start capture session."),
+                                QSystemTrayIcon::Warning,
+                                3000);
+        }
+    };
+    request.showError = [this](const QString &message) {
+        if (m_tray) {
+            m_tray->showMessage(QStringLiteral("Mark Shot"), message, QSystemTrayIcon::Warning, 3000);
+        }
+    };
+
+    recording::runRecordingStartFlow(request);
+    updateRecordingState();
+}
+
+void WindowsTrayController::stopRecordingFromTray()
+{
+    QString error;
+    if (recording::RecordingSessionManager::instance().stop(&error)) {
+        updateRecordingState();
+        return;
+    }
+    if (m_tray && !error.isEmpty()) {
+        m_tray->showMessage(QStringLiteral("Mark Shot"), error, QSystemTrayIcon::Information, 3000);
+    }
+}
+
+void WindowsTrayController::updateRecordingState()
+{
+    const recording::RecordingStatus status = recording::RecordingSessionManager::instance().status();
+    const QString statusText = recordingStatusText(status);
+
+    if (m_recordingStatusAction) {
+        m_recordingStatusAction->setText(statusText);
+    }
+    if (m_stopRecordingAction) {
+        m_stopRecordingAction->setEnabled(status.active);
+    }
+    if (m_startRecordingAction) {
+        m_startRecordingAction->setEnabled(!status.active);
+    }
+    if (m_tray) {
+        m_tray->setToolTip(status.active
+                               ? QStringLiteral("Mark Shot - %1").arg(statusText)
+                               : QStringLiteral("Mark Shot"));
+    }
+    if (m_recordingStatusTimer) {
+        if (status.active && !m_recordingStatusTimer->isActive()) {
+            m_recordingStatusTimer->start();
+        } else if (!status.active && m_recordingStatusTimer->isActive()) {
+            m_recordingStatusTimer->stop();
+        }
     }
 }
 

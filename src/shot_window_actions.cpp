@@ -1,5 +1,7 @@
 #include "shot_window_module.h"
 
+#include "notifications/app_notifications.h"
+
 #include "app_config_store.h"
 #include "export_image_effect.h"
 #include "save_path_config.h"
@@ -338,7 +340,7 @@ void ShotWindow::saveSelection()
     if (markshot::ensureSavePathDirectory(path) && output.save(path, "PNG")) {
         const QString message = MS_TR("Saved to %1").arg(path);
         // Keyboard save should finish without another dialog round-trip.
-        if (!sendDesktopNotification(QStringLiteral("Mark Shot"), message, 3000)) {
+        if (!markshot::notifications::notifyScreenshotSaved(path)) {
             showToast(message, 2500);
         }
         QTimer::singleShot(150, this, [this] { close(); });
@@ -400,7 +402,7 @@ void ShotWindow::saveSelectionAs()
             && output.save(files.first(), "PNG")) {
             const QString message = MS_TR("Saved to %1").arg(files.first());
             // Prefer desktop notifications because the window may close immediately after saving.
-            if (!sendDesktopNotification(QStringLiteral("Mark Shot"), message, 3000)) {
+            if (!markshot::notifications::notifyScreenshotSaved(files.first())) {
                 showToast(message, 2500);
             }
             QTimer::singleShot(150, this, [this] { close(); });

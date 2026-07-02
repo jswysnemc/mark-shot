@@ -150,6 +150,12 @@ void ShotWindow::keyPressEvent(QKeyEvent *event)
 {
     clearWheelPreview();
 
+    if (m_mode == Mode::Selecting && activeRecordingAvailable() && event->key() == Qt::Key_S) {
+        stopActiveRecordingFromOverlay();
+        event->accept();
+        return;
+    }
+
     if (m_mode == Mode::Selecting
         && displayCapturePickerVisible()
         && eventMatchesShortcut(event, Action::Cancel)) {
@@ -167,6 +173,22 @@ void ShotWindow::keyPressEvent(QKeyEvent *event)
     }
 
     if (m_mode == Mode::Selecting) {
+        if (event->isAutoRepeat()
+            && (eventMatchesDisplayCaptureShortcut(event)
+                || eventMatchesStartupShortcut(event, StartupTool::ColorPicker)
+                || eventMatchesStartupShortcut(event, StartupTool::Ruler)
+                || eventMatchesStartupShortcut(event, StartupTool::CodeScanner)
+                || eventMatchesStartupShortcut(event, StartupTool::GifRecorder)
+                || eventMatchesStartupShortcut(event, StartupTool::VideoRecorder))) {
+            event->accept();
+            return;
+        }
+        if (activeRecordingAvailable()
+            && (eventMatchesStartupShortcut(event, StartupTool::GifRecorder)
+                || eventMatchesStartupShortcut(event, StartupTool::VideoRecorder))) {
+            event->accept();
+            return;
+        }
         if (eventMatchesDisplayCaptureShortcut(event)) {
             toggleDisplayCapturePicker();
             event->accept();
@@ -184,6 +206,16 @@ void ShotWindow::keyPressEvent(QKeyEvent *event)
         }
         if (eventMatchesStartupShortcut(event, StartupTool::CodeScanner)) {
             setStartupTool(StartupTool::CodeScanner);
+            event->accept();
+            return;
+        }
+        if (eventMatchesStartupShortcut(event, StartupTool::GifRecorder)) {
+            beginStartupRecording(markshot::recording::RecordingMode::Gif);
+            event->accept();
+            return;
+        }
+        if (eventMatchesStartupShortcut(event, StartupTool::VideoRecorder)) {
+            beginStartupRecording(markshot::recording::RecordingMode::Video);
             event->accept();
             return;
         }

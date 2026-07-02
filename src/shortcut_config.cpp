@@ -122,6 +122,12 @@ void applyStartupShortcutObject(const QJsonObject &object, ShortcutConfig *confi
         } else if (key == QStringLiteral("displaycapture") || key == QStringLiteral("display")
                    || key == QStringLiteral("screen") || key == QStringLiteral("monitor")) {
             config->startupDisplayCapture = *sequence;
+        } else if (key == QStringLiteral("gif") || key == QStringLiteral("gifrecorder")
+                   || key == QStringLiteral("recording")) {
+            config->startupGifRecorder = *sequence;
+        } else if (key == QStringLiteral("video") || key == QStringLiteral("videorecorder")
+                   || key == QStringLiteral("screenrecording")) {
+            config->startupVideoRecorder = *sequence;
         }
     }
 }
@@ -272,7 +278,9 @@ ShortcutConfig configuredShortcuts(const QString &configPath)
                           QKeySequence(Qt::Key_C),
                           QKeySequence(Qt::Key_R),
                           QKeySequence(Qt::Key_Q),
-                          QKeySequence(Qt::Key_D)};
+                          QKeySequence(Qt::Key_D),
+                          QKeySequence(Qt::Key_G),
+                          QKeySequence(Qt::Key_V)};
 
     QFile file(configPath);
     if (!file.exists() || !file.open(QIODevice::ReadOnly | QIODevice::Text)) {

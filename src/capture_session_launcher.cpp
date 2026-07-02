@@ -2,6 +2,7 @@
 
 #include "annotation_launch.h"
 #include "capture_geometry.h"
+#include "capture_session_screen_utils.h"
 #include "debug_log.h"
 #include "display_capture/display_capture_snapshot.h"
 #include "screen_capture.h"
@@ -18,7 +19,6 @@
 #include <QTimer>
 #include <QWindow>
 
-#include <cmath>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -34,122 +34,6 @@ struct CapturedScreenFrame {
     bool detectWindows = false;
 };
 
-/// @brief 返回冻结范围日志名称。
-/// @param scope 冻结范围枚举值。
-/// @return 日志使用的固定字符串。
-const char *freezeScopeDebugName(markshot::CaptureFreezeScope scope)
-{
-    switch (scope) {
-    case markshot::CaptureFreezeScope::CursorScreen:
-        return "cursor-screen";
-    case markshot::CaptureFreezeScope::AllScreens:
-        return "all-screens";
-    }
-    return "unknown";
-}
-
-/// @brief 判断当前窗口系统是否为 Wayland。
-/// @return 当前 Qt 平台为 Wayland 时返回 true。
-bool isWaylandPlatform()
-{
-    return QGuiApplication::platformName().compare(QStringLiteral("wayland"),
-                                                   Qt::CaseInsensitive) == 0;
-}
-
-/// @brief 判断屏幕列表是否包含不同的设备像素比例。
-/// @param screens 当前屏幕列表。
-/// @return 存在两个以上不同设备像素比例时返回 true。
-bool hasMixedDevicePixelRatios(const QList<QScreen *> &screens)
-{
-    std::optional<qreal> firstRatio;
-    for (QScreen *screen : screens) {
-        if (!screen || screen->geometry().isEmpty()) {
-            continue;
-        }
-
-        const qreal ratio = screen->devicePixelRatio();
-        if (!firstRatio.has_value()) {
-            firstRatio = ratio;
-            continue;
-        }
-        if (std::abs(*firstRatio - ratio) > 0.01) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/// @brief 判断多屏冻结是否需要逐屏捕获。
-/// @param screens 当前屏幕列表。
-/// @return Wayland 多屏场景返回 true。
-bool shouldCaptureScreensIndividually(const QList<QScreen *> &screens)
-{
-    return isWaylandPlatform() && screens.size() > 1;
-}
-
-/// @brief 记录截图会话中的屏幕缩放诊断信息。
-/// @param screens 当前屏幕列表。
-/// @return 无返回值。
-void logCaptureSessionScreens(const QList<QScreen *> &screens)
-{
-    int index = 0;
-    for (QScreen *screen : screens) {
-        if (!screen) {
-            markshot::debugLog("capture-session",
-                               "【截图会话】【缩放诊断】screen index=%d null=1",
-                               index++);
-            continue;
-        }
-
-        const QRect geometry = screen->geometry();
-        const QRect available = screen->availableGeometry();
-        markshot::debugLog("capture-session",
-                           "【截图会话】【缩放诊断】screen index=%d name=%s geom=%d,%d %dx%d "
-                           "available=%d,%d %dx%d dpr=%.3f logical_dpi=%.3fx%.3f "
-                           "physical_dpi=%.3fx%.3f refresh=%.3f",
-                           index++,
-                           screen->name().toUtf8().constData(),
-                           geometry.x(), geometry.y(), geometry.width(), geometry.height(),
-                           available.x(), available.y(), available.width(), available.height(),
-                           screen->devicePixelRatio(),
-                           screen->logicalDotsPerInchX(), screen->logicalDotsPerInchY(),
-                           screen->physicalDotsPerInchX(), screen->physicalDotsPerInchY(),
-                           screen->refreshRate());
-    }
-}
-
-/// @brief 计算全部显示器组成的虚拟桌面几何。
-/// @return 虚拟桌面几何。
-QRect virtualScreensGeometry()
-{
-    QRect geometry;
-    const QList<QScreen *> screens = QGuiApplication::screens();
-    for (QScreen *screen : screens) {
-        if (!screen) {
-            continue;
-        }
-        geometry = geometry.isNull() ? screen->geometry() : geometry.united(screen->geometry());
-    }
-    return geometry;
-}
-
-/// @brief 按显示器名称查找屏幕。
-/// @param screenName 显示器名称。
-/// @return 匹配到的屏幕；未找到时返回 nullptr。
-QScreen *screenByName(const QString &screenName)
-{
-    if (screenName.isEmpty()) {
-        return nullptr;
-    }
-    const QList<QScreen *> screens = QGuiApplication::screens();
-    for (QScreen *screen : screens) {
-        if (screen && screen->name() == screenName) {
-            return screen;
-        }
-    }
-    return nullptr;
-}
-
 /// @brief 根据已经捕获的图像创建并显示截图窗口。
 /// @param screen 要显示窗口的屏幕。
 /// @param image 截图图像。
@@ -161,6 +45,7 @@ QScreen *screenByName(const QString &screenName)
 /// @param useRegularWindow 是否使用普通窗口。
 /// @param fullscreenAnnotation 是否直接进入全屏标注。
 /// @param defaultTools 默认工具配置。
+/// @param regionRecordingOptions 区域录制配置，为空时启动普通截图流程。
 /// @return 创建出的截图窗口。
 ShotWindow *showCapturedWindow(QScreen *screen,
                                QImage image,
@@ -171,7 +56,8 @@ ShotWindow *showCapturedWindow(QScreen *screen,
                                bool allOutputs,
                                bool useRegularWindow,
                                bool fullscreenAnnotation,
-                               const markshot::DefaultTools &defaultTools)
+                               const markshot::DefaultTools &defaultTools,
+                               const std::optional<markshot::recording::RecordingOptions> &regionRecordingOptions)
 {
     const QSize imageSize = image.size();
     ShotWindow *window =
@@ -213,7 +99,7 @@ ShotWindow *showCapturedWindow(QScreen *screen,
                        actualScreen ? actualScreen->name().toUtf8().constData() : "(none)",
                        actualScreen ? actualScreen->devicePixelRatio() : 0.0);
 
-    if (!layerShellReady && !allOutputs && isWaylandPlatform()) {
+    if (!layerShellReady && !allOutputs && markshot::capture_session::isWaylandPlatform()) {
         QTimer::singleShot(0, window, [window, screen]() {
             const QSize before = window->size();
             if (screen) {
@@ -235,6 +121,9 @@ ShotWindow *showCapturedWindow(QScreen *screen,
             window->startFullscreenAnnotation();
         });
     }
+    if (regionRecordingOptions.has_value()) {
+        window->beginRegionRecordingSelection(*regionRecordingOptions);
+    }
 
     return window;
 }
@@ -247,6 +136,7 @@ ShotWindow *showCapturedWindow(QScreen *screen,
 /// @param fullscreenAnnotation 是否直接进入全屏标注。
 /// @param defaultTools 默认工具配置。
 /// @param error 输出错误信息。
+/// @param regionRecordingOptions 区域录制配置，为空时启动普通截图流程。
 /// @return 创建出的截图窗口。
 ShotWindow *showCaptureWindow(QScreen *screen,
                               bool allOutputs,
@@ -254,9 +144,12 @@ ShotWindow *showCaptureWindow(QScreen *screen,
                               bool useRegularWindow,
                               bool fullscreenAnnotation,
                               const markshot::DefaultTools &defaultTools,
-                              QString *error)
+                              QString *error,
+                              const std::optional<markshot::recording::RecordingOptions> &regionRecordingOptions)
 {
-    const QRect captureGeometry = allOutputs ? virtualScreensGeometry() : (screen ? screen->geometry() : QRect());
+    const QRect captureGeometry = allOutputs
+        ? markshot::capture_session::virtualScreensGeometry()
+        : (screen ? screen->geometry() : QRect());
     const QString outputName = (!allOutputs && screen) ? screen->name() : QString();
     const bool detectWindows = markshot::windowDetectionEnabled();
     const QVector<markshot::WindowInfo> windowInfos = detectWindows
@@ -288,7 +181,8 @@ ShotWindow *showCaptureWindow(QScreen *screen,
                               allOutputs,
                               useRegularWindow,
                               fullscreenAnnotation,
-                              defaultTools);
+                              defaultTools,
+                              regionRecordingOptions);
 }
 
 /// @brief 判断普通区域截图是否应冻结全部显示器。
@@ -338,11 +232,13 @@ void showCaptureWindows(const QVector<QPointer<ShotWindow>> &windows)
 /// @param useRegularWindow 是否使用普通窗口。
 /// @param defaultTools 默认工具配置。
 /// @param error 输出错误信息。
+/// @param regionRecordingOptions 区域录制配置，为空时启动普通截图流程。
 /// @return 创建出的截图窗口。
 ShotWindow *showDisplayCaptureTarget(const markshot::display_capture::Target &target,
                                      bool useRegularWindow,
                                      const markshot::DefaultTools &defaultTools,
-                                     QString *error)
+                                     QString *error,
+                                     const std::optional<markshot::recording::RecordingOptions> &regionRecordingOptions)
 {
     if (target.image.isNull()) {
         if (error) {
@@ -353,7 +249,7 @@ ShotWindow *showDisplayCaptureTarget(const markshot::display_capture::Target &ta
 
     QScreen *screen = nullptr;
     if (!target.allOutputs) {
-        screen = screenByName(target.screenName);
+        screen = markshot::capture_session::screenByName(target.screenName);
         if (!screen) {
             screen = QGuiApplication::screenAt(target.geometry.center());
         }
@@ -372,7 +268,8 @@ ShotWindow *showDisplayCaptureTarget(const markshot::display_capture::Target &ta
                               target.allOutputs,
                               useRegularWindow,
                               true,
-                              defaultTools);
+                              defaultTools,
+                              regionRecordingOptions);
 }
 
 /// @brief 为截图冻结窗口绑定互斥关闭和显示器快速截取逻辑。
@@ -381,12 +278,14 @@ ShotWindow *showDisplayCaptureTarget(const markshot::display_capture::Target &ta
 /// @param includeCursor 冻结图是否包含鼠标。
 /// @param useRegularWindow 是否使用普通窗口。
 /// @param defaultTools 默认工具配置。
+/// @param regionRecordingOptions 区域录制配置，为空时启动普通截图流程。
 /// @return 无返回值。
 void connectCaptureWindowSession(QApplication *app,
                                  const QVector<QPointer<ShotWindow>> &windows,
                                  bool includeCursor,
                                  bool useRegularWindow,
-                                 const markshot::DefaultTools &defaultTools)
+                                 const markshot::DefaultTools &defaultTools,
+                                 const std::optional<markshot::recording::RecordingOptions> &regionRecordingOptions)
 {
     if (!app || windows.isEmpty()) {
         return;
@@ -454,7 +353,13 @@ void connectCaptureWindowSession(QApplication *app,
         QObject::connect(window,
                          &ShotWindow::displayCaptureEditRequested,
                          app,
-                         [app, windows, closingSession, includeCursor, useRegularWindow, defaultTools](
+                         [app,
+                          windows,
+                          closingSession,
+                          includeCursor,
+                          useRegularWindow,
+                          defaultTools,
+                          regionRecordingOptions](
                              ShotWindow *, markshot::display_capture::Target target) {
             if (*closingSession) {
                 return;
@@ -465,11 +370,17 @@ void connectCaptureWindowSession(QApplication *app,
             ShotWindow *newWindow = showDisplayCaptureTarget(target,
                                                              useRegularWindow,
                                                              defaultTools,
-                                                             &error);
+                                                             &error,
+                                                             regionRecordingOptions);
 
             if (newWindow) {
                 QVector<QPointer<ShotWindow>> newWindows{QPointer<ShotWindow>(newWindow)};
-                connectCaptureWindowSession(app, newWindows, includeCursor, useRegularWindow, defaultTools);
+                connectCaptureWindowSession(app,
+                                            newWindows,
+                                            includeCursor,
+                                            useRegularWindow,
+                                            defaultTools,
+                                            regionRecordingOptions);
                 closeCaptureWindows(windows);
             } else {
                 showCaptureWindows(windows);
@@ -564,13 +475,15 @@ QVector<CapturedScreenFrame> captureScreensIndividually(const QList<QScreen *> &
 /// @param fullscreenAnnotation 是否直接进入全屏标注。
 /// @param defaultTools 默认工具配置。
 /// @param error 输出错误信息。
+/// @param regionRecordingOptions 区域录制配置，为空时启动普通截图流程。
 /// @return 创建出的截图窗口列表。
 QVector<QPointer<ShotWindow>> showCaptureWindowsFromIndividualFrames(const QList<QScreen *> &screens,
                                                                      bool includeCursor,
                                                                      bool useRegularWindow,
                                                                      bool fullscreenAnnotation,
                                                                      const markshot::DefaultTools &defaultTools,
-                                                                     QString *error)
+                                                                     QString *error,
+                                                                     const std::optional<markshot::recording::RecordingOptions> &regionRecordingOptions)
 {
     QVector<QPointer<ShotWindow>> windows;
     QVector<CapturedScreenFrame> frames = captureScreensIndividually(screens, includeCursor, error);
@@ -593,7 +506,8 @@ QVector<QPointer<ShotWindow>> showCaptureWindowsFromIndividualFrames(const QList
                                                 false,
                                                 useRegularWindow,
                                                 fullscreenAnnotation,
-                                                defaultTools);
+                                                defaultTools,
+                                                regionRecordingOptions);
         windows.append(window);
     }
 
@@ -607,16 +521,18 @@ QVector<QPointer<ShotWindow>> showCaptureWindowsFromIndividualFrames(const QList
 /// @param fullscreenAnnotation 是否直接进入全屏标注。
 /// @param defaultTools 默认工具配置。
 /// @param error 输出错误信息。
+/// @param regionRecordingOptions 区域录制配置，为空时启动普通截图流程。
 /// @return 创建出的截图窗口列表。
 QVector<QPointer<ShotWindow>> showCaptureWindowsFromSingleFrame(const QList<QScreen *> &screens,
                                                                 bool includeCursor,
                                                                 bool useRegularWindow,
                                                                 bool fullscreenAnnotation,
                                                                 const markshot::DefaultTools &defaultTools,
-                                                                QString *error)
+                                                                QString *error,
+                                                                const std::optional<markshot::recording::RecordingOptions> &regionRecordingOptions)
 {
     QVector<QPointer<ShotWindow>> windows;
-    const QRect virtualGeometry = virtualScreensGeometry();
+    const QRect virtualGeometry = markshot::capture_session::virtualScreensGeometry();
     if (virtualGeometry.isEmpty()) {
         if (error) {
             *error = QStringLiteral("no virtual screen geometry available for capture");
@@ -693,7 +609,8 @@ QVector<QPointer<ShotWindow>> showCaptureWindowsFromSingleFrame(const QList<QScr
                                                 false,
                                                 useRegularWindow,
                                                 fullscreenAnnotation,
-                                                defaultTools);
+                                                defaultTools,
+                                                regionRecordingOptions);
         windows.append(window);
     }
     return windows;
@@ -710,7 +627,8 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
                                                  bool useRegularWindow,
                                                  bool fullscreenAnnotation,
                                                  const DefaultTools &defaultTools,
-                                                 QString *error)
+                                                 QString *error,
+                                                 std::optional<recording::RecordingOptions> regionRecordingOptions)
 {
     QVector<QPointer<ShotWindow>> windows;
     QScreen *screen = markshot::focusedScreen();
@@ -719,9 +637,9 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
                                                          fullscreenAnnotation,
                                                          freezeScope,
                                                          screens.size());
-    const bool waylandPlatform = isWaylandPlatform();
-    const bool mixedDevicePixelRatios = hasMixedDevicePixelRatios(screens);
-    const bool captureIndividually = shouldCaptureScreensIndividually(screens);
+    const bool waylandPlatform = markshot::capture_session::isWaylandPlatform();
+    const bool mixedDevicePixelRatios = markshot::capture_session::hasMixedDevicePixelRatios(screens);
+    const bool captureIndividually = markshot::capture_session::shouldCaptureScreensIndividually(screens);
     markshot::debugLog("capture-session",
                        "【截图会话】【缩放诊断】session all_outputs=%d fullscreen_annotation=%d "
                        "freeze_scope=%s screen_count=%d focused=%s platform=%s wayland=%d "
@@ -729,7 +647,7 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
                        "regular_window=%d",
                        allOutputs ? 1 : 0,
                        fullscreenAnnotation ? 1 : 0,
-                       freezeScopeDebugName(freezeScope),
+                       markshot::capture_session::freezeScopeDebugName(freezeScope),
                        static_cast<int>(screens.size()),
                        screen ? screen->name().toUtf8().constData() : "(none)",
                        QGuiApplication::platformName().toUtf8().constData(),
@@ -739,7 +657,7 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
                        captureIndividually ? 1 : 0,
                        includeCursor ? 1 : 0,
                        useRegularWindow ? 1 : 0);
-    logCaptureSessionScreens(screens);
+    markshot::capture_session::logCaptureSessionScreens(screens);
     if (freezeAllScreens) {
         if (captureIndividually) {
             windows = showCaptureWindowsFromIndividualFrames(screens,
@@ -747,25 +665,44 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
                                                              useRegularWindow,
                                                              fullscreenAnnotation,
                                                              defaultTools,
-                                                             error);
+                                                             error,
+                                                             regionRecordingOptions);
         } else {
             windows = showCaptureWindowsFromSingleFrame(screens,
                                                         includeCursor,
                                                         useRegularWindow,
                                                         fullscreenAnnotation,
                                                         defaultTools,
-                                                        error);
+                                                        error,
+                                                        regionRecordingOptions);
         }
-        connectCaptureWindowSession(app, windows, includeCursor, useRegularWindow, defaultTools);
+        connectCaptureWindowSession(app,
+                                    windows,
+                                    includeCursor,
+                                    useRegularWindow,
+                                    defaultTools,
+                                    regionRecordingOptions);
         return windows;
     }
 
     ShotWindow *window =
-        showCaptureWindow(allOutputs ? nullptr : screen, allOutputs, includeCursor, useRegularWindow, fullscreenAnnotation, defaultTools, error);
+        showCaptureWindow(allOutputs ? nullptr : screen,
+                          allOutputs,
+                          includeCursor,
+                          useRegularWindow,
+                          fullscreenAnnotation,
+                          defaultTools,
+                          error,
+                          regionRecordingOptions);
     if (window) {
         windows.append(window);
     }
-    connectCaptureWindowSession(app, windows, includeCursor, useRegularWindow, defaultTools);
+    connectCaptureWindowSession(app,
+                                windows,
+                                includeCursor,
+                                useRegularWindow,
+                                defaultTools,
+                                regionRecordingOptions);
     return windows;
 }
 

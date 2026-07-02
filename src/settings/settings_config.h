@@ -36,6 +36,8 @@ struct ShortcutSettings {
     QKeySequence startupRuler;
     QKeySequence startupCodeScanner;
     QKeySequence startupDisplayCapture;
+    QKeySequence startupGifRecorder;
+    QKeySequence startupVideoRecorder;
 };
 
 struct AnnotationSettings {
@@ -66,6 +68,8 @@ struct PinnedSettings {
 
 struct StorageSettings {
     QString savePathTemplate;
+    QString recordingVideoDirectory;
+    QString recordingGifDirectory;
     ClipboardImageMode clipboardImageMode = ClipboardImageMode::ImagePng;
     int clipboardThresholdM = 4;
     ExportImageEffectConfig exportImageEffect;

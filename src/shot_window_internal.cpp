@@ -1,5 +1,7 @@
 #include "shot_window_module.h"
 
+#include "notifications/app_notifications.h"
+
 namespace cfg = markshot::config;
 
 namespace markshot::shot {
@@ -101,31 +103,7 @@ std::optional<bool> envFlagValue(const QProcessEnvironment &env, const QStringLi
 
 bool sendDesktopNotification(const QString &summary, const QString &body, int timeoutMs)
 {
-#ifdef MARK_SHOT_WITH_DBUS
-    QDBusInterface notifications(QStringLiteral("org.freedesktop.Notifications"),
-                                 QStringLiteral("/org/freedesktop/Notifications"),
-                                 QStringLiteral("org.freedesktop.Notifications"),
-                                 QDBusConnection::sessionBus());
-    if (!notifications.isValid()) {
-        return false;
-    }
-
-    QDBusMessage reply = notifications.call(QStringLiteral("Notify"),
-                                            QStringLiteral("mark-shot"),
-                                            static_cast<uint>(0),
-                                            QString(),
-                                            summary,
-                                            body,
-                                            QStringList(),
-                                            QVariantMap(),
-                                            timeoutMs);
-    return reply.type() != QDBusMessage::ErrorMessage;
-#else
-    Q_UNUSED(summary);
-    Q_UNUSED(body);
-    Q_UNUSED(timeoutMs);
-    return false;
-#endif
+    return markshot::notifications::sendDesktopNotification(summary, body, timeoutMs);
 }
 
 

@@ -19,8 +19,14 @@ void ShotWindow::initializeShortcuts()
         auto *shortcut = new QShortcut(sequence, this);
         shortcut->setContext(Qt::WindowShortcut);
         shortcut->setAutoRepeat(false);
-        connect(shortcut, &QShortcut::activated, this, [this, shortcutBlockedByTextInput, callback] {
+        connect(shortcut, &QShortcut::activated, this, [this, sequence, shortcutBlockedByTextInput, callback] {
             if (shortcutBlockedByTextInput()) {
+                return;
+            }
+            if (m_mode == Mode::Selecting
+                && activeRecordingAvailable()
+                && sequence == QKeySequence(Qt::Key_S)) {
+                stopActiveRecordingFromOverlay();
                 return;
             }
             callback();
@@ -43,6 +49,14 @@ void ShotWindow::initializeShortcuts()
             }
             if (m_mode == Mode::Selecting && sequence == m_startupDisplayCaptureShortcut) {
                 toggleDisplayCapturePicker();
+                return;
+            }
+            if (m_mode == Mode::Selecting && sequence == m_startupGifRecorderShortcut) {
+                beginStartupRecording(markshot::recording::RecordingMode::Gif);
+                return;
+            }
+            if (m_mode == Mode::Selecting && sequence == m_startupVideoRecorderShortcut) {
+                beginStartupRecording(markshot::recording::RecordingMode::Video);
                 return;
             }
             setTool(tool);
@@ -96,6 +110,20 @@ void ShotWindow::initializeShortcuts()
         addPlainShortcut(m_startupDisplayCaptureShortcut, [this] {
             if (m_mode == Mode::Selecting) {
                 toggleDisplayCapturePicker();
+            }
+        });
+    }
+    if (!sequenceUsedByTool(m_startupGifRecorderShortcut)) {
+        addPlainShortcut(m_startupGifRecorderShortcut, [this] {
+            if (m_mode == Mode::Selecting) {
+                beginStartupRecording(markshot::recording::RecordingMode::Gif);
+            }
+        });
+    }
+    if (!sequenceUsedByTool(m_startupVideoRecorderShortcut)) {
+        addPlainShortcut(m_startupVideoRecorderShortcut, [this] {
+            if (m_mode == Mode::Selecting) {
+                beginStartupRecording(markshot::recording::RecordingMode::Video);
             }
         });
     }

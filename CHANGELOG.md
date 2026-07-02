@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.33 - 2026-07-03
+
+### Features & Enhancements
+
+- **GIF and Video Recording**: Added GIF and MP4 screen recording with stepped frame-rate selection, display or region capture, optional video audio input, and configurable output directories.
+- **Recording Control Surfaces**: Added tray actions to start and stop recordings, live tray recording status, `--recording-status` JSON output, and `--stop-recording` control through the running instance.
+- **Recording-Aware Capture Overlay**: When a recording is already active, a new frozen-frame status card shows the current recording state and offers an `S` shortcut or button to stop recording while keeping normal screenshot selection available.
+- **Recording and Save Notifications**: Added desktop notifications for recording start, recording saved, recording failure, and screenshot save completion.
+- **Recording Dialog Improvements**: The recording dialog now supports switching between GIF and video modes, defaults to the current display, uses localized text, and updates frame-rate, audio, and output path controls when the mode changes.
+- **Storage Settings**: Added settings and config support for video and GIF output directories, defaulting to `Pictures/mark-shot/videos` and `Pictures/mark-shot/gifs`.
+- **Source Organization**: Split notification, recording, IPC, CLI, CMake source lists, and capture-session screen helpers into focused modules.
+
+### Bug Fixes
+
+- **Wayland Capture Placement**: Improved mixed-DPI Wayland capture placement and crop handling so frozen frames align with the compositor-assigned screen geometry.
+- **Text Selection Context Menu**: Fixed right-click handling in editable text areas so context menus no longer clear or lose the current text selection.
+
 ## 0.1.32 - 2026-06-28
 
 ### Features & Enhancements

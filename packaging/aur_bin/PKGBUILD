@@ -2,7 +2,7 @@
 # Binary package: downloads prebuilt pacman package from GitHub Release.
 # Source package mark-shot builds from source; mark-shot-bin installs prebuilt binary.
 pkgname=mark-shot-bin
-pkgver=0.1.32
+pkgver=0.1.33
 pkgrel=1
 pkgdesc='Qt 6 Wayland screenshot selection and annotation tool (prebuilt binary)'
 arch=('x86_64' 'aarch64')

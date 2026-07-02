@@ -40,6 +40,8 @@ private:
     QKeySequenceEdit *m_startupRuler = nullptr;
     QKeySequenceEdit *m_startupCodeScanner = nullptr;
     QKeySequenceEdit *m_startupDisplayCapture = nullptr;
+    QKeySequenceEdit *m_startupGifRecorder = nullptr;
+    QKeySequenceEdit *m_startupVideoRecorder = nullptr;
 };
 
 }  // namespace markshot::settings

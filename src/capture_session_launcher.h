@@ -1,11 +1,14 @@
 #pragma once
 
 #include "capture_freeze_scope.h"
+#include "recording/recording_options.h"
 #include "shot_window.h"
 #include "startup_config.h"
 
 #include <QPointer>
 #include <QVector>
+
+#include <optional>
 
 class QApplication;
 
@@ -20,6 +23,7 @@ namespace markshot {
 /// @param fullscreenAnnotation 是否直接进入全屏标注。
 /// @param defaultTools 默认工具配置。
 /// @param error 输出错误信息。
+/// @param regionRecordingOptions 区域录制配置，为空时启动普通截图流程。
 /// @return 创建出的截图窗口列表。
 QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
                                                  bool allOutputs,
@@ -28,6 +32,7 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
                                                  bool useRegularWindow,
                                                  bool fullscreenAnnotation,
                                                  const DefaultTools &defaultTools,
-                                                 QString *error);
+                                                 QString *error,
+                                                 std::optional<recording::RecordingOptions> regionRecordingOptions = std::nullopt);
 
 }  // namespace markshot
