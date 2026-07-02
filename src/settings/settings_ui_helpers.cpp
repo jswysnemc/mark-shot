@@ -10,6 +10,7 @@
 #include <QKeySequenceEdit>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QDoubleSpinBox>
@@ -72,6 +73,13 @@ QLineEdit *addTextRow(QFormLayout *form, const QString &label, const QString &pl
 {
     auto *edit = new QLineEdit;
     edit->setPlaceholderText(placeholder);
+    edit->setContextMenuPolicy(Qt::CustomContextMenu);
+    QObject::connect(edit, &QLineEdit::customContextMenuRequested, edit, [edit](const QPoint &pos) {
+        QMenu *menu = edit->createStandardContextMenu();
+        menu->setStyleSheet(markshot::theme::menuStyleSheet());
+        menu->exec(edit->mapToGlobal(pos));
+        menu->deleteLater();
+    });
     form->addRow(label, edit);
     return edit;
 }
@@ -81,6 +89,13 @@ QPlainTextEdit *addPlainTextRow(QFormLayout *form, const QString &label, const Q
     auto *edit = new QPlainTextEdit;
     edit->setPlaceholderText(placeholder);
     edit->setMinimumHeight(74);
+    edit->setContextMenuPolicy(Qt::CustomContextMenu);
+    QObject::connect(edit, &QPlainTextEdit::customContextMenuRequested, edit, [edit](const QPoint &pos) {
+        QMenu *menu = edit->createStandardContextMenu();
+        menu->setStyleSheet(markshot::theme::menuStyleSheet());
+        menu->exec(edit->viewport()->mapToGlobal(pos));
+        menu->deleteLater();
+    });
     form->addRow(label, edit);
     return edit;
 }
@@ -90,6 +105,7 @@ QSpinBox *addSpinRow(QFormLayout *form, const QString &label, int minimum, int m
     auto *spin = new QSpinBox;
     spin->setRange(minimum, maximum);
     spin->setSuffix(suffix);
+    spin->setContextMenuPolicy(Qt::NoContextMenu);
     form->addRow(label, spin);
     return spin;
 }
@@ -99,6 +115,7 @@ QDoubleSpinBox *addDoubleRow(QFormLayout *form, const QString &label, double min
     auto *spin = new QDoubleSpinBox;
     spin->setRange(minimum, maximum);
     spin->setDecimals(decimals);
+    spin->setContextMenuPolicy(Qt::NoContextMenu);
     form->addRow(label, spin);
     return spin;
 }
@@ -107,6 +124,7 @@ QComboBox *addComboRow(QFormLayout *form, const QString &label)
 {
     auto *combo = new QComboBox;
     combo->setCursor(Qt::PointingHandCursor);
+    combo->setContextMenuPolicy(Qt::NoContextMenu);
     form->addRow(label, combo);
     return combo;
 }
@@ -115,6 +133,9 @@ QKeySequenceEdit *addShortcutRow(QFormLayout *form, const QString &label)
 {
     auto *edit = new QKeySequenceEdit;
     edit->setContextMenuPolicy(Qt::NoContextMenu);
+    if (auto *le = edit->findChild<QLineEdit *>()) {
+        le->setContextMenuPolicy(Qt::NoContextMenu);
+    }
     form->addRow(label, edit);
     return edit;
 }
