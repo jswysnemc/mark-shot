@@ -213,6 +213,23 @@ ShotWindow *showCapturedWindow(QScreen *screen,
                        actualScreen ? actualScreen->name().toUtf8().constData() : "(none)",
                        actualScreen ? actualScreen->devicePixelRatio() : 0.0);
 
+    if (!layerShellReady && !allOutputs && isWaylandPlatform()) {
+        QTimer::singleShot(0, window, [window, screen]() {
+            const QSize before = window->size();
+            if (screen) {
+                const QRect g = screen->geometry();
+                window->setGeometry(g);
+                window->resize(g.width() - 1, g.height());
+                window->resize(g.width(), g.height());
+            }
+            markshot::debugLog("capture-session",
+                               "【截图会话】【延迟重排】before=%dx%d after=%dx%d screen=%s",
+                               before.width(), before.height(),
+                               window->size().width(), window->size().height(),
+                               screen ? screen->name().toUtf8().constData() : "(none)");
+        });
+    }
+
     if (fullscreenAnnotation) {
         QTimer::singleShot(0, window, [window] {
             window->startFullscreenAnnotation();
