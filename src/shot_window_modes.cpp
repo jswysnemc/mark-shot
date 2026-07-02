@@ -459,6 +459,13 @@ bool ShotWindow::eventFilter(QObject *watched, QEvent *event)
         }
     }
 
+    if (watched == m_textEditor && event->type() == QEvent::MouseButtonPress) {
+        auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        if (mouseEvent->button() == Qt::RightButton) {
+            m_textEditorCursorForContextMenu = m_textEditor->textCursor();
+        }
+    }
+
     if (watched == m_textEditor && event->type() == QEvent::KeyPress) {
         auto *keyEvent = static_cast<QKeyEvent *>(event);
         if (imageNavigationAvailable() && keyEvent->key() == Qt::Key_Control && !keyEvent->isAutoRepeat()) {

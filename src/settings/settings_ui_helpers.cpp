@@ -3,10 +3,14 @@
 #include "ui/i18n.h"
 #include "ui/theme.h"
 
+#include <QAction>
+#include <QApplication>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QComboBox>
 #include <QFormLayout>
 #include <QFrame>
+#include <QKeySequence>
 #include <QKeySequenceEdit>
 #include <QLabel>
 #include <QLineEdit>
@@ -15,9 +19,77 @@
 #include <QPushButton>
 #include <QDoubleSpinBox>
 #include <QSpinBox>
+#include <QTextCursor>
 #include <QVBoxLayout>
 
 namespace markshot::settings {
+
+namespace {
+
+void showLineEditContextMenu(QLineEdit *edit, const QPoint &pos)
+{
+    QMenu menu(edit);
+    menu.setStyleSheet(markshot::theme::menuStyleSheet());
+    const bool hasSelection = edit->hasSelectedText();
+    const bool hasText = !edit->text().isEmpty();
+    const bool hasClipboard = !QApplication::clipboard()->text().isEmpty();
+
+    auto addAction = [&menu, edit](const QString &label, const QKeySequence &shortcut, bool enabled, auto callback) {
+        QAction *action = menu.addAction(label);
+        action->setShortcut(shortcut);
+        action->setShortcutVisibleInContextMenu(true);
+        action->setEnabled(enabled);
+        QObject::connect(action, &QAction::triggered, edit, callback);
+    };
+
+    addAction(MS_TR("Undo"), QKeySequence::Undo, edit->isUndoAvailable(), [edit] { edit->undo(); });
+    addAction(MS_TR("Redo"), QKeySequence::Redo, edit->isRedoAvailable(), [edit] { edit->redo(); });
+    menu.addSeparator();
+    addAction(MS_TR("Cut"), QKeySequence::Cut, hasSelection, [edit] { edit->cut(); });
+    addAction(MS_TR("Copy"), QKeySequence::Copy, hasSelection, [edit] { edit->copy(); });
+    addAction(MS_TR("Paste"), QKeySequence::Paste, hasClipboard, [edit] { edit->paste(); });
+    addAction(MS_TR("Delete"), QKeySequence(Qt::Key_Delete), hasSelection, [edit] { edit->del(); });
+    menu.addSeparator();
+    addAction(MS_TR("Select All"), QKeySequence::SelectAll, hasText, [edit] { edit->selectAll(); });
+
+    menu.exec(edit->mapToGlobal(pos));
+}
+
+void showPlainTextEditContextMenu(QPlainTextEdit *edit, const QPoint &pos)
+{
+    QMenu menu(edit);
+    menu.setStyleSheet(markshot::theme::menuStyleSheet());
+    const QTextCursor cursor = edit->textCursor();
+    const bool hasSelection = cursor.hasSelection();
+    const bool hasDocumentText = !edit->document()->isEmpty();
+    const bool hasClipboard = !QApplication::clipboard()->text().isEmpty();
+
+    auto addAction = [&menu, edit](const QString &label, const QKeySequence &shortcut, bool enabled, auto callback) {
+        QAction *action = menu.addAction(label);
+        action->setShortcut(shortcut);
+        action->setShortcutVisibleInContextMenu(true);
+        action->setEnabled(enabled);
+        QObject::connect(action, &QAction::triggered, edit, callback);
+    };
+
+    addAction(MS_TR("Undo"), QKeySequence::Undo, edit->document()->isUndoAvailable(), [edit] { edit->undo(); });
+    addAction(MS_TR("Redo"), QKeySequence::Redo, edit->document()->isRedoAvailable(), [edit] { edit->redo(); });
+    menu.addSeparator();
+    addAction(MS_TR("Cut"), QKeySequence::Cut, hasSelection, [edit] { edit->cut(); });
+    addAction(MS_TR("Copy"), QKeySequence::Copy, hasSelection, [edit] { edit->copy(); });
+    addAction(MS_TR("Paste"), QKeySequence::Paste, hasClipboard, [edit] { edit->paste(); });
+    addAction(MS_TR("Delete"), QKeySequence(Qt::Key_Delete), hasSelection, [edit] {
+        QTextCursor sel = edit->textCursor();
+        sel.removeSelectedText();
+        edit->setTextCursor(sel);
+    });
+    menu.addSeparator();
+    addAction(MS_TR("Select All"), QKeySequence::SelectAll, hasDocumentText, [edit] { edit->selectAll(); });
+
+    menu.exec(edit->viewport()->mapToGlobal(pos));
+}
+
+} // namespace
 
 QVBoxLayout *createSettingsPageLayout(QWidget *parent)
 {
@@ -75,10 +147,7 @@ QLineEdit *addTextRow(QFormLayout *form, const QString &label, const QString &pl
     edit->setPlaceholderText(placeholder);
     edit->setContextMenuPolicy(Qt::CustomContextMenu);
     QObject::connect(edit, &QLineEdit::customContextMenuRequested, edit, [edit](const QPoint &pos) {
-        QMenu *menu = edit->createStandardContextMenu();
-        menu->setStyleSheet(markshot::theme::menuStyleSheet());
-        menu->exec(edit->mapToGlobal(pos));
-        menu->deleteLater();
+        showLineEditContextMenu(edit, pos);
     });
     form->addRow(label, edit);
     return edit;
@@ -91,10 +160,7 @@ QPlainTextEdit *addPlainTextRow(QFormLayout *form, const QString &label, const Q
     edit->setMinimumHeight(74);
     edit->setContextMenuPolicy(Qt::CustomContextMenu);
     QObject::connect(edit, &QPlainTextEdit::customContextMenuRequested, edit, [edit](const QPoint &pos) {
-        QMenu *menu = edit->createStandardContextMenu();
-        menu->setStyleSheet(markshot::theme::menuStyleSheet());
-        menu->exec(edit->viewport()->mapToGlobal(pos));
-        menu->deleteLater();
+        showPlainTextEditContextMenu(edit, pos);
     });
     form->addRow(label, edit);
     return edit;
