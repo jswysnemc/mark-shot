@@ -1,5 +1,7 @@
 #include "shot_window_module.h"
 
+#include "debug_log.h"
+
 namespace cfg = markshot::config;
 namespace shortcuts = markshot::shortcut;
 using namespace markshot::shot;
@@ -424,6 +426,16 @@ void ShotWindow::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
     markshot::windows::setExcludedFromCapture(this);
+    if (auto *handle = windowHandle()) {
+        connect(handle, &QWindow::screenChanged, this, [this](QScreen *newScreen) {
+            markshot::debugLog("capture-session",
+                               "【截图会话】【屏幕切换】new=%s dpr=%.3f",
+                               newScreen ? newScreen->name().toUtf8().constData() : "(none)",
+                               newScreen ? newScreen->devicePixelRatio() : 0.0);
+            updateFrozenImageRect();
+            update();
+        }, Qt::UniqueConnection);
+    }
 }
 
 void ShotWindow::mousePressEvent(QMouseEvent *event)
