@@ -679,10 +679,6 @@ void ShotWindow::showTextEditorContextMenu(const QPoint &globalPosition)
         return;
     }
 
-    if (m_textEditorCursorForContextMenu.hasSelection()) {
-        m_textEditor->setTextCursor(m_textEditorCursorForContextMenu);
-    }
-
     QMenu menu(this);
     menu.setStyleSheet(markshot::theme::menuStyleSheet());
     const QTextCursor cursor = m_textEditor->textCursor();

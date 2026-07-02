@@ -8,7 +8,6 @@
 #include <QRect>
 #include <QRectF>
 #include <QStringList>
-#include <QTextCursor>
 #include <QVector>
 #include <QWidget>
 
@@ -698,7 +697,6 @@ private:
     int m_annotationWidthWheelHistoryContext = 0;
     QTextEdit *m_textEditor = nullptr;
     QPointF m_textEditorImagePoint;
-    QTextCursor m_textEditorCursorForContextMenu;
     std::optional<int> m_editingTextAnnotationId;
     QVector<HistorySnapshot> m_undoStack;
     QVector<HistorySnapshot> m_redoStack;
