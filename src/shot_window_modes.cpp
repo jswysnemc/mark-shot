@@ -459,7 +459,8 @@ bool ShotWindow::eventFilter(QObject *watched, QEvent *event)
         }
     }
 
-    if ((watched == m_textEditor || watched == m_textEditor->viewport())
+    if (m_textEditor
+        && (watched == m_textEditor || watched == m_textEditor->viewport())
         && event->type() == QEvent::MouseButtonPress) {
         auto *mouseEvent = static_cast<QMouseEvent *>(event);
         if (mouseEvent->button() == Qt::RightButton) {
