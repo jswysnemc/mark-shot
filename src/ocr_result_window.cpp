@@ -389,6 +389,7 @@ void OcrResultWindow::showEditorContextMenu(const QPoint &globalPosition)
     }
 
     QMenu menu(this);
+    menu.setStyleSheet(markshot::theme::menuStyleSheet());
     const QTextCursor cursor = m_editor->textCursor();
     const bool readOnly = m_editor->isReadOnly();
     const bool hasSelection = cursor.hasSelection();

@@ -673,6 +673,53 @@ void ShotWindow::commitTextEditor()
     persistAnnotationState();
 }
 
+void ShotWindow::showTextEditorContextMenu(const QPoint &globalPosition)
+{
+    if (!m_textEditor) {
+        return;
+    }
+
+    QMenu menu(this);
+    menu.setStyleSheet(markshot::theme::menuStyleSheet());
+    const QTextCursor cursor = m_textEditor->textCursor();
+    const bool hasSelection = cursor.hasSelection();
+    const bool hasDocumentText = !m_textEditor->document()->isEmpty();
+    const bool hasClipboardText = !QApplication::clipboard()->text().isEmpty();
+
+    auto addAction = [&menu](const QString &label, const QKeySequence &shortcut, bool enabled, auto callback) {
+        QAction *action = menu.addAction(label);
+        action->setShortcut(shortcut);
+        action->setShortcutVisibleInContextMenu(true);
+        action->setEnabled(enabled);
+        QObject::connect(action, &QAction::triggered, menu.parent(), callback);
+    };
+
+    addAction(MS_TR("Undo"), QKeySequence::Undo,
+              m_textEditor->document()->isUndoAvailable(),
+              [this] { m_textEditor->undo(); });
+    addAction(MS_TR("Redo"), QKeySequence::Redo,
+              m_textEditor->document()->isRedoAvailable(),
+              [this] { m_textEditor->redo(); });
+    menu.addSeparator();
+    addAction(MS_TR("Cut"), QKeySequence::Cut, hasSelection,
+              [this] { m_textEditor->cut(); });
+    addAction(MS_TR("Copy"), QKeySequence::Copy, hasSelection,
+              [this] { m_textEditor->copy(); });
+    addAction(MS_TR("Paste"), QKeySequence::Paste, hasClipboardText,
+              [this] { m_textEditor->paste(); });
+    addAction(MS_TR("Delete"), QKeySequence(Qt::Key_Delete), hasSelection,
+              [this] {
+                  QTextCursor sel = m_textEditor->textCursor();
+                  sel.removeSelectedText();
+                  m_textEditor->setTextCursor(sel);
+              });
+    menu.addSeparator();
+    addAction(MS_TR("Select All"), QKeySequence::SelectAll, hasDocumentText,
+              [this] { m_textEditor->selectAll(); });
+
+    menu.exec(globalPosition);
+}
+
 QString ShotWindow::saveSelectionToTempFile(bool applyExportEffect) const
 {
     if (!hasUsableSelection()) {

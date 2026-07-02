@@ -407,6 +407,7 @@ private:
     void beginSelection(QPointF imagePoint);
     void commitDraft();
     void commitTextEditor();
+    void showTextEditorContextMenu(const QPoint &globalPosition);
     void copySelection();
     void redoAnnotation();
     void drawAnnotation(QPainter &painter, const Annotation &annotation, bool widgetCoordinates) const;

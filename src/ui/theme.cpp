@@ -500,4 +500,30 @@ QString propertyColorButtonStyleSheet(const QColor &fillColor)
         .arg(textColor);
 }
 
+QString menuStyleSheet()
+{
+    return QStringLiteral(
+        "QMenu {"
+        " background: #1E293B;"
+        " border: 1px solid #334155;"
+        " border-radius: 8px;"
+        " padding: 4px;"
+        "}"
+        "QMenu::item {"
+        " color: #F1F5F9;"
+        " padding: 6px 24px 6px 16px;"
+        " border-radius: 4px;"
+        "}"
+        "QMenu::item:selected {"
+        " background: #2DD4BF;"
+        " color: #0F172A;"
+        "}"
+        "QMenu::separator {"
+        " height: 1px;"
+        " background: #334155;"
+        " margin: 4px 8px;"
+        "}"
+    );
+}
+
 }  // namespace markshot::theme

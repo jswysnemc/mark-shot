@@ -72,4 +72,6 @@ QString textEditorStyleSheet(const QColor &color, const QColor &backgroundColor,
 // regenerated whenever the selection changes.
 QString propertyColorButtonStyleSheet(const QColor &fillColor);
 
+QString menuStyleSheet();
+
 }  // namespace markshot::theme
