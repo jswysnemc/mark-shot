@@ -126,6 +126,87 @@ private slots:
         QCOMPARE(imageRect, QRect(400, 200, 400, 200));
         QCOMPARE(roundTrip, geometry);
     }
+
+    void perScreenCropRectHorizontalMixedDprWithGap()
+    {
+        const QList<markshot::capture::ScreenLayoutEntry> screens = {
+            {QRect(0, 0, 1920, 1080), 2.0},    // HDMI-1 4K@200%
+            {QRect(3840, 0, 1920, 1080), 1.0}, // DP-1 1080p@100%
+        };
+        const QSize rawImageSize(5760, 2160);
+
+        const QRect cropHdmi = markshot::capture::perScreenCropRect(screens, QRect(0, 0, 1920, 1080), rawImageSize);
+        QCOMPARE(cropHdmi, QRect(0, 0, 3840, 2160));
+
+        const QRect cropDp = markshot::capture::perScreenCropRect(screens, QRect(3840, 0, 1920, 1080), rawImageSize);
+        QCOMPARE(cropDp, QRect(3840, 0, 1920, 1080));
+    }
+
+    void perScreenCropRectHorizontalMixedDprAdjacent()
+    {
+        const QList<markshot::capture::ScreenLayoutEntry> screens = {
+            {QRect(0, 0, 1920, 1080), 2.0},
+            {QRect(1920, 0, 1920, 1080), 1.0},
+        };
+        const QSize rawImageSize(5760, 2160);
+
+        const QRect cropFirst = markshot::capture::perScreenCropRect(screens, QRect(0, 0, 1920, 1080), rawImageSize);
+        QCOMPARE(cropFirst, QRect(0, 0, 3840, 2160));
+
+        const QRect cropSecond = markshot::capture::perScreenCropRect(screens, QRect(1920, 0, 1920, 1080), rawImageSize);
+        QCOMPARE(cropSecond, QRect(3840, 0, 1920, 1080));
+    }
+
+    void perScreenCropRectVerticalMixedDpr()
+    {
+        const QList<markshot::capture::ScreenLayoutEntry> screens = {
+            {QRect(0, 0, 1920, 1080), 2.0},
+            {QRect(0, 1080, 1920, 1080), 1.0},
+        };
+        const QSize rawImageSize(3840, 3240);
+
+        const QRect cropTop = markshot::capture::perScreenCropRect(screens, QRect(0, 0, 1920, 1080), rawImageSize);
+        QCOMPARE(cropTop, QRect(0, 0, 3840, 2160));
+
+        const QRect cropBottom = markshot::capture::perScreenCropRect(screens, QRect(0, 1080, 1920, 1080), rawImageSize);
+        QCOMPARE(cropBottom, QRect(0, 2160, 1920, 1080));
+    }
+
+    void perScreenCropRectUniformDprReturnsEmpty()
+    {
+        const QList<markshot::capture::ScreenLayoutEntry> screens = {
+            {QRect(0, 0, 1920, 1080), 2.0},
+            {QRect(1920, 0, 1920, 1080), 2.0},
+        };
+        const QSize rawImageSize(7680, 2160);
+
+        const QRect crop = markshot::capture::perScreenCropRect(screens, QRect(0, 0, 1920, 1080), rawImageSize);
+        QVERIFY(crop.isEmpty());
+    }
+
+    void perScreenCropRectTargetNotFoundReturnsEmpty()
+    {
+        const QList<markshot::capture::ScreenLayoutEntry> screens = {
+            {QRect(0, 0, 1920, 1080), 2.0},
+            {QRect(3840, 0, 1920, 1080), 1.0},
+        };
+        const QSize rawImageSize(5760, 2160);
+
+        const QRect crop = markshot::capture::perScreenCropRect(screens, QRect(100, 100, 500, 500), rawImageSize);
+        QVERIFY(crop.isEmpty());
+    }
+
+    void perScreenCropRectRawSizeMismatchReturnsEmpty()
+    {
+        const QList<markshot::capture::ScreenLayoutEntry> screens = {
+            {QRect(0, 0, 1920, 1080), 2.0},
+            {QRect(3840, 0, 1920, 1080), 1.0},
+        };
+        const QSize rawImageSize(9999, 9999);
+
+        const QRect crop = markshot::capture::perScreenCropRect(screens, QRect(0, 0, 1920, 1080), rawImageSize);
+        QVERIFY(crop.isEmpty());
+    }
 };
 
 /// @brief Main entry point for the CaptureGeometryTest test suite.

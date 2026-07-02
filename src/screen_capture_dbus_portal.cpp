@@ -238,7 +238,22 @@ CaptureResult captureWithPortalScreenshot(const CaptureRequest &request)
         const QSize rawSize = image.size();
         QRect cropRect(QPoint(0, 0), image.size());
         if (rawSize != overlap.size()) {
-            cropRect = markshot::capture::scaledCropRect(coverage, overlap, rawSize);
+            QList<markshot::capture::ScreenLayoutEntry> screenLayout;
+            const QList<QScreen *> allScreens = QGuiApplication::screens();
+            for (const QScreen *s : allScreens) {
+                if (s && !s->geometry().isEmpty()) {
+                    screenLayout.append({s->geometry(), s->devicePixelRatio()});
+                }
+            }
+            cropRect = markshot::capture::perScreenCropRect(screenLayout, requested, rawSize);
+            if (!cropRect.isEmpty()) {
+                markshot::debugLog("capture",
+                                   "portal-screenshot per-screen-crop target=%d,%d %dx%d crop=%d,%d %dx%d",
+                                   requested.x(), requested.y(), requested.width(), requested.height(),
+                                   cropRect.x(), cropRect.y(), cropRect.width(), cropRect.height());
+            } else {
+                cropRect = markshot::capture::scaledCropRect(coverage, overlap, rawSize);
+            }
         }
         if (cropRect.isEmpty()) {
             return {{}, QStringLiteral("portal screenshot physical crop is empty"), {}, request.sourceGeometry};

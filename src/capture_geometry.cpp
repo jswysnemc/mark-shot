@@ -27,6 +27,108 @@ QRect scaledCropRect(QRect sourceGeometry, QRect requestedGeometry, QSize imageS
         .intersected(QRect(QPoint(0, 0), imageSize));
 }
 
+QRect perScreenCropRect(const QList<ScreenLayoutEntry> &screens,
+                        const QRect &targetGeometry,
+                        QSize rawImageSize)
+{
+    if (screens.isEmpty() || targetGeometry.isEmpty() || rawImageSize.isEmpty()) {
+        return {};
+    }
+
+    int targetIndex = -1;
+    for (int i = 0; i < screens.size(); ++i) {
+        if (screens[i].geometry == targetGeometry) {
+            targetIndex = i;
+            break;
+        }
+    }
+    if (targetIndex < 0) {
+        return {};
+    }
+
+    qreal firstDpr = screens.first().dpr;
+    bool hasMixedDpr = false;
+    for (const auto &entry : screens) {
+        if (qAbs(entry.dpr - firstDpr) > 0.01) {
+            hasMixedDpr = true;
+            break;
+        }
+    }
+    if (!hasMixedDpr) {
+        return {};
+    }
+
+    QList<int> validIndices;
+    for (int i = 0; i < screens.size(); ++i) {
+        if (!screens[i].geometry.isEmpty() && screens[i].dpr > 0) {
+            validIndices.append(i);
+        }
+    }
+    if (validIndices.isEmpty()) {
+        return {};
+    }
+
+    struct RowGroup {
+        QList<int> indices;
+        int minY = 0;
+        int maxY = 0;
+    };
+    QList<RowGroup> rows;
+    for (int idx : validIndices) {
+        const QRect &g = screens[idx].geometry;
+        bool placed = false;
+        for (RowGroup &row : rows) {
+            if (g.y() < row.maxY && row.minY < g.y() + g.height()) {
+                row.indices.append(idx);
+                row.minY = std::min(row.minY, g.y());
+                row.maxY = std::max(row.maxY, g.y() + g.height());
+                placed = true;
+                break;
+            }
+        }
+        if (!placed) {
+            rows.append({{idx}, g.y(), g.y() + g.height()});
+        }
+    }
+
+    std::sort(rows.begin(), rows.end(), [](const RowGroup &a, const RowGroup &b) {
+        return a.minY < b.minY;
+    });
+
+    for (RowGroup &row : rows) {
+        std::sort(row.indices.begin(), row.indices.end(), [&](int a, int b) {
+            return screens[a].geometry.x() < screens[b].geometry.x();
+        });
+    }
+
+    QList<QRect> physicalRects;
+    physicalRects.resize(screens.size());
+    int physYOffset = 0;
+    int maxRowPhysWidth = 0;
+    for (const RowGroup &row : rows) {
+        int physXOffset = 0;
+        int rowPhysHeight = 0;
+        for (int idx : row.indices) {
+            const auto &screen = screens[idx];
+            const int physW = qRound(screen.geometry.width() * screen.dpr);
+            const int physH = qRound(screen.geometry.height() * screen.dpr);
+            physicalRects[idx] = QRect(physXOffset, physYOffset, physW, physH);
+            physXOffset += physW;
+            rowPhysHeight = std::max(rowPhysHeight, physH);
+        }
+        maxRowPhysWidth = std::max(maxRowPhysWidth, physXOffset);
+        physYOffset += rowPhysHeight;
+    }
+
+    const int tolerance = 2;
+    if (qAbs(maxRowPhysWidth - rawImageSize.width()) > tolerance ||
+        qAbs(physYOffset - rawImageSize.height()) > tolerance) {
+        return {};
+    }
+
+    return physicalRects[targetIndex].intersected(QRect(QPoint(0, 0), rawImageSize));
+}
+
 QImage cropFrameToRequest(const QImage &frame, QRect streamGeometry, QRect requestedGeometry)
 {
     if (frame.isNull() || requestedGeometry.isEmpty()) {

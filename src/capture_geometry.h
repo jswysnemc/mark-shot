@@ -1,12 +1,21 @@
 #pragma once
 
 #include <QImage>
+#include <QList>
 #include <QRect>
 #include <QSize>
 
 namespace markshot::capture {
 
+struct ScreenLayoutEntry {
+    QRect geometry;
+    qreal dpr = 1.0;
+};
+
 QRect scaledCropRect(QRect sourceGeometry, QRect requestedGeometry, QSize imageSize);
+QRect perScreenCropRect(const QList<ScreenLayoutEntry> &screens,
+                        const QRect &targetGeometry,
+                        QSize rawImageSize);
 QImage cropFrameToRequest(const QImage &frame, QRect streamGeometry, QRect requestedGeometry);
 /// @brief 将捕获帧缩放到指定几何的逻辑尺寸。
 /// @param frame 原始捕获帧。
