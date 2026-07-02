@@ -427,6 +427,7 @@ void ShotWindow::showEvent(QShowEvent *event)
     QWidget::showEvent(event);
     markshot::windows::setExcludedFromCapture(this);
     if (auto *handle = windowHandle()) {
+        disconnect(handle, &QWindow::screenChanged, this, nullptr);
         connect(handle, &QWindow::screenChanged, this, [this](QScreen *newScreen) {
             markshot::debugLog("capture-session",
                                "【截图会话】【屏幕切换】new=%s dpr=%.3f",
@@ -434,7 +435,7 @@ void ShotWindow::showEvent(QShowEvent *event)
                                newScreen ? newScreen->devicePixelRatio() : 0.0);
             updateFrozenImageRect();
             update();
-        }, Qt::UniqueConnection);
+        });
     }
 }
 

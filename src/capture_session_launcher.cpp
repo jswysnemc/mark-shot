@@ -16,6 +16,7 @@
 #include <QPointer>
 #include <QScreen>
 #include <QTimer>
+#include <QWindow>
 
 #include <cmath>
 #include <memory>
@@ -199,7 +200,7 @@ ShotWindow *showCapturedWindow(QScreen *screen,
         window->activateWindow();
     }
 
-    QScreen *actualScreen = window->screen();
+    QScreen *actualScreen = window->windowHandle() ? window->windowHandle()->screen() : window->screen();
     markshot::debugLog("capture-session",
                        "【截图会话】【窗口放置】target=%s target_dpr=%.3f target_geom=%d,%d %dx%d "
                            "image=%dx%d layer_shell=%d actual=%s actual_dpr=%.3f",
