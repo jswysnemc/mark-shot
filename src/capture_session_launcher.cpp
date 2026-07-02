@@ -172,6 +172,7 @@ ShotWindow *showCapturedWindow(QScreen *screen,
                                bool fullscreenAnnotation,
                                const markshot::DefaultTools &defaultTools)
 {
+    const QSize imageSize = image.size();
     ShotWindow *window =
         new ShotWindow(std::move(image), std::move(outputName), sourceGeometry, std::move(windowInfos), detectWindows);
     window->setDefaultTools(defaultTools.normal, defaultTools.fullscreen);
@@ -197,6 +198,19 @@ ShotWindow *showCapturedWindow(QScreen *screen,
         window->raise();
         window->activateWindow();
     }
+
+    QScreen *actualScreen = window->screen();
+    markshot::debugLog("capture-session",
+                       "【截图会话】【窗口放置】target=%s target_dpr=%.3f target_geom=%d,%d %dx%d "
+                           "image=%dx%d layer_shell=%d actual=%s actual_dpr=%.3f",
+                       screen ? screen->name().toUtf8().constData() : "(none)",
+                       screen ? screen->devicePixelRatio() : 0.0,
+                       sourceGeometry.x(), sourceGeometry.y(),
+                       sourceGeometry.width(), sourceGeometry.height(),
+                       imageSize.width(), imageSize.height(),
+                       layerShellReady ? 1 : 0,
+                       actualScreen ? actualScreen->name().toUtf8().constData() : "(none)",
+                       actualScreen ? actualScreen->devicePixelRatio() : 0.0);
 
     if (fullscreenAnnotation) {
         QTimer::singleShot(0, window, [window] {
