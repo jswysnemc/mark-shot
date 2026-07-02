@@ -77,6 +77,8 @@ qt_add_executable(mark-shot
     src/app_config_store.h
     src/debug_log.cpp
     src/debug_log.h
+    src/export_image_effect.cpp
+    src/export_image_effect.h
     src/config_value.cpp
     src/config_value.h
     src/toolbar_appearance_config.cpp
@@ -442,6 +444,23 @@ if(BUILD_TESTING)
             Qt6::Test
     )
     add_test(NAME clipboard-image-config COMMAND mark-shot-clipboard-image-config-test)
+
+    qt_add_executable(mark-shot-export-image-effect-test
+        tests/export_image_effect_test.cpp
+        src/export_image_effect.cpp
+        src/export_image_effect.h
+        src/config_value.cpp
+        src/config_value.h
+    )
+    target_include_directories(mark-shot-export-image-effect-test PRIVATE src)
+    target_link_libraries(mark-shot-export-image-effect-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Widgets
+            Qt6::Test
+    )
+    add_test(NAME export-image-effect COMMAND mark-shot-export-image-effect-test)
 
     qt_add_executable(mark-shot-line-constraint-test
         tests/shot_window_line_constraint_test.cpp

@@ -312,6 +312,7 @@ private:
     QVector<DesktopApp> imageDesktopApps() const;
     QVector<ExtensionCommand> extensionCommands(QString *errorMessage = nullptr) const;
     QImage renderedSelection() const;
+    QImage exportSelectionImage() const;
     QPointF clampImagePoint(QPointF point) const;
     QImage mosaicImage(QRect sourceRect, int blockSize) const;
     QString currentToolName() const;
@@ -439,7 +440,7 @@ private:
     void scanCodeSelection();
     void uploadSelection();
     void showToast(const QString &text, int durationMs = 2000);
-    QString saveSelectionToTempFile() const;
+    QString saveSelectionToTempFile(bool applyExportEffect = false) const;
     void setCurrentColor(QColor color);
     void saveSelectionAs();
     void saveSelection();
