@@ -54,6 +54,7 @@ It captures screen frames instantly and opens an interactive fullscreen overlay,
 - **Startup Code Scan**: Press `Q` before selecting a region, drag around a QR code or barcode, and open the decoded result in a copyable window.
 - **Quick Display Capture**: Press `D` before selecting a region to instantly capture all outputs, crop them by display, and hover a thumbnail to copy, edit, or save that display image.
 - **Image Host Upload**: Press `Ctrl+U` or click the toolbar upload button after selecting a region to upload the screenshot to a custom image host (ImgURL, sm.ms, imgbb, litterbox, etc.). The returned URL is automatically copied to the clipboard. Configure the host via `upload.env`, or plug in any custom uploader via `upload.command`.
+- **Mac-style Export Frame**: Adds transparent padding, rounded corners, and a soft shadow to saved, copied, uploaded, Open With, and extension-command images.
 
 ### Pinned Window Stickers
 - Pins any cropped region or annotated screenshot as an independent, frameless, and top-level floating window.
@@ -270,6 +271,16 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
   "save": {
     "pathTemplate": "{pictures}/mark-shot/mark-shot-{datetime}.png"
   },
+  "export": {
+    "imageFrame": {
+      "enabled": true,
+      "padding": 112,
+      "cornerRadius": 18,
+      "shadowRadius": 72,
+      "shadowOffsetY": 28,
+      "shadowOpacity": 0.32
+    }
+  },
   "capture": {
     "wayland": {
       "kde": {
@@ -377,6 +388,7 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
 | `annotation.defaultColor` | String | `"#FF4D4D"` | Initial annotation color. Supports `#RRGGBB` (opaque) or `#RRGGBBAA` (with alpha). Overridden by CLI `--default-color`. |
 | `save.pathTemplate` | String | `"{pictures}/mark-shot/mark-shot-{datetime}.png"` | Default PNG path used by Save and as the initial Save As filename. Parent directories are created before saving. Aliases include `save.path`, `save.location`, root `savePathTemplate`, and directory-only `save.directory`. |
 | `save.directoryTemplate` | String | `""` | Directory-only save template. If set, filename automatically uses `mark-shot-{datetime}.png`. Aliases: `save.directory`, `save.dir`, `save.folder`. |
+| `export.imageFrame` | Boolean/Object | `true` | Mac-style image frame for user-facing exports. Object form supports `enabled`, `padding` (`0`-`256`, default `112`), `cornerRadius` (`0`-`128`, default `18`), `shadowRadius` (`0`-`128`, default `72`), `shadowOffsetY` (`0`-`128`, default `28`), and `shadowOpacity` (`0.0`-`1.0`, default `0.32`). Applies to Save, Save As, Copy, Upload, Open With, and extension-command images; OCR, code scan, pinned windows, quick display capture, and scrolling capture keep the raw image. Set `enabled` to `false` to export the raw selection size. |
 | `shortcuts` | Object | - | Customizable keyboard shortcuts. Alias: `hotkeys` (or under `annotation.shortcuts`/`annotation.hotkeys`). See details below. |
 | `windows.tray.enabled` | Boolean | `true` on Windows, `false` elsewhere | Starts tray mode automatically. The key name is kept for compatibility. Use `mark-shot --tray` to start tray mode without changing config, or `mark-shot --capture` to force one-shot capture when autostart is enabled. |
 | `windows.hotkeys.capture` | String | `"Ctrl+Alt+S"` | Global hotkey for region capture while tray mode is running. Windows uses RegisterHotKey; supported Linux desktops use the desktop portal. Aliases include `hotkey`, `captureHotkey`, and `screenshot`. |
@@ -682,6 +694,22 @@ yay -S mark-shot-bin
 
 `mark-shot` compiles from source; `mark-shot-bin` downloads the prebuilt pacman package from GitHub Releases.
 
+##### NixOS
+NixOS users can install mark-shot by adding it as a Flake input:
+```nix
+# flake.nix
+mark-shot = {
+  url = "github:jswysnemc/mark-shot";
+  inputs.nixpkgs.follows = "nixpkgs";
+};
+
+# home-manager
+home.packages = with pkgs; [
+  # other user packages
+  inputs.mark-shot.packages.${pkgs.stdenv.hostPlatform.system}.default
+]
+```
+
 ##### Other Distributions (Pre-built Packages)
 For other distributions (such as Debian, Ubuntu, or Fedora), download the compiled package from the Releases page and install it via:
 - **Debian / Ubuntu**:
@@ -852,6 +880,12 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
 
 # Build
 cmake --build build
+```
+
+Or build with Nix:
+
+```bash
+nix build
 ```
 
 LayerShellQt is detected automatically. When found, full Wayland layer-shell support is enabled. When absent, the build succeeds and falls back to standard fullscreen windows at runtime.

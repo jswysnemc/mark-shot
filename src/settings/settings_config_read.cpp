@@ -282,6 +282,7 @@ StorageSettings readStorageSettings(const QJsonObject &root)
     const ClipboardImageConfig clipboard = clipboardImageConfigFromRoot(root);
     settings.clipboardImageMode = clipboard.mode;
     settings.clipboardThresholdM = clipboard.thresholdM;
+    settings.exportImageEffect = exportImageEffectConfigFromRoot(root);
     return settings;
 }
 
