@@ -375,6 +375,8 @@ ColorPicker::ColorPicker(QWidget *parent) : QWidget(parent)
     m_hex = new QLineEdit(this);
     m_hex->setPlaceholderText(QStringLiteral("#RRGGBB or #RRGGBBAA"));
     m_hex->setMaxLength(9);
+    // Align the hex field height with the swatch beside it.
+    m_hex->setFixedHeight(kSwatchSize);
     QRegularExpression re(QStringLiteral("^#?[0-9a-fA-F]{0,8}$"));
     m_hex->setValidator(new QRegularExpressionValidator(re, this));
     m_hex->setStyleSheet(QStringLiteral(

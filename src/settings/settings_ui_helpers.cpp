@@ -214,6 +214,7 @@ QString colorButtonStyleSheet(const QColor &color)
     return QStringLiteral(
                "QPushButton {"
                " min-height: 30px;"
+               " padding: 2px 8px;"
                " border-radius: 8px;"
                " border: 1px solid #334155;"
                " background: %1;"
