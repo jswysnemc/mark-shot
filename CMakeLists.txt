@@ -254,7 +254,7 @@ if(WIN32)
     configure_file(packaging/windows/mark-shot.rc.in "${CMAKE_CURRENT_BINARY_DIR}/mark-shot.rc" @ONLY)
     target_sources(mark-shot PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/mark-shot.rc")
     set_target_properties(mark-shot PROPERTIES WIN32_EXECUTABLE TRUE)
-    target_link_libraries(mark-shot PRIVATE d3d11 dwmapi dxgi ole32 user32 uuid windowsapp)
+    target_link_libraries(mark-shot PRIVATE d3d11 dwmapi dxgi ksuser ole32 user32 uuid windowsapp)
 endif()
 
 target_link_libraries(mark-shot

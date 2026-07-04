@@ -15,10 +15,12 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <audioclient.h>
-#include <mmdeviceapi.h>
 #include <windows.h>
+#define INITGUID
+#include <initguid.h>
+#include <audioclient.h>
 #include <ksmedia.h>
+#include <mmdeviceapi.h>
 #include <objbase.h>
 #endif
 
