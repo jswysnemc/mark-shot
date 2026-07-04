@@ -121,6 +121,7 @@ jobs:
             git
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-cppwinrt
+            mingw-w64-ucrt-x86_64-ffmpeg
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-ninja
             mingw-w64-ucrt-x86_64-qt6-base
@@ -130,6 +131,7 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DMARK_SHOT_REQUIRE_FFMPEG=ON \
             -DMARK_SHOT_WITH_LAYER_SHELL=OFF \
             -DMARK_SHOT_WITH_LIBPORTAL=OFF
 
@@ -145,55 +147,16 @@ jobs:
 
       - name: Deploy runtime libraries
         run: |
-          set -euo pipefail
+          bash scripts/windows-deploy-runtime.sh "$PWD/app/bin" "$PWD/app/bin/mark-shot.exe"
 
-          app_bin="$PWD/app/bin"
-          exe="$app_bin/mark-shot.exe"
-          if [ ! -x "$exe" ]; then
-            echo "Expected executable not found: $exe" >&2
-            exit 1
-          fi
-
-          windeployqt_path="$(command -v windeployqt || true)"
-          if [ -z "$windeployqt_path" ]; then
-            windeployqt_path="$(command -v windeployqt6 || true)"
-          fi
-          if [ -z "$windeployqt_path" ]; then
-            windeployqt_path="$(find /ucrt64 -type f -name windeployqt.exe -print -quit)"
-          fi
-          if [ -z "$windeployqt_path" ]; then
-            echo "windeployqt was not found" >&2
-            exit 1
-          fi
-
-          "$windeployqt_path" --release --compiler-runtime --dir "$app_bin" "$exe"
-
-          declare -A seen
-          mapfile -t queue < <(find "$app_bin" -type f \( -name "*.exe" -o -name "*.dll" \))
-          while ((${#queue[@]})); do
-            current="${queue[0]}"
-            queue=("${queue[@]:1}")
-            current_key="$(cygpath -am "$current" 2>/dev/null || printf '%s' "$current")"
-            if [[ -n "${seen[$current_key]:-}" ]]; then
-              continue
-            fi
-            seen["$current_key"]=1
-
-            while IFS= read -r dep_name; do
-              dep_path="/ucrt64/bin/$dep_name"
-              if [ ! -f "$dep_path" ]; then
-                continue
-              fi
-
-              dest="$app_bin/$(basename "$dep_path")"
-              if [ ! -f "$dest" ]; then
-                cp "$dep_path" "$dest"
-              fi
-              queue+=("$dest")
-            done < <(objdump -p "$current" | awk '/DLL Name:/ { print $3 }')
-          done
-
-          find "$app_bin" -maxdepth 1 -type f -name "*.dll" -printf "%f\n" | sort
+      - name: Sign Windows binaries
+        shell: pwsh
+        env:
+          WINDOWS_CODESIGN_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CODESIGN_CERTIFICATE_BASE64 }}
+          WINDOWS_CODESIGN_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_CERTIFICATE_PASSWORD }}
+          WINDOWS_CODESIGN_TIMESTAMP_URL: ${{ vars.WINDOWS_CODESIGN_TIMESTAMP_URL }}
+        run: |
+          ./scripts/windows-sign-artifact.ps1 -Path "$env:GITHUB_WORKSPACE/app"
 
       - name: Package artifact
         run: |

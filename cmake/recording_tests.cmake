@@ -83,7 +83,7 @@ if(FFmpegLibav_FOUND)
             Qt6::Core
             Qt6::Gui
             Qt6::Test
-            PkgConfig::FFmpegLibav
+            MarkShot::FFmpegLibav
     )
     if(PulseAudioRecording_FOUND)
         target_link_libraries(mark-shot-libav-recording-process-test PRIVATE PkgConfig::PulseAudioRecording)

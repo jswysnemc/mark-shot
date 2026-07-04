@@ -13,6 +13,7 @@ option(MARK_SHOT_WITH_LAYER_SHELL "Build the optional LayerShellQt plugin when a
 option(MARK_SHOT_REQUIRE_LAYER_SHELL "Fail configuration when the optional LayerShellQt plugin cannot be built" OFF)
 option(MARK_SHOT_WITH_LIBPORTAL "Enable libportal screencast negotiation when available" OFF)
 option(MARK_SHOT_REQUIRE_LIBPORTAL "Fail configuration when libportal support is requested but unavailable" OFF)
+option(MARK_SHOT_REQUIRE_FFMPEG "Fail configuration when FFmpeg libav recording support is unavailable" OFF)
 
 if(WIN32)
     enable_language(RC)
@@ -44,13 +45,6 @@ if(MARK_SHOT_LINUX)
     if(PkgConfig_FOUND)
         pkg_check_modules(PipeWire QUIET IMPORTED_TARGET libpipewire-0.3)
         pkg_check_modules(WaylandClient QUIET IMPORTED_TARGET wayland-client)
-        pkg_check_modules(FFmpegLibav QUIET IMPORTED_TARGET
-            libavcodec
-            libavformat
-            libavutil
-            libswresample
-            libswscale
-        )
         pkg_check_modules(PulseAudioRecording QUIET IMPORTED_TARGET
             libpulse-simple
             libpulse
@@ -66,6 +60,8 @@ if(MARK_SHOT_LINUX)
 elseif(MARK_SHOT_REQUIRE_LIBPORTAL)
     message(FATAL_ERROR "libportal support is only supported on Linux")
 endif()
+
+include(cmake/ffmpeg_libav.cmake)
 
 if(COMMAND qt_standard_project_setup)
     qt_standard_project_setup()
@@ -286,7 +282,7 @@ if(MARK_SHOT_LINUX AND X11_xcb_FOUND)
 endif()
 
 if(FFmpegLibav_FOUND)
-    target_link_libraries(mark-shot PRIVATE PkgConfig::FFmpegLibav)
+    target_link_libraries(mark-shot PRIVATE MarkShot::FFmpegLibav)
     target_compile_definitions(mark-shot PRIVATE HAVE_LIBAV_RECORDING)
     message(STATUS "mark-shot: FFmpeg libav recording writer enabled")
 else()
