@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.34 - 2026-07-04
+
+### Features & Enhancements
+
+- **System/Light/Dark Theme Setting**: Added `ui.theme` with `system`, `dark`, and `light` modes. The General settings page now exposes the theme selector, and the settings dialog can follow the desktop color scheme or apply a forced light/dark palette.
+- **PipeWire Recording Backend**: Reworked the recording capture backend order and PipeWire integration so portal screencast capture can use both shared-memory and DMA-BUF frames, with wlroots screencopy and polling fallbacks when PipeWire cannot provide usable frames.
+- **Recording Backend Modularity**: Split recording capture backends and tests into focused modules, keeping PipeWire, wlroots screencopy, and polling capture paths easier to maintain.
+- **Settings Control Styling**: Normalized settings combobox and spinbox sub-controls, including embedded chevron resources, so dropdowns and numeric controls render consistently across widget styles.
+
+### Bug Fixes
+
+- **PipeWire DMA-BUF Import**: Fixed DMA-BUF frame import by using the Qt Wayland EGL display when available, avoiding mismatches between compositor GPU buffers and the default EGL display.
+- **Recording Status Timer**: Aligned the recording UI timer with captured frame timestamps so the overlay duration matches the saved video timeline instead of including portal authorization and capture startup delay.
+- **PipeWire Error Recovery**: Improved first-frame diagnostics and fallback behavior after PipeWire capture errors such as missing formats or non-mappable buffers.
+- **Theme Setting Localization**: Added Simplified Chinese translations for the new interface theme controls.
+
 ## 0.1.33 - 2026-07-03
 
 ### Features & Enhancements

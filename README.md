@@ -53,7 +53,7 @@ It captures screen frames instantly and opens an interactive fullscreen overlay,
 - **Magnifier with Independent Frames**: The magnifier loupe exposes resize handles on both the inner source viewfinder and the outer lens. Rectangle lenses get 8 corner/edge handles per frame, circular lenses get 4. Resizing either frame keeps the magnification ratio constant by scaling the other frame proportionally; translating one frame leaves the other untouched.
 - **Startup Code Scan**: Press `Q` before selecting a region, drag around a QR code or barcode, and open the decoded result in a copyable window.
 - **Quick Display Capture**: Press `D` before selecting a region to instantly capture all outputs, crop them by display, and hover a thumbnail to copy, edit, or save that display image.
-- **GIF and Video Recording**: Press the configured startup recording shortcuts or use the tray menu to record a selected display or a custom region as GIF or MP4. Active recordings show tray and frozen-frame status, can be stopped with `S`, the overlay button, the tray menu, or `--stop-recording`, and send desktop notifications when recording starts or saves.
+- **GIF and Video Recording**: Press the configured startup recording shortcuts or use the tray menu to record a selected display or a custom region as GIF or MP4. Active recordings show tray and frozen-frame status, can be stopped with `S`, the overlay button, the tray menu, or `--stop-recording`, and send desktop notifications when recording starts or saves. On Wayland, recording prefers the PipeWire portal backend and can fall back to wlroots screencopy or polling capture when portal capture is unavailable.
 - **Image Host Upload**: Press `Ctrl+U` or click the toolbar upload button after selecting a region to upload the screenshot to a custom image host (ImgURL, sm.ms, imgbb, litterbox, etc.). The returned URL is automatically copied to the clipboard. Configure the host via `upload.env`, or plug in any custom uploader via `upload.command`.
 - **Mac-style Export Frame**: Adds transparent padding, rounded corners, and a soft shadow to saved, copied, uploaded, Open With, and extension-command images.
 
@@ -79,7 +79,7 @@ It captures screen frames instantly and opens an interactive fullscreen overlay,
 - To report a scrolling capture issue, run `mark-shot --debug --debug-log /path/to/mark-shot.log`, reproduce the failure, then attach the log to a GitHub issue. The same logging can be enabled through `debug.enabled` and `debug.logPath` in `config.json`; `DEBUG=1` and `MARK_SHOT_DEBUG_LOG=/path/to/log` remain supported.
 
 ### Cross-Platform Display Server Support
-- **Wayland**: Uses PipeWire portal screencast for experimental scrolling capture, `grim` for wlroots screenshot capture, `layer-shell-qt` for native overlay, and `wl-copy` for clipboard persistence.
+- **Wayland**: Uses PipeWire portal screencast for recording and experimental scrolling capture, including shared-memory and DMA-BUF frame paths, `grim` for wlroots screenshot capture, `layer-shell-qt` for native overlay, and `wl-copy` for clipboard persistence.
 - **GNOME Wayland**: Uses the Mark Shot Scroll Helper GNOME Shell extension for scrolling capture. Without the extension, Mark Shot disables the scrolling capture action on GNOME Wayland.
 - **X11**: Uses `QScreen::grabWindow` for screen capture, fullscreen top-level window for overlay, and `xclip` for clipboard persistence.
 - **Windows**: Uses Qt's native screen capture and clipboard APIs for the core screenshot, annotation, copy, save, and pin workflows. Linux-specific backends such as PipeWire, xdg-desktop-portal, `grim`, XCB window detection, LayerShellQt, and GNOME Shell helpers are disabled at build time.
@@ -262,6 +262,10 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
   "env": {
     "QT_FONT_DPI": 96
   },
+  "ui": {
+    "language": "system",
+    "theme": "system"
+  },
   "debug": {
     "enabled": false,
     "logPath": ""
@@ -382,6 +386,7 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
 | :--- | :---: | :---: | :--- |
 | `env` | Object | `{}` | Environment variables applied to the process before `QApplication` creation (e.g., `"QT_FONT_DPI": 96` to normalize high-DPI scaling). Alias: `environment`. |
 | `ui.language` | String | `"system"` | Interface language. Supported values: `system` (follow system locale), `english`, `chinese`. Also accepts `en`/`zh`/`zh_cn`/`cn` variants. Supersedes the legacy root-level `language` key. Configurable from the General settings page. |
+| `ui.theme` | String | `"system"` | Interface theme. Supported values: `system` (follow the Qt/desktop color scheme), `dark`, and `light`. The General settings page writes this value and the settings dialog applies it immediately. Supersedes the legacy root-level `theme` key. |
 | `capture.freezeScope` | String | `"all-screens"` | Scope of displays frozen during region screenshot session. Only effective in multi-monitor setups when not capturing all outputs explicitly. Supported values: `all-screens` (freeze all monitors) and `cursor-screen` (freeze only the monitor containing the mouse cursor). Aliases: `freezeScope`, `freezeDisplayScope`, etc. |
 | `capture.wayland.kde.kwinScreenshot.enabled` | Boolean | `true` | Whether to enable KWin `org.kde.KWin.ScreenShot2` restricted D-Bus interface screenshot capture on KDE Wayland. If disabled, fallback to standard Portal capture. |
 | `debug.enabled` | Boolean | `false` | Enables debug logging on Linux and Windows. CLI `--debug` / `--no-debug` override this value; `DEBUG=1` still enables logging unless `--no-debug` is set. |
@@ -1014,6 +1019,16 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 
 ## Release Notes
 
+### 0.1.34
+
+- **Theme Setting**: Added `ui.theme` with System, Dark, and Light options, including a General settings selector and immediate settings-dialog theme application.
+- **PipeWire Recording Backend**: Improved Wayland recording capture with shared-memory and DMA-BUF PipeWire frame handling, plus wlroots screencopy and polling fallbacks when portal capture is unusable.
+- **Recording Timeline Accuracy**: Aligned the recording status timer with saved video timestamps so portal authorization and capture startup delay are not counted in the displayed duration.
+- **Settings Polish**: Localized the theme setting controls and normalized combobox and spinbox styling across widget styles.
+
+<details>
+<summary>Previous versions</summary>
+
 ### 0.1.33
 
 - **GIF and Video Recording**: Added GIF and MP4 recording with stepped frame rates, display or region capture, optional video audio input, and configurable output directories.
@@ -1022,9 +1037,6 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 - **Save and Recording Notifications**: Added desktop notifications for recording start/save/failure and screenshot save completion.
 - **Recording Dialog Updates**: The recording dialog now switches between GIF and video modes, defaults to the current display, and updates frame rate, audio, and output path controls as the mode changes.
 - **Wayland and Text Selection Fixes**: Improved mixed-DPI Wayland capture placement and fixed right-click context menus so editable text selections are preserved.
-
-<details>
-<summary>Previous versions</summary>
 
 ### 0.1.32
 
