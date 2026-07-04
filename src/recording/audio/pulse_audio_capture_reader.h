@@ -1,23 +1,20 @@
 #pragma once
 
-#include "recording/audio/audio_capture_sample.h"
+#include "recording/audio/audio_capture_reader.h"
 
 #include <QString>
 
 #include <atomic>
-#include <functional>
 #include <thread>
 
 struct pa_simple;
 
 namespace markshot::recording {
 
-class PulseAudioCaptureReader final {
+class PulseAudioCaptureReader final : public AudioCaptureReader {
 public:
-    using SampleCallback = std::function<void(const AudioCaptureSample &)>;
-
     PulseAudioCaptureReader();
-    ~PulseAudioCaptureReader();
+    ~PulseAudioCaptureReader() override;
 
     /**
      * 初始化 PulseAudio 采集流。
@@ -27,19 +24,19 @@ public:
      * @param error 输出错误信息。
      * @return 初始化成功时返回 true。
      */
-    bool init(int frameBytes, int sampleRate, SampleCallback callback, QString *error);
+    bool init(int frameBytes, int sampleRate, SampleCallback callback, QString *error) override;
 
     /**
      * 启动音频采集线程。
      * @return 无返回值。
      */
-    void start();
+    void start() override;
 
     /**
      * 停止音频采集线程并释放连接。
      * @return 无返回值。
      */
-    void stop();
+    void stop() override;
 
 private:
     /**

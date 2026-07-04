@@ -13,6 +13,8 @@ pacman -S --needed \
 
 发布构建使用 `-DMARK_SHOT_REQUIRE_FFMPEG=ON`。如果缺少 FFmpeg 头文件或导入库，CMake 会在配置阶段失败，避免生成无法录制的 Windows 包。
 
+Windows 视频录制音频使用 WASAPI loopback 采集默认播放设备输出，不依赖 PulseAudio。当前实现录制系统声音；麦克风混音和单独音轨属于后续增强范围。
+
 ## 运行时部署
 
 Windows 包通过 `scripts/windows-deploy-runtime.sh` 运行 `windeployqt`，并用 `objdump` 递归复制 `mark-shot.exe` 和 DLL 的依赖项。FFmpeg 的 `avcodec`、`avformat`、`avutil`、`swresample`、`swscale` 相关 DLL 会随依赖闭包进入 `app/bin`。

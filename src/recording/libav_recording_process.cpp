@@ -1,6 +1,7 @@
 #include "recording/libav_recording_process.h"
 
-#include "recording/audio/pulse_audio_capture_reader.h"
+#include "recording/audio/audio_capture_reader.h"
+#include "recording/audio/audio_capture_reader_factory.h"
 #include "recording/libav_audio_encoder.h"
 #include "recording/libav_error.h"
 #include "recording/recording_frame_converter.h"
@@ -10,6 +11,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <memory>
 #include <mutex>
 
 #ifdef HAVE_LIBAV_RECORDING
@@ -257,7 +259,7 @@ private:
 #endif
     RecordingFrameConverter m_converter;
     LibavAudioEncoder m_audioEncoder;
-    PulseAudioCaptureReader m_audioReader;
+    std::unique_ptr<AudioCaptureReader> m_audioReader;
     QByteArray m_outputPathBytes;
     QSize m_frameSize;
     QSize m_encodedSize;
@@ -382,7 +384,9 @@ bool LibavRecordingProcessPrivate::finish(QString *error)
         return true;
     }
     if (m_enableAudio) {
-        m_audioReader.stop();
+        if (m_audioReader) {
+            m_audioReader->stop();
+        }
         m_audioCaptureStarted = false;
     }
     if (!encodeFrame(nullptr, error)) {
@@ -414,16 +418,20 @@ bool LibavRecordingProcessPrivate::openAudio(QString *error)
 #ifndef HAVE_LIBAV_RECORDING
     return failWith(error, QStringLiteral("FFmpeg libraries are not linked"));
 #else
-    constexpr int kAudioSampleRate = 48000;
-    if (!m_audioEncoder.open(m_formatContext, kAudioSampleRate, error)) {
+    m_audioReader = createPlatformAudioCaptureReader();
+    if (!m_audioReader) {
+        return failWith(error, recordingAudioUnavailableText());
+    }
+    const int audioSampleRate = m_audioReader->preferredSampleRate();
+    if (!m_audioEncoder.open(m_formatContext, audioSampleRate, error)) {
         return false;
     }
-    if (!m_audioReader.init(m_audioEncoder.frameBytes(),
-                            kAudioSampleRate,
-                            [this](const AudioCaptureSample &sample) {
-                                encodeAudioSample(sample);
-                            },
-                            error)) {
+    if (!m_audioReader->init(m_audioEncoder.frameBytes(),
+                             audioSampleRate,
+                             [this](const AudioCaptureSample &sample) {
+                                 encodeAudioSample(sample);
+                             },
+                             error)) {
         return false;
     }
     return true;
@@ -436,7 +444,9 @@ void LibavRecordingProcessPrivate::startAudioCaptureIfNeeded()
         return;
     }
     m_audioCaptureStarted = true;
-    m_audioReader.start();
+    if (m_audioReader) {
+        m_audioReader->start();
+    }
 }
 
 void LibavRecordingProcessPrivate::encodeAudioSample(const AudioCaptureSample &sample)
@@ -661,7 +671,10 @@ bool LibavRecordingProcessPrivate::encodeFrame(AVFrame *frame, QString *error)
 void LibavRecordingProcessPrivate::cleanup()
 {
 #ifdef HAVE_LIBAV_RECORDING
-    m_audioReader.stop();
+    if (m_audioReader) {
+        m_audioReader->stop();
+        m_audioReader.reset();
+    }
     m_audioCaptureStarted = false;
     m_audioEncoder.close();
     if (m_codecContext && m_started) {

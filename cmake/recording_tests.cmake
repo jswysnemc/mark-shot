@@ -57,9 +57,14 @@ add_test(NAME recording-dialog-config COMMAND mark-shot-recording-dialog-config-
 if(FFmpegLibav_FOUND)
     qt_add_executable(mark-shot-libav-recording-process-test
         tests/libav_recording_process_test.cpp
+        src/recording/audio/audio_capture_reader.h
+        src/recording/audio/audio_capture_reader_factory.cpp
+        src/recording/audio/audio_capture_reader_factory.h
         src/recording/audio/audio_capture_sample.h
         src/recording/audio/pulse_audio_capture_reader.cpp
         src/recording/audio/pulse_audio_capture_reader.h
+        src/recording/audio/wasapi_audio_capture_reader.cpp
+        src/recording/audio/wasapi_audio_capture_reader.h
         src/recording/libav_audio_encoder.cpp
         src/recording/libav_audio_encoder.h
         src/recording/libav_error.cpp
@@ -87,6 +92,9 @@ if(FFmpegLibav_FOUND)
     )
     if(PulseAudioRecording_FOUND)
         target_link_libraries(mark-shot-libav-recording-process-test PRIVATE PkgConfig::PulseAudioRecording)
+    endif()
+    if(WIN32)
+        target_link_libraries(mark-shot-libav-recording-process-test PRIVATE ole32 uuid)
     endif()
     add_test(NAME libav-recording-process COMMAND mark-shot-libav-recording-process-test)
 endif()

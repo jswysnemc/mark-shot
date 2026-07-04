@@ -1,5 +1,6 @@
 #include "recording/recording_config_dialog.h"
 
+#include "recording/audio/audio_capture_reader_factory.h"
 #include "recording/recording_dialog_config.h"
 #include "recording/recording_display_source.h"
 #include "recording/recording_file_naming.h"
@@ -339,10 +340,14 @@ void RecordingConfigDialog::updateAudioControls()
         return;
     }
     const bool videoMode = m_mode == RecordingMode::Video;
-    m_audio->setEnabled(videoMode);
+    const bool audioAvailable = recordingAudioCaptureAvailable();
+    m_audio->setEnabled(videoMode && audioAvailable);
     if (!videoMode) {
         m_audio->setChecked(false);
         m_audio->setToolTip(MS_TR("GIF recording does not include audio."));
+    } else if (!audioAvailable) {
+        m_audio->setChecked(false);
+        m_audio->setToolTip(recordingAudioUnavailableText());
     } else {
         m_audio->setToolTip(QString());
     }
