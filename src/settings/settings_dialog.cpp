@@ -1,5 +1,6 @@
 #include "settings/settings_dialog.h"
 
+#include "app_config_store.h"
 #include "settings/settings_design_tokens.h"
 #include "settings/settings_navigation.h"
 #include "settings/settings_page_advanced.h"
@@ -13,13 +14,14 @@
 #include "settings/settings_page_storage.h"
 #include "ui/i18n.h"
 #include "ui/icons.h"
+#include "ui/interface_theme_config.h"
 
 #include <QDialogButtonBox>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QJsonObject>
 #include <QLabel>
 #include <QMessageBox>
-#include <QPalette>
 #include <QPointer>
 #include <QPushButton>
 #include <QScreen>
@@ -43,6 +45,18 @@ void addScrollablePage(QStackedWidget *stack, QWidget *page)
     stack->addWidget(area);
 }
 
+/**
+ * 读取配置中的设置界面主题。
+ * @return 配置的界面主题模式。
+ */
+markshot::ui::UiThemeMode configuredSettingsThemeMode()
+{
+    bool ok = false;
+    const QJsonObject root = markshot::readAppConfigRoot(&ok);
+    return ok ? markshot::ui::uiThemeModeFromConfigRoot(root)
+              : markshot::ui::UiThemeMode::System;
+}
+
 }  // namespace
 
 SettingsDialog::SettingsDialog(QWidget *parent)
@@ -54,23 +68,7 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     setMinimumSize(820, 600);
     resize(900, 640);
 
-    QPalette pal;
-    pal.setColor(QPalette::Window, tokens::kWindowBackground);
-    pal.setColor(QPalette::WindowText, tokens::kTextPrimary);
-    pal.setColor(QPalette::Base, tokens::kInputBackground);
-    pal.setColor(QPalette::AlternateBase, tokens::kCardSurface);
-    pal.setColor(QPalette::Text, tokens::kTextPrimary);
-    pal.setColor(QPalette::Button, tokens::kCardSurface);
-    pal.setColor(QPalette::ButtonText, tokens::kTextPrimary);
-    pal.setColor(QPalette::ToolTipBase, tokens::kCardSurface);
-    pal.setColor(QPalette::ToolTipText, tokens::kTextPrimary);
-    pal.setColor(QPalette::BrightText, tokens::kAccent);
-    pal.setColor(QPalette::Link, tokens::kAccent);
-    pal.setColor(QPalette::Highlight, tokens::kAccent);
-    pal.setColor(QPalette::HighlightedText, tokens::kAccentInk);
-    qApp->setPalette(pal);
-
-    setStyleSheet(tokens::settingsStyleSheet());
+    applyTheme(configuredSettingsThemeMode());
 
     auto *rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(0, 0, 0, 0);
@@ -150,6 +148,7 @@ void SettingsDialog::loadConfig()
     if (!error.isEmpty()) {
         m_statusLabel->setText(error);
     }
+    applyTheme(m_config.general.uiThemeMode);
 }
 
 SettingsConfig SettingsDialog::collectConfig() const
@@ -177,10 +176,18 @@ void SettingsDialog::saveConfig(bool closeAfterSave)
     }
 
     m_config = nextConfig;
+    applyTheme(m_config.general.uiThemeMode);
     m_statusLabel->setText(MS_TR("Settings saved. Some changes take effect after restarting Mark Shot."));
     if (closeAfterSave) {
         close();
     }
+}
+
+void SettingsDialog::applyTheme(markshot::ui::UiThemeMode mode)
+{
+    const markshot::ui::UiThemeMode effectiveMode = markshot::ui::effectiveUiThemeMode(mode);
+    qApp->setPalette(tokens::settingsPalette(effectiveMode));
+    setStyleSheet(tokens::settingsStyleSheet(effectiveMode));
 }
 
 void showSettingsDialog(QWidget *parent)

@@ -8,6 +8,7 @@
 #include "recording/recording_storage_config.h"
 #include "ui/i18n.h"
 #include "ui/interface_language_config.h"
+#include "ui/interface_theme_config.h"
 
 #include <QJsonObject>
 #include <QJsonValue>
@@ -120,6 +121,8 @@ void writeGeneralSettings(QJsonObject *root, const GeneralSettings &settings)
 {
     setNestedValue(root, {QStringLiteral("ui"), QStringLiteral("language")},
                    markshot::ui::uiLanguageModeName(settings.uiLanguageMode));
+    setNestedValue(root, {QStringLiteral("ui"), QStringLiteral("theme")},
+                   markshot::ui::uiThemeModeName(settings.uiThemeMode));
     setNestedValue(root, {QStringLiteral("windows"), QStringLiteral("tray"), QStringLiteral("enabled")},
                    settings.trayEnabled);
     setNestedValue(root, {QStringLiteral("windows"), QStringLiteral("tray"), QStringLiteral("autoStart")},

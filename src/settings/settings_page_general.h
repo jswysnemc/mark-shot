@@ -26,6 +26,7 @@ public:
 
 private:
     QComboBox *m_uiLanguage = nullptr;
+    QComboBox *m_uiTheme = nullptr;
     QCheckBox *m_trayEnabled = nullptr;
     QCheckBox *m_launchOnStartup = nullptr;
     QCheckBox *m_hotkeysEnabled = nullptr;

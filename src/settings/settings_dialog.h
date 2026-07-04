@@ -39,6 +39,10 @@ private:
     /// @param closeAfterSave 保存成功后是否关闭窗口。
     void saveConfig(bool closeAfterSave);
 
+    /// @brief 应用设置界面主题。
+    /// @param mode 配置中的界面主题模式。
+    void applyTheme(markshot::ui::UiThemeMode mode);
+
     SettingsNavigation *m_navigation = nullptr;
     QStackedWidget *m_stack = nullptr;
     QLabel *m_statusLabel = nullptr;

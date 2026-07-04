@@ -3,6 +3,160 @@
 #include <QStringLiteral>
 
 namespace markshot::settings::tokens {
+namespace {
+
+/**
+ * 生成浅色设置界面完整样式表。
+ * @return Qt 样式表文本。
+ */
+QString lightSettingsStyleSheet()
+{
+    return QStringLiteral(
+        // 窗口与分区背景
+        "QDialog#settingsDialog { background: #F8FAFC; color: #0F172A; }"
+        "QFrame#settingsSidebar { background: #E2E8F0; border: 0; }"
+        "QFrame#settingsFooter { background: #E2E8F0; border-top: 1px solid #CBD5E1; }"
+
+        // 侧栏标题区
+        "QLabel#settingsHeroTitle { color: #0F172A; font-size: 20px; font-weight: 800; }"
+        "QLabel#settingsHeroText { color: #64748B; font-size: 12px; }"
+
+        // 状态标签
+        "QLabel#settingsStatus { color: #64748B; }"
+
+        // 侧栏导航列表
+        "QListWidget#settingsNavigation {"
+        " background: transparent;"
+        " border: 0;"
+        " padding: 6px;"
+        " outline: 0;"
+        "}"
+        "QListWidget#settingsNavigation::item {"
+        " color: #475569;"
+        " border-radius: 10px;"
+        " padding: 9px 12px;"
+        " margin: 2px 0;"
+        "}"
+        "QListWidget#settingsNavigation::item:hover {"
+        " background: #FFFFFF;"
+        " color: #0F172A;"
+        "}"
+        "QListWidget#settingsNavigation::item:selected {"
+        " background: rgba(13, 148, 136, 0.14);"
+        " color: #0F766E;"
+        "}"
+        "QListWidget#settingsNavigation::item:separator {"
+        " background: transparent;"
+        " border: 0;"
+        " min-height: 1px;"
+        " max-height: 1px;"
+        " margin: 6px 10px;"
+        "}"
+
+        // 卡片
+        "QFrame#settingsCard {"
+        " background: #FFFFFF;"
+        " border: 1px solid #CBD5E1;"
+        " border-radius: 14px;"
+        "}"
+        "QLabel#settingsCardTitle { color: #0F172A; font-size: 15px; font-weight: 800; }"
+        "QLabel#settingsCardDescription { color: #64748B; font-size: 12px; }"
+
+        // 输入控件统一浅色底
+        "QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QKeySequenceEdit, QPlainTextEdit {"
+        " min-height: 30px;"
+        " border: 1px solid #CBD5E1;"
+        " border-radius: 8px;"
+        " padding: 2px 8px;"
+        " background: #FFFFFF;"
+        " color: #0F172A;"
+        " selection-background-color: rgba(13, 148, 136, 0.22);"
+        "}"
+        "QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus,"
+        " QKeySequenceEdit:focus, QPlainTextEdit:focus {"
+        " border-color: #0D9488;"
+        "}"
+        "QComboBox QAbstractItemView {"
+        " background: #FFFFFF;"
+        " border: 1px solid #CBD5E1;"
+        " border-radius: 8px;"
+        " selection-background-color: rgba(13, 148, 136, 0.14);"
+        " selection-color: #0F766E;"
+        " color: #0F172A;"
+        " outline: 0;"
+        "}"
+        "QSpinBox, QDoubleSpinBox { max-height: 30px; }"
+        "QComboBox::drop-down {"
+        " subcontrol-origin: padding;"
+        " subcontrol-position: center right;"
+        " width: 22px;"
+        " border: 0;"
+        " background: transparent;"
+        "}"
+        "QComboBox::down-arrow {"
+        " image: url(:/icons/chevron-down.svg);"
+        " width: 12px;"
+        " height: 12px;"
+        "}"
+        "QSpinBox::up-button, QDoubleSpinBox::up-button {"
+        " subcontrol-origin: content;"
+        " subcontrol-position: top right;"
+        " width: 20px;"
+        " border: 0;"
+        " background: transparent;"
+        "}"
+        "QSpinBox::down-button, QDoubleSpinBox::down-button {"
+        " subcontrol-origin: content;"
+        " subcontrol-position: bottom right;"
+        " width: 20px;"
+        " border: 0;"
+        " background: transparent;"
+        "}"
+        "QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {"
+        " image: url(:/icons/chevron-up.svg);"
+        " width: 11px;"
+        " height: 11px;"
+        "}"
+        "QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {"
+        " image: url(:/icons/chevron-down.svg);"
+        " width: 11px;"
+        " height: 11px;"
+        "}"
+
+        "QCheckBox { color: #334155; spacing: 8px; }"
+        "QCheckBox::indicator { width: 18px; height: 18px; }"
+
+        // 按钮
+        "QPushButton {"
+        " min-height: 32px;"
+        " border-radius: 9px;"
+        " border: 1px solid #CBD5E1;"
+        " padding: 4px 16px;"
+        " background: #FFFFFF;"
+        " color: #0F172A;"
+        " font-weight: 700;"
+        "}"
+        "QPushButton:hover { border-color: #0D9488; color: #0F766E; }"
+        "QPushButton[role=\"primary\"] {"
+        " background: #0D9488;"
+        " border-color: #0D9488;"
+        " color: #FFFFFF;"
+        "}"
+        "QPushButton[role=\"primary\"]:hover { background: #0F766E; border-color: #0F766E; color: #FFFFFF; }"
+
+        // 滚动条：浅色窄轨
+        "QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; }"
+        "QScrollBar::handle:vertical {"
+        " background: #CBD5E1;"
+        " border-radius: 4px;"
+        " min-height: 28px;"
+        "}"
+        "QScrollBar::handle:vertical:hover { background: #94A3B8; }"
+        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
+        "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }");
+}
+
+}  // namespace
 
 QString settingsStyleSheet()
 {
@@ -157,6 +311,50 @@ QString settingsStyleSheet()
         "QScrollBar::handle:vertical:hover { background: #475569; }"
         "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
         "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }");
+}
+
+QString settingsStyleSheet(markshot::ui::UiThemeMode mode)
+{
+    if (mode == markshot::ui::UiThemeMode::Light) {
+        return lightSettingsStyleSheet();
+    }
+    return settingsStyleSheet();
+}
+
+QPalette settingsPalette(markshot::ui::UiThemeMode mode)
+{
+    QPalette pal;
+    if (mode == markshot::ui::UiThemeMode::Light) {
+        pal.setColor(QPalette::Window, QColor(248, 250, 252));
+        pal.setColor(QPalette::WindowText, QColor(15, 23, 42));
+        pal.setColor(QPalette::Base, QColor(255, 255, 255));
+        pal.setColor(QPalette::AlternateBase, QColor(226, 232, 240));
+        pal.setColor(QPalette::Text, QColor(15, 23, 42));
+        pal.setColor(QPalette::Button, QColor(255, 255, 255));
+        pal.setColor(QPalette::ButtonText, QColor(15, 23, 42));
+        pal.setColor(QPalette::ToolTipBase, QColor(255, 255, 255));
+        pal.setColor(QPalette::ToolTipText, QColor(15, 23, 42));
+        pal.setColor(QPalette::BrightText, QColor(13, 148, 136));
+        pal.setColor(QPalette::Link, QColor(13, 148, 136));
+        pal.setColor(QPalette::Highlight, QColor(13, 148, 136));
+        pal.setColor(QPalette::HighlightedText, QColor(255, 255, 255));
+        return pal;
+    }
+
+    pal.setColor(QPalette::Window, kWindowBackground);
+    pal.setColor(QPalette::WindowText, kTextPrimary);
+    pal.setColor(QPalette::Base, kInputBackground);
+    pal.setColor(QPalette::AlternateBase, kCardSurface);
+    pal.setColor(QPalette::Text, kTextPrimary);
+    pal.setColor(QPalette::Button, kCardSurface);
+    pal.setColor(QPalette::ButtonText, kTextPrimary);
+    pal.setColor(QPalette::ToolTipBase, kCardSurface);
+    pal.setColor(QPalette::ToolTipText, kTextPrimary);
+    pal.setColor(QPalette::BrightText, kAccent);
+    pal.setColor(QPalette::Link, kAccent);
+    pal.setColor(QPalette::Highlight, kAccent);
+    pal.setColor(QPalette::HighlightedText, kAccentInk);
+    return pal;
 }
 
 }  // namespace markshot::settings::tokens

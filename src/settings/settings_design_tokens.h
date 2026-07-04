@@ -1,6 +1,9 @@
 #pragma once
 
+#include "ui/interface_theme_config.h"
+
 #include <QColor>
+#include <QPalette>
 #include <QString>
 
 namespace markshot::settings::tokens {
@@ -44,5 +47,19 @@ inline constexpr int kNavIconSize = 18;       // 导航图标边长
 /// @brief 生成设置界面完整样式表（深色玻璃 + teal）。
 /// @return Qt 样式表文本，按 objectName 作用域隔离。
 QString settingsStyleSheet();
+
+/**
+ * 生成设置界面完整样式表。
+ * @param mode 实际应用的明暗主题。
+ * @return Qt 样式表文本，按 objectName 作用域隔离。
+ */
+QString settingsStyleSheet(markshot::ui::UiThemeMode mode);
+
+/**
+ * 生成设置界面使用的 Qt 调色板。
+ * @param mode 实际应用的明暗主题。
+ * @return 与设置样式表匹配的调色板。
+ */
+QPalette settingsPalette(markshot::ui::UiThemeMode mode);
 
 }  // namespace markshot::settings::tokens
