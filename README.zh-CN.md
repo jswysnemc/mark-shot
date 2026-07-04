@@ -1041,15 +1041,19 @@ gdbus call --session \
 
 ## 发版说明
 
+### 0.1.35
+
+- **Qt 6.4 DMA-BUF 构建兼容性**：修复 Debian 12 / Qt 6.4 环境下的编译失败；Qt 6.5 及更新版本仍会使用 Wayland EGL display 路径导入 PipeWire DMA-BUF。
+
+<details>
+<summary>历史版本</summary>
+
 ### 0.1.34
 
 - **界面主题设置**：新增 `ui.theme` 配置，支持跟随系统、深色和浅色主题，并在通用设置页提供选择控件；设置窗口会立即应用所选主题。
 - **PipeWire 录制后端**：改进 Wayland 录制采集，支持 PipeWire 共享内存帧和 DMA-BUF 帧；当 portal 采集不可用时，可回退到 wlroots screencopy 或轮询采集。
 - **录制时间轴校准**：录制状态计时改为对齐保存视频的帧时间戳，避免把 portal 授权和采集启动等待时间计入显示时长。
 - **设置界面优化**：补齐主题设置控件的简体中文翻译，并统一组合框和数字输入控件在不同样式下的显示。
-
-<details>
-<summary>历史版本</summary>
 
 ### 0.1.33
 

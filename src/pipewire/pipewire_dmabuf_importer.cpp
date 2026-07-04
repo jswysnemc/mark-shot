@@ -6,6 +6,7 @@
 
 #include <QByteArray>
 #include <QGuiApplication>
+#include <QtGlobal>
 #include <QtGui/qguiapplication_platform.h>
 
 #include <algorithm>
@@ -103,6 +104,22 @@ QString glErrorText(const QString &prefix, GLenum code)
     return QStringLiteral("%1 (GL error 0x%2)")
         .arg(prefix)
         .arg(static_cast<uint>(code), 0, 16);
+}
+
+/**
+ * 【录制】【PipeWire DMA-BUF】读取 Qt Wayland 平台插件持有的 Wayland display。
+ * @return 支持该 native interface 时返回 display 指针，否则返回空指针。
+ */
+void *qtWaylandDisplay()
+{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    auto *waylandApp = qGuiApp
+        ? qGuiApp->nativeInterface<QNativeInterface::QWaylandApplication>()
+        : nullptr;
+    return waylandApp ? waylandApp->display() : nullptr;
+#else
+    return nullptr;
+#endif
 }
 
 /**
@@ -387,12 +404,10 @@ private:
         if (getPlatformDisplay
             && (hasExtension(clientExtensions, "EGL_EXT_platform_wayland")
                 || hasExtension(clientExtensions, "EGL_KHR_platform_wayland"))) {
-            auto *waylandApp = qGuiApp
-                ? qGuiApp->nativeInterface<QNativeInterface::QWaylandApplication>()
-                : nullptr;
-            if (waylandApp && waylandApp->display()) {
+            void *waylandDisplay = qtWaylandDisplay();
+            if (waylandDisplay) {
                 m_display = getPlatformDisplay(EGL_PLATFORM_WAYLAND_EXT,
-                                               waylandApp->display(),
+                                               waylandDisplay,
                                                nullptr);
                 displaySource = QStringLiteral("wayland");
             }

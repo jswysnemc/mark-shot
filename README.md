@@ -1019,15 +1019,19 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 
 ## Release Notes
 
+### 0.1.35
+
+- **Qt 6.4 DMA-BUF Build Compatibility**: Fixed Debian 12 / Qt 6.4 builds by guarding Qt Wayland native display access while preserving the Wayland EGL display path on Qt 6.5 and newer.
+
+<details>
+<summary>Previous versions</summary>
+
 ### 0.1.34
 
 - **Theme Setting**: Added `ui.theme` with System, Dark, and Light options, including a General settings selector and immediate settings-dialog theme application.
 - **PipeWire Recording Backend**: Improved Wayland recording capture with shared-memory and DMA-BUF PipeWire frame handling, plus wlroots screencopy and polling fallbacks when portal capture is unusable.
 - **Recording Timeline Accuracy**: Aligned the recording status timer with saved video timestamps so portal authorization and capture startup delay are not counted in the displayed duration.
 - **Settings Polish**: Localized the theme setting controls and normalized combobox and spinbox styling across widget styles.
-
-<details>
-<summary>Previous versions</summary>
 
 ### 0.1.33
 

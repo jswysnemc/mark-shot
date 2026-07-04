@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.35 - 2026-07-04
+
+### Bug Fixes
+
+- **Qt 6.4 DMA-BUF Build Compatibility**: Guarded Qt Wayland native display access so Debian 12 / Qt 6.4 builds can compile while Qt 6.5+ still uses the Wayland EGL display for PipeWire DMA-BUF import.
+
 ## 0.1.34 - 2026-07-04
 
 ### Features & Enhancements
