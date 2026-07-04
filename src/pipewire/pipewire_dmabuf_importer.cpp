@@ -2,7 +2,11 @@
 
 #ifdef HAVE_PIPEWIRE
 
+#include "debug_log.h"
+
 #include <QByteArray>
+#include <QGuiApplication>
+#include <QtGui/qguiapplication_platform.h>
 
 #include <algorithm>
 #include <array>
@@ -40,6 +44,10 @@ constexpr std::uint64_t kDrmFormatModInvalid =
 
 #ifndef EGL_PLATFORM_SURFACELESS_MESA
 #define EGL_PLATFORM_SURFACELESS_MESA 0x31DD
+#endif
+
+#ifndef EGL_PLATFORM_WAYLAND_EXT
+#define EGL_PLATFORM_WAYLAND_EXT 0x31D8
 #endif
 
 /**
@@ -82,6 +90,19 @@ QString glErrorText(const QString &prefix)
     return QStringLiteral("%1 (GL error 0x%2)")
         .arg(prefix)
         .arg(static_cast<uint>(glGetError()), 0, 16);
+}
+
+/**
+ * 【录制】【PipeWire DMA-BUF】生成 OpenGL 错误文本。
+ * @param prefix 错误前缀。
+ * @param code OpenGL 错误码。
+ * @return 带 OpenGL 错误码的文本。
+ */
+QString glErrorText(const QString &prefix, GLenum code)
+{
+    return QStringLiteral("%1 (GL error 0x%2)")
+        .arg(prefix)
+        .arg(static_cast<uint>(code), 0, 16);
 }
 
 /**
@@ -328,11 +349,13 @@ public:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         m_glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, image);
-        if (glGetError() != GL_NO_ERROR) {
+        const GLenum bindError = glGetError();
+        if (bindError != GL_NO_ERROR) {
             glDeleteTextures(1, &importedTexture);
             m_eglDestroyImageKHR(m_display, image);
             if (error) {
-                *error = glErrorText(QStringLiteral("failed to bind PipeWire DMA-BUF EGLImage"));
+                *error = glErrorText(QStringLiteral("failed to bind PipeWire DMA-BUF EGLImage"),
+                                     bindError);
             }
             return {};
         }
@@ -360,11 +383,26 @@ private:
         auto getPlatformDisplay =
             reinterpret_cast<PFNEGLGETPLATFORMDISPLAYEXTPROC>(
                 eglGetProcAddress("eglGetPlatformDisplayEXT"));
+        QString displaySource = QStringLiteral("default");
         if (getPlatformDisplay
+            && (hasExtension(clientExtensions, "EGL_EXT_platform_wayland")
+                || hasExtension(clientExtensions, "EGL_KHR_platform_wayland"))) {
+            auto *waylandApp = qGuiApp
+                ? qGuiApp->nativeInterface<QNativeInterface::QWaylandApplication>()
+                : nullptr;
+            if (waylandApp && waylandApp->display()) {
+                m_display = getPlatformDisplay(EGL_PLATFORM_WAYLAND_EXT,
+                                               waylandApp->display(),
+                                               nullptr);
+                displaySource = QStringLiteral("wayland");
+            }
+        }
+        if (m_display == EGL_NO_DISPLAY && getPlatformDisplay
             && hasExtension(clientExtensions, "EGL_MESA_platform_surfaceless")) {
             m_display = getPlatformDisplay(EGL_PLATFORM_SURFACELESS_MESA,
                                            EGL_DEFAULT_DISPLAY,
                                            nullptr);
+            displaySource = QStringLiteral("surfaceless");
         }
         if (m_display == EGL_NO_DISPLAY) {
             m_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
@@ -400,6 +438,12 @@ private:
         }
         m_hasModifierImport =
             hasExtension(displayExtensions, "EGL_EXT_image_dma_buf_import_modifiers");
+        markshot::debugLog("screencast",
+                           "【录制】【PipeWire DMA-BUF】egl-display source=%s vendor=%s version=%s modifier_import=%d",
+                           displaySource.toUtf8().constData(),
+                           eglQueryString(m_display, EGL_VENDOR),
+                           eglQueryString(m_display, EGL_VERSION),
+                           m_hasModifierImport ? 1 : 0);
 
         EGLConfig config = nullptr;
         EGLint configCount = 0;
