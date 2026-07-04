@@ -4,6 +4,8 @@
 
 #include "app_config_store.h"
 #include "export_image_effect.h"
+#include "providers/ocr/ocr_provider_factory.h"
+#include "providers/provider_task.h"
 #include "save_path_config.h"
 
 namespace cfg = markshot::config;
@@ -173,7 +175,11 @@ void ShotWindow::ocrCopySelection()
 
     QApplication::setOverrideCursor(Qt::WaitCursor);
 
-    QProcess process;
+    // 1. 组装 OCR 请求，provider 优先链由工厂解析
+    markshot::providers::OcrTaskRequest request;
+    request.imagePath = tempPath;
+    request.backend = config.ocrBackend;
+    request.provider = config.ocrProvider;
     if (!config.ocrCommand.isEmpty()) {
         QString commandLine = config.ocrCommand;
         const bool replaced = replaceExtensionImagePlaceholders(&commandLine, tempPath);
@@ -181,39 +187,34 @@ void ShotWindow::ocrCopySelection()
             commandLine += QLatin1Char(' ');
             commandLine += shellQuote(tempPath);
         }
-        markshot::setShellCommand(&process, commandLine);
+        request.commandLine = commandLine;
     } else {
-        process.setProgram(helperProgramPath(QStringLiteral("mark-shot-ocr")));
-        process.setArguments({QStringLiteral("--format"),
-                              QStringLiteral("json"),
-                              QStringLiteral("--backend"),
-                              config.ocrBackend,
-                              tempPath});
+        request.helperProgram = helperProgramPath(QStringLiteral("mark-shot-ocr"));
     }
-    process.start();
-    if (!process.waitForStarted(3000)) {
-        QFile::remove(tempPath);
-        QApplication::restoreOverrideCursor();
+
+    // 2. 同步等待任务结果，行为与旧版阻塞式调用一致
+    markshot::providers::ProviderTask *task = markshot::providers::createOcrTask(request, this);
+    task->start(config.ocrTimeoutMs);
+    const markshot::providers::TaskResult taskResult = task->waitForResult();
+    task->deleteLater();
+
+    QFile::remove(tempPath);
+    QApplication::restoreOverrideCursor();
+
+    if (taskResult.error == markshot::providers::TaskError::StartFailed) {
         showToast(config.ocrCommand.isEmpty()
                       ? MS_TR("OCR helper not found")
                       : MS_TR("OCR failed"));
         return;
     }
-    if (!process.waitForFinished(config.ocrTimeoutMs)) {
-        process.kill();
-        process.waitForFinished(1000);
-        QFile::remove(tempPath);
-        QApplication::restoreOverrideCursor();
+    if (taskResult.error == markshot::providers::TaskError::Timeout) {
         showToast(MS_TR("OCR timed out"));
         return;
     }
 
-    QFile::remove(tempPath);
-    QApplication::restoreOverrideCursor();
-
-    const QByteArray output = process.readAllStandardOutput();
-    const QByteArray errorOutput = process.readAllStandardError();
-    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+    const QByteArray output = taskResult.output;
+    const QByteArray errorOutput = taskResult.errorOutput;
+    if (!taskResult.ok) {
         showToast(config.ocrCommand.isEmpty()
                       && ocrOutputReportsMissingBackend(output, errorOutput, config.ocrBackend)
                       ? MS_TR("OCR backend not installed. Install rapidocr or tesseract.")

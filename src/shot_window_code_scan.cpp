@@ -1,5 +1,8 @@
 #include "shot_window_module.h"
 
+#include "providers/code_scan/code_scan_provider_factory.h"
+#include "providers/provider_task.h"
+
 using namespace markshot::shot;
 
 /**
@@ -21,10 +24,12 @@ void ShotWindow::scanCodeSelection()
     const CodeScanConfig config = codeScanConfig();
     QApplication::setOverrideCursor(Qt::WaitCursor);
 
-    QProcess process;
+    // 1. 组装扫码请求，provider 优先链由工厂解析
+    markshot::providers::CodeScanTaskRequest request;
+    request.imagePath = tempPath;
+    request.provider = config.provider;
     if (config.command.isEmpty()) {
-        process.setProgram(helperProgramPath(QStringLiteral("mark-shot-code-scan")));
-        process.setArguments({QStringLiteral("--format"), QStringLiteral("json"), tempPath});
+        request.helperProgram = helperProgramPath(QStringLiteral("mark-shot-code-scan"));
     } else {
         QString commandLine = config.command;
         const bool replaced = replaceExtensionImagePlaceholders(&commandLine, tempPath);
@@ -32,32 +37,32 @@ void ShotWindow::scanCodeSelection()
             commandLine += QLatin1Char(' ');
             commandLine += shellQuote(tempPath);
         }
-        markshot::setShellCommand(&process, commandLine);
+        request.commandLine = commandLine;
     }
-    process.start();
-    if (!process.waitForStarted(3000)) {
-        QFile::remove(tempPath);
-        QApplication::restoreOverrideCursor();
+
+    // 2. 同步等待任务结果，行为与旧版阻塞式调用一致
+    markshot::providers::ProviderTask *task = markshot::providers::createCodeScanTask(request, this);
+    task->start(config.timeoutMs);
+    const markshot::providers::TaskResult result = task->waitForResult();
+    task->deleteLater();
+
+    QFile::remove(tempPath);
+    QApplication::restoreOverrideCursor();
+
+    if (result.error == markshot::providers::TaskError::StartFailed) {
         showToast(config.command.isEmpty()
                       ? MS_TR("Code scanner helper not found")
                       : MS_TR("Code scan failed"));
         return;
     }
-    if (!process.waitForFinished(config.timeoutMs)) {
-        process.kill();
-        process.waitForFinished(1000);
-        QFile::remove(tempPath);
-        QApplication::restoreOverrideCursor();
+    if (result.error == markshot::providers::TaskError::Timeout) {
         showToast(MS_TR("Code scan timed out"));
         return;
     }
 
-    QFile::remove(tempPath);
-    QApplication::restoreOverrideCursor();
-
-    const QByteArray output = process.readAllStandardOutput();
-    const QByteArray errorOutput = process.readAllStandardError();
-    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+    const QByteArray output = result.output;
+    const QByteArray errorOutput = result.errorOutput;
+    if (!result.ok) {
         showToast(markshot::code_scan::outputReportsMissingBackend(output, errorOutput)
                       ? MS_TR("Code scanner backend not installed. Install zxing-cpp.")
                       : MS_TR("Code scan failed"));

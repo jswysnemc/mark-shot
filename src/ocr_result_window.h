@@ -13,9 +13,12 @@ class QEvent;
 class QLabel;
 class QKeyEvent;
 class QMouseEvent;
-class QProcess;
 class QPushButton;
 class QTextEdit;
+
+namespace markshot::providers {
+class ProviderTask;
+}
 
 namespace markshot::shot {
 
@@ -106,22 +109,22 @@ private:
     /// @return 无返回值。
     void applyTargetLanguageFromCombo();
 
-    /// @brief 启动翻译子进程。
+    /// @brief 启动翻译任务。
     /// @return 无返回值。
     void startTranslation();
 
-    /// @brief 处理翻译子进程输出。
-    /// @param process 翻译子进程。
-    /// @param output 翻译标准输出。
-    void finishTranslation(QProcess *process, const QByteArray &output);
+    /// @brief 处理翻译任务输出。
+    /// @param task 翻译任务。
+    /// @param output 翻译输出 JSON。
+    void finishTranslation(markshot::providers::ProviderTask *task, const QByteArray &output);
 
-    /// @brief 取消正在运行的翻译子进程并清理临时文件。
+    /// @brief 取消正在运行的翻译任务并清理临时文件。
     /// @return 无返回值。
     void cancelTranslation();
 
-    /// @brief 清理已结束的翻译子进程。
-    /// @param process 翻译子进程。
-    void finishTranslationCleanup(QProcess *process);
+    /// @brief 清理已结束的翻译任务。
+    /// @param task 翻译任务。
+    void finishTranslationCleanup(markshot::providers::ProviderTask *task);
 
     /// @brief 恢复翻译按钮与语言下拉框状态。
     /// @return 无返回值。
@@ -138,7 +141,7 @@ private:
     QComboBox *m_targetLanguageCombo = nullptr;
     QPushButton *m_targetLanguagePopupButton = nullptr;
     QPushButton *m_pinButton = nullptr;
-    QProcess *m_translationProcess = nullptr;
+    markshot::providers::ProviderTask *m_translationTask = nullptr;
     QString m_translationInputPath;
     QPoint m_dragOffset;
     PinnedWindowConfig m_config;

@@ -1,39 +1,81 @@
-Windows 提供了一系列 API 来支持界面自动化和元素捕获功能。这些 API 可以帮助开发者创建能够识别、定位并与应用程序控件和网页元素进行交互的截图软件。以下是一些关键的 API 和技术：
+# Mark Shot 开发进度与计划
 
-UI Automation (UIA)：
+更新日期：2026-07-05
+当前分支：`feature/plugin-runtime`（基于 main，用于插件运行时开发）
 
-概述：UI Automation 是 Windows 提供的一种用于访问和自动化用户界面的框架。它可以识别并操作应用程序中的控件和元素。
-使用方法：通过 UIA，可以获取应用程序窗口中每个控件的位置、大小和其他属性。例如，可以使用 AutomationElement 类来查找特定的控件，并使用 BoundingRectangle 属性获取控件的位置信息。
-示例：
-csharp
-复制代码
-AutomationElement element = AutomationElement.RootElement
-    .FindFirst(TreeScope.Children, new PropertyCondition(AutomationElement.NameProperty, "应用程序窗口标题"));
-Rect boundingRect = element.Current.BoundingRectangle;
-Microsoft Active Accessibility (MSAA)：
+## 一、已完成
 
-概述：MSAA 是一种较早的技术，旨在帮助辅助技术（如屏幕阅读器）与 Windows 应用程序进行交互。它提供了访问和操作 UI 元素的接口。
-使用方法：可以通过 AccessibleObjectFromWindow 函数获取窗口的 IAccessible 接口，然后使用该接口获取控件的信息。
-示例：
-cpp
-复制代码
-IAccessible* pAcc = NULL;
-HRESULT hr = AccessibleObjectFromWindow(hwnd, OBJID_WINDOW, IID_IAccessible, (void**)&pAcc);
-if (SUCCEEDED(hr)) {
-    // 使用 pAcc 操作控件
-}
-Windows Graphics Device Interface (GDI)：
+### 1. 录制管线性能优化（已合入 main，commit 9109f9a）
 
-概述：GDI 提供了一种捕获屏幕图像的低级方法。可以用它来截取屏幕上特定区域的图像。
-使用方法：通过 BitBlt 函数可以将屏幕图像复制到内存中的位图。
-示例：
-cpp
-复制代码
-HDC hdcScreen = GetDC(NULL);
-HDC hdcMem = CreateCompatibleDC(hdcScreen);
-HBITMAP hbmScreen = CreateCompatibleBitmap(hdcScreen, width, height);
-SelectObject(hdcMem, hbmScreen);
-BitBlt(hdcMem, 0, 0, width, height, hdcScreen, x, y, SRCCOPY);
-这些 API 和技术结合起来，可以让截图软件精准地识别和捕获特定控件或网页元素。比如，UI Automation 可以帮助识别和定位目标控件，而 GDI 则可以用来截取包含这些控件的屏幕区域的图像。
+| 改动 | 说明 |
+|---|---|
+| 编码器多线程 | `thread_count=0` 自动分配，修复 libx264 单线程瓶颈；移除 `tune=zerolatency` |
+| 补帧零转换 | `writeRepeatFrame` 复用已转换 AVFrame，只推进 pts，消除慢机器上的补帧雪崩 |
+| 背压前置 | PipeWire/WGC 采集回调在拷贝与 GPU 读回之前丢帧，过载时不再为丢弃帧付全款 |
+| BGRA 缓冲池 | `RecordingBgraBufferPool` 4 槽环形复用，消除每帧 8-33MB 新分配 |
+| DMA-BUF 直读 | 着色器输出 BGRA 字节序 + GPU 裁剪 + 单次读回，每帧 4-5 次全帧拷贝降为 1 次；失败自动回退 QImage 链 |
+| 硬件编码候选 | Linux h264_nvenc；Windows h264_nvenc/h264_amf/h264_mf；失败回退 libx264；`MARK_SHOT_RECORDING_SW_ENCODER=1` 可禁用 |
+| 顺带修复 | GIF 链路忽略 yInverted 导致直读帧上下颠倒 |
 
-通过这些工具和技术，开发者可以创建功能强大的截图软件，为用户提供更为便捷的选择和捕获体验。
+### 2. 插件化架构（本分支，60 文件 +4367 行）
+
+- **插件 SDK**（`plugin-sdk/markshot/`）：OCR/翻译/扫码三个自包含接口头，
+  IID `dev.mark-shot.*ProviderPlugin/1.0`，接口不绑定推理运行时
+- **provider 框架**（`src/providers/`）：`ProviderTask` 统一异步任务抽象，
+  输出沿用 `{backend,tokens,errors}` JSON 契约；插件注册器沿用 layer-shell
+  目录约定并新增用户级 `~/.local/share/mark-shot/plugins`
+- **去 Python 化内置实现**：tesseract CLI 直调（TSV 解析 C++ 移植）、
+  openai-compatible 翻译（QNetworkAccessManager）、zxing-cpp 扫码（编译期可选）
+- **优先链**：自定义命令 > 显式 provider（`plugin`/`plugin:<id>`/`builtin`/`helper`）>
+  auto；旧 rapidocr venv 用户在 auto 下保持 helper，升级零感知；
+  Python helper 全部保留为兜底
+- **ocr-rapid 插件**（`plugins/ocr-rapid/`）：ONNX Runtime 完整推理
+  （DBNet 检测 + CTC 识别，PP-OCRv5），模型复用旧 venv 已下载文件；
+  onnxruntime 缺失时构建自动跳过
+- **配置与可观测**：`ocr/translation/codeScan.provider` 配置字段；
+  设置页 Provider Status 卡片；`MARK_SHOT_DEBUG_LOG=providers` 日志
+- **文档**：`docs/plugin-development.md`（接口、目录、优先链、最小骨架、兼容承诺）
+
+### 验证状态
+
+| 项目 | 状态 |
+|---|---|
+| 全量构建（含插件） | 通过，零警告 |
+| 单元测试 | 29/29 通过 |
+| ocr-rapid 真实模型推理 | 通过（"HELLO 123"/"你好世界" 渲染图识别，240ms） |
+| 内置 tesseract / zxing | 编译验证通过（本机 5.5.2 / 3.0.2） |
+| 录制 PipeWire 路径 | **未运行时验证**（本机 niri 走 wlroots 后端） |
+| Windows 全部改动 | **仅代码审查**，未在 Windows 编译运行 |
+
+## 二、待办计划
+
+### 近期（发布前必做）
+
+1. 发起 `feature/plugin-runtime` 分支 PR
+2. Windows 构建验证：providers 层、WGC 录制改动、h264_mf 硬件编码、
+   插件在 Windows 的加载（`.dll` + vcpkg onnxruntime/zxing）
+3. PipeWire 录制路径实测：KDE 虚拟机（192.168.122.43）或
+   `MARK_SHOT_RECORDING_BACKEND=pipewire` 强制后端，确认 DMA-BUF
+   直读无 `direct-read fallback` 日志
+4. 更新 CHANGELOG 与 README（插件使用说明、新配置字段、新环境变量）
+
+### 中期（插件生态 v1 收尾）
+
+5. 发行版打包：`mark-shot-ocr-rapid` 独立包（AUR 先行），主包 optdepends 声明
+6. 设置页缺插件时的安装指引链接（Provider Status 卡片补充）
+7. ocr-rapid 词级 token 切分（当前行级，贴图窗口划选粒度粗于旧 helper）
+8. 录制 VAAPI 硬件编码（需 hwframes 上下文，Linux Intel/AMD 用户收益）
+
+### 远期（v2 方向）
+
+9. 应用内插件下载与更新（签名校验、模型分发），产品决策：v1 不做
+10. 方向分类模型接入（非直立文字场景）
+11. 翻译/扫码示例插件（验证多能力接口的生态可用性）
+12. 旧 Python helper 的退役评估（观察插件采用率后再定，不主动迁移用户）
+
+## 三、关键约定备忘
+
+- 单文件上限 800 行；providers 层最大文件 267 行
+- 插件接口不兼容变更必须提升 IID 版本号
+- auto 链兼容规则：老用户已有配置的行为在升级后不得改变
+- 调试日志域：`recording`、`screencast`、`providers`

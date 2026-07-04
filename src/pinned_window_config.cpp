@@ -38,6 +38,7 @@ void applyOcrConfig(const QJsonObject &root, PinnedWindowConfig *config)
         config->autoOcr = *autoOcr;
     }
     config->ocrBackend = ocr.value(QStringLiteral("backend")).toString(config->ocrBackend).trimmed();
+    config->ocrProvider = ocr.value(QStringLiteral("provider")).toString(config->ocrProvider).trimmed();
     config->ocrCommand = ocr.value(QStringLiteral("command")).toString().trimmed();
     if (ocr.value(QStringLiteral("timeoutMs")).isDouble()) {
         config->ocrTimeoutMs = std::max(1000, ocr.value(QStringLiteral("timeoutMs")).toInt(config->ocrTimeoutMs));
@@ -54,6 +55,8 @@ void applyTranslationConfig(const QJsonObject &root, PinnedWindowConfig *config)
 {
     const QJsonObject translation = cfg::firstObjectValue(root, QStringLiteral("translation"));
     config->translationCommand = translation.value(QStringLiteral("command")).toString().trimmed();
+    config->translationProvider =
+        translation.value(QStringLiteral("provider")).toString(config->translationProvider).trimmed();
     config->translationTargetLanguage = translation.value(QStringLiteral("targetLanguage"))
                                             .toString(config->translationTargetLanguage)
                                             .trimmed();

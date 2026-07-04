@@ -1,6 +1,8 @@
 #include "ocr_result_window.h"
 
 #include "debug_log.h"
+#include "providers/provider_task.h"
+#include "providers/translate/translate_provider_factory.h"
 #include "shell_command.h"
 #include "translation_language_options.h"
 #include "ui/i18n.h"
@@ -14,13 +16,10 @@
 #include <QJsonParseError>
 #include <QJsonValue>
 #include <QLineEdit>
-#include <QProcess>
-#include <QProcessEnvironment>
 #include <QPushButton>
 #include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QTextEdit>
-#include <QTimer>
 
 namespace markshot::shot {
 
@@ -158,11 +157,11 @@ void OcrResultWindow::applyTargetLanguageFromCombo()
     }
 }
 
-/// @brief 启动翻译子进程,将 OCR 文本按行转换成翻译输入 token。
+/// @brief 启动翻译任务,将 OCR 文本按行转换成翻译输入 token。
 /// @return 无返回值。
 void OcrResultWindow::startTranslation()
 {
-    if (!m_editor || !m_translateButton || m_translationProcess) {
+    if (!m_editor || !m_translateButton || m_translationTask) {
         return;
     }
     applyTargetLanguageFromCombo();
@@ -216,13 +215,17 @@ void OcrResultWindow::startTranslation()
     }
 
     m_translationInputPath = inputFile.fileName();
-    inputFile.write(QJsonDocument(root).toJson(QJsonDocument::Compact));
+    const QByteArray inputJson = QJsonDocument(root).toJson(QJsonDocument::Compact);
+    inputFile.write(inputJson);
     inputFile.close();
 
-    auto *process = new QProcess(this);
-    m_translationProcess = process;
-    process->setProcessEnvironment(QProcessEnvironment::systemEnvironment());
-
+    // 1. 组装翻译请求，provider 优先链由工厂解析
+    markshot::providers::TranslateTaskRequest request;
+    request.inputJson = inputJson;
+    request.inputPath = m_translationInputPath;
+    request.targetLanguage = targetLanguage;
+    request.configPath = appConfigPath();
+    request.provider = m_config.translationProvider;
     if (!m_config.translationCommand.isEmpty()) {
         QString commandLine = m_config.translationCommand;
         bool replaced = false;
@@ -234,16 +237,9 @@ void OcrResultWindow::startTranslation()
             commandLine += QLatin1Char(' ');
             commandLine += shellQuote(m_translationInputPath);
         }
-
-        markshot::setShellCommand(process, commandLine);
+        request.commandLine = commandLine;
     } else {
-        process->setProgram(helperProgramPath(QStringLiteral("mark-shot-translate")));
-        process->setArguments({QStringLiteral("--input"),
-                               m_translationInputPath,
-                               QStringLiteral("--target-language"),
-                               targetLanguage,
-                               QStringLiteral("--config"),
-                               appConfigPath()});
+        request.helperProgram = helperProgramPath(QStringLiteral("mark-shot-translate"));
     }
 
     m_translateButton->setEnabled(false);
@@ -255,36 +251,25 @@ void OcrResultWindow::startTranslation()
         m_targetLanguagePopupButton->setEnabled(false);
     }
 
-    connect(process, &QProcess::errorOccurred, this, [this, process] {
-        if (process == m_translationProcess && process->state() == QProcess::NotRunning) {
-            finishTranslation(process, QByteArray());
-        }
-    });
-    connect(process,
-            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+    // 2. 异步启动任务，超时由任务内部处理
+    markshot::providers::ProviderTask *task = markshot::providers::createTranslateTask(request, this);
+    m_translationTask = task;
+    connect(task,
+            &markshot::providers::ProviderTask::finished,
             this,
-            [this, process](int exitCode, QProcess::ExitStatus exitStatus) {
-                const QByteArray output = exitStatus == QProcess::NormalExit && exitCode == 0
-                    ? process->readAllStandardOutput()
-                    : QByteArray();
-                finishTranslation(process, output);
+            [this, task](const markshot::providers::TaskResult &result) {
+                finishTranslation(task, result.ok ? result.output : QByteArray());
             });
-    QTimer::singleShot(m_config.translationTimeoutMs, process, [process] {
-        if (process->state() != QProcess::NotRunning) {
-            process->kill();
-        }
-    });
-
-    process->start();
+    task->start(m_config.translationTimeoutMs);
 }
 
-/// @brief 处理翻译子进程输出。
-/// @param process 翻译子进程。
-/// @param output 翻译标准输出。
+/// @brief 处理翻译任务输出。
+/// @param task 翻译任务。
+/// @param output 翻译输出 JSON。
 /// @return 无返回值。
-void OcrResultWindow::finishTranslation(QProcess *process, const QByteArray &output)
+void OcrResultWindow::finishTranslation(markshot::providers::ProviderTask *task, const QByteArray &output)
 {
-    if (process != m_translationProcess) {
+    if (task != m_translationTask) {
         return;
     }
 
@@ -311,21 +296,19 @@ void OcrResultWindow::finishTranslation(QProcess *process, const QByteArray &out
         showToast(MS_TR("Translation failed"));
     }
 
-    finishTranslationCleanup(process);
+    finishTranslationCleanup(task);
 }
 
-/// @brief 取消正在运行的翻译子进程并清理临时文件。
+/// @brief 取消正在运行的翻译任务并清理临时文件。
 /// @return 无返回值。
 void OcrResultWindow::cancelTranslation()
 {
-    if (m_translationProcess) {
-        disconnect(m_translationProcess, nullptr, this, nullptr);
-        if (m_translationProcess->state() != QProcess::NotRunning) {
-            m_translationProcess->kill();
-        }
-        QProcess *process = m_translationProcess;
-        m_translationProcess = nullptr;
-        process->deleteLater();
+    if (m_translationTask) {
+        disconnect(m_translationTask, nullptr, this, nullptr);
+        m_translationTask->cancel();
+        markshot::providers::ProviderTask *task = m_translationTask;
+        m_translationTask = nullptr;
+        task->deleteLater();
     }
 
     if (!m_translationInputPath.isEmpty()) {
@@ -335,18 +318,18 @@ void OcrResultWindow::cancelTranslation()
     resetTranslationUi();
 }
 
-/// @brief 清理已结束的翻译子进程。
-/// @param process 翻译子进程。
+/// @brief 清理已结束的翻译任务。
+/// @param task 翻译任务。
 /// @return 无返回值。
-void OcrResultWindow::finishTranslationCleanup(QProcess *process)
+void OcrResultWindow::finishTranslationCleanup(markshot::providers::ProviderTask *task)
 {
-    m_translationProcess = nullptr;
+    m_translationTask = nullptr;
     if (!m_translationInputPath.isEmpty()) {
         QFile::remove(m_translationInputPath);
         m_translationInputPath.clear();
     }
     resetTranslationUi();
-    process->deleteLater();
+    task->deleteLater();
 }
 
 /// @brief 恢复翻译按钮与语言下拉框状态。
