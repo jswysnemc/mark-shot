@@ -1041,12 +1041,18 @@ gdbus call --session \
 
 ## 发版说明
 
-### 0.1.36
+### 0.1.37
 
-- **旧版 PipeWire 构建兼容性**：通过 CMake 探测 `spa_video_info_raw::flags` 字段，修复 Debian 12 / 旧版 PipeWire 头文件下的编译失败；新版 PipeWire 仍保留明确的 DMA-BUF modifier 检测。
+- **Windows 录制音频**：新增 Windows 原生 WASAPI loopback 音频采集，视频录制可采集系统声音，不再依赖 PulseAudio。
+- **Windows 发布打包**：启用基于 FFmpeg 的 Windows 发布包构建，补齐运行时 DLL 部署，并支持对可执行文件和 DLL 执行 Authenticode 签名。
+- **Windows CI 构建修复**：修复 WASAPI GUID 链接和录制测试目标链接问题，Windows 构建、测试、签名、打包和 artifact 上传已完整通过。
 
 <details>
 <summary>历史版本</summary>
+
+### 0.1.36
+
+- **旧版 PipeWire 构建兼容性**：通过 CMake 探测 `spa_video_info_raw::flags` 字段，修复 Debian 12 / 旧版 PipeWire 头文件下的编译失败；新版 PipeWire 仍保留明确的 DMA-BUF modifier 检测。
 
 ### 0.1.35
 

@@ -1019,12 +1019,18 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 
 ## Release Notes
 
-### 0.1.36
+### 0.1.37
 
-- **Older PipeWire Build Compatibility**: Fixed Debian 12 / older PipeWire header builds by probing `spa_video_info_raw::flags` at configure time while keeping explicit DMA-BUF modifier detection on newer PipeWire versions.
+- **Windows Recording Audio**: Added native WASAPI loopback capture for Windows video recording, replacing the PulseAudio-only path on Windows.
+- **Windows Release Packaging**: Enabled FFmpeg-backed Windows packages with runtime DLL deployment and Authenticode signing support for executables and DLLs.
+- **Windows CI Build Fixes**: Fixed WASAPI GUID and recording test linkage so Windows builds, tests, signing, packaging, and artifact upload complete successfully.
 
 <details>
 <summary>Previous versions</summary>
+
+### 0.1.36
+
+- **Older PipeWire Build Compatibility**: Fixed Debian 12 / older PipeWire header builds by probing `spa_video_info_raw::flags` at configure time while keeping explicit DMA-BUF modifier detection on newer PipeWire versions.
 
 ### 0.1.35
 

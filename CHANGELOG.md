@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.37 - 2026-07-05
+
+### Features & Enhancements
+
+- **Windows Recording Audio**: Added native WASAPI loopback audio capture for Windows video recording so system audio can be recorded without PulseAudio.
+- **Windows Release Packaging**: Enabled FFmpeg-backed Windows release builds, runtime DLL deployment, and Authenticode signing support for packaged executables and DLLs.
+
+### Bug Fixes
+
+- **Windows Recording Build**: Fixed MinGW WASAPI GUID linking and recording test linkage so Windows CI builds, tests, signs, packages, and uploads release artifacts successfully.
+
 ## 0.1.36 - 2026-07-04
 
 ### Bug Fixes
