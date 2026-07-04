@@ -20,7 +20,7 @@ SettingsPageGeneral::SettingsPageGeneral(QWidget *parent)
     auto *layout = createSettingsPageLayout(this);
 
     QFrame *startupCard = createSettingsCard(MS_TR("General"),
-                                             MS_TR("Configure interface language, tray startup, and global shortcuts."),
+                                             MS_TR("Configure interface language, theme, tray startup, and global shortcuts."),
                                              this);
     QFormLayout *startupForm = settingsCardForm(startupCard);
     m_uiLanguage = addComboRow(startupForm, MS_TR("Interface Language"));
