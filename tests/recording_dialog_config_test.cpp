@@ -1,7 +1,32 @@
 #include "recording/recording_dialog_config.h"
 
+#include <QDir>
 #include <QFileInfo>
 #include <QtTest/QtTest>
+
+namespace {
+
+/**
+ * 生成平台可用的临时目录文件路径。
+ * @param fileName 文件名。
+ * @return 临时目录下的完整文件路径。
+ */
+QString temporaryFilePath(const QString &fileName)
+{
+    return QDir::temp().filePath(fileName);
+}
+
+/**
+ * 读取文件路径所在目录的绝对路径。
+ * @param path 文件路径。
+ * @return 文件所在目录的绝对路径。
+ */
+QString absoluteDirectoryPath(const QString &path)
+{
+    return QFileInfo(path).absolutePath();
+}
+
+}  // namespace
 
 class RecordingDialogConfigTest : public QObject {
     Q_OBJECT
@@ -13,13 +38,15 @@ private slots:
      */
     void readsDialogConfigFromRoot()
     {
+        const QString inputPath =
+            temporaryFilePath(QStringLiteral("mark-shot-test.mp4"));
         QJsonObject dialog;
         dialog.insert(QStringLiteral("mode"), QStringLiteral("video"));
         dialog.insert(QStringLiteral("scope"), QStringLiteral("display"));
         dialog.insert(QStringLiteral("backend"), QStringLiteral("wlroots-screencopy"));
         dialog.insert(QStringLiteral("fps"), 48);
         dialog.insert(QStringLiteral("includeAudio"), true);
-        dialog.insert(QStringLiteral("outputPath"), QStringLiteral("/tmp/mark-shot-test.mp4"));
+        dialog.insert(QStringLiteral("outputPath"), inputPath);
         dialog.insert(QStringLiteral("displayKey"), QStringLiteral("screen:DP-1"));
 
         QJsonObject recording;
@@ -39,9 +66,9 @@ private slots:
         QCOMPARE(config.videoFps, 48);
         QCOMPARE(config.gifFps, 12);
         QVERIFY(config.includeAudio);
-        QCOMPARE(QFileInfo(config.outputPath).absolutePath(), QStringLiteral("/tmp"));
+        QCOMPARE(absoluteDirectoryPath(config.outputPath), absoluteDirectoryPath(inputPath));
         QVERIFY(config.outputPath.endsWith(QStringLiteral(".mp4")));
-        QVERIFY(config.outputPath != QStringLiteral("/tmp/mark-shot-test.mp4"));
+        QVERIFY(config.outputPath != inputPath);
         QCOMPARE(config.displayKey, QStringLiteral("screen:DP-1"));
     }
 
@@ -51,10 +78,11 @@ private slots:
      */
     void migratesLegacyCompoundOutputPathToDirectory()
     {
+        const QString inputPath =
+            temporaryFilePath(QStringLiteral("mark-shot-recording-20260704-220015.mp4.gif"));
         QJsonObject dialog;
         dialog.insert(QStringLiteral("mode"), QStringLiteral("gif"));
-        dialog.insert(QStringLiteral("outputPath"),
-                      QStringLiteral("/tmp/mark-shot-recording-20260704-220015.mp4.gif"));
+        dialog.insert(QStringLiteral("outputPath"), inputPath);
 
         QJsonObject recording;
         recording.insert(QStringLiteral("dialog"), dialog);
@@ -67,10 +95,10 @@ private slots:
                 markshot::recording::RecordingMode::Video);
 
         QCOMPARE(config.mode, markshot::recording::RecordingMode::Video);
-        QCOMPARE(QFileInfo(config.outputPath).absolutePath(), QStringLiteral("/tmp"));
+        QCOMPARE(absoluteDirectoryPath(config.outputPath), absoluteDirectoryPath(inputPath));
         QVERIFY(config.outputPath.endsWith(QStringLiteral(".mp4")));
         QVERIFY(!config.outputPath.endsWith(QStringLiteral(".mp4.gif")));
-        QVERIFY(config.outputPath != QStringLiteral("/tmp/mark-shot-recording-20260704-220015.mp4.gif"));
+        QVERIFY(config.outputPath != inputPath);
     }
 
     /**
@@ -145,13 +173,14 @@ private slots:
      */
     void createsDialogConfigFromOptions()
     {
+        const QString inputPath = temporaryFilePath(QStringLiteral("sample.gif"));
         markshot::recording::RecordingOptions options;
         options.mode = markshot::recording::RecordingMode::Gif;
         options.scope = markshot::recording::RecordingScope::Region;
         options.captureBackend = markshot::recording::RecordingCaptureBackend::PipeWire;
         options.fps = 12;
         options.includeAudio = false;
-        options.outputPath = QStringLiteral("/tmp/sample.gif");
+        options.outputPath = inputPath;
         options.display.screenName = QStringLiteral("HDMI-A-1");
 
         const markshot::recording::RecordingDialogConfig config =
@@ -164,9 +193,9 @@ private slots:
         QCOMPARE(config.videoFps, 30);
         QCOMPARE(config.gifFps, 12);
         QVERIFY(!config.includeAudio);
-        QCOMPARE(QFileInfo(config.outputPath).absolutePath(), QStringLiteral("/tmp"));
+        QCOMPARE(absoluteDirectoryPath(config.outputPath), absoluteDirectoryPath(inputPath));
         QVERIFY(config.outputPath.endsWith(QStringLiteral(".gif")));
-        QVERIFY(config.outputPath != QStringLiteral("/tmp/sample.gif"));
+        QVERIFY(config.outputPath != inputPath);
         QCOMPARE(config.displayKey, QStringLiteral("screen:HDMI-A-1"));
     }
 };
