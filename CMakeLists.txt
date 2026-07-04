@@ -58,6 +58,10 @@ endif()
 
 if(COMMAND qt_standard_project_setup)
     qt_standard_project_setup()
+    # qt_standard_project_setup() enables AUTOMOC/AUTOUIC but NOT AUTORCC, so a
+    # .qrc listed as a target source would be silently dropped (resources never
+    # embedded). Enable it explicitly so resources.qrc is compiled in.
+    set(CMAKE_AUTORCC ON)
 else()
     set(CMAKE_AUTOMOC ON)
     set(CMAKE_AUTOUIC ON)
