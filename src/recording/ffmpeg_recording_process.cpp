@@ -5,6 +5,8 @@
 #include <QImage>
 #include <QStandardPaths>
 
+#include <algorithm>
+
 namespace markshot::recording {
 namespace {
 
@@ -26,29 +28,6 @@ QString resolvedProgram(QString program)
     }
 
     return QStandardPaths::findExecutable(program);
-}
-
-/**
- * 把图像转换为连续 BGRA 字节。
- * @param frame 输入图像。
- * @param size 目标帧尺寸。
- * @return 可写入 FFmpeg 的原始帧数据。
- */
-QByteArray bgraBytes(const QImage &frame, QSize size)
-{
-    QImage image = frame.convertToFormat(QImage::Format_ARGB32);
-    if (image.size() != size) {
-        image = image.scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
-                    .convertToFormat(QImage::Format_ARGB32);
-    }
-
-    QByteArray bytes;
-    bytes.reserve(size.width() * size.height() * 4);
-    const int rowBytes = size.width() * 4;
-    for (int y = 0; y < image.height(); ++y) {
-        bytes.append(reinterpret_cast<const char *>(image.constScanLine(y)), rowBytes);
-    }
-    return bytes;
 }
 
 }  // namespace
@@ -80,7 +59,7 @@ bool FfmpegRecordingProcess::start(const QString &program,
         }
     });
 
-    m_process.start(executable, arguments, QIODevice::WriteOnly);
+    m_process.start(executable, arguments, QIODevice::ReadWrite);
     if (!m_process.waitForStarted(3000)) {
         if (error) {
             *error = QStringLiteral("FFmpeg failed to start: %1").arg(m_process.errorString());
@@ -90,6 +69,12 @@ bool FfmpegRecordingProcess::start(const QString &program,
     return true;
 }
 
+/**
+ * 【录制】【FFmpeg写入】写入一帧 QImage。
+ * @param frame 需要写入的图像。
+ * @param error 输出错误信息。
+ * @return 写入成功时返回 true。
+ */
 bool FfmpegRecordingProcess::writeFrame(const QImage &frame, QString *error)
 {
     if (error) {
@@ -102,28 +87,87 @@ bool FfmpegRecordingProcess::writeFrame(const QImage &frame, QString *error)
         return false;
     }
 
-    const QByteArray bytes = bgraBytes(frame, m_frameSize);
+    const RecordingBgraFrame bytes = m_frameConverter.convertToBgra(frame, m_frameSize, error);
+    if (!bytes.data || bytes.size <= 0) {
+        return false;
+    }
+    return writeBgraBytes(bytes, error);
+}
+
+/**
+ * 【录制】【FFmpeg写入】写入一帧录制样本。
+ * @param sample 录制帧样本。
+ * @param error 输出错误信息。
+ * @return 写入成功时返回 true。
+ */
+bool FfmpegRecordingProcess::writeFrame(const RecordingFrameSample &sample, QString *error)
+{
+    if (error) {
+        error->clear();
+    }
+    if (sample.bgra.isValid() && sample.bgra.size == m_frameSize) {
+        const int rowBytes = m_frameSize.width() * 4;
+        if (sample.bgra.stride == rowBytes) {
+            return writeBgraBytes({sample.bgra.bytes.constData(), sample.bgra.bytes.size()}, error);
+        }
+    }
+    if (!sample.image.isNull()) {
+        return writeFrame(sample.image, error);
+    }
+    if (error) {
+        *error = QStringLiteral("Cannot write an empty recording frame");
+    }
+    return false;
+}
+
+/**
+ * 【录制】【FFmpeg写入】写入连续 BGRA 原始字节。
+ * @param bytes BGRA 字节视图。
+ * @param error 输出错误信息。
+ * @return 写入成功时返回 true。
+ */
+bool FfmpegRecordingProcess::writeBgraBytes(RecordingBgraFrame bytes, QString *error)
+{
+    if (error) {
+        error->clear();
+    }
+    if (m_process.state() != QProcess::Running) {
+        if (error) {
+            *error = QStringLiteral("FFmpeg is not running: %1").arg(stderrTail());
+        }
+        return false;
+    }
+
     qsizetype offset = 0;
-    while (offset < bytes.size()) {
-        const qint64 written = m_process.write(bytes.constData() + offset, bytes.size() - offset);
+    constexpr qint64 kWriteChunkBytes = 1024 * 1024;
+    constexpr qint64 kMaxPendingBytes = 2 * 1024 * 1024;
+    constexpr int kWriteDrainTimeoutMs = 5000;
+    while (offset < bytes.size) {
+        const qint64 chunkBytes = std::min<qint64>(bytes.size - offset, kWriteChunkBytes);
+        const qint64 written = m_process.write(bytes.data + offset, chunkBytes);
         if (written < 0) {
             if (error) {
-                *error = QStringLiteral("Failed to write video frame to FFmpeg: %1").arg(m_process.errorString());
+                *error = QStringLiteral("Failed to write video frame to FFmpeg: %1\n%2")
+                             .arg(m_process.errorString(), stderrTail());
             }
             return false;
         }
-        if (written == 0 && !m_process.waitForBytesWritten(1500)) {
+        if (written == 0 && !m_process.waitForBytesWritten(kWriteDrainTimeoutMs)) {
             if (error) {
-                *error = QStringLiteral("Timed out while writing video frame to FFmpeg");
+                *error = QStringLiteral("Timed out while writing video frame to FFmpeg: %1")
+                             .arg(stderrTail());
             }
             return false;
         }
         offset += written;
-        if (m_process.bytesToWrite() > bytes.size() && !m_process.waitForBytesWritten(1500)) {
-            if (error) {
-                *error = QStringLiteral("Timed out while writing video frame to FFmpeg");
+        while (m_process.bytesToWrite() > kMaxPendingBytes) {
+            if (!m_process.waitForBytesWritten(kWriteDrainTimeoutMs)) {
+                if (error) {
+                    *error = QStringLiteral("Timed out while writing video frame to FFmpeg: %1")
+                                 .arg(stderrTail());
+                }
+                return false;
             }
-            return false;
         }
     }
     return true;
@@ -166,8 +210,13 @@ void FfmpegRecordingProcess::cancel()
     m_process.waitForFinished(3000);
 }
 
-QString FfmpegRecordingProcess::stderrTail() const
+QString FfmpegRecordingProcess::stderrTail()
 {
+    m_stderr.append(m_process.readAllStandardError());
+    constexpr qsizetype kMaxStderrBytes = 32768;
+    if (m_stderr.size() > kMaxStderrBytes) {
+        m_stderr.remove(0, m_stderr.size() - kMaxStderrBytes);
+    }
     const QString text = QString::fromLocal8Bit(m_stderr).trimmed();
     return text.isEmpty() ? QStringLiteral("no FFmpeg error output") : text;
 }

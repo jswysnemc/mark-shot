@@ -1,5 +1,7 @@
 #pragma once
 
+#include "recording/recording_frame_sample.h"
+
 #include <QImage>
 #include <QSize>
 #include <QString>
@@ -25,7 +27,20 @@ public:
      * @param error 输出错误信息。
      * @return 写入成功时返回 true。
      */
-    virtual bool writeFrame(const QImage &frame, QString *error) = 0;
+    bool writeFrame(const QImage &frame, QString *error)
+    {
+        RecordingFrameSample sample;
+        sample.image = frame;
+        return writeFrame(sample, error);
+    }
+
+    /**
+     * 写入带时间戳的帧样本。
+     * @param sample 录制帧样本。
+     * @param error 输出错误信息。
+     * @return 写入成功时返回 true。
+     */
+    virtual bool writeFrame(const RecordingFrameSample &sample, QString *error) = 0;
 
     /**
      * 完成写出并关闭文件。

@@ -17,6 +17,8 @@ struct CaptureResult {
     QRect sourceGeometry;
     // 后端已经把鼠标写入 image 时为 true
     bool cursorIncluded = false;
+    // 流式后端产生该帧的时间，0 表示后端没有提供
+    qint64 frameTimeMs = 0;
 };
 
 // Backend-independent capture request. Callers can ask for all outputs, one
@@ -30,6 +32,8 @@ struct CaptureRequest {
     bool allowInteractivePortal = true; // Permit user-facing portal prompts for one-shot capture.
     bool allowPortalScreenshotFallback = true; // Allow slower portal screenshots if streaming fails.
     qint64 minimumFrameTimeMs = 0; // Ignore stale stream frames captured before this timestamp.
+    // 流式后端可按该帧率限制捕获节奏，0 表示保持后端默认行为
+    int targetFps = 0;
     // 捕获冻结图时是否包含鼠标
     bool includeCursor = false;
 };

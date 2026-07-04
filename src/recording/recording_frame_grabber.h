@@ -1,11 +1,12 @@
 #pragma once
 
+#include "recording/recording_capture_stream.h"
+#include "recording/recording_frame_sample.h"
 #include "recording/recording_options.h"
 
 #include <QObject>
-#include <QTimer>
 
-class QImage;
+#include <memory>
 
 namespace markshot::recording {
 
@@ -32,20 +33,34 @@ public:
      */
     void stop();
 
+    /**
+     * 设置背压暂停状态。
+     * @param active 队列繁忙时为 true。
+     * @return 无返回值。
+     */
+    void setBackpressureActive(bool active);
+
 signals:
-    void frameReady(const QImage &frame);
+    void frameReady(const RecordingFrameSample &sample);
     void failed(const QString &error);
 
 private:
     /**
-     * 抓取单帧屏幕图像。
+     * 创建并启动采集流。
+     * @param error 输出错误信息。
+     * @return 启动成功时返回 true。
+     */
+    bool startCaptureStream(QString *error);
+
+    /**
+     * 连接采集流信号。
      * @return 无返回值。
      */
-    void captureFrame();
+    void connectCaptureStream();
 
     RecordingOptions m_options;
-    QTimer m_timer;
-    bool m_capturing = false;
+    std::unique_ptr<RecordingCaptureStream> m_stream;
+    bool m_backpressureActive = false;
 };
 
 }  // namespace markshot::recording

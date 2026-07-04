@@ -1,9 +1,8 @@
 #include "recording/recording_controller.h"
 
 #include "debug_log.h"
-#include "recording/gif_recording_writer.h"
+#include "recording/recording_async_writer.h"
 #include "recording/recording_frame_grabber.h"
-#include "recording/video_recording_writer.h"
 
 #include <QImage>
 
@@ -17,10 +16,7 @@ namespace {
  */
 std::unique_ptr<RecordingWriter> createWriter(const RecordingOptions &options)
 {
-    if (options.mode == RecordingMode::Gif) {
-        return std::make_unique<GifRecordingWriter>(options);
-    }
-    return std::make_unique<VideoRecordingWriter>(options);
+    return std::make_unique<RecordingAsyncWriter>(options);
 }
 
 }  // namespace
@@ -51,9 +47,17 @@ bool RecordingController::start(const RecordingOptions &options, QString *error)
     m_options = options;
     m_writer = createWriter(m_options);
     m_grabber = new RecordingFrameGrabber(m_options, this);
+    if (RecordingAsyncWriter *writer = asyncWriter()) {
+        connect(writer, &RecordingAsyncWriter::failed, this, &RecordingController::fail);
+        connect(writer, &RecordingAsyncWriter::finished, this, &RecordingController::handleWriterFinished);
+        connect(writer, &RecordingAsyncWriter::backpressureChanged,
+                m_grabber, &RecordingFrameGrabber::setBackpressureActive);
+    }
     connect(m_grabber, &RecordingFrameGrabber::frameReady, this, &RecordingController::handleFrame);
     connect(m_grabber, &RecordingFrameGrabber::failed, this, &RecordingController::fail);
     m_elapsed.restart();
+    m_statusThrottler.reset();
+    m_finishEmitted = false;
 
     markshot::debugLog("recording",
                        "【录制】【开始】mode=%s fps=%d audio=%d geometry=%d,%d %dx%d output=%s",
@@ -66,7 +70,7 @@ bool RecordingController::start(const RecordingOptions &options, QString *error)
                        m_options.captureGeometry.height(),
                        m_options.outputPath.toUtf8().constData());
     m_grabber->start();
-    emit statusChanged();
+    publishStatus(true);
     return true;
 }
 
@@ -87,7 +91,7 @@ RecordingStatus RecordingController::status() const
     return result;
 }
 
-void RecordingController::handleFrame(const QImage &frame)
+void RecordingController::handleFrame(const RecordingFrameSample &sample)
 {
     if (m_stopping) {
         return;
@@ -95,19 +99,24 @@ void RecordingController::handleFrame(const QImage &frame)
 
     QString error;
     if (!m_writerStarted) {
-        if (!m_writer->start(frame.size(), m_options.fps, &error)) {
+        const QSize frameSize = sample.frameSize();
+        if (frameSize.isEmpty()) {
+            fail(QStringLiteral("recording frame size is empty"));
+            return;
+        }
+        if (!m_writer->start(frameSize, m_options.fps, &error)) {
             fail(error);
             return;
         }
         m_writerStarted = true;
     }
 
-    if (!m_writer->writeFrame(frame, &error)) {
+    if (!m_writer->writeFrame(sample, &error)) {
         fail(error);
         return;
     }
     ++m_frameCount;
-    emit statusChanged();
+    publishStatus(false);
 }
 
 void RecordingController::stop()
@@ -127,18 +136,21 @@ void RecordingController::stop()
         if (m_writer) {
             m_writer->cancel();
         }
+        completeStop(false, error);
+        return;
+    }
+
+    if (RecordingAsyncWriter *writer = asyncWriter()) {
+        if (!writer->finish(&error)) {
+            completeStop(false, error);
+        } else {
+            publishStatus(true);
+        }
+        return;
     } else {
         ok = m_writer->finish(&error);
     }
-    markshot::debugLog("recording",
-                       "【录制】【结束】ok=%d frames=%d output=%s error=%s",
-                       ok ? 1 : 0,
-                       m_frameCount,
-                       m_options.outputPath.toUtf8().constData(),
-                       error.toUtf8().constData());
-    emit statusChanged();
-    emit finished(ok, m_options.outputPath, error);
-    deleteLater();
+    completeStop(ok, error);
 }
 
 void RecordingController::fail(const QString &message)
@@ -157,9 +169,50 @@ void RecordingController::fail(const QString &message)
                        "【录制】【失败】frames=%d error=%s",
                        m_frameCount,
                        message.toUtf8().constData());
-    emit statusChanged();
+    publishStatus(true);
     emit finished(false, m_options.outputPath, message);
+    m_finishEmitted = true;
     deleteLater();
+}
+
+void RecordingController::handleWriterFinished(bool ok, const QString &error)
+{
+    if (!m_stopping) {
+        if (!ok) {
+            fail(error);
+        }
+        return;
+    }
+    completeStop(ok, error);
+}
+
+void RecordingController::completeStop(bool ok, const QString &error)
+{
+    if (m_finishEmitted) {
+        return;
+    }
+    m_finishEmitted = true;
+    markshot::debugLog("recording",
+                       "【录制】【结束】ok=%d frames=%d output=%s error=%s",
+                       ok ? 1 : 0,
+                       m_frameCount,
+                       m_options.outputPath.toUtf8().constData(),
+                       error.toUtf8().constData());
+    publishStatus(true);
+    emit finished(ok, m_options.outputPath, error);
+    deleteLater();
+}
+
+RecordingAsyncWriter *RecordingController::asyncWriter() const
+{
+    return dynamic_cast<RecordingAsyncWriter *>(m_writer.get());
+}
+
+void RecordingController::publishStatus(bool force)
+{
+    if (m_statusThrottler.shouldPublish(force)) {
+        emit statusChanged();
+    }
 }
 
 }  // namespace markshot::recording

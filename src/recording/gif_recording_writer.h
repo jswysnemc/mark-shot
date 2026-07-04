@@ -15,7 +15,7 @@ public:
     explicit GifRecordingWriter(RecordingOptions options);
 
     bool start(QSize frameSize, int fps, QString *error) override;
-    bool writeFrame(const QImage &frame, QString *error) override;
+    bool writeFrame(const RecordingFrameSample &sample, QString *error) override;
     bool finish(QString *error) override;
     void cancel() override;
 

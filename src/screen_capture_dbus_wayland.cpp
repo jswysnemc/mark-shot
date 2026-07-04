@@ -244,8 +244,8 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
         markshot::debugLog("capture", "kwin-screenshot-disabled-by-config");
     }
 
-    if (request.preferScreencast && !grimPreferred) {
-        markshot::debugLog("capture", "route=screencast (preferScreencast && !prefersGrim)");
+    if (request.preferScreencast) {
+        markshot::debugLog("capture", "route=screencast (preferScreencast)");
         CaptureResult screencastCapture = captureWithPortalScreencast(request);
         if (!screencastCapture.image.isNull()) {
             markshot::debugLog("capture", "screencast-ok frame=%dx%d",
@@ -297,6 +297,14 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
             return grimCapture;
         }
 
+        if (!request.allowPortalScreenshotFallback) {
+            markshot::debugLog("capture", "【Wayland捕获】【Portal截图回退】已禁用");
+            return {{},
+                    QStringLiteral("%1\nPortal fallback: disabled for live capture").arg(grimCapture.error),
+                    {},
+                    request.sourceGeometry};
+        }
+
         CaptureResult portalCapture = captureWithPortalScreenshot(request);
         if (!portalCapture.image.isNull()) {
             return portalCapture;
@@ -305,9 +313,14 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
         return {{}, QStringLiteral("%1\nPortal fallback: %2").arg(grimCapture.error, portalCapture.error), {}, request.sourceGeometry};
     }
 
-    CaptureResult portalCapture = captureWithPortalScreenshot(request);
-    if (!portalCapture.image.isNull()) {
-        return portalCapture;
+    CaptureResult portalCapture;
+    if (request.allowPortalScreenshotFallback) {
+        portalCapture = captureWithPortalScreenshot(request);
+        if (!portalCapture.image.isNull()) {
+            return portalCapture;
+        }
+    } else {
+        markshot::debugLog("capture", "【Wayland捕获】【Portal截图回退】已禁用");
     }
 
     CaptureResult grimCapture = captureWithGrim(request);
@@ -315,7 +328,14 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
         return grimCapture;
     }
 
-    return {{}, QStringLiteral("%1\nGrim fallback: %2").arg(portalCapture.error, grimCapture.error), {}, request.sourceGeometry};
+    return {{},
+            QStringLiteral("%1\nGrim fallback: %2")
+                .arg(request.allowPortalScreenshotFallback
+                         ? portalCapture.error
+                         : QStringLiteral("Portal fallback disabled for live capture"),
+                     grimCapture.error),
+            {},
+            request.sourceGeometry};
 }
 
 #endif  // MARK_SHOT_WITH_DBUS

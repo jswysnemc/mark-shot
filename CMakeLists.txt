@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(mark-shot VERSION 0.1.33 LANGUAGES CXX)
+project(mark-shot VERSION 0.1.33 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -43,6 +43,7 @@ if(MARK_SHOT_LINUX)
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND)
         pkg_check_modules(PipeWire QUIET IMPORTED_TARGET libpipewire-0.3)
+        pkg_check_modules(WaylandClient QUIET IMPORTED_TARGET wayland-client)
         if(MARK_SHOT_WITH_LIBPORTAL)
             pkg_check_modules(LibPortal QUIET IMPORTED_TARGET libportal)
             if(MARK_SHOT_REQUIRE_LIBPORTAL AND NOT LibPortal_FOUND)
@@ -50,6 +51,7 @@ if(MARK_SHOT_LINUX)
             endif()
         endif()
     endif()
+    find_program(WAYLAND_SCANNER_EXECUTABLE NAMES wayland-scanner)
 elseif(MARK_SHOT_REQUIRE_LIBPORTAL)
     message(FATAL_ERROR "libportal support is only supported on Linux")
 endif()
@@ -148,6 +150,9 @@ qt_add_executable(mark-shot
     src/screen_capture_pipewire.cpp
     src/screen_capture_pipewire_libportal.cpp
     src/screen_capture_pipewire_libportal.h
+    src/screen_capture_pipewire_screencast.cpp
+    src/screen_capture_pipewire_screencast.h
+    src/screen_capture_pipewire_stream.cpp
     src/screen_capture_platform_api.cpp
     src/screen_capture_windows_wgc.cpp
     src/screen_capture_x11.cpp
@@ -294,6 +299,36 @@ elseif(MARK_SHOT_WITH_LAYER_SHELL)
     message(STATUS "mark-shot: LayerShellQt is Linux-only, building without optional layer-shell plugin")
 else()
     message(STATUS "mark-shot: optional layer-shell plugin disabled")
+endif()
+
+if(MARK_SHOT_LINUX AND WaylandClient_FOUND AND WAYLAND_SCANNER_EXECUTABLE)
+    set(MARK_SHOT_WAYLAND_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/wayland")
+    set(MARK_SHOT_WLR_SCREENCOPY_XML "${CMAKE_CURRENT_SOURCE_DIR}/protocols/wlr-screencopy-unstable-v1.xml")
+    set(MARK_SHOT_WLR_SCREENCOPY_HEADER
+        "${MARK_SHOT_WAYLAND_GENERATED_DIR}/wlr-screencopy-unstable-v1-client-protocol.h")
+    set(MARK_SHOT_WLR_SCREENCOPY_CODE
+        "${MARK_SHOT_WAYLAND_GENERATED_DIR}/wlr-screencopy-unstable-v1-protocol.c")
+    add_custom_command(
+        OUTPUT
+            "${MARK_SHOT_WLR_SCREENCOPY_HEADER}"
+            "${MARK_SHOT_WLR_SCREENCOPY_CODE}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${MARK_SHOT_WAYLAND_GENERATED_DIR}"
+        COMMAND "${WAYLAND_SCANNER_EXECUTABLE}" client-header
+            "${MARK_SHOT_WLR_SCREENCOPY_XML}"
+            "${MARK_SHOT_WLR_SCREENCOPY_HEADER}"
+        COMMAND "${WAYLAND_SCANNER_EXECUTABLE}" private-code
+            "${MARK_SHOT_WLR_SCREENCOPY_XML}"
+            "${MARK_SHOT_WLR_SCREENCOPY_CODE}"
+        DEPENDS "${MARK_SHOT_WLR_SCREENCOPY_XML}"
+        VERBATIM
+    )
+    target_sources(mark-shot PRIVATE "${MARK_SHOT_WLR_SCREENCOPY_CODE}")
+    target_include_directories(mark-shot PRIVATE "${MARK_SHOT_WAYLAND_GENERATED_DIR}")
+    target_link_libraries(mark-shot PRIVATE PkgConfig::WaylandClient)
+    target_compile_definitions(mark-shot PRIVATE HAVE_WLROOTS_SCREENCOPY)
+    message(STATUS "mark-shot: wlroots screencopy recording backend enabled")
+elseif(MARK_SHOT_LINUX)
+    message(STATUS "mark-shot: wlroots screencopy recording backend disabled")
 endif()
 
 if(MARK_SHOT_LINUX AND PipeWire_FOUND)
