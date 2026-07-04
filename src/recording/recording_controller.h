@@ -5,8 +5,8 @@
 #include "recording/recording_status_throttler.h"
 #include "recording/recording_writer.h"
 
-#include <QElapsedTimer>
 #include <QObject>
+#include <QtGlobal>
 #include <memory>
 
 class QImage;
@@ -106,7 +106,7 @@ private:
     bool m_stopping = false;
     bool m_finishEmitted = false;
     int m_frameCount = 0;
-    QElapsedTimer m_elapsed;
+    qint64 m_recordedElapsedMs = 0;
     RecordingStatusThrottler m_statusThrottler;
 };
 

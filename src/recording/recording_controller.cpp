@@ -6,6 +6,8 @@
 
 #include <QImage>
 
+#include <algorithm>
+
 namespace markshot::recording {
 namespace {
 
@@ -55,8 +57,8 @@ bool RecordingController::start(const RecordingOptions &options, QString *error)
     }
     connect(m_grabber, &RecordingFrameGrabber::frameReady, this, &RecordingController::handleFrame);
     connect(m_grabber, &RecordingFrameGrabber::failed, this, &RecordingController::fail);
-    m_elapsed.restart();
     m_statusThrottler.reset();
+    m_recordedElapsedMs = 0;
     m_finishEmitted = false;
 
     markshot::debugLog("recording",
@@ -86,7 +88,7 @@ RecordingStatus RecordingController::status() const
     result.mode = m_options.mode;
     result.fps = m_options.fps;
     result.frameCount = m_frameCount;
-    result.elapsedMs = m_elapsed.isValid() ? m_elapsed.elapsed() : 0;
+    result.elapsedMs = m_recordedElapsedMs;
     result.outputPath = m_options.outputPath;
     return result;
 }
@@ -115,6 +117,7 @@ void RecordingController::handleFrame(const RecordingFrameSample &sample)
         fail(error);
         return;
     }
+    m_recordedElapsedMs = std::max(m_recordedElapsedMs, sample.timestampMs);
     ++m_frameCount;
     publishStatus(false);
 }
