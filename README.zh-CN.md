@@ -1041,12 +1041,16 @@ gdbus call --session \
 
 ## 发版说明
 
-### 0.1.35
+### 0.1.36
 
-- **Qt 6.4 DMA-BUF 构建兼容性**：修复 Debian 12 / Qt 6.4 环境下的编译失败；Qt 6.5 及更新版本仍会使用 Wayland EGL display 路径导入 PipeWire DMA-BUF。
+- **旧版 PipeWire 构建兼容性**：通过 CMake 探测 `spa_video_info_raw::flags` 字段，修复 Debian 12 / 旧版 PipeWire 头文件下的编译失败；新版 PipeWire 仍保留明确的 DMA-BUF modifier 检测。
 
 <details>
 <summary>历史版本</summary>
+
+### 0.1.35
+
+- **Qt 6.4 DMA-BUF 构建兼容性**：修复 Debian 12 / Qt 6.4 环境下的编译失败；Qt 6.5 及更新版本仍会使用 Wayland EGL display 路径导入 PipeWire DMA-BUF。
 
 ### 0.1.34
 

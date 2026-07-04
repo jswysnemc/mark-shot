@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.36 - 2026-07-04
+
+### Bug Fixes
+
+- **Older PipeWire Build Compatibility**: Added a CMake capability check for `spa_video_info_raw::flags` so Debian 12 / older PipeWire headers compile while newer headers keep explicit DMA-BUF modifier detection.
+
 ## 0.1.35 - 2026-07-04
 
 ### Bug Fixes

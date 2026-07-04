@@ -7,8 +7,22 @@ if(MARK_SHOT_LINUX AND PipeWire_FOUND)
         pkg_check_modules(GLESv2Pkg QUIET IMPORTED_TARGET glesv2)
     endif()
     if(EGLPkg_FOUND AND GLESv2Pkg_FOUND)
+        include(CheckCXXSourceCompiles)
+        set(MARK_SHOT_OLD_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES}")
+        set(CMAKE_REQUIRED_INCLUDES ${PipeWire_INCLUDE_DIRS})
+        check_cxx_source_compiles("
+            #include <spa/param/video/raw.h>
+            int main() {
+                spa_video_info_raw info = {};
+                return (info.flags & SPA_VIDEO_FLAG_MODIFIER) != 0 ? 0 : 0;
+            }
+        " MARK_SHOT_HAS_SPA_VIDEO_INFO_RAW_FLAGS)
+        set(CMAKE_REQUIRED_INCLUDES "${MARK_SHOT_OLD_REQUIRED_INCLUDES}")
         target_link_libraries(mark-shot PRIVATE PkgConfig::EGLPkg PkgConfig::GLESv2Pkg)
         target_compile_definitions(mark-shot PRIVATE HAVE_PIPEWIRE_DMABUF_IMPORT)
+        if(MARK_SHOT_HAS_SPA_VIDEO_INFO_RAW_FLAGS)
+            target_compile_definitions(mark-shot PRIVATE HAVE_PIPEWIRE_VIDEO_INFO_RAW_FLAGS)
+        endif()
         message(STATUS "mark-shot: PipeWire DMA-BUF import enabled")
     else()
         message(STATUS "mark-shot: PipeWire DMA-BUF import disabled; EGL/GLESv2 not found")

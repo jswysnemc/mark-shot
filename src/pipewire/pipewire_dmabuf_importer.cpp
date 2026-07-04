@@ -320,8 +320,12 @@ public:
         }
 
         const std::uint64_t modifier = videoInfo.modifier;
+#ifdef HAVE_PIPEWIRE_VIDEO_INFO_RAW_FLAGS
         const bool hasModifier = (videoInfo.flags & SPA_VIDEO_FLAG_MODIFIER) != 0
             && modifier != kDrmFormatModInvalid;
+#else
+        const bool hasModifier = modifier != 0 && modifier != kDrmFormatModInvalid;
+#endif
         if (hasModifier && !m_hasModifierImport) {
             if (error) {
                 *error = QStringLiteral("EGL does not support DMA-BUF modifier import");

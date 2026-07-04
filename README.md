@@ -1019,12 +1019,16 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 
 ## Release Notes
 
-### 0.1.35
+### 0.1.36
 
-- **Qt 6.4 DMA-BUF Build Compatibility**: Fixed Debian 12 / Qt 6.4 builds by guarding Qt Wayland native display access while preserving the Wayland EGL display path on Qt 6.5 and newer.
+- **Older PipeWire Build Compatibility**: Fixed Debian 12 / older PipeWire header builds by probing `spa_video_info_raw::flags` at configure time while keeping explicit DMA-BUF modifier detection on newer PipeWire versions.
 
 <details>
 <summary>Previous versions</summary>
+
+### 0.1.35
+
+- **Qt 6.4 DMA-BUF Build Compatibility**: Fixed Debian 12 / Qt 6.4 builds by guarding Qt Wayland native display access while preserving the Wayland EGL display path on Qt 6.5 and newer.
 
 ### 0.1.34
 
