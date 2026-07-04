@@ -1,7 +1,44 @@
 #include "screen_capture_pipewire_screencast.h"
 
 #ifdef HAVE_PIPEWIRE
+
+#include <cerrno>
+#include <sys/mman.h>
+
+#if __has_include(<drm_fourcc.h>)
+#include <drm_fourcc.h>
+#elif __has_include(<libdrm/drm_fourcc.h>)
+#include <libdrm/drm_fourcc.h>
+#endif
+
 namespace {
+
+constexpr spa_video_format kSupportedRawFormats[] = {
+    SPA_VIDEO_FORMAT_BGRA,
+    SPA_VIDEO_FORMAT_BGRx,
+    SPA_VIDEO_FORMAT_xBGR,
+    SPA_VIDEO_FORMAT_RGBA,
+    SPA_VIDEO_FORMAT_RGBx,
+    SPA_VIDEO_FORMAT_ARGB,
+    SPA_VIDEO_FORMAT_ABGR,
+    SPA_VIDEO_FORMAT_xRGB,
+    SPA_VIDEO_FORMAT_RGB,
+    SPA_VIDEO_FORMAT_BGR,
+};
+
+constexpr std::uint64_t kDrmFormatModInvalid =
+#ifdef DRM_FORMAT_MOD_INVALID
+    DRM_FORMAT_MOD_INVALID;
+#else
+    0x00ffffffffffffffULL;
+#endif
+
+constexpr std::uint64_t kDrmFormatModLinear =
+#ifdef DRM_FORMAT_MOD_LINEAR
+    DRM_FORMAT_MOD_LINEAR;
+#else
+    0;
+#endif
 
 /**
  * 【录制】【PipeWire协商】读取 raw 像素格式每像素字节数。
@@ -26,6 +63,60 @@ int rawBytesPerPixel(spa_video_format format)
     default:
         return 0;
     }
+}
+
+/**
+ * 【录制】【PipeWire协商】写入 modifier 选择，优先声明可 CPU 读取的无修饰或线性布局。
+ * @param builder SPA POD 构造器。
+ * @return 无返回值。
+ */
+void addReadableModifierChoice(spa_pod_builder *builder)
+{
+    spa_pod_frame frame;
+    spa_pod_builder_push_choice(builder, &frame, SPA_CHOICE_Enum, 0);
+    spa_pod_builder_long(builder, static_cast<int64_t>(kDrmFormatModInvalid));
+    spa_pod_builder_long(builder, static_cast<int64_t>(kDrmFormatModInvalid));
+    if (kDrmFormatModLinear != kDrmFormatModInvalid) {
+        spa_pod_builder_long(builder, static_cast<int64_t>(kDrmFormatModLinear));
+    }
+    spa_pod_builder_pop(builder, &frame);
+}
+
+/**
+ * 【录制】【PipeWire协商】构造单个 raw 格式参数。
+ * @param builder SPA POD 构造器。
+ * @param format PipeWire 像素格式。
+ * @param withModifier 是否声明 DMA-BUF modifier 变体。
+ * @return 构造完成的格式参数。
+ */
+const spa_pod *buildRawFormatParam(spa_pod_builder *builder,
+                                   spa_video_format format,
+                                   bool withModifier)
+{
+    spa_pod_frame frame;
+    spa_pod_builder_push_object(builder, &frame, SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat);
+    spa_pod_builder_add(builder,
+                        SPA_FORMAT_mediaType, SPA_POD_Id(SPA_MEDIA_TYPE_video),
+                        SPA_FORMAT_mediaSubtype, SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw),
+                        SPA_FORMAT_VIDEO_format, SPA_POD_Id(format),
+                        0);
+    if (withModifier) {
+        spa_pod_builder_prop(builder,
+                             SPA_FORMAT_VIDEO_modifier,
+                             SPA_POD_PROP_FLAG_MANDATORY);
+        addReadableModifierChoice(builder);
+    }
+    return static_cast<const spa_pod *>(spa_pod_builder_pop(builder, &frame));
+}
+
+/**
+ * 【录制】【PipeWire协商】判断协商结果是否包含 modifier。
+ * @param param PipeWire 格式参数。
+ * @return 包含 modifier 时返回 true。
+ */
+bool formatHasModifier(const spa_pod *param)
+{
+    return spa_pod_find_prop(param, nullptr, SPA_FORMAT_VIDEO_modifier) != nullptr;
 }
 
 }  // namespace
@@ -97,28 +188,16 @@ bool PortalPipeWireScreencast::startPipeWire(int fd, QString *error)
     m_streamEvents.process = &PortalPipeWireScreencast::onStreamProcess;
     pw_stream_add_listener(m_stream, &m_streamListener, &m_streamEvents, this);
 
-    uint8_t buffer[2048];
+    uint8_t buffer[16384];
     spa_pod_builder builder = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
-    const spa_pod *params[1];
-    // 1. 【录制】【PipeWire协商】只协商像素格式，目标帧率交给应用层限帧
-    params[0] = static_cast<const spa_pod *>(
-        spa_pod_builder_add_object(&builder,
-                                   SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat,
-                                   SPA_FORMAT_mediaType, SPA_POD_Id(SPA_MEDIA_TYPE_video),
-                                   SPA_FORMAT_mediaSubtype, SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw),
-                                   SPA_FORMAT_VIDEO_format,
-                                   SPA_POD_CHOICE_ENUM_Id(11,
-                                                          SPA_VIDEO_FORMAT_BGRA,
-                                                          SPA_VIDEO_FORMAT_BGRA,
-                                                          SPA_VIDEO_FORMAT_BGRx,
-                                                          SPA_VIDEO_FORMAT_xBGR,
-                                                          SPA_VIDEO_FORMAT_RGBA,
-                                                          SPA_VIDEO_FORMAT_RGBx,
-                                                          SPA_VIDEO_FORMAT_ARGB,
-                                                          SPA_VIDEO_FORMAT_ABGR,
-                                                          SPA_VIDEO_FORMAT_xRGB,
-                                                          SPA_VIDEO_FORMAT_RGB,
-                                                          SPA_VIDEO_FORMAT_BGR)));
+    const spa_pod *params[std::size(kSupportedRawFormats) * 2];
+    uint32_t paramCount = 0;
+    for (spa_video_format format : kSupportedRawFormats) {
+        // 1. 【录制】【PipeWire协商】优先请求共享内存，方便直接复制为 QImage
+        params[paramCount++] = buildRawFormatParam(&builder, format, false);
+        // 2. 【录制】【PipeWire协商】补充 modifier 变体，兼容只发布 DMA-BUF 格式的门户
+        params[paramCount++] = buildRawFormatParam(&builder, format, true);
+    }
 
     const pw_stream_flags flags = static_cast<pw_stream_flags>(
         PW_STREAM_FLAG_AUTOCONNECT | PW_STREAM_FLAG_MAP_BUFFERS);
@@ -128,7 +207,7 @@ bool PortalPipeWireScreencast::startPipeWire(int fd, QString *error)
                                          targetId,
                                          flags,
                                          params,
-                                         1);
+                                         paramCount);
     pw_thread_loop_unlock(m_loop);
     if (result < 0) {
         if (error) {
@@ -141,10 +220,11 @@ bool PortalPipeWireScreencast::startPipeWire(int fd, QString *error)
         return false;
     }
     markshot::debugLog("screencast",
-                       "pw-connect ok node=%u target_id=%d target_object=%s target_fps=%d flags=AUTOCONNECT|MAP_BUFFERS",
+                       "pw-connect ok node=%u target_id=%d target_object=%s target_fps=%d params=%u flags=AUTOCONNECT|MAP_BUFFERS",
                        m_nodeId, targetId,
                        m_targetObject.isEmpty() ? "<none>" : m_targetObject.toUtf8().constData(),
-                       m_targetFps);
+                       m_targetFps,
+                       paramCount);
     return true;
 }
 
@@ -200,6 +280,7 @@ void PortalPipeWireScreencast::onStreamParamChanged(void *data, uint32_t id, con
     }
 
     self->m_videoInfo = info;
+    const bool hasModifier = formatHasModifier(param);
     const int bytesPerPixel = rawBytesPerPixel(info.format);
     if (bytesPerPixel <= 0) {
         markshot::debugLog("screencast",
@@ -212,13 +293,17 @@ void PortalPipeWireScreencast::onStreamParamChanged(void *data, uint32_t id, con
 
     markshot::debugLog("screencast",
                        "pw-param-changed format=%d size=%ux%u bpp=%d stride=%u "
-                       "framerate=%u/%u",
+                       "framerate=%u/%u modifier=%d",
                        static_cast<int>(info.format), info.size.width, info.size.height,
-                       bytesPerPixel, stride, info.max_framerate.num, info.max_framerate.denom);
+                       bytesPerPixel, stride, info.max_framerate.num, info.max_framerate.denom,
+                       hasModifier ? 1 : 0);
 
     uint8_t buffer[1024];
     spa_pod_builder builder = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
     const spa_pod *params[1];
+    const uint32_t dataTypes = hasModifier
+        ? (1u << SPA_DATA_DmaBuf)
+        : ((1u << SPA_DATA_MemPtr) | (1u << SPA_DATA_MemFd));
     params[0] = static_cast<const spa_pod *>(
         spa_pod_builder_add_object(&builder,
                                    SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
@@ -227,8 +312,7 @@ void PortalPipeWireScreencast::onStreamParamChanged(void *data, uint32_t id, con
                                    MARKSHOT_SPA_PARAM_BUFFERS_SIZE, SPA_POD_Int(size),
                                    MARKSHOT_SPA_PARAM_BUFFERS_STRIDE, SPA_POD_Int(stride),
                                    MARKSHOT_SPA_PARAM_BUFFERS_DATA_TYPE,
-                                   SPA_POD_CHOICE_FLAGS_Int((1u << SPA_DATA_MemPtr)
-                                                            | (1u << SPA_DATA_MemFd))));
+                                   SPA_POD_CHOICE_FLAGS_Int(dataTypes)));
     pw_stream_update_params(self->m_stream, params, 1);
 }
 
@@ -316,9 +400,9 @@ QImage PortalPipeWireScreencast::imageFromBuffer(pw_buffer *pipewireBuffer, QStr
     }
     const spa_buffer *spaBuffer = pipewireBuffer->buffer;
     const spa_data &data = spaBuffer->datas[0];
-    if (!data.data || !data.chunk) {
+    if (!data.chunk) {
         if (error) {
-            *error = QStringLiteral("PipeWire buffer is not CPU-mappable (data type %1)")
+            *error = QStringLiteral("PipeWire buffer chunk is missing (data type %1)")
                          .arg(static_cast<uint>(data.type));
         }
         return {};
@@ -344,36 +428,86 @@ QImage PortalPipeWireScreencast::imageFromBuffer(pw_buffer *pipewireBuffer, QStr
     const int stride = data.chunk->stride != 0
         ? std::abs(static_cast<int>(data.chunk->stride))
         : width * bytesPerPixel;
-    const uchar *source = static_cast<const uchar *>(data.data) + data.chunk->offset;
+    void *mappedAddress = nullptr;
+    size_t mappedSize = 0;
+    const uchar *base = static_cast<const uchar *>(data.data);
+    if (!base && data.fd >= 0 && data.maxsize > 0 && (data.flags & SPA_DATA_FLAG_MAPPABLE)) {
+        mappedSize = data.maxsize;
+        mappedAddress = ::mmap(nullptr,
+                               mappedSize,
+                               PROT_READ,
+                               MAP_SHARED,
+                               static_cast<int>(data.fd),
+                               static_cast<off_t>(data.mapoffset));
+        if (mappedAddress == MAP_FAILED) {
+            mappedAddress = nullptr;
+            if (error) {
+                *error = QStringLiteral("failed to mmap PipeWire buffer fd: %1")
+                             .arg(QString::fromLocal8Bit(std::strerror(errno)));
+            }
+            return {};
+        }
+        base = static_cast<const uchar *>(mappedAddress);
+    }
+    if (!base) {
+        if (error) {
+            *error = QStringLiteral("PipeWire buffer is not CPU-mappable (data type %1 flags=0x%2)")
+                         .arg(static_cast<uint>(data.type))
+                         .arg(static_cast<uint>(data.flags), 0, 16);
+        }
+        return {};
+    }
+    if (data.maxsize > 0 && data.chunk->offset >= data.maxsize) {
+        if (mappedAddress) {
+            ::munmap(mappedAddress, mappedSize);
+        }
+        if (error) {
+            *error = QStringLiteral("PipeWire frame offset is invalid");
+        }
+        return {};
+    }
+    const uchar *source = base ? base + data.chunk->offset : nullptr;
     if (!source || stride < width * bytesPerPixel) {
+        if (mappedAddress) {
+            ::munmap(mappedAddress, mappedSize);
+        }
         if (error) {
             *error = QStringLiteral("PipeWire frame stride is invalid");
         }
         return {};
     }
 
+    QImage image;
     switch (m_videoInfo.format) {
     case SPA_VIDEO_FORMAT_BGRA:
-        return QImage(source, width, height, stride, QImage::Format_ARGB32).copy();
+        image = QImage(source, width, height, stride, QImage::Format_ARGB32).copy();
+        break;
     case SPA_VIDEO_FORMAT_BGRx:
-        return QImage(source, width, height, stride, QImage::Format_RGB32).copy();
+        image = QImage(source, width, height, stride, QImage::Format_RGB32).copy();
+        break;
     case SPA_VIDEO_FORMAT_RGBA:
     case SPA_VIDEO_FORMAT_RGBx:
     case SPA_VIDEO_FORMAT_ARGB:
     case SPA_VIDEO_FORMAT_ABGR:
     case SPA_VIDEO_FORMAT_xRGB:
     case SPA_VIDEO_FORMAT_xBGR:
-        return convertFourByteFrame(source, width, height, stride, m_videoInfo.format);
+        image = convertFourByteFrame(source, width, height, stride, m_videoInfo.format);
+        break;
     case SPA_VIDEO_FORMAT_RGB:
     case SPA_VIDEO_FORMAT_BGR:
-        return convertThreeByteFrame(source, width, height, stride, m_videoInfo.format);
+        image = convertThreeByteFrame(source, width, height, stride, m_videoInfo.format);
+        break;
     default:
         if (error) {
             *error = QStringLiteral("unsupported PipeWire video format %1")
                          .arg(static_cast<int>(m_videoInfo.format));
         }
-        return {};
+        break;
     }
+    if (mappedAddress) {
+        ::munmap(mappedAddress, mappedSize);
+    }
+    return image;
 }
 
 QImage PortalPipeWireScreencast::convertFourByteFrame(const uchar *source,
