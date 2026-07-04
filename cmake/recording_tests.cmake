@@ -65,6 +65,8 @@ if(FFmpegLibav_FOUND)
         src/recording/audio/pulse_audio_capture_reader.h
         src/recording/audio/wasapi_audio_capture_reader.cpp
         src/recording/audio/wasapi_audio_capture_reader.h
+        src/debug_log.cpp
+        src/debug_log.h
         src/recording/libav_audio_encoder.cpp
         src/recording/libav_audio_encoder.h
         src/recording/libav_error.cpp
