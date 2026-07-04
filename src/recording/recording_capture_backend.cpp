@@ -72,7 +72,16 @@ QVector<RecordingCaptureBackend> recordingCaptureBackendOrder(RecordingCaptureBa
             RecordingCaptureBackend::Polling,
         };
     case RecordingCaptureBackend::Wlroots:
+        return {
+            RecordingCaptureBackend::Wlroots,
+            RecordingCaptureBackend::Polling,
+        };
     case RecordingCaptureBackend::PipeWire:
+        return {
+            RecordingCaptureBackend::PipeWire,
+            RecordingCaptureBackend::Wlroots,
+            RecordingCaptureBackend::Polling,
+        };
     case RecordingCaptureBackend::Polling:
         return {requested};
     }
