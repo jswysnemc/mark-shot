@@ -191,7 +191,11 @@ QImage WlrootsScreencopyShmBuffer::toImage(bool yInvert, QString *error) const
     }
     QImage image = view.copy();
     if (yInvert) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
         image = image.flipped(Qt::Vertical);
+#else
+        image = image.mirrored(false, true);
+#endif
     }
     image.setDevicePixelRatio(1.0);
     return image;
