@@ -186,6 +186,7 @@ void PortalPipeWireScreencast::stop()
     m_targetObject.clear();
     m_cursorIncluded = false;
     m_frameCount = 0;
+    m_frameErrorCount = 0;
     m_droppedFrameCount = 0;
     QMutexLocker locker(&m_frameMutex);
     m_latestFrame = {};

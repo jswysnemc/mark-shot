@@ -145,6 +145,7 @@ private:
     pw_stream_events m_streamEvents = {};
     spa_video_info_raw m_videoInfo = {};
     int m_frameCount = 0;
+    int m_frameErrorCount = 0;
     int m_droppedFrameCount = 0;
 };
 

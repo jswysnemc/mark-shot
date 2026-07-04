@@ -119,6 +119,17 @@ bool formatHasModifier(const spa_pod *param)
     return spa_pod_find_prop(param, nullptr, SPA_FORMAT_VIDEO_modifier) != nullptr;
 }
 
+/**
+ * 【录制】【PipeWire帧读取】判断当前 buffer 是否可以尝试 fd 映射。
+ * @param data PipeWire 数据块。
+ * @return 具备 fd 和有效大小时返回 true。
+ */
+bool canTryFdMap(const spa_data &data)
+{
+    return data.fd >= 0 && data.maxsize > 0
+        && (data.type == SPA_DATA_MemFd || data.type == SPA_DATA_DmaBuf);
+}
+
 }  // namespace
 
 bool PortalPipeWireScreencast::startPipeWire(int fd, QString *error)
@@ -361,8 +372,11 @@ void PortalPipeWireScreencast::onStreamProcess(void *data)
         QMutexLocker locker(&self->m_frameMutex);
         self->m_lastError = imageError;
         self->m_frameReady.wakeAll();
-        markshot::debugLog("screencast", "pw-frame-error %s",
-                           imageError.toUtf8().constData());
+        self->m_frameErrorCount += 1;
+        if (self->m_frameErrorCount == 1 || self->m_frameErrorCount % 100 == 0) {
+            markshot::debugLog("screencast", "pw-frame-error %s",
+                               imageError.toUtf8().constData());
+        }
     }
     pw_stream_queue_buffer(self->m_stream, buffer);
 }
@@ -431,7 +445,7 @@ QImage PortalPipeWireScreencast::imageFromBuffer(pw_buffer *pipewireBuffer, QStr
     void *mappedAddress = nullptr;
     size_t mappedSize = 0;
     const uchar *base = static_cast<const uchar *>(data.data);
-    if (!base && data.fd >= 0 && data.maxsize > 0 && (data.flags & SPA_DATA_FLAG_MAPPABLE)) {
+    if (!base && canTryFdMap(data)) {
         mappedSize = data.maxsize;
         mappedAddress = ::mmap(nullptr,
                                mappedSize,
@@ -457,16 +471,10 @@ QImage PortalPipeWireScreencast::imageFromBuffer(pw_buffer *pipewireBuffer, QStr
         }
         return {};
     }
-    if (data.maxsize > 0 && data.chunk->offset >= data.maxsize) {
-        if (mappedAddress) {
-            ::munmap(mappedAddress, mappedSize);
-        }
-        if (error) {
-            *error = QStringLiteral("PipeWire frame offset is invalid");
-        }
-        return {};
-    }
-    const uchar *source = base ? base + data.chunk->offset : nullptr;
+    const uint32_t dataOffset = data.maxsize > 0
+        ? data.chunk->offset % data.maxsize
+        : data.chunk->offset;
+    const uchar *source = base + dataOffset;
     if (!source || stride < width * bytesPerPixel) {
         if (mappedAddress) {
             ::munmap(mappedAddress, mappedSize);
