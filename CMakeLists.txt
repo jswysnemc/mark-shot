@@ -398,18 +398,7 @@ if(BUILD_TESTING)
     )
     add_test(NAME config-value COMMAND mark-shot-config-value-test)
 
-    qt_add_executable(mark-shot-recording-capture-backend-test
-        tests/recording_capture_backend_test.cpp
-        src/recording/recording_capture_backend.cpp
-        src/recording/recording_capture_backend.h
-    )
-    target_include_directories(mark-shot-recording-capture-backend-test PRIVATE src)
-    target_link_libraries(mark-shot-recording-capture-backend-test
-        PRIVATE
-            Qt6::Core
-            Qt6::Test
-    )
-    add_test(NAME recording-capture-backend COMMAND mark-shot-recording-capture-backend-test)
+    include(cmake/recording_tests.cmake)
 
     qt_add_executable(mark-shot-startup-default-color-test
         tests/startup_default_color_test.cpp
