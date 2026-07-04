@@ -354,6 +354,44 @@ void PortalPipeWireScreencast::onStreamProcess(void *data)
         return;
     }
 
+    if (self->m_rawStreamMode) {
+        QString frameError;
+        PipeWireScreencastRawFrame frame;
+        if (self->rawFrameFromBuffer(buffer, &frame, &frameError)) {
+            {
+                QMutexLocker locker(&self->m_frameMutex);
+                self->m_latestFrameTimeMs = frameTimeMs;
+                self->m_streamGeometry = frame.streamGeometry;
+                self->m_frameCount += 1;
+            }
+            if (self->m_frameCount == 1 || self->m_frameCount % 100 == 0) {
+                markshot::debugLog("screencast",
+                                   "【录制】【PipeWire流回调】frame #%d raw=%dx%d stream_geom=%d,%d %dx%d",
+                                   self->m_frameCount,
+                                   frame.size.width(),
+                                   frame.size.height(),
+                                   frame.streamGeometry.x(),
+                                   frame.streamGeometry.y(),
+                                   frame.streamGeometry.width(),
+                                   frame.streamGeometry.height());
+            }
+            if (self->m_rawFrameCallback) {
+                self->m_rawFrameCallback(std::move(frame));
+            }
+        } else if (!frameError.isEmpty()) {
+            {
+                QMutexLocker locker(&self->m_frameMutex);
+                self->m_lastError = frameError;
+                self->m_frameErrorCount += 1;
+            }
+            if (self->m_rawErrorCallback) {
+                self->m_rawErrorCallback(frameError);
+            }
+        }
+        pw_stream_queue_buffer(self->m_stream, buffer);
+        return;
+    }
+
     QString imageError;
     QImage image = self->imageFromBuffer(buffer, &imageError);
     if (!image.isNull()) {

@@ -20,6 +20,7 @@ private slots:
                  QVector<markshot::recording::RecordingCaptureBackend>({
                      markshot::recording::RecordingCaptureBackend::Wlroots,
                      markshot::recording::RecordingCaptureBackend::PipeWire,
+                     markshot::recording::RecordingCaptureBackend::WindowsWgc,
                      markshot::recording::RecordingCaptureBackend::Polling,
                  }));
     }
@@ -38,6 +39,7 @@ private slots:
                  QVector<markshot::recording::RecordingCaptureBackend>({
                      markshot::recording::RecordingCaptureBackend::PipeWire,
                      markshot::recording::RecordingCaptureBackend::Wlroots,
+                     markshot::recording::RecordingCaptureBackend::WindowsWgc,
                      markshot::recording::RecordingCaptureBackend::Polling,
                  }));
     }
@@ -55,6 +57,24 @@ private slots:
         QCOMPARE(order,
                  QVector<markshot::recording::RecordingCaptureBackend>({
                      markshot::recording::RecordingCaptureBackend::Wlroots,
+                     markshot::recording::RecordingCaptureBackend::WindowsWgc,
+                     markshot::recording::RecordingCaptureBackend::Polling,
+                 }));
+    }
+
+    /**
+     * 验证 Windows WGC 后端不可用时仍可回退到轮询采集。
+     * @return 无返回值。
+     */
+    void windowsWgcBackendFallsBackToPolling()
+    {
+        const QVector<markshot::recording::RecordingCaptureBackend> order =
+            markshot::recording::recordingCaptureBackendOrder(
+                markshot::recording::RecordingCaptureBackend::WindowsWgc);
+
+        QCOMPARE(order,
+                 QVector<markshot::recording::RecordingCaptureBackend>({
+                     markshot::recording::RecordingCaptureBackend::WindowsWgc,
                      markshot::recording::RecordingCaptureBackend::Polling,
                  }));
     }

@@ -1,14 +1,23 @@
 set(MARK_SHOT_RECORDING_SOURCES
-    src/recording/audio_capture_options.cpp
-    src/recording/audio_capture_options.h
-    src/recording/ffmpeg_recording_process.cpp
-    src/recording/ffmpeg_recording_process.h
+    src/recording/audio/audio_capture_sample.h
+    src/recording/audio/pulse_audio_capture_reader.cpp
+    src/recording/audio/pulse_audio_capture_reader.h
     src/recording/gif_recording_writer.cpp
     src/recording/gif_recording_writer.h
+    src/recording/libav_error.cpp
+    src/recording/libav_error.h
+    src/recording/libav_audio_encoder.cpp
+    src/recording/libav_audio_encoder.h
+    src/recording/libav_gif_recording_process.cpp
+    src/recording/libav_gif_recording_process.h
+    src/recording/libav_recording_process.cpp
+    src/recording/libav_recording_process.h
     src/recording/recording_async_writer.cpp
     src/recording/recording_async_writer.h
     src/recording/recording_config_dialog.cpp
     src/recording/recording_config_dialog.h
+    src/recording/recording_dialog_config.cpp
+    src/recording/recording_dialog_config.h
     src/recording/recording_controller.cpp
     src/recording/recording_controller.h
     src/recording/recording_capture_backend.cpp
@@ -34,6 +43,8 @@ set(MARK_SHOT_RECORDING_SOURCES
     src/recording/recording_pipewire_capture_stream.h
     src/recording/recording_polling_capture_stream.cpp
     src/recording/recording_polling_capture_stream.h
+    src/recording/recording_windows_wgc_capture_stream.cpp
+    src/recording/recording_windows_wgc_capture_stream.h
     src/recording/recording_session_manager.cpp
     src/recording/recording_session_manager.h
     src/recording/recording_start_flow.cpp
@@ -47,18 +58,23 @@ set(MARK_SHOT_RECORDING_SOURCES
     src/recording/recording_video_encoder_options.cpp
     src/recording/recording_video_encoder_options.h
     src/recording/recording_writer.h
-    src/recording/video_recording_ffmpeg_arguments.cpp
-    src/recording/video_recording_ffmpeg_arguments.h
     src/recording/video_recording_writer.cpp
     src/recording/video_recording_writer.h
     src/platform/wayland/wlroots_screencopy_capture_stream.cpp
     src/platform/wayland/wlroots_screencopy_capture_stream.h
+    src/platform/wayland/wlroots_screencopy_buffer_pool.cpp
+    src/platform/wayland/wlroots_screencopy_buffer_pool.h
     src/platform/wayland/wlroots_screencopy_shm_buffer.cpp
     src/platform/wayland/wlroots_screencopy_shm_buffer.h
     src/platform/wayland/wlroots_screencopy_worker_frame.cpp
     src/platform/wayland/wlroots_screencopy_worker_lifecycle.cpp
     src/platform/wayland/wlroots_screencopy_worker_registry.cpp
     src/platform/wayland/wlroots_screencopy_worker.h
+    src/platform/windows/windows_wgc_frame.h
+    src/platform/windows/windows_wgc_stream.cpp
+    src/platform/windows/windows_wgc_stream.h
+    src/platform/windows/windows_wgc_support.cpp
+    src/platform/windows/windows_wgc_support.h
     src/shot_window_recording.cpp
     src/shot_window_recording_status_overlay.cpp
 )

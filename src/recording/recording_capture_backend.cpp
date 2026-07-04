@@ -19,6 +19,11 @@ RecordingCaptureBackend parseBackend(QString text)
     if (text == QStringLiteral("pipewire") || text == QStringLiteral("portal")) {
         return RecordingCaptureBackend::PipeWire;
     }
+    if (text == QStringLiteral("windows-wgc")
+        || text == QStringLiteral("wgc")
+        || text == QStringLiteral("windows-graphics-capture")) {
+        return RecordingCaptureBackend::WindowsWgc;
+    }
     if (text == QStringLiteral("polling") || text == QStringLiteral("fallback")) {
         return RecordingCaptureBackend::Polling;
     }
@@ -51,6 +56,8 @@ QString recordingCaptureBackendName(RecordingCaptureBackend backend)
         return QStringLiteral("wlroots-screencopy");
     case RecordingCaptureBackend::PipeWire:
         return QStringLiteral("pipewire");
+    case RecordingCaptureBackend::WindowsWgc:
+        return QStringLiteral("windows-wgc");
     case RecordingCaptureBackend::Polling:
         return QStringLiteral("polling");
     }
@@ -69,17 +76,25 @@ QVector<RecordingCaptureBackend> recordingCaptureBackendOrder(RecordingCaptureBa
         return {
             RecordingCaptureBackend::Wlroots,
             RecordingCaptureBackend::PipeWire,
+            RecordingCaptureBackend::WindowsWgc,
             RecordingCaptureBackend::Polling,
         };
     case RecordingCaptureBackend::Wlroots:
         return {
             RecordingCaptureBackend::Wlroots,
+            RecordingCaptureBackend::WindowsWgc,
             RecordingCaptureBackend::Polling,
         };
     case RecordingCaptureBackend::PipeWire:
         return {
             RecordingCaptureBackend::PipeWire,
             RecordingCaptureBackend::Wlroots,
+            RecordingCaptureBackend::WindowsWgc,
+            RecordingCaptureBackend::Polling,
+        };
+    case RecordingCaptureBackend::WindowsWgc:
+        return {
+            RecordingCaptureBackend::WindowsWgc,
             RecordingCaptureBackend::Polling,
         };
     case RecordingCaptureBackend::Polling:
@@ -87,6 +102,7 @@ QVector<RecordingCaptureBackend> recordingCaptureBackendOrder(RecordingCaptureBa
     }
     return {RecordingCaptureBackend::Wlroots,
             RecordingCaptureBackend::PipeWire,
+            RecordingCaptureBackend::WindowsWgc,
             RecordingCaptureBackend::Polling};
 }
 

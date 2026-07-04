@@ -5,6 +5,7 @@
 #include "recording/recording_capture_backend.h"
 #include "recording/recording_pipewire_capture_stream.h"
 #include "recording/recording_polling_capture_stream.h"
+#include "recording/recording_windows_wgc_capture_stream.h"
 
 #include <QStringList>
 
@@ -29,6 +30,8 @@ std::unique_ptr<RecordingCaptureStream> createStreamForBackend(RecordingCaptureB
         return createWlrootsScreencopyCaptureStream(options, parent);
     case RecordingCaptureBackend::PipeWire:
         return createPipeWireRecordingCaptureStream(options, parent);
+    case RecordingCaptureBackend::WindowsWgc:
+        return createWindowsWgcRecordingCaptureStream(options, parent);
     case RecordingCaptureBackend::Polling:
         return std::make_unique<RecordingPollingCaptureStream>(options, parent);
     case RecordingCaptureBackend::Auto:
@@ -92,7 +95,10 @@ bool RecordingFrameGrabber::startCaptureStream(QString *error)
         error->clear();
     }
 
-    const RecordingCaptureBackend requested = recordingCaptureBackendFromEnvironment();
+    const RecordingCaptureBackend environmentBackend = recordingCaptureBackendFromEnvironment();
+    const RecordingCaptureBackend requested = environmentBackend == RecordingCaptureBackend::Auto
+        ? m_options.captureBackend
+        : environmentBackend;
     const QVector<RecordingCaptureBackend> backends = recordingCaptureBackendOrder(requested);
     markshot::debugLog("recording",
                        "【录制】【采集后端选择】requested=%s order=%s",

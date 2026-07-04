@@ -1,6 +1,6 @@
 #pragma once
 
-#include "platform/wayland/wlroots_screencopy_shm_buffer.h"
+#include "platform/wayland/wlroots_screencopy_buffer_pool.h"
 #include "recording/recording_frame_sample.h"
 #include "recording/recording_options.h"
 
@@ -192,7 +192,8 @@ private:
     zwlr_screencopy_frame_v1 *m_frame = nullptr;
     std::vector<std::unique_ptr<WlrootsOutput>> m_outputs;
     WlrootsOutput *m_selectedOutput = nullptr;
-    WlrootsScreencopyShmBuffer m_buffer;
+    WlrootsScreencopyBufferPool m_buffers;
+    std::shared_ptr<WlrootsScreencopyShmBuffer> m_currentBuffer;
     uint32_t m_screencopyVersion = 1;
     uint32_t m_pendingFormat = 0;
     int m_pendingWidth = 0;

@@ -1,6 +1,7 @@
 #include "recording/recording_start_flow.h"
 
 #include "recording/recording_config_dialog.h"
+#include "recording/recording_dialog_config.h"
 #include "ui/i18n.h"
 #include "windows_integration.h"
 
@@ -47,6 +48,8 @@ bool runRecordingStartFlow(const RecordingStartFlowRequest &request)
     }
 
     RecordingOptions options = dialog.options();
+    QString saveError;
+    saveRecordingDialogConfig(recordingDialogConfigFromOptions(options), &saveError);
     if (options.display.geometry.isEmpty()) {
         showStartFlowError(request, MS_TR("No display is available for recording."));
         return true;

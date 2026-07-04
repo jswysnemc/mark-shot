@@ -42,7 +42,7 @@ RecordingBgraFrame RecordingFrameConverter::contiguousView(const QImage &image, 
 {
     const qsizetype frameBytes = static_cast<qsizetype>(rowBytes) * image.height();
     if (image.bytesPerLine() == rowBytes) {
-        return {reinterpret_cast<const char *>(image.constBits()), frameBytes};
+        return {reinterpret_cast<const char *>(image.constBits()), frameBytes, rowBytes};
     }
 
     m_buffer.resize(frameBytes);
@@ -52,7 +52,7 @@ RecordingBgraFrame RecordingFrameConverter::contiguousView(const QImage &image, 
                     image.constScanLine(y),
                     static_cast<size_t>(rowBytes));
     }
-    return {m_buffer.constData(), m_buffer.size()};
+    return {m_buffer.constData(), m_buffer.size(), rowBytes};
 }
 
 }  // namespace markshot::recording

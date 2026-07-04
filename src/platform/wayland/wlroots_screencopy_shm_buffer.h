@@ -6,6 +6,7 @@
 #include <QString>
 
 #include <cstdint>
+#include <memory>
 
 struct wl_buffer;
 struct wl_shm;
@@ -57,6 +58,17 @@ public:
      * @return 连续 raw BGRA 帧。
      */
     RecordingRawBgraFrame copyBgraFrame(bool yInvert, QString *error) const;
+
+    /**
+     * 把缓冲内容包装为共享内存 raw BGRA 视图。
+     * @param owner 维持缓冲生命周期的共享所有者。
+     * @param yInvert 内容是否上下翻转。
+     * @param error 输出错误信息。
+     * @return raw BGRA 视图。
+     */
+    RecordingRawBgraFrame mappedBgraFrame(std::shared_ptr<const void> owner,
+                                          bool yInvert,
+                                          QString *error) const;
 
     /**
      * 释放当前缓冲资源。

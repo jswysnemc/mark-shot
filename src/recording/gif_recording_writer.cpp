@@ -14,6 +14,9 @@ GifRecordingWriter::GifRecordingWriter(RecordingOptions options)
 
 bool GifRecordingWriter::start(QSize frameSize, int fps, QString *error)
 {
+    if (error) {
+        error->clear();
+    }
     const QFileInfo outputInfo(m_options.outputPath);
     if (!QDir().mkpath(outputInfo.absolutePath())) {
         if (error) {
@@ -22,32 +25,12 @@ bool GifRecordingWriter::start(QSize frameSize, int fps, QString *error)
         return false;
     }
 
-    const QString sizeText = QStringLiteral("%1x%2").arg(frameSize.width()).arg(frameSize.height());
-    const QStringList arguments{
-        QStringLiteral("-hide_banner"),
-        QStringLiteral("-loglevel"),
-        QStringLiteral("error"),
-        QStringLiteral("-y"),
-        QStringLiteral("-f"),
-        QStringLiteral("rawvideo"),
-        QStringLiteral("-pix_fmt"),
-        QStringLiteral("bgra"),
-        QStringLiteral("-video_size"),
-        sizeText,
-        QStringLiteral("-framerate"),
-        QString::number(fps),
-        QStringLiteral("-i"),
-        QStringLiteral("pipe:0"),
-        QStringLiteral("-loop"),
-        QStringLiteral("0"),
-        m_options.outputPath,
-    };
-    return m_process.start(m_options.ffmpegPath, arguments, frameSize, error);
+    return m_process.start(m_options.outputPath, frameSize, fps, error);
 }
 
 bool GifRecordingWriter::writeFrame(const RecordingFrameSample &sample, QString *error)
 {
-    return m_process.writeFrame(sample.image, error);
+    return m_process.writeFrame(sample, error);
 }
 
 bool GifRecordingWriter::finish(QString *error)

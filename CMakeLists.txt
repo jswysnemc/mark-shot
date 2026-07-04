@@ -44,6 +44,17 @@ if(MARK_SHOT_LINUX)
     if(PkgConfig_FOUND)
         pkg_check_modules(PipeWire QUIET IMPORTED_TARGET libpipewire-0.3)
         pkg_check_modules(WaylandClient QUIET IMPORTED_TARGET wayland-client)
+        pkg_check_modules(FFmpegLibav QUIET IMPORTED_TARGET
+            libavcodec
+            libavformat
+            libavutil
+            libswresample
+            libswscale
+        )
+        pkg_check_modules(PulseAudioRecording QUIET IMPORTED_TARGET
+            libpulse-simple
+            libpulse
+        )
         if(MARK_SHOT_WITH_LIBPORTAL)
             pkg_check_modules(LibPortal QUIET IMPORTED_TARGET libportal)
             if(MARK_SHOT_REQUIRE_LIBPORTAL AND NOT LibPortal_FOUND)
@@ -272,6 +283,21 @@ endif()
 if(MARK_SHOT_LINUX AND X11_xcb_FOUND)
     target_link_libraries(mark-shot PRIVATE X11::xcb)
     target_compile_definitions(mark-shot PRIVATE HAVE_XCB)
+endif()
+
+if(FFmpegLibav_FOUND)
+    target_link_libraries(mark-shot PRIVATE PkgConfig::FFmpegLibav)
+    target_compile_definitions(mark-shot PRIVATE HAVE_LIBAV_RECORDING)
+    message(STATUS "mark-shot: FFmpeg libav recording writer enabled")
+else()
+    message(STATUS "mark-shot: FFmpeg libav recording writer disabled")
+endif()
+if(PulseAudioRecording_FOUND)
+    target_link_libraries(mark-shot PRIVATE PkgConfig::PulseAudioRecording)
+    target_compile_definitions(mark-shot PRIVATE HAVE_PULSE_RECORDING)
+    message(STATUS "mark-shot: PulseAudio lib recording capture enabled")
+else()
+    message(STATUS "mark-shot: PulseAudio lib recording capture disabled")
 endif()
 
 if(MARK_SHOT_WITH_LAYER_SHELL AND MARK_SHOT_LINUX AND LayerShellQt_FOUND)

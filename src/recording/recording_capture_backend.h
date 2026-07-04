@@ -9,6 +9,7 @@ enum class RecordingCaptureBackend {
     Auto,
     Wlroots,
     PipeWire,
+    WindowsWgc,
     Polling,
 };
 

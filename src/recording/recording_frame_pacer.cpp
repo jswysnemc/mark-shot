@@ -13,7 +13,7 @@ void RecordingFramePacer::reset(int fps)
 {
     const int safeFps = std::max(1, fps);
     m_intervalUs = std::max<qint64>(1, 1000000 / safeFps);
-    m_maxCatchUpFrames = std::max(1, safeFps);
+    m_maxCatchUpFrames = std::max(1, safeFps * 10);
     m_nextFrameUs = 0;
     m_started = false;
 }

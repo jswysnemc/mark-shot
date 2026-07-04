@@ -1,6 +1,6 @@
 #pragma once
 
-#include "recording/ffmpeg_recording_process.h"
+#include "recording/libav_recording_process.h"
 #include "recording/recording_frame_pacer.h"
 #include "recording/recording_options.h"
 #include "recording/recording_video_encoder_options.h"
@@ -55,10 +55,9 @@ private:
     bool writeSampleWithPacing(const RecordingFrameSample &sample, QString *error);
 
     RecordingOptions m_options;
-    FfmpegRecordingProcess m_process;
+    LibavRecordingProcess m_libavProcess;
     RecordingFramePacer m_pacer;
     QVector<RecordingVideoEncoderOptions> m_candidates;
-    QStringList m_audioArguments;
     RecordingFrameSample m_lastSample;
     QSize m_frameSize;
     int m_fps = 30;

@@ -3,10 +3,27 @@
 #include "pipewire/pipewire_dmabuf_importer.h"
 #include "screen_capture_internal.h"
 
+#include <QByteArray>
+
+#include <functional>
+
 #ifdef HAVE_PIPEWIRE
+
+struct PipeWireScreencastRawFrame {
+    QByteArray bgra;
+    QSize size;
+    int stride = 0;
+    qint64 timestampMs = 0;
+    QRect streamGeometry;
+    QString outputName;
+    bool cursorIncluded = false;
+};
 
 class PortalPipeWireScreencast final {
 public:
+    using RawFrameCallback = std::function<void(PipeWireScreencastRawFrame)>;
+    using ErrorCallback = std::function<void(QString)>;
+
     /**
      * 销毁 PipeWire 截屏会话。
      */
@@ -18,6 +35,19 @@ public:
      * @return 捕获结果。
      */
     CaptureResult capture(const CaptureRequest &request);
+
+    /**
+     * 启动 PipeWire raw-frame 流式采集。
+     * @param request 捕获请求。
+     * @param frameCallback 原始帧回调。
+     * @param errorCallback 错误回调。
+     * @param error 输出错误信息。
+     * @return 启动成功时返回 true。
+     */
+    bool startRawStream(const CaptureRequest &request,
+                        RawFrameCallback frameCallback,
+                        ErrorCallback errorCallback,
+                        QString *error);
 
     /**
      * 停止 Portal 和 PipeWire 会话。
@@ -90,6 +120,17 @@ private:
     QImage imageFromBuffer(pw_buffer *pipewireBuffer, QString *error);
 
     /**
+     * 从 PipeWire buffer 读取 raw BGRA 帧。
+     * @param pipewireBuffer PipeWire buffer。
+     * @param frame 输出 raw BGRA 帧。
+     * @param error 输出错误信息。
+     * @return 读取成功时返回 true。
+     */
+    bool rawFrameFromBuffer(pw_buffer *pipewireBuffer,
+                            PipeWireScreencastRawFrame *frame,
+                            QString *error);
+
+    /**
      * 转换四字节像素格式。
      * @param source 源像素数据。
      * @param width 宽度。
@@ -120,6 +161,7 @@ private:
                                         spa_video_format format);
 
     bool m_started = false;
+    bool m_rawStreamMode = false;
     uint m_nodeId = 0;
     QString m_targetObject;
     QString m_sessionHandle;
@@ -138,6 +180,11 @@ private:
     QImage m_latestFrame;
     qint64 m_latestFrameTimeMs = 0;
     QRect m_streamGeometry;
+    QRect m_rawRequestedGeometry;
+    QString m_rawOutputName;
+    qint64 m_rawBaseFrameTimeMs = -1;
+    RawFrameCallback m_rawFrameCallback;
+    ErrorCallback m_rawErrorCallback;
     pw_thread_loop *m_loop = nullptr;
     pw_context *m_context = nullptr;
     pw_core *m_core = nullptr;

@@ -8,6 +8,7 @@
 
 #include <cerrno>
 #include <cstring>
+#include <utility>
 
 #ifdef HAVE_WLROOTS_SCREENCOPY
 #include <fcntl.h>
@@ -190,7 +191,7 @@ QImage WlrootsScreencopyShmBuffer::toImage(bool yInvert, QString *error) const
     }
     QImage image = view.copy();
     if (yInvert) {
-        image = image.mirrored(false, true);
+        image = image.flipped(Qt::Vertical);
     }
     image.setDevicePixelRatio(1.0);
     return image;
@@ -243,6 +244,52 @@ RecordingRawBgraFrame WlrootsScreencopyShmBuffer::copyBgraFrame(bool yInvert, QS
                     source + static_cast<qsizetype>(sourceY) * m_stride,
                     static_cast<size_t>(rowBytes));
     }
+    return frame;
+#endif
+}
+
+/**
+ * 【录制】【wlroots采集】把缓冲内容包装为共享内存 raw BGRA 视图。
+ * @param owner 维持缓冲生命周期的共享所有者。
+ * @param yInvert 内容是否上下翻转。
+ * @param error 输出错误信息。
+ * @return raw BGRA 视图。
+ */
+RecordingRawBgraFrame WlrootsScreencopyShmBuffer::mappedBgraFrame(std::shared_ptr<const void> owner,
+                                                                  bool yInvert,
+                                                                  QString *error) const
+{
+    if (error) {
+        error->clear();
+    }
+#ifndef HAVE_WLROOTS_SCREENCOPY
+    Q_UNUSED(owner)
+    Q_UNUSED(yInvert)
+    if (error) {
+        *error = QStringLiteral("wlroots screencopy support is not enabled");
+    }
+    return {};
+#else
+    if (!m_data || !m_buffer || m_width <= 0 || m_height <= 0 || !owner) {
+        if (error) {
+            *error = QStringLiteral("wl_shm buffer is empty");
+        }
+        return {};
+    }
+    if (!isSupportedFormat(m_format)) {
+        if (error) {
+            *error = QStringLiteral("unsupported wl_shm format %1").arg(m_format);
+        }
+        return {};
+    }
+
+    RecordingRawBgraFrame frame;
+    frame.mappedOwner = std::move(owner);
+    frame.mappedData = static_cast<const char *>(m_data);
+    frame.mappedSize = m_size;
+    frame.size = QSize(m_width, m_height);
+    frame.stride = m_stride;
+    frame.yInverted = yInvert;
     return frame;
 #endif
 }

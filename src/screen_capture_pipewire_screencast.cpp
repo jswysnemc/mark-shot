@@ -12,6 +12,9 @@ PortalPipeWireScreencast::~PortalPipeWireScreencast()
 
 CaptureResult PortalPipeWireScreencast::capture(const CaptureRequest &request)
 {
+    if (m_rawStreamMode) {
+        stop();
+    }
     const int requestedTargetFps = std::max(0, request.targetFps);
     if (m_started && requestedTargetFps != m_targetFps) {
         stop();
@@ -122,6 +125,58 @@ CaptureResult PortalPipeWireScreencast::capture(const CaptureRequest &request)
     return {image, {}, request.preferredOutputName, request.sourceGeometry, m_cursorIncluded, frameTimeMs};
 }
 
+bool PortalPipeWireScreencast::startRawStream(const CaptureRequest &request,
+                                             RawFrameCallback frameCallback,
+                                             ErrorCallback errorCallback,
+                                             QString *error)
+{
+    if (error) {
+        error->clear();
+    }
+    if (!frameCallback) {
+        if (error) {
+            *error = QStringLiteral("PipeWire raw stream callback is empty");
+        }
+        return false;
+    }
+    if (m_started) {
+        stop();
+    }
+    if (!request.allowInteractivePortal) {
+        if (error) {
+            *error = QStringLiteral("portal screencast requires interactive authorization");
+        }
+        return false;
+    }
+
+    m_rawStreamMode = true;
+    m_rawFrameCallback = std::move(frameCallback);
+    m_rawErrorCallback = std::move(errorCallback);
+    m_rawRequestedGeometry = request.sourceGeometry;
+    m_rawOutputName = request.preferredOutputName;
+    m_rawBaseFrameTimeMs = -1;
+    m_targetFps = std::max(0, request.targetFps);
+    m_minFrameIntervalUs = m_targetFps > 0
+        ? std::max<qint64>(1, 1000000 / m_targetFps)
+        : 0;
+
+    QString startError;
+    if (!start(request.includeCursor, &startError)) {
+        stop();
+        if (error) {
+            *error = startError;
+        }
+        return false;
+    }
+    markshot::debugLog("screencast",
+                       "【录制】【PipeWire流回调】started node_id=%u target=%s session=%s fps=%d",
+                       m_nodeId,
+                       m_targetObject.isEmpty() ? "(none)" : m_targetObject.toUtf8().constData(),
+                       m_sessionHandle.toUtf8().constData(),
+                       m_targetFps);
+    return true;
+}
+
 void PortalPipeWireScreencast::stop()
 {
     if (m_loop) {
@@ -183,6 +238,12 @@ void PortalPipeWireScreencast::stop()
     markshot::debugLog("screencast", "stop session=%s frames_seen=%d",
                        m_sessionHandle.isEmpty() ? "<closed>" : "closing", m_frameCount);
     m_started = false;
+    m_rawStreamMode = false;
+    m_rawFrameCallback = {};
+    m_rawErrorCallback = {};
+    m_rawRequestedGeometry = {};
+    m_rawOutputName.clear();
+    m_rawBaseFrameTimeMs = -1;
     m_nodeId = 0;
     m_targetObject.clear();
     m_cursorIncluded = false;

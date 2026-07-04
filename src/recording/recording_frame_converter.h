@@ -10,6 +10,8 @@ namespace markshot::recording {
 struct RecordingBgraFrame {
     const char *data = nullptr;
     qsizetype size = 0;
+    int stride = 0;
+    bool yInverted = false;
 };
 
 class RecordingFrameConverter final {

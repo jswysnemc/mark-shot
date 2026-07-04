@@ -23,10 +23,17 @@ QString extensionForMode(RecordingMode mode)
 
 QString defaultRecordingPath(RecordingMode mode)
 {
+    return defaultRecordingPathInDirectory(recordingDirectoryForMode(mode), mode);
+}
+
+QString defaultRecordingPathInDirectory(const QString &directory, RecordingMode mode)
+{
     const QString timestamp = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"));
-    const QString directory = recordingDirectoryForMode(mode);
-    QDir().mkpath(directory);
-    return QDir(directory)
+    const QString targetDirectory = directory.trimmed().isEmpty()
+        ? recordingDirectoryForMode(mode)
+        : directory.trimmed();
+    QDir().mkpath(targetDirectory);
+    return QDir(targetDirectory)
         .filePath(QStringLiteral("mark-shot-recording-%1.%2").arg(timestamp, extensionForMode(mode)));
 }
 

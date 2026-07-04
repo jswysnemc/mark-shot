@@ -1,8 +1,6 @@
 #include "recording/video_recording_writer.h"
 
 #include "debug_log.h"
-#include "recording/audio_capture_options.h"
-#include "recording/video_recording_ffmpeg_arguments.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -33,13 +31,6 @@ bool VideoRecordingWriter::start(QSize frameSize, int fps, QString *error)
 
     m_frameSize = frameSize;
     m_fps = std::max(1, fps);
-    m_audioArguments = m_options.includeAudio ? defaultAudioInputArguments() : QStringList();
-    if (m_options.includeAudio && m_audioArguments.isEmpty()) {
-        if (error) {
-            *error = QStringLiteral("Audio recording is not supported on this platform");
-        }
-        return false;
-    }
 
     m_candidates = recordingVideoEncoderCandidates(m_options, m_fps);
     m_candidateIndex = 0;
@@ -70,12 +61,12 @@ bool VideoRecordingWriter::writeFrame(const RecordingFrameSample &sample, QStrin
 
 bool VideoRecordingWriter::finish(QString *error)
 {
-    return m_process.finish(error);
+    return m_libavProcess.finish(error);
 }
 
 void VideoRecordingWriter::cancel()
 {
-    m_process.cancel();
+    m_libavProcess.cancel();
 }
 
 bool VideoRecordingWriter::startCandidate(int candidateIndex, QString *error)
@@ -88,23 +79,18 @@ bool VideoRecordingWriter::startCandidate(int candidateIndex, QString *error)
     }
 
     const RecordingVideoEncoderOptions &candidate = m_candidates.at(candidateIndex);
-    const QStringList arguments = buildVideoRecordingFfmpegArguments(m_options,
-                                                                     m_frameSize,
-                                                                     m_fps,
-                                                                     m_audioArguments,
-                                                                     candidate);
     markshot::debugLog("recording",
-                       "【录制】【编码器】start encoder=%s hardware=%d",
+                       "【录制】【库内编码】start encoder=%s hardware=%d",
                        candidate.id.toUtf8().constData(),
                        candidate.hardware ? 1 : 0);
-    return m_process.start(m_options.ffmpegPath, arguments, m_frameSize, error);
+    return m_libavProcess.start(m_options, candidate, m_frameSize, m_fps, error);
 }
 
 bool VideoRecordingWriter::startNextCandidate(QString *error)
 {
     const QString previousError = error ? *error : QString();
     QString lastError = previousError;
-    m_process.cancel();
+    cancel();
     for (int index = m_candidateIndex + 1; index < m_candidates.size(); ++index) {
         QString candidateError;
         if (startCandidate(index, &candidateError)) {
@@ -154,14 +140,14 @@ bool VideoRecordingWriter::writeSampleWithPacing(const RecordingFrameSample &sam
     const int duplicates = m_pacer.duplicatesBefore(sample.timestampMs);
     if (m_lastSample.hasFrameData()) {
         for (int i = 0; i < duplicates; ++i) {
-            if (!m_process.writeFrame(m_lastSample, error)) {
+            if (!m_libavProcess.writeFrame(m_lastSample, error)) {
                 return false;
             }
             ++m_writtenFrames;
         }
     }
 
-    if (!m_process.writeFrame(sample, error)) {
+    if (!m_libavProcess.writeFrame(sample, error)) {
         return false;
     }
     m_lastSample = sample;

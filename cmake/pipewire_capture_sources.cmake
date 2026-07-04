@@ -4,6 +4,7 @@ set(MARK_SHOT_PIPEWIRE_CAPTURE_SOURCES
     src/screen_capture_pipewire.cpp
     src/screen_capture_pipewire_libportal.cpp
     src/screen_capture_pipewire_libportal.h
+    src/screen_capture_pipewire_raw_frame.cpp
     src/screen_capture_pipewire_screencast.cpp
     src/screen_capture_pipewire_screencast.h
     src/screen_capture_pipewire_stream.cpp

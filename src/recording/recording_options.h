@@ -1,5 +1,7 @@
 #pragma once
 
+#include "recording/recording_capture_backend.h"
+
 #include <QRect>
 #include <QString>
 
@@ -28,10 +30,10 @@ struct RecordingOptions {
     RecordingScope scope = RecordingScope::Region;
     int fps = 12;
     bool includeAudio = false;
+    RecordingCaptureBackend captureBackend = RecordingCaptureBackend::Auto;
     DisplaySource display;
     QRect captureGeometry;
     QString outputPath;
-    QString ffmpegPath = QStringLiteral("ffmpeg");
 };
 
 }  // namespace markshot::recording

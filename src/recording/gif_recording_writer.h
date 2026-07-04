@@ -1,6 +1,6 @@
 #pragma once
 
-#include "recording/ffmpeg_recording_process.h"
+#include "recording/libav_gif_recording_process.h"
 #include "recording/recording_options.h"
 #include "recording/recording_writer.h"
 
@@ -21,7 +21,7 @@ public:
 
 private:
     RecordingOptions m_options;
-    FfmpegRecordingProcess m_process;
+    LibavGifRecordingProcess m_process;
 };
 
 }  // namespace markshot::recording

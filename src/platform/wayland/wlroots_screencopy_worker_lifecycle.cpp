@@ -149,7 +149,12 @@ void WlrootsScreencopyWorker::cleanup()
     }
     // 2. 【录制】【wlroots采集】按依赖顺序释放 frame、buffer、output 和全局对象
     destroyCurrentFrame();
-    m_buffer.reset();
+    m_currentBuffer.reset();
+    if (!m_buffers.waitUntilIdle(2000)) {
+        markshot::debugLog("recording",
+                           "【录制】【wlroots缓冲池】等待缓冲归还超时");
+    }
+    m_buffers.reset();
     for (std::unique_ptr<WlrootsOutput> &output : m_outputs) {
         if (output->output) {
             wl_output_destroy(output->output);

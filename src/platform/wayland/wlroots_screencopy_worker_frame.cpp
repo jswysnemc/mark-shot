@@ -1,5 +1,7 @@
 #include "platform/wayland/wlroots_screencopy_worker.h"
 
+#include <QTimer>
+
 #include <algorithm>
 #include <utility>
 
@@ -216,23 +218,30 @@ void WlrootsScreencopyWorker::copyPendingFrame()
     if (!m_frame || !m_hasPendingBuffer) {
         return;
     }
-    // 1. 【录制】【wlroots采集】复用或创建满足当前帧参数的共享内存 buffer
+    // 1. 【录制】【wlroots采集】从缓冲池复用或创建满足当前帧参数的共享内存 buffer
     QString error;
-    if (!m_buffer.ensure(m_shm,
-                         m_pendingFormat,
-                         m_pendingWidth,
-                         m_pendingHeight,
-                         m_pendingStride,
-                         &error)) {
-        emit failed(error);
+    m_currentBuffer = m_buffers.acquire(m_shm,
+                                        m_pendingFormat,
+                                        m_pendingWidth,
+                                        m_pendingHeight,
+                                        m_pendingStride,
+                                        &error);
+    if (!m_currentBuffer) {
         destroyCurrentFrame();
+        if (error == QStringLiteral("wlroots screencopy buffer pool is temporarily full")) {
+            QTimer::singleShot(2, this, [this] {
+                requestFrame();
+            });
+            return;
+        }
+        emit failed(error);
         return;
     }
     // 2. 【录制】【wlroots采集】优先使用带 damage 的复制接口，旧协议回退普通 copy
     if (m_screencopyVersion >= 2) {
-        zwlr_screencopy_frame_v1_copy_with_damage(m_frame, m_buffer.buffer());
+        zwlr_screencopy_frame_v1_copy_with_damage(m_frame, m_currentBuffer->buffer());
     } else {
-        zwlr_screencopy_frame_v1_copy(m_frame, m_buffer.buffer());
+        zwlr_screencopy_frame_v1_copy(m_frame, m_currentBuffer->buffer());
     }
     wl_display_flush(m_display);
 }
@@ -248,9 +257,17 @@ void WlrootsScreencopyWorker::publishReadyFrame(uint32_t tvSecHi,
                                                 uint32_t tvSecLo,
                                                 uint32_t tvNsec)
 {
-    // 1. 【录制】【wlroots采集】把 wl_shm 内容复制成连续 BGRA，避免后续帧覆盖
+    // 1. 【录制】【wlroots采集】把 wl_shm 内容包装成 raw BGRA 视图，由样本持有缓冲生命周期
     QString error;
-    RecordingRawBgraFrame frame = m_buffer.copyBgraFrame(m_yInvert, &error);
+    if (!m_currentBuffer) {
+        emit failed(QStringLiteral("wlroots screencopy ready frame has no buffer"));
+        destroyCurrentFrame();
+        return;
+    }
+    RecordingRawBgraFrame frame =
+        m_currentBuffer->mappedBgraFrame(std::static_pointer_cast<const void>(m_currentBuffer),
+                                         m_yInvert,
+                                         &error);
     if (!frame.isValid()) {
         emit failed(error);
         destroyCurrentFrame();
@@ -297,6 +314,7 @@ void WlrootsScreencopyWorker::destroyCurrentFrame()
         zwlr_screencopy_frame_v1_destroy(m_frame);
         m_frame = nullptr;
     }
+    m_currentBuffer.reset();
     m_capturePending = false;
     m_hasPendingBuffer = false;
 }

@@ -3,7 +3,6 @@
 #include "recording/recording_options.h"
 
 #include <QString>
-#include <QStringList>
 #include <QVector>
 
 namespace markshot::recording {
@@ -11,8 +10,6 @@ namespace markshot::recording {
 struct RecordingVideoEncoderOptions {
     QString id;
     QString label;
-    QStringList globalArguments;
-    QStringList videoArguments;
     bool hardware = false;
 };
 

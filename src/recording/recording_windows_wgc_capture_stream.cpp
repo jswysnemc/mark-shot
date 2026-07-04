@@ -1,7 +1,7 @@
-#include "recording/recording_pipewire_capture_stream.h"
+#include "recording/recording_windows_wgc_capture_stream.h"
 
 #include "debug_log.h"
-#include "screen_capture.h"
+#include "platform/windows/windows_wgc_stream.h"
 
 #include <QMetaObject>
 
@@ -9,23 +9,19 @@
 #include <atomic>
 #include <utility>
 
-#ifdef HAVE_PIPEWIRE
-#include "screen_capture_pipewire_screencast.h"
-#endif
-
 namespace markshot::recording {
 namespace {
 
-#ifdef HAVE_PIPEWIRE
+#if defined(Q_OS_WIN)
 
-class RecordingPipeWireCaptureStream final : public RecordingCaptureStream {
+class RecordingWindowsWgcCaptureStream final : public RecordingCaptureStream {
 public:
     /**
-     * 创建 PipeWire portal 录制采集流。
+     * 创建 Windows Graphics Capture 录制采集流。
      * @param options 录制配置。
      * @param parent 父对象。
      */
-    explicit RecordingPipeWireCaptureStream(RecordingOptions options, QObject *parent = nullptr)
+    explicit RecordingWindowsWgcCaptureStream(RecordingOptions options, QObject *parent = nullptr)
         : RecordingCaptureStream(parent)
         , m_options(std::move(options))
     {
@@ -33,7 +29,7 @@ public:
     }
 
     /**
-     * 启动 PipeWire portal 采集。
+     * 启动 Windows Graphics Capture 采集。
      * @param error 输出错误信息。
      * @return 启动成功时返回 true。
      */
@@ -44,7 +40,7 @@ public:
         }
         if (m_options.display.allOutputs && m_options.scope == RecordingScope::Display) {
             if (error) {
-                *error = QStringLiteral("PipeWire recording capture does not support all-outputs recording");
+                *error = QStringLiteral("Windows Graphics Capture recording does not support all-outputs recording");
             }
             return false;
         }
@@ -57,15 +53,15 @@ public:
         request.preferredOutputName = m_options.display.outputName;
         request.allOutputs = false;
         request.preferScreencast = true;
-        request.allowInteractivePortal = true;
+        request.allowInteractivePortal = false;
         request.allowPortalScreenshotFallback = false;
         request.includeCursor = true;
         request.targetFps = std::max(1, m_options.fps);
 
         QString streamError;
-        if (!m_screencast.startRawStream(
+        if (!m_stream.start(
                 request,
-                [this](PipeWireScreencastRawFrame frame) {
+                [this](markshot::platform::windows::WindowsWgcFrame frame) {
                     handleRawFrame(std::move(frame));
                 },
                 [this](QString errorText) {
@@ -80,7 +76,7 @@ public:
         }
 
         markshot::debugLog("recording",
-                           "【录制】【PipeWire采集】started mode=stream-callback geometry=%d,%d %dx%d fps=%d",
+                           "【录制】【Windows采集】started mode=wgc-stream geometry=%d,%d %dx%d fps=%d",
                            m_options.captureGeometry.x(),
                            m_options.captureGeometry.y(),
                            m_options.captureGeometry.width(),
@@ -90,13 +86,13 @@ public:
     }
 
     /**
-     * 停止 PipeWire portal 采集。
+     * 停止 Windows Graphics Capture 采集。
      * @return 无返回值。
      */
     void stop() override
     {
         m_running = false;
-        m_screencast.stop();
+        m_stream.stop();
     }
 
     /**
@@ -114,11 +110,11 @@ public:
 
 private:
     /**
-     * 处理 PipeWire stream 回调送来的 raw BGRA 帧。
+     * 处理 Windows WGC 回调送来的 raw BGRA 帧。
      * @param frame raw BGRA 帧。
      * @return 无返回值。
      */
-    void handleRawFrame(PipeWireScreencastRawFrame frame)
+    void handleRawFrame(markshot::platform::windows::WindowsWgcFrame frame)
     {
         if (!m_running || m_backpressureActive || frame.bgra.isEmpty() || frame.size.isEmpty()) {
             return;
@@ -141,7 +137,7 @@ private:
     }
 
     /**
-     * 处理 PipeWire stream 回调错误。
+     * 处理 Windows WGC 回调错误。
      * @param errorText 错误文本。
      * @return 无返回值。
      */
@@ -161,7 +157,7 @@ private:
     }
 
     RecordingOptions m_options;
-    PortalPipeWireScreencast m_screencast;
+    markshot::platform::windows::WindowsWgcStream m_stream;
     qint64 m_sequence = 0;
     std::atomic_bool m_running{false};
     std::atomic_bool m_backpressureActive{false};
@@ -171,11 +167,18 @@ private:
 
 }  // namespace
 
-std::unique_ptr<RecordingCaptureStream> createPipeWireRecordingCaptureStream(const RecordingOptions &options,
-                                                                             QObject *parent)
+std::unique_ptr<RecordingCaptureStream> createWindowsWgcRecordingCaptureStream(const RecordingOptions &options,
+                                                                               QObject *parent)
 {
-#ifdef HAVE_PIPEWIRE
-    return std::make_unique<RecordingPipeWireCaptureStream>(options, parent);
+#if defined(Q_OS_WIN)
+    QString error;
+    if (!markshot::platform::windows::windowsWgcStreamSupported(&error)) {
+        markshot::debugLog("recording",
+                           "【录制】【Windows采集】unavailable error=%s",
+                           error.toUtf8().constData());
+        return nullptr;
+    }
+    return std::make_unique<RecordingWindowsWgcCaptureStream>(options, parent);
 #else
     Q_UNUSED(options)
     Q_UNUSED(parent)
