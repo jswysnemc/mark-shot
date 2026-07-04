@@ -1,10 +1,12 @@
 #pragma once
 
 #include "pipewire/pipewire_dmabuf_importer.h"
+#include "recording/recording_bgra_buffer_pool.h"
 #include "screen_capture_internal.h"
 
 #include <QByteArray>
 
+#include <atomic>
 #include <functional>
 
 #ifdef HAVE_PIPEWIRE
@@ -13,6 +15,7 @@ struct PipeWireScreencastRawFrame {
     QByteArray bgra;
     QSize size;
     int stride = 0;
+    bool yInverted = false;
     qint64 timestampMs = 0;
     QRect streamGeometry;
     QString outputName;
@@ -54,6 +57,13 @@ public:
      * @return 无返回值。
      */
     void stop();
+
+    /**
+     * 设置 raw 流写出背压状态，激活时在拷贝前丢弃回调帧。
+     * @param active 下游写出队列繁忙时为 true。
+     * @return 无返回值。
+     */
+    void setRawBackpressure(bool active);
 
 private:
     /**
@@ -131,6 +141,19 @@ private:
                             QString *error);
 
     /**
+     * 读取 DMA-BUF buffer 的 raw BGRA 帧，优先 GPU 裁剪直读。
+     * @param spaBuffer SPA buffer。
+     * @param pipewireBuffer PipeWire buffer，回退路径使用。
+     * @param frame 输出 raw BGRA 帧。
+     * @param error 输出错误信息。
+     * @return 读取成功时返回 true。
+     */
+    bool readDmaBufRawFrame(const spa_buffer *spaBuffer,
+                            pw_buffer *pipewireBuffer,
+                            PipeWireScreencastRawFrame *frame,
+                            QString *error);
+
+    /**
      * 转换四字节像素格式。
      * @param source 源像素数据。
      * @param width 宽度。
@@ -185,6 +208,9 @@ private:
     qint64 m_rawBaseFrameTimeMs = -1;
     RawFrameCallback m_rawFrameCallback;
     ErrorCallback m_rawErrorCallback;
+    std::atomic_bool m_rawBackpressure{false};
+    markshot::recording::RecordingBgraBufferPool m_rawBufferPool;
+    bool m_rawDmaBufDirectReadBroken = false;
     pw_thread_loop *m_loop = nullptr;
     pw_context *m_context = nullptr;
     pw_core *m_core = nullptr;

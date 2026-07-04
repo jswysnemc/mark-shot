@@ -42,6 +42,13 @@ public:
      */
     void stop();
 
+    /**
+     * 设置写出背压状态，激活时在纹理读回前丢弃帧。
+     * @param active 下游写出队列繁忙时为 true。
+     * @return 无返回值。
+     */
+    void setBackpressure(bool active);
+
 private:
     class Private;
     std::unique_ptr<Private> d;

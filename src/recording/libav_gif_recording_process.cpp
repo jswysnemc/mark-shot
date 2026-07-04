@@ -246,7 +246,10 @@ RecordingBgraFrame LibavGifRecordingProcess::Private::bgraBytesForSample(
     if (sample.bgra.isValid() && sample.bgra.size == m_frameSize) {
         const int rowBytes = m_frameSize.width() * 4;
         if (sample.bgra.stride == rowBytes) {
-            return {sample.bgra.bytes.constData(), sample.bgra.bytes.size()};
+            return {sample.bgra.bytes.constData(),
+                    sample.bgra.bytes.size(),
+                    sample.bgra.stride,
+                    sample.bgra.yInverted};
         }
     }
     if (!sample.image.isNull()) {
@@ -268,8 +271,15 @@ bool LibavGifRecordingProcess::Private::fillFrame(RecordingBgraFrame bytes, QStr
                         QStringLiteral("Failed to make GIF frame writable: %1")
                             .arg(libavErrorText(result)));
     }
-    const uint8_t *sourceData[] = {reinterpret_cast<const uint8_t *>(bytes.data)};
-    const int sourceLineSize[] = {m_frameSize.width() * 4};
+    const char *source = bytes.data;
+    int sourceStride = bytes.stride > 0 ? bytes.stride : m_frameSize.width() * 4;
+    if (bytes.yInverted) {
+        // 自底向上的帧从末行起以负跨度读取，交给 sws 完成翻转
+        source += static_cast<qsizetype>(sourceStride) * (m_frameSize.height() - 1);
+        sourceStride = -sourceStride;
+    }
+    const uint8_t *sourceData[] = {reinterpret_cast<const uint8_t *>(source)};
+    const int sourceLineSize[] = {sourceStride};
     sws_scale(m_swsContext,
               sourceData,
               sourceLineSize,

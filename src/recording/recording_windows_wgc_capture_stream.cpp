@@ -106,6 +106,8 @@ public:
             return;
         }
         m_backpressureActive = active;
+        // 背压状态下沉到 WGC 回调层，让丢帧发生在纹理读回之前
+        m_stream.setBackpressure(active);
     }
 
 private:

@@ -2,7 +2,10 @@
 
 #ifdef HAVE_PIPEWIRE
 
+#include "debug_log.h"
+
 #include <cerrno>
+#include <cstdlib>
 #include <cstring>
 #include <sys/mman.h>
 
@@ -47,10 +50,13 @@ bool canTryFdMap(const spa_data &data)
 /**
  * 【录制】【PipeWire帧读取】把 QImage 转成连续 BGRA 字节。
  * @param image 输入图像。
+ * @param pool 帧缓冲池。
  * @param frame 输出 raw BGRA 帧。
  * @return 转换成功时返回 true。
  */
-bool fillRawFrameFromImage(const QImage &image, PipeWireScreencastRawFrame *frame)
+bool fillRawFrameFromImage(const QImage &image,
+                           markshot::recording::RecordingBgraBufferPool &pool,
+                           PipeWireScreencastRawFrame *frame)
 {
     if (image.isNull() || !frame) {
         return false;
@@ -63,14 +69,16 @@ bool fillRawFrameFromImage(const QImage &image, PipeWireScreencastRawFrame *fram
     }
 
     const int rowBytes = bgra.width() * 4;
-    frame->bgra.resize(static_cast<qsizetype>(rowBytes) * bgra.height());
+    QByteArray &buffer = pool.acquire(static_cast<qsizetype>(rowBytes) * bgra.height());
     for (int y = 0; y < bgra.height(); ++y) {
-        std::memcpy(frame->bgra.data() + static_cast<qsizetype>(y) * rowBytes,
+        std::memcpy(buffer.data() + static_cast<qsizetype>(y) * rowBytes,
                     bgra.constScanLine(y),
                     static_cast<size_t>(rowBytes));
     }
+    frame->bgra = buffer;
     frame->size = bgra.size();
     frame->stride = rowBytes;
+    frame->yInverted = false;
     return true;
 }
 
@@ -106,17 +114,7 @@ bool PortalPipeWireScreencast::rawFrameFromBuffer(pw_buffer *pipewireBuffer,
         return false;
     }
     if (data.type == SPA_DATA_DmaBuf) {
-        QImage image = imageFromBuffer(pipewireBuffer, error);
-        if (!m_rawRequestedGeometry.isEmpty()) {
-            image = markshot::capture::cropFrameToRequest(
-                image,
-                streamGeometryFromProperties(m_streamProperties, image.size()),
-                m_rawRequestedGeometry);
-        }
-        if (!fillRawFrameFromImage(image, frame)) {
-            if (error && error->isEmpty()) {
-                *error = QStringLiteral("failed to convert PipeWire DMA-BUF frame to raw BGRA");
-            }
+        if (!readDmaBufRawFrame(spaBuffer, pipewireBuffer, frame, error)) {
             return false;
         }
     } else {
@@ -206,24 +204,28 @@ bool PortalPipeWireScreencast::rawFrameFromBuffer(pw_buffer *pipewireBuffer,
 
         if (m_videoInfo.format == SPA_VIDEO_FORMAT_BGRA
             || m_videoInfo.format == SPA_VIDEO_FORMAT_BGRx) {
+            // BGRA 快路径复用池化缓冲，避免每帧新分配整帧内存
             const int rowBytes = crop.width() * 4;
-            frame->bgra.resize(static_cast<qsizetype>(rowBytes) * crop.height());
+            QByteArray &buffer =
+                m_rawBufferPool.acquire(static_cast<qsizetype>(rowBytes) * crop.height());
             for (int y = 0; y < crop.height(); ++y) {
                 const uchar *row = source
                     + static_cast<qsizetype>(crop.y() + y) * stride
                     + static_cast<qsizetype>(crop.x()) * 4;
-                std::memcpy(frame->bgra.data() + static_cast<qsizetype>(y) * rowBytes,
+                std::memcpy(buffer.data() + static_cast<qsizetype>(y) * rowBytes,
                             row,
                             static_cast<size_t>(rowBytes));
             }
+            frame->bgra = buffer;
             frame->size = crop.size();
             frame->stride = rowBytes;
+            frame->yInverted = false;
         } else {
             QImage image = imageFromBuffer(pipewireBuffer, error);
             if (!m_rawRequestedGeometry.isEmpty()) {
                 image = markshot::capture::cropFrameToRequest(image, sourceGeometry, m_rawRequestedGeometry);
             }
-            if (!fillRawFrameFromImage(image, frame)) {
+            if (!fillRawFrameFromImage(image, m_rawBufferPool, frame)) {
                 if (mappedAddress) {
                     ::munmap(mappedAddress, mappedSize);
                 }
@@ -249,6 +251,70 @@ bool PortalPipeWireScreencast::rawFrameFromBuffer(pw_buffer *pipewireBuffer,
     }
     frame->outputName = m_rawOutputName;
     frame->cursorIncluded = m_cursorIncluded;
+    return true;
+}
+
+bool PortalPipeWireScreencast::readDmaBufRawFrame(const spa_buffer *spaBuffer,
+                                                  pw_buffer *pipewireBuffer,
+                                                  PipeWireScreencastRawFrame *frame,
+                                                  QString *error)
+{
+    const int width = static_cast<int>(m_videoInfo.size.width);
+    const int height = static_cast<int>(m_videoInfo.size.height);
+    if (!m_rawDmaBufDirectReadBroken && width > 0 && height > 0) {
+        const QRect streamGeometry =
+            streamGeometryFromProperties(m_streamProperties, QSize(width, height));
+        const QRect sourceGeometry = streamGeometry.isEmpty()
+            ? QRect(QPoint(0, 0), QSize(width, height))
+            : streamGeometry;
+        const QRect crop = m_rawRequestedGeometry.isEmpty()
+            ? QRect(QPoint(0, 0), QSize(width, height))
+            : markshot::capture::scaledCropRect(sourceGeometry,
+                                                m_rawRequestedGeometry,
+                                                QSize(width, height));
+        if (!crop.isEmpty()) {
+            // 1. 优先走 GPU 裁剪直读，单次读回即得到编码器可用的 BGRA 数据
+            if (!m_dmaBufImporter) {
+                m_dmaBufImporter = std::make_unique<markshot::PipeWireDmaBufImporter>();
+            }
+            const int rowBytes = crop.width() * 4;
+            QByteArray &buffer =
+                m_rawBufferPool.acquire(static_cast<qsizetype>(rowBytes) * crop.height());
+            QString directError;
+            if (m_dmaBufImporter->importBufferToBgra(spaBuffer,
+                                                     m_videoInfo,
+                                                     crop,
+                                                     &buffer,
+                                                     &directError)) {
+                frame->bgra = buffer;
+                frame->size = crop.size();
+                frame->stride = rowBytes;
+                frame->yInverted = true;
+                frame->streamGeometry = sourceGeometry;
+                return true;
+            }
+            // 直读失败后记住结果，后续帧直接走回退路径避免重复失败开销
+            m_rawDmaBufDirectReadBroken = true;
+            markshot::debugLog("screencast",
+                               "【录制】【PipeWire DMA-BUF】direct-read fallback error=%s",
+                               directError.toUtf8().constData());
+        }
+    }
+
+    // 2. 直读失败时回退 QImage 转换链，保持旧驱动兼容
+    QImage image = imageFromBuffer(pipewireBuffer, error);
+    if (!m_rawRequestedGeometry.isEmpty()) {
+        image = markshot::capture::cropFrameToRequest(
+            image,
+            streamGeometryFromProperties(m_streamProperties, image.size()),
+            m_rawRequestedGeometry);
+    }
+    if (!fillRawFrameFromImage(image, m_rawBufferPool, frame)) {
+        if (error && error->isEmpty()) {
+            *error = QStringLiteral("failed to convert PipeWire DMA-BUF frame to raw BGRA");
+        }
+        return false;
+    }
     return true;
 }
 

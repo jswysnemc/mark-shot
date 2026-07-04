@@ -110,6 +110,8 @@ public:
             return;
         }
         m_backpressureActive = active;
+        // 背压状态下沉到 PipeWire 回调层，让丢帧发生在拷贝之前
+        m_screencast.setRawBackpressure(active);
     }
 
 private:
@@ -128,6 +130,7 @@ private:
         sample.bgra.bytes = std::move(frame.bgra);
         sample.bgra.size = frame.size;
         sample.bgra.stride = frame.stride;
+        sample.bgra.yInverted = frame.yInverted;
         sample.timestampMs = frame.timestampMs;
         sample.sequence = ++m_sequence;
         QMetaObject::invokeMethod(

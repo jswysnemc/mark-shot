@@ -2,6 +2,7 @@
 
 #include "debug_log.h"
 #include "platform/windows/windows_wgc_support.h"
+#include "recording/recording_bgra_buffer_pool.h"
 
 #include <QElapsedTimer>
 
@@ -33,11 +34,13 @@ struct StreamState {
     QSize outputSize;
     std::mutex frameMutex;
     winrt::com_ptr<ID3D11Texture2D> staging;
+    markshot::recording::RecordingBgraBufferPool bgraPool;
     UINT stagingWidth = 0;
     UINT stagingHeight = 0;
     DXGI_FORMAT stagingFormat = DXGI_FORMAT_UNKNOWN;
     std::atomic_bool running{false};
     std::atomic_bool errorReported{false};
+    std::atomic_bool backpressure{false};
 };
 
 /**
@@ -158,18 +161,21 @@ std::optional<WindowsWgcFrame> readFrameToBgra(const std::shared_ptr<StreamState
     const QRect sourceCrop = state->cropPixels.intersected(QRect(QPoint(0, 0), frameSize));
     const QRect crop = sourceCrop.isEmpty() ? QRect(QPoint(0, 0), frameSize) : sourceCrop;
     const int rowBytes = crop.width() * 4;
-    QByteArray bgra(rowBytes * crop.height(), Qt::Uninitialized);
+    // 复用池化缓冲承接 staging 纹理数据，避免每帧新分配整帧内存
+    QByteArray &bgra = state->bgraPool.acquire(static_cast<qsizetype>(rowBytes) * crop.height());
     for (int y = 0; y < crop.height(); ++y) {
         const auto *source = static_cast<const uchar *>(mapped.pData)
             + mapped.RowPitch * (crop.y() + y)
             + crop.x() * 4;
-        std::memcpy(bgra.data() + rowBytes * y, source, static_cast<std::size_t>(rowBytes));
+        std::memcpy(bgra.data() + static_cast<qsizetype>(rowBytes) * y,
+                    source,
+                    static_cast<std::size_t>(rowBytes));
     }
 
     state->bundle.context->Unmap(state->staging.get(), 0);
 
     WindowsWgcFrame output;
-    output.bgra = std::move(bgra);
+    output.bgra = bgra;
     output.size = crop.size();
     output.stride = rowBytes;
     output.timestampMs = state->elapsed.isValid() ? state->elapsed.elapsed() : 0;
@@ -194,6 +200,10 @@ void handleFrameArrived(const std::weak_ptr<StreamState> &weakState,
         const Capture::Direct3D11CaptureFrame frame = sender.TryGetNextFrame();
         if (!frame) {
             reportStreamError(state, QStringLiteral("Windows Graphics Capture frame was empty"));
+            return;
+        }
+        // 写出队列繁忙时在纹理读回前丢弃帧，避免为将被丢弃的帧支付拷贝成本
+        if (state->backpressure.load(std::memory_order_relaxed)) {
             return;
         }
 
@@ -375,6 +385,18 @@ public:
         m_state.reset();
     }
 
+    /**
+     * 【录制】【Windows采集】设置写出背压状态。
+     * @param active 下游写出队列繁忙时为 true。
+     * @return 无返回值。
+     */
+    void setBackpressure(bool active)
+    {
+        if (m_state) {
+            m_state->backpressure.store(active, std::memory_order_relaxed);
+        }
+    }
+
 private:
     std::shared_ptr<StreamState> m_state;
     Capture::GraphicsCaptureItem m_item{nullptr};
@@ -406,6 +428,13 @@ void WindowsWgcStream::stop()
 {
     if (d) {
         d->stop();
+    }
+}
+
+void WindowsWgcStream::setBackpressure(bool active)
+{
+    if (d) {
+        d->setBackpressure(active);
     }
 }
 
@@ -446,6 +475,11 @@ bool WindowsWgcStream::start(const CaptureRequest &request,
 
 void WindowsWgcStream::stop()
 {
+}
+
+void WindowsWgcStream::setBackpressure(bool active)
+{
+    Q_UNUSED(active)
 }
 
 bool windowsWgcStreamSupported(QString *error)

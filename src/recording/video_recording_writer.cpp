@@ -35,9 +35,28 @@ bool VideoRecordingWriter::start(QSize frameSize, int fps, QString *error)
     m_candidates = recordingVideoEncoderCandidates(m_options, m_fps);
     m_candidateIndex = 0;
     m_writtenFrames = 0;
-    m_lastSample = {};
     m_pacer.reset(m_fps);
-    return startCandidate(m_candidateIndex, error);
+
+    // 1. 依次尝试编码候选，硬件编码器打开失败时自动回退软件编码
+    QString lastError;
+    for (int index = 0; index < m_candidates.size(); ++index) {
+        QString candidateError;
+        if (startCandidate(index, &candidateError)) {
+            m_candidateIndex = index;
+            return true;
+        }
+        markshot::debugLog("recording",
+                           "【录制】【编码器启动失败】candidate=%s error=%s",
+                           m_candidates.at(index).id.toUtf8().constData(),
+                           candidateError.toUtf8().constData());
+        lastError = candidateError;
+    }
+    if (error) {
+        *error = lastError.isEmpty()
+            ? QStringLiteral("No video encoder candidate is available")
+            : lastError;
+    }
+    return false;
 }
 
 bool VideoRecordingWriter::writeFrame(const RecordingFrameSample &sample, QString *error)
@@ -54,7 +73,6 @@ bool VideoRecordingWriter::writeFrame(const RecordingFrameSample &sample, QStrin
                        static_cast<long long>(sample.timestampMs),
                        m_writtenFrames);
     m_pacer.reset(m_fps);
-    m_lastSample = {};
     m_writtenFrames = 0;
     return writeSampleWithPacing(sample, error);
 }
@@ -138,9 +156,10 @@ bool VideoRecordingWriter::writeSampleWithPacing(const RecordingFrameSample &sam
     }
 
     const int duplicates = m_pacer.duplicatesBefore(sample.timestampMs);
-    if (m_lastSample.hasFrameData()) {
+    if (m_writtenFrames > 0) {
+        // 补帧复用编码器内上一帧已转换像素，避免重复执行 sws_scale 放大写线程负载
         for (int i = 0; i < duplicates; ++i) {
-            if (!m_libavProcess.writeFrame(m_lastSample, error)) {
+            if (!m_libavProcess.writeRepeatFrame(error)) {
                 return false;
             }
             ++m_writtenFrames;
@@ -150,7 +169,6 @@ bool VideoRecordingWriter::writeSampleWithPacing(const RecordingFrameSample &sam
     if (!m_libavProcess.writeFrame(sample, error)) {
         return false;
     }
-    m_lastSample = sample;
     ++m_writtenFrames;
     return true;
 }

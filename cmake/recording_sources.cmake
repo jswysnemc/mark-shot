@@ -14,6 +14,8 @@ set(MARK_SHOT_RECORDING_SOURCES
     src/recording/libav_recording_process.h
     src/recording/recording_async_writer.cpp
     src/recording/recording_async_writer.h
+    src/recording/recording_bgra_buffer_pool.cpp
+    src/recording/recording_bgra_buffer_pool.h
     src/recording/recording_config_dialog.cpp
     src/recording/recording_config_dialog.h
     src/recording/recording_dialog_config.cpp

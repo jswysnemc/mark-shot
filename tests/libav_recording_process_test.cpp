@@ -63,6 +63,49 @@ private slots:
     }
 
     /**
+     * 验证补帧接口可复用上一帧数据生成视频。
+     * @return 无返回值。
+     */
+    void writesRepeatFrames()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+
+        markshot::recording::RecordingOptions options;
+        options.mode = markshot::recording::RecordingMode::Video;
+        options.includeAudio = false;
+        options.outputPath = directory.filePath(QStringLiteral("repeat.mp4"));
+
+        markshot::recording::RecordingVideoEncoderOptions encoder;
+        encoder.id = QStringLiteral("libx264");
+        encoder.label = QStringLiteral("libx264");
+        encoder.hardware = false;
+
+        QString error;
+        markshot::recording::LibavRecordingProcess process;
+        QVERIFY2(process.start(options, encoder, QSize(32, 24), 10, &error),
+                 qPrintable(error));
+
+        // 无前置帧时补帧必须失败
+        QVERIFY(!process.writeRepeatFrame(&error));
+
+        QImage image(32, 24, QImage::Format_ARGB32);
+        image.fill(QColor(60, 90, 130).rgba());
+        markshot::recording::RecordingFrameSample sample;
+        sample.image = image;
+        sample.timestampMs = 0;
+        sample.sequence = 1;
+        QVERIFY2(process.writeFrame(sample, &error), qPrintable(error));
+        QVERIFY2(process.writeRepeatFrame(&error), qPrintable(error));
+        QVERIFY2(process.writeRepeatFrame(&error), qPrintable(error));
+
+        QVERIFY2(process.finish(&error), qPrintable(error));
+        const QFileInfo output(options.outputPath);
+        QVERIFY(output.exists());
+        QVERIFY(output.size() > 0);
+    }
+
+    /**
      * 验证库内音频编码器可以写入 AAC 音频流。
      * @return 无返回值。
      */

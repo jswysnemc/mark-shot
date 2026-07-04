@@ -11,6 +11,19 @@ target_link_libraries(mark-shot-recording-capture-backend-test
 )
 add_test(NAME recording-capture-backend COMMAND mark-shot-recording-capture-backend-test)
 
+qt_add_executable(mark-shot-recording-bgra-buffer-pool-test
+    tests/recording_bgra_buffer_pool_test.cpp
+    src/recording/recording_bgra_buffer_pool.cpp
+    src/recording/recording_bgra_buffer_pool.h
+)
+target_include_directories(mark-shot-recording-bgra-buffer-pool-test PRIVATE src)
+target_link_libraries(mark-shot-recording-bgra-buffer-pool-test
+    PRIVATE
+        Qt6::Core
+        Qt6::Test
+)
+add_test(NAME recording-bgra-buffer-pool COMMAND mark-shot-recording-bgra-buffer-pool-test)
+
 qt_add_executable(mark-shot-recording-dialog-config-test
     tests/recording_dialog_config_test.cpp
     src/recording/recording_dialog_config.cpp

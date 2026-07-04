@@ -42,6 +42,13 @@ public:
     bool writeFrame(const RecordingFrameSample &sample, QString *error);
 
     /**
+     * 复用上一帧已转换数据补写一帧，跳过像素转换。
+     * @param error 输出错误信息。
+     * @return 写入成功时返回 true。
+     */
+    bool writeRepeatFrame(QString *error);
+
+    /**
      * 冲刷编码器并关闭输出文件。
      * @param error 输出错误信息。
      * @return 完成成功时返回 true。

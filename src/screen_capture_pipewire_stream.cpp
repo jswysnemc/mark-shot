@@ -355,6 +355,11 @@ void PortalPipeWireScreencast::onStreamProcess(void *data)
     }
 
     if (self->m_rawStreamMode) {
+        // 1. 写出队列繁忙时直接归还 buffer，避免为将被丢弃的帧支付拷贝和 GPU 读回成本
+        if (self->m_rawBackpressure.load(std::memory_order_relaxed)) {
+            pw_stream_queue_buffer(self->m_stream, buffer);
+            return;
+        }
         QString frameError;
         PipeWireScreencastRawFrame frame;
         if (self->rawFrameFromBuffer(buffer, &frame, &frameError)) {

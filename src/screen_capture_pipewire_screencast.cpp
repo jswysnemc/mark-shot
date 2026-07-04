@@ -125,6 +125,11 @@ CaptureResult PortalPipeWireScreencast::capture(const CaptureRequest &request)
     return {image, {}, request.preferredOutputName, request.sourceGeometry, m_cursorIncluded, frameTimeMs};
 }
 
+void PortalPipeWireScreencast::setRawBackpressure(bool active)
+{
+    m_rawBackpressure.store(active, std::memory_order_relaxed);
+}
+
 bool PortalPipeWireScreencast::startRawStream(const CaptureRequest &request,
                                              RawFrameCallback frameCallback,
                                              ErrorCallback errorCallback,
@@ -155,6 +160,8 @@ bool PortalPipeWireScreencast::startRawStream(const CaptureRequest &request,
     m_rawRequestedGeometry = request.sourceGeometry;
     m_rawOutputName = request.preferredOutputName;
     m_rawBaseFrameTimeMs = -1;
+    m_rawBackpressure = false;
+    m_rawDmaBufDirectReadBroken = false;
     m_targetFps = std::max(0, request.targetFps);
     m_minFrameIntervalUs = m_targetFps > 0
         ? std::max<qint64>(1, 1000000 / m_targetFps)
@@ -244,6 +251,8 @@ void PortalPipeWireScreencast::stop()
     m_rawRequestedGeometry = {};
     m_rawOutputName.clear();
     m_rawBaseFrameTimeMs = -1;
+    m_rawBackpressure = false;
+    m_rawDmaBufDirectReadBroken = false;
     m_nodeId = 0;
     m_targetObject.clear();
     m_cursorIncluded = false;

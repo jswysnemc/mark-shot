@@ -58,7 +58,6 @@ private:
     LibavRecordingProcess m_libavProcess;
     RecordingFramePacer m_pacer;
     QVector<RecordingVideoEncoderOptions> m_candidates;
-    RecordingFrameSample m_lastSample;
     QSize m_frameSize;
     int m_fps = 30;
     int m_candidateIndex = 0;
