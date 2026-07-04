@@ -262,9 +262,9 @@ void LibavAudioEncoder::Private::close()
     }
     m_stream = nullptr;
     m_formatContext = nullptr;
+    m_nextPts = 0;
 #endif
     m_frameBytes = 0;
-    m_nextPts = 0;
 }
 
 #ifdef HAVE_LIBAV_RECORDING

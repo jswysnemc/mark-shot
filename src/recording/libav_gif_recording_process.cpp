@@ -46,7 +46,9 @@ public:
 private:
     RecordingBgraFrame bgraBytesForSample(const RecordingFrameSample &sample, QString *error);
     bool fillFrame(RecordingBgraFrame bytes, QString *error);
+#ifdef HAVE_LIBAV_RECORDING
     bool encodeFrame(AVFrame *frame, QString *error);
+#endif
     void cleanup();
 
 #ifdef HAVE_LIBAV_RECORDING
@@ -279,12 +281,9 @@ bool LibavGifRecordingProcess::Private::fillFrame(RecordingBgraFrame bytes, QStr
 #endif
 }
 
+#ifdef HAVE_LIBAV_RECORDING
 bool LibavGifRecordingProcess::Private::encodeFrame(AVFrame *frame, QString *error)
 {
-#ifndef HAVE_LIBAV_RECORDING
-    Q_UNUSED(frame)
-    return failWith(error, QStringLiteral("FFmpeg libraries are not linked"));
-#else
     int result = avcodec_send_frame(m_codecContext, frame);
     if (result < 0) {
         return failWith(error,
@@ -312,8 +311,8 @@ bool LibavGifRecordingProcess::Private::encodeFrame(AVFrame *frame, QString *err
         }
     }
     return true;
-#endif
 }
+#endif
 
 void LibavGifRecordingProcess::Private::cleanup()
 {
