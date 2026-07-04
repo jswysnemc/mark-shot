@@ -1,9 +1,17 @@
 #include "screen_capture_pipewire_screencast.h"
 
+#include "pipewire/pipewire_dmabuf_importer.h"
+
 #ifdef HAVE_PIPEWIRE
 
 #include <cerrno>
 #include <sys/mman.h>
+
+#if __has_include(<drm_fourcc.h>)
+#include <drm_fourcc.h>
+#elif __has_include(<libdrm/drm_fourcc.h>)
+#include <libdrm/drm_fourcc.h>
+#endif
 
 namespace {
 
@@ -19,6 +27,20 @@ constexpr spa_video_format kSupportedRawFormats[] = {
     SPA_VIDEO_FORMAT_RGB,
     SPA_VIDEO_FORMAT_BGR,
 };
+
+constexpr std::uint64_t kDrmFormatModInvalid =
+#ifdef DRM_FORMAT_MOD_INVALID
+    DRM_FORMAT_MOD_INVALID;
+#else
+    0x00ffffffffffffffULL;
+#endif
+
+constexpr std::uint64_t kDrmFormatModLinear =
+#ifdef DRM_FORMAT_MOD_LINEAR
+    DRM_FORMAT_MOD_LINEAR;
+#else
+    0;
+#endif
 
 /**
  * 【录制】【PipeWire协商】读取 raw 像素格式每像素字节数。
@@ -46,13 +68,32 @@ int rawBytesPerPixel(spa_video_format format)
 }
 
 /**
+ * 【录制】【PipeWire协商】写入基础 modifier 选择。
+ * @param builder SPA POD 构造器。
+ * @return 无返回值。
+ */
+void addReadableModifierChoice(spa_pod_builder *builder)
+{
+    spa_pod_frame frame;
+    spa_pod_builder_push_choice(builder, &frame, SPA_CHOICE_Enum, 0);
+    spa_pod_builder_long(builder, static_cast<int64_t>(kDrmFormatModInvalid));
+    spa_pod_builder_long(builder, static_cast<int64_t>(kDrmFormatModInvalid));
+    if (kDrmFormatModLinear != kDrmFormatModInvalid) {
+        spa_pod_builder_long(builder, static_cast<int64_t>(kDrmFormatModLinear));
+    }
+    spa_pod_builder_pop(builder, &frame);
+}
+
+/**
  * 【录制】【PipeWire协商】构造单个 raw 格式参数。
  * @param builder SPA POD 构造器。
  * @param format PipeWire 像素格式。
+ * @param withModifier 是否声明 DMA-BUF modifier 变体。
  * @return 构造完成的格式参数。
  */
 const spa_pod *buildRawFormatParam(spa_pod_builder *builder,
-                                   spa_video_format format)
+                                   spa_video_format format,
+                                   bool withModifier)
 {
     spa_pod_frame frame;
     spa_pod_builder_push_object(builder, &frame, SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat);
@@ -61,6 +102,12 @@ const spa_pod *buildRawFormatParam(spa_pod_builder *builder,
                         SPA_FORMAT_mediaSubtype, SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw),
                         SPA_FORMAT_VIDEO_format, SPA_POD_Id(format),
                         0);
+    if (withModifier) {
+        spa_pod_builder_prop(builder,
+                             SPA_FORMAT_VIDEO_modifier,
+                             SPA_POD_PROP_FLAG_MANDATORY | SPA_POD_PROP_FLAG_DONT_FIXATE);
+        addReadableModifierChoice(builder);
+    }
     return static_cast<const spa_pod *>(spa_pod_builder_pop(builder, &frame));
 }
 
@@ -156,11 +203,13 @@ bool PortalPipeWireScreencast::startPipeWire(int fd, QString *error)
 
     uint8_t buffer[16384];
     spa_pod_builder builder = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
-    const spa_pod *params[std::size(kSupportedRawFormats)];
+    const spa_pod *params[std::size(kSupportedRawFormats) * 2];
     uint32_t paramCount = 0;
     for (spa_video_format format : kSupportedRawFormats) {
-        // 1. 【录制】【PipeWire协商】只声明无 modifier 格式，要求门户协商 CPU 可读共享内存
-        params[paramCount++] = buildRawFormatParam(&builder, format);
+        // 1. 【录制】【PipeWire协商】优先声明 DMA-BUF，兼容只发布 modifier 格式的门户
+        params[paramCount++] = buildRawFormatParam(&builder, format, true);
+        // 2. 【录制】【PipeWire协商】同时声明共享内存，门户支持时避免 GPU 导入
+        params[paramCount++] = buildRawFormatParam(&builder, format, false);
     }
 
     const pw_stream_flags flags = static_cast<pw_stream_flags>(
@@ -245,17 +294,6 @@ void PortalPipeWireScreencast::onStreamParamChanged(void *data, uint32_t id, con
 
     self->m_videoInfo = info;
     const bool hasModifier = formatHasModifier(param);
-    if (hasModifier) {
-        const QString error = QStringLiteral(
-            "PipeWire negotiated DMA-BUF modifier frames, but CPU recording only supports shared-memory frames");
-        markshot::debugLog("screencast",
-                           "pw-param-changed rejected modifier=1 reason=%s",
-                           error.toUtf8().constData());
-        QMutexLocker locker(&self->m_frameMutex);
-        self->m_lastError = error;
-        self->m_frameReady.wakeAll();
-        return;
-    }
     const int bytesPerPixel = rawBytesPerPixel(info.format);
     if (bytesPerPixel <= 0) {
         markshot::debugLog("screencast",
@@ -268,15 +306,18 @@ void PortalPipeWireScreencast::onStreamParamChanged(void *data, uint32_t id, con
 
     markshot::debugLog("screencast",
                        "pw-param-changed format=%d size=%ux%u bpp=%d stride=%u "
-                       "framerate=%u/%u modifier=%d",
+                       "framerate=%u/%u modifier=%d modifier_value=0x%llx",
                        static_cast<int>(info.format), info.size.width, info.size.height,
                        bytesPerPixel, stride, info.max_framerate.num, info.max_framerate.denom,
-                       hasModifier ? 1 : 0);
+                       hasModifier ? 1 : 0,
+                       static_cast<unsigned long long>(info.modifier));
 
     uint8_t buffer[1024];
     spa_pod_builder builder = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
     const spa_pod *params[1];
-    const uint32_t dataTypes = (1u << SPA_DATA_MemPtr) | (1u << SPA_DATA_MemFd);
+    const uint32_t dataTypes = hasModifier
+        ? (1u << SPA_DATA_DmaBuf)
+        : ((1u << SPA_DATA_MemPtr) | (1u << SPA_DATA_MemFd));
     params[0] = static_cast<const spa_pod *>(
         spa_pod_builder_add_object(&builder,
                                    SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
@@ -366,7 +407,7 @@ bool PortalPipeWireScreencast::shouldDropIncomingFrame(qint64 frameTimeMs)
     return true;
 }
 
-QImage PortalPipeWireScreencast::imageFromBuffer(pw_buffer *pipewireBuffer, QString *error) const
+QImage PortalPipeWireScreencast::imageFromBuffer(pw_buffer *pipewireBuffer, QString *error)
 {
     if (!pipewireBuffer || !pipewireBuffer->buffer || pipewireBuffer->buffer->n_datas == 0) {
         if (error) {
@@ -382,6 +423,12 @@ QImage PortalPipeWireScreencast::imageFromBuffer(pw_buffer *pipewireBuffer, QStr
                          .arg(static_cast<uint>(data.type));
         }
         return {};
+    }
+    if (data.type == SPA_DATA_DmaBuf) {
+        if (!m_dmaBufImporter) {
+            m_dmaBufImporter = std::make_unique<markshot::PipeWireDmaBufImporter>();
+        }
+        return m_dmaBufImporter->importBuffer(spaBuffer, m_videoInfo, error);
     }
 
     const int width = static_cast<int>(m_videoInfo.size.width);

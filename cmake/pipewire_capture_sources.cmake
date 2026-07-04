@@ -1,0 +1,10 @@
+set(MARK_SHOT_PIPEWIRE_CAPTURE_SOURCES
+    src/pipewire/pipewire_dmabuf_importer.cpp
+    src/pipewire/pipewire_dmabuf_importer.h
+    src/screen_capture_pipewire.cpp
+    src/screen_capture_pipewire_libportal.cpp
+    src/screen_capture_pipewire_libportal.h
+    src/screen_capture_pipewire_screencast.cpp
+    src/screen_capture_pipewire_screencast.h
+    src/screen_capture_pipewire_stream.cpp
+)

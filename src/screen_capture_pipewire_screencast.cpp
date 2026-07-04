@@ -1,5 +1,6 @@
 #include "screen_capture_pipewire_screencast.h"
 
+#include "pipewire/pipewire_dmabuf_importer.h"
 #include "screen_capture_pipewire_libportal.h"
 
 #ifdef HAVE_PIPEWIRE

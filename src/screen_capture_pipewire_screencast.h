@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pipewire/pipewire_dmabuf_importer.h"
 #include "screen_capture_internal.h"
 
 #ifdef HAVE_PIPEWIRE
@@ -86,7 +87,7 @@ private:
      * @param error 输出错误信息。
      * @return 转换后的图像。
      */
-    QImage imageFromBuffer(pw_buffer *pipewireBuffer, QString *error) const;
+    QImage imageFromBuffer(pw_buffer *pipewireBuffer, QString *error);
 
     /**
      * 转换四字节像素格式。
@@ -144,6 +145,7 @@ private:
     spa_hook m_streamListener = {};
     pw_stream_events m_streamEvents = {};
     spa_video_info_raw m_videoInfo = {};
+    std::unique_ptr<markshot::PipeWireDmaBufImporter> m_dmaBufImporter;
     int m_frameCount = 0;
     int m_frameErrorCount = 0;
     int m_droppedFrameCount = 0;

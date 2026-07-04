@@ -67,6 +67,7 @@ endif()
 include(cmake/ipc_sources.cmake)
 include(cmake/cli_sources.cmake)
 include(cmake/notification_sources.cmake)
+include(cmake/pipewire_capture_sources.cmake)
 include(cmake/recording_sources.cmake)
 include(cmake/shot_window_sources.cmake)
 
@@ -147,12 +148,7 @@ qt_add_executable(mark-shot
     src/screen_capture_dbus_portal.cpp
     src/screen_capture_dbus_wayland.cpp
     src/screen_capture_internal.h
-    src/screen_capture_pipewire.cpp
-    src/screen_capture_pipewire_libportal.cpp
-    src/screen_capture_pipewire_libportal.h
-    src/screen_capture_pipewire_screencast.cpp
-    src/screen_capture_pipewire_screencast.h
-    src/screen_capture_pipewire_stream.cpp
+    ${MARK_SHOT_PIPEWIRE_CAPTURE_SOURCES}
     src/screen_capture_platform_api.cpp
     src/screen_capture_windows_wgc.cpp
     src/screen_capture_x11.cpp
@@ -331,26 +327,7 @@ elseif(MARK_SHOT_LINUX)
     message(STATUS "mark-shot: wlroots screencopy recording backend disabled")
 endif()
 
-if(MARK_SHOT_LINUX AND PipeWire_FOUND)
-    target_link_libraries(mark-shot PRIVATE PkgConfig::PipeWire)
-    target_compile_definitions(mark-shot PRIVATE HAVE_PIPEWIRE)
-    message(STATUS "mark-shot: PipeWire ${PipeWire_VERSION} found, portal screencast capture enabled")
-    if(MARK_SHOT_WITH_LIBPORTAL AND LibPortal_FOUND)
-        target_link_libraries(mark-shot PRIVATE PkgConfig::LibPortal)
-        target_compile_definitions(mark-shot PRIVATE HAVE_LIBPORTAL)
-        message(STATUS "mark-shot: libportal ${LibPortal_VERSION} found, libportal screencast negotiation enabled")
-    elseif(MARK_SHOT_WITH_LIBPORTAL)
-        message(STATUS "mark-shot: libportal not found, using direct D-Bus portal screencast negotiation")
-    else()
-        message(STATUS "mark-shot: libportal support disabled, using direct D-Bus portal screencast negotiation")
-    endif()
-else()
-    if(MARK_SHOT_LINUX)
-        message(STATUS "mark-shot: PipeWire not found, Wayland scrolling capture falls back to screenshot portal/grim")
-    else()
-        message(STATUS "mark-shot: Linux screenshot backends disabled on ${CMAKE_SYSTEM_NAME}; using Qt screen capture")
-    endif()
-endif()
+include(cmake/pipewire_capture_target.cmake)
 
 include(CTest)
 if(BUILD_TESTING)
