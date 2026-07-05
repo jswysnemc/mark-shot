@@ -1,0 +1,29 @@
+set(MARK_SHOT_PROVIDER_SOURCES
+    src/providers/provider_plugin_registry.cpp
+    src/providers/provider_plugin_registry.h
+    src/providers/provider_process_task.cpp
+    src/providers/provider_process_task.h
+    src/providers/provider_task.cpp
+    src/providers/provider_task.h
+    src/providers/code_scan/code_scan_provider_factory.cpp
+    src/providers/code_scan/code_scan_provider_factory.h
+    src/providers/code_scan/code_scan_tasks.cpp
+    src/providers/code_scan/code_scan_tasks.h
+    src/providers/ocr/ocr_plugin_task.cpp
+    src/providers/ocr/ocr_plugin_task.h
+    src/providers/ocr/ocr_provider_factory.cpp
+    src/providers/ocr/ocr_provider_factory.h
+    src/providers/ocr/ocr_tesseract_task.cpp
+    src/providers/ocr/ocr_tesseract_task.h
+    src/providers/translate/translate_openai_task.cpp
+    src/providers/translate/translate_openai_task.h
+    src/providers/translate/translate_plugin_task.cpp
+    src/providers/translate/translate_plugin_task.h
+    src/providers/translate/translate_provider_factory.cpp
+    src/providers/translate/translate_provider_factory.h
+    src/providers/translate/translate_segments.cpp
+    src/providers/translate/translate_segments.h
+    plugin-sdk/markshot/code_scan_provider_plugin.h
+    plugin-sdk/markshot/ocr_provider_plugin.h
+    plugin-sdk/markshot/translate_provider_plugin.h
+)

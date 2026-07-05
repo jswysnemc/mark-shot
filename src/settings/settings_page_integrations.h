@@ -6,6 +6,7 @@
 
 class QCheckBox;
 class QDoubleSpinBox;
+class QLabel;
 class QLineEdit;
 class QPlainTextEdit;
 class QSpinBox;
@@ -27,6 +28,13 @@ public:
     void updateConfig(SettingsConfig *config) const;
 
 private:
+    /// @brief 刷新各能力实际生效的 provider 状态展示。
+    /// @param config 设置配置。
+    void refreshProviderStatus(const SettingsConfig &config);
+
+    QLabel *m_ocrProviderStatus = nullptr;
+    QLabel *m_translationProviderStatus = nullptr;
+    QLabel *m_codeScanProviderStatus = nullptr;
     QLineEdit *m_codeScanCommand = nullptr;
     QSpinBox *m_codeScanTimeoutMs = nullptr;
     QLineEdit *m_uploadCommand = nullptr;

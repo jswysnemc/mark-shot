@@ -2,16 +2,16 @@
 
 #include "clipboard_image.h"
 #include "ocr_result.h"
+#include "providers/ocr/ocr_provider_factory.h"
+#include "providers/provider_task.h"
 #include "shell_command.h"
 #include "ui/i18n.h"
 
 #include <QCursor>
 #include <QDir>
 #include <QFile>
-#include <QProcess>
 #include <QStandardPaths>
 #include <QTemporaryFile>
-#include <QTimer>
 
 namespace markshot::shot {
 
@@ -45,8 +45,11 @@ void PinnedImageWindow::startOcr()
     }
     tempFile.close();
 
-    auto *process = new QProcess(this);
-    m_ocrProcess = process;
+    // 1. 组装 OCR 请求，provider 优先链由工厂解析
+    markshot::providers::OcrTaskRequest request;
+    request.imagePath = m_ocrTempPath;
+    request.backend = m_config.ocrBackend;
+    request.provider = m_config.ocrProvider;
     if (!m_config.ocrCommand.isEmpty()) {
         QString commandLine = m_config.ocrCommand;
         const bool replaced = replaceExtensionImagePlaceholders(&commandLine, m_ocrTempPath);
@@ -54,41 +57,21 @@ void PinnedImageWindow::startOcr()
             commandLine += QLatin1Char(' ');
             commandLine += shellQuote(m_ocrTempPath);
         }
-        markshot::setShellCommand(process, commandLine);
+        request.commandLine = commandLine;
     } else {
-        process->setProgram(defaultOcrHelperProgram());
-        process->setArguments({QStringLiteral("--format"),
-                               QStringLiteral("json"),
-                               QStringLiteral("--backend"),
-                               m_config.ocrBackend,
-                               m_ocrTempPath});
+        request.helperProgram = defaultOcrHelperProgram();
     }
 
-    connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError error) {
-        if (process == m_ocrProcess && process->state() == QProcess::NotRunning) {
-            finishOcr(process,
-                      QByteArray(),
-                      process->readAllStandardError(),
-                      -1,
-                      QProcess::CrashExit,
-                      error);
-        }
-    });
-    connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
-            [this, process](int exitCode, QProcess::ExitStatus exitStatus) {
-        finishOcr(process,
-                  process->readAllStandardOutput(),
-                  process->readAllStandardError(),
-                  exitCode,
-                  exitStatus,
-                  process->error());
-    });
-    QTimer::singleShot(m_config.ocrTimeoutMs, process, [process] {
-        if (process->state() != QProcess::NotRunning) {
-            process->kill();
-        }
-    });
-    process->start();
+    // 2. 异步启动任务，超时由任务内部处理
+    markshot::providers::ProviderTask *task = markshot::providers::createOcrTask(request, this);
+    m_ocrTask = task;
+    connect(task,
+            &markshot::providers::ProviderTask::finished,
+            this,
+            [this, task](const markshot::providers::TaskResult &result) {
+                finishOcr(task, result);
+            });
+    task->start(m_config.ocrTimeoutMs);
 }
 
 QString PinnedImageWindow::defaultOcrHelperProgram() const
@@ -98,13 +81,11 @@ QString PinnedImageWindow::defaultOcrHelperProgram() const
 
 void PinnedImageWindow::cancelOcr()
 {
-    if (m_ocrProcess) {
-        disconnect(m_ocrProcess, nullptr, this, nullptr);
-        if (m_ocrProcess->state() != QProcess::NotRunning) {
-            m_ocrProcess->kill();
-        }
-        m_ocrProcess->deleteLater();
-        m_ocrProcess = nullptr;
+    if (m_ocrTask) {
+        disconnect(m_ocrTask, nullptr, this, nullptr);
+        m_ocrTask->cancel();
+        m_ocrTask->deleteLater();
+        m_ocrTask = nullptr;
     }
     if (!m_ocrTempPath.isEmpty()) {
         QFile::remove(m_ocrTempPath);
@@ -112,26 +93,22 @@ void PinnedImageWindow::cancelOcr()
     }
 }
 
-void PinnedImageWindow::finishOcr(QProcess *process,
-                                  const QByteArray &output,
-                                  const QByteArray &errorOutput,
-                                  int exitCode,
-                                  QProcess::ExitStatus exitStatus,
-                                  QProcess::ProcessError processError)
+void PinnedImageWindow::finishOcr(markshot::providers::ProviderTask *task,
+                                  const markshot::providers::TaskResult &result)
 {
-    if (process != m_ocrProcess) {
+    if (task != m_ocrTask) {
         return;
     }
 
-    const bool success = exitStatus == QProcess::NormalExit && exitCode == 0;
-    if (success && !output.isEmpty()) {
-        applyOcrOutput(output, errorOutput);
-    } else if (processError == QProcess::FailedToStart && m_config.ocrCommand.isEmpty()) {
+    if (result.ok && !result.output.isEmpty()) {
+        applyOcrOutput(result.output, result.errorOutput);
+    } else if (result.error == markshot::providers::TaskError::StartFailed
+               && m_config.ocrCommand.isEmpty()) {
         notifyMissingOcrBackend();
         m_translateAfterOcr = false;
         m_copyTextAfterOcr = false;
     } else if (m_config.ocrCommand.isEmpty()
-               && ocrOutputReportsMissingBackend(output, errorOutput, m_config.ocrBackend)) {
+               && ocrOutputReportsMissingBackend(result.output, result.errorOutput, m_config.ocrBackend)) {
         notifyMissingOcrBackend();
         m_translateAfterOcr = false;
         m_copyTextAfterOcr = false;
@@ -139,12 +116,12 @@ void PinnedImageWindow::finishOcr(QProcess *process,
         m_translateAfterOcr = false;
         m_copyTextAfterOcr = false;
     }
-    m_ocrProcess = nullptr;
+    m_ocrTask = nullptr;
     if (!m_ocrTempPath.isEmpty()) {
         QFile::remove(m_ocrTempPath);
         m_ocrTempPath.clear();
     }
-    process->deleteLater();
+    task->deleteLater();
 }
 
 void PinnedImageWindow::applyOcrOutput(const QByteArray &output, const QByteArray &errorOutput)

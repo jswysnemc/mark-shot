@@ -61,6 +61,8 @@ elseif(MARK_SHOT_REQUIRE_LIBPORTAL)
     message(FATAL_ERROR "libportal support is only supported on Linux")
 endif()
 
+include(cmake/zxing.cmake)
+
 include(cmake/ffmpeg_libav.cmake)
 
 if(COMMAND qt_standard_project_setup)
@@ -79,6 +81,7 @@ include(cmake/ipc_sources.cmake)
 include(cmake/cli_sources.cmake)
 include(cmake/notification_sources.cmake)
 include(cmake/pipewire_capture_sources.cmake)
+include(cmake/provider_sources.cmake)
 include(cmake/recording_sources.cmake)
 include(cmake/shot_window_sources.cmake)
 
@@ -87,6 +90,7 @@ qt_add_executable(mark-shot
     ${MARK_SHOT_IPC_SOURCES}
     ${MARK_SHOT_CLI_SOURCES}
     ${MARK_SHOT_NOTIFICATION_SOURCES}
+    ${MARK_SHOT_PROVIDER_SOURCES}
     ${MARK_SHOT_RECORDING_SOURCES}
     ${MARK_SHOT_WINDOW_SOURCES}
     src/main.cpp
@@ -246,7 +250,7 @@ qt_add_executable(mark-shot
 
 include(cmake/capture_session_sources.cmake)
 
-target_include_directories(mark-shot PRIVATE src)
+target_include_directories(mark-shot PRIVATE src plugin-sdk)
 target_compile_definitions(mark-shot PRIVATE MARK_SHOT_VERSION="${PROJECT_VERSION}")
 if(WIN32)
     set_property(TARGET mark-shot PROPERTY CXX_STANDARD 20)
@@ -265,6 +269,18 @@ target_link_libraries(mark-shot
         Qt6::Network
         Qt6::Widgets
 )
+
+if(ZXing_FOUND)
+    target_link_libraries(mark-shot PRIVATE ZXing::ZXing)
+    target_compile_definitions(mark-shot PRIVATE HAVE_ZXING_CPP)
+    message(STATUS "mark-shot: builtin zxing-cpp code scanner enabled (CMake package)")
+elseif(ZXingCpp_FOUND)
+    target_link_libraries(mark-shot PRIVATE PkgConfig::ZXingCpp)
+    target_compile_definitions(mark-shot PRIVATE HAVE_ZXING_CPP)
+    message(STATUS "mark-shot: builtin zxing-cpp code scanner enabled (pkg-config)")
+else()
+    message(STATUS "mark-shot: builtin zxing-cpp code scanner disabled")
+endif()
 
 if(MARK_SHOT_LINUX)
     target_sources(mark-shot
@@ -357,6 +373,9 @@ endif()
 
 include(cmake/pipewire_capture_target.cmake)
 
+# provider 插件：可选构建，依赖缺失时各自跳过；需在测试注册前定义 target
+add_subdirectory(plugins/ocr-rapid)
+
 include(CTest)
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
@@ -404,6 +423,7 @@ if(BUILD_TESTING)
     add_test(NAME config-value COMMAND mark-shot-config-value-test)
 
     include(cmake/recording_tests.cmake)
+    include(cmake/provider_tests.cmake)
 
     qt_add_executable(mark-shot-startup-default-color-test
         tests/startup_default_color_test.cpp
@@ -720,46 +740,4 @@ if(BUILD_TESTING)
     add_test(NAME stitcher COMMAND mark-shot-stitcher-test)
 endif()
 
-install(TARGETS mark-shot RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-if(TARGET mark-shot-layer-shell)
-    install(TARGETS mark-shot-layer-shell
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/mark-shot
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    )
-endif()
-if(MARK_SHOT_LINUX)
-    set(MARK_SHOT_DESKTOP_EXEC "${CMAKE_INSTALL_FULL_BINDIR}/mark-shot")
-    configure_file(data/mark-shot.desktop.in "${CMAKE_CURRENT_BINARY_DIR}/mark-shot.desktop" @ONLY)
-    configure_file(data/mark-shot-edit.desktop.in "${CMAKE_CURRENT_BINARY_DIR}/mark-shot-edit.desktop" @ONLY)
-    configure_file(data/net.local.mark-shot.desktop.in "${CMAKE_CURRENT_BINARY_DIR}/net.local.mark-shot.desktop" @ONLY)
-
-    install(PROGRAMS
-        scripts/mark-shot-ocr
-        scripts/mark-shot-code-scan
-        scripts/mark-shot-translate
-        scripts/mark-shot-upload
-        scripts/mark-shot-window-detection-niri
-        scripts/mark-shot-window-detection-hyprland
-        scripts/mark-shot-window-detection-gnome
-        scripts/mark-shot-window-detection-kde
-        DESTINATION ${CMAKE_INSTALL_BINDIR}
-    )
-    install(FILES
-        "${CMAKE_CURRENT_BINARY_DIR}/mark-shot.desktop"
-        "${CMAKE_CURRENT_BINARY_DIR}/mark-shot-edit.desktop"
-        "${CMAKE_CURRENT_BINARY_DIR}/net.local.mark-shot.desktop"
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
-    )
-    install(FILES
-        data/icons/hicolor/scalable/apps/mark-shot.svg
-        data/icons/hicolor/scalable/apps/mark-shot-edit.svg
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
-    )
-    install(DIRECTORY
-        packaging/gnome-extension/mark-shot-scroll-helper@snemc.org/
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/gnome-shell/extensions/mark-shot-scroll-helper@snemc.org
-        FILES_MATCHING
-            PATTERN "metadata.json"
-            PATTERN "*.js"
-    )
-endif()
+include(cmake/install_rules.cmake)

@@ -1,5 +1,8 @@
 #include "settings/settings_page_integrations.h"
 
+#include "providers/code_scan/code_scan_provider_factory.h"
+#include "providers/ocr/ocr_provider_factory.h"
+#include "providers/translate/translate_provider_factory.h"
 #include "settings/settings_ui_helpers.h"
 #include "ui/i18n.h"
 
@@ -7,6 +10,7 @@
 #include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QFrame>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QSpinBox>
@@ -18,6 +22,20 @@ SettingsPageIntegrations::SettingsPageIntegrations(QWidget *parent)
     : QWidget(parent)
 {
     auto *layout = createSettingsPageLayout(this);
+
+    // 1. Provider 状态卡片：展示各能力当前实际生效的执行方
+    QFrame *providerCard = createSettingsCard(MS_TR("Provider Status"),
+                                              MS_TR("Shows which provider each capability currently resolves to: "
+                                                    "custom command, plugin, builtin, or the legacy helper."),
+                                              this);
+    QFormLayout *providerForm = settingsCardForm(providerCard);
+    m_ocrProviderStatus = new QLabel(this);
+    providerForm->addRow(MS_TR("OCR"), m_ocrProviderStatus);
+    m_translationProviderStatus = new QLabel(this);
+    providerForm->addRow(MS_TR("Translation"), m_translationProviderStatus);
+    m_codeScanProviderStatus = new QLabel(this);
+    providerForm->addRow(MS_TR("Code Scanner"), m_codeScanProviderStatus);
+    layout->addWidget(providerCard);
 
     QFrame *codeCard = createSettingsCard(MS_TR("Code Scanner"),
                                           MS_TR("Configure the external helper used to recognize QR codes and barcodes."),
@@ -76,6 +94,23 @@ void SettingsPageIntegrations::setConfig(const SettingsConfig &config)
     m_translationModel->setText(config.integrations.translationModel);
     m_translationTemperature->setValue(config.integrations.translationTemperature);
     m_translationSystemPrompt->setPlainText(config.integrations.translationSystemPrompt);
+    refreshProviderStatus(config);
+}
+
+void SettingsPageIntegrations::refreshProviderStatus(const SettingsConfig &config)
+{
+    // 1. 按 auto 链解析各能力实际生效的 provider 并展示
+    markshot::providers::OcrTaskRequest ocrRequest;
+    m_ocrProviderStatus->setText(markshot::providers::resolvedOcrProviderName(ocrRequest));
+
+    markshot::providers::TranslateTaskRequest translateRequest;
+    m_translationProviderStatus->setText(
+        markshot::providers::resolvedTranslateProviderName(translateRequest));
+
+    markshot::providers::CodeScanTaskRequest codeScanRequest;
+    codeScanRequest.commandLine = config.integrations.codeScanCommand.trimmed();
+    m_codeScanProviderStatus->setText(
+        markshot::providers::resolvedCodeScanProviderName(codeScanRequest));
 }
 
 void SettingsPageIntegrations::updateConfig(SettingsConfig *config) const

@@ -1,0 +1,6 @@
+{
+    "name": "mark-shot-ocr-rapid",
+    "version": "1.0.0",
+    "description": "PP-OCR text recognition provider backed by ONNX Runtime",
+    "vendor": "mark-shot"
+}

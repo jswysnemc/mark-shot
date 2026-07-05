@@ -149,7 +149,7 @@ void PinnedImageWindow::copyImageText()
         return;
     }
     m_copyTextAfterOcr = true;
-    if (!m_ocrProcess) {
+    if (!m_ocrTask) {
         startOcr();
     }
 }

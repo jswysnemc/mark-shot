@@ -1,6 +1,8 @@
 #include "pinned_window/pinned_image_window.h"
 
 #include "ocr_result.h"
+#include "providers/provider_task.h"
+#include "providers/translate/translate_provider_factory.h"
 #include "shell_command.h"
 
 #include <QApplication>
@@ -10,12 +12,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QPainter>
-#include <QProcess>
 #include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QTextDocument>
 #include <QTextOption>
-#include <QTimer>
 
 #include <algorithm>
 
@@ -40,11 +40,17 @@ void PinnedImageWindow::startTranslation(bool activateWhenFinished, bool showBus
         return;
     }
     m_translationInputPath = inputFile.fileName();
-    inputFile.write(translationInputJson());
+    const QByteArray inputJson = translationInputJson();
+    inputFile.write(inputJson);
     inputFile.close();
 
-    auto *process = new QProcess(this);
-    m_translationProcess = process;
+    // 1. 组装翻译请求，provider 优先链由工厂解析
+    markshot::providers::TranslateTaskRequest request;
+    request.inputJson = inputJson;
+    request.inputPath = m_translationInputPath;
+    request.targetLanguage = m_config.translationTargetLanguage;
+    request.configPath = appConfigPath();
+    request.provider = m_config.translationProvider;
     if (!m_config.translationCommand.isEmpty()) {
         QString commandLine = m_config.translationCommand;
         bool replaced = false;
@@ -56,38 +62,24 @@ void PinnedImageWindow::startTranslation(bool activateWhenFinished, bool showBus
             commandLine += QLatin1Char(' ');
             commandLine += shellQuote(m_translationInputPath);
         }
-        markshot::setShellCommand(process, commandLine);
+        request.commandLine = commandLine;
     } else {
-        process->setProgram(defaultTranslationHelperProgram());
-        process->setArguments({QStringLiteral("--input"),
-                               m_translationInputPath,
-                               QStringLiteral("--target-language"),
-                               m_config.translationTargetLanguage,
-                               QStringLiteral("--config"),
-                               appConfigPath()});
+        request.helperProgram = defaultTranslationHelperProgram();
     }
 
-    connect(process, &QProcess::errorOccurred, this, [this, process] {
-        if (process == m_translationProcess && process->state() == QProcess::NotRunning) {
-            finishTranslation(process, QByteArray());
-        }
-    });
-    connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
-            [this, process](int exitCode, QProcess::ExitStatus exitStatus) {
-        const QByteArray output = exitStatus == QProcess::NormalExit && exitCode == 0
-            ? process->readAllStandardOutput()
-            : QByteArray();
-        finishTranslation(process, output);
-    });
-    QTimer::singleShot(m_config.translationTimeoutMs, process, [process] {
-        if (process->state() != QProcess::NotRunning) {
-            process->kill();
-        }
-    });
+    // 2. 异步启动任务，超时由任务内部处理
+    markshot::providers::ProviderTask *task = markshot::providers::createTranslateTask(request, this);
+    m_translationTask = task;
+    connect(task,
+            &markshot::providers::ProviderTask::finished,
+            this,
+            [this, task](const markshot::providers::TaskResult &result) {
+                finishTranslation(task, result.ok ? result.output : QByteArray());
+            });
     if (showBusyCursor) {
         setTranslationBusyCursor(true);
     }
-    process->start();
+    task->start(m_config.translationTimeoutMs);
     update();
 }
 
@@ -121,13 +113,11 @@ QString PinnedImageWindow::defaultTranslationHelperProgram() const
 
 void PinnedImageWindow::cancelTranslation()
 {
-    if (m_translationProcess) {
-        disconnect(m_translationProcess, nullptr, this, nullptr);
-        if (m_translationProcess->state() != QProcess::NotRunning) {
-            m_translationProcess->kill();
-        }
-        m_translationProcess->deleteLater();
-        m_translationProcess = nullptr;
+    if (m_translationTask) {
+        disconnect(m_translationTask, nullptr, this, nullptr);
+        m_translationTask->cancel();
+        m_translationTask->deleteLater();
+        m_translationTask = nullptr;
     }
     if (!m_translationInputPath.isEmpty()) {
         QFile::remove(m_translationInputPath);
@@ -137,9 +127,9 @@ void PinnedImageWindow::cancelTranslation()
     setTranslationBusyCursor(false);
 }
 
-void PinnedImageWindow::finishTranslation(QProcess *process, const QByteArray &output)
+void PinnedImageWindow::finishTranslation(markshot::providers::ProviderTask *task, const QByteArray &output)
 {
-    if (process != m_translationProcess) {
+    if (task != m_translationTask) {
         return;
     }
     if (!output.isEmpty()) {
@@ -153,19 +143,19 @@ void PinnedImageWindow::finishTranslation(QProcess *process, const QByteArray &o
             update();
         }
     }
-    m_translationProcess = nullptr;
+    m_translationTask = nullptr;
     if (!m_translationInputPath.isEmpty()) {
         QFile::remove(m_translationInputPath);
         m_translationInputPath.clear();
     }
     setTranslationBusyCursor(false);
     m_activateTranslationWhenFinished = true;
-    process->deleteLater();
+    task->deleteLater();
 }
 
 bool PinnedImageWindow::canRequestTranslation() const
 {
-    return m_config.ocrEnabled && !m_translationProcess;
+    return m_config.ocrEnabled && !m_translationTask;
 }
 
 void PinnedImageWindow::requestTranslation()
@@ -179,7 +169,7 @@ void PinnedImageWindow::requestTranslation()
     }
     if (m_ocrTokens.isEmpty()) {
         m_translateAfterOcr = true;
-        if (!m_ocrProcess) {
+        if (!m_ocrTask) {
             startOcr();
         }
         return;

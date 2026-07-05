@@ -32,6 +32,11 @@ namespace markshot::ocr {
 struct Token;
 }
 
+namespace markshot::providers {
+class ProviderTask;
+struct TaskResult;
+}
+
 namespace markshot::shot {
 
 /// @brief 提供置顶图片显示、文本识别、文本选择、翻译和边界缩放的窗口。
@@ -208,19 +213,11 @@ private:
     /// @return 无返回值。
     void cancelOcr();
 
-    /// @brief 处理 OCR 子进程结束结果。
-    /// @param process OCR 子进程。
-    /// @param output 标准输出。
-    /// @param errorOutput 标准错误。
-    /// @param exitCode 退出码。
-    /// @param exitStatus 退出状态。
-    /// @param processError 进程错误。
-    void finishOcr(QProcess *process,
-                   const QByteArray &output,
-                   const QByteArray &errorOutput,
-                   int exitCode,
-                   QProcess::ExitStatus exitStatus,
-                   QProcess::ProcessError processError);
+    /// @brief 处理 OCR 任务结束结果。
+    /// @param task OCR 任务。
+    /// @param result 任务结果。
+    void finishOcr(markshot::providers::ProviderTask *task,
+                   const markshot::providers::TaskResult &result);
 
     /// @brief 解析并应用 OCR 输出。
     /// @param output 标准输出。
@@ -258,10 +255,10 @@ private:
     /// @return 无返回值。
     void cancelTranslation();
 
-    /// @brief 处理翻译子进程结束结果。
-    /// @param process 翻译子进程。
-    /// @param output 标准输出。
-    void finishTranslation(QProcess *process, const QByteArray &output);
+    /// @brief 处理翻译任务结束结果。
+    /// @param task 翻译任务。
+    /// @param output 翻译输出 JSON。
+    void finishTranslation(markshot::providers::ProviderTask *task, const QByteArray &output);
 
     /// @brief 将窗口坐标转换为图片坐标。
     /// @param point 窗口内坐标。
@@ -378,8 +375,8 @@ private:
     QVector<OcrToken> m_ocrTokens;
     QVector<OcrToken> m_translatedTokens;
     QVector<OcrToken> m_translationOverlayTokens;
-    QProcess *m_ocrProcess = nullptr;
-    QProcess *m_translationProcess = nullptr;
+    markshot::providers::ProviderTask *m_ocrTask = nullptr;
+    markshot::providers::ProviderTask *m_translationTask = nullptr;
     QString m_ocrTempPath;
     QString m_translationInputPath;
     int m_selectionAnchor = -1;

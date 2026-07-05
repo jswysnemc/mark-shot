@@ -215,6 +215,8 @@ CodeScanConfig codeScanConfig()
                                  .toString(codeScan.value(QStringLiteral("path"))
                                                .toString(codeScan.value(QStringLiteral("helper")).toString()))
                                  .trimmed();
+            config.provider =
+                codeScan.value(QStringLiteral("provider")).toString(config.provider).trimmed();
             if (codeScan.value(QStringLiteral("timeoutMs")).isDouble()) {
                 config.timeoutMs = std::max(1000,
                                             codeScan.value(QStringLiteral("timeoutMs")).toInt(config.timeoutMs));

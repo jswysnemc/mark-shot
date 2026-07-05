@@ -394,7 +394,7 @@ void PinnedImageWindow::contextMenuEvent(QContextMenuEvent *event)
         m_translationActive ? MS_TR("Show Original Text") : MS_TR("Show Translated Text"),
         this,
         [this] { setTranslationActive(!m_translationActive); });
-    toggleTranslationAction->setEnabled(!m_translationOverlayTokens.isEmpty() && !m_translationProcess);
+    toggleTranslationAction->setEnabled(!m_translationOverlayTokens.isEmpty() && !m_translationTask);
     menu.addAction(MS_TR("Save As"), this, [this] { saveImageAs(); });
     menu.addSeparator();
     menu.addAction(MS_TR("Close"), this, &QWidget::close);

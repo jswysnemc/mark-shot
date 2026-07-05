@@ -66,9 +66,11 @@ struct PinnedWindowConfig {
     bool textSelectionCopyEnabled = true;
     bool autoOcr = false;
     QString ocrBackend = QStringLiteral("auto");
+    QString ocrProvider = QStringLiteral("auto");
     QString ocrCommand;
     int ocrTimeoutMs = kPinnedOcrTimeoutMs;
     QString translationCommand;
+    QString translationProvider = QStringLiteral("auto");
     QString translationTargetLanguage = QStringLiteral("Simplified Chinese");
     int translationTimeoutMs = kPinnedTranslationTimeoutMs;
     bool autoTranslateAfterOcr = false;
@@ -84,6 +86,7 @@ PinnedWindowConfig pinnedWindowConfigFromRoot(const QJsonObject &root);
 
 struct CodeScanConfig {
     QString command;
+    QString provider = QStringLiteral("auto");
     int timeoutMs = kCodeScanTimeoutMs;
 };
 
