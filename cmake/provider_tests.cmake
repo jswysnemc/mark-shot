@@ -85,3 +85,52 @@ if(TARGET mark-shot-ocr-rapid AND (OnnxRuntimeTest_FOUND OR onnxruntime_FOUND))
     endif()
     add_test(NAME ocr-rapid-plugin COMMAND mark-shot-ocr-rapid-plugin-test)
 endif()
+
+if(TARGET mark-shot-translate-openai)
+    qt_add_executable(mark-shot-translate-openai-plugin-test
+        tests/translate_openai_plugin_test.cpp
+        plugins/translate-openai/openai_translate_config.cpp
+        plugins/translate-openai/openai_translate_config.h
+        plugins/translate-openai/openai_translate_plugin.cpp
+        plugins/translate-openai/openai_translate_plugin.h
+        plugins/translate-openai/openai_translation_parser.cpp
+        plugins/translate-openai/openai_translation_parser.h
+    )
+    target_include_directories(mark-shot-translate-openai-plugin-test PRIVATE
+        plugins/translate-openai
+        plugin-sdk
+    )
+    target_link_libraries(mark-shot-translate-openai-plugin-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Network
+            Qt6::Test
+    )
+    add_test(NAME translate-openai-plugin COMMAND mark-shot-translate-openai-plugin-test)
+endif()
+
+if(TARGET mark-shot-code-scan-zxing)
+    qt_add_executable(mark-shot-code-scan-zxing-plugin-test
+        tests/code_scan_zxing_plugin_test.cpp
+        plugins/code-scan-zxing/zxing_code_scan_plugin.cpp
+        plugins/code-scan-zxing/zxing_code_scan_plugin.h
+    )
+    target_include_directories(mark-shot-code-scan-zxing-plugin-test PRIVATE
+        plugins/code-scan-zxing
+        plugin-sdk
+    )
+    target_link_libraries(mark-shot-code-scan-zxing-plugin-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+    )
+    if(ZXing_FOUND)
+        target_link_libraries(mark-shot-code-scan-zxing-plugin-test PRIVATE ZXing::ZXing)
+    elseif(ZXingCpp_FOUND)
+        target_link_libraries(mark-shot-code-scan-zxing-plugin-test PRIVATE PkgConfig::ZXingCpp)
+    elseif(TARGET PkgConfig::ZXingPlugin)
+        target_link_libraries(mark-shot-code-scan-zxing-plugin-test PRIVATE PkgConfig::ZXingPlugin)
+    endif()
+    add_test(NAME code-scan-zxing-plugin COMMAND mark-shot-code-scan-zxing-plugin-test)
+endif()

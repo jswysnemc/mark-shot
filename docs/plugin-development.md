@@ -88,7 +88,7 @@ target_link_libraries(my-ocr-plugin PRIVATE Qt6::Core Qt6::Gui)
 { "name": "my-ocr-plugin", "version": "1.0.0", "vendor": "example" }
 ```
 
-## 参考实现：ocr-rapid
+## 参考实现
 
 `plugins/ocr-rapid/` 是完整的 OCR 模型运行时插件，基于 ONNX Runtime 执行
 PP-OCR 检测与识别模型：
@@ -101,6 +101,18 @@ PP-OCR 检测与识别模型：
   缺失时该插件目标自动跳过，不影响主程序构建
 - 已知限制：输出行级 token（无词级切分）；不含方向分类模型，
   假定文字直立（截图场景成立）
+
+`plugins/translate-openai/` 是 OpenAI-compatible 翻译 provider 插件：
+
+- 复用应用 `translation` 配置与 `MARK_SHOT_LLM_*`、`OPENAI_*` 环境变量
+- 调用 `/chat/completions` 并解析 `{ "translations": [{ "id": 0, "text": "..." }] }`
+- provider id 为 `openai-compatible`
+
+`plugins/code-scan-zxing/` 是 zxing-cpp 扫码 provider 插件：
+
+- 构建依赖 zxing-cpp，缺失时插件目标自动跳过
+- 支持二维码和条形码扫描
+- provider id 为 `zxing-cpp`
 
 ## 兼容性承诺
 

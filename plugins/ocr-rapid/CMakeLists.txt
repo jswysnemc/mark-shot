@@ -43,6 +43,7 @@ else()
 endif()
 
 install(TARGETS mark-shot-ocr-rapid
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/mark-shot/plugins)
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/mark-shot/plugins
+        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/mark-shot/plugins)
 
 message(STATUS "mark-shot: ocr-rapid plugin enabled")
