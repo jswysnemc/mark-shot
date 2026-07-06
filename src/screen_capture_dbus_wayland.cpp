@@ -108,6 +108,12 @@ CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
     // native-resolution keeps device pixels on HiDPI instead of downscaling to
     // logical size, so the stitched result stays sharp.
     options.insert(QStringLiteral("native-resolution"), true);
+    // Respect the Hide Own Windows toggle: tell KWin to include or exclude
+    // mark-shot's own windows (settings dialog, pinned images, ...) in the
+    // captured frame. KWin's ScreenShot2 defaults to hiding caller windows.
+    if (!request.hideOwnWindows) {
+        options.insert(QStringLiteral("hide-caller-windows"), false);
+    }
 
     // KWin sends the D-Bus reply with the buffer metadata first, then writes the
     // pixels to the pipe, so this synchronous call does not deadlock even when

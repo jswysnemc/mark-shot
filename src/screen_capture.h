@@ -36,6 +36,8 @@ struct CaptureRequest {
     int targetFps = 0;
     // 捕获冻结图时是否包含鼠标
     bool includeCursor = false;
+    // 截屏时是否让后端隐藏调用者自身窗口（KWin hide-caller-windows 选项）
+    bool hideOwnWindows = true;
 };
 
 // Captures one frame and normalizes the image for downstream painting/stitching.
