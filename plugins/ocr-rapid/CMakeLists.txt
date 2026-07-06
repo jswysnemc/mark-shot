@@ -7,6 +7,7 @@ endif()
 if(NOT OnnxRuntime_FOUND)
     find_package(onnxruntime CONFIG QUIET)
 endif()
+find_package(protobuf CONFIG QUIET)
 
 if(NOT OnnxRuntime_FOUND AND NOT onnxruntime_FOUND)
     message(STATUS "mark-shot: ocr-rapid plugin disabled (onnxruntime not found)")
@@ -42,6 +43,9 @@ if(OnnxRuntime_FOUND)
     target_link_libraries(mark-shot-ocr-rapid PRIVATE PkgConfig::OnnxRuntime)
 else()
     target_link_libraries(mark-shot-ocr-rapid PRIVATE onnxruntime::onnxruntime)
+endif()
+if(TARGET protobuf::libprotobuf)
+    target_link_libraries(mark-shot-ocr-rapid PRIVATE protobuf::libprotobuf)
 endif()
 
 install(TARGETS mark-shot-ocr-rapid

@@ -61,6 +61,7 @@ jobs:
             onnxruntime-cpu \
             pkgconf \
             pipewire \
+            protobuf \
             qt6-base \
             qt6-wayland \
             zxing-cpp \
@@ -162,7 +163,6 @@ jobs:
             cmake \
             libgl1-mesa-dev \
             libpipewire-0.3-dev \
-            libzxing-dev \
             libx11-xcb-dev \
             libxcb1-dev \
             ninja-build \
