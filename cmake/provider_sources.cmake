@@ -1,6 +1,10 @@
 set(MARK_SHOT_PROVIDER_SOURCES
     src/providers/provider_plugin_registry.cpp
     src/providers/provider_plugin_registry.h
+    src/providers/provider_plugin_info.cpp
+    src/providers/provider_plugin_info.h
+    src/providers/provider_plugin_paths.cpp
+    src/providers/provider_plugin_paths.h
     src/providers/provider_process_task.cpp
     src/providers/provider_process_task.h
     src/providers/provider_task.cpp

@@ -17,6 +17,7 @@ class SettingsPageCapture;
 class SettingsPageGeneral;
 class SettingsPageIntegrations;
 class SettingsPagePinned;
+class SettingsPagePlugins;
 class SettingsPageScroll;
 class SettingsPageShortcuts;
 class SettingsPageStorage;
@@ -53,6 +54,7 @@ private:
     SettingsPageAnnotation *m_annotationPage = nullptr;
     SettingsPagePinned *m_pinnedPage = nullptr;
     SettingsPageIntegrations *m_integrationsPage = nullptr;
+    SettingsPagePlugins *m_pluginsPage = nullptr;
     SettingsPageScroll *m_scrollPage = nullptr;
     SettingsPageStorage *m_storagePage = nullptr;
     SettingsPageAdvanced *m_advancedPage = nullptr;

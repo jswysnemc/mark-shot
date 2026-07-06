@@ -204,6 +204,78 @@ bool isNoLeadingSpacePunctuation(QChar ch)
     }
 }
 
+/**
+ * 判断码点是否属于中日韩、假名或韩文范围。
+ * @param codePoint Unicode 码点。
+ * @return 属于 CJK 类文字时返回 true。
+ */
+bool isCjkCodePoint(uint codePoint)
+{
+    return (codePoint >= 0x3400 && codePoint <= 0x4DBF)
+        || (codePoint >= 0x4E00 && codePoint <= 0x9FFF)
+        || (codePoint >= 0xF900 && codePoint <= 0xFAFF)
+        || (codePoint >= 0x20000 && codePoint <= 0x2A6DF)
+        || (codePoint >= 0x2A700 && codePoint <= 0x2B73F)
+        || (codePoint >= 0x2B740 && codePoint <= 0x2B81F)
+        || (codePoint >= 0x2B820 && codePoint <= 0x2CEAF)
+        || (codePoint >= 0x3040 && codePoint <= 0x30FF)
+        || (codePoint >= 0xAC00 && codePoint <= 0xD7AF);
+}
+
+/**
+ * 判断文本是否包含 CJK 类文字。
+ * @param text 输入文本。
+ * @return 包含 CJK 类文字时返回 true。
+ */
+bool containsCjkText(const QString &text)
+{
+    const QVector<uint> codePoints = text.toUcs4();
+    return std::any_of(codePoints.cbegin(), codePoints.cend(), isCjkCodePoint);
+}
+
+/**
+ * 判断字符是否为不应在后方补空格的中文标点。
+ * @param ch 输入字符。
+ * @return 中文标点后方应直接连接后续文字时返回 true。
+ */
+bool isNoTrailingSpaceCjkPunctuation(QChar ch)
+{
+    switch (ch.unicode()) {
+    case 0x3001:
+    case 0x3002:
+    case 0x300B:
+    case 0x3011:
+    case 0xFF01:
+    case 0xFF09:
+    case 0xFF0C:
+    case 0xFF1A:
+    case 0xFF1B:
+    case 0xFF1F:
+        return true;
+    default:
+        return false;
+    }
+}
+
+/**
+ * 判断两个 CJK 相关 token 是否应保持直接相邻。
+ * @param previousText 前一个 token 文本。
+ * @param currentText 当前 token 文本。
+ * @return 不应补空格时返回 true。
+ */
+bool shouldKeepCjkTokensAdjacent(const QString &previousText, const QString &currentText)
+{
+    if (containsCjkText(previousText) && containsCjkText(currentText)) {
+        return true;
+    }
+    if (!previousText.isEmpty()
+        && isNoTrailingSpaceCjkPunctuation(previousText.back())
+        && containsCjkText(currentText)) {
+        return true;
+    }
+    return false;
+}
+
 bool shouldInsertSpace(const QString &previousText,
                        const QString &currentText,
                        QRectF previousRect,
@@ -213,6 +285,9 @@ bool shouldInsertSpace(const QString &previousText,
         return false;
     }
     if (isNoLeadingSpacePunctuation(currentText.front())) {
+        return false;
+    }
+    if (shouldKeepCjkTokensAdjacent(previousText, currentText)) {
         return false;
     }
 

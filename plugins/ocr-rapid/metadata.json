@@ -2,5 +2,14 @@
     "name": "mark-shot-ocr-rapid",
     "version": "1.0.0",
     "description": "PP-OCR text recognition provider backed by ONNX Runtime",
-    "vendor": "mark-shot"
+    "vendor": "mark-shot",
+    "markShotMinVersion": "0.1.38",
+    "license": "MIT",
+    "capabilities": [
+        {
+            "type": "ocr",
+            "providerId": "rapid-onnx",
+            "displayName": "PP-OCR (ONNX Runtime)"
+        }
+    ]
 }

@@ -1,6 +1,7 @@
 #include "rapid_ocr_plugin.h"
 
 #include "rapid_model_paths.h"
+#include "rapid_ocr_word_segments.h"
 
 #include <QMutexLocker>
 
@@ -164,13 +165,29 @@ bool RapidOcrPlugin::recognize(const QImage &image,
         }
         previousCenterY = box.center().y();
 
-        markshot::plugin::OcrToken token;
-        token.text = recResult.text;
-        token.box = QRectF(box);
-        token.line = line;
-        token.index = 0;
-        token.confidence = recResult.confidence;
-        tokens->append(token);
+        const QVector<RapidOcrWordSegment> segments =
+            buildRapidOcrWordSegments(recResult, QRectF(box));
+        if (segments.isEmpty()) {
+            // 识别模型没有提供可用字符跨度时，保留旧版整行 token 行为
+            markshot::plugin::OcrToken token;
+            token.text = recResult.text;
+            token.box = QRectF(box);
+            token.line = line;
+            token.index = 0;
+            token.confidence = recResult.confidence;
+            tokens->append(token);
+            continue;
+        }
+
+        for (const RapidOcrWordSegment &segment : segments) {
+            markshot::plugin::OcrToken token;
+            token.text = segment.text;
+            token.box = segment.box;
+            token.line = line;
+            token.index = 0;
+            token.confidence = segment.confidence;
+            tokens->append(token);
+        }
     }
 
     // 3. 同行多框时补齐行内序号

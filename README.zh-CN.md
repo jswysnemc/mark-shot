@@ -1041,6 +1041,13 @@ gdbus call --session \
 
 ## 发版说明
 
+### 0.1.38
+
+- **插件生态基础**：新增 Provider 插件注册、用户级插件目录、插件优先级配置和插件设置页，OCR、翻译、扫码能力都可以通过动态库扩展。
+- **GitHub 插件市场**：新增 C++/Qt 内置插件索引解析、下载、SHA-256 校验和安装流程，插件市场只依赖 GitHub Release 资产，不需要 Python 环境。
+- **C++ Rapid OCR 插件升级**：Rapid OCR 插件改为输出词级 token，中文和标点按字符切分，拉丁文本按空白切词，并复用旧 RapidOCR 模型目录。
+- **钉图文本选择修复**：修复中文全角字符选中背景半宽、复制时连续中文 token 被误插入空格等问题。
+
 ### 0.1.37
 
 - **Windows 录制音频**：新增 Windows 原生 WASAPI loopback 音频采集，视频录制可采集系统声音，不再依赖 PulseAudio。

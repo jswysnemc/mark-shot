@@ -79,6 +79,8 @@ bool RapidRecModel::recognize(const QImage &lineImage, RapidRecResult *result, Q
 {
     result->text.clear();
     result->confidence = 0.0;
+    result->characters.clear();
+    result->stepCount = 0;
     if (lineImage.isNull() || lineImage.width() <= 0 || lineImage.height() <= 0) {
         if (error) {
             *error = QStringLiteral("recognition input image is empty");
@@ -125,12 +127,11 @@ bool RapidRecModel::recognize(const QImage &lineImage, RapidRecResult *result, Q
         }
         return false;
     }
+    result->stepCount = steps;
 
-    // 3. CTC 解码：逐步取 argmax，折叠重复并跳过 blank(0)
-    QString text;
-    double confidenceSum = 0.0;
-    int keptSteps = 0;
-    int previousIndex = 0;
+    // 3. 逐时间步取 argmax，先保留类别与置信度
+    QVector<int> bestIndexes(steps);
+    QVector<float> bestScores(steps);
     for (int step = 0; step < steps; ++step) {
         const float *probabilities = output.constData() + static_cast<qsizetype>(step) * classes;
         int best = 0;
@@ -141,21 +142,50 @@ bool RapidRecModel::recognize(const QImage &lineImage, RapidRecResult *result, Q
                 best = c;
             }
         }
-        if (best != 0 && best != previousIndex) {
+        bestIndexes[step] = best;
+        bestScores[step] = bestScore;
+    }
+
+    // 4. CTC 解码：按连续 run 折叠重复并跳过 blank(0)，同时保留字符跨度
+    QString text;
+    QVector<RapidRecCharacter> characters;
+    double confidenceSum = 0.0;
+    int keptSteps = 0;
+    int previousIndex = 0;
+    int step = 0;
+    while (step < steps) {
+        const int currentIndex = bestIndexes.at(step);
+        const int startStep = step;
+        double runConfidenceSum = 0.0;
+        int runStepCount = 0;
+        while (step < steps && bestIndexes.at(step) == currentIndex) {
+            runConfidenceSum += bestScores.at(step);
+            ++runStepCount;
+            ++step;
+        }
+
+        if (currentIndex != 0 && currentIndex != previousIndex) {
             // 类别布局：0=blank，1..dictSize=字典字符，dictSize+1=空格
-            if (best <= m_characters.size()) {
-                text += m_characters.at(best - 1);
-            } else {
-                text += QLatin1Char(' ');
-            }
-            confidenceSum += bestScore;
+            const QString characterText =
+                currentIndex <= m_characters.size()
+                ? m_characters.at(currentIndex - 1)
+                : QStringLiteral(" ");
+            RapidRecCharacter character;
+            character.text = characterText;
+            character.startStep = startStep;
+            character.endStep = step - 1;
+            character.confidence = runStepCount > 0 ? runConfidenceSum / runStepCount : 0.0;
+            characters.append(character);
+            text += characterText;
+            confidenceSum += character.confidence;
             ++keptSteps;
         }
-        previousIndex = best;
+        previousIndex = currentIndex;
     }
 
     result->text = text.trimmed();
     result->confidence = keptSteps > 0 ? confidenceSum / keptSteps : 0.0;
+    result->characters = characters;
     return true;
 }
 

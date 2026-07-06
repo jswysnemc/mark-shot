@@ -2,6 +2,7 @@
 
 #include "clipboard_image.h"
 #include "ocr_result.h"
+#include "pinned_window/pinned_text_selection_metrics.h"
 
 #include <QCursor>
 
@@ -38,7 +39,7 @@ std::optional<int> PinnedImageWindow::tokenAt(QPointF imagePoint) const
 {
     const QVector<OcrToken> &tokens = activeTokens();
     for (int i = 0; i < tokens.size(); ++i) {
-        const QRectF hitRect = tokens.at(i).imageRect.adjusted(-2.0, -2.0, 2.0, 2.0);
+        const QRectF hitRect = selectionImageRectForToken(tokens.at(i)).adjusted(-2.0, -2.0, 2.0, 2.0);
         if (hitRect.contains(imagePoint)) {
             return i;
         }
@@ -56,7 +57,7 @@ std::optional<int> PinnedImageWindow::closestToken(QPointF imagePoint) const
     int bestIndex = 0;
     qreal bestDistance = std::numeric_limits<qreal>::max();
     for (int i = 0; i < tokens.size(); ++i) {
-        const QRectF rect = tokens.at(i).imageRect;
+        const QRectF rect = selectionImageRectForToken(tokens.at(i));
         const qreal dx = imagePoint.x() < rect.left()
             ? rect.left() - imagePoint.x()
             : imagePoint.x() > rect.right() ? imagePoint.x() - rect.right() : 0.0;
@@ -158,6 +159,11 @@ QString PinnedImageWindow::tokenRangeText(int first, int last) const
 {
     const QVector<OcrToken> &tokens = activeTokens();
     return markshot::ocr::tokenRangeText(sharedOcrTokens(tokens), first, last);
+}
+
+QRectF PinnedImageWindow::selectionImageRectForToken(const OcrToken &token) const
+{
+    return pinnedTextSelectionHighlightRect(token.imageRect, token.text);
 }
 
 QVector<markshot::ocr::Token> PinnedImageWindow::sharedOcrTokens(const QVector<OcrToken> &tokens) const

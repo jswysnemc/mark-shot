@@ -58,10 +58,12 @@ struct PinnedSettings {
     bool ocrEnabled = true;
     bool autoOcr = false;
     QString ocrBackend = QStringLiteral("rapidocr");
+    QString ocrProvider = QStringLiteral("auto");
     QString ocrCommand;
     int ocrTimeoutMs = 30000;
     bool autoTranslateAfterOcr = false;
     QString translationCommand;
+    QString translationProvider = QStringLiteral("auto");
     QString translationTargetLanguage = QStringLiteral("Simplified Chinese");
     int translationTimeoutMs = 60000;
     bool borderEnabled = true;
@@ -87,6 +89,7 @@ struct ScrollSettings {
 
 struct IntegrationSettings {
     QString codeScanCommand;
+    QString codeScanProvider = QStringLiteral("auto");
     int codeScanTimeoutMs = 15000;
     QString uploadCommand;
     int uploadTimeoutMs = 30000;

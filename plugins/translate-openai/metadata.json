@@ -1,5 +1,14 @@
 {
     "name": "mark-shot-translate-openai",
     "version": "1.0.0",
-    "vendor": "mark-shot"
+    "vendor": "mark-shot",
+    "markShotMinVersion": "0.1.38",
+    "license": "MIT",
+    "capabilities": [
+        {
+            "type": "translation",
+            "providerId": "openai-compatible",
+            "displayName": "OpenAI Compatible"
+        }
+    ]
 }

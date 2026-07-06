@@ -1,6 +1,7 @@
 #include "pinned_window/pinned_image_window.h"
 
 #include "ocr_result.h"
+#include "pinned_window/pinned_text_selection_metrics.h"
 #include "providers/provider_task.h"
 #include "providers/translate/translate_provider_factory.h"
 #include "shell_command.h"
@@ -230,7 +231,7 @@ QVector<PinnedImageWindow::OcrToken> PinnedImageWindow::splitTokenForSelection(c
     QVector<qreal> weights;
     weights.reserve(token.text.size());
     for (const QChar ch : token.text) {
-        const qreal weight = selectionCharacterWeight(ch);
+        const qreal weight = pinnedTextSelectionCharacterWeight(ch);
         weights.append(weight);
         totalWeight += weight;
     }
@@ -252,20 +253,6 @@ QVector<PinnedImageWindow::OcrToken> PinnedImageWindow::splitTokenForSelection(c
         offset = nextOffset;
     }
     return splitTokens;
-}
-
-qreal PinnedImageWindow::selectionCharacterWeight(QChar ch) const
-{
-    if (ch.isSpace()) {
-        return 0.45;
-    }
-    if (markshot::ocr::isNoLeadingSpacePunctuation(ch)) {
-        return 0.65;
-    }
-    if (ch.unicode() < 0x80) {
-        return 0.75;
-    }
-    return 1.0;
 }
 
 void PinnedImageWindow::drawTranslationOverlay(QPainter &painter) const

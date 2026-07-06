@@ -1,0 +1,41 @@
+{
+    "schemaVersion": 1,
+    "generatedAt": "2026-07-06T00:00:00Z",
+    "plugins": [
+        {
+            "id": "mark-shot-sample-ocr",
+            "name": "mark-shot-sample-ocr",
+            "version": "0.1.0",
+            "vendor": "example",
+            "description": "Sample OCR provider for Mark Shot.",
+            "markShotMinVersion": "0.1.37",
+            "homepage": "https://github.com/example/mark-shot-sample-ocr",
+            "license": "MIT",
+            "capabilities": [
+                {
+                    "type": "ocr",
+                    "providerId": "sample-ocr",
+                    "displayName": "Sample OCR"
+                }
+            ],
+            "assets": [
+                {
+                    "platform": "windows",
+                    "architecture": "x86_64",
+                    "fileName": "mark-shot-sample-ocr.dll",
+                    "downloadUrl": "https://github.com/example/mark-shot-sample-ocr/releases/download/v0.1.0/mark-shot-sample-ocr.dll",
+                    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "size": 1048576
+                },
+                {
+                    "platform": "linux",
+                    "architecture": "x86_64",
+                    "fileName": "libmark-shot-sample-ocr.so",
+                    "downloadUrl": "https://github.com/example/mark-shot-sample-ocr/releases/download/v0.1.0/libmark-shot-sample-ocr.so",
+                    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "size": 1048576
+                }
+            ]
+        }
+    ]
+}

@@ -189,7 +189,7 @@ void PinnedImageWindow::paintEvent(QPaintEvent *)
     const auto [first, last] = selectionRange();
     const QVector<OcrToken> &tokens = activeTokens();
     for (int i = first; i <= last; ++i) {
-        painter.drawRect(imageToWidget(tokens.at(i).imageRect).intersected(QRectF(rect())));
+        painter.drawRect(imageToWidget(selectionImageRectForToken(tokens.at(i))).intersected(QRectF(rect())));
     }
     drawBorder();
 }

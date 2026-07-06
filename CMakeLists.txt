@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(mark-shot VERSION 0.1.37 LANGUAGES C CXX)
+project(mark-shot VERSION 0.1.38 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -82,7 +82,9 @@ include(cmake/cli_sources.cmake)
 include(cmake/notification_sources.cmake)
 include(cmake/pipewire_capture_sources.cmake)
 include(cmake/provider_sources.cmake)
+include(cmake/marketplace_sources.cmake)
 include(cmake/recording_sources.cmake)
+include(cmake/settings_sources.cmake)
 include(cmake/shot_window_sources.cmake)
 
 qt_add_executable(mark-shot
@@ -91,7 +93,9 @@ qt_add_executable(mark-shot
     ${MARK_SHOT_CLI_SOURCES}
     ${MARK_SHOT_NOTIFICATION_SOURCES}
     ${MARK_SHOT_PROVIDER_SOURCES}
+    ${MARK_SHOT_MARKETPLACE_SOURCES}
     ${MARK_SHOT_RECORDING_SOURCES}
+    ${MARK_SHOT_SETTINGS_SOURCES}
     ${MARK_SHOT_WINDOW_SOURCES}
     src/main.cpp
     src/clipboard_image.cpp
@@ -172,36 +176,6 @@ qt_add_executable(mark-shot
     src/screen_capture_x11.cpp
     src/shell_command.cpp
     src/shell_command.h
-    src/settings/settings_config.cpp
-    src/settings/settings_config.h
-    src/settings/settings_config_read.cpp
-    src/settings/settings_config_write.cpp
-    src/settings/settings_design_tokens.cpp
-    src/settings/settings_design_tokens.h
-    src/settings/settings_dialog.cpp
-    src/settings/settings_dialog.h
-    src/settings/settings_navigation.cpp
-    src/settings/settings_navigation.h
-    src/settings/settings_page_advanced.cpp
-    src/settings/settings_page_advanced.h
-    src/settings/settings_page_annotation.cpp
-    src/settings/settings_page_annotation.h
-    src/settings/settings_page_capture.cpp
-    src/settings/settings_page_capture.h
-    src/settings/settings_page_general.cpp
-    src/settings/settings_page_general.h
-    src/settings/settings_page_integrations.cpp
-    src/settings/settings_page_integrations.h
-    src/settings/settings_page_pinned.cpp
-    src/settings/settings_page_pinned.h
-    src/settings/settings_page_scroll.cpp
-    src/settings/settings_page_scroll.h
-    src/settings/settings_page_shortcuts.cpp
-    src/settings/settings_page_shortcuts.h
-    src/settings/settings_page_storage.cpp
-    src/settings/settings_page_storage.h
-    src/settings/settings_ui_helpers.cpp
-    src/settings/settings_ui_helpers.h
     src/ocr_result.cpp
     src/ocr_result.h
     src/save_path_config.cpp
@@ -219,6 +193,8 @@ qt_add_executable(mark-shot
     src/pinned_window/pinned_layer_shell_geometry.h
     src/pinned_window/pinned_resize_controller.cpp
     src/pinned_window/pinned_resize_controller.h
+    src/pinned_window/pinned_text_selection_metrics.cpp
+    src/pinned_window/pinned_text_selection_metrics.h
     src/pinned_window_top.cpp
     src/pinned_window_top.h
     src/annotation_launch.cpp
@@ -429,6 +405,8 @@ if(BUILD_TESTING)
 
     include(cmake/recording_tests.cmake)
     include(cmake/provider_tests.cmake)
+    include(cmake/marketplace_tests.cmake)
+    include(cmake/settings_tests.cmake)
 
     qt_add_executable(mark-shot-startup-default-color-test
         tests/startup_default_color_test.cpp
@@ -712,6 +690,20 @@ if(BUILD_TESTING)
             Qt6::Widgets
     )
     add_test(NAME pinned-window-config COMMAND mark-shot-pinned-window-config-test)
+
+    qt_add_executable(mark-shot-pinned-text-selection-metrics-test
+        tests/pinned_text_selection_metrics_test.cpp
+        src/pinned_window/pinned_text_selection_metrics.cpp
+        src/pinned_window/pinned_text_selection_metrics.h
+    )
+    target_include_directories(mark-shot-pinned-text-selection-metrics-test PRIVATE src)
+    target_link_libraries(mark-shot-pinned-text-selection-metrics-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+    )
+    add_test(NAME pinned-text-selection-metrics COMMAND mark-shot-pinned-text-selection-metrics-test)
 
     qt_add_executable(mark-shot-pinned-layer-shell-geometry-test
         tests/pinned_layer_shell_geometry_test.cpp

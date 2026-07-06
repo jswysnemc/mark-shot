@@ -51,6 +51,36 @@ private slots:
         QCOMPARE(markshot::ocr::tokensText(tokens), QStringLiteral("Hello, world"));
     }
 
+    void avoidsSpacesBetweenChineseTokens()
+    {
+        QVector<markshot::ocr::Token> tokens;
+        tokens.append({QStringLiteral("源"), QRectF(0, 0, 10, 20), 0, 0, 1.0});
+        tokens.append({QStringLiteral("文"), QRectF(18, 0, 10, 20), 0, 1, 1.0});
+        tokens.append({QStringLiteral("件"), QRectF(36, 0, 10, 20), 0, 2, 1.0});
+
+        QCOMPARE(markshot::ocr::tokensText(tokens), QStringLiteral("源文件"));
+    }
+
+    void avoidsSpacesAfterChinesePunctuation()
+    {
+        QVector<markshot::ocr::Token> tokens;
+        tokens.append({QStringLiteral("完成"), QRectF(0, 0, 20, 20), 0, 0, 1.0});
+        tokens.append({QStringLiteral("，"), QRectF(30, 0, 10, 20), 0, 1, 1.0});
+        tokens.append({QStringLiteral("源"), QRectF(48, 0, 10, 20), 0, 2, 1.0});
+
+        QCOMPARE(markshot::ocr::tokensText(tokens), QStringLiteral("完成，源"));
+    }
+
+    void keepsSpacesBetweenChineseAndLatinWhenGapIsLarge()
+    {
+        QVector<markshot::ocr::Token> tokens;
+        tokens.append({QStringLiteral("文件"), QRectF(0, 0, 24, 20), 0, 0, 1.0});
+        tokens.append({QStringLiteral("SHA-256"), QRectF(42, 0, 60, 20), 0, 1, 1.0});
+        tokens.append({QStringLiteral("一致"), QRectF(120, 0, 24, 20), 0, 2, 1.0});
+
+        QCOMPARE(markshot::ocr::tokensText(tokens), QStringLiteral("文件 SHA-256 一致"));
+    }
+
     void reportsInvalidJson()
     {
         const markshot::ocr::ParsedOutput parsed = markshot::ocr::parseOutput(QByteArray("{"));

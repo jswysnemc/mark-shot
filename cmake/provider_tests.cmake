@@ -26,6 +26,8 @@ qt_add_executable(mark-shot-ocr-provider-factory-test
     src/providers/ocr/ocr_tesseract_task.h
     src/providers/provider_plugin_registry.cpp
     src/providers/provider_plugin_registry.h
+    src/providers/provider_plugin_paths.cpp
+    src/providers/provider_plugin_paths.h
     src/providers/provider_process_task.cpp
     src/providers/provider_process_task.h
     src/providers/provider_task.cpp
@@ -42,6 +44,22 @@ target_link_libraries(mark-shot-ocr-provider-factory-test
         Qt6::Test
 )
 add_test(NAME ocr-provider-factory COMMAND mark-shot-ocr-provider-factory-test)
+
+qt_add_executable(mark-shot-rapid-ocr-word-segments-test
+    tests/rapid_ocr_word_segments_test.cpp
+    plugins/ocr-rapid/rapid_ocr_word_segments.cpp
+    plugins/ocr-rapid/rapid_ocr_word_segments.h
+)
+target_include_directories(mark-shot-rapid-ocr-word-segments-test PRIVATE
+    plugins/ocr-rapid
+)
+target_link_libraries(mark-shot-rapid-ocr-word-segments-test
+    PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Test
+)
+add_test(NAME rapid-ocr-word-segments COMMAND mark-shot-rapid-ocr-word-segments-test)
 
 if(TARGET mark-shot-ocr-rapid)
     # pkg_check_modules 的 IMPORTED target 为目录作用域，测试目录内重新探测
@@ -63,6 +81,8 @@ if(TARGET mark-shot-ocr-rapid AND (OnnxRuntimeTest_FOUND OR onnxruntime_FOUND))
         plugins/ocr-rapid/rapid_model_paths.h
         plugins/ocr-rapid/rapid_ocr_plugin.cpp
         plugins/ocr-rapid/rapid_ocr_plugin.h
+        plugins/ocr-rapid/rapid_ocr_word_segments.cpp
+        plugins/ocr-rapid/rapid_ocr_word_segments.h
         plugins/ocr-rapid/rapid_onnx_session.cpp
         plugins/ocr-rapid/rapid_onnx_session.h
         plugins/ocr-rapid/rapid_rec_model.cpp

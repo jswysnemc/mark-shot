@@ -1,6 +1,8 @@
 #pragma once
 
-#include <QString>
+#include "providers/provider_plugin_info.h"
+
+#include <QStringList>
 #include <QVector>
 
 namespace markshot::plugin {
@@ -44,6 +46,12 @@ public:
     QVector<markshot::plugin::CodeScanProviderPlugin *> codeScanProviders();
 
     /**
+     * 枚举插件加载诊断信息。
+     * @return 插件诊断条目。
+     */
+    QVector<ProviderPluginInfo> pluginInfos();
+
+    /**
      * 读取插件搜索目录列表。
      * @return 目录绝对路径列表，供设置页展示。
      */
@@ -59,6 +67,7 @@ private:
     void loadOnce();
 
     bool m_loaded = false;
+    QVector<ProviderPluginInfo> m_pluginInfos;
     QVector<markshot::plugin::OcrProviderPlugin *> m_ocrProviders;
     QVector<markshot::plugin::TranslateProviderPlugin *> m_translateProviders;
     QVector<markshot::plugin::CodeScanProviderPlugin *> m_codeScanProviders;

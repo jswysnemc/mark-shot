@@ -21,6 +21,8 @@ qt_add_plugin(mark-shot-ocr-rapid
     rapid_model_paths.h
     rapid_ocr_plugin.cpp
     rapid_ocr_plugin.h
+    rapid_ocr_word_segments.cpp
+    rapid_ocr_word_segments.h
     rapid_onnx_session.cpp
     rapid_onnx_session.h
     rapid_rec_model.cpp

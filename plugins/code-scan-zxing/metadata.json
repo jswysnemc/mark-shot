@@ -1,5 +1,14 @@
 {
     "name": "mark-shot-code-scan-zxing",
     "version": "1.0.0",
-    "vendor": "mark-shot"
+    "vendor": "mark-shot",
+    "markShotMinVersion": "0.1.38",
+    "license": "MIT",
+    "capabilities": [
+        {
+            "type": "code-scan",
+            "providerId": "zxing-cpp",
+            "displayName": "ZXing-C++"
+        }
+    ]
 }

@@ -8,6 +8,7 @@
 #include "kde_capture_config.h"
 #include "recording/recording_storage_config.h"
 #include "save_path_config.h"
+#include "settings/provider_preference_config.h"
 #include "startup_config.h"
 #include "toolbar_appearance_config.h"
 #include "ui/i18n.h"
@@ -557,6 +558,10 @@ SettingsConfig readSettingsConfig(QString *error)
     settings.storage = readStorageSettings(root);
     settings.scroll = readScrollSettings(root);
     settings.integrations = readIntegrationSettings(root);
+    const ProviderPreferenceConfig providerPreferences = providerPreferenceConfigFromRoot(root);
+    settings.pinned.ocrProvider = providerPreferences.ocrProvider;
+    settings.pinned.translationProvider = providerPreferences.translationProvider;
+    settings.integrations.codeScanProvider = providerPreferences.codeScanProvider;
     settings.advanced = readAdvancedSettings(root);
     return settings;
 }

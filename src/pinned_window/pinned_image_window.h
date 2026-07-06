@@ -318,6 +318,11 @@ private:
     /// @return 拼接后的文本。
     QString tokenRangeText(int first, int last) const;
 
+    /// @brief 返回用于鼠标命中和选区绘制的 token 矩形。
+    /// @param token OCR 或翻译 token。
+    /// @return 经过全角字符宽度补正后的图片坐标矩形。
+    QRectF selectionImageRectForToken(const OcrToken &token) const;
+
     /// @brief 将窗口内部 token 转换为共享 OCR token。
     /// @param tokens 窗口内部 token 列表。
     /// @return 共享 OCR token 列表。
@@ -352,11 +357,6 @@ private:
     /// @param token 翻译 token。
     /// @return 拆分后的 token 列表。
     QVector<OcrToken> splitTokenForSelection(const OcrToken &token) const;
-
-    /// @brief 返回字符在选择拆分中的宽度权重。
-    /// @param ch 字符。
-    /// @return 宽度权重。
-    qreal selectionCharacterWeight(QChar ch) const;
 
     /// @brief 绘制翻译覆盖层。
     /// @param painter 当前窗口画笔。

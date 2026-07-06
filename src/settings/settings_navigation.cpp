@@ -25,6 +25,7 @@ enum class NavIcon {
     Annotation,
     Pinned,
     Integrations,
+    Plugins,
     Scroll,
     Storage,
     Advanced,
@@ -120,6 +121,19 @@ void drawPuzzle(QPainter &p, const QColor &ink)
     p.drawRoundedRect(QRectF(8.5, 6, 7.5, 7.5), 1.8, 1.8);
 }
 
+/// @brief 绘制插件插槽图标（Plugins）。
+void drawPluginBlocks(QPainter &p, const QColor &ink)
+{
+    p.setPen(navPen(ink, 1.45));
+    p.setBrush(Qt::NoBrush);
+    p.drawRoundedRect(QRectF(2.5, 3.5, 5.2, 5.2), 1.4, 1.4);
+    p.drawRoundedRect(QRectF(10.3, 3.5, 5.2, 5.2), 1.4, 1.4);
+    p.drawRoundedRect(QRectF(6.4, 10.2, 5.2, 5.2), 1.4, 1.4);
+    // 1. 中心连线表现多个 provider 插件汇聚到同一管理页
+    p.drawLine(QPointF(7.7, 6.1), QPointF(10.3, 6.1));
+    p.drawLine(QPointF(9, 8.7), QPointF(9, 10.2));
+}
+
 /// @brief 绘制向下双箭头图标（Scroll Capture）。
 void drawScroll(QPainter &p, const QColor &ink)
 {
@@ -181,6 +195,9 @@ void drawNavGlyph(QPainter &p, NavIcon icon, const QColor &ink)
         break;
     case NavIcon::Integrations:
         drawPuzzle(p, ink);
+        break;
+    case NavIcon::Plugins:
+        drawPluginBlocks(p, ink);
         break;
     case NavIcon::Scroll:
         drawScroll(p, ink);
@@ -261,6 +278,7 @@ void SettingsNavigation::buildList()
     // 组2：进阶
     addCategory(MS_TR("Pinned Image"), makeNavIcon(NavIcon::Pinned));
     addCategory(MS_TR("Integrations"), makeNavIcon(NavIcon::Integrations));
+    addCategory(MS_TR("Plugins"), makeNavIcon(NavIcon::Plugins));
     addCategory(MS_TR("Scroll Capture"), makeNavIcon(NavIcon::Scroll));
     addCategory(MS_TR("Storage"), makeNavIcon(NavIcon::Storage));
     addSeparator();

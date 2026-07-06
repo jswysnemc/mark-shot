@@ -6,8 +6,8 @@
 namespace markshot::settings {
 
 /// @brief 设置界面侧栏导航组件。
-///        封装标题区与分类列表，9 个分类按组排列，组间留白分隔。
-///        对外暴露逻辑索引（0..8），与内容栈一一对应；分隔项不占用逻辑索引。
+///        封装标题区与分类列表，10 个分类按组排列，组间留白分隔。
+///        对外暴露逻辑索引（0..9），与内容栈一一对应；分隔项不占用逻辑索引。
 class SettingsNavigation final : public QWidget {
     Q_OBJECT
 
@@ -17,7 +17,7 @@ public:
     explicit SettingsNavigation(QWidget *parent = nullptr);
 
     /// @brief 设置当前激活的逻辑页索引。
-    /// @param index 逻辑索引，范围 0..8。
+    /// @param index 逻辑索引，范围 0..9。
     void setCurrentLogicalRow(int index);
 
 signals:

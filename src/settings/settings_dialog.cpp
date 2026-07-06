@@ -9,6 +9,7 @@
 #include "settings/settings_page_general.h"
 #include "settings/settings_page_integrations.h"
 #include "settings/settings_page_pinned.h"
+#include "settings/settings_page_plugins.h"
 #include "settings/settings_page_scroll.h"
 #include "settings/settings_page_shortcuts.h"
 #include "settings/settings_page_storage.h"
@@ -83,7 +84,7 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     m_navigation = new SettingsNavigation(body);
     bodyLayout->addWidget(m_navigation);
 
-    // 内容栈：9 个可滚动设置页
+    // 内容栈：10 个可滚动设置页
     m_stack = new QStackedWidget(body);
     m_generalPage = new SettingsPageGeneral(m_stack);
     m_capturePage = new SettingsPageCapture(m_stack);
@@ -91,6 +92,7 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     m_annotationPage = new SettingsPageAnnotation(m_stack);
     m_pinnedPage = new SettingsPagePinned(m_stack);
     m_integrationsPage = new SettingsPageIntegrations(m_stack);
+    m_pluginsPage = new SettingsPagePlugins(m_stack);
     m_scrollPage = new SettingsPageScroll(m_stack);
     m_storagePage = new SettingsPageStorage(m_stack);
     m_advancedPage = new SettingsPageAdvanced(m_stack);
@@ -100,6 +102,7 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     addScrollablePage(m_stack, m_annotationPage);
     addScrollablePage(m_stack, m_pinnedPage);
     addScrollablePage(m_stack, m_integrationsPage);
+    addScrollablePage(m_stack, m_pluginsPage);
     addScrollablePage(m_stack, m_scrollPage);
     addScrollablePage(m_stack, m_storagePage);
     addScrollablePage(m_stack, m_advancedPage);
@@ -142,6 +145,7 @@ void SettingsDialog::loadConfig()
     m_annotationPage->setConfig(m_config);
     m_pinnedPage->setConfig(m_config);
     m_integrationsPage->setConfig(m_config);
+    m_pluginsPage->setConfig(m_config);
     m_scrollPage->setConfig(m_config);
     m_storagePage->setConfig(m_config);
     m_advancedPage->setConfig(m_config);
@@ -160,6 +164,7 @@ SettingsConfig SettingsDialog::collectConfig() const
     m_annotationPage->updateConfig(&config);
     m_pinnedPage->updateConfig(&config);
     m_integrationsPage->updateConfig(&config);
+    m_pluginsPage->updateConfig(&config);
     m_scrollPage->updateConfig(&config);
     m_storagePage->updateConfig(&config);
     m_advancedPage->updateConfig(&config);

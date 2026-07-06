@@ -3,11 +3,14 @@
 #include "debug_log.h"
 #include "markshot/code_scan_provider_plugin.h"
 #include "markshot/ocr_provider_plugin.h"
+#include "providers/provider_plugin_paths.h"
 #include "markshot/translate_provider_plugin.h"
 
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QJsonObject>
+#include <QJsonValue>
 #include <QLibrary>
 #include <QPluginLoader>
 
@@ -15,17 +18,48 @@ namespace markshot::providers {
 namespace {
 
 /**
- * 追加去重后的插件搜索目录。
- * @param dirs 目录列表。
- * @param path 待追加路径。
- * @return 无返回值。
+ * 从插件加载器读取基础诊断信息。
+ * @param entry 插件库文件信息。
+ * @param loader 插件加载器。
+ * @return 基础诊断信息。
  */
-void addSearchDir(QStringList *dirs, const QString &path)
+ProviderPluginInfo basePluginInfo(const QFileInfo &entry, const QPluginLoader &loader)
 {
-    const QString absolute = QDir(path).absolutePath();
-    if (!absolute.isEmpty() && !dirs->contains(absolute)) {
-        dirs->append(absolute);
-    }
+    ProviderPluginInfo info;
+    info.path = entry.absoluteFilePath();
+    const QJsonObject metadata = loader.metaData().value(QStringLiteral("MetaData")).toObject();
+    info.metadataName = metadata.value(QStringLiteral("name")).toString();
+    info.metadataVersion = metadata.value(QStringLiteral("version")).toString();
+    info.metadataVendor = metadata.value(QStringLiteral("vendor")).toString();
+    return info;
+}
+
+/**
+ * 构造已匹配 provider 接口的诊断信息。
+ * @param base 插件基础诊断信息。
+ * @param capability 插件能力。
+ * @param providerId provider 标识。
+ * @param displayName 展示名称。
+ * @param available 当前是否可用。
+ * @param error 不可用原因。
+ * @return provider 诊断信息。
+ */
+ProviderPluginInfo matchedPluginInfo(const ProviderPluginInfo &base,
+                                     ProviderPluginCapability capability,
+                                     const QString &providerId,
+                                     const QString &displayName,
+                                     bool available,
+                                     const QString &error)
+{
+    ProviderPluginInfo info = base;
+    info.capability = capability;
+    info.providerId = providerId;
+    info.displayName = displayName;
+    info.loaded = true;
+    info.matched = true;
+    info.available = available;
+    info.error = error;
+    return info;
 }
 
 }  // namespace
@@ -38,22 +72,7 @@ ProviderPluginRegistry &ProviderPluginRegistry::instance()
 
 QStringList ProviderPluginRegistry::pluginSearchDirs()
 {
-    QStringList dirs;
-    const QString appDir = QCoreApplication::applicationDirPath();
-    // 1. 与 layer-shell 插件一致的目录约定，外加 providers 子目录
-    addSearchDir(&dirs, QDir(appDir).filePath(QStringLiteral("plugins")));
-    addSearchDir(&dirs, QDir(appDir).filePath(QStringLiteral("../lib/mark-shot/plugins")));
-    addSearchDir(&dirs, QDir(appDir).filePath(QStringLiteral("../lib64/mark-shot/plugins")));
-    for (const QString &path : QCoreApplication::libraryPaths()) {
-        addSearchDir(&dirs, QDir(path).filePath(QStringLiteral("mark-shot/plugins")));
-    }
-    // 2. 用户级插件目录，便于免打包尝试插件
-    const QString dataHome = qEnvironmentVariable("XDG_DATA_HOME").trimmed();
-    const QString userBase = dataHome.isEmpty()
-        ? QDir::home().filePath(QStringLiteral(".local/share"))
-        : dataHome;
-    addSearchDir(&dirs, QDir(userBase).filePath(QStringLiteral("mark-shot/plugins")));
-    return dirs;
+    return markshot::providers::pluginSearchDirs();
 }
 
 QVector<markshot::plugin::OcrProviderPlugin *> ProviderPluginRegistry::ocrProviders()
@@ -74,6 +93,12 @@ QVector<markshot::plugin::CodeScanProviderPlugin *> ProviderPluginRegistry::code
     return m_codeScanProviders;
 }
 
+QVector<ProviderPluginInfo> ProviderPluginRegistry::pluginInfos()
+{
+    loadOnce();
+    return m_pluginInfos;
+}
+
 void ProviderPluginRegistry::loadOnce()
 {
     if (m_loaded) {
@@ -92,8 +117,12 @@ void ProviderPluginRegistry::loadOnce()
             }
             // 1. 加载候选动态库并检查是否实现任一 provider 接口
             auto *loader = new QPluginLoader(entry.absoluteFilePath(), QCoreApplication::instance());
+            const ProviderPluginInfo baseInfo = basePluginInfo(entry, *loader);
             QObject *instance = loader->instance();
             if (!instance) {
+                ProviderPluginInfo info = baseInfo;
+                info.error = loader->errorString();
+                m_pluginInfos.append(info);
                 markshot::debugLog("providers",
                                    "【插件】【加载失败】path=%s error=%s",
                                    entry.absoluteFilePath().toUtf8().constData(),
@@ -106,6 +135,14 @@ void ProviderPluginRegistry::loadOnce()
             if (auto *ocr = qobject_cast<markshot::plugin::OcrProviderPlugin *>(instance)) {
                 m_ocrProviders.append(ocr);
                 matched = true;
+                QString error;
+                const bool available = ocr->isAvailable(&error);
+                m_pluginInfos.append(matchedPluginInfo(baseInfo,
+                                                       ProviderPluginCapability::Ocr,
+                                                       ocr->providerId(),
+                                                       ocr->displayName(),
+                                                       available,
+                                                       error));
                 markshot::debugLog("providers",
                                    "【插件】【OCR】loaded id=%s path=%s",
                                    ocr->providerId().toUtf8().constData(),
@@ -114,6 +151,14 @@ void ProviderPluginRegistry::loadOnce()
             if (auto *translate = qobject_cast<markshot::plugin::TranslateProviderPlugin *>(instance)) {
                 m_translateProviders.append(translate);
                 matched = true;
+                QString error;
+                const bool available = translate->isAvailable(&error);
+                m_pluginInfos.append(matchedPluginInfo(baseInfo,
+                                                       ProviderPluginCapability::Translation,
+                                                       translate->providerId(),
+                                                       translate->displayName(),
+                                                       available,
+                                                       error));
                 markshot::debugLog("providers",
                                    "【插件】【翻译】loaded id=%s path=%s",
                                    translate->providerId().toUtf8().constData(),
@@ -122,6 +167,14 @@ void ProviderPluginRegistry::loadOnce()
             if (auto *codeScan = qobject_cast<markshot::plugin::CodeScanProviderPlugin *>(instance)) {
                 m_codeScanProviders.append(codeScan);
                 matched = true;
+                QString error;
+                const bool available = codeScan->isAvailable(&error);
+                m_pluginInfos.append(matchedPluginInfo(baseInfo,
+                                                       ProviderPluginCapability::CodeScan,
+                                                       codeScan->providerId(),
+                                                       codeScan->displayName(),
+                                                       available,
+                                                       error));
                 markshot::debugLog("providers",
                                    "【插件】【扫码】loaded id=%s path=%s",
                                    codeScan->providerId().toUtf8().constData(),
@@ -130,6 +183,10 @@ void ProviderPluginRegistry::loadOnce()
 
             // 2. 与 provider 无关的插件立即卸载，避免占用内存
             if (!matched) {
+                ProviderPluginInfo info = baseInfo;
+                info.loaded = true;
+                info.error = QStringLiteral("No supported provider interface");
+                m_pluginInfos.append(info);
                 loader->unload();
                 loader->deleteLater();
             }

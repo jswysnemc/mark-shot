@@ -6,6 +6,7 @@
 #include "capture_cursor_policy.h"
 #include "config_value.h"
 #include "recording/recording_storage_config.h"
+#include "settings/provider_preference_config.h"
 #include "ui/i18n.h"
 #include "ui/interface_language_config.h"
 #include "ui/interface_theme_config.h"
@@ -372,6 +373,10 @@ bool writeSettingsConfig(const SettingsConfig &config, QString *error)
     writeStorageSettings(&root, config.storage);
     writeScrollSettings(&root, config.scroll);
     writeIntegrationSettings(&root, config.integrations);
+    writeProviderPreferenceConfig(&root,
+                                  ProviderPreferenceConfig{config.pinned.ocrProvider,
+                                                           config.pinned.translationProvider,
+                                                           config.integrations.codeScanProvider});
     writeAdvancedSettings(&root, config.advanced);
     if (!writeAppConfigRoot(root, error)) {
         return false;

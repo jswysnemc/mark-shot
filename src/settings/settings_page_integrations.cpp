@@ -101,13 +101,19 @@ void SettingsPageIntegrations::refreshProviderStatus(const SettingsConfig &confi
 {
     // 1. 按 auto 链解析各能力实际生效的 provider 并展示
     markshot::providers::OcrTaskRequest ocrRequest;
+    ocrRequest.provider = config.pinned.ocrProvider;
+    ocrRequest.commandLine = config.pinned.ocrCommand.trimmed();
+    ocrRequest.backend = config.pinned.ocrBackend;
     m_ocrProviderStatus->setText(markshot::providers::resolvedOcrProviderName(ocrRequest));
 
     markshot::providers::TranslateTaskRequest translateRequest;
+    translateRequest.provider = config.pinned.translationProvider;
+    translateRequest.commandLine = config.pinned.translationCommand.trimmed();
     m_translationProviderStatus->setText(
         markshot::providers::resolvedTranslateProviderName(translateRequest));
 
     markshot::providers::CodeScanTaskRequest codeScanRequest;
+    codeScanRequest.provider = config.integrations.codeScanProvider;
     codeScanRequest.commandLine = config.integrations.codeScanCommand.trimmed();
     m_codeScanProviderStatus->setText(
         markshot::providers::resolvedCodeScanProviderName(codeScanRequest));
