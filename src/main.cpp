@@ -1,6 +1,7 @@
 #include "annotation_launch.h"
 #include "capture_cursor_policy.h"
 #include "capture_freeze_scope.h"
+#include "capture_own_windows_policy.h"
 #include "capture_session_launcher.h"
 #include "cli/image_pin_launch.h"
 #include "cli/recording_cli.h"
@@ -298,6 +299,7 @@ int main(int argc, char *argv[])
     const bool allOutputs = parser.isSet(allOutputsOption);
     const markshot::CaptureFreezeScope freezeScope = markshot::configuredCaptureFreezeScope();
     const bool includeCursor = markshot::configuredCaptureIncludeCursor();
+    const bool hideOwnWindows = markshot::configuredHideOwnWindowsDuringCapture();
     const bool useRegularWindow = parser.isSet(xdgWindowOption);
     const bool fullscreenAnnotation = parser.isSet(fullscreenAnnotationOption);
     const markshot::WindowsTrayController::Config trayConfig = markshot::WindowsTrayController::readConfig();
@@ -338,6 +340,7 @@ int main(int argc, char *argv[])
                           &captureActive,
                           freezeScope,
                           includeCursor,
+                          hideOwnWindows,
                           useRegularWindow,
                           defaultTools](bool startFullscreen,
                                         bool requestAllOutputs,
@@ -352,6 +355,7 @@ int main(int argc, char *argv[])
                                          requestAllOutputs,
                                          freezeScope,
                                          includeCursor,
+                                         hideOwnWindows,
                                          useRegularWindow,
                                          startFullscreen,
                                          defaultTools,

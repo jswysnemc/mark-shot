@@ -116,6 +116,9 @@ qt_add_executable(mark-shot
     src/translation_language_options.h
     src/capture_cursor_policy.cpp
     src/capture_cursor_policy.h
+    src/capture_own_windows_policy.cpp
+    src/capture_own_windows_policy.h
+    src/capture_own_windows_policy_config.cpp
     src/display_capture/display_capture_card.cpp
     src/display_capture/display_capture_card.h
     src/display_capture/display_capture_picker.cpp
@@ -542,6 +545,22 @@ if(BUILD_TESTING)
             Qt6::Test
     )
     add_test(NAME capture-cursor-policy COMMAND mark-shot-capture-cursor-policy-test)
+
+    qt_add_executable(mark-shot-capture-own-windows-policy-test
+        tests/capture_own_windows_policy_test.cpp
+        src/capture_own_windows_policy.cpp
+        src/capture_own_windows_policy.h
+        src/config_value.cpp
+        src/config_value.h
+    )
+    target_include_directories(mark-shot-capture-own-windows-policy-test PRIVATE src)
+    target_link_libraries(mark-shot-capture-own-windows-policy-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+    )
+    add_test(NAME capture-own-windows-policy COMMAND mark-shot-capture-own-windows-policy-test)
 
     qt_add_executable(mark-shot-kde-capture-config-test
         tests/kde_capture_config_test.cpp

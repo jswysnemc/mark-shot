@@ -29,6 +29,7 @@ struct CaptureSettings {
     bool includeCursor = false;
     CaptureFreezeScope freezeScope = CaptureFreezeScope::AllScreens;
     bool kdeKwinScreenshotEnabled = true;
+    bool hideOwnWindows = true;
 };
 
 struct ShortcutSettings {

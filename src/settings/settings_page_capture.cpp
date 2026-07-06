@@ -28,6 +28,9 @@ SettingsPageCapture::SettingsPageCapture(QWidget *parent)
     m_kdeKwinScreenshot = addSwitchRow(form,
                                        MS_TR("KDE KWin Screenshot"),
                                        MS_TR("Use KWin ScreenShot2 on KDE Wayland when available."));
+    m_hideOwnWindows = addSwitchRow(form,
+                                    MS_TR("Hide Mark Shot Windows While Capturing"),
+                                    MS_TR("Hide own windows from screenshots. Turn off to include them."));
     layout->addWidget(captureCard);
     layout->addStretch();
 }
@@ -38,6 +41,7 @@ void SettingsPageCapture::setConfig(const SettingsConfig &config)
     const int index = m_freezeScope->findData(static_cast<int>(config.capture.freezeScope));
     m_freezeScope->setCurrentIndex(index >= 0 ? index : 0);
     m_kdeKwinScreenshot->setChecked(config.capture.kdeKwinScreenshotEnabled);
+    m_hideOwnWindows->setChecked(config.capture.hideOwnWindows);
 }
 
 void SettingsPageCapture::updateConfig(SettingsConfig *config) const
@@ -50,6 +54,7 @@ void SettingsPageCapture::updateConfig(SettingsConfig *config) const
     config->capture.freezeScope =
         static_cast<CaptureFreezeScope>(m_freezeScope->currentData().toInt());
     config->capture.kdeKwinScreenshotEnabled = m_kdeKwinScreenshot->isChecked();
+    config->capture.hideOwnWindows = m_hideOwnWindows->isChecked();
 }
 
 }  // namespace markshot::settings

@@ -26,6 +26,7 @@ public:
 private:
     QCheckBox *m_includeCursor = nullptr;
     QCheckBox *m_kdeKwinScreenshot = nullptr;
+    QCheckBox *m_hideOwnWindows = nullptr;
     QComboBox *m_freezeScope = nullptr;
 };
 

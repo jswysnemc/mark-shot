@@ -141,6 +141,7 @@ ShotWindow *showCapturedWindow(QScreen *screen,
 ShotWindow *showCaptureWindow(QScreen *screen,
                               bool allOutputs,
                               bool includeCursor,
+                              bool hideOwnWindows,
                               bool useRegularWindow,
                               bool fullscreenAnnotation,
                               const markshot::DefaultTools &defaultTools,
@@ -283,6 +284,7 @@ ShotWindow *showDisplayCaptureTarget(const markshot::display_capture::Target &ta
 void connectCaptureWindowSession(QApplication *app,
                                  const QVector<QPointer<ShotWindow>> &windows,
                                  bool includeCursor,
+                                 bool hideOwnWindows,
                                  bool useRegularWindow,
                                  const markshot::DefaultTools &defaultTools,
                                  const std::optional<markshot::recording::RecordingOptions> &regionRecordingOptions)
@@ -357,6 +359,7 @@ void connectCaptureWindowSession(QApplication *app,
                           windows,
                           closingSession,
                           includeCursor,
+                          hideOwnWindows,
                           useRegularWindow,
                           defaultTools,
                           regionRecordingOptions](
@@ -378,6 +381,7 @@ void connectCaptureWindowSession(QApplication *app,
                 connectCaptureWindowSession(app,
                                             newWindows,
                                             includeCursor,
+                                            hideOwnWindows,
                                             useRegularWindow,
                                             defaultTools,
                                             regionRecordingOptions);
@@ -403,6 +407,7 @@ void connectCaptureWindowSession(QApplication *app,
 /// @return 捕获成功的逐屏冻结帧列表。
 QVector<CapturedScreenFrame> captureScreensIndividually(const QList<QScreen *> &screens,
                                                         bool includeCursor,
+                                                        bool hideOwnWindows,
                                                         QString *error)
 {
     QVector<CapturedScreenFrame> frames;
@@ -424,6 +429,7 @@ QVector<CapturedScreenFrame> captureScreensIndividually(const QList<QScreen *> &
         request.sourceGeometry = captureGeometry;
         request.allOutputs = false;
         request.includeCursor = includeCursor;
+        request.hideOwnWindows = hideOwnWindows;
 
         markshot::debugLog("capture-session",
                            "【截图会话】【缩放诊断】individual-request screen=%s geom=%d,%d %dx%d "
@@ -479,6 +485,7 @@ QVector<CapturedScreenFrame> captureScreensIndividually(const QList<QScreen *> &
 /// @return 创建出的截图窗口列表。
 QVector<QPointer<ShotWindow>> showCaptureWindowsFromIndividualFrames(const QList<QScreen *> &screens,
                                                                      bool includeCursor,
+                                                                     bool hideOwnWindows,
                                                                      bool useRegularWindow,
                                                                      bool fullscreenAnnotation,
                                                                      const markshot::DefaultTools &defaultTools,
@@ -486,7 +493,7 @@ QVector<QPointer<ShotWindow>> showCaptureWindowsFromIndividualFrames(const QList
                                                                      const std::optional<markshot::recording::RecordingOptions> &regionRecordingOptions)
 {
     QVector<QPointer<ShotWindow>> windows;
-    QVector<CapturedScreenFrame> frames = captureScreensIndividually(screens, includeCursor, error);
+    QVector<CapturedScreenFrame> frames = captureScreensIndividually(screens, includeCursor, hideOwnWindows, error);
     if (frames.isEmpty()) {
         return windows;
     }
@@ -525,6 +532,7 @@ QVector<QPointer<ShotWindow>> showCaptureWindowsFromIndividualFrames(const QList
 /// @return 创建出的截图窗口列表。
 QVector<QPointer<ShotWindow>> showCaptureWindowsFromSingleFrame(const QList<QScreen *> &screens,
                                                                 bool includeCursor,
+                                                                bool hideOwnWindows,
                                                                 bool useRegularWindow,
                                                                 bool fullscreenAnnotation,
                                                                 const markshot::DefaultTools &defaultTools,
@@ -624,6 +632,7 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
                                                  bool allOutputs,
                                                  CaptureFreezeScope freezeScope,
                                                  bool includeCursor,
+                                                 bool hideOwnWindows,
                                                  bool useRegularWindow,
                                                  bool fullscreenAnnotation,
                                                  const DefaultTools &defaultTools,
@@ -662,6 +671,7 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
         if (captureIndividually) {
             windows = showCaptureWindowsFromIndividualFrames(screens,
                                                              includeCursor,
+                                                             hideOwnWindows,
                                                              useRegularWindow,
                                                              fullscreenAnnotation,
                                                              defaultTools,
@@ -670,6 +680,7 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
         } else {
             windows = showCaptureWindowsFromSingleFrame(screens,
                                                         includeCursor,
+                                                        hideOwnWindows,
                                                         useRegularWindow,
                                                         fullscreenAnnotation,
                                                         defaultTools,
@@ -679,6 +690,7 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
         connectCaptureWindowSession(app,
                                     windows,
                                     includeCursor,
+                                    hideOwnWindows,
                                     useRegularWindow,
                                     defaultTools,
                                     regionRecordingOptions);
@@ -689,6 +701,7 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
         showCaptureWindow(allOutputs ? nullptr : screen,
                           allOutputs,
                           includeCursor,
+                          hideOwnWindows,
                           useRegularWindow,
                           fullscreenAnnotation,
                           defaultTools,
@@ -700,6 +713,7 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
     connectCaptureWindowSession(app,
                                 windows,
                                 includeCursor,
+                                hideOwnWindows,
                                 useRegularWindow,
                                 defaultTools,
                                 regionRecordingOptions);
