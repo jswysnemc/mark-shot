@@ -58,10 +58,12 @@ jobs:
             cmake \
             gcc \
             ninja \
+            onnxruntime-cpu \
             pkgconf \
             pipewire \
             qt6-base \
             qt6-wayland \
+            zxing-cpp \
             layer-shell-qt
 
       - name: Configure
@@ -85,6 +87,27 @@ jobs:
           tar -C app -czf "$ASSET" .
           sha256sum "$ASSET" > "$ASSET.sha256"
 
+      - name: Package plugin assets
+        shell: bash
+        run: |
+          mkdir -p plugin-assets
+          plugins=()
+          while IFS= read -r -d '' plugin; do
+            plugins+=("$plugin")
+          done < <(find app -type f -path '*/mark-shot/plugins/*' -name '*.so' -print0)
+          if [ "${#plugins[@]}" -eq 0 ]; then
+            echo "No provider plugin dynamic libraries were installed" >&2
+            exit 1
+          fi
+          for plugin in "${plugins[@]}"; do
+            base="$(basename "$plugin")"
+            provider="${base#libmark-shot-}"
+            provider="${provider%.so}"
+            asset="mark-shot-plugin-${provider}-${{ steps.version.outputs.tag }}-linux-x86_64.so"
+            cp "$plugin" "plugin-assets/$asset"
+            (cd plugin-assets && sha256sum "$asset" > "$asset.sha256")
+          done
+
       - name: Upload binaries to release
         if: github.event_name == 'release' || github.event_name == 'push' || inputs.upload_to_release
         uses: softprops/action-gh-release@v2
@@ -93,6 +116,7 @@ jobs:
           files: |
             mark-shot-${{ steps.version.outputs.tag }}-linux-x86_64.tar.gz
             mark-shot-${{ steps.version.outputs.tag }}-linux-x86_64.tar.gz.sha256
+            plugin-assets/*
 
       - name: Upload binaries artifact
         if: github.event_name == 'workflow_dispatch'
@@ -102,6 +126,7 @@ jobs:
           path: |
             mark-shot-${{ steps.version.outputs.tag }}-linux-x86_64.tar.gz
             mark-shot-${{ steps.version.outputs.tag }}-linux-x86_64.tar.gz.sha256
+            plugin-assets/*
           if-no-files-found: error
 
   linux-arm64:
@@ -137,6 +162,7 @@ jobs:
             cmake \
             libgl1-mesa-dev \
             libpipewire-0.3-dev \
+            libzxing-dev \
             libx11-xcb-dev \
             libxcb1-dev \
             ninja-build \
@@ -165,6 +191,27 @@ jobs:
           tar -C app -czf "$ASSET" .
           sha256sum "$ASSET" > "$ASSET.sha256"
 
+      - name: Package plugin assets
+        shell: bash
+        run: |
+          mkdir -p plugin-assets
+          plugins=()
+          while IFS= read -r -d '' plugin; do
+            plugins+=("$plugin")
+          done < <(find app -type f -path '*/mark-shot/plugins/*' -name '*.so' -print0)
+          if [ "${#plugins[@]}" -eq 0 ]; then
+            echo "No provider plugin dynamic libraries were installed" >&2
+            exit 1
+          fi
+          for plugin in "${plugins[@]}"; do
+            base="$(basename "$plugin")"
+            provider="${base#libmark-shot-}"
+            provider="${provider%.so}"
+            asset="mark-shot-plugin-${provider}-${{ steps.version.outputs.tag }}-linux-arm64.so"
+            cp "$plugin" "plugin-assets/$asset"
+            (cd plugin-assets && sha256sum "$asset" > "$asset.sha256")
+          done
+
       - name: Upload binaries to release
         if: github.event_name == 'release' || github.event_name == 'push' || inputs.upload_to_release
         uses: softprops/action-gh-release@v2
@@ -173,6 +220,7 @@ jobs:
           files: |
             mark-shot-${{ steps.version.outputs.tag }}-linux-arm64.tar.gz
             mark-shot-${{ steps.version.outputs.tag }}-linux-arm64.tar.gz.sha256
+            plugin-assets/*
 
       - name: Upload binaries artifact
         if: github.event_name == 'workflow_dispatch'
@@ -182,6 +230,7 @@ jobs:
           path: |
             mark-shot-${{ steps.version.outputs.tag }}-linux-arm64.tar.gz
             mark-shot-${{ steps.version.outputs.tag }}-linux-arm64.tar.gz.sha256
+            plugin-assets/*
           if-no-files-found: error
 
   windows:
@@ -269,6 +318,26 @@ jobs:
           (cd app && zip -r "../$ASSET" .)
           sha256sum "$ASSET" > "$ASSET.sha256"
 
+      - name: Package plugin assets
+        run: |
+          mkdir -p plugin-assets
+          plugins=()
+          while IFS= read -r -d '' plugin; do
+            plugins+=("$plugin")
+          done < <(find app -type f -path '*/mark-shot/plugins/*' -name '*.dll' -print0)
+          if [ "${#plugins[@]}" -eq 0 ]; then
+            echo "No provider plugin dynamic libraries were installed" >&2
+            exit 1
+          fi
+          for plugin in "${plugins[@]}"; do
+            base="$(basename "$plugin")"
+            provider="${base#mark-shot-}"
+            provider="${provider%.dll}"
+            asset="mark-shot-plugin-${provider}-${{ steps.version.outputs.tag }}-windows-x86_64.dll"
+            cp "$plugin" "plugin-assets/$asset"
+            (cd plugin-assets && sha256sum "$asset" > "$asset.sha256")
+          done
+
       - name: Upload binaries to release
         if: github.event_name == 'release' || github.event_name == 'push' || inputs.upload_to_release
         uses: softprops/action-gh-release@v2
@@ -277,6 +346,7 @@ jobs:
           files: |
             mark-shot-${{ steps.version.outputs.tag }}-windows-x86_64.zip
             mark-shot-${{ steps.version.outputs.tag }}-windows-x86_64.zip.sha256
+            plugin-assets/*
 
       - name: Upload binaries artifact
         if: github.event_name == 'workflow_dispatch'
@@ -286,4 +356,5 @@ jobs:
           path: |
             mark-shot-${{ steps.version.outputs.tag }}-windows-x86_64.zip
             mark-shot-${{ steps.version.outputs.tag }}-windows-x86_64.zip.sha256
+            plugin-assets/*
           if-no-files-found: error
