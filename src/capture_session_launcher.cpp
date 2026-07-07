@@ -161,6 +161,7 @@ ShotWindow *showCaptureWindow(QScreen *screen,
     request.sourceGeometry = captureGeometry;
     request.allOutputs = allOutputs;
     request.includeCursor = includeCursor;
+    request.hideOwnWindows = hideOwnWindows;
     CaptureResult capture = captureScreenFrame(request);
     if (capture.image.isNull()) {
         if (error) {
