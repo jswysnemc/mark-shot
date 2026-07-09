@@ -89,6 +89,7 @@ jobs:
             ninja \
             pkgconf \
             pipewire \
+            ffmpeg \
             qt6-base \
             qt6-wayland \
             layer-shell-qt
@@ -121,7 +122,8 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=/usr
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DMARK_SHOT_REQUIRE_FFMPEG=ON
 
       - name: Configure (ubuntu)
         if: matrix.platform == 'ubuntu'
@@ -165,11 +167,13 @@ jobs:
           BUILD_DATE=$(date +%s)
 
           # 构造 .PKGINFO 元数据文件，pacman 解析此文件获取包信息
-          # arch 平台包含 layer-shell-qt 依赖，ubuntu 平台编译时禁用了 layer-shell
+          # arch 平台包含 layer-shell-qt 与 ffmpeg 依赖，ubuntu 平台编译时禁用了 layer-shell 和 libav 录制
           if [ "$PLATFORM" = "arch" ]; then
               LAYER_SHELL_DEP="depend = layer-shell-qt"
+              FFMPEG_DEP="depend = ffmpeg"
           else
               LAYER_SHELL_DEP=""
+              FFMPEG_DEP=""
           fi
 
           cat > "$STAGE/.PKGINFO" <<EOF
@@ -185,6 +189,7 @@ jobs:
           depend = qt6-base
           depend = qt6-wayland
           ${LAYER_SHELL_DEP}
+          ${FFMPEG_DEP}
           depend = pipewire
           depend = grim
           depend = wl-clipboard
