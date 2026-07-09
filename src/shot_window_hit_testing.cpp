@@ -356,19 +356,18 @@ QPointF ShotWindow::rotatedPoint(QPointF point, QPointF center, qreal degrees) c
                             delta.x() * s + delta.y() * c);
 }
 
-QRectF ShotWindow::rotatedRectBounds(QRectF rect, qreal degrees) const
+QRectF ShotWindow::rotatedRectBounds(QRectF rect, qreal degrees, QPointF pivot) const
 {
     rect = rect.normalized();
     if (rect.isEmpty() || qFuzzyIsNull(degrees)) {
         return rect;
     }
 
-    const QPointF center = rect.center();
     const QVector<QPointF> points = {
-        rotatedPoint(rect.topLeft(), center, degrees),
-        rotatedPoint(rect.topRight(), center, degrees),
-        rotatedPoint(rect.bottomLeft(), center, degrees),
-        rotatedPoint(rect.bottomRight(), center, degrees),
+        rotatedPoint(rect.topLeft(), pivot, degrees),
+        rotatedPoint(rect.topRight(), pivot, degrees),
+        rotatedPoint(rect.bottomLeft(), pivot, degrees),
+        rotatedPoint(rect.bottomRight(), pivot, degrees),
     };
 
     qreal left = points.first().x();
@@ -382,6 +381,11 @@ QRectF ShotWindow::rotatedRectBounds(QRectF rect, qreal degrees) const
         bottom = std::max(bottom, point.y());
     }
     return QRectF(QPointF(left, top), QPointF(right, bottom)).normalized();
+}
+
+QRectF ShotWindow::rotatedRectBounds(QRectF rect, qreal degrees) const
+{
+    return rotatedRectBounds(rect, degrees, rect.normalized().center());
 }
 
 QRectF ShotWindow::annotationUnrotatedBounds(const Annotation &annotation) const
@@ -456,6 +460,13 @@ QRectF ShotWindow::annotationUnrotatedBounds(const Annotation &annotation) const
 
 QPointF ShotWindow::annotationRotationCenter(const Annotation &annotation, bool widgetCoordinates) const
 {
+    // 序号标注以气泡圆心为旋转轴心,轴心与气泡拖动点重合,旋转后拖动仍能精确跟随鼠标
+    if (annotation.tool == Tool::Number && !annotation.points.isEmpty()) {
+        const QPointF bubble = annotation.points.size() >= 2
+            ? annotation.points.last()
+            : annotation.points.first();
+        return widgetCoordinates ? imageToWidget(bubble) : bubble;
+    }
     const QRectF bounds = annotationUnrotatedBounds(annotation);
     const QPointF center = bounds.center();
     return widgetCoordinates ? imageToWidget(center) : center;
@@ -471,7 +482,7 @@ QPointF ShotWindow::annotationRotationHandlePoint(const Annotation &annotation, 
     if (widgetCoordinates) {
         bounds = imageRectToWidget(bounds);
     }
-    const QPointF center = bounds.center();
+    const QPointF center = annotationRotationCenter(annotation, widgetCoordinates);
     const qreal angle = annotation.rotationDegrees;
     const QPointF topCenter = rotatedPoint(QPointF(bounds.center().x(), bounds.top()), center, angle);
     QPointF direction = topCenter - center;
@@ -517,7 +528,7 @@ QRectF ShotWindow::annotationBounds(const Annotation &annotation) const
     if (!annotationSupportsRotation(annotation)) {
         return bounds;
     }
-    return rotatedRectBounds(bounds, annotation.rotationDegrees)
+    return rotatedRectBounds(bounds, annotation.rotationDegrees, annotationRotationCenter(annotation, false))
         .intersected(QRectF(QPointF(0, 0), QSizeF(m_frozenFrame.size())));
 }
 
@@ -653,7 +664,9 @@ ShotWindow::SelectionDrag ShotWindow::annotationDragAt(QPointF imagePoint, int a
     if (annotationSupportsRotation(*annotation)) {
         localBounds = annotationUnrotatedBounds(*annotation);
         if (!localBounds.isEmpty()) {
-            localPoint = rotatedPoint(imagePoint, localBounds.center(), -annotation->rotationDegrees);
+            localPoint = rotatedPoint(imagePoint,
+                                      annotationRotationCenter(*annotation, false),
+                                      -annotation->rotationDegrees);
         }
     }
 
@@ -699,7 +712,9 @@ std::optional<int> ShotWindow::annotationAt(QPointF imagePoint) const
         if (annotationSupportsRotation(annotation)) {
             const QRectF localBounds = annotationUnrotatedBounds(annotation);
             if (!localBounds.isEmpty()) {
-                localPoint = rotatedPoint(imagePoint, localBounds.center(), -annotation.rotationDegrees);
+                localPoint = rotatedPoint(imagePoint,
+                                          annotationRotationCenter(annotation, false),
+                                          -annotation.rotationDegrees);
             }
         }
         if (annotation.tool == Tool::Magnifier) {

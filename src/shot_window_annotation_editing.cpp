@@ -165,7 +165,8 @@ void ShotWindow::updateAnnotationDrag(QPointF imagePoint, bool keepAspectRatio)
                 if (beforeBounds.isEmpty()) {
                     continue;
                 }
-                const QPointF beforeCenter = beforeBounds.center();
+                // 围绕组中心公转时按各标注自身的旋转轴心计算平移量,保证渲染结果精确公转
+                const QPointF beforeCenter = annotationRotationCenter(before, false);
                 const QPointF rotatedCenter = rotatedPoint(beforeCenter, center, deltaDegrees);
                 moveAnnotation(*annotation, rotatedCenter - beforeCenter);
                 annotation->rotationDegrees = normalizedRotationDegrees(before.rotationDegrees + deltaDegrees);
@@ -184,19 +185,22 @@ void ShotWindow::updateAnnotationDrag(QPointF imagePoint, bool keepAspectRatio)
             || m_annotationBeforeDrag.points.isEmpty()) {
             return;
         }
-        const QRectF beforeBounds = annotationUnrotatedBounds(m_annotationBeforeDrag);
-        const QPointF localPoint = beforeBounds.isEmpty()
-            ? clampImagePoint(imagePoint)
-            : rotatedPoint(clampImagePoint(imagePoint),
-                           beforeBounds.center(),
-                           -m_annotationBeforeDrag.rotationDegrees);
         while (annotation->points.size() < 2) {
             annotation->points.append(m_annotationBeforeDrag.points.last());
         }
+        // 序号的旋转轴心是气泡圆心,在屏幕坐标系下直接求解,保证拖动点始终吸附鼠标
+        const QPointF bubbleBefore = m_annotationBeforeDrag.points.last();
+        const qreal rotation = m_annotationBeforeDrag.rotationDegrees;
+        const QPointF target = clampImagePoint(imagePoint);
         if (m_annotationDrag == SelectionDrag::NumberTip) {
-            annotation->points[0] = clampImagePoint(localPoint);
+            // 1. 轴心不动,把鼠标位置反旋转回本地坐标,渲染后尖端正好落在鼠标处
+            annotation->points[0] = clampImagePoint(rotatedPoint(target, bubbleBefore, -rotation));
         } else {
-            annotation->points[1] = clampImagePoint(localPoint);
+            // 2. 拖动气泡会移动轴心,先记录尖端的屏幕位置,再围绕新轴心反解尖端本地坐标
+            const QPointF tipVisual =
+                rotatedPoint(m_annotationBeforeDrag.points.first(), bubbleBefore, rotation);
+            annotation->points[1] = target;
+            annotation->points[0] = clampImagePoint(rotatedPoint(tipVisual, target, -rotation));
         }
         annotation->rotationDegrees = m_annotationBeforeDrag.rotationDegrees;
     } else if (m_annotationDrag == SelectionDrag::Move) {
@@ -218,7 +222,7 @@ void ShotWindow::updateAnnotationDrag(QPointF imagePoint, bool keepAspectRatio)
         const QRectF oldBounds = annotationUnrotatedBounds(m_annotationBeforeDrag);
         const QPointF localPoint =
             rotatedPoint(clampImagePoint(imagePoint),
-                         oldBounds.center(),
+                         annotationRotationCenter(m_annotationBeforeDrag, false),
                          -m_annotationBeforeDrag.rotationDegrees);
         const QRectF newBounds = resizedBounds(oldBounds,
                                                m_annotationDrag,

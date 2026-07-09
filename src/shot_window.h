@@ -360,6 +360,7 @@ private:
     SelectionDrag numberDragAt(const Annotation &annotation, QPointF imagePoint) const;
     QPointF rotatedPoint(QPointF point, QPointF center, qreal degrees) const;
     QRectF rotatedRectBounds(QRectF rect, qreal degrees) const;
+    QRectF rotatedRectBounds(QRectF rect, qreal degrees, QPointF pivot) const;
     QRectF annotationUnrotatedBounds(const Annotation &annotation) const;
     QPointF annotationRotationCenter(const Annotation &annotation, bool widgetCoordinates) const;
     QPointF annotationRotationHandlePoint(const Annotation &annotation, bool widgetCoordinates) const;

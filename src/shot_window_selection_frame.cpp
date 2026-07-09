@@ -77,7 +77,7 @@ void ShotWindow::drawSelectedAnnotationFrame(QPainter &painter) const
     }
     if (rotatedSingleSelection) {
         const QRectF localBounds = imageRectToWidget(annotationUnrotatedBounds(*singleSelectedAnnotation));
-        const QPointF center = localBounds.center();
+        const QPointF center = annotationRotationCenter(*singleSelectedAnnotation, true);
         const qreal angle = singleSelectedAnnotation->rotationDegrees;
         const QVector<QPointF> corners = {
             rotatedPoint(localBounds.topLeft(), center, angle),
