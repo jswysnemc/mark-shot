@@ -1,5 +1,16 @@
 # Release Notes
 
+### 0.1.39
+
+- **Wayland Multi-Monitor Capture**: Fixed mixed-scale multi-monitor screenshots by capturing Wayland outputs independently, preventing half-screen selection and incorrectly scaled overlays.
+- **Niri DMS Window Geometry**: The niri window detector now reads DMS bar, dock, frame, and frame-exclusion settings so tiled-window selection aligns with the visible window bounds.
+- **Pinned Windows Across Outputs**: Pinned layer-shell windows now rebind to the target output while being dragged, so images remain visible after moving between monitors.
+- **Image Frame Default**: The optional macOS-style export frame is now disabled by default. Existing configurations can still enable it with `export.imageFrame.enabled`.
+- **Capture Window Visibility Setting**: `capture.hideOwnWindows` is now read at capture time and applied consistently to single-screen and multi-screen paths, so settings changes take effect without restarting.
+- **Number Badge Rotation**: Number annotations now rotate around the badge center, with matching hit testing and selection geometry.
+- **Standalone Plugin Assets**: Release builds now publish provider plugins as separate checksummed assets, with a stabilized Rapid OCR plugin build.
+- **Packaging and Documentation**: Arch packages now depend on FFmpeg for recording support, all package versions are synchronized, and installed packages include the linked configuration and release documentation.
+
 
 ### 0.1.38
 

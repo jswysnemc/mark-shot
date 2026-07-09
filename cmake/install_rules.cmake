@@ -1,5 +1,15 @@
 install(TARGETS mark-shot RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+install(FILES
+    README.md
+    README.zh-CN.md
+    CHANGELOG.md
+    DESTINATION ${CMAKE_INSTALL_DOCDIR}
+)
+install(DIRECTORY docs/
+    DESTINATION ${CMAKE_INSTALL_DOCDIR}/docs
+)
+
 if(TARGET mark-shot-layer-shell)
     install(TARGETS mark-shot-layer-shell
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/mark-shot

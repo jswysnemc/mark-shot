@@ -39,6 +39,7 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
     }
   },
   "capture": {
+    "hideOwnWindows": true,
     "wayland": {
       "kde": {
         "kwinScreenshot": {
@@ -138,6 +139,7 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
 | `ui.language` | String | `"system"` | Interface language. Supported values: `system` (follow system locale), `english`, `chinese`. Also accepts `en`/`zh`/`zh_cn`/`cn` variants. Supersedes the legacy root-level `language` key. Configurable from the General settings page. |
 | `ui.theme` | String | `"system"` | Interface theme. Supported values: `system` (follow the Qt/desktop color scheme), `dark`, and `light`. The General settings page writes this value and the settings dialog applies it immediately. Supersedes the legacy root-level `theme` key. |
 | `capture.freezeScope` | String | `"all-screens"` | Scope of displays frozen during region screenshot session. Only effective in multi-monitor setups when not capturing all outputs explicitly. Supported values: `all-screens` (freeze all monitors) and `cursor-screen` (freeze only the monitor containing the mouse cursor). Aliases: `freezeScope`, `freezeDisplayScope`, etc. |
+| `capture.hideOwnWindows` | Boolean | `true` | Whether the screenshot backend should exclude Mark Shot windows from captured frames. The Capture settings switch applies to the next screenshot immediately without restarting the application. Alias: `screenshot.hideOwnWindowsDuringCapture`. |
 | `capture.wayland.kde.kwinScreenshot.enabled` | Boolean | `true` | Whether to enable KWin `org.kde.KWin.ScreenShot2` restricted D-Bus interface screenshot capture on KDE Wayland. If disabled, fallback to standard Portal capture. |
 | `debug.enabled` | Boolean | `false` | Enables debug logging on Linux and Windows. CLI `--debug` / `--no-debug` override this value; `DEBUG=1` still enables logging unless `--no-debug` is set. |
 | `debug.logPath` | String | system temp `mark-shot-scroll.log` | Debug log destination. CLI `--debug-log` overrides this value; `MARK_SHOT_DEBUG_LOG` remains supported when no config or CLI path is set. |

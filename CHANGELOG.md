@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.1.39 - 2026-07-10
+
+### Features & Enhancements
+
+- **Standalone Plugin Assets**: Release builds now publish provider plugins as separate checksummed assets for direct marketplace installation.
+- **Packaged Documentation**: Installed packages now include the configuration reference, release notes, plugin documentation, and linked documentation assets.
+
+### Bug Fixes
+
+- **Wayland Multi-Monitor Capture**: Fixed mixed-scale multi-monitor screenshots by capturing Wayland outputs independently, preventing half-screen selection and incorrectly scaled overlays.
+- **Niri DMS Window Geometry**: Added DMS-aware bar, dock, frame, and frame-exclusion calculations so tiled-window selection matches visible window bounds.
+- **Pinned Windows Across Outputs**: Rebound pinned layer-shell windows to the target output during cross-monitor dragging so images remain visible.
+- **Image Frame Default**: Disabled the optional macOS-style export frame by default while retaining the configuration switch.
+- **Capture Window Visibility Setting**: Read `capture.hideOwnWindows` at capture time and applied it consistently across single-screen and multi-screen capture paths.
+- **Number Badge Rotation**: Rotated number annotations around the badge center and aligned hit testing and selection geometry.
+- **Arch Recording Dependency**: Added FFmpeg to Arch source and x86_64 binary package dependencies.
+- **Plugin Release Stability**: Ensured provider plugin libraries are installed and discovered reliably during release asset packaging.
+
+## 0.1.38 - 2026-07-07
+
+### Features & Enhancements
+
+- **Plugin Ecosystem Foundation**: Added provider plugin registration, user-level plugin directories, provider preference configuration, and a Plugins settings page for OCR, translation, and code scanning extensions.
+- **GitHub Plugin Marketplace**: Added the C++/Qt plugin index parser, download, SHA-256 verification, and install flow. The marketplace can be hosted entirely on GitHub Releases without requiring Python.
+- **C++ Rapid OCR Plugin Upgrade**: Rapid OCR now emits word-level tokens, splits Chinese text and punctuation into selectable characters, splits Latin text by whitespace, and reuses existing RapidOCR model directories.
+
+### Bug Fixes
+
+- **Pinned Text Selection**: Fixed half-width highlight backgrounds for full-width Chinese characters and avoided unintended spaces when copying adjacent Chinese OCR tokens.
+
 ## 0.1.37 - 2026-07-05
 
 ### Features & Enhancements

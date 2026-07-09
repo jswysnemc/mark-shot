@@ -1,7 +1,7 @@
 # Maintainer: jswysnemc <snemc@qq.com>
 # 本地打包：在 packaging/local_aur 目录执行 ./make-local.sh 或先 make-local.sh --tar-only 再 makepkg -si
 pkgname=mark-shot
-pkgver=0.1.36
+pkgver=0.1.39
 pkgrel=1
 pkgdesc='Qt 6 Wayland screenshot selection and annotation tool'
 arch=('x86_64' 'aarch64')

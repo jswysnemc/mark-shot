@@ -1,5 +1,5 @@
 Name:           mark-shot
-Version:        0.1.36
+Version:        0.1.39
 Release:        1%{?dist}
 Summary:        Qt 6 screenshot selection and annotation tool
 
@@ -60,7 +60,7 @@ sed -i '1s|^#!/usr/bin/env python3$|#!/usr/bin/python3|' \
 
 %files
 %license LICENSE
-%doc README.md README.zh-CN.md
+%doc %{_docdir}/mark-shot/
 %{_bindir}/mark-shot
 %{_bindir}/mark-shot-ocr
 %{_bindir}/mark-shot-code-scan
@@ -80,6 +80,9 @@ sed -i '1s|^#!/usr/bin/env python3$|#!/usr/bin/python3|' \
 %{_datadir}/gnome-shell/extensions/mark-shot-scroll-helper@snemc.org/
 
 %changelog
+* Fri Jul 10 2026 jswysnemc <snemc@qq.com> - 0.1.39-1
+- Update to version 0.1.39
+
 * Sun Jun 07 2026 jswysnemc <snemc@qq.com> - 0.1.22-1
 - Update to version 0.1.22
 
