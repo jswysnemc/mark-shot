@@ -7,7 +7,7 @@
 namespace markshot {
 
 struct ExportImageEffectConfig {
-    bool enabled = true;
+    bool enabled = false;
     int padding = 112;
     qreal cornerRadius = 18.0;
     int shadowRadius = 72;

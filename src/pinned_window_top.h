@@ -1,6 +1,7 @@
 #pragma once
 
 class QRect;
+class QScreen;
 class QWidget;
 
 namespace markshot::shot {
@@ -31,5 +32,20 @@ bool pinnedWindowUsesLayerShellTop();
 /// @param window Pinned image window.
 /// @return True when the window has an active layer-shell topmost role.
 bool pinnedWindowHasLayerShellTop(QWidget *window);
+
+/**
+ * 返回贴图几何对应的目标 layer-shell 屏幕。
+ * @param geometry 贴图全局逻辑几何。
+ * @return 匹配屏幕，没有候选屏幕时返回 nullptr。
+ */
+QScreen *pinnedWindowTargetLayerShellScreen(const QRect &geometry);
+
+/**
+ * 判断当前 layer-shell surface 是否需要切换输出。
+ * @param window 贴图窗口。
+ * @param geometry 贴图全局逻辑几何。
+ * @return 目标屏幕与当前 surface 绑定屏幕不同时返回 true。
+ */
+bool pinnedWindowNeedsLayerShellScreenRebind(QWidget *window, const QRect &geometry);
 
 }  // namespace markshot::shot

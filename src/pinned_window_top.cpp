@@ -3,6 +3,7 @@
 #include "debug_log.h"
 #include "layer_shell_runtime.h"
 #include "pinned_window/pinned_layer_shell_geometry.h"
+#include "pinned_window/pinned_layer_shell_screen_binding.h"
 #include "windows_integration.h"
 
 #include <QGuiApplication>
@@ -24,6 +25,7 @@
 namespace {
 
 constexpr int kPinnedLayerShellMinimumVisibleExtent = 24;
+constexpr const char *kPinnedLayerShellScreenNameProperty = "markShotPinnedLayerShellScreenName";
 
 #ifdef MARK_SHOT_WITH_DBUS
 constexpr const char *kGnomeShellService = "org.gnome.Shell";
@@ -95,6 +97,37 @@ bool isWaylandSession()
         || env.contains(QStringLiteral("WAYLAND_DISPLAY"));
 }
 
+/**
+ * 提取屏幕全局逻辑几何。
+ * @param screens 屏幕对象列表。
+ * @return 与输入顺序一致的屏幕几何列表。
+ */
+QVector<QRect> screenGeometries(const QList<QScreen *> &screens)
+{
+    QVector<QRect> geometries;
+    geometries.reserve(screens.size());
+    for (QScreen *screen : screens) {
+        geometries.append(screen ? screen->geometry() : QRect());
+    }
+    return geometries;
+}
+
+/**
+ * 按名称查找屏幕索引。
+ * @param screens 屏幕对象列表。
+ * @param screenName 屏幕名称。
+ * @return 匹配索引，未找到时返回 -1。
+ */
+int screenIndexByName(const QList<QScreen *> &screens, const QString &screenName)
+{
+    for (int i = 0; i < screens.size(); ++i) {
+        if (screens.at(i) && screens.at(i)->name() == screenName) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 /// @brief 根据窗口几何选择最合适的屏幕。
 /// @param geometry 窗口全局逻辑几何。
 /// @return 匹配屏幕,没有候选屏幕时返回 nullptr。
@@ -105,15 +138,14 @@ QScreen *screenForGeometry(QRect geometry)
     }
 
     const QList<QScreen *> screens = QGuiApplication::screens();
-    QVector<QRect> screenGeometries;
-    screenGeometries.reserve(screens.size());
-    for (QScreen *screen : screens) {
-        screenGeometries.append(screen ? screen->geometry() : QRect());
-    }
+    const markshot::shot::PinnedLayerShellScreenBinding binding =
+        markshot::shot::resolvePinnedLayerShellScreenBinding(
+            geometry,
+            screenGeometries(screens),
+            -1);
 
-    const int screenIndex = markshot::shot::bestPinnedLayerShellScreenIndex(geometry, screenGeometries);
-    if (screenIndex >= 0 && screenIndex < screens.size()) {
-        return screens.at(screenIndex);
+    if (binding.targetScreenIndex >= 0 && binding.targetScreenIndex < screens.size()) {
+        return screens.at(binding.targetScreenIndex);
     }
     return nullptr;
 }
@@ -213,6 +245,8 @@ bool configurePinnedLayerShell(QWidget *window)
     const markshot::layershell::FloatingOverlayConfig config = floatingOverlayConfig(window, screen);
     const bool configured = markshot::layershell::configureFloatingOverlay(window, screen, config);
     window->setProperty("markShotPinnedLayerShellActive", configured);
+    window->setProperty(kPinnedLayerShellScreenNameProperty,
+                        configured && screen ? screen->name() : QString());
     return configured;
 }
 
@@ -225,6 +259,10 @@ void updatePinnedLayerShell(QWidget *window)
     }
 
     QScreen *screen = screenForWindow(window);
+    if (window->property(kPinnedLayerShellScreenNameProperty).toString()
+        != (screen ? screen->name() : QString())) {
+        return;
+    }
     const markshot::layershell::FloatingOverlayConfig config = floatingOverlayConfig(window, screen);
     markshot::layershell::updateFloatingOverlay(window, screen, config);
 }
@@ -269,6 +307,7 @@ void applyPinnedWindowTopState(QWidget *window, bool alwaysOnTop)
     const bool wasVisible = window->isVisible();
     if (!alwaysOnTop) {
         window->setProperty("markShotPinnedLayerShellActive", false);
+        window->setProperty(kPinnedLayerShellScreenNameProperty, QString());
     }
     applyQtTopHint(window, alwaysOnTop, !layerShellTop);
     markshot::windows::setWindowTopMost(window, alwaysOnTop);
@@ -325,6 +364,27 @@ bool pinnedWindowUsesLayerShellTop()
 bool pinnedWindowHasLayerShellTop(QWidget *window)
 {
     return window && window->property("markShotPinnedLayerShellActive").toBool();
+}
+
+QScreen *pinnedWindowTargetLayerShellScreen(const QRect &geometry)
+{
+    return screenForGeometry(geometry);
+}
+
+bool pinnedWindowNeedsLayerShellScreenRebind(QWidget *window, const QRect &geometry)
+{
+    if (!pinnedWindowHasLayerShellTop(window)) {
+        return false;
+    }
+    const QList<QScreen *> screens = QGuiApplication::screens();
+    const int boundScreenIndex = screenIndexByName(
+        screens,
+        window->property(kPinnedLayerShellScreenNameProperty).toString());
+    return resolvePinnedLayerShellScreenBinding(
+               geometry,
+               screenGeometries(screens),
+               boundScreenIndex)
+        .screenChanged;
 }
 
 }  // namespace markshot::shot

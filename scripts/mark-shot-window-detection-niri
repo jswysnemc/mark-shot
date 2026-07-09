@@ -6,6 +6,32 @@ import subprocess
 import sys
 
 
+def add_shared_module_path():
+    """将源码目录或安装目录中的共享模块加入搜索路径。
+    返回: 无返回值
+    """
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    prefix_dir = os.path.dirname(script_dir)
+    candidates = (
+        os.path.join(script_dir, "lib"),
+        os.path.join(prefix_dir, "share", "mark-shot", "python"),
+    )
+    for candidate in candidates:
+        if os.path.isdir(candidate) and candidate not in sys.path:
+            sys.path.insert(0, candidate)
+
+
+add_shared_module_path()
+
+from mark_shot_window_detection.niri_dms import dms_insets
+from mark_shot_window_detection.niri_geometry import append_candidate
+from mark_shot_window_detection.niri_geometry import env_int
+from mark_shot_window_detection.niri_geometry import output_origin
+from mark_shot_window_detection.niri_geometry import output_rect
+from mark_shot_window_detection.niri_geometry import output_size
+from mark_shot_window_detection.niri_geometry import union_rect
+
+
 def niri_json(command):
     niri = shutil.which("niri")
     if not niri:
@@ -116,145 +142,6 @@ def waybar_settings():
             return settings
 
     return settings
-
-
-def number(value, default=0.0):
-    if isinstance(value, bool):
-        return default
-    if isinstance(value, (int, float)):
-        return float(value)
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def dms_settings_path():
-    return os.path.join(config_home(), "DankMaterialShell", "settings.json")
-
-
-def dms_settings():
-    try:
-        with open(dms_settings_path(), "r", encoding="utf-8") as file:
-            payload = json.load(file)
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-def dms_layer_present(layers, output_name, namespace):
-    for layer in layers:
-        if not isinstance(layer, dict):
-            continue
-        if layer.get("namespace") != namespace:
-            continue
-        if output_name and layer.get("output") != output_name:
-            continue
-        return True
-    return False
-
-
-def dms_edge(position, default="top"):
-    if isinstance(position, str):
-        lowered = position.strip().lower()
-        if lowered in ("top", "bottom", "left", "right"):
-            return lowered
-        try:
-            position = int(lowered)
-        except ValueError:
-            return default
-    mapping = {0: "top", 1: "bottom", 2: "left", 3: "right"}
-    return mapping.get(position, default)
-
-
-def dms_screen_matches(preferences, output_name):
-    if not isinstance(preferences, list) or not preferences:
-        return True
-    if "all" in preferences:
-        return True
-    if not output_name:
-        return True
-    return output_name in preferences
-
-
-def add_inset(insets, edge, amount):
-    if edge not in insets:
-        return
-    if amount <= 0:
-        return
-    insets[edge] += amount
-
-
-def dms_bar_insets(settings, layers, output_name):
-    insets = {"top": 0.0, "bottom": 0.0, "left": 0.0, "right": 0.0}
-    if not dms_layer_present(layers, output_name, "dms:bar"):
-        return insets
-
-    configs = settings.get("barConfigs")
-    if not isinstance(configs, list):
-        configs = []
-    for config in configs:
-        if not isinstance(config, dict):
-            continue
-        if not config.get("enabled", True):
-            continue
-        if not config.get("visible", True):
-            continue
-        if config.get("autoHide", False):
-            continue
-        if not dms_screen_matches(config.get("screenPreferences"), output_name):
-            continue
-
-        inner_padding = number(config.get("innerPadding"), 4.0)
-        widget_thickness = max(20.0, 26.0 + inner_padding * 0.6)
-        bar_thickness = max(widget_thickness + inner_padding + 4.0,
-                            48.0 - 4.0 - (8.0 - inner_padding))
-        spacing = number(config.get("spacing"), 4.0)
-        bottom_gap = number(config.get("bottomGap"), 0.0)
-        add_inset(insets, dms_edge(config.get("position"), "top"),
-                  bar_thickness + spacing + bottom_gap)
-    return insets
-
-
-def dms_dock_insets(settings, layers, output_name, bar_insets):
-    insets = {"top": 0.0, "bottom": 0.0, "left": 0.0, "right": 0.0}
-    if not dms_layer_present(layers, output_name, "dms:dock"):
-        return insets
-    if not settings.get("showDock", True):
-        return insets
-    if settings.get("dockAutoHide", False) or settings.get("dockSmartAutoHide", False):
-        return insets
-
-    edge = dms_edge(settings.get("dockPosition", 1), "bottom")
-    # When DMS places the dock on the same edge as a visible bar, the dock layer
-    # does not reserve additional compositor space.
-    if bar_insets.get(edge, 0.0) > 0:
-        return insets
-
-    border = number(settings.get("dockBorderThickness"), 1.0) if settings.get("dockBorderEnabled", False) else 0.0
-    spacing = number(settings.get("dockSpacing"), 4.0)
-    icon_size = number(settings.get("dockIconSize"), 35.0)
-    bottom_gap = number(settings.get("dockBottomGap"), 0.0)
-    margin = number(settings.get("dockMargin"), 10.0)
-    effective_bar_height = icon_size + spacing * 2.0 + 10.0 + border * 2.0
-    add_inset(insets, edge, effective_bar_height + spacing + bottom_gap + margin)
-    return insets
-
-
-def dms_insets(layers, output_name):
-    if (not dms_layer_present(layers, output_name, "dms:bar")
-            and not dms_layer_present(layers, output_name, "dms:dock")):
-        return None
-
-    settings = dms_settings()
-    bar = dms_bar_insets(settings, layers, output_name)
-    dock = dms_dock_insets(settings, layers, output_name, bar)
-    return {
-        "top": bar["top"] + dock["top"],
-        "bottom": bar["bottom"] + dock["bottom"],
-        "left": bar["left"] + dock["left"],
-        "right": bar["right"] + dock["right"],
-    }
 
 
 def panel_info(layers, output_name):
@@ -394,16 +281,6 @@ def pair(value):
         return None
 
 
-def env_int(name):
-    value = os.environ.get(name)
-    if value is None or value == "":
-        return None
-    try:
-        return int(value)
-    except ValueError:
-        return None
-
-
 def capture_rect():
     x = env_int("MARK_SHOT_CAPTURE_X")
     y = env_int("MARK_SHOT_CAPTURE_Y")
@@ -414,82 +291,6 @@ def capture_rect():
     if width <= 0 or height <= 0:
         return None
     return x, y, width, height
-
-
-def intersects(left, right):
-    ax, ay, aw, ah = left
-    bx, by, bw, bh = right
-    return ax < bx + bw and bx < ax + aw and ay < by + bh and by < ay + ah
-
-
-def clipped_rect(rect, bounds):
-    ax, ay, aw, ah = rect
-    bx, by, bw, bh = bounds
-    x = max(ax, bx)
-    y = max(ay, by)
-    right = min(ax + aw, bx + bw)
-    bottom = min(ay + ah, by + bh)
-    width = right - x
-    height = bottom - y
-    if width <= 1 or height <= 1:
-        return None
-    return int(round(x)), int(round(y)), int(round(width)), int(round(height))
-
-
-def append_rect(result, seen, rect):
-    if rect[2] <= 1 or rect[3] <= 1:
-        return
-    key = tuple(rect)
-    if key in seen:
-        return
-    seen.add(key)
-    result.append({
-        "x": rect[0],
-        "y": rect[1],
-        "width": rect[2],
-        "height": rect[3],
-    })
-
-
-def rect_adjustment():
-    return (
-        env_int("MARK_SHOT_NIRI_OFFSET_X") or 0,
-        env_int("MARK_SHOT_NIRI_OFFSET_Y") or 0,
-        env_int("MARK_SHOT_NIRI_OFFSET_WIDTH") or 0,
-        env_int("MARK_SHOT_NIRI_OFFSET_HEIGHT") or 0,
-    )
-
-
-def adjusted_rect(rect):
-    dx, dy, dw, dh = rect_adjustment()
-    x, y, width, height = rect
-    adjusted = (x + dx, y + dy, width + dw, height + dh)
-    if adjusted[2] <= 1 or adjusted[3] <= 1:
-        return None
-    return adjusted
-
-
-def append_candidate(result, seen, rect, capture):
-    rect = adjusted_rect(rect)
-    if rect is None:
-        return
-    if capture is not None:
-        if not intersects(rect, capture):
-            return
-        rect = clipped_rect(rect, capture)
-        if rect is None:
-            return
-    append_rect(result, seen, rect)
-
-
-def output_origin(outputs, output_name):
-    output = outputs.get(output_name)
-    if not isinstance(output, dict):
-        return 0, 0
-    logical = output.get("logical")
-    if not isinstance(logical, dict):
-        return 0, 0
-    return int(round(logical.get("x", 0))), int(round(logical.get("y", 0)))
 
 
 def workspace_targets(workspaces):
@@ -582,35 +383,6 @@ def window_rect(window, outputs, layers, layout_config, workspace_outputs, works
         return None
 
     return x, y, width, height
-
-
-def output_size(outputs, output_name):
-    output = outputs.get(output_name)
-    if not isinstance(output, dict):
-        return 0, 0
-    logical = output.get("logical")
-    if not isinstance(logical, dict):
-        return 0, 0
-    return int(round(logical.get("width", 0))), int(round(logical.get("height", 0)))
-
-
-def output_rect(outputs, output_name):
-    width, height = output_size(outputs, output_name)
-    if width <= 0 or height <= 0:
-        return None
-    x, y = output_origin(outputs, output_name)
-    return x, y, width, height
-
-
-def union_rect(rects):
-    valid = [rect for rect in rects if rect is not None]
-    if not valid:
-        return None
-    left = min(rect[0] for rect in valid)
-    top = min(rect[1] for rect in valid)
-    right = max(rect[0] + rect[2] for rect in valid)
-    bottom = max(rect[1] + rect[3] for rect in valid)
-    return left, top, right - left, bottom - top
 
 
 def default_capture_rect(outputs, workspace_outputs):

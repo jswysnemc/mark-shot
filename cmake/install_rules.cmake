@@ -24,6 +24,12 @@ if(MARK_SHOT_LINUX)
         scripts/mark-shot-window-detection-kde
         DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
+    install(DIRECTORY scripts/lib/mark_shot_window_detection
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/mark-shot/python
+        FILES_MATCHING
+            PATTERN "*.py"
+            PATTERN "__pycache__" EXCLUDE
+    )
     install(FILES
         "${CMAKE_CURRENT_BINARY_DIR}/mark-shot.desktop"
         "${CMAKE_CURRENT_BINARY_DIR}/mark-shot-edit.desktop"

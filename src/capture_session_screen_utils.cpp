@@ -49,7 +49,12 @@ bool hasMixedDevicePixelRatios(const QList<QScreen *> &screens)
 
 bool shouldCaptureScreensIndividually(const QList<QScreen *> &screens)
 {
-    return isWaylandPlatform() && screens.size() > 1;
+    return shouldCaptureScreensIndividually(isWaylandPlatform(), screens.size());
+}
+
+bool shouldCaptureScreensIndividually(bool waylandPlatform, int screenCount)
+{
+    return waylandPlatform && screenCount > 1;
 }
 
 void logCaptureSessionScreens(const QList<QScreen *> &screens)

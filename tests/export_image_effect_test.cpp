@@ -8,7 +8,7 @@ class ExportImageEffectTest : public QObject
     Q_OBJECT
 
 private slots:
-    void defaultConfigEnablesImageFrame()
+    void defaultConfigLeavesImageUnchanged()
     {
         QImage source(12, 8, QImage::Format_ARGB32_Premultiplied);
         source.fill(QColor(20, 120, 220, 255));
@@ -17,11 +17,9 @@ private slots:
             markshot::exportImageEffectConfigFromRoot(QJsonObject());
         const QImage output = markshot::applyExportImageEffect(source, config);
 
-        QVERIFY(config.enabled);
-        QCOMPARE(output.size(), QSize(source.width() + config.padding * 2,
-                                      source.height() + config.padding * 2));
-        QCOMPARE(output.pixelColor(config.padding + source.width() / 2,
-                                   config.padding + source.height() / 2),
+        QVERIFY(!config.enabled);
+        QCOMPARE(output.size(), source.size());
+        QCOMPARE(output.pixelColor(source.width() / 2, source.height() / 2),
                  QColor(20, 120, 220, 255));
     }
 

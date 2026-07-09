@@ -173,6 +173,18 @@ private:
     /// @param moveWidget 是否同步更新 QWidget 几何。
     void setPinnedGeometry(QRect geometry, bool moveWidget);
 
+    /**
+     * 延迟检查并重建目标屏幕上的 layer-shell surface。
+     * @return 无返回值。
+     */
+    void scheduleLayerShellScreenRebind();
+
+    /**
+     * 在当前逻辑几何对应的屏幕上重建 layer-shell surface。
+     * @return 无返回值。
+     */
+    void rebindLayerShellScreen();
+
     /// @brief 判断鼠标位置命中的缩放边界方向。
     /// @param widgetPoint 鼠标在窗口内的位置。
     /// @return 缩放边界方向。
@@ -389,6 +401,7 @@ private:
     bool m_activateTranslationWhenFinished = true;
     bool m_ocrBackendWarningShown = false;
     bool m_recreating = false;
+    bool m_layerShellScreenRebindPending = false;
 };
 
 }  // namespace markshot::shot

@@ -34,6 +34,8 @@ qt_add_executable(mark-shot-recording-dialog-config-test
     src/recording/recording_file_naming.h
     src/recording/recording_storage_config.cpp
     src/recording/recording_storage_config.h
+    src/app_config_defaults.cpp
+    src/app_config_defaults.h
     src/app_config_store.cpp
     src/app_config_store.h
     src/config_value.cpp

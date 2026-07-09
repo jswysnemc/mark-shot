@@ -38,6 +38,14 @@ bool hasMixedDevicePixelRatios(const QList<QScreen *> &screens);
 bool shouldCaptureScreensIndividually(const QList<QScreen *> &screens);
 
 /**
+ * 按平台和屏幕数量判断是否需要逐屏捕获。
+ * @param waylandPlatform 当前窗口系统是否为 Wayland。
+ * @param screenCount 当前有效显示器数量。
+ * @return Wayland 多屏场景返回 true。
+ */
+bool shouldCaptureScreensIndividually(bool waylandPlatform, int screenCount);
+
+/**
  * 记录截图会话中的屏幕缩放诊断信息。
  * @param screens 当前屏幕列表。
  * @return 无返回值。

@@ -71,6 +71,7 @@ sed -i '1s|^#!/usr/bin/env python3$|#!/usr/bin/python3|' \
 %{_bindir}/mark-shot-window-detection-gnome
 %{_bindir}/mark-shot-window-detection-kde
 %{_libdir}/mark-shot/
+%{_datadir}/mark-shot/python/
 %{_datadir}/applications/mark-shot.desktop
 %{_datadir}/applications/mark-shot-edit.desktop
 %{_datadir}/applications/net.local.mark-shot.desktop

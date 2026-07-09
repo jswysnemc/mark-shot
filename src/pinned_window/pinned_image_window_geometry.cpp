@@ -109,6 +109,7 @@ void PinnedImageWindow::setPinnedGeometry(QRect geometry, bool moveWidget)
                 setFixedSize(placement.desiredSize);
             }
             syncPinnedWindowTopGeometry(this, m_logicalGeometry);
+            scheduleLayerShellScreenRebind();
             update();
             return;
         }

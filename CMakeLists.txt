@@ -106,6 +106,8 @@ qt_add_executable(mark-shot
     src/code_scan_result.h
     src/cli/image_pin_launch.cpp
     src/cli/image_pin_launch.h
+    src/app_config_defaults.cpp
+    src/app_config_defaults.h
     src/app_config_store.cpp
     src/app_config_store.h
     src/debug_log.cpp
@@ -186,11 +188,14 @@ qt_add_executable(mark-shot
     src/pinned_window/pinned_image_window.cpp
     src/pinned_window/pinned_image_window.h
     src/pinned_window/pinned_image_window_geometry.cpp
+    src/pinned_window/pinned_image_window_layer_shell.cpp
     src/pinned_window/pinned_image_window_ocr.cpp
     src/pinned_window/pinned_image_window_text_selection.cpp
     src/pinned_window/pinned_image_window_translation.cpp
     src/pinned_window/pinned_layer_shell_geometry.cpp
     src/pinned_window/pinned_layer_shell_geometry.h
+    src/pinned_window/pinned_layer_shell_screen_binding.cpp
+    src/pinned_window/pinned_layer_shell_screen_binding.h
     src/pinned_window/pinned_resize_controller.cpp
     src/pinned_window/pinned_resize_controller.h
     src/pinned_window/pinned_text_selection_metrics.cpp
@@ -441,6 +446,8 @@ if(BUILD_TESTING)
         tests/clipboard_image_config_test.cpp
         src/clipboard_image_config.cpp
         src/clipboard_image_config.h
+        src/app_config_defaults.cpp
+        src/app_config_defaults.h
         src/app_config_store.cpp
         src/app_config_store.h
         src/config_value.cpp
@@ -544,6 +551,8 @@ if(BUILD_TESTING)
         tests/kde_capture_config_test.cpp
         src/kde_capture_config.cpp
         src/kde_capture_config.h
+        src/app_config_defaults.cpp
+        src/app_config_defaults.h
         src/app_config_store.cpp
         src/app_config_store.h
         src/config_value.cpp
@@ -651,106 +660,7 @@ if(BUILD_TESTING)
     )
     add_test(NAME ui-theme-config COMMAND mark-shot-ui-theme-config-test)
 
-    qt_add_executable(mark-shot-color-history-store-test
-        tests/color_history_store_test.cpp
-        src/ui/color_history_store.cpp
-        src/ui/color_history_store.h
-        src/app_config_store.cpp
-        src/app_config_store.h
-        src/window_detection.cpp
-        src/window_detection.h
-        src/config_value.cpp
-        src/config_value.h
-        src/debug_log.cpp
-        src/debug_log.h
-        src/shell_command.cpp
-        src/shell_command.h
-    )
-    target_include_directories(mark-shot-color-history-store-test PRIVATE src)
-    target_link_libraries(mark-shot-color-history-store-test
-        PRIVATE
-            Qt6::Core
-            Qt6::Gui
-            Qt6::Test
-    )
-    add_test(NAME color-history-store COMMAND mark-shot-color-history-store-test)
-
-    qt_add_executable(mark-shot-pinned-window-config-test
-        tests/pinned_window_config_test.cpp
-        src/pinned_window_config.cpp
-        src/config_value.cpp
-        src/config_value.h
-    )
-    target_include_directories(mark-shot-pinned-window-config-test PRIVATE src)
-    target_link_libraries(mark-shot-pinned-window-config-test
-        PRIVATE
-            Qt6::Core
-            Qt6::Gui
-            Qt6::Test
-            Qt6::Widgets
-    )
-    add_test(NAME pinned-window-config COMMAND mark-shot-pinned-window-config-test)
-
-    qt_add_executable(mark-shot-pinned-text-selection-metrics-test
-        tests/pinned_text_selection_metrics_test.cpp
-        src/pinned_window/pinned_text_selection_metrics.cpp
-        src/pinned_window/pinned_text_selection_metrics.h
-    )
-    target_include_directories(mark-shot-pinned-text-selection-metrics-test PRIVATE src)
-    target_link_libraries(mark-shot-pinned-text-selection-metrics-test
-        PRIVATE
-            Qt6::Core
-            Qt6::Gui
-            Qt6::Test
-    )
-    add_test(NAME pinned-text-selection-metrics COMMAND mark-shot-pinned-text-selection-metrics-test)
-
-    qt_add_executable(mark-shot-pinned-layer-shell-geometry-test
-        tests/pinned_layer_shell_geometry_test.cpp
-        src/pinned_window/pinned_layer_shell_geometry.cpp
-        src/pinned_window/pinned_layer_shell_geometry.h
-    )
-    target_include_directories(mark-shot-pinned-layer-shell-geometry-test PRIVATE src)
-    target_link_libraries(mark-shot-pinned-layer-shell-geometry-test
-        PRIVATE
-            Qt6::Core
-            Qt6::Gui
-            Qt6::Test
-    )
-    add_test(NAME pinned-layer-shell-geometry COMMAND mark-shot-pinned-layer-shell-geometry-test)
-
-    qt_add_executable(mark-shot-pinned-resize-controller-test
-        tests/pinned_resize_controller_test.cpp
-        src/pinned_window/pinned_resize_controller.cpp
-        src/pinned_window/pinned_resize_controller.h
-    )
-    target_include_directories(mark-shot-pinned-resize-controller-test PRIVATE src)
-    target_link_libraries(mark-shot-pinned-resize-controller-test
-        PRIVATE
-            Qt6::Core
-            Qt6::Gui
-            Qt6::Test
-    )
-    add_test(NAME pinned-resize-controller COMMAND mark-shot-pinned-resize-controller-test)
-
-    qt_add_executable(mark-shot-stitcher-test
-        tests/stitcher_test.cpp
-        src/debug_log.cpp
-        src/debug_log.h
-        src/scroll/stitcher.cpp
-        src/scroll/stitcher.h
-        src/scroll/stitcher_internal.cpp
-        src/scroll/stitcher_internal.h
-        src/scroll/stitcher_algorithm.cpp
-    )
-    target_include_directories(mark-shot-stitcher-test PRIVATE src)
-    target_link_libraries(mark-shot-stitcher-test
-        PRIVATE
-            Qt6::Core
-            Qt6::Gui
-            Qt6::Test
-    )
-    add_test(NAME stitcher COMMAND mark-shot-stitcher-test)
+    include(cmake/tests.cmake)
 endif()
 
 include(cmake/install_rules.cmake)
