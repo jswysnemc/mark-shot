@@ -19,6 +19,7 @@ namespace markshot {
 /// @param allOutputs 是否把所有输出捕获为一张虚拟桌面图片。
 /// @param freezeScope 普通区域截图的显示器冻结范围。
 /// @param includeCursor 冻结图是否包含鼠标。
+/// @param hideOwnWindows 是否让截屏后端隐藏 mark-shot 自身窗口。
 /// @param useRegularWindow 是否使用普通窗口替代 layer-shell。
 /// @param fullscreenAnnotation 是否直接进入全屏标注。
 /// @param defaultTools 默认工具配置。

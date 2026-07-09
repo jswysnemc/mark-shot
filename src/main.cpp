@@ -299,7 +299,6 @@ int main(int argc, char *argv[])
     const bool allOutputs = parser.isSet(allOutputsOption);
     const markshot::CaptureFreezeScope freezeScope = markshot::configuredCaptureFreezeScope();
     const bool includeCursor = markshot::configuredCaptureIncludeCursor();
-    const bool hideOwnWindows = markshot::configuredHideOwnWindowsDuringCapture();
     const bool useRegularWindow = parser.isSet(xdgWindowOption);
     const bool fullscreenAnnotation = parser.isSet(fullscreenAnnotationOption);
     const markshot::WindowsTrayController::Config trayConfig = markshot::WindowsTrayController::readConfig();
@@ -340,7 +339,6 @@ int main(int argc, char *argv[])
                           &captureActive,
                           freezeScope,
                           includeCursor,
-                          hideOwnWindows,
                           useRegularWindow,
                           defaultTools](bool startFullscreen,
                                         bool requestAllOutputs,
@@ -355,7 +353,7 @@ int main(int argc, char *argv[])
                                          requestAllOutputs,
                                          freezeScope,
                                          includeCursor,
-                                         hideOwnWindows,
+                                         markshot::configuredHideOwnWindowsDuringCapture(),
                                          useRegularWindow,
                                          startFullscreen,
                                          defaultTools,
