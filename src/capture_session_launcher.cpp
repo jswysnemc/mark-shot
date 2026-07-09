@@ -558,6 +558,7 @@ QVector<QPointer<ShotWindow>> showCaptureWindowsFromSingleFrame(const QList<QScr
     request.sourceGeometry = virtualGeometry;
     request.allOutputs = true;
     request.includeCursor = includeCursor;
+    request.hideOwnWindows = hideOwnWindows;
     CaptureResult capture = captureScreenFrame(request);
     if (capture.image.isNull()) {
         if (error) {
