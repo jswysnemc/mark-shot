@@ -1,5 +1,6 @@
 #include "screen_capture_pipewire_screencast.h"
 
+#include "pipewire/pipewire_buffer_data_types.h"
 #include "pipewire/pipewire_dmabuf_importer.h"
 
 #ifdef HAVE_PIPEWIRE
@@ -205,11 +206,13 @@ bool PortalPipeWireScreencast::startPipeWire(int fd, QString *error)
     spa_pod_builder builder = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
     const spa_pod *params[std::size(kSupportedRawFormats) * 2];
     uint32_t paramCount = 0;
+    const std::array<bool, 2> modifierOrder =
+        markshot::pipewire::modifierPreference(m_rawStreamMode);
     for (spa_video_format format : kSupportedRawFormats) {
-        // 1. 【录制】【PipeWire协商】优先声明 DMA-BUF，兼容只发布 modifier 格式的门户
-        params[paramCount++] = buildRawFormatParam(&builder, format, true);
-        // 2. 【录制】【PipeWire协商】同时声明共享内存，门户支持时避免 GPU 导入
-        params[paramCount++] = buildRawFormatParam(&builder, format, false);
+        // 1. raw 录制优先共享内存，避免部分 KWin/NVIDIA 组合无法分配 DMA-BUF
+        params[paramCount++] = buildRawFormatParam(&builder, format, modifierOrder[0]);
+        // 2. 保留另一种内存布局作为门户兼容回退
+        params[paramCount++] = buildRawFormatParam(&builder, format, modifierOrder[1]);
     }
 
     const pw_stream_flags flags = static_cast<pw_stream_flags>(
@@ -315,9 +318,7 @@ void PortalPipeWireScreencast::onStreamParamChanged(void *data, uint32_t id, con
     uint8_t buffer[1024];
     spa_pod_builder builder = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
     const spa_pod *params[1];
-    const uint32_t dataTypes = hasModifier
-        ? (1u << SPA_DATA_DmaBuf)
-        : ((1u << SPA_DATA_MemPtr) | (1u << SPA_DATA_MemFd));
+    const uint32_t dataTypes = markshot::pipewire::bufferDataTypeMask(hasModifier);
     params[0] = static_cast<const spa_pod *>(
         spa_pod_builder_add_object(&builder,
                                    SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,

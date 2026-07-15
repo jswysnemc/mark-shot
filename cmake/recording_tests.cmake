@@ -24,6 +24,22 @@ target_link_libraries(mark-shot-recording-bgra-buffer-pool-test
 )
 add_test(NAME recording-bgra-buffer-pool COMMAND mark-shot-recording-bgra-buffer-pool-test)
 
+if(PipeWire_FOUND)
+    qt_add_executable(mark-shot-pipewire-buffer-data-types-test
+        tests/pipewire_buffer_data_types_test.cpp
+        src/pipewire/pipewire_buffer_data_types.cpp
+        src/pipewire/pipewire_buffer_data_types.h
+    )
+    target_include_directories(mark-shot-pipewire-buffer-data-types-test PRIVATE src)
+    target_link_libraries(mark-shot-pipewire-buffer-data-types-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Test
+            PkgConfig::PipeWire
+    )
+    add_test(NAME pipewire-buffer-data-types COMMAND mark-shot-pipewire-buffer-data-types-test)
+endif()
+
 qt_add_executable(mark-shot-recording-dialog-config-test
     tests/recording_dialog_config_test.cpp
     src/recording/recording_dialog_config.cpp

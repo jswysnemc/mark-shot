@@ -42,6 +42,16 @@ private slots:
 
         QCOMPARE(markshot::hideOwnWindowsDuringCaptureFromConfigRoot(root), true);
     }
+
+    /**
+     * 验证保留自身窗口时跳过无法表达该策略的 KWin 截图后端。
+     * @return 无返回值。
+     */
+    void kwinScreenShotIsSkippedWhenOwnWindowsMustRemainVisible()
+    {
+        QCOMPARE(markshot::kwinScreenShotSupportsOwnWindowPolicy(false), false);
+        QCOMPARE(markshot::kwinScreenShotSupportsOwnWindowPolicy(true), true);
+    }
 };
 
 QTEST_MAIN(CaptureOwnWindowsPolicyTest)

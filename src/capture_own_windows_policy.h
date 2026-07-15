@@ -17,4 +17,9 @@ bool hideOwnWindowsDuringCaptureFromConfigRoot(const QJsonObject &root);
 /// @return 配置的策略。
 bool configuredHideOwnWindowsDuringCapture();
 
+/// @brief 判断 KWin ScreenShot2 是否支持当前自身窗口策略。
+/// @param hideOwnWindows 是否隐藏 mark-shot 自身窗口。
+/// @return KWin ScreenShot2 可以正确执行该策略时返回 true。
+bool kwinScreenShotSupportsOwnWindowPolicy(bool hideOwnWindows);
+
 }  // namespace markshot

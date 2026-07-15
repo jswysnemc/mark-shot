@@ -40,4 +40,9 @@ bool hideOwnWindowsDuringCaptureFromConfigRoot(const QJsonObject &root)
     return value.value_or(defaultHideOwnWindowsDuringCapture());
 }
 
+bool kwinScreenShotSupportsOwnWindowPolicy(bool hideOwnWindows)
+{
+    return hideOwnWindows;
+}
+
 }  // namespace markshot

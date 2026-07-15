@@ -1,5 +1,6 @@
 #include "screen_capture_internal.h"
 
+#include "capture_own_windows_policy.h"
 #include "kde_capture_config.h"
 
 /// @brief Captures the screen using the grim utility.
@@ -108,12 +109,6 @@ CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
     // native-resolution keeps device pixels on HiDPI instead of downscaling to
     // logical size, so the stitched result stays sharp.
     options.insert(QStringLiteral("native-resolution"), true);
-    // 按隐藏自身窗口开关决定是否要求 KWin 排除调用者窗口
-    // KWin ScreenShot2 默认会隐藏调用截图接口的窗口
-    if (!request.hideOwnWindows) {
-        options.insert(QStringLiteral("hide-caller-windows"), false);
-    }
-
     // KWin sends the D-Bus reply with the buffer metadata first, then writes the
     // pixels to the pipe, so this synchronous call does not deadlock even when
     // the image is larger than the pipe buffer.
@@ -232,7 +227,10 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
     }
 
     // KDE 使用 ScreenShot2.CaptureArea 截取精确区域，失败后继续进入现有回退链路
-    if (kwinConfigured && (kdeSession || kwinAvailable) && request.sourceGeometry.isValid()
+    const bool kwinAllowedForRequest =
+        markshot::kwinScreenShotSupportsOwnWindowPolicy(request.hideOwnWindows);
+    if (kwinConfigured && kwinAllowedForRequest
+        && (kdeSession || kwinAvailable) && request.sourceGeometry.isValid()
         && !request.sourceGeometry.isEmpty()) {
         markshot::debugLog("capture", "route=kwin-screenshot kde=%d kwin=%d all_outputs=%d",
                            kdeSession ? 1 : 0, kwinAvailable ? 1 : 0,
@@ -245,8 +243,11 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
         }
         markshot::debugLog("capture", "kwin-screenshot-failed (falling back) error=%s",
                            kwinCapture.error.toUtf8().constData());
-    } else if (!kwinConfigured && (kdeSession || kwinAvailable)) {
-        markshot::debugLog("capture", "kwin-screenshot-disabled-by-config");
+    } else if (kdeSession || kwinAvailable) {
+        markshot::debugLog("capture",
+                           "【Wayland捕获】【KWin路由】skipped configured=%d hide_own_windows=%d",
+                           kwinConfigured ? 1 : 0,
+                           request.hideOwnWindows ? 1 : 0);
     }
 
     if (request.preferScreencast) {
