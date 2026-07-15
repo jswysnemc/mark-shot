@@ -298,7 +298,6 @@ int main(int argc, char *argv[])
 
     const bool allOutputs = parser.isSet(allOutputsOption);
     const markshot::CaptureFreezeScope freezeScope = markshot::configuredCaptureFreezeScope();
-    const bool includeCursor = markshot::configuredCaptureIncludeCursor();
     const bool useRegularWindow = parser.isSet(xdgWindowOption);
     const bool fullscreenAnnotation = parser.isSet(fullscreenAnnotationOption);
     const markshot::WindowsTrayController::Config trayConfig = markshot::WindowsTrayController::readConfig();
@@ -338,7 +337,6 @@ int main(int argc, char *argv[])
     auto launchCapture = [&app,
                           &captureActive,
                           freezeScope,
-                          includeCursor,
                           useRegularWindow,
                           defaultTools](bool startFullscreen,
                                         bool requestAllOutputs,
@@ -350,10 +348,10 @@ int main(int argc, char *argv[])
         QString captureError;
         QVector<QPointer<ShotWindow>> windows =
             markshot::showCaptureSession(&app,
-                                         requestAllOutputs,
-                                         freezeScope,
-                                         includeCursor,
-                                         markshot::configuredHideOwnWindowsDuringCapture(),
+                                          requestAllOutputs,
+                                          freezeScope,
+                                          markshot::configuredCaptureIncludeCursor(),
+                                          markshot::configuredHideOwnWindowsDuringCapture(),
                                          useRegularWindow,
                                          startFullscreen,
                                          defaultTools,
