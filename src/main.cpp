@@ -336,9 +336,7 @@ int main(int argc, char *argv[])
     bool captureActive = false;
     auto launchCapture = [&app,
                           &captureActive,
-                          freezeScope,
-                          useRegularWindow,
-                          defaultTools](bool startFullscreen,
+                          useRegularWindow](bool startFullscreen,
                                         bool requestAllOutputs,
                                         std::optional<markshot::recording::RecordingOptions> regionRecordingOptions = std::nullopt) -> bool {
         if (captureActive) {
@@ -346,12 +344,13 @@ int main(int argc, char *argv[])
         }
 
         QString captureError;
+        markshot::DefaultTools defaultTools = markshot::configuredDefaultTools(nullptr);
         QVector<QPointer<ShotWindow>> windows =
             markshot::showCaptureSession(&app,
-                                          requestAllOutputs,
-                                          freezeScope,
-                                          markshot::configuredCaptureIncludeCursor(),
-                                          markshot::configuredHideOwnWindowsDuringCapture(),
+                                         requestAllOutputs,
+                                         markshot::configuredCaptureFreezeScope(),
+                                         markshot::configuredCaptureIncludeCursor(),
+                                         markshot::configuredHideOwnWindowsDuringCapture(),
                                          useRegularWindow,
                                          startFullscreen,
                                          defaultTools,
