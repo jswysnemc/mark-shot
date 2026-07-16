@@ -21,6 +21,11 @@ void ShotWindow::updateCursor()
         return;
     }
 
+    if (propertyComboPopupVisible() || mouseOverUiWidget()) {
+        setCursor(Qt::ArrowCursor);
+        return;
+    }
+
     if (m_tool == Tool::Move && !m_fullscreenAnnotation) {
         switch (m_selectionDrag) {
         case SelectionDrag::MagnifierSource:
@@ -61,7 +66,7 @@ void ShotWindow::updateCursor()
             setCursor(Qt::SizeAllCursor);
             return;
         case SelectionDrag::None:
-            setCursor(captureCrossCursor());
+            setCursor(Qt::ArrowCursor);
             return;
         }
     }
@@ -112,6 +117,38 @@ void ShotWindow::updateCursor()
     }
 
     setCursor(m_tool == Tool::Text ? Qt::IBeamCursor : captureCrossCursor());
+}
+
+bool ShotWindow::propertyComboPopupVisible() const
+{
+    return (m_propertyRectangleStyleCombo && m_propertyRectangleStyleCombo->view()->isVisible())
+        || (m_propertyArrowStyleCombo && m_propertyArrowStyleCombo->view()->isVisible())
+        || (m_propertyHighlighterStyleCombo && m_propertyHighlighterStyleCombo->view()->isVisible())
+        || (m_propertyNumberStyleCombo && m_propertyNumberStyleCombo->view()->isVisible());
+}
+
+bool ShotWindow::mouseOverUiWidget() const
+{
+    const QPoint pos = mapFromGlobal(QCursor::pos());
+    for (QWidget *w = childAt(pos); w && w != this; w = w->parentWidget()) {
+        const QString name = w->objectName();
+        if (name == QLatin1String("toolbarGrip")
+            || name == QLatin1String("actionToolbarGrip")) {
+            return false;
+        }
+        if (name == QLatin1String("shotToolbar")
+            || name == QLatin1String("actionToolbar")
+            || name == QLatin1String("annotationPropertyPanel")
+            || name == QLatin1String("propertyColorDialogPanel")
+            || name == QLatin1String("propertyFontPanel")
+            || name == QLatin1String("openWithPanel")
+            || name == QLatin1String("extensionPanel")
+            || name == QLatin1String("colorPalette")
+            || qobject_cast<const QComboBox *>(w)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void ShotWindow::clearWheelPreview()

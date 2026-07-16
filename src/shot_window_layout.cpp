@@ -287,7 +287,7 @@ void ShotWindow::updateToolbarGeometry()
     }
 
     m_toolbar->adjustSize();
-    if (m_fullscreenAnnotation && m_toolbarUserPlaced) {
+    if (m_toolbarUserPlaced) {
         const QSize toolbarSize = m_toolbar->sizeHint();
         QRect toolbarGeometry = m_toolbar->geometry();
         toolbarGeometry.setSize(toolbarSize);
@@ -324,6 +324,14 @@ void ShotWindow::updateActionToolbarGeometry()
     }
 
     m_actionToolbar->adjustSize();
+    if (m_actionToolbarUserPlaced) {
+        const QSize toolbarSize = m_actionToolbar->sizeHint();
+        QRect toolbarGeometry = m_actionToolbar->geometry();
+        toolbarGeometry.setSize(toolbarSize);
+        m_actionToolbar->setGeometry(clampedToolbarGeometry(toolbarGeometry));
+        return;
+    }
+
     const QRectF selection = imageRectToWidget(normalizedSelection());
     const QSize toolbarSize = m_actionToolbar->sizeHint();
     const QRect selectionRect = selection.toAlignedRect();

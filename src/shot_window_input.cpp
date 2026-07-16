@@ -115,19 +115,6 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
         return;
     }
 
-    if (m_fullscreenAnnotation && m_toolbarDragging) {
-        const QPoint delta = event->pos() - m_toolbarDragStart;
-        QRect toolbarGeometry = m_toolbarBeforeDrag.translated(delta);
-        if (m_toolbar) {
-            m_toolbarUserPlaced = true;
-            m_toolbar->setGeometry(clampedToolbarGeometry(toolbarGeometry));
-        }
-        updateOpenWithPanelGeometry();
-        updateExtensionPanelGeometry();
-        updateAnnotationPropertyPanelGeometry();
-        return;
-    }
-
     if (m_mode == Mode::Editing && m_tool == Tool::Move && !m_fullscreenAnnotation && !m_dragging) {
         const SelectionDrag hoverDrag = selectionDragAt(imagePoint);
         switch (hoverDrag) {
@@ -159,7 +146,7 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
             setCursor(Qt::SizeAllCursor);
             break;
         case SelectionDrag::None:
-            setCursor(captureCrossCursor());
+            setCursor(Qt::ArrowCursor);
             break;
         }
         return;
@@ -470,6 +457,7 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
             m_mode = Mode::Editing;
             m_fullscreenAnnotation = false;
             m_toolbarUserPlaced = false;
+            m_actionToolbarUserPlaced = false;
             setTool(defaultEditingTool());
             setFullscreenActionButtonsVisible(false);
             m_toolbar->show();
@@ -498,6 +486,7 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
         m_mode = Mode::Editing;
         m_fullscreenAnnotation = false;
         m_toolbarUserPlaced = false;
+        m_actionToolbarUserPlaced = false;
         setTool(defaultEditingTool());
         setFullscreenActionButtonsVisible(false);
         m_toolbar->show();
@@ -539,6 +528,7 @@ void ShotWindow::beginSelection(QPointF imagePoint)
     m_fullscreenAnnotation = false;
     m_toolbarDragging = false;
     m_toolbarUserPlaced = false;
+    m_actionToolbarUserPlaced = false;
     m_selectionDrag = SelectionDrag::None;
     m_selectionBeforeFullscreenAnnotation.reset();
     m_selectionStart = imagePoint;
