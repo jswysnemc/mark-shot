@@ -43,8 +43,13 @@ bool RapidOnnxSession::load(const QString &modelPath, QString *error)
         options.SetIntraOpNumThreads(static_cast<int>(threads));
         options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
-        const QByteArray pathBytes = QFile::encodeName(modelPath);
-        m_impl->session = std::make_unique<Ort::Session>(m_impl->env, pathBytes.constData(), options);
+#ifdef Q_OS_WIN
+        const std::wstring nativePath = modelPath.toStdWString();
+        m_impl->session = std::make_unique<Ort::Session>(m_impl->env, nativePath.c_str(), options);
+#else
+        const QByteArray nativePath = QFile::encodeName(modelPath);
+        m_impl->session = std::make_unique<Ort::Session>(m_impl->env, nativePath.constData(), options);
+#endif
 
         // 2. 缓存输入输出名，PP-OCR 模型均为单输入单输出
         Ort::AllocatorWithDefaultOptions allocator;
