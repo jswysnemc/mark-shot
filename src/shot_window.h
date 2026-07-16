@@ -469,6 +469,8 @@ private:
     void hideAnnotationPropertyPanels();
     void hideTransientPanels();
     void updateCursor();
+    bool propertyComboPopupVisible() const;
+    bool mouseOverUiWidget() const;
     void clearWheelPreview();
     void updateColorPaletteGeometry(QPoint anchor);
     void updateColorPalettePreview();

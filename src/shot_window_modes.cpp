@@ -445,8 +445,12 @@ bool ShotWindow::eventFilter(QObject *watched, QEvent *event)
                 return false;
             }
             const QPoint delta = eventWidget->mapTo(this, mouseEvent->pos()) - m_toolbarDragStart;
-            m_toolbarUserPlaced = true;
-            m_actionToolbarUserPlaced = true;
+            if (targetToolbar == m_toolbar) {
+                m_toolbarUserPlaced = true;
+            }
+            if (targetToolbar == m_actionToolbar) {
+                m_actionToolbarUserPlaced = true;
+            }
             targetToolbar->setGeometry(clampedToolbarGeometry(m_toolbarBeforeDrag.translated(delta)));
             updateOpenWithPanelGeometry();
             updateExtensionPanelGeometry();
