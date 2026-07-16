@@ -18,8 +18,8 @@ QJsonObject defaultAppConfigRoot(const QString &windowDetectionCommand)
     root.insert(QStringLiteral("debug"), debug);
 
     QJsonObject annotation;
-    annotation.insert(QStringLiteral("defaultTool"), QStringLiteral("pen"));
-    annotation.insert(QStringLiteral("fullscreenDefaultTool"), QStringLiteral("pen"));
+    annotation.insert(QStringLiteral("defaultTool"), QStringLiteral("move"));
+    annotation.insert(QStringLiteral("fullscreenDefaultTool"), QStringLiteral("move"));
     annotation.insert(QStringLiteral("defaultColor"), QStringLiteral("#FF4D4D"));
     root.insert(QStringLiteral("annotation"), annotation);
 

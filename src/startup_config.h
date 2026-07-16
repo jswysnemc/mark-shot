@@ -18,9 +18,9 @@ enum class DefaultColorSource {
 };
 
 struct DefaultTools {
-    ShotWindow::Tool normal = ShotWindow::Tool::Pen;
-    ShotWindow::Tool fullscreen = ShotWindow::Tool::Pen;
-    ShotWindow::Tool file = ShotWindow::Tool::Pen;
+    ShotWindow::Tool normal = ShotWindow::Tool::Move;
+    ShotWindow::Tool fullscreen = ShotWindow::Tool::Move;
+    ShotWindow::Tool file = ShotWindow::Tool::Move;
     QColor color = markshot::theme::kDefaultAnnotationColor;
     DefaultColorSource colorSource = DefaultColorSource::BuiltIn;
 };
