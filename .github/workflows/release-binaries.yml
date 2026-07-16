@@ -275,8 +275,10 @@ jobs:
             mingw-w64-ucrt-x86_64-ffmpeg
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-onnxruntime
             mingw-w64-ucrt-x86_64-qt6-base
             mingw-w64-ucrt-x86_64-qt6-tools
+            mingw-w64-ucrt-x86_64-zxing-cpp
 
       - name: Configure
         run: |
@@ -295,6 +297,12 @@ jobs:
       - name: Package install tree
         run: |
           cmake --install build --prefix "$PWD/app"
+          for plugin in ocr-rapid translate-openai code-scan-zxing; do
+            test -f "$PWD/app/lib/mark-shot/plugins/mark-shot-${plugin}.dll" || {
+              echo "Expected provider plugin was not installed: ${plugin}" >&2
+              exit 1
+            }
+          done
           install -Dm644 LICENSE app/share/licenses/mark-shot/LICENSE
           install -Dm644 README.md app/share/doc/mark-shot/README.md
           install -Dm644 README.zh-CN.md app/share/doc/mark-shot/README.zh-CN.md

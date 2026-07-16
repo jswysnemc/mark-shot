@@ -3,6 +3,7 @@ set -euo pipefail
 
 app_bin="${1:-$PWD/app/bin}"
 exe="${2:-$app_bin/mark-shot.exe}"
+app_root="$(dirname "$app_bin")"
 
 if [ ! -x "$exe" ]; then
   echo "Expected executable not found: $exe" >&2
@@ -30,7 +31,7 @@ find_windeployqt() {
 copy_dependency_closure() {
   local current current_key dep_name dep_path dest
   declare -A seen
-  mapfile -t queue < <(find "$app_bin" -type f \( -name "*.exe" -o -name "*.dll" \))
+  mapfile -t queue < <(find "$app_root" -type f \( -name "*.exe" -o -name "*.dll" \))
 
   while ((${#queue[@]})); do
     current="${queue[0]}"
