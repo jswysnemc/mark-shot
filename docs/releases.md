@@ -1,5 +1,14 @@
 # Release Notes
 
+### 0.1.40
+
+- **Runtime Capture Settings**: Cursor inclusion, freeze scope, and default annotation tools are now read for every capture, so settings changes apply without restarting Mark Shot.
+- **Default Move Tool**: New installations now start annotation editing with the Move tool instead of Pen unless an explicit default is configured.
+- **Draggable Toolbars**: The annotation toolbar and right-side action toolbar now include drag grips and retain their user-selected positions during editing.
+- **Cursor Feedback**: The Move tool uses an arrow outside the selection, while toolbars, property panels, color controls, font lists, extension panels, and combo box popups no longer inherit drawing crosshairs.
+- **Text Annotation Layout**: Text backgrounds include additional width padding to prevent premature wrapping in the editor.
+- **KDE and PipeWire Capture**: Improved KWin own-window handling, KDE Wayland capture compatibility, and PipeWire buffer data-type processing with expanded tests.
+
 ### 0.1.39
 
 - **Wayland Multi-Monitor Capture**: Fixed mixed-scale multi-monitor screenshots by capturing Wayland outputs independently, preventing half-screen selection and incorrectly scaled overlays.

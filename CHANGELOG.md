@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.40 - 2026-07-16
+
+### Features & Enhancements
+
+- **Draggable Editing Toolbars**: Added dedicated drag grips to the annotation and action toolbars so both panels can be repositioned after a region capture.
+- **Default Move Tool**: Changed the default annotation tool from Pen to Move for new installations and users without an explicit tool preference.
+
+### Bug Fixes
+
+- **Runtime Capture Settings**: Read cursor inclusion, freeze scope, and default tool settings for every capture so configuration changes take effect without restarting the tray process.
+- **Annotation Cursor Feedback**: Restored the arrow cursor for the Move tool outside the selection and across toolbars, property panels, color controls, font lists, extension panels, and combo box popups.
+- **Text Annotation Wrapping**: Added layout padding to text backgrounds so annotation text no longer wraps prematurely while editing.
+- **KDE Capture Compatibility**: Improved KWin own-window policy handling and Wayland screenshot behavior for KDE capture sessions.
+- **PipeWire Buffer Handling**: Added explicit PipeWire buffer data-type handling and tests to improve capture compatibility across shared-memory and DMA-BUF frame paths.
+
 ## 0.1.39 - 2026-07-10
 
 ### Features & Enhancements
