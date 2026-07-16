@@ -417,7 +417,8 @@ bool ShotWindow::eventFilter(QObject *watched, QEvent *event)
 
     const bool isFullscreenMoveButton = m_fullscreenAnnotation
         && watched->property("action").toString() == markshot::ui::actionName(Action::ToolMove);
-    if (isFullscreenMoveButton) {
+    const bool isToolbarGrip = watched->objectName() == QStringLiteral("toolbarGrip");
+    if (isFullscreenMoveButton || isToolbarGrip) {
         if (event->type() == QEvent::MouseButtonPress) {
             auto *mouseEvent = static_cast<QMouseEvent *>(event);
             if (mouseEvent->button() == Qt::LeftButton) {

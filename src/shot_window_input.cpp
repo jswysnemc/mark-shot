@@ -159,7 +159,7 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
             setCursor(Qt::SizeAllCursor);
             break;
         case SelectionDrag::None:
-            setCursor(captureCrossCursor());
+            setCursor(Qt::ArrowCursor);
             break;
         }
         return;

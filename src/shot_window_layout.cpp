@@ -287,7 +287,7 @@ void ShotWindow::updateToolbarGeometry()
     }
 
     m_toolbar->adjustSize();
-    if (m_fullscreenAnnotation && m_toolbarUserPlaced) {
+    if (m_toolbarUserPlaced) {
         const QSize toolbarSize = m_toolbar->sizeHint();
         QRect toolbarGeometry = m_toolbar->geometry();
         toolbarGeometry.setSize(toolbarSize);

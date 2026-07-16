@@ -61,7 +61,7 @@ void ShotWindow::updateCursor()
             setCursor(Qt::SizeAllCursor);
             return;
         case SelectionDrag::None:
-            setCursor(captureCrossCursor());
+            setCursor(Qt::ArrowCursor);
             return;
         }
     }

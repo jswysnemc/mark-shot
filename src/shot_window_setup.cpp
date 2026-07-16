@@ -419,6 +419,23 @@ void ShotWindow::initializeToolbar()
     m_toolbarLayout->setContentsMargins(6, 6, 6, 6);
     m_toolbarLayout->setSpacing(3);
 
+    QWidget *toolbarGrip = new QWidget(m_toolbar);
+    toolbarGrip->setObjectName(QStringLiteral("toolbarGrip"));
+    toolbarGrip->setFixedWidth(10);
+    toolbarGrip->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    toolbarGrip->setCursor(Qt::SizeAllCursor);
+    toolbarGrip->setStyleSheet(
+        QStringLiteral("QWidget#toolbarGrip {"
+                       "  background-color: rgba(148,163,184,60);"
+                       "  border-radius: 2px;"
+                       "  margin: 2px 0px;"
+                       "}"
+                       "QWidget#toolbarGrip:hover {"
+                       "  background-color: rgba(148,163,184,120);"
+                       "}"));
+    toolbarGrip->installEventFilter(this);
+    m_toolbarLayout->addWidget(toolbarGrip);
+
     m_toolbarLayout->addWidget(addToolbarButton(Action::ToolMove, shortcutText(Tool::Move)));
     m_toolbarLayout->addWidget(addToolbarButton(Action::ToolSelect, shortcutText(Tool::Select)));
     m_toolbarLayout->addWidget(addToolbarButton(Action::ToolPen, shortcutText(Tool::Pen)));
