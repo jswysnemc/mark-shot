@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.41 - 2026-07-16
+
+### Bug Fixes
+
+- **Windows Build Compatibility**: Restricted PipeWire SPA buffer helpers and their dedicated tests to Linux builds, restoring Windows compilation and packaging without changing Linux PipeWire capture behavior.
+
 ## 0.1.40 - 2026-07-16
 
 ### Features & Enhancements

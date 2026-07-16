@@ -1,5 +1,9 @@
 # Release Notes
 
+### 0.1.41
+
+- **Windows Build Compatibility**: PipeWire SPA buffer helpers and their dedicated tests now compile only on Linux, restoring Windows builds and release packages while preserving Linux PipeWire capture behavior.
+
 ### 0.1.40
 
 - **Runtime Capture Settings**: Cursor inclusion, freeze scope, and default annotation tools are now read for every capture, so settings changes apply without restarting Mark Shot.
