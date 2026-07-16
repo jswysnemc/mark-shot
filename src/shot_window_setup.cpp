@@ -143,6 +143,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
 
     m_annotationPropertyPanel = new QWidget(this);
     m_annotationPropertyPanel->setObjectName(QStringLiteral("annotationPropertyPanel"));
+    m_annotationPropertyPanel->setCursor(Qt::ArrowCursor);
     m_annotationPropertyPanel->setStyleSheet(m_toolbar->styleSheet());
     const qreal propertyScale = std::max<qreal>(1.0, m_toolbarAppearance.fontSize / 11.0);
     const int propertyMarginX = std::max(8, qRound(8 * propertyScale));
@@ -247,6 +248,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     propertyLayout->addWidget(m_propertyRadiusSlider);
     // 矩形风格切换:描边/高亮/反色,仅在 Tool::Rectangle 选中或激活时显示
     m_propertyRectangleStyleCombo = new QComboBox(m_annotationPropertyPanel);
+    m_propertyRectangleStyleCombo->setCursor(Qt::ArrowCursor);
     m_propertyRectangleStyleCombo->setFocusPolicy(Qt::NoFocus);
     m_propertyRectangleStyleCombo->addItem(MS_TR("Stroke"), static_cast<int>(RectangleStyle::Stroke));
     m_propertyRectangleStyleCombo->addItem(MS_TR("Highlight"), static_cast<int>(RectangleStyle::Highlight));
@@ -262,6 +264,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     });
     propertyLayout->addWidget(m_propertyRectangleStyleCombo);
     m_propertyArrowStyleCombo = new QComboBox(m_annotationPropertyPanel);
+    m_propertyArrowStyleCombo->setCursor(Qt::ArrowCursor);
     m_propertyArrowStyleCombo->setFocusPolicy(Qt::NoFocus);
     m_propertyArrowStyleCombo->addItem(MS_TR("Fletched"), static_cast<int>(ArrowStyle::Fletched));
     m_propertyArrowStyleCombo->addItem(MS_TR("KDE"), static_cast<int>(ArrowStyle::Kde));
@@ -277,6 +280,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     });
     propertyLayout->addWidget(m_propertyArrowStyleCombo);
     m_propertyHighlighterStyleCombo = new QComboBox(m_annotationPropertyPanel);
+    m_propertyHighlighterStyleCombo->setCursor(Qt::ArrowCursor);
     m_propertyHighlighterStyleCombo->setFocusPolicy(Qt::NoFocus);
     m_propertyHighlighterStyleCombo->addItem(MS_TR("Pen"), static_cast<int>(HighlighterStyle::Freehand));
     m_propertyHighlighterStyleCombo->addItem(MS_TR("Line"), static_cast<int>(HighlighterStyle::StraightLine));
@@ -291,6 +295,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     });
     propertyLayout->addWidget(m_propertyHighlighterStyleCombo);
     m_propertyNumberStyleCombo = new QComboBox(m_annotationPropertyPanel);
+    m_propertyNumberStyleCombo->setCursor(Qt::ArrowCursor);
     m_propertyNumberStyleCombo->setFocusPolicy(Qt::NoFocus);
     m_propertyNumberStyleCombo->addItem(MS_TR("1, 2, 3"), static_cast<int>(NumberStyle::Arabic));
     m_propertyNumberStyleCombo->addItem(MS_TR("A, B, C"), static_cast<int>(NumberStyle::UpperAlpha));
@@ -360,6 +365,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
 
     m_propertyColorDialogPanel = new QWidget(this);
     m_propertyColorDialogPanel->setObjectName(QStringLiteral("propertyColorDialogPanel"));
+    m_propertyColorDialogPanel->setCursor(Qt::ArrowCursor);
     m_propertyColorDialogPanel->setStyleSheet(markshot::theme::propertyColorDialogPanelStyleSheet());
     auto *propertyColorLayout = new QVBoxLayout(m_propertyColorDialogPanel);
     propertyColorLayout->setContentsMargins(8, 8, 8, 8);
@@ -373,6 +379,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
 
     m_propertyFontPanel = new QWidget(this);
     m_propertyFontPanel->setObjectName(QStringLiteral("propertyFontPanel"));
+    m_propertyFontPanel->setCursor(Qt::ArrowCursor);
     m_propertyFontPanel->setStyleSheet(markshot::theme::openWithPanelStyleSheet());
     auto *fontPanelLayout = new QVBoxLayout(m_propertyFontPanel);
     fontPanelLayout->setContentsMargins(6, 6, 6, 6);
@@ -571,6 +578,7 @@ void ShotWindow::initializeTransientPanels()
 {
     m_openWithPanel = new QWidget(this);
     m_openWithPanel->setObjectName(QStringLiteral("openWithPanel"));
+    m_openWithPanel->setCursor(Qt::ArrowCursor);
     m_openWithPanel->setStyleSheet(markshot::theme::openWithPanelStyleSheet());
     auto *openLayout = new QVBoxLayout(m_openWithPanel);
     openLayout->setContentsMargins(8, 8, 8, 8);
@@ -579,6 +587,7 @@ void ShotWindow::initializeTransientPanels()
 
     m_extensionPanel = new QWidget(this);
     m_extensionPanel->setObjectName(QStringLiteral("extensionPanel"));
+    m_extensionPanel->setCursor(Qt::ArrowCursor);
     m_extensionPanel->setStyleSheet(markshot::theme::openWithPanelStyleSheet());
     auto *extensionLayout = new QVBoxLayout(m_extensionPanel);
     extensionLayout->setContentsMargins(8, 8, 8, 8);
@@ -587,6 +596,7 @@ void ShotWindow::initializeTransientPanels()
 
     m_colorPalette = new QWidget(this);
     m_colorPalette->setObjectName(QStringLiteral("colorPalette"));
+    m_colorPalette->setCursor(Qt::ArrowCursor);
     m_colorPalette->setStyleSheet(markshot::theme::colorPaletteStyleSheet());
     for (const QColor &color : markshot::theme::paletteColors()) {
         auto *button = new QPushButton(m_colorPalette);
