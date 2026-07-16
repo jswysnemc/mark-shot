@@ -411,6 +411,7 @@ void ShotWindow::initializeToolbar()
 {
     m_toolbar = new QWidget(this);
     m_toolbar->setObjectName(QStringLiteral("shotToolbar"));
+    m_toolbar->setCursor(Qt::ArrowCursor);
     m_toolbar->setStyleSheet(
         markshot::theme::panelStyleSheet(m_toolbarAppearance.toolbarButtonSize, m_toolbarAppearance.fontSize));
     m_toolbar->installEventFilter(this);
@@ -514,6 +515,7 @@ void ShotWindow::initializeActionToolbar()
 {
     m_actionToolbar = new QWidget(this);
     m_actionToolbar->setObjectName(QStringLiteral("actionToolbar"));
+    m_actionToolbar->setCursor(Qt::ArrowCursor);
     const int actionButtonSize = m_toolbarAppearance.actionToolbarButtonSize;
     m_actionToolbar->setStyleSheet(m_toolbar->styleSheet()
         + QStringLiteral(
