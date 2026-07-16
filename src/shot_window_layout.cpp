@@ -46,7 +46,7 @@ QRectF ShotWindow::textContentRect(const Annotation &annotation, bool widgetCoor
         textHeight = documentSize.height();
     }
 
-    const qreal rectWidth = std::max<qreal>(1.0, std::ceil(textWidth + kTextBackgroundPaddingX * 2.0 * scale));
+    const qreal rectWidth = std::max<qreal>(1.0, std::ceil(textWidth + kTextBackgroundPaddingX * 2.0 * scale) + 5.0);
     const qreal rectHeight = std::max<qreal>(1.0, std::ceil(textHeight + kTextBackgroundPaddingY * 2.0 * scale));
     return QRectF(topLeft, QSizeF(rectWidth, rectHeight));
 }
