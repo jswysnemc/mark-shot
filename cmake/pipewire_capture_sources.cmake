@@ -1,6 +1,4 @@
 set(MARK_SHOT_PIPEWIRE_CAPTURE_SOURCES
-    src/pipewire/pipewire_buffer_data_types.cpp
-    src/pipewire/pipewire_buffer_data_types.h
     src/pipewire/pipewire_dmabuf_importer.cpp
     src/pipewire/pipewire_dmabuf_importer.h
     src/pipewire/pipewire_dmabuf_importer_gl_helpers.h
@@ -12,3 +10,10 @@ set(MARK_SHOT_PIPEWIRE_CAPTURE_SOURCES
     src/screen_capture_pipewire_screencast.h
     src/screen_capture_pipewire_stream.cpp
 )
+
+if(MARK_SHOT_LINUX)
+    list(INSERT MARK_SHOT_PIPEWIRE_CAPTURE_SOURCES 0
+        src/pipewire/pipewire_buffer_data_types.cpp
+        src/pipewire/pipewire_buffer_data_types.h
+    )
+endif()

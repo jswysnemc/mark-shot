@@ -24,7 +24,7 @@ target_link_libraries(mark-shot-recording-bgra-buffer-pool-test
 )
 add_test(NAME recording-bgra-buffer-pool COMMAND mark-shot-recording-bgra-buffer-pool-test)
 
-if(PipeWire_FOUND)
+if(MARK_SHOT_LINUX AND PipeWire_FOUND)
     qt_add_executable(mark-shot-pipewire-buffer-data-types-test
         tests/pipewire_buffer_data_types_test.cpp
         src/pipewire/pipewire_buffer_data_types.cpp
