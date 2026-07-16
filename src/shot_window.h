@@ -621,6 +621,7 @@ private:
     bool m_fullscreenAnnotation = false;
     bool m_toolbarDragging = false;
     bool m_toolbarUserPlaced = false;
+    bool m_actionToolbarUserPlaced = false;
     bool m_committingText = false;
     bool m_showSelectionInfo = false;
     bool m_showWheelPreview = false;

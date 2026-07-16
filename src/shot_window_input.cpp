@@ -470,6 +470,7 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
             m_mode = Mode::Editing;
             m_fullscreenAnnotation = false;
             m_toolbarUserPlaced = false;
+            m_actionToolbarUserPlaced = false;
             setTool(defaultEditingTool());
             setFullscreenActionButtonsVisible(false);
             m_toolbar->show();
@@ -539,6 +540,7 @@ void ShotWindow::beginSelection(QPointF imagePoint)
     m_fullscreenAnnotation = false;
     m_toolbarDragging = false;
     m_toolbarUserPlaced = false;
+    m_actionToolbarUserPlaced = false;
     m_selectionDrag = SelectionDrag::None;
     m_selectionBeforeFullscreenAnnotation.reset();
     m_selectionStart = imagePoint;

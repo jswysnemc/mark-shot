@@ -527,6 +527,24 @@ void ShotWindow::initializeActionToolbar()
     auto *actionLayout = new QVBoxLayout(m_actionToolbar);
     actionLayout->setContentsMargins(4, 4, 4, 4);
     actionLayout->setSpacing(2);
+
+    QWidget *actionGrip = new QWidget(m_actionToolbar);
+    actionGrip->setObjectName(QStringLiteral("actionToolbarGrip"));
+    actionGrip->setFixedHeight(10);
+    actionGrip->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    actionGrip->setCursor(Qt::SizeAllCursor);
+    actionGrip->setStyleSheet(
+        QStringLiteral("QWidget#actionToolbarGrip {"
+                       "  background-color: rgba(148,163,184,60);"
+                       "  border-radius: 2px;"
+                       "  margin: 0px 2px;"
+                       "}"
+                       "QWidget#actionToolbarGrip:hover {"
+                       "  background-color: rgba(148,163,184,120);"
+                       "}"));
+    actionGrip->installEventFilter(this);
+    actionLayout->addWidget(actionGrip);
+
     for (QPushButton *button : {
              addToolbarButton(Action::ToggleCaptureScope, shortcutText(Action::ToggleCaptureScope), m_actionToolbar),
              addToolbarButton(Action::OpenWith, shortcutText(Action::OpenWith, QStringLiteral("Open")), m_actionToolbar),

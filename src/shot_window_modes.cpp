@@ -51,6 +51,7 @@ void ShotWindow::enterFullscreenAnnotation(bool resetAnnotations)
     updateMinimumImageWindowSize();
     m_toolbarDragging = false;
     m_toolbarUserPlaced = false;
+    m_actionToolbarUserPlaced = false;
     m_selection = QRectF(QPointF(0, 0), QSizeF(m_frozenFrame.size()));
     if (resetAnnotations) {
         m_annotations.clear();
@@ -100,6 +101,7 @@ void ShotWindow::leaveFullscreenAnnotation()
     m_dragging = false;
     m_toolbarDragging = false;
     m_toolbarUserPlaced = false;
+    m_actionToolbarUserPlaced = false;
     m_fullscreenAnnotation = false;
     m_toolbarVerticalLayout = false;
     applyToolbarLayout();
@@ -158,6 +160,7 @@ void ShotWindow::toggleToolbarLayout()
 {
     m_toolbarVerticalLayout = !m_toolbarVerticalLayout;
     m_toolbarUserPlaced = false;
+    m_actionToolbarUserPlaced = false;
     applyToolbarLayout();
     updateToolbarGeometry();
     updateOpenWithPanelGeometry();
@@ -418,7 +421,9 @@ bool ShotWindow::eventFilter(QObject *watched, QEvent *event)
     const bool isFullscreenMoveButton = m_fullscreenAnnotation
         && watched->property("action").toString() == markshot::ui::actionName(Action::ToolMove);
     const bool isToolbarGrip = watched->objectName() == QStringLiteral("toolbarGrip");
-    if (isFullscreenMoveButton || isToolbarGrip) {
+    const bool isActionToolbarGrip = watched->objectName() == QStringLiteral("actionToolbarGrip");
+    if (isFullscreenMoveButton || isToolbarGrip || isActionToolbarGrip) {
+        QWidget *targetToolbar = isActionToolbarGrip ? m_actionToolbar : m_toolbar;
         if (event->type() == QEvent::MouseButtonPress) {
             auto *mouseEvent = static_cast<QMouseEvent *>(event);
             if (mouseEvent->button() == Qt::LeftButton) {
@@ -429,7 +434,7 @@ bool ShotWindow::eventFilter(QObject *watched, QEvent *event)
                 m_dragging = true;
                 m_toolbarDragging = true;
                 m_toolbarDragStart = eventWidget->mapTo(this, mouseEvent->pos());
-                m_toolbarBeforeDrag = m_toolbar->geometry();
+                m_toolbarBeforeDrag = targetToolbar->geometry();
                 setCursor(Qt::SizeAllCursor);
                 return true;
             }
@@ -441,7 +446,8 @@ bool ShotWindow::eventFilter(QObject *watched, QEvent *event)
             }
             const QPoint delta = eventWidget->mapTo(this, mouseEvent->pos()) - m_toolbarDragStart;
             m_toolbarUserPlaced = true;
-            m_toolbar->setGeometry(clampedToolbarGeometry(m_toolbarBeforeDrag.translated(delta)));
+            m_actionToolbarUserPlaced = true;
+            targetToolbar->setGeometry(clampedToolbarGeometry(m_toolbarBeforeDrag.translated(delta)));
             updateOpenWithPanelGeometry();
             updateExtensionPanelGeometry();
             updateAnnotationPropertyPanelGeometry();
