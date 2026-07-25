@@ -201,24 +201,25 @@ jobs:
             fi
           fi
 
-          # dpkg control fields must not have leading indentation.
+          # Heredoc body is indented for YAML; strip the fixed shell indent after write.
           cat > "$CONTROL_DIR/control" <<EOF
-Package: mark-shot
-Version: $VERSION
-Section: graphics
-Priority: optional
-Architecture: $DEB_ARCH
-Maintainer: jswysnemc <snemc@qq.com>
-Depends: $DEPENDS
-Recommends: $RECOMMENDS
-Suggests: $SUGGESTS
-Description: Qt 6 screenshot selection and annotation tool
- Mark Shot captures screenshots, annotates image regions, pins floating
- image stickers, and provides OCR and translation helpers for pinned
- image text.
- .
- Build target: $TARGET
-EOF
+          Package: mark-shot
+          Version: $VERSION
+          Section: graphics
+          Priority: optional
+          Architecture: $DEB_ARCH
+          Maintainer: jswysnemc <snemc@qq.com>
+          Depends: $DEPENDS
+          Recommends: $RECOMMENDS
+          Suggests: $SUGGESTS
+          Description: Qt 6 screenshot selection and annotation tool
+           Mark Shot captures screenshots, annotates image regions, pins floating
+           image stickers, and provides OCR and translation helpers for pinned
+           image text.
+           .
+           Build target: $TARGET
+          EOF
+          sed -i 's/^          //' "$CONTROL_DIR/control"
 
           fakeroot dpkg-deb --build --root-owner-group "$PACKAGE_DIR" "$ASSET"
           sha256sum "$ASSET" > "$ASSET.sha256"
