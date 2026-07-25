@@ -31,18 +31,41 @@ env:
 
 jobs:
   deb:
-    name: Build Debian 12 compatible ${{ matrix.deb_arch }} package
+    name: Build ${{ matrix.target }} ${{ matrix.deb_arch }} package
     runs-on: ${{ matrix.runner }}
     container:
-      image: debian:12
+      image: ${{ matrix.image }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - deb_arch: amd64
+          # Debian 12 baseline: Deepin / older Debian-derived systems.
+          # Intentionally avoids LayerShellQt and newer t64/Qt 6.9+ deps.
+          - target: debian12
+            deb_arch: amd64
             runner: ubuntu-22.04
-          - deb_arch: arm64
+            image: debian:12
+            compat_check: true
+            asset_suffix: ""
+          - target: debian12
+            deb_arch: arm64
             runner: ubuntu-22.04-arm
+            image: debian:12
+            compat_check: true
+            asset_suffix: ""
+          # Ubuntu 26.04 / recent Ubuntu: FFmpeg 7 (libavcodec61) and t64 Qt packages.
+          - target: ubuntu2604
+            deb_arch: amd64
+            runner: ubuntu-24.04
+            image: ubuntu:26.04
+            compat_check: false
+            asset_suffix: ".ubuntu26.04"
+          - target: ubuntu2604
+            deb_arch: arm64
+            runner: ubuntu-24.04-arm
+            image: ubuntu:26.04
+            compat_check: false
+            asset_suffix: ".ubuntu26.04"
 
     steps:
       - name: Resolve version
@@ -70,7 +93,10 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Install build dependencies
+        shell: bash
         run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get install -y --no-install-recommends \
             build-essential \
@@ -124,7 +150,10 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           DEB_ARCH="${{ matrix.deb_arch }}"
           HOST_ARCH="$(dpkg --print-architecture)"
-          ASSET="mark-shot_${VERSION}_${DEB_ARCH}.deb"
+          ASSET_SUFFIX="${{ matrix.asset_suffix }}"
+          ASSET="mark-shot_${VERSION}_${DEB_ARCH}${ASSET_SUFFIX}.deb"
+          TARGET="${{ matrix.target }}"
+          COMPAT_CHECK="${{ matrix.compat_check }}"
 
           if [ "$HOST_ARCH" != "$DEB_ARCH" ]; then
             echo "Runner architecture $HOST_ARCH does not match package architecture $DEB_ARCH" >&2
@@ -164,27 +193,32 @@ jobs:
             DEPENDS="$MANUAL_DEPS"
           fi
 
-          if echo "$DEPENDS" | grep -Eq 't64|libstdc\+\+6 \(>= 14|libqt6[^,]+ \(>= 6\.(9|10)|liblayershellqtinterface|wl-clipboard'; then
-            echo "Generated dependencies are too new for the Debian/Deepin compatible package:" >&2
-            echo "$DEPENDS" >&2
-            exit 1
+          if [ "$COMPAT_CHECK" = "true" ]; then
+            if echo "$DEPENDS" | grep -Eq 't64|libstdc\+\+6 \(>= 14|libqt6[^,]+ \(>= 6\.(9|10)|liblayershellqtinterface|wl-clipboard'; then
+              echo "Generated dependencies are too new for the Debian/Deepin compatible package:" >&2
+              echo "$DEPENDS" >&2
+              exit 1
+            fi
           fi
 
+          # dpkg control fields must not have leading indentation.
           cat > "$CONTROL_DIR/control" <<EOF
-          Package: mark-shot
-          Version: $VERSION
-          Section: graphics
-          Priority: optional
-          Architecture: $DEB_ARCH
-          Maintainer: jswysnemc <snemc@qq.com>
-          Depends: $DEPENDS
-          Recommends: $RECOMMENDS
-          Suggests: $SUGGESTS
-          Description: Qt 6 screenshot selection and annotation tool
-           Mark Shot captures screenshots, annotates image regions, pins floating
-           image stickers, and provides OCR and translation helpers for pinned
-           image text.
-          EOF
+Package: mark-shot
+Version: $VERSION
+Section: graphics
+Priority: optional
+Architecture: $DEB_ARCH
+Maintainer: jswysnemc <snemc@qq.com>
+Depends: $DEPENDS
+Recommends: $RECOMMENDS
+Suggests: $SUGGESTS
+Description: Qt 6 screenshot selection and annotation tool
+ Mark Shot captures screenshots, annotates image regions, pins floating
+ image stickers, and provides OCR and translation helpers for pinned
+ image text.
+ .
+ Build target: $TARGET
+EOF
 
           fakeroot dpkg-deb --build --root-owner-group "$PACKAGE_DIR" "$ASSET"
           sha256sum "$ASSET" > "$ASSET.sha256"
@@ -198,7 +232,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: mark-shot-deb-${{ steps.version.outputs.version }}-${{ matrix.deb_arch }}
+          name: mark-shot-deb-${{ steps.version.outputs.version }}-${{ matrix.target }}-${{ matrix.deb_arch }}
           path: |
             ${{ steps.package.outputs.asset }}
             ${{ steps.package.outputs.checksum }}

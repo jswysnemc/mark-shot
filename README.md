@@ -313,7 +313,11 @@ For other distributions (such as Debian, Ubuntu, or Fedora), download the compil
   sudo dnf install ./mark-shot-<version>-1.x86_64.rpm
   ```
 
-The official `.deb` package is built on a Debian 12 compatibility baseline. It intentionally avoids linking the optional LayerShellQt plugin so that Deepin and other Debian-derived systems with Qt 6.8-era packages can install it without Ubuntu `t64` or newer GCC runtime dependencies.
+The official `.deb` packages are built for two targets:
+- **Debian 12** (`mark-shot_<version>_amd64.deb`): Deepin / older Debian-derived systems. Avoids LayerShellQt and newer `t64` / Qt 6.9+ runtime deps.
+- **Ubuntu 26.04** (`mark-shot_<version>_amd64.ubuntu26.04.deb`): recent Ubuntu (FFmpeg 7 / `libavcodec61` and `t64` Qt packages). Use this on Ubuntu Budgie 26.04 and similar releases.
+
+A Debian 12 package will fail to install on Ubuntu 26.04 because it depends on FFmpeg 5 libraries (`libavcodec59`, …) that are no longer shipped.
 
 ### Dependencies
 
