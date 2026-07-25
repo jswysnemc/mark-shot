@@ -37,7 +37,11 @@ bool truthyDebugValue(const QByteArray &raw)
 
 bool environmentDebugEnabled()
 {
-    const char *raw = std::getenv("DEBUG");
+    const char *raw = std::getenv("MARK_SHOT_DEBUG");
+    if (raw) {
+        return truthyDebugValue(QByteArray(raw));
+    }
+    raw = std::getenv("DEBUG");
     return raw && truthyDebugValue(QByteArray(raw));
 }
 

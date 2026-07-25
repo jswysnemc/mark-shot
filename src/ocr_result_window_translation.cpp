@@ -258,33 +258,44 @@ void OcrResultWindow::startTranslation()
             &markshot::providers::ProviderTask::finished,
             this,
             [this, task](const markshot::providers::TaskResult &result) {
-                finishTranslation(task, result.ok ? result.output : QByteArray());
+                finishTranslation(task, result);
             });
     task->start(m_config.translationTimeoutMs);
 }
 
 /// @brief 处理翻译任务输出。
 /// @param task 翻译任务。
-/// @param output 翻译输出 JSON。
+/// @param result 翻译任务结果。
 /// @return 无返回值。
-void OcrResultWindow::finishTranslation(markshot::providers::ProviderTask *task, const QByteArray &output)
+void OcrResultWindow::finishTranslation(markshot::providers::ProviderTask *task,
+                                        const markshot::providers::TaskResult &result)
 {
     if (task != m_translationTask) {
         return;
     }
 
+    const QByteArray &output = result.output;
     QStringList translatedLines;
     if (!output.isEmpty()) {
         QJsonParseError parseError;
         const QJsonDocument document = QJsonDocument::fromJson(output, &parseError);
         if (parseError.error == QJsonParseError::NoError && document.isObject()) {
-            const QJsonArray tokenArray = document.object().value(QStringLiteral("tokens")).toArray();
+            const QJsonObject root = document.object();
+            const QJsonArray tokenArray = root.value(QStringLiteral("tokens")).toArray();
             translatedLines.reserve(tokenArray.size());
             for (const QJsonValue &value : tokenArray) {
                 if (!value.isObject()) {
                     continue;
                 }
                 translatedLines.append(value.toObject().value(QStringLiteral("text")).toString().trimmed());
+            }
+            if (translatedLines.isEmpty()) {
+                const QJsonArray errors = root.value(QStringLiteral("errors")).toArray();
+                if (!errors.isEmpty()) {
+                    showToast(MS_TR("Translation failed: %1").arg(errors.first().toString()));
+                    finishTranslationCleanup(task);
+                    return;
+                }
             }
         }
     }
@@ -293,7 +304,29 @@ void OcrResultWindow::finishTranslation(markshot::providers::ProviderTask *task,
     if (!translatedText.isEmpty() && m_editor) {
         m_editor->setPlainText(translatedText);
     } else {
-        showToast(MS_TR("Translation failed"));
+        QString detail = QString::fromUtf8(result.errorOutput).trimmed();
+        if (detail.isEmpty() && !result.ok) {
+            switch (result.error) {
+            case markshot::providers::TaskError::Timeout:
+                detail = MS_TR("timed out");
+                break;
+            case markshot::providers::TaskError::StartFailed:
+                detail = MS_TR("provider failed to start");
+                break;
+            case markshot::providers::TaskError::Failed:
+                detail = MS_TR("provider failed");
+                break;
+            case markshot::providers::TaskError::None:
+                break;
+            }
+        }
+        if (detail.isEmpty()) {
+            detail = MS_TR("no translation result");
+        }
+        const QString provider = result.providerName.isEmpty()
+            ? MS_TR("unknown provider")
+            : result.providerName;
+        showToast(MS_TR("Translation failed (%1): %2").arg(provider, detail));
     }
 
     finishTranslationCleanup(task);

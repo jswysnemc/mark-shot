@@ -18,7 +18,12 @@ BuildRequires:  cmake(Qt6DBus)
 BuildRequires:  cmake(Qt6Gui)
 BuildRequires:  cmake(Qt6Widgets)
 BuildRequires:  cmake(LayerShellQt)
+BuildRequires:  pkgconfig(libavcodec)
+BuildRequires:  pkgconfig(libavformat)
+BuildRequires:  pkgconfig(libavutil)
 BuildRequires:  pkgconfig(libpipewire-0.3)
+BuildRequires:  pkgconfig(libswresample)
+BuildRequires:  pkgconfig(libswscale)
 BuildRequires:  pkgconfig(x11-xcb)
 BuildRequires:  pkgconfig(xcb)
 
@@ -42,6 +47,7 @@ stickers, and provides OCR and translation helpers for pinned image text.
 
 %build
 %cmake -G Ninja \
+    -DMARK_SHOT_REQUIRE_FFMPEG=ON \
     -DMARK_SHOT_WITH_LAYER_SHELL=ON \
     -DMARK_SHOT_REQUIRE_LAYER_SHELL=ON
 %cmake_build

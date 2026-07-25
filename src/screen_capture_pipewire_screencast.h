@@ -184,7 +184,7 @@ private:
                                         spa_video_format format);
 
     bool m_started = false;
-    bool m_rawStreamMode = false;
+    std::atomic_bool m_rawStreamMode{false};
     uint m_nodeId = 0;
     QString m_targetObject;
     QString m_sessionHandle;

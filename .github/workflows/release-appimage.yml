@@ -62,6 +62,7 @@ jobs:
             cmake \
             desktop-file-utils \
             file \
+            ffmpeg \
             fuse2 \
             gcc \
             layer-shell-qt \
@@ -89,6 +90,7 @@ jobs:
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
+            -DMARK_SHOT_REQUIRE_FFMPEG=ON \
             -DMARK_SHOT_WITH_LAYER_SHELL=ON \
             -DMARK_SHOT_REQUIRE_LAYER_SHELL=ON
 
@@ -108,7 +110,7 @@ jobs:
           sed -i -E 's#^Exec=[^ ]*/mark-shot( |$)#Exec=mark-shot\1#' \
             "$APPDIR"/usr/share/applications/*.desktop
 
-      - name: Assert LayerShellQt packaging
+      - name: Assert runtime dependencies
         shell: bash
         run: |
           set -euo pipefail
@@ -120,6 +122,9 @@ jobs:
           fi
           test -n "$PLUGIN"
           ldd "$PLUGIN" | grep -Ei 'LayerShellQt|layershell'
+          for library in libavcodec libavformat libavutil libswresample libswscale; do
+            ldd "$BINARY" | grep -F "$library"
+          done
 
       - name: Build AppImage
         id: package

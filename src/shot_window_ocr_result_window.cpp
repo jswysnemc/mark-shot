@@ -6,9 +6,9 @@
 
 namespace markshot::shot {
 
-QWidget *createOcrResultWindow(QString text)
+QWidget *createOcrResultWindow(QString text, QScreen *targetScreen)
 {
-    return new OcrResultWindow(std::move(text));
+    return new OcrResultWindow(std::move(text), targetScreen);
 }
 
 }  // namespace markshot::shot

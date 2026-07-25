@@ -20,13 +20,8 @@
 #include <algorithm>
 #include <optional>
 
-#if __has_include(<drm_fourcc.h>)
-#include <drm_fourcc.h>
+#include "pipewire/pipewire_drm_fourcc.h"
 #define MARKSHOT_HAS_DRM_FOURCC 1
-#elif __has_include(<libdrm/drm_fourcc.h>)
-#include <libdrm/drm_fourcc.h>
-#define MARKSHOT_HAS_DRM_FOURCC 1
-#endif
 
 #ifndef EGL_PLATFORM_SURFACELESS_MESA
 #define EGL_PLATFORM_SURFACELESS_MESA 0x31DD
@@ -148,35 +143,12 @@ inline int bytesPerPixel(spa_video_format format)
  */
 inline std::optional<EGLint> drmFourccForFormat(spa_video_format format)
 {
-#ifdef MARKSHOT_HAS_DRM_FOURCC
-    switch (format) {
-    case SPA_VIDEO_FORMAT_BGRA:
-        return DRM_FORMAT_ARGB8888;
-    case SPA_VIDEO_FORMAT_BGRx:
-        return DRM_FORMAT_XRGB8888;
-    case SPA_VIDEO_FORMAT_RGBA:
-        return DRM_FORMAT_ABGR8888;
-    case SPA_VIDEO_FORMAT_RGBx:
-        return DRM_FORMAT_XBGR8888;
-    case SPA_VIDEO_FORMAT_ARGB:
-        return DRM_FORMAT_BGRA8888;
-    case SPA_VIDEO_FORMAT_ABGR:
-        return DRM_FORMAT_RGBA8888;
-    case SPA_VIDEO_FORMAT_xRGB:
-        return DRM_FORMAT_BGRX8888;
-    case SPA_VIDEO_FORMAT_xBGR:
-        return DRM_FORMAT_RGBX8888;
-    case SPA_VIDEO_FORMAT_RGB:
-        return DRM_FORMAT_RGB888;
-    case SPA_VIDEO_FORMAT_BGR:
-        return DRM_FORMAT_BGR888;
-    default:
+    const std::optional<std::uint32_t> fourcc =
+        markshot::pipewire::drmFourccForSpaFormat(format);
+    if (!fourcc.has_value()) {
         return std::nullopt;
     }
-#else
-    Q_UNUSED(format);
-    return std::nullopt;
-#endif
+    return static_cast<EGLint>(*fourcc);
 }
 
 /**

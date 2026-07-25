@@ -16,6 +16,17 @@ finish-args:
   - --talk-name=org.freedesktop.portal.Desktop
   - --talk-name=org.kde.KWin.ScreenShot2
 
+add-extensions:
+  org.freedesktop.Platform.ffmpeg-full:
+    version: '24.08'
+    directory: lib/ffmpeg
+    add-ld-path: .
+    no-autodownload: false
+    autodelete: true
+
+cleanup-commands:
+  - mkdir -p ${FLATPAK_DEST}/lib/ffmpeg
+
 cleanup:
   - /include
   - /lib/cmake
@@ -29,6 +40,7 @@ modules:
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
       - -DCMAKE_INSTALL_PREFIX=/app
+      - -DMARK_SHOT_REQUIRE_FFMPEG=ON
       - -DMARK_SHOT_WITH_LAYER_SHELL=OFF
       - -DMARK_SHOT_WITH_LIBPORTAL=ON
     sources:

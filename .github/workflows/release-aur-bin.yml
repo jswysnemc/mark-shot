@@ -105,8 +105,13 @@ jobs:
             cmake \
             git \
             libarchive-tools \
+            libavcodec-dev \
+            libavformat-dev \
             libgl1-mesa-dev \
+            libavutil-dev \
             libpipewire-0.3-dev \
+            libswresample-dev \
+            libswscale-dev \
             libx11-xcb-dev \
             libxcb1-dev \
             ninja-build \
@@ -132,6 +137,7 @@ jobs:
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
+            -DMARK_SHOT_REQUIRE_FFMPEG=ON \
             -DMARK_SHOT_WITH_LAYER_SHELL=OFF
 
       - name: Build
@@ -167,14 +173,13 @@ jobs:
           BUILD_DATE=$(date +%s)
 
           # 构造 .PKGINFO 元数据文件，pacman 解析此文件获取包信息
-          # arch 平台包含 layer-shell-qt 与 ffmpeg 依赖，ubuntu 平台编译时禁用了 layer-shell 和 libav 录制
+          # 两个平台均包含 FFmpeg 录制支持，仅 Arch 平台额外依赖 layer-shell-qt
           if [ "$PLATFORM" = "arch" ]; then
               LAYER_SHELL_DEP="depend = layer-shell-qt"
-              FFMPEG_DEP="depend = ffmpeg"
           else
               LAYER_SHELL_DEP=""
-              FFMPEG_DEP=""
           fi
+          FFMPEG_DEP="depend = ffmpeg"
 
           cat > "$STAGE/.PKGINFO" <<EOF
           pkgname = mark-shot-bin

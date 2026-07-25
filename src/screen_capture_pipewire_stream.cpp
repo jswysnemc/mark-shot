@@ -207,12 +207,19 @@ bool PortalPipeWireScreencast::startPipeWire(int fd, QString *error)
     const spa_pod *params[std::size(kSupportedRawFormats) * 2];
     uint32_t paramCount = 0;
     const std::array<bool, 2> modifierOrder =
-        markshot::pipewire::modifierPreference(m_rawStreamMode);
+        markshot::pipewire::modifierPreference(
+            m_rawStreamMode.load(std::memory_order_acquire));
     for (spa_video_format format : kSupportedRawFormats) {
         // 1. raw 录制优先共享内存，避免部分 KWin/NVIDIA 组合无法分配 DMA-BUF
         params[paramCount++] = buildRawFormatParam(&builder, format, modifierOrder[0]);
-        // 2. 保留另一种内存布局作为门户兼容回退
-        params[paramCount++] = buildRawFormatParam(&builder, format, modifierOrder[1]);
+        // 2. 保留另一种内存布局作为门户兼容回退（DISABLE_DMABUF 时两者相同，跳过重复）
+        if (modifierOrder[1] != modifierOrder[0]) {
+            params[paramCount++] = buildRawFormatParam(&builder, format, modifierOrder[1]);
+        }
+    }
+    if (qEnvironmentVariableIsSet("MARK_SHOT_DISABLE_DMABUF")) {
+        markshot::debugLog("screencast",
+                           "【录制】【PipeWire协商】MARK_SHOT_DISABLE_DMABUF=1 force shared-memory");
     }
 
     const pw_stream_flags flags = static_cast<pw_stream_flags>(
@@ -273,10 +280,25 @@ void PortalPipeWireScreencast::onStreamStateChanged(void *data,
     markshot::debugLog("screencast", "pw-state %s -> %s%s%s",
                        streamStateName(old), streamStateName(state),
                        error ? " error=" : "", error ? error : "");
-    if (state == PW_STREAM_STATE_ERROR && error) {
-        QMutexLocker locker(&self->m_frameMutex);
-        self->m_lastError = QString::fromUtf8(error);
-        self->m_frameReady.wakeAll();
+    if (state == PW_STREAM_STATE_ERROR) {
+        const QString errorText = error && *error
+            ? QString::fromUtf8(error)
+            : QStringLiteral("PipeWire stream entered an error state");
+        PortalPipeWireScreencast::ErrorCallback rawErrorCallback;
+        {
+            QMutexLocker locker(&self->m_frameMutex);
+            self->m_lastError = errorText;
+            self->m_frameReady.wakeAll();
+            if (self->m_rawStreamMode.load(std::memory_order_acquire)) {
+                rawErrorCallback = self->m_rawErrorCallback;
+            }
+        }
+        if (rawErrorCallback) {
+            markshot::debugLog("screencast",
+                               "【录制】【PipeWire流回调】state-error=%s",
+                               errorText.toUtf8().constData());
+            rawErrorCallback(errorText);
+        }
     }
 }
 
@@ -355,7 +377,7 @@ void PortalPipeWireScreencast::onStreamProcess(void *data)
         return;
     }
 
-    if (self->m_rawStreamMode) {
+    if (self->m_rawStreamMode.load(std::memory_order_acquire)) {
         // 1. 写出队列繁忙时直接归还 buffer，避免为将被丢弃的帧支付拷贝和 GPU 读回成本
         if (self->m_rawBackpressure.load(std::memory_order_relaxed)) {
             pw_stream_queue_buffer(self->m_stream, buffer);
@@ -364,11 +386,13 @@ void PortalPipeWireScreencast::onStreamProcess(void *data)
         QString frameError;
         PipeWireScreencastRawFrame frame;
         if (self->rawFrameFromBuffer(buffer, &frame, &frameError)) {
+            PortalPipeWireScreencast::RawFrameCallback rawFrameCallback;
             {
                 QMutexLocker locker(&self->m_frameMutex);
                 self->m_latestFrameTimeMs = frameTimeMs;
                 self->m_streamGeometry = frame.streamGeometry;
                 self->m_frameCount += 1;
+                rawFrameCallback = self->m_rawFrameCallback;
             }
             if (self->m_frameCount == 1 || self->m_frameCount % 100 == 0) {
                 markshot::debugLog("screencast",
@@ -381,17 +405,19 @@ void PortalPipeWireScreencast::onStreamProcess(void *data)
                                    frame.streamGeometry.width(),
                                    frame.streamGeometry.height());
             }
-            if (self->m_rawFrameCallback) {
-                self->m_rawFrameCallback(std::move(frame));
+            if (rawFrameCallback) {
+                rawFrameCallback(std::move(frame));
             }
         } else if (!frameError.isEmpty()) {
+            PortalPipeWireScreencast::ErrorCallback rawErrorCallback;
             {
                 QMutexLocker locker(&self->m_frameMutex);
                 self->m_lastError = frameError;
                 self->m_frameErrorCount += 1;
+                rawErrorCallback = self->m_rawErrorCallback;
             }
-            if (self->m_rawErrorCallback) {
-                self->m_rawErrorCallback(frameError);
+            if (rawErrorCallback) {
+                rawErrorCallback(frameError);
             }
         }
         pw_stream_queue_buffer(self->m_stream, buffer);

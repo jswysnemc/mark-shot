@@ -1,6 +1,7 @@
 #include "screen_capture_internal.h"
 
 #include "capture_own_windows_policy.h"
+#include "capture_own_windows_guard.h"
 #include "kde_capture_config.h"
 
 /// @brief Captures the screen using the grim utility.
@@ -109,6 +110,11 @@ CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
     // native-resolution keeps device pixels on HiDPI instead of downscaling to
     // logical size, so the stitched result stays sharp.
     options.insert(QStringLiteral("native-resolution"), true);
+    // KWin ScreenShot2 defaults to hide-caller-windows=true, which drops pinned
+    // mark-shot windows. Pass false when the user wants own windows included.
+    if (!request.hideOwnWindows) {
+        options.insert(QStringLiteral("hide-caller-windows"), false);
+    }
     // KWin sends the D-Bus reply with the buffer metadata first, then writes the
     // pixels to the pipe, so this synchronous call does not deadlock even when
     // the image is larger than the pipe buffer.
@@ -195,6 +201,11 @@ CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
 
 CaptureResult captureWaylandFrame(const CaptureRequest &request)
 {
+    std::optional<markshot::CaptureOwnWindowsGuard> ownWindowsGuard;
+    if (request.hideOwnWindows && !request.preferScreencast) {
+        ownWindowsGuard.emplace();
+    }
+
     const bool grimPreferred = prefersGrim();
     const bool kdeSession = isKdePlasma();
     const bool kwinConfigured = markshot::configuredKdeKWinScreenshotEnabled();
@@ -228,7 +239,8 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
 
     // KDE 使用 ScreenShot2.CaptureArea 截取精确区域，失败后继续进入现有回退链路
     const bool kwinAllowedForRequest =
-        markshot::kwinScreenShotSupportsOwnWindowPolicy(request.hideOwnWindows);
+        markshot::kwinScreenShotSupportsOwnWindowPolicy(request.hideOwnWindows,
+                                                         request.preferScreencast);
     if (kwinConfigured && kwinAllowedForRequest
         && (kdeSession || kwinAvailable) && request.sourceGeometry.isValid()
         && !request.sourceGeometry.isEmpty()) {
@@ -245,9 +257,11 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
                            kwinCapture.error.toUtf8().constData());
     } else if (kdeSession || kwinAvailable) {
         markshot::debugLog("capture",
-                           "【Wayland捕获】【KWin路由】skipped configured=%d hide_own_windows=%d",
+                           "【Wayland捕获】【KWin路由】skipped configured=%d hide_own_windows=%d "
+                           "prefer_screencast=%d",
                            kwinConfigured ? 1 : 0,
-                           request.hideOwnWindows ? 1 : 0);
+                           request.hideOwnWindows ? 1 : 0,
+                           request.preferScreencast ? 1 : 0);
     }
 
     if (request.preferScreencast) {
@@ -298,10 +312,20 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
     }
 
     if (prefersGrim()) {
+        markshot::debugLog("capture", "route=grim (prefersGrim)");
         CaptureResult grimCapture = captureWithGrim(request);
         if (!grimCapture.image.isNull()) {
+            markshot::debugLog("capture", "grim-ok frame=%dx%d",
+                               grimCapture.image.width(), grimCapture.image.height());
             return grimCapture;
         }
+
+        // Portal fallback is much slower (often multi-second) and may map a
+        // temporary xdg window that disturbs niri/Hyprland tiling layouts. Log
+        // the grim failure loudly so packaging PATH issues are obvious.
+        markshot::debugLog("capture",
+                           "grim-failed error=%s (portal fallback is slow and may reflow tiled windows)",
+                           grimCapture.error.toUtf8().constData());
 
         if (!request.allowPortalScreenshotFallback) {
             markshot::debugLog("capture", "【Wayland捕获】【Portal截图回退】已禁用");
@@ -311,8 +335,11 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
                     request.sourceGeometry};
         }
 
+        markshot::debugLog("capture", "fallback=portal-screenshot");
         CaptureResult portalCapture = captureWithPortalScreenshot(request);
         if (!portalCapture.image.isNull()) {
+            markshot::debugLog("capture", "portal-screenshot-ok frame=%dx%d",
+                               portalCapture.image.width(), portalCapture.image.height());
             return portalCapture;
         }
 

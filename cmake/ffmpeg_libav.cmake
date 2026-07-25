@@ -49,5 +49,5 @@ elseif(WIN32)
 endif()
 
 if(MARK_SHOT_REQUIRE_FFMPEG AND NOT FFmpegLibav_FOUND)
-    message(FATAL_ERROR "FFmpeg libav support was required but libavcodec/libavformat dependencies were not found")
+    message(FATAL_ERROR "FFmpeg libav support was required but libavcodec/libavformat/libavutil/libswresample/libswscale dependencies were not found")
 endif()

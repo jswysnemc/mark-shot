@@ -3,6 +3,7 @@
 #include "config_value.h"
 
 #include <QJsonValue>
+#include <QtGlobal>
 
 #include <optional>
 
@@ -40,9 +41,13 @@ bool hideOwnWindowsDuringCaptureFromConfigRoot(const QJsonObject &root)
     return value.value_or(defaultHideOwnWindowsDuringCapture());
 }
 
-bool kwinScreenShotSupportsOwnWindowPolicy(bool hideOwnWindows)
+bool kwinScreenShotSupportsOwnWindowPolicy(bool hideOwnWindows, bool preferScreencast)
 {
-    return hideOwnWindows;
+    // KWin still accepts still captures when own windows should stay visible:
+    // captureWithKWinScreenShot passes hide-caller-windows=false in that case.
+    // Screencast sessions keep using the portal path instead.
+    Q_UNUSED(hideOwnWindows);
+    return !preferScreencast;
 }
 
 }  // namespace markshot

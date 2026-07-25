@@ -1,44 +1,16 @@
 #include "recording/recording_frame_grabber.h"
 
 #include "debug_log.h"
-#include "platform/wayland/wlroots_screencopy_capture_stream.h"
 #include "recording/recording_capture_backend.h"
-#include "recording/recording_pipewire_capture_stream.h"
-#include "recording/recording_polling_capture_stream.h"
-#include "recording/recording_windows_wgc_capture_stream.h"
 
+#include <QPointer>
 #include <QStringList>
+#include <QTimer>
 
 #include <utility>
 
 namespace markshot::recording {
 namespace {
-
-/**
- * 【录制】【采集后端】创建指定类型的采集流。
- * @param backend 采集后端。
- * @param options 录制配置。
- * @param parent 父对象。
- * @return 可用时返回采集流，否则返回空。
- */
-std::unique_ptr<RecordingCaptureStream> createStreamForBackend(RecordingCaptureBackend backend,
-                                                               const RecordingOptions &options,
-                                                               QObject *parent)
-{
-    switch (backend) {
-    case RecordingCaptureBackend::Wlroots:
-        return createWlrootsScreencopyCaptureStream(options, parent);
-    case RecordingCaptureBackend::PipeWire:
-        return createPipeWireRecordingCaptureStream(options, parent);
-    case RecordingCaptureBackend::WindowsWgc:
-        return createWindowsWgcRecordingCaptureStream(options, parent);
-    case RecordingCaptureBackend::Polling:
-        return std::make_unique<RecordingPollingCaptureStream>(options, parent);
-    case RecordingCaptureBackend::Auto:
-        break;
-    }
-    return nullptr;
-}
 
 /**
  * 【录制】【采集后端】拼接后端尝试顺序文本。
@@ -57,16 +29,23 @@ QString backendOrderText(const QVector<RecordingCaptureBackend> &backends)
 
 }  // namespace
 
-RecordingFrameGrabber::RecordingFrameGrabber(RecordingOptions options, QObject *parent)
+RecordingFrameGrabber::RecordingFrameGrabber(RecordingOptions options,
+                                             RecordingCaptureStreamFactory streamFactory,
+                                             QObject *parent)
     : QObject(parent)
     , m_options(std::move(options))
+    , m_streamFactory(std::move(streamFactory))
 {
 }
 
 void RecordingFrameGrabber::start()
 {
+    stop();
+    m_running = true;
+
     QString error;
     if (!startCaptureStream(&error)) {
+        m_running = false;
         emit failed(error.isEmpty()
                         ? QStringLiteral("recording capture stream failed to start")
                         : error);
@@ -75,6 +54,12 @@ void RecordingFrameGrabber::start()
 
 void RecordingFrameGrabber::stop()
 {
+    m_running = false;
+    m_fallbackPending = false;
+    m_receivedFirstFrame = false;
+    m_activeBackend = RecordingCaptureBackend::Auto;
+    m_captureBackends.clear();
+    m_nextBackendIndex = 0;
     if (m_stream) {
         m_stream->stop();
     }
@@ -99,16 +84,27 @@ bool RecordingFrameGrabber::startCaptureStream(QString *error)
     const RecordingCaptureBackend requested = environmentBackend == RecordingCaptureBackend::Auto
         ? m_options.captureBackend
         : environmentBackend;
-    const QVector<RecordingCaptureBackend> backends = recordingCaptureBackendOrder(requested);
+    m_captureBackends = recordingCaptureBackendOrder(requested);
+    m_nextBackendIndex = 0;
     markshot::debugLog("recording",
                        "【录制】【采集后端选择】requested=%s order=%s",
                        recordingCaptureBackendName(requested).toUtf8().constData(),
-                       backendOrderText(backends).toUtf8().constData());
+                       backendOrderText(m_captureBackends).toUtf8().constData());
+
+    return startNextCaptureStream(error);
+}
+
+bool RecordingFrameGrabber::startNextCaptureStream(QString *error)
+{
+    if (error) {
+        error->clear();
+    }
 
     QString lastError;
-    for (RecordingCaptureBackend backend : backends) {
+    while (m_running && m_nextBackendIndex < m_captureBackends.size()) {
+        const RecordingCaptureBackend backend = m_captureBackends.at(m_nextBackendIndex++);
         std::unique_ptr<RecordingCaptureStream> stream =
-            createStreamForBackend(backend, m_options, this);
+            m_streamFactory ? m_streamFactory(backend, m_options, this) : nullptr;
         if (!stream) {
             lastError = QStringLiteral("recording capture backend %1 is not available")
                             .arg(recordingCaptureBackendName(backend));
@@ -119,7 +115,10 @@ bool RecordingFrameGrabber::startCaptureStream(QString *error)
         }
 
         m_stream = std::move(stream);
-        connectCaptureStream();
+        m_activeBackend = backend;
+        m_receivedFirstFrame = false;
+        m_fallbackPending = false;
+        connectCaptureStream(m_stream.get());
         QString streamError;
         if (m_stream->start(&streamError)) {
             markshot::debugLog("recording",
@@ -133,7 +132,10 @@ bool RecordingFrameGrabber::startCaptureStream(QString *error)
                            "【录制】【采集后端回退】backend=%s error=%s",
                            recordingCaptureBackendName(backend).toUtf8().constData(),
                            streamError.toUtf8().constData());
+        m_stream->stop();
         m_stream.reset();
+        m_activeBackend = RecordingCaptureBackend::Auto;
+        m_fallbackPending = false;
     }
 
     if (error) {
@@ -144,16 +146,77 @@ bool RecordingFrameGrabber::startCaptureStream(QString *error)
     return false;
 }
 
-void RecordingFrameGrabber::connectCaptureStream()
+void RecordingFrameGrabber::connectCaptureStream(RecordingCaptureStream *stream)
 {
-    connect(m_stream.get(),
+    connect(stream,
             &RecordingCaptureStream::frameReady,
             this,
-            &RecordingFrameGrabber::frameReady);
-    connect(m_stream.get(),
+            [this, stream](const RecordingFrameSample &sample) {
+                handleFrameReady(stream, sample);
+            });
+    connect(stream,
             &RecordingCaptureStream::failed,
             this,
-            &RecordingFrameGrabber::failed);
+            [this, stream](const QString &error) {
+                handleCaptureFailure(stream, error);
+            });
+}
+
+void RecordingFrameGrabber::handleFrameReady(RecordingCaptureStream *stream,
+                                             const RecordingFrameSample &sample)
+{
+    if (!m_running || m_fallbackPending || stream != m_stream.get()) {
+        return;
+    }
+    m_receivedFirstFrame = true;
+    emit frameReady(sample);
+}
+
+void RecordingFrameGrabber::handleCaptureFailure(RecordingCaptureStream *stream,
+                                                 const QString &error)
+{
+    if (!m_running || stream != m_stream.get()) {
+        return;
+    }
+    if (m_receivedFirstFrame) {
+        m_running = false;
+        emit failed(error);
+        return;
+    }
+    if (m_fallbackPending) {
+        return;
+    }
+
+    m_fallbackPending = true;
+    markshot::debugLog("recording",
+                       "【录制】【采集后端异步回退】backend=%s error=%s",
+                       recordingCaptureBackendName(m_activeBackend).toUtf8().constData(),
+                       error.toUtf8().constData());
+    QPointer<RecordingCaptureStream> failedStream(stream);
+    QTimer::singleShot(0, this, [this, failedStream, error] {
+        continueCaptureFallback(failedStream.data(), error);
+    });
+}
+
+void RecordingFrameGrabber::continueCaptureFallback(RecordingCaptureStream *stream,
+                                                    const QString &error)
+{
+    if (!m_running || !stream || stream != m_stream.get()) {
+        return;
+    }
+
+    m_stream->stop();
+    m_stream.reset();
+    m_activeBackend = RecordingCaptureBackend::Auto;
+    m_fallbackPending = false;
+
+    QString fallbackError;
+    if (startNextCaptureStream(&fallbackError)) {
+        return;
+    }
+
+    m_running = false;
+    emit failed(fallbackError.isEmpty() ? error : fallbackError);
 }
 
 }  // namespace markshot::recording

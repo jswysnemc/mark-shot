@@ -161,6 +161,9 @@ void ShotWindow::ocrCopySelection()
     if (!hasUsableSelection()) {
         return;
     }
+    const QPointer<QScreen> targetScreen = m_captureScreen
+        ? m_captureScreen
+        : QPointer<QScreen>(screen());
 
     const QString tempPath = saveSelectionToTempFile();
     if (tempPath.isEmpty()) {
@@ -242,7 +245,7 @@ void ShotWindow::ocrCopySelection()
     const QString result = markshot::ocr::tokensText(parsedOcr.tokens);
 
     if (ocrResultPanelEnabled()) {
-        auto *window = createOcrResultWindow(result);
+        auto *window = createOcrResultWindow(result, targetScreen.data());
         window->show();
         window->raise();
         window->activateWindow();

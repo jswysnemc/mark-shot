@@ -78,6 +78,7 @@ jobs:
           dnf -y --setopt=install_weak_deps=False install \
             cmake \
             cmake-rpm-macros \
+            ffmpeg-free-devel \
             gcc-c++ \
             layer-shell-qt-devel \
             libX11-devel \

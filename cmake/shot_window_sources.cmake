@@ -3,6 +3,8 @@ set(MARK_SHOT_WINDOW_SOURCES
     src/annotation_state_store.h
     src/ocr_result_window.cpp
     src/ocr_result_window.h
+    src/ocr_result_window_geometry.cpp
+    src/ocr_result_window_geometry.h
     src/ocr_result_window_translation.cpp
     src/shot_window.cpp
     src/shot_window.h

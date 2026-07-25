@@ -125,6 +125,8 @@ qt_add_executable(mark-shot
     src/capture_own_windows_policy.cpp
     src/capture_own_windows_policy.h
     src/capture_own_windows_policy_config.cpp
+    src/capture_own_windows_guard.cpp
+    src/capture_own_windows_guard.h
     src/display_capture/display_capture_card.cpp
     src/display_capture/display_capture_card.h
     src/display_capture/display_capture_picker.cpp
@@ -409,6 +411,9 @@ if(BUILD_TESTING)
     add_test(NAME config-value COMMAND mark-shot-config-value-test)
 
     include(cmake/recording_tests.cmake)
+    include(cmake/capture_tests.cmake)
+    include(cmake/shot_window_tests.cmake)
+    include(cmake/debug_tests.cmake)
     include(cmake/provider_tests.cmake)
     include(cmake/marketplace_tests.cmake)
     include(cmake/settings_tests.cmake)
@@ -661,6 +666,7 @@ if(BUILD_TESTING)
     add_test(NAME ui-theme-config COMMAND mark-shot-ui-theme-config-test)
 
     include(cmake/tests.cmake)
+    include(cmake/release_tests.cmake)
 endif()
 
 include(cmake/install_rules.cmake)

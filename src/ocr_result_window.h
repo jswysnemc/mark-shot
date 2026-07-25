@@ -14,10 +14,12 @@ class QLabel;
 class QKeyEvent;
 class QMouseEvent;
 class QPushButton;
+class QScreen;
 class QTextEdit;
 
 namespace markshot::providers {
 class ProviderTask;
+struct TaskResult;
 }
 
 namespace markshot::shot {
@@ -27,7 +29,8 @@ class OcrResultWindow final : public QWidget {
 public:
     /// @brief 创建 OCR 结果浮窗。
     /// @param text 初始 OCR 文本。
-    explicit OcrResultWindow(QString text);
+    /// @param targetScreen 截图所在屏幕，缺失时回退到主屏幕。
+    explicit OcrResultWindow(QString text, QScreen *targetScreen = nullptr);
 
     /// @brief 取消仍在运行的翻译任务并释放临时文件。
     ~OcrResultWindow() override;
@@ -76,14 +79,6 @@ private:
     /// @return 成功结束拖动时返回 true。
     bool finishWindowDrag(QMouseEvent *event);
 
-    /// @brief 返回 OCR 浮窗初始尺寸。
-    /// @return 初始窗口尺寸。
-    QSize initialWindowSize() const;
-
-    /// @brief 将 OCR 浮窗移动到主屏幕中央。
-    /// @return 无返回值。
-    void centerOnPrimaryScreen();
-
     /// @brief 在 OCR 浮窗底部显示短提示。
     /// @param text 提示文本。
     /// @param durationMs 显示时长。
@@ -116,7 +111,8 @@ private:
     /// @brief 处理翻译任务输出。
     /// @param task 翻译任务。
     /// @param output 翻译输出 JSON。
-    void finishTranslation(markshot::providers::ProviderTask *task, const QByteArray &output);
+    void finishTranslation(markshot::providers::ProviderTask *task,
+                           const markshot::providers::TaskResult &result);
 
     /// @brief 取消正在运行的翻译任务并清理临时文件。
     /// @return 无返回值。

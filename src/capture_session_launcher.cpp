@@ -62,6 +62,7 @@ ShotWindow *showCapturedWindow(QScreen *screen,
     const QSize imageSize = image.size();
     ShotWindow *window =
         new ShotWindow(std::move(image), std::move(outputName), sourceGeometry, std::move(windowInfos), detectWindows);
+    window->setCaptureScreen(screen);
     window->setDefaultTools(defaultTools.normal, defaultTools.fullscreen);
     if (markshot::shouldApplyDefaultColor(defaultTools)) {
         window->setDefaultColor(defaultTools.color);
@@ -74,6 +75,13 @@ ShotWindow *showCapturedWindow(QScreen *screen,
     if (layerShellReady) {
         window->show();
     } else {
+        // Regular xdg windows are tiled by niri/Hyprland/Sway. Qt showFullScreen
+        // often still maps as a large tiled column on niri, which squeezes other
+        // windows into the frozen frame's pre-capture layout and the live layout.
+        // Prefer layer-shell; this path is the degraded fallback only.
+        markshot::debugLog("capture-session",
+                           "layer-shell unavailable; using xdg window fallback "
+                           "(tiling compositors may reflow other windows)");
         if (sourceGeometry.isValid() && !sourceGeometry.isEmpty()) {
             window->setGeometry(sourceGeometry);
         }

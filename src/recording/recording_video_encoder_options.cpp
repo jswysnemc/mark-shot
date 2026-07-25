@@ -6,16 +6,15 @@ namespace markshot::recording {
 namespace {
 
 /**
- * 创建软件编码回退配置。
- * @param fps 目标帧率。
+ * 【录制】【软件编码】创建指定的软件编码候选。
+ * @param id FFmpeg 编码器名称。
  * @return 软件编码配置。
  */
-RecordingVideoEncoderOptions softwareEncoder(int fps)
+RecordingVideoEncoderOptions softwareEncoder(const QString &id)
 {
-    Q_UNUSED(fps)
     return {
-        QStringLiteral("libx264"),
-        QStringLiteral("libx264"),
+        id,
+        id,
         false,
     };
 }
@@ -45,6 +44,7 @@ QVector<RecordingVideoEncoderOptions> recordingVideoEncoderCandidates(const Reco
                                                                       int fps)
 {
     Q_UNUSED(options)
+    Q_UNUSED(fps)
     QVector<RecordingVideoEncoderOptions> candidates;
     if (!hardwareEncodersDisabled()) {
         // 1. 只挑选接受系统内存帧输入的硬件编码器，打开失败时自动回退软件编码
@@ -56,8 +56,10 @@ QVector<RecordingVideoEncoderOptions> recordingVideoEncoderCandidates(const Reco
         candidates.append(hardwareEncoder(QStringLiteral("h264_nvenc")));
 #endif
     }
-    // 2. libx264 作为最终回退，保证任何环境都可录制
-    candidates.append(softwareEncoder(fps));
+    // 2. 优先使用画质更好的 libx264
+    candidates.append(softwareEncoder(QStringLiteral("libx264")));
+    // 3. mpeg4 是 FFmpeg 原生编码器，Fedora ffmpeg-free 默认提供该候选
+    candidates.append(softwareEncoder(QStringLiteral("mpeg4")));
     return candidates;
 }
 

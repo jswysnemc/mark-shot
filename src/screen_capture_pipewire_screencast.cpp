@@ -12,7 +12,7 @@ PortalPipeWireScreencast::~PortalPipeWireScreencast()
 
 CaptureResult PortalPipeWireScreencast::capture(const CaptureRequest &request)
 {
-    if (m_rawStreamMode) {
+    if (m_rawStreamMode.load(std::memory_order_acquire)) {
         stop();
     }
     const int requestedTargetFps = std::max(0, request.targetFps);
@@ -154,9 +154,12 @@ bool PortalPipeWireScreencast::startRawStream(const CaptureRequest &request,
         return false;
     }
 
-    m_rawStreamMode = true;
-    m_rawFrameCallback = std::move(frameCallback);
-    m_rawErrorCallback = std::move(errorCallback);
+    {
+        QMutexLocker locker(&m_frameMutex);
+        m_rawFrameCallback = std::move(frameCallback);
+        m_rawErrorCallback = std::move(errorCallback);
+        m_rawStreamMode.store(true, std::memory_order_release);
+    }
     m_rawRequestedGeometry = request.sourceGeometry;
     m_rawOutputName = request.preferredOutputName;
     m_rawBaseFrameTimeMs = -1;
@@ -186,6 +189,12 @@ bool PortalPipeWireScreencast::startRawStream(const CaptureRequest &request,
 
 void PortalPipeWireScreencast::stop()
 {
+    {
+        QMutexLocker locker(&m_frameMutex);
+        m_rawStreamMode.store(false, std::memory_order_release);
+        m_rawFrameCallback = {};
+        m_rawErrorCallback = {};
+    }
     if (m_loop) {
         pw_thread_loop_lock(m_loop);
         if (m_stream) {
@@ -245,9 +254,6 @@ void PortalPipeWireScreencast::stop()
     markshot::debugLog("screencast", "stop session=%s frames_seen=%d",
                        m_sessionHandle.isEmpty() ? "<closed>" : "closing", m_frameCount);
     m_started = false;
-    m_rawStreamMode = false;
-    m_rawFrameCallback = {};
-    m_rawErrorCallback = {};
     m_rawRequestedGeometry = {};
     m_rawOutputName.clear();
     m_rawBaseFrameTimeMs = -1;

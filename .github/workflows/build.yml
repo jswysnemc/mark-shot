@@ -27,6 +27,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm --needed \
             cmake \
+            ffmpeg \
             gcc \
             ninja \
             pkgconf \
@@ -40,7 +41,8 @@ jobs:
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=ON \
-            -DCMAKE_INSTALL_PREFIX=/usr
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DMARK_SHOT_REQUIRE_FFMPEG=ON
 
       - name: Build
         run: cmake --build build --parallel
@@ -74,8 +76,13 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential \
             cmake \
+            libavcodec-dev \
+            libavformat-dev \
             libgl1-mesa-dev \
+            libavutil-dev \
             libpipewire-0.3-dev \
+            libswresample-dev \
+            libswscale-dev \
             libx11-xcb-dev \
             libxcb1-dev \
             ninja-build \
@@ -88,7 +95,8 @@ jobs:
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=ON \
-            -DCMAKE_INSTALL_PREFIX=/usr
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DMARK_SHOT_REQUIRE_FFMPEG=ON
 
       - name: Build
         run: cmake --build build --parallel

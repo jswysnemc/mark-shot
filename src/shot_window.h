@@ -4,6 +4,7 @@
 #include <QElapsedTimer>
 #include <QImage>
 #include <QKeySequence>
+#include <QPointer>
 #include <QPointF>
 #include <QRect>
 #include <QRectF>
@@ -133,6 +134,12 @@ public:
                         QWidget *parent = nullptr);
     static std::optional<Tool> toolFromName(QString name);
     static QStringList supportedToolNames();
+    /**
+     * 【截图会话】【目标屏幕】记录本窗口对应的截图屏幕。
+     * @param screen 截图屏幕，缺失时后续功能回退到窗口当前屏幕。
+     * @return 无返回值。
+     */
+    void setCaptureScreen(QScreen *screen);
     bool configureLayerShell(QScreen *screen);
     void updateLayerShellForIme();
     void startFullscreenAnnotation();
@@ -565,6 +572,7 @@ private:
     QImage m_frozenFrame;
     QString m_outputName;
     QRect m_sourceGeometry;
+    QPointer<QScreen> m_captureScreen;
     QRectF m_frozenImageRect;
     bool m_imageNavigationEnabled = false;
     qreal m_imageZoom = 1.0;

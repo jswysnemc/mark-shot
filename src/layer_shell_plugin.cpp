@@ -87,11 +87,14 @@ public:
 
         LayerShellQt::Window *layerWindow = LayerShellQt::Window::get(nativeWindow);
         if (!layerWindow) {
+            const QByteArray pluginPath = qgetenv("QT_PLUGIN_PATH");
             markshot::debugLog("layershell",
                                "configure failed: LayerShellQt::Window::get returned null "
-                               "platform=%s screen=%s",
+                               "platform=%s screen=%s qt_plugin_path=%s "
+                               "(is layer-shell-qt wayland-shell-integration installed?)",
                                QGuiApplication::platformName().toUtf8().constData(),
-                               screen ? screen->name().toUtf8().constData() : "(none)");
+                               screen ? screen->name().toUtf8().constData() : "(none)",
+                               pluginPath.isEmpty() ? "(empty)" : pluginPath.constData());
             return false;
         }
 
@@ -104,7 +107,10 @@ public:
         layerWindow->setLayer(LayerShellQt::Window::LayerOverlay);
         layerWindow->setAnchors(anchors);
         layerWindow->setMargins({});
-        layerWindow->setExclusiveZone(-1);
+        // exclusive_zone=0: cover the full output, including other surfaces'
+        // exclusive zones (DMS bar/dock, waybar, ...). -1 would ask the
+        // compositor to avoid those zones and leave unfrozen gaps.
+        layerWindow->setExclusiveZone(0);
         layerWindow->setKeyboardInteractivity(keyboardInteractivity(config.keyboardInteractivity));
         layerWindow->setActivateOnShow(config.activateOnShow);
         layerWindow->setCloseOnDismissed(config.closeOnDismissed);
@@ -209,7 +215,9 @@ private:
             LayerShellQt::Window::Anchors anchors = LayerShellQt::Window::AnchorTop;
             anchors |= LayerShellQt::Window::AnchorLeft;
             layerWindow->setAnchors(anchors);
-            layerWindow->setExclusiveZone(-1);
+            // See configureOverlay: cover exclusive zones so pinned surfaces are
+            // not pushed into the remaining work area.
+            layerWindow->setExclusiveZone(0);
             layerWindow->setKeyboardInteractivity(keyboardInteractivity(config.keyboardInteractivity));
             layerWindow->setActivateOnShow(config.activateOnShow);
             layerWindow->setCloseOnDismissed(config.closeOnDismissed);

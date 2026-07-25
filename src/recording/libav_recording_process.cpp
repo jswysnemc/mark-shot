@@ -120,12 +120,12 @@ AVPixelFormat chooseEncoderPixelFormat(const AVCodec *codec)
 }
 
 /**
- * 【录制】【库内编码】估算硬件编码器目标码率。
+ * 【录制】【库内编码】估算需要显式码率的编码器目标码率。
  * @param size 编码尺寸。
  * @param fps 目标帧率。
  * @return 码率（bit/s）。
  */
-qint64 estimatedHardwareBitRate(QSize size, int fps)
+qint64 estimatedVideoBitRate(QSize size, int fps)
 {
     const qint64 pixelRate = static_cast<qint64>(size.width()) * size.height() * std::max(1, fps);
     return std::max<qint64>(1000000, pixelRate / 10);
@@ -524,8 +524,8 @@ bool LibavRecordingProcessPrivate::openEncoder(const RecordingVideoEncoderOption
     if (m_formatContext->oformat->flags & AVFMT_GLOBALHEADER) {
         m_codecContext->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
     }
-    if (encoder.hardware) {
-        m_codecContext->bit_rate = estimatedHardwareBitRate(m_encodedSize, fps);
+    if (encoder.hardware || encoder.id == QStringLiteral("mpeg4")) {
+        m_codecContext->bit_rate = estimatedVideoBitRate(m_encodedSize, fps);
     }
 
     AVDictionary *codecOptions = nullptr;

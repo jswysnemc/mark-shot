@@ -8,10 +8,10 @@ pkgdesc='Qt 6 Wayland screenshot selection and annotation tool (prebuilt binary)
 arch=('x86_64' 'aarch64')
 url='https://github.com/jswysnemc/mark-shot'
 license=('MIT')
-depends=('qt6-base' 'qt6-wayland' 'pipewire' 'grim' 'wl-clipboard' 'hicolor-icon-theme' 'python')
-# x86_64 由 arch 容器编译，包含 layer-shell-qt 与 ffmpeg 录制支持；aarch64 由 ubuntu 编译，禁用了 layer-shell 和 libav 录制
+depends=('qt6-base' 'qt6-wayland' 'pipewire' 'ffmpeg' 'grim' 'wl-clipboard' 'hicolor-icon-theme' 'python')
+# x86_64 由 Arch 容器编译并包含 layer-shell-qt；aarch64 由 Ubuntu 编译且关闭 layer-shell
 # depends_x86_64 在 depends 基础上追加，不是替换
-depends_x86_64=('layer-shell-qt' 'ffmpeg')
+depends_x86_64=('layer-shell-qt')
 optdepends=(
     'xdg-desktop-portal: portal-based screenshot and screencast backend'
     'xclip: X11 clipboard backend'

@@ -158,7 +158,13 @@ bool ocrResultPanelEnabled();
 bool annotationAutoSelectAfterDrawEnabled();
 std::array<bool, static_cast<int>(ShotWindow::Tool::Laser) + 1> annotationAutoSelectAfterDrawTools();
 markshot::scroll::ScrollSessionUiConfig scrollSessionUiConfig();
-QWidget *createOcrResultWindow(QString text);
+/**
+ * 【OCR】【结果窗口】创建 OCR 结果浮窗。
+ * @param text OCR 识别文本。
+ * @param targetScreen 截图所在屏幕。
+ * @return OCR 结果浮窗。
+ */
+QWidget *createOcrResultWindow(QString text, QScreen *targetScreen);
 QWidget *createCodeScanResultWindow(QString text);
 QWidget *createPinnedImageWindow(QImage image, std::optional<QPoint> initialTopLeft = std::nullopt);
 

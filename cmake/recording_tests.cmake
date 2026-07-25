@@ -11,6 +11,38 @@ target_link_libraries(mark-shot-recording-capture-backend-test
 )
 add_test(NAME recording-capture-backend COMMAND mark-shot-recording-capture-backend-test)
 
+qt_add_executable(mark-shot-recording-frame-grabber-test
+    tests/recording_frame_grabber_test.cpp
+    src/debug_log.cpp
+    src/debug_log.h
+    src/recording/recording_capture_backend.cpp
+    src/recording/recording_capture_backend.h
+    src/recording/recording_frame_grabber.cpp
+    src/recording/recording_frame_grabber.h
+    src/recording/recording_capture_stream.h
+)
+target_include_directories(mark-shot-recording-frame-grabber-test PRIVATE src)
+target_link_libraries(mark-shot-recording-frame-grabber-test
+    PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Test
+)
+add_test(NAME recording-frame-grabber COMMAND mark-shot-recording-frame-grabber-test)
+
+qt_add_executable(mark-shot-recording-video-encoder-options-test
+    tests/recording_video_encoder_options_test.cpp
+    src/recording/recording_video_encoder_options.cpp
+    src/recording/recording_video_encoder_options.h
+)
+target_include_directories(mark-shot-recording-video-encoder-options-test PRIVATE src)
+target_link_libraries(mark-shot-recording-video-encoder-options-test
+    PRIVATE
+        Qt6::Core
+        Qt6::Test
+)
+add_test(NAME recording-video-encoder-options COMMAND mark-shot-recording-video-encoder-options-test)
+
 qt_add_executable(mark-shot-recording-bgra-buffer-pool-test
     tests/recording_bgra_buffer_pool_test.cpp
     src/recording/recording_bgra_buffer_pool.cpp
@@ -29,6 +61,7 @@ if(MARK_SHOT_LINUX AND PipeWire_FOUND)
         tests/pipewire_buffer_data_types_test.cpp
         src/pipewire/pipewire_buffer_data_types.cpp
         src/pipewire/pipewire_buffer_data_types.h
+        src/pipewire/pipewire_drm_fourcc.h
     )
     target_include_directories(mark-shot-pipewire-buffer-data-types-test PRIVATE src)
     target_link_libraries(mark-shot-pipewire-buffer-data-types-test

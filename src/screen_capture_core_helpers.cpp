@@ -12,12 +12,25 @@ QString desktopEnvironmentText()
     return (env.value(QStringLiteral("XDG_CURRENT_DESKTOP")) + QLatin1Char(':')
             + env.value(QStringLiteral("XDG_SESSION_DESKTOP")) + QLatin1Char(':')
             + env.value(QStringLiteral("DESKTOP_SESSION")) + QLatin1Char(':')
-            + env.value(QStringLiteral("WAYLAND_DISPLAY")))
+            + env.value(QStringLiteral("WAYLAND_DISPLAY"))
+            // Compositor socket env vars are more reliable than desktop names
+            // when XDG_CURRENT_DESKTOP is unset (common on bare niri/Hyprland).
+            + QLatin1Char(':') + env.value(QStringLiteral("NIRI_SOCKET"))
+            + QLatin1Char(':') + env.value(QStringLiteral("HYPRLAND_INSTANCE_SIGNATURE"))
+            + QLatin1Char(':') + env.value(QStringLiteral("SWAYSOCK")))
         .toLower();
 }
 
 bool prefersGrim()
 {
+    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    // Prefer compositor sockets even when desktop strings are empty/custom.
+    if (!env.value(QStringLiteral("NIRI_SOCKET")).isEmpty()
+        || !env.value(QStringLiteral("HYPRLAND_INSTANCE_SIGNATURE")).isEmpty()
+        || !env.value(QStringLiteral("SWAYSOCK")).isEmpty()) {
+        return true;
+    }
+
     const QString desktop = desktopEnvironmentText();
     return desktop.contains(QStringLiteral("sway"))
         || desktop.contains(QStringLiteral("hyprland"))

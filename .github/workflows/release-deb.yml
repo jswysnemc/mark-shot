@@ -80,8 +80,13 @@ jobs:
             fakeroot \
             file \
             git \
+            libavcodec-dev \
+            libavformat-dev \
             libgl1-mesa-dev \
+            libavutil-dev \
             libpipewire-0.3-dev \
+            libswresample-dev \
+            libswscale-dev \
             libx11-xcb-dev \
             libxcb1-dev \
             ninja-build \
@@ -101,6 +106,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
             -DCMAKE_INSTALL_LIBDIR=lib \
+            -DMARK_SHOT_REQUIRE_FFMPEG=ON \
             -DMARK_SHOT_WITH_LAYER_SHELL=OFF
 
       - name: Build

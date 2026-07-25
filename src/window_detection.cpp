@@ -107,6 +107,15 @@ QString detectWaylandSessionType()
         return {};
     }
 
+    // Prefer compositor-specific sockets over free-form desktop strings so bare
+    // niri/Hyprland sessions still pick the matching detection script.
+    if (!env.value(QStringLiteral("NIRI_SOCKET")).isEmpty()) {
+        return QStringLiteral("niri");
+    }
+    if (!env.value(QStringLiteral("HYPRLAND_INSTANCE_SIGNATURE")).isEmpty()) {
+        return QStringLiteral("hyprland");
+    }
+
     const QString desktop = (env.value(QStringLiteral("XDG_CURRENT_DESKTOP"))
         + QLatin1Char(':') + env.value(QStringLiteral("XDG_SESSION_DESKTOP"))
         + QLatin1Char(':') + env.value(QStringLiteral("DESKTOP_SESSION")))

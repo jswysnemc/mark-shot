@@ -3,6 +3,7 @@
 #include "app_config_store.h"
 #include "clipboard_image.h"
 #include "debug_log.h"
+#include "ocr_result_window_geometry.h"
 #include "pinned_window_top.h"
 #include "shot_window.h"
 #include "ui/i18n.h"
@@ -33,8 +34,6 @@
 #include <QTextEdit>
 #include <QTimer>
 #include <QWindow>
-
-#include <algorithm>
 
 namespace markshot::shot {
 
@@ -77,7 +76,7 @@ QAction *addEditorMenuAction(QWidget *owner,
 
 }  // namespace
 
-OcrResultWindow::OcrResultWindow(QString text)
+OcrResultWindow::OcrResultWindow(QString text, QScreen *targetScreen)
     : m_config(pinnedWindowConfig())
 {
     setWindowTitle(MS_TR("OCR Result"));
@@ -220,8 +219,29 @@ OcrResultWindow::OcrResultWindow(QString text)
     actions->addWidget(closeButton);
     layout->addLayout(actions);
 
-    resize(initialWindowSize());
-    centerOnPrimaryScreen();
+    QScreen *primaryScreen = QApplication::primaryScreen();
+    QScreen *resolvedScreen = targetScreen ? targetScreen : primaryScreen;
+    if (resolvedScreen) {
+        setScreen(resolvedScreen);
+    }
+    const QRect targetAvailableGeometry = targetScreen
+        ? targetScreen->availableGeometry()
+        : QRect();
+    const QRect primaryAvailableGeometry = primaryScreen
+        ? primaryScreen->availableGeometry()
+        : QRect();
+    const OcrResultWindowPlacement placement =
+        ocrResultWindowPlacement(targetAvailableGeometry, primaryAvailableGeometry);
+    resize(placement.size);
+    move(placement.topLeft);
+    markshot::debugLog("ocr",
+                       "【OCR】【结果窗口放置】target=%s actual=%s geometry=%d,%d %dx%d",
+                       targetScreen ? targetScreen->name().toUtf8().constData() : "fallback",
+                       screen() ? screen()->name().toUtf8().constData() : "none",
+                       placement.topLeft.x(),
+                       placement.topLeft.y(),
+                       placement.size.width(),
+                       placement.size.height());
     applyPinnedWindowTopState(this, m_config.alwaysOnTop);
     m_editor->setFocus(Qt::MouseFocusReason);
 }
@@ -346,24 +366,6 @@ bool OcrResultWindow::finishWindowDrag(QMouseEvent *event)
     unsetCursor();
     event->accept();
     return true;
-}
-
-QSize OcrResultWindow::initialWindowSize() const
-{
-    QSize size(420, 520);
-    if (QScreen *screen = QApplication::primaryScreen()) {
-        const QSize available = screen->availableGeometry().size();
-        size.setWidth(std::min(size.width(), std::max(320, qRound(available.width() * 0.9))));
-        size.setHeight(std::min(size.height(), std::max(260, qRound(available.height() * 0.9))));
-    }
-    return size;
-}
-
-void OcrResultWindow::centerOnPrimaryScreen()
-{
-    if (QScreen *screen = QApplication::primaryScreen()) {
-        move(screen->availableGeometry().center() - rect().center());
-    }
 }
 
 void OcrResultWindow::showToast(const QString &text, int durationMs)

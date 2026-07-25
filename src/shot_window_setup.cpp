@@ -414,6 +414,11 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     initializeWindowDetection(std::move(windowInfos), windowDetectionEnabled);
 }
 
+void ShotWindow::setCaptureScreen(QScreen *screen)
+{
+    m_captureScreen = screen;
+}
+
 void ShotWindow::initializeToolbar()
 {
     m_toolbar = new QWidget(this);

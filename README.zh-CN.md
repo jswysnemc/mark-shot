@@ -196,6 +196,18 @@ binds {
 }
 ```
 
+在 niri / DMS 下请确保：
+- 运行时能找到 `grim`（Nix flake 包装会自动注入 PATH）。缺少 `grim` 时会回退到 xdg-desktop-portal，启动可能慢数秒，且 portal 临时窗口会挤压平铺布局。
+- 已安装并可加载 `layer-shell-qt`（Wayland shell integration）。layer-shell 失败时 mark-shot 会退化为普通 xdg 窗口，niri 会把它当作新的一列并挤压其他窗口。
+- 仅在 layer-shell 不可用时，可临时用 window-rule 缓解挤压（正确修复仍是 layer-shell + grim）：
+```kdl
+window-rule {
+    match app-id="mark-shot"
+    open-fullscreen false
+    open-floating true
+}
+```
+
 **Hyprland**（修改 `~/.config/hypr/hyprland.conf`）：
 ```ini
 # 绑定 Super+Shift+S 启动 mark-shot 选区截图
@@ -572,6 +584,8 @@ cmake --build build
 ```bash
 nix build
 ```
+
+Nix flake 会把 `grim`、`wl-clipboard`、`python3` 注入运行时 `PATH`，并把 `layer-shell-qt` 的 Wayland shell-integration 插件加入 `QT_PLUGIN_PATH`。这能避免 niri 上因缺少 `grim` 走 portal 导致的数秒延迟，以及 layer-shell 插件找不到时退化为平铺 xdg 窗口挤压其他窗口的问题。
 
 LayerShellQt 会被自动检测。找到时启用完整 Wayland layer-shell 支持；未找到时编译照常成功，运行时自动降级为标准全屏窗口。
 

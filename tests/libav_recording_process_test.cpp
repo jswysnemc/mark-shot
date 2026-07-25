@@ -36,8 +36,8 @@ private slots:
         options.outputPath = directory.filePath(QStringLiteral("sample.mp4"));
 
         markshot::recording::RecordingVideoEncoderOptions encoder;
-        encoder.id = QStringLiteral("libx264");
-        encoder.label = QStringLiteral("libx264");
+        encoder.id = QStringLiteral("mpeg4");
+        encoder.label = QStringLiteral("mpeg4");
         encoder.hardware = false;
 
         QString error;
@@ -77,8 +77,8 @@ private slots:
         options.outputPath = directory.filePath(QStringLiteral("repeat.mp4"));
 
         markshot::recording::RecordingVideoEncoderOptions encoder;
-        encoder.id = QStringLiteral("libx264");
-        encoder.label = QStringLiteral("libx264");
+        encoder.id = QStringLiteral("mpeg4");
+        encoder.label = QStringLiteral("mpeg4");
         encoder.hardware = false;
 
         QString error;

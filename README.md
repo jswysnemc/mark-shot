@@ -208,6 +208,18 @@ binds {
 }
 ```
 
+On niri / DMS setups, make sure:
+- `grim` is available at runtime (the Nix flake wrapper injects it into `PATH`). Without `grim`, Mark Shot falls back to xdg-desktop-portal, which can take several seconds and may reflow tiled windows while the portal runs.
+- `layer-shell-qt` (including its Wayland shell-integration plugin) is loadable. If layer-shell setup fails, Mark Shot falls back to a regular xdg window that niri tiles as a new column and squeezes other windows.
+- Only as a temporary workaround when layer-shell is unavailable, a niri window-rule can reduce squeezing (the real fix is layer-shell + grim):
+```kdl
+window-rule {
+    match app-id="mark-shot"
+    open-fullscreen false
+    open-floating true
+}
+```
+
 **Hyprland** (`~/.config/hypr/hyprland.conf`):
 ```ini
 # Bind Super+Shift+S to start mark-shot selection
@@ -467,6 +479,8 @@ Or build with Nix:
 ```bash
 nix build
 ```
+
+The Nix flake wraps `grim`, `wl-clipboard`, and `python3` into the runtime `PATH`, and adds `layer-shell-qt`'s Wayland shell-integration plugin to `QT_PLUGIN_PATH`. That avoids the multi-second portal fallback on niri when `grim` is missing, and prevents layer-shell setup from failing (which would map a regular xdg window that niri tiles and squeezes).
 
 LayerShellQt is detected automatically. When found, full Wayland layer-shell support is enabled. When absent, the build succeeds and falls back to standard fullscreen windows at runtime.
 

@@ -42,6 +42,7 @@ set(MARK_SHOT_RECORDING_SOURCES
     src/recording/recording_frame_queue.cpp
     src/recording/recording_frame_queue.h
     src/recording/recording_frame_grabber.cpp
+    src/recording/recording_frame_grabber_factory.cpp
     src/recording/recording_frame_grabber.h
     src/recording/recording_frame_sample.h
     src/recording/recording_capture_stream.h
