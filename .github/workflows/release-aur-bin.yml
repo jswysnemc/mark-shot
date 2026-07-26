@@ -173,18 +173,24 @@ jobs:
           BUILD_DATE=$(date +%s)
 
           # 构造 .PKGINFO 元数据文件，pacman 解析此文件获取包信息
-          # 两个平台均包含 FFmpeg 录制支持，仅 Arch 平台额外依赖 layer-shell-qt
+          # x86_64：Arch 容器构建，可声明 layer-shell-qt / ffmpeg
+          # aarch64：当前在 Ubuntu 22.04-arm 构建，so 代际与 Arch aarch64 可能不一致；
+          #          包描述中标明来源，并建议 aarch64 用户优先使用源码包 mark-shot
           if [ "$PLATFORM" = "arch" ]; then
               LAYER_SHELL_DEP="depend = layer-shell-qt"
+              PKGDESC="Qt 6 Wayland screenshot selection and annotation tool (prebuilt Arch binary)"
+              EXTRA_NOTE=""
           else
               LAYER_SHELL_DEP=""
+              PKGDESC="Qt 6 screenshot tool (prebuilt Ubuntu aarch64 binary; prefer source package mark-shot on Arch aarch64)"
+              EXTRA_NOTE="optdepend = mark-shot: preferred source package on Arch aarch64 when runtime libraries mismatch"
           fi
           FFMPEG_DEP="depend = ffmpeg"
 
           cat > "$STAGE/.PKGINFO" <<EOF
           pkgname = mark-shot-bin
           pkgver = ${VERSION}-${PKGREL}
-          pkgdesc = Qt 6 Wayland screenshot selection and annotation tool (prebuilt binary)
+          pkgdesc = ${PKGDESC}
           url = https://github.com/jswysnemc/mark-shot
           builddate = ${BUILD_DATE}
           packager = GitHub Actions <github-actions[bot]@users.noreply.github.com>
@@ -204,6 +210,7 @@ jobs:
           optdepend = xclip: X11 clipboard backend
           optdepend = tesseract: fallback OCR backend
           optdepend = tesseract-data-chi_sim: simplified Chinese OCR data for tesseract
+          ${EXTRA_NOTE}
           provides = mark-shot
           conflicts = mark-shot
           EOF

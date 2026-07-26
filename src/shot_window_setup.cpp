@@ -52,6 +52,10 @@ std::optional<ShotWindow::Tool> ShotWindow::toolFromName(QString name)
     if (key == QStringLiteral("laser")) {
         return Tool::Laser;
     }
+    if (key == QStringLiteral("marker") || key == QStringLiteral("shape")
+        || key == QStringLiteral("stamp") || key == QStringLiteral("shape-marker")) {
+        return Tool::Marker;
+    }
     return std::nullopt;
 }
 
@@ -71,6 +75,7 @@ QStringList ShotWindow::supportedToolNames()
         QStringLiteral("magnifier"),
         QStringLiteral("mosaic"),
         QStringLiteral("laser"),
+        QStringLiteral("marker"),
     };
 }
 
@@ -456,12 +461,14 @@ void ShotWindow::initializeToolbar()
     m_toolbarLayout->addWidget(addToolbarButton(Action::ToolHighlighter, shortcutText(Tool::Highlighter)));
     m_toolbarLayout->addWidget(addToolbarButton(Action::ToolRectangle, shortcutText(Tool::Rectangle)));
     m_toolbarLayout->addWidget(addToolbarButton(Action::ToolEllipse, shortcutText(Tool::Ellipse)));
+    m_toolbarLayout->addWidget(addToolbarButton(Action::ToolMarker, shortcutText(Tool::Marker)));
     m_toolbarLayout->addWidget(addToolbarButton(Action::ToolArrow, shortcutText(Tool::Arrow)));
     m_toolbarLayout->addWidget(addToolbarButton(Action::ToolText, shortcutText(Tool::Text)));
     m_toolbarLayout->addWidget(addToolbarButton(Action::ToolNumber, shortcutText(Tool::Number)));
     m_toolbarLayout->addWidget(addToolbarButton(Action::ToolMosaic, shortcutText(Tool::Mosaic)));
     m_toolbarLayout->addWidget(addToolbarButton(Action::ToolMagnifier, shortcutText(Tool::Magnifier)));
     m_toolbarLayout->addWidget(addToolbarButton(Action::ToolLaser, shortcutText(Tool::Laser)));
+    refreshShapeMarkerToolbarButton();
     m_toolbarLayout->addWidget(addToolbarButton(Action::Clear, shortcutText(Action::Clear, QStringLiteral("Clear"))));
     m_toolbarLayout->addWidget(addToolbarButton(Action::Undo, shortcutText(Action::Undo)));
     m_toolbarLayout->addWidget(addToolbarButton(Action::Redo, shortcutText(Action::Redo, QStringLiteral("Ctrl+Shift+Z"))));
@@ -612,6 +619,37 @@ void ShotWindow::initializeTransientPanels()
     m_colorPalettePreview = new QWidget(m_colorPalette);
     m_colorPalettePreview->setObjectName(QStringLiteral("colorPalettePreview"));
     m_colorPalette->installEventFilter(this);
+
+    // 形状标记下拉面板：网格选择三角形/星形/对钩等
+    m_shapeMarkerPopup = new QWidget(this);
+    m_shapeMarkerPopup->setObjectName(QStringLiteral("shapeMarkerPopup"));
+    m_shapeMarkerPopup->setCursor(Qt::ArrowCursor);
+    m_shapeMarkerPopup->setStyleSheet(m_toolbar->styleSheet());
+    auto *shapeLayout = new QGridLayout(m_shapeMarkerPopup);
+    shapeLayout->setContentsMargins(8, 8, 8, 8);
+    shapeLayout->setHorizontalSpacing(6);
+    shapeLayout->setVerticalSpacing(6);
+    const auto shapes = markshot::marker::allShapes();
+    for (int i = 0; i < static_cast<int>(shapes.size()); ++i) {
+        const ShotWindow::MarkerShape shape = shapes[static_cast<size_t>(i)];
+        auto *button = new QPushButton(m_shapeMarkerPopup);
+        button->setFocusPolicy(Qt::NoFocus);
+        button->setCursor(Qt::ArrowCursor);
+        button->setIcon(markshot::ui::makeMarkerShapeIcon(shape));
+        button->setIconSize(QSize(m_toolbarAppearance.toolbarIconSize, m_toolbarAppearance.toolbarIconSize));
+        button->setToolTip(markshot::i18n::translate(markshot::marker::shapeLabel(shape)));
+        button->setProperty("markerShape", static_cast<int>(shape));
+        button->setCheckable(true);
+        connect(button, &QPushButton::clicked, this, [this, shape] {
+            setSelectedMarkerShape(shape);
+            setTool(Tool::Marker);
+            hideShapeMarkerPopup();
+        });
+        // 6 列网格，容纳扑克花色与更多形状
+        shapeLayout->addWidget(button, i / 6, i % 6);
+    }
+    m_shapeMarkerPopup->hide();
+
     m_colorPalette->hide();
     updateColorPalettePreview();
 }

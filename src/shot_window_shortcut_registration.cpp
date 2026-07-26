@@ -74,7 +74,8 @@ void ShotWindow::initializeShortcuts()
                       Tool::Number,
                       Tool::Mosaic,
                       Tool::Magnifier,
-                      Tool::Laser}) {
+                      Tool::Laser,
+                       Tool::Marker}) {
         addToolShortcut(tool);
     }
     auto sequenceUsedByTool = [this](const QKeySequence &sequence) {

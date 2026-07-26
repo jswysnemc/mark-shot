@@ -432,6 +432,9 @@ void ShotWindow::resizeEvent(QResizeEvent *)
     if (m_colorPalette && m_colorPalette->isVisible()) {
         updateColorPaletteGeometry(m_colorPaletteAnchor);
     }
+    if (m_shapeMarkerPopup && m_shapeMarkerPopup->isVisible()) {
+        updateShapeMarkerPopupGeometry();
+    }
     updateTextEditorGeometry();
     updateImageScrollBars();
     updateToolbarGeometry();
@@ -569,7 +572,20 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
     if (m_colorPalette && m_colorPalette->isVisible()
         && !m_colorPalette->geometry().contains(event->pos())) {
         m_colorPalette->hide();
-        update();
+    }
+    if (m_shapeMarkerPopup && m_shapeMarkerPopup->isVisible()) {
+        const QPoint localPos = event->pos();
+        const bool overPopup = m_shapeMarkerPopup->geometry().contains(localPos);
+        bool overButton = false;
+        if (m_shapeMarkerToolbarButton) {
+            const QRect buttonRect(m_shapeMarkerToolbarButton->mapTo(this, QPoint(0, 0)),
+                                   m_shapeMarkerToolbarButton->size());
+            overButton = buttonRect.contains(localPos);
+        }
+        if (!overPopup && !overButton) {
+            hideShapeMarkerPopup();
+            update();
+        }
     }
     if (m_propertyColorDialogPanel && m_propertyColorDialogPanel->isVisible()
         && !m_propertyColorDialogPanel->geometry().contains(event->pos())
@@ -704,8 +720,12 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
     annotation.width = currentToolWidth();
     annotation.filled = m_shapeFilled;
     annotation.cornerRadius = m_tool == Tool::Rectangle ? m_rectangleCornerRadius : 0.0;
+    if (m_tool == Tool::Marker) {
+        annotation.filled = true;
+    }
     annotation.arrowStyle = m_arrowStyle;
     annotation.rectangleStyle = m_rectangleStyle;
+    annotation.markerShape = m_markerShape;
     annotation.fontFamily = m_textFontFamily;
     annotation.rotationDegrees = 0.0;
     annotation.highlighterStyle = m_tool == Tool::Highlighter ? m_highlighterStyle : HighlighterStyle::Freehand;

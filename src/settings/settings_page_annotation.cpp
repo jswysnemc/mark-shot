@@ -33,6 +33,7 @@ QString toolLabel(ShotWindow::Tool tool)
     case ShotWindow::Tool::Mosaic: return MS_TR("Mosaic");
     case ShotWindow::Tool::Magnifier: return MS_TR("Magnifier");
     case ShotWindow::Tool::Laser: return MS_TR("Laser");
+    case ShotWindow::ShotWindow::Tool::Marker: return MS_TR("Marker");
     }
     return MS_TR("Pen");
 }
@@ -120,7 +121,8 @@ void SettingsPageAnnotation::populateToolCombo(QComboBox *combo)
                                   ShotWindow::Tool::Number,
                                   ShotWindow::Tool::Mosaic,
                                   ShotWindow::Tool::Magnifier,
-                                  ShotWindow::Tool::Laser}) {
+                                  ShotWindow::Tool::Laser,
+                                  ShotWindow::Tool::Marker}) {
         combo->addItem(toolLabel(tool), static_cast<int>(tool));
     }
 }

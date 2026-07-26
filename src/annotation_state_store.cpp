@@ -28,6 +28,7 @@ constexpr const char *kKeyMosaicBlockSize = "mosaicBlockSize";
 constexpr const char *kKeyShapeFilled = "shapeFilled";
 constexpr const char *kKeyRectangleCornerRadius = "rectangleCornerRadius";
 constexpr const char *kKeyRectangleStyle = "rectangleStyle";
+constexpr const char *kKeyMarkerShape = "markerShape";
 constexpr const char *kKeyMagnifierScale = "magnifierScale";
 constexpr const char *kKeyMagnifierShape = "magnifierShape";
 constexpr const char *kKeyArrowStyle = "arrowStyle";
@@ -144,6 +145,11 @@ AnnotationState loadAnnotationState()
         state.rectangleStyle,
         static_cast<int>(ShotWindow::RectangleStyle::Stroke),
         static_cast<int>(ShotWindow::RectangleStyle::Invert));
+    state.markerShape = enumFromInt<ShotWindow::MarkerShape>(
+        root.value(QString::fromLatin1(kKeyMarkerShape)),
+        state.markerShape,
+        static_cast<int>(ShotWindow::MarkerShape::Triangle),
+        static_cast<int>(ShotWindow::MarkerShape::Crescent));
 
     // 4. 放大镜相关
     state.magnifierScale =
@@ -203,6 +209,7 @@ bool saveAnnotationState(const AnnotationState &state)
     root.insert(QString::fromLatin1(kKeyShapeFilled), state.shapeFilled);
     root.insert(QString::fromLatin1(kKeyRectangleCornerRadius), state.rectangleCornerRadius);
     root.insert(QString::fromLatin1(kKeyRectangleStyle), static_cast<int>(state.rectangleStyle));
+    root.insert(QString::fromLatin1(kKeyMarkerShape), static_cast<int>(state.markerShape));
     root.insert(QString::fromLatin1(kKeyMagnifierScale), state.magnifierScale);
     root.insert(QString::fromLatin1(kKeyMagnifierShape), static_cast<int>(state.magnifierShape));
     root.insert(QString::fromLatin1(kKeyArrowStyle), static_cast<int>(state.arrowStyle));

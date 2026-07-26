@@ -34,7 +34,7 @@ private:
     /// @param form 目标表单布局。
     void addActionShortcutRows(QFormLayout *form);
 
-    std::array<QKeySequenceEdit *, static_cast<int>(ShotWindow::Tool::Laser) + 1> m_toolEdits = {};
+    std::array<QKeySequenceEdit *, static_cast<int>(ShotWindow::Tool::Marker) + 1> m_toolEdits = {};
     std::array<QKeySequenceEdit *, static_cast<int>(ShotWindow::Action::Cancel) + 1> m_actionEdits = {};
     QKeySequenceEdit *m_startupColorPicker = nullptr;
     QKeySequenceEdit *m_startupRuler = nullptr;

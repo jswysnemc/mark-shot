@@ -205,7 +205,7 @@ bool ShotWindow::handleConfiguredActionShortcut(QKeyEvent *event)
  */
 bool ShotWindow::handleConfiguredToolShortcut(QKeyEvent *event)
 {
-    const std::array<Tool, static_cast<int>(Tool::Laser) + 1> tools = {
+    const std::array<Tool, static_cast<int>(Tool::Marker) + 1> tools = {
         Tool::Move,
         Tool::Select,
         Tool::Pen,
@@ -219,6 +219,7 @@ bool ShotWindow::handleConfiguredToolShortcut(QKeyEvent *event)
         Tool::Mosaic,
         Tool::Magnifier,
         Tool::Laser,
+        Tool::Marker,
     };
     for (Tool tool : tools) {
         if (eventMatchesShortcut(event, tool)) {

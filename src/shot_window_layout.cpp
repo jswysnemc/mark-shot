@@ -450,6 +450,9 @@ void ShotWindow::updateAnnotationPropertyPanel()
     case Tool::Ellipse:
         title = QStringLiteral("Ellipse");
         break;
+    case Tool::Marker:
+        title = markshot::marker::shapeLabel(annotation ? annotation->markerShape : m_markerShape);
+        break;
     case Tool::Arrow:
         title = QStringLiteral("Arrow");
         break;

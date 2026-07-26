@@ -256,14 +256,14 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
         const QPointF lineEnd = constrainLine
             ? clampImagePoint(markshot::shot::constrainedLineEnd(m_dragStart, clamped))
             : clamped;
-        if ((m_draft->tool == Tool::Rectangle || m_draft->tool == Tool::Ellipse || m_draft->tool == Tool::Magnifier)
+        if ((m_draft->tool == Tool::Rectangle || m_draft->tool == Tool::Ellipse || m_draft->tool == Tool::Marker || m_draft->tool == Tool::Magnifier)
             && event->modifiers().testFlag(Qt::ControlModifier)) {
             m_draft->rect = constrainedRect(m_dragStart, clamped);
         } else {
             m_draft->rect = normalizedRect(m_dragStart, lineEnd);
         }
         if (m_draft->points.size() >= 2) {
-            m_draft->points[1] = (m_draft->tool == Tool::Rectangle || m_draft->tool == Tool::Ellipse || m_draft->tool == Tool::Magnifier)
+            m_draft->points[1] = (m_draft->tool == Tool::Rectangle || m_draft->tool == Tool::Ellipse || m_draft->tool == Tool::Marker || m_draft->tool == Tool::Magnifier)
                 ? m_draft->rect.bottomRight()
                 : lineEnd;
         }
@@ -334,6 +334,7 @@ void ShotWindow::mouseDoubleClickEvent(QMouseEvent *event)
     case Tool::Line:
     case Tool::Rectangle:
     case Tool::Ellipse:
+    case Tool::Marker:
     case Tool::Arrow:
     case Tool::Mosaic:
     case Tool::Magnifier:
@@ -619,6 +620,7 @@ void ShotWindow::commitDraft()
         case Tool::Line:
         case Tool::Rectangle:
         case Tool::Ellipse:
+        case Tool::Marker:
         case Tool::Arrow:
         case Tool::Number:
         case Tool::Magnifier:

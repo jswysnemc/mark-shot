@@ -40,31 +40,37 @@ jobs:
       matrix:
         include:
           # Debian 12 baseline for Deepin / older Debian-derived systems.
+          # Keep LayerShell off so Depends stay installable without KF6 packages.
           - target: debian12
             deb_arch: amd64
             runner: ubuntu-22.04
             image: debian:12
             compat_check: true
             asset_suffix: ""
+            layer_shell: "OFF"
           - target: debian12
             deb_arch: arm64
             runner: ubuntu-22.04-arm
             image: debian:12
             compat_check: true
             asset_suffix: ""
-          # Ubuntu 26.04 for modern FFmpeg 7 / t64 Qt (Ubuntu Budgie, labwc, etc.).
+            layer_shell: "OFF"
+          # Ubuntu 26.04 for modern FFmpeg / t64 Qt (Ubuntu Budgie, labwc, etc.).
+          # Enable LayerShell when the distro package is available.
           - target: ubuntu2604
             deb_arch: amd64
             runner: ubuntu-24.04
             image: ubuntu:26.04
             compat_check: false
             asset_suffix: ".ubuntu26.04"
+            layer_shell: "ON"
           - target: ubuntu2604
             deb_arch: arm64
             runner: ubuntu-24.04-arm
             image: ubuntu:26.04
             compat_check: false
             asset_suffix: ".ubuntu26.04"
+            layer_shell: "ON"
 
     steps:
       - name: Resolve version
@@ -120,19 +126,46 @@ jobs:
             qt6-base-dev-tools \
             qt6-wayland-dev
 
+          # 1. Ubuntu 目标尝试启用 LayerShellQt（失败则保持关闭，不阻塞打包）
+          if [ "${{ matrix.layer_shell }}" = "ON" ]; then
+            apt-get install -y --no-install-recommends \
+              liblayershellqtinterface6-dev \
+              || apt-get install -y --no-install-recommends layer-shell-qt-dev \
+              || true
+          fi
+
+          # 2. 可选 provider 插件依赖：有则编入，无则跳过
+          apt-get install -y --no-install-recommends libprotobuf-dev || true
+          apt-get install -y --no-install-recommends libonnxruntime-dev || true
+          apt-get install -y --no-install-recommends libzxing-dev \
+            || apt-get install -y --no-install-recommends libzxingcore-dev \
+            || true
+
       - name: Checkout source
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.version.outputs.checkout_ref }}
 
       - name: Configure
+        shell: bash
         run: |
+          set -euo pipefail
+          LAYER_SHELL="${{ matrix.layer_shell }}"
+          # LayerShell 包不存在时回退 OFF，避免 configure 失败
+          if [ "$LAYER_SHELL" = "ON" ]; then
+            if ! pkg-config --exists LayerShellQt 2>/dev/null \
+              && ! ls /usr/lib/*/cmake/LayerShellQt/LayerShellQtConfig.cmake >/dev/null 2>&1 \
+              && ! ls /usr/lib/cmake/LayerShellQt/LayerShellQtConfig.cmake >/dev/null 2>&1; then
+              echo "LayerShellQt development files not found; disabling layer-shell plugin" >&2
+              LAYER_SHELL=OFF
+            fi
+          fi
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
             -DCMAKE_INSTALL_LIBDIR=lib \
             -DMARK_SHOT_REQUIRE_FFMPEG=ON \
-            -DMARK_SHOT_WITH_LAYER_SHELL=OFF
+            -DMARK_SHOT_WITH_LAYER_SHELL="$LAYER_SHELL"
 
       - name: Build
         run: cmake --build build --parallel

@@ -23,6 +23,7 @@ qreal ShotWindow::currentToolWidth() const
     case Tool::Arrow:
     case Tool::Rectangle:
     case Tool::Ellipse:
+    case Tool::Marker:
     case Tool::Magnifier:
     case Tool::Laser:
         return m_strokeWidth;
@@ -46,6 +47,7 @@ qreal ShotWindow::currentToolPreviewSize() const
     case Tool::Arrow:
     case Tool::Rectangle:
     case Tool::Ellipse:
+    case Tool::Marker:
     case Tool::Magnifier:
         return std::max<qreal>(1.5, currentToolWidth() * scale);
     case Tool::Highlighter:
@@ -93,6 +95,7 @@ bool ShotWindow::setSelectedAnnotationWidth(int width, bool captureHistory)
         case Tool::Line:
         case Tool::Rectangle:
         case Tool::Ellipse:
+        case Tool::Marker:
         case Tool::Arrow:
         case Tool::Magnifier:
         case Tool::Laser:
@@ -122,6 +125,7 @@ bool ShotWindow::setSelectedAnnotationWidth(int width, bool captureHistory)
         case Tool::Line:
         case Tool::Rectangle:
         case Tool::Ellipse:
+        case Tool::Marker:
         case Tool::Arrow:
         case Tool::Magnifier:
         case Tool::Laser:
@@ -194,6 +198,7 @@ bool ShotWindow::setSelectedAnnotationWidth(int width, bool captureHistory)
         case Tool::Line:
         case Tool::Rectangle:
         case Tool::Ellipse:
+        case Tool::Marker:
         case Tool::Arrow:
         case Tool::Magnifier:
         case Tool::Laser:

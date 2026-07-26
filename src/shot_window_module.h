@@ -13,6 +13,7 @@
 #include "shell_command.h"
 #include "shortcut_config.h"
 #include "shot_window_line_constraint.h"
+#include "shot_window_marker_shapes.h"
 #include "ui/color_picker.h"
 #include "ui/i18n.h"
 #include "ui/icons.h"
@@ -25,6 +26,7 @@
 #include <QApplication>
 #include <QBoxLayout>
 #include <QComboBox>
+#include <QGridLayout>
 #include <QBrush>
 #include <QClipboard>
 #include <QContextMenuEvent>

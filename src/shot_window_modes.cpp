@@ -30,6 +30,7 @@ void ShotWindow::hideTransientPanels()
     if (m_colorPalette) {
         m_colorPalette->hide();
     }
+    hideShapeMarkerPopup();
     hideAnnotationPropertyPanels();
 }
 
@@ -234,6 +235,18 @@ QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcut
         connect(button, &QPushButton::clicked, this, [this] { setTool(Tool::Magnifier); });
     } else if (action == Action::ToolLaser) {
         connect(button, &QPushButton::clicked, this, [this] { setTool(Tool::Laser); });
+    } else if (action == Action::ToolMarker) {
+        connect(button, &QPushButton::clicked, this, [this] {
+            // 1. 主按钮点击选中形状标记工具
+            // 2. 再次点击已激活的按钮时展开形状面板
+            if (m_tool == Tool::Marker) {
+                toggleShapeMarkerPopup();
+            } else {
+                setTool(Tool::Marker);
+                hideShapeMarkerPopup();
+            }
+        });
+        m_shapeMarkerToolbarButton = button;
     } else if (action == Action::ToggleCaptureScope) {
         connect(button, &QPushButton::clicked, this, [this] { toggleCaptureScope(); });
     } else if (action == Action::ToggleToolbarLayout) {

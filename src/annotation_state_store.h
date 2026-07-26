@@ -28,6 +28,7 @@ struct AnnotationState {
     bool shapeFilled = false;
     qreal rectangleCornerRadius = 0.0;
     ShotWindow::RectangleStyle rectangleStyle = ShotWindow::RectangleStyle::Stroke;
+    ShotWindow::MarkerShape markerShape = ShotWindow::MarkerShape::Triangle;
 
     // 放大镜相关
     qreal magnifierScale = 2.75;

@@ -1,5 +1,7 @@
 #include "ui/icons.h"
 
+#include "shot_window_marker_shapes.h"
+
 #include "ui/theme.h"
 
 #include <QCoreApplication>
@@ -11,6 +13,7 @@
 #include <QPen>
 #include <QPixmap>
 #include <QPolygonF>
+#include <QtMath>
 #include <QStringLiteral>
 
 namespace markshot::ui {
@@ -83,6 +86,8 @@ QString actionName(ShotWindow::Action action)
         return QStringLiteral("Magnifier");
     case ShotWindow::Action::ToolLaser:
         return QStringLiteral("Laser");
+    case ShotWindow::Action::ToolMarker:
+        return QStringLiteral("Marker");
     case ShotWindow::Action::ToggleCaptureScope:
         return QStringLiteral("Scope");
     case ShotWindow::Action::ToggleToolbarLayout:
@@ -338,7 +343,16 @@ QIcon makeToolIcon(ShotWindow::Action action)
         p.setBrush(Qt::NoBrush);
         break;
     }
-    case ShotWindow::Action::ToggleCaptureScope: {
+        case ShotWindow::Action::ToolMarker: {
+        const QPainterPath path = markshot::marker::pathForShape(
+            ShotWindow::MarkerShape::Star, QRectF(6, 6, 20, 20));
+        p.setPen(Qt::NoPen);
+        p.setBrush(kInk);
+        p.drawPath(path);
+        p.setBrush(Qt::NoBrush);
+        break;
+    }
+case ShotWindow::Action::ToggleCaptureScope: {
         p.setPen(makePen(kInk, 1.7));
         p.drawRoundedRect(QRectF(6.5, 8.5, 19.0, 15.0), 2.4, 2.4);
         p.setPen(makePen(kInkSoft, 1.3));
@@ -756,6 +770,24 @@ QIcon makeFillIcon(bool filled)
 
     p.end();
     return QIcon(pixmap);
+}
+
+
+
+QIcon makeMarkerShapeIcon(ShotWindow::MarkerShape shape, QColor ink)
+{
+    if (!ink.isValid()) {
+        ink = QColor(229, 231, 235);
+    }
+    QPixmap pm(kIconSize, kIconSize);
+    pm.fill(Qt::transparent);
+    QPainter p(&pm);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    const QPainterPath path = markshot::marker::pathForShape(shape, QRectF(5, 5, 22, 22));
+    p.setPen(Qt::NoPen);
+    p.setBrush(ink);
+    p.drawPath(path);
+    return QIcon(pm);
 }
 
 }  // namespace markshot::ui

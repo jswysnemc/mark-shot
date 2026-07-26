@@ -33,6 +33,16 @@ bool failWith(QString *error, const QString &text)
 
 #ifdef HAVE_LIBAV_RECORDING
 /**
+ * 【录制】【音频编码】判断是否使用 FFmpeg 5.1+ 的 AVChannelLayout API。
+ * Ubuntu 22.04 arm64 CI 仍是 FFmpeg 4.4 / libavutil 56，只有 channel_layout。
+ */
+#if defined(LIBAVUTIL_VERSION_INT) && LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(57, 28, 100)
+#define MARK_SHOT_HAVE_AVCHANNEL_LAYOUT 1
+#else
+#define MARK_SHOT_HAVE_AVCHANNEL_LAYOUT 0
+#endif
+
+/**
  * 【录制】【音频编码】选择 AAC 编码器支持的采样格式。
  * @param codec 编码器。
  * @param codecContext 编码上下文。
@@ -131,7 +141,14 @@ bool LibavAudioEncoder::Private::open(AVFormatContext *formatContext,
     m_codecContext->sample_rate = m_sampleRate;
     m_codecContext->sample_fmt = preferredAudioSampleFormat(codec, m_codecContext);
     m_codecContext->time_base = AVRational{1, m_sampleRate};
+#if MARK_SHOT_HAVE_AVCHANNEL_LAYOUT
+    // FFmpeg 5.1+: 新通道布局 API
     av_channel_layout_from_mask(&m_codecContext->ch_layout, AV_CH_LAYOUT_STEREO);
+#else
+    // FFmpeg 4.x: 旧 channel_layout / channels 字段
+    m_codecContext->channel_layout = AV_CH_LAYOUT_STEREO;
+    m_codecContext->channels = 2;
+#endif
     if (m_formatContext->oformat->flags & AVFMT_GLOBALHEADER) {
         m_codecContext->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
     }
@@ -155,9 +172,14 @@ bool LibavAudioEncoder::Private::open(AVFormatContext *formatContext,
     if (!m_swrContext) {
         return failWith(error, QStringLiteral("Failed to allocate libav audio resampler"));
     }
+#if MARK_SHOT_HAVE_AVCHANNEL_LAYOUT
     AVChannelLayout inputLayout = AV_CHANNEL_LAYOUT_STEREO;
     av_opt_set_chlayout(m_swrContext, "in_chlayout", &inputLayout, 0);
     av_opt_set_chlayout(m_swrContext, "out_chlayout", &m_codecContext->ch_layout, 0);
+#else
+    av_opt_set_int(m_swrContext, "in_channel_layout", AV_CH_LAYOUT_STEREO, 0);
+    av_opt_set_int(m_swrContext, "out_channel_layout", m_codecContext->channel_layout, 0);
+#endif
     av_opt_set_int(m_swrContext, "in_sample_rate", m_sampleRate, 0);
     av_opt_set_int(m_swrContext, "out_sample_rate", m_codecContext->sample_rate, 0);
     av_opt_set_sample_fmt(m_swrContext, "in_sample_fmt", AV_SAMPLE_FMT_FLT, 0);
@@ -281,14 +303,24 @@ bool LibavAudioEncoder::Private::allocateReusableFrames(int frameSamples, QStrin
     m_inputFrame->format = AV_SAMPLE_FMT_FLT;
     m_inputFrame->sample_rate = m_sampleRate;
     m_inputFrame->nb_samples = frameSamples;
+#if MARK_SHOT_HAVE_AVCHANNEL_LAYOUT
     av_channel_layout_from_mask(&m_inputFrame->ch_layout, AV_CH_LAYOUT_STEREO);
+#else
+    m_inputFrame->channel_layout = AV_CH_LAYOUT_STEREO;
+    m_inputFrame->channels = 2;
+#endif
     int result = av_frame_get_buffer(m_inputFrame, 0);
 
     // 2. 【录制】【音频编码】输出帧使用 AAC 编码器实际支持的采样格式
     m_outputFrame->format = m_codecContext->sample_fmt;
     m_outputFrame->sample_rate = m_codecContext->sample_rate;
     m_outputFrame->nb_samples = frameSamples;
+#if MARK_SHOT_HAVE_AVCHANNEL_LAYOUT
     av_channel_layout_copy(&m_outputFrame->ch_layout, &m_codecContext->ch_layout);
+#else
+    m_outputFrame->channel_layout = m_codecContext->channel_layout;
+    m_outputFrame->channels = m_codecContext->channels;
+#endif
     if (result >= 0) {
         result = av_frame_get_buffer(m_outputFrame, 0);
     }

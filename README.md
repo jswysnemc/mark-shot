@@ -314,10 +314,14 @@ For other distributions (such as Debian, Ubuntu, or Fedora), download the compil
   ```
 
 The official `.deb` packages are built for two targets:
-- **Debian 12** (`mark-shot_<version>_amd64.deb`): Deepin / older Debian-derived systems. Avoids LayerShellQt and newer `t64` / Qt 6.9+ runtime deps.
-- **Ubuntu 26.04** (`mark-shot_<version>_amd64.ubuntu26.04.deb`): recent Ubuntu (FFmpeg 7 / `libavcodec61` and `t64` Qt packages). Use this on Ubuntu Budgie 26.04 and similar releases.
+- **Debian 12** (`mark-shot_<version>_amd64.deb`): Deepin / older Debian-derived systems. Avoids LayerShellQt and newer `t64` / Qt 6.9+ runtime deps so the package remains installable on the older baseline.
+- **Ubuntu 26.04** (`mark-shot_<version>_amd64.ubuntu26.04.deb`): recent Ubuntu (modern FFmpeg / `t64` Qt). Use this on Ubuntu Budgie 26.04 and similar releases. LayerShell is enabled when distro packages are available, and `Depends` includes shared libraries from the main binary plus installed plugins.
 
 A Debian 12 package will fail to install on Ubuntu 26.04 because it depends on FFmpeg 5 libraries (`libavcodec59`, …) that are no longer shipped.
+
+Plugin notes:
+- Packages include C++ provider plugins only when their build deps (onnxruntime, zxing-cpp, …) are present on the builder.
+- Standalone `mark-shot-plugin-*.so` release assets are tied to the builder ABI and should not be mixed across distros.
 
 ### Dependencies
 

@@ -1,5 +1,7 @@
 #include "shot_window_module.h"
 
+#include "shot_window_marker_shapes.h"
+
 namespace cfg = markshot::config;
 namespace shortcuts = markshot::shortcut;
 using namespace markshot::shot;
@@ -88,6 +90,10 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
         break;
     case Tool::Rectangle: {
         drawRectangle(painter, annotation, widgetCoordinates);
+        break;
+    }
+    case Tool::Marker: {
+        drawMarker(painter, annotation, widgetCoordinates);
         break;
     }
     case Tool::Ellipse:
@@ -232,20 +238,36 @@ void ShotWindow::drawRectangle(QPainter &painter, const Annotation &annotation, 
         painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
         painter.drawImage(destRect, region);
         painter.restore();
-        // 4. 描边可选保留;width 极小时省略以避免视觉干扰
-        if (penWidth >= 1.5) {
-            painter.setPen(QPen(annotation.color, penWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-            painter.setBrush(Qt::NoBrush);
-            if (radius > 0.0) {
-                painter.drawRoundedRect(rect, radius, radius);
-            } else {
-                painter.drawRect(rect);
-            }
-        }
+        // 4. 反色区域不再叠加外描边，避免出现红色边框干扰阅读
         break;
     }
     }
 
+    painter.restore();
+}
+
+void ShotWindow::drawMarker(QPainter &painter, const Annotation &annotation, bool widgetCoordinates) const
+{
+    // 1. 将图像矩形映射到绘制坐标系
+    // 2. 按 markerShape 生成路径并填充
+    const auto mapRect = [this, widgetCoordinates](const QRectF &rect) {
+        return widgetCoordinates ? imageRectToWidget(rect) : rect;
+    };
+    const QRectF rect = mapRect(annotation.rect.normalized());
+    if (rect.isEmpty()) {
+        return;
+    }
+
+    const QPainterPath path = markshot::marker::pathForShape(annotation.markerShape, rect);
+    if (path.isEmpty()) {
+        return;
+    }
+
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(annotation.color);
+    painter.drawPath(path);
     painter.restore();
 }
 

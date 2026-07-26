@@ -40,4 +40,7 @@ QIcon makePropertyIcon(PropertyIcon icon, QColor ink = QColor());
 // Fill toggle so the glyph itself communicates the state.
 QIcon makeFillIcon(bool filled);
 
+// 形状标记工具/弹层图标。
+QIcon makeMarkerShapeIcon(ShotWindow::MarkerShape shape, QColor ink = QColor());
+
 }  // namespace markshot::ui

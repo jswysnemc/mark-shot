@@ -155,6 +155,46 @@ void ShotWindow::setSelectedRectangleStyle(RectangleStyle style)
     persistAnnotationState();
 }
 
+void ShotWindow::setSelectedMarkerShape(MarkerShape shape)
+{
+    // 1. 选中已有形状标记时批量改形状
+    // 2. 无选中时更新工具默认形状，并刷新工具栏图标
+    const QVector<int> selectedIds = selectedAnnotationIds();
+    if (!selectedIds.isEmpty()) {
+        bool changed = false;
+        for (int id : selectedIds) {
+            const Annotation *annotation = annotationById(id);
+            if (annotation && annotation->tool == Tool::Marker && annotation->markerShape != shape) {
+                changed = true;
+                break;
+            }
+        }
+        if (!changed) {
+            m_markerShape = shape;
+            refreshShapeMarkerToolbarButton();
+            return;
+        }
+        pushHistorySnapshot();
+        for (int id : selectedIds) {
+            if (Annotation *annotation = annotationById(id);
+                annotation && annotation->tool == Tool::Marker) {
+                annotation->markerShape = shape;
+            }
+        }
+    } else {
+        m_markerShape = shape;
+    }
+
+    if (m_draft.has_value() && m_draft->tool == Tool::Marker) {
+        m_draft->markerShape = shape;
+    }
+    m_markerShape = shape;
+    refreshShapeMarkerToolbarButton();
+    updateAnnotationPropertyPanel();
+    update();
+    persistAnnotationState();
+}
+
 void ShotWindow::setSelectedHighlighterStyle(HighlighterStyle style)
 {
     const QVector<int> selectedIds = selectedAnnotationIds();

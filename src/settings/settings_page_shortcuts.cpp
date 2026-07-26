@@ -13,7 +13,7 @@ namespace {
 
 /// @brief 返回设置页支持编辑的工具列表。
 /// @return 标注工具数组。
-std::array<ShotWindow::Tool, static_cast<int>(ShotWindow::Tool::Laser) + 1> shortcutTools()
+std::array<ShotWindow::Tool, static_cast<int>(ShotWindow::Tool::Marker) + 1> shortcutTools()
 {
     return {ShotWindow::Tool::Move,
             ShotWindow::Tool::Select,
@@ -27,7 +27,8 @@ std::array<ShotWindow::Tool, static_cast<int>(ShotWindow::Tool::Laser) + 1> shor
             ShotWindow::Tool::Number,
             ShotWindow::Tool::Mosaic,
             ShotWindow::Tool::Magnifier,
-            ShotWindow::Tool::Laser};
+            ShotWindow::Tool::Laser,
+             ShotWindow::Tool::Marker};
 }
 
 /// @brief 返回设置页支持编辑的动作列表。
@@ -70,6 +71,7 @@ QString toolLabel(ShotWindow::Tool tool)
     case ShotWindow::Tool::Mosaic: return MS_TR("Mosaic");
     case ShotWindow::Tool::Magnifier: return MS_TR("Magnifier");
     case ShotWindow::Tool::Laser: return MS_TR("Laser");
+    case ShotWindow::Tool::Marker: return MS_TR("Marker");
     }
     return MS_TR("Pen");
 }

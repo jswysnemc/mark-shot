@@ -147,3 +147,70 @@ void ShotWindow::updateToolbarState()
         button->update();
     }
 }
+
+
+void ShotWindow::hideShapeMarkerPopup()
+{
+    if (m_shapeMarkerPopup) {
+        m_shapeMarkerPopup->hide();
+    }
+}
+
+void ShotWindow::refreshShapeMarkerToolbarButton()
+{
+    // 1. 工具栏主按钮图标跟随当前默认形状
+    if (!m_shapeMarkerToolbarButton) {
+        return;
+    }
+    m_shapeMarkerToolbarButton->setIcon(markshot::ui::makeMarkerShapeIcon(m_markerShape));
+    m_shapeMarkerToolbarButton->setToolTip(
+        QStringLiteral("%1 (%2)").arg(
+            markshot::i18n::translate(markshot::marker::shapeLabel(m_markerShape)),
+            shortcutText(Tool::Marker)));
+
+    // 2. 同步弹层中按钮选中态
+    if (!m_shapeMarkerPopup) {
+        return;
+    }
+    const auto buttons = m_shapeMarkerPopup->findChildren<QPushButton *>();
+    for (QPushButton *button : buttons) {
+        const bool selected = button->property("markerShape").toInt() == static_cast<int>(m_markerShape);
+        const QSignalBlocker blocker(button);
+        button->setChecked(selected);
+        button->setProperty("role", selected ? QStringLiteral("primary") : QVariant());
+        button->style()->unpolish(button);
+        button->style()->polish(button);
+    }
+}
+
+void ShotWindow::updateShapeMarkerPopupGeometry()
+{
+    if (!m_shapeMarkerPopup || !m_shapeMarkerPopup->isVisible() || !m_shapeMarkerToolbarButton) {
+        return;
+    }
+    m_shapeMarkerPopup->adjustSize();
+    const QSize popupSize = m_shapeMarkerPopup->sizeHint().expandedTo(m_shapeMarkerPopup->size());
+    const QRect buttonRect = m_shapeMarkerToolbarButton->rect();
+    const QPoint globalTopLeft = m_shapeMarkerToolbarButton->mapTo(this, buttonRect.bottomLeft() + QPoint(0, 6));
+    int x = globalTopLeft.x();
+    int y = globalTopLeft.y();
+    x = std::clamp(x, 8, std::max(8, width() - popupSize.width() - 8));
+    y = std::clamp(y, 8, std::max(8, height() - popupSize.height() - 8));
+    m_shapeMarkerPopup->setGeometry(x, y, popupSize.width(), popupSize.height());
+    m_shapeMarkerPopup->raise();
+}
+
+void ShotWindow::toggleShapeMarkerPopup()
+{
+    if (!m_shapeMarkerPopup) {
+        return;
+    }
+    if (m_shapeMarkerPopup->isVisible()) {
+        hideShapeMarkerPopup();
+        return;
+    }
+    hideTransientPanels();
+    refreshShapeMarkerToolbarButton();
+    m_shapeMarkerPopup->show();
+    updateShapeMarkerPopupGeometry();
+}

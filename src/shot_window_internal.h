@@ -156,7 +156,7 @@ bool ocrOutputReportsMissingBackend(const QByteArray &stdoutData,
                                     const QString &configuredBackend);
 bool ocrResultPanelEnabled();
 bool annotationAutoSelectAfterDrawEnabled();
-std::array<bool, static_cast<int>(ShotWindow::Tool::Laser) + 1> annotationAutoSelectAfterDrawTools();
+std::array<bool, static_cast<int>(ShotWindow::Tool::Marker) + 1> annotationAutoSelectAfterDrawTools();
 markshot::scroll::ScrollSessionUiConfig scrollSessionUiConfig();
 /**
  * 【OCR】【结果窗口】创建 OCR 结果浮窗。

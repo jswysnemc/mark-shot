@@ -37,6 +37,7 @@ void ShotWindow::transformAnnotation(Annotation &annotation, QRectF oldBounds, Q
         return;
     case Tool::Rectangle:
     case Tool::Ellipse:
+    case Tool::Marker:
     case Tool::Mosaic:
         annotation.rect = QRectF(mapPoint(annotation.rect.normalized().topLeft()),
                                  mapPoint(annotation.rect.normalized().bottomRight())).normalized();
@@ -520,6 +521,7 @@ QString ShotWindow::currentToolName() const
     case Tool::Rectangle:
         return QStringLiteral("Rect");
     case Tool::Ellipse:
+    case Tool::Marker:
         return QStringLiteral("Ellipse");
     case Tool::Arrow:
         return QStringLiteral("Arrow");

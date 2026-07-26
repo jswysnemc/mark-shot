@@ -144,6 +144,7 @@ bool ShotWindow::mouseOverUiWidget() const
             || name == QLatin1String("openWithPanel")
             || name == QLatin1String("extensionPanel")
             || name == QLatin1String("colorPalette")
+            || name == QLatin1String("shapeMarkerPopup")
             || qobject_cast<const QComboBox *>(w)) {
             return true;
         }
@@ -267,6 +268,7 @@ bool ShotWindow::annotationSupportsRotation(const Annotation &annotation) const
     case Tool::Arrow:
     case Tool::Rectangle:
     case Tool::Ellipse:
+    case Tool::Marker:
     case Tool::Mosaic:
     case Tool::Text:
     case Tool::Number:
@@ -469,6 +471,7 @@ QRectF ShotWindow::annotationUnrotatedBounds(const Annotation &annotation) const
         break;
     case Tool::Rectangle:
     case Tool::Ellipse:
+    case Tool::Marker:
     case Tool::Mosaic:
         bounds = annotation.rect.normalized();
         break;

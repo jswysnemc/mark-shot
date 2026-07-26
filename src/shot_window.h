@@ -72,6 +72,7 @@ public:
         ToolMosaic,
         ToolMagnifier,
         ToolLaser,
+        ToolMarker,
         ToggleCaptureScope,
         ToggleToolbarLayout,
         Clear,
@@ -105,6 +106,7 @@ public:
         Mosaic,
         Magnifier,
         Laser,
+        Marker,
     };
 
     // Desktop file entry used by the Open With panel.
@@ -217,11 +219,34 @@ public:
     };
 
     // 矩形工具的视觉风格。Stroke 即默认描边/填充样式;Highlight 类似荧光笔,
-    // 在矩形区域用半透明色 Multiply 混合;Invert 对矩形覆盖区域做像素反色。
+    // 在矩形区域用半透明色 Multiply 混合;Invert 对矩形覆盖区域做像素反色（无外描边）。
     enum class RectangleStyle {
         Stroke,
         Highlight,
         Invert,
+    };
+
+    // 形状标记工具使用的图章种类。几何统一以 Annotation::rect 存储，绘制时按形状填充路径。
+    // 枚举序号一经发布不可重排，新增形状只能追加到末尾。
+    enum class MarkerShape {
+        Triangle = 0,
+        Star,
+        Check,
+        Cross,
+        Diamond,
+        Heart,
+        Hexagon,
+        Circle,
+        Square,
+        Pentagon,
+        Plus,
+        ArrowUp,
+        Spade,
+        Club,
+        Lightning,
+        Ban,
+        Octagon,
+        Crescent,
     };
 
     // Number badge display styles. Existing annotations keep their own style so
@@ -295,6 +320,7 @@ private:
         NumberStyle numberStyle = NumberStyle::Arabic;
         QString fontFamily = markshot::theme::textFontFamily();
         RectangleStyle rectangleStyle = RectangleStyle::Stroke;
+        MarkerShape markerShape = MarkerShape::Triangle;
     };
 
     // Undo/redo captures only the annotation graph and id counters. The frozen
@@ -434,6 +460,7 @@ private:
                    ArrowStyle style) const;
     void drawMosaic(QPainter &painter, QRectF imageRect, qreal blockSize, bool widgetCoordinates) const;
     void drawRectangle(QPainter &painter, const Annotation &annotation, bool widgetCoordinates) const;
+    void drawMarker(QPainter &painter, const Annotation &annotation, bool widgetCoordinates) const;
     void drawMagnifier(QPainter &painter, const Annotation &annotation, bool widgetCoordinates) const;
     void drawNumber(QPainter &painter,
                     QPointF tipPoint,
@@ -489,6 +516,10 @@ private:
     void updateAnnotationPropertyPanelGeometry();
     void updatePropertyColorDialogGeometry();
     void updatePropertyFontPanelGeometry();
+    void updateShapeMarkerPopupGeometry();
+    void toggleShapeMarkerPopup();
+    void hideShapeMarkerPopup();
+    void refreshShapeMarkerToolbarButton();
     bool setSelectedAnnotationWidth(int width);
     bool setSelectedAnnotationWidth(int width, bool captureHistory);
     void setSelectedAnnotationOpacity(int opacity);
@@ -496,6 +527,7 @@ private:
     void setSelectedAnnotationCornerRadius(int radius);
     void setSelectedAnnotationArrowStyle(ArrowStyle style);
     void setSelectedRectangleStyle(RectangleStyle style);
+    void setSelectedMarkerShape(MarkerShape shape);
     void setSelectedHighlighterStyle(HighlighterStyle style);
     void setSelectedNumberStyle(NumberStyle style);
     void resetNumberSequence();
@@ -614,7 +646,7 @@ private:
     Tool m_defaultTool = Tool::Pen;
     Tool m_fullscreenDefaultTool = Tool::Pen;
     std::array<QKeySequence, static_cast<int>(Action::Cancel) + 1> m_actionShortcuts;
-    std::array<QKeySequence, static_cast<int>(Tool::Laser) + 1> m_toolShortcuts;
+    std::array<QKeySequence, static_cast<int>(Tool::Marker) + 1> m_toolShortcuts;
     QKeySequence m_startupColorPickerShortcut;
     QKeySequence m_startupRulerShortcut;
     QKeySequence m_startupCodeScannerShortcut;
@@ -655,9 +687,10 @@ private:
     qreal m_magnifierScale = 2.75;
     MagnifierShape m_magnifierShape = MagnifierShape::Circle;
     bool m_shapeFilled = false;
-    std::array<bool, static_cast<int>(Tool::Laser) + 1> m_autoSelectAfterDrawByTool = {};
+    std::array<bool, static_cast<int>(Tool::Marker) + 1> m_autoSelectAfterDrawByTool = {};
     qreal m_rectangleCornerRadius = 0.0;
     RectangleStyle m_rectangleStyle = RectangleStyle::Stroke;
+    MarkerShape m_markerShape = MarkerShape::Triangle;
     ArrowStyle m_arrowStyle = ArrowStyle::Fletched;
     HighlighterStyle m_highlighterStyle = HighlighterStyle::StraightLine;
     NumberStyle m_numberStyle = NumberStyle::Arabic;
@@ -717,6 +750,8 @@ private:
     QWidget *m_colorPalette = nullptr;
     QWidget *m_colorPalettePreview = nullptr;
     QPoint m_colorPaletteAnchor;
+    QWidget *m_shapeMarkerPopup = nullptr;
+    QPushButton *m_shapeMarkerToolbarButton = nullptr;
     QPoint m_toolbarDragStart;
     QRect m_toolbarBeforeDrag;
     std::optional<QRectF> m_selectionBeforeFullscreenAnnotation;

@@ -35,6 +35,8 @@ void ShotWindow::loadAnnotationStateFromDisk()
     m_shapeFilled = state.shapeFilled;
     m_rectangleCornerRadius = state.rectangleCornerRadius;
     m_rectangleStyle = state.rectangleStyle;
+    m_markerShape = state.markerShape;
+    refreshShapeMarkerToolbarButton();
 
     // 5. 放大镜相关
     m_magnifierScale = state.magnifierScale;
@@ -100,6 +102,7 @@ void ShotWindow::flushAnnotationStateNow()
     state.shapeFilled = m_shapeFilled;
     state.rectangleCornerRadius = m_rectangleCornerRadius;
     state.rectangleStyle = m_rectangleStyle;
+    state.markerShape = m_markerShape;
     state.magnifierScale = m_magnifierScale;
     state.magnifierShape = m_magnifierShape;
     state.arrowStyle = m_arrowStyle;

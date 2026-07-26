@@ -47,6 +47,7 @@ ToolShortcuts defaultToolShortcuts()
     shortcuts[toolIndex(ShotWindow::Tool::Mosaic)] = QKeySequence(Qt::Key_M);
     shortcuts[toolIndex(ShotWindow::Tool::Magnifier)] = QKeySequence(Qt::Key_Z);
     shortcuts[toolIndex(ShotWindow::Tool::Laser)] = QKeySequence(Qt::Key_G);
+    shortcuts[toolIndex(ShotWindow::Tool::Marker)] = QKeySequence(Qt::Key_K);
     return shortcuts;
 }
 
@@ -267,6 +268,10 @@ std::optional<ShotWindow::Tool> toolFromConfigName(QString name)
     }
     if (key == QStringLiteral("laser")) {
         return ShotWindow::Tool::Laser;
+    }
+    if (key == QStringLiteral("marker") || key == QStringLiteral("shape")
+        || key == QStringLiteral("stamp") || key == QStringLiteral("shapemarker")) {
+        return ShotWindow::Tool::Marker;
     }
     return std::nullopt;
 }
