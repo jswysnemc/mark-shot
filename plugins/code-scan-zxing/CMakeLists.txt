@@ -30,6 +30,7 @@ target_include_directories(mark-shot-code-scan-zxing PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/plugin-sdk
 )
+target_compile_definitions(mark-shot-code-scan-zxing PRIVATE ${MARK_SHOT_ZXING_COMPILE_DEFINITIONS})
 target_link_libraries(mark-shot-code-scan-zxing
     PRIVATE
         Qt6::Core

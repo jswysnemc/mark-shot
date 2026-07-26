@@ -258,11 +258,11 @@ target_link_libraries(mark-shot
 
 if(ZXing_FOUND)
     target_link_libraries(mark-shot PRIVATE ZXing::ZXing)
-    target_compile_definitions(mark-shot PRIVATE HAVE_ZXING_CPP)
+    target_compile_definitions(mark-shot PRIVATE HAVE_ZXING_CPP ${MARK_SHOT_ZXING_COMPILE_DEFINITIONS})
     message(STATUS "mark-shot: builtin zxing-cpp code scanner enabled (CMake package)")
 elseif(ZXingCpp_FOUND)
     target_link_libraries(mark-shot PRIVATE PkgConfig::ZXingCpp)
-    target_compile_definitions(mark-shot PRIVATE HAVE_ZXING_CPP)
+    target_compile_definitions(mark-shot PRIVATE HAVE_ZXING_CPP ${MARK_SHOT_ZXING_COMPILE_DEFINITIONS})
     message(STATUS "mark-shot: builtin zxing-cpp code scanner enabled (pkg-config)")
 else()
     message(STATUS "mark-shot: builtin zxing-cpp code scanner disabled")

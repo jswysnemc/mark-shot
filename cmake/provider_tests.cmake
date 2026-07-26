@@ -139,6 +139,7 @@ if(TARGET mark-shot-code-scan-zxing AND MARK_SHOT_ZXING_WRITER_SUPPORTED)
         plugins/code-scan-zxing
         plugin-sdk
     )
+    target_compile_definitions(mark-shot-code-scan-zxing-plugin-test PRIVATE ${MARK_SHOT_ZXING_COMPILE_DEFINITIONS})
     target_link_libraries(mark-shot-code-scan-zxing-plugin-test
         PRIVATE
             Qt6::Core

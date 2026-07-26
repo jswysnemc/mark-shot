@@ -2,10 +2,7 @@
 
 #include <QImage>
 
-#include <ZXing/Barcode.h>
-#include <ZXing/BarcodeFormat.h>
-#include <ZXing/ImageView.h>
-#include <ZXing/ReadBarcode.h>
+#include "markshot/zxing_compat.h"
 
 namespace markshot::code_scan_zxing {
 
@@ -51,10 +48,7 @@ bool ZxingCodeScanPlugin::scan(const QImage &image,
                           gray.height(),
                           ZXing::ImageFormat::Lum,
                           static_cast<int>(gray.bytesPerLine()));
-    ZXing::ReaderOptions options;
-    options.setTryHarder(true);
-    options.setTryRotate(true);
-    const auto barcodes = ZXing::ReadBarcodes(view, options);
+    const auto barcodes = ZXing::ReadBarcodes(view, markshot::zxing::screenReaderOptions());
 
     for (const auto &barcode : barcodes) {
         markshot::plugin::CodeScanResult result;
