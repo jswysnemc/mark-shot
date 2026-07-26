@@ -29,6 +29,7 @@ enum class NavIcon {
     Scroll,
     Storage,
     Advanced,
+    About,
 };
 
 /// @brief 构造圆角连接的标准画笔。
@@ -174,6 +175,21 @@ void drawTerminal(QPainter &p, const QColor &ink)
     p.drawLine(QPointF(10, 12), QPointF(14, 12));
 }
 
+/// @brief 绘制信息圆图标（About）。
+void drawAbout(QPainter &p, const QColor &ink)
+{
+    p.setPen(navPen(ink, 1.6));
+    p.setBrush(Qt::NoBrush);
+    p.drawEllipse(QPointF(9, 9), 6.2, 6.2);
+    // 1. 顶部圆点
+    p.setPen(Qt::NoPen);
+    p.setBrush(ink);
+    p.drawEllipse(QPointF(9, 5.8), 1.1, 1.1);
+    // 2. 竖向信息条
+    p.setPen(navPen(ink, 1.8));
+    p.drawLine(QPointF(9, 8.2), QPointF(9, 13.0));
+}
+
 /// @brief 按图标种类分派绘制。
 void drawNavGlyph(QPainter &p, NavIcon icon, const QColor &ink)
 {
@@ -207,6 +223,9 @@ void drawNavGlyph(QPainter &p, NavIcon icon, const QColor &ink)
         break;
     case NavIcon::Advanced:
         drawTerminal(p, ink);
+        break;
+    case NavIcon::About:
+        drawAbout(p, ink);
         break;
     }
 }
@@ -243,8 +262,8 @@ SettingsNavigation::SettingsNavigation(QWidget *parent)
     setObjectName(QStringLiteral("settingsSidebar"));
     setFixedWidth(tokens::kSidebarWidth);
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(18, 20, 18, 18);
-    layout->setSpacing(14);
+    layout->setContentsMargins(16, 18, 16, 16);
+    layout->setSpacing(12);
 
     buildHeader();
     buildList();
@@ -267,7 +286,10 @@ void SettingsNavigation::buildList()
     m_list->setObjectName(QStringLiteral("settingsNavigation"));
     m_list->setFrameShape(QFrame::NoFrame);
     m_list->setFocusPolicy(Qt::NoFocus);
+    m_list->setSpacing(tokens::kNavItemGap);
+    m_list->setUniformItemSizes(false);
     m_list->setIconSize(QSize(tokens::kNavIconSize, tokens::kNavIconSize));
+    m_list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
     // 组1：常用
     addCategory(MS_TR("General"), makeNavIcon(NavIcon::General));
@@ -282,8 +304,9 @@ void SettingsNavigation::buildList()
     addCategory(MS_TR("Scroll Capture"), makeNavIcon(NavIcon::Scroll));
     addCategory(MS_TR("Storage"), makeNavIcon(NavIcon::Storage));
     addSeparator();
-    // 组3：其他
+    // 组3：系统
     addCategory(MS_TR("Advanced"), makeNavIcon(NavIcon::Advanced));
+    addCategory(MS_TR("About"), makeNavIcon(NavIcon::About));
 
     static_cast<QVBoxLayout *>(layout())->addWidget(m_list, 1);
 
@@ -301,7 +324,8 @@ void SettingsNavigation::addCategory(const QString &text, const QIcon &icon)
     auto *item = new QListWidgetItem(m_list);
     item->setText(text);
     item->setIcon(icon);
-    item->setSizeHint(QSize(0, 38));
+    // 固定高度 + 水平 padding 由样式控制，保证图标与文字垂直居中对齐
+    item->setSizeHint(QSize(0, tokens::kNavItemHeight));
     m_logicalRows.append(m_list->row(item));
 }
 
@@ -310,7 +334,7 @@ void SettingsNavigation::addSeparator()
     auto *item = new QListWidgetItem(m_list);
     item->setText(QString());
     item->setFlags(Qt::NoItemFlags);
-    item->setSizeHint(QSize(0, 10));
+    item->setSizeHint(QSize(0, tokens::kNavSeparatorHeight));
 }
 
 void SettingsNavigation::setCurrentLogicalRow(int index)

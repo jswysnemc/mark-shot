@@ -43,6 +43,9 @@ inline constexpr int kRadiusControl = 8;      // 输入控件圆角
 inline constexpr int kRadiusButton = 9;       // 按钮圆角
 inline constexpr int kSidebarWidth = 220;     // 侧栏固定宽度
 inline constexpr int kNavIconSize = 18;       // 导航图标边长
+inline constexpr int kNavItemHeight = 36;     // 导航项固定高度，图标与文字垂直居中
+inline constexpr int kNavItemGap = 2;         // 导航项之间的垂直间距
+inline constexpr int kNavSeparatorHeight = 12; // 分组分隔占位高度
 
 /// @brief 生成设置界面完整样式表（深色玻璃 + teal）。
 /// @return Qt 样式表文本，按 objectName 作用域隔离。

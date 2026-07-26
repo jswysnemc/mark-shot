@@ -318,6 +318,9 @@ if(MARK_SHOT_WITH_LAYER_SHELL AND MARK_SHOT_LINUX AND LayerShellQt_FOUND)
     set_target_properties(mark-shot-layer-shell PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     )
+    # 主程序运行时通过 QPluginLoader 动态加载该插件；这里建立构建依赖，
+    # 避免只编译 mark-shot 目标时漏掉 libmark-shot-layer-shell.so。
+    add_dependencies(mark-shot mark-shot-layer-shell)
     message(STATUS "mark-shot: LayerShellQt found, optional layer-shell plugin enabled")
 elseif(MARK_SHOT_WITH_LAYER_SHELL AND MARK_SHOT_LINUX)
     message(STATUS "mark-shot: LayerShellQt not found, building without optional layer-shell plugin")

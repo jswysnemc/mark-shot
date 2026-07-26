@@ -3,6 +3,7 @@
 #include "app_config_store.h"
 #include "settings/settings_design_tokens.h"
 #include "settings/settings_navigation.h"
+#include "settings/settings_page_about.h"
 #include "settings/settings_page_advanced.h"
 #include "settings/settings_page_annotation.h"
 #include "settings/settings_page_capture.h"
@@ -84,7 +85,7 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     m_navigation = new SettingsNavigation(body);
     bodyLayout->addWidget(m_navigation);
 
-    // 内容栈：10 个可滚动设置页
+    // 内容栈：11 个可滚动设置页
     m_stack = new QStackedWidget(body);
     m_generalPage = new SettingsPageGeneral(m_stack);
     m_capturePage = new SettingsPageCapture(m_stack);
@@ -96,6 +97,7 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     m_scrollPage = new SettingsPageScroll(m_stack);
     m_storagePage = new SettingsPageStorage(m_stack);
     m_advancedPage = new SettingsPageAdvanced(m_stack);
+    m_aboutPage = new SettingsPageAbout(m_stack);
     addScrollablePage(m_stack, m_generalPage);
     addScrollablePage(m_stack, m_capturePage);
     addScrollablePage(m_stack, m_shortcutsPage);
@@ -106,6 +108,7 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     addScrollablePage(m_stack, m_scrollPage);
     addScrollablePage(m_stack, m_storagePage);
     addScrollablePage(m_stack, m_advancedPage);
+    addScrollablePage(m_stack, m_aboutPage);
     bodyLayout->addWidget(m_stack, 1);
     rootLayout->addWidget(body, 1);
 

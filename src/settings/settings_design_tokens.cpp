@@ -14,7 +14,7 @@ QString lightSettingsStyleSheet()
     return QStringLiteral(
         // 窗口与分区背景
         "QDialog#settingsDialog { background: #F8FAFC; color: #0F172A; }"
-        "QFrame#settingsSidebar { background: #E2E8F0; border: 0; }"
+        "QWidget#settingsSidebar, QFrame#settingsSidebar { background: #E2E8F0; border: 0; }"
         "QFrame#settingsFooter { background: #E2E8F0; border-top: 1px solid #CBD5E1; }"
 
         // 侧栏标题区
@@ -24,18 +24,18 @@ QString lightSettingsStyleSheet()
         // 状态标签
         "QLabel#settingsStatus { color: #64748B; }"
 
-        // 侧栏导航列表
+        // 侧栏导航列表：固定高度由 sizeHint 控制，避免 padding/margin 叠加导致图标与文字不齐
         "QListWidget#settingsNavigation {"
         " background: transparent;"
         " border: 0;"
-        " padding: 6px;"
+        " padding: 0;"
         " outline: 0;"
         "}"
         "QListWidget#settingsNavigation::item {"
         " color: #475569;"
         " border-radius: 10px;"
-        " padding: 9px 12px;"
-        " margin: 2px 0;"
+        " padding: 0 10px;"
+        " margin: 0;"
         "}"
         "QListWidget#settingsNavigation::item:hover {"
         " background: #FFFFFF;"
@@ -45,12 +45,9 @@ QString lightSettingsStyleSheet()
         " background: rgba(13, 148, 136, 0.14);"
         " color: #0F766E;"
         "}"
-        "QListWidget#settingsNavigation::item:separator {"
+        "QListWidget#settingsNavigation::item:disabled {"
         " background: transparent;"
-        " border: 0;"
-        " min-height: 1px;"
-        " max-height: 1px;"
-        " margin: 6px 10px;"
+        " color: transparent;"
         "}"
 
         // 卡片
@@ -195,7 +192,7 @@ QString settingsStyleSheet()
     return QStringLiteral(
         // 窗口与分区背景
         "QDialog#settingsDialog { background: #0F172A; color: #F1F5F9; }"
-        "QFrame#settingsSidebar { background: #0B1220; border: 0; }"
+        "QWidget#settingsSidebar, QFrame#settingsSidebar { background: #0B1220; border: 0; }"
         "QFrame#settingsFooter { background: #0B1220; border-top: 1px solid #1E293B; }"
 
         // 侧栏标题区
@@ -205,18 +202,18 @@ QString settingsStyleSheet()
         // 状态标签
         "QLabel#settingsStatus { color: #64748B; }"
 
-        // 侧栏导航列表
+        // 侧栏导航列表：固定高度由 sizeHint 控制，避免 padding/margin 叠加导致图标与文字不齐
         "QListWidget#settingsNavigation {"
         " background: transparent;"
         " border: 0;"
-        " padding: 6px;"
+        " padding: 0;"
         " outline: 0;"
         "}"
         "QListWidget#settingsNavigation::item {"
         " color: #94A3B8;"
         " border-radius: 10px;"
-        " padding: 9px 12px;"
-        " margin: 2px 0;"
+        " padding: 0 10px;"
+        " margin: 0;"
         "}"
         "QListWidget#settingsNavigation::item:hover {"
         " background: #1E293B;"
@@ -226,13 +223,9 @@ QString settingsStyleSheet()
         " background: rgba(94, 234, 212, 0.14);"
         " color: #5EEAD4;"
         "}"
-        // 分组分隔条：不可选的 separator 项
-        "QListWidget#settingsNavigation::item:separator {"
+        "QListWidget#settingsNavigation::item:disabled {"
         " background: transparent;"
-        " border: 0;"
-        " min-height: 1px;"
-        " max-height: 1px;"
-        " margin: 6px 10px;"
+        " color: transparent;"
         "}"
 
         // 卡片

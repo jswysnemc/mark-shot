@@ -11,6 +11,7 @@ class QWidget;
 namespace markshot::settings {
 
 class SettingsNavigation;
+class SettingsPageAbout;
 class SettingsPageAnnotation;
 class SettingsPageAdvanced;
 class SettingsPageCapture;
@@ -58,6 +59,7 @@ private:
     SettingsPageScroll *m_scrollPage = nullptr;
     SettingsPageStorage *m_storagePage = nullptr;
     SettingsPageAdvanced *m_advancedPage = nullptr;
+    SettingsPageAbout *m_aboutPage = nullptr;
 };
 
 /// @brief 显示全局设置窗口，重复调用会复用现有窗口。

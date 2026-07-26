@@ -107,10 +107,12 @@ public:
         layerWindow->setLayer(LayerShellQt::Window::LayerOverlay);
         layerWindow->setAnchors(anchors);
         layerWindow->setMargins({});
-        // exclusive_zone=0: cover the full output, including other surfaces'
-        // exclusive zones (DMS bar/dock, waybar, ...). -1 would ask the
-        // compositor to avoid those zones and leave unfrozen gaps.
-        layerWindow->setExclusiveZone(0);
+        // exclusive_zone=-1 (DontCare): use the full output and ignore other
+        // surfaces' exclusive zones (waybar/DMS bar/dock). 0 still keeps the
+        // surface out of those zones, so niri would configure a shorter
+        // height (e.g. 1600-24) and leave the live bar visible above the
+        // frozen frame, which looks like a duplicated waybar.
+        layerWindow->setExclusiveZone(-1);
         layerWindow->setKeyboardInteractivity(keyboardInteractivity(config.keyboardInteractivity));
         layerWindow->setActivateOnShow(config.activateOnShow);
         layerWindow->setCloseOnDismissed(config.closeOnDismissed);
@@ -215,9 +217,8 @@ private:
             LayerShellQt::Window::Anchors anchors = LayerShellQt::Window::AnchorTop;
             anchors |= LayerShellQt::Window::AnchorLeft;
             layerWindow->setAnchors(anchors);
-            // See configureOverlay: cover exclusive zones so pinned surfaces are
-            // not pushed into the remaining work area.
-            layerWindow->setExclusiveZone(0);
+            // See configureOverlay: DontCare (-1) ignores other exclusive zones.
+            layerWindow->setExclusiveZone(-1);
             layerWindow->setKeyboardInteractivity(keyboardInteractivity(config.keyboardInteractivity));
             layerWindow->setActivateOnShow(config.activateOnShow);
             layerWindow->setCloseOnDismissed(config.closeOnDismissed);
