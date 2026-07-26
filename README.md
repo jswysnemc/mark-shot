@@ -201,7 +201,7 @@ mark-shot --tray
 Tray mode registers these global hotkeys by default:
 - `Ctrl+Alt+S`: start region capture.
 
-The tray menu also provides Capture, Fullscreen Capture, Start Recording, live recording status, Stop Recording, Settings, and Quit actions.
+The tray menu also provides Capture, Fullscreen Capture, Start Recording, live recording status, Pause Recording, Stop Recording, Settings, and Quit actions.
 
 **niri** (`~/.config/niri/config.kdl`):
 ```kdl
