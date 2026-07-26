@@ -1,5 +1,16 @@
 # Release Notes
 
+### 0.1.42
+
+- **Shape Marker Tool**: Added a toolbar shape-marker group with triangle, star, check, cross, card suits, plus, ban, and more. Re-clicking the tool opens a shape palette with a solid panel background.
+- **Curve Marker Glyphs**: Spade, club, and ban markers use cubic curves and rounded strokes for clearer silhouettes.
+- **Dual Debian Packages**: Keep separate Debian 12 and Ubuntu 26.04 `.deb` packages for different FFmpeg/Qt shared-library generations.
+- **Plugin Dependency Packaging**: Deb packaging scans the main binary and installed plugin modules when generating shared-library `Depends`.
+- **Wayland Overlay Exclusive Zone**: Layer-shell overlays cover exclusive zones again so frozen captures no longer leave a live waybar gap.
+- **Invert Rectangle Border**: Invert rectangles no longer draw an outer red frame.
+- **FFmpeg Arm64 Compatibility**: Added channel-layout API fallbacks for FFmpeg 4.4 builders such as Ubuntu 22.04 arm64.
+- **Settings About Page**: Moved About into its own settings navigation page and tightened sidebar spacing.
+
 ### 0.1.41
 
 - **Windows Build Compatibility**: PipeWire SPA buffer helpers and their dedicated tests now compile only on Linux, restoring Windows builds and release packages while preserving Linux PipeWire capture behavior.

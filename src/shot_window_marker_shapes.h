@@ -14,7 +14,7 @@
 namespace markshot::marker {
 namespace {
 
-/// @brief 将中心线路径加粗为可填充轮廓。
+/// @brief 将中心线路径加粗为圆角填充轮廓（曲线端帽）。
 /// @param centerline 中心线路径。
 /// @param width 线宽（单位正方形坐标）。
 /// @return 填充路径。
@@ -70,6 +70,64 @@ QPainterPath starPolygon(int points, qreal outer, qreal inner)
     return path;
 }
 
+/// @brief 构造水平条路径（加号/禁止斜杠的矩形近似）。
+/// @param x1 左。
+/// @param y1 上。
+/// @param x2 右。
+/// @param y2 下。
+/// @return 矩形路径。
+QPainterPath axisAlignedBar(qreal x1, qreal y1, qreal x2, qreal y2)
+{
+    QPainterPath path;
+    path.addRect(QRectF(QPointF(x1, y1), QPointF(x2, y2)).normalized());
+    return path;
+}
+
+/// @brief 构造任意角度的厚线段多边形。
+/// @param a 起点。
+/// @param b 终点。
+/// @param halfWidth 半宽。
+/// @return 填充多边形。
+QPainterPath thickSegment(QPointF a, QPointF b, qreal halfWidth)
+{
+    const QPointF delta = b - a;
+    const qreal len = qHypot(delta.x(), delta.y());
+    if (len < 1e-6) {
+        return {};
+    }
+    const QPointF n(-delta.y() / len * halfWidth, delta.x() / len * halfWidth);
+    QPainterPath path;
+    path.moveTo(a + n);
+    path.lineTo(b + n);
+    path.lineTo(b - n);
+    path.lineTo(a - n);
+    path.closeSubpath();
+    return path;
+}
+
+/// @brief 用布尔并集合并多条实心路径，消除重叠处的挖空。
+/// @param parts 子路径。
+/// @return 合并后的单一外轮廓路径。
+QPainterPath uniteParts(std::initializer_list<QPainterPath> parts)
+{
+    QPainterPath result;
+    bool hasResult = false;
+    for (const QPainterPath &part : parts) {
+        if (part.isEmpty()) {
+            continue;
+        }
+        if (!hasResult) {
+            result = part;
+            hasResult = true;
+            continue;
+        }
+        // united() 做真正的区域并集，比 addPath + WindingFill 更稳
+        result = result.united(part);
+    }
+    result.setFillRule(Qt::WindingFill);
+    return result;
+}
+
 }  // namespace
 
 /// @brief 在单位矩形 [0,1]x[0,1] 内构造形状路径，再映射到目标矩形。
@@ -83,163 +141,213 @@ inline QPainterPath pathForShape(ShotWindow::MarkerShape shape, const QRectF &re
         return {};
     }
 
-    // 1. 先在单位正方形内生成路径，便于后续等比映射
+    // 1. 单位正方形内生成路径；多部件统一 WindingFill，避免重叠区域被 OddEven 挖空
     QPainterPath unit;
+    unit.setFillRule(Qt::WindingFill);
+
     switch (shape) {
     case ShotWindow::MarkerShape::Triangle:
-        unit.moveTo(0.50, 0.08);
-        unit.lineTo(0.92, 0.90);
-        unit.lineTo(0.08, 0.90);
+        unit.moveTo(0.50, 0.10);
+        unit.lineTo(0.90, 0.88);
+        unit.lineTo(0.10, 0.88);
         unit.closeSubpath();
         break;
+
     case ShotWindow::MarkerShape::Star:
-        unit = starPolygon(5, 0.46, 0.19);
+        unit = starPolygon(5, 0.45, 0.18);
+        unit.setFillRule(Qt::WindingFill);
         break;
+
     case ShotWindow::MarkerShape::Check: {
-        // 对钩：中心线 ✓ 再加粗成填充体，避免手写多边形走样
-        QPainterPath centerline;
-        centerline.moveTo(0.16, 0.52);
-        centerline.lineTo(0.40, 0.76);
-        centerline.lineTo(0.86, 0.24);
-        unit = strokeOutline(centerline, 0.16);
+        // 对钩：两段厚线段拼成 ✓，不用 stroker，避免圆角自交
+        const QPainterPath a = thickSegment(QPointF(0.18, 0.52), QPointF(0.40, 0.74), 0.075);
+        const QPainterPath b = thickSegment(QPointF(0.40, 0.74), QPointF(0.84, 0.26), 0.075);
+        unit = uniteParts({a, b});
         break;
     }
+
     case ShotWindow::MarkerShape::Cross: {
-        // 叉叉：两条对角中心线加粗，形成清晰 X
-        QPainterPath a;
-        a.moveTo(0.20, 0.20);
-        a.lineTo(0.80, 0.80);
-        QPainterPath b;
-        b.moveTo(0.80, 0.20);
-        b.lineTo(0.20, 0.80);
-        unit = strokeOutline(a, 0.15);
-        unit.addPath(strokeOutline(b, 0.15));
+        // 叉叉：两条对角厚线段，明确是 X 而不是块状多边形
+        const QPainterPath a = thickSegment(QPointF(0.22, 0.22), QPointF(0.78, 0.78), 0.07);
+        const QPainterPath b = thickSegment(QPointF(0.78, 0.22), QPointF(0.22, 0.78), 0.07);
+        unit = uniteParts({a, b});
         break;
     }
+
     case ShotWindow::MarkerShape::Diamond:
-        unit.moveTo(0.50, 0.06);
-        unit.lineTo(0.92, 0.50);
-        unit.lineTo(0.50, 0.94);
-        unit.lineTo(0.08, 0.50);
+        unit.moveTo(0.50, 0.08);
+        unit.lineTo(0.90, 0.50);
+        unit.lineTo(0.50, 0.92);
+        unit.lineTo(0.10, 0.50);
         unit.closeSubpath();
         break;
+
     case ShotWindow::MarkerShape::Heart: {
-        unit.moveTo(0.50, 0.88);
-        unit.cubicTo(0.14, 0.68, 0.08, 0.42, 0.22, 0.26);
-        unit.cubicTo(0.32, 0.14, 0.44, 0.16, 0.50, 0.30);
-        unit.cubicTo(0.56, 0.16, 0.68, 0.14, 0.78, 0.26);
-        unit.cubicTo(0.92, 0.42, 0.86, 0.68, 0.50, 0.88);
+        // 红心：顶部两瓣 + 底部尖角，单路径避免挖空
+        unit.moveTo(0.50, 0.86);
+        unit.cubicTo(0.18, 0.68, 0.08, 0.44, 0.20, 0.28);
+        unit.cubicTo(0.28, 0.16, 0.42, 0.16, 0.50, 0.30);
+        unit.cubicTo(0.58, 0.16, 0.72, 0.16, 0.80, 0.28);
+        unit.cubicTo(0.92, 0.44, 0.82, 0.68, 0.50, 0.86);
         unit.closeSubpath();
         break;
     }
+
     case ShotWindow::MarkerShape::Hexagon:
-        unit = regularPolygon(6, 0.46, -M_PI_2);
+        unit = regularPolygon(6, 0.45, -M_PI_2);
         break;
+
     case ShotWindow::MarkerShape::Circle:
-        unit.addEllipse(QRectF(0.08, 0.08, 0.84, 0.84));
+        unit.addEllipse(QRectF(0.10, 0.10, 0.80, 0.80));
         break;
+
     case ShotWindow::MarkerShape::Square:
-        unit.addRoundedRect(QRectF(0.12, 0.12, 0.76, 0.76), 0.08, 0.08);
+        unit.addRoundedRect(QRectF(0.14, 0.14, 0.72, 0.72), 0.08, 0.08);
         break;
+
     case ShotWindow::MarkerShape::Pentagon:
-        unit = regularPolygon(5, 0.46, -M_PI_2);
+        unit = regularPolygon(5, 0.45, -M_PI_2);
         break;
+
     case ShotWindow::MarkerShape::Plus: {
-        // 加号：横竖两条中心线加粗
-        QPainterPath h;
-        h.moveTo(0.16, 0.50);
-        h.lineTo(0.84, 0.50);
-        QPainterPath v;
-        v.moveTo(0.50, 0.16);
-        v.lineTo(0.50, 0.84);
-        unit = strokeOutline(h, 0.18);
-        unit.addPath(strokeOutline(v, 0.18));
+        // 加号：横竖两矩形合并，交叉处不会被 OddEven 挖空
+        const QPainterPath h = axisAlignedBar(0.14, 0.40, 0.86, 0.60);
+        const QPainterPath v = axisAlignedBar(0.40, 0.14, 0.60, 0.86);
+        unit = uniteParts({h, v});
         break;
     }
+
     case ShotWindow::MarkerShape::ArrowUp: {
-        // 上箭头：三角头 + 竖杆
-        unit.moveTo(0.50, 0.08);
-        unit.lineTo(0.86, 0.46);
+        // 上箭头：三角头 + 竖杆，单闭合路径
+        unit.moveTo(0.50, 0.10);
+        unit.lineTo(0.84, 0.46);
         unit.lineTo(0.66, 0.46);
-        unit.lineTo(0.66, 0.90);
-        unit.lineTo(0.34, 0.90);
+        unit.lineTo(0.66, 0.88);
+        unit.lineTo(0.34, 0.88);
         unit.lineTo(0.34, 0.46);
-        unit.lineTo(0.14, 0.46);
+        unit.lineTo(0.16, 0.46);
         unit.closeSubpath();
         break;
     }
+
     case ShotWindow::MarkerShape::Spade: {
-        // 黑桃：倒心形 + 短柄
-        unit.moveTo(0.50, 0.08);
-        unit.cubicTo(0.18, 0.28, 0.10, 0.48, 0.22, 0.62);
-        unit.cubicTo(0.32, 0.74, 0.42, 0.70, 0.50, 0.58);
-        unit.cubicTo(0.58, 0.70, 0.68, 0.74, 0.78, 0.62);
-        unit.cubicTo(0.90, 0.48, 0.82, 0.28, 0.50, 0.08);
-        unit.closeSubpath();
-        unit.addRect(QRectF(0.44, 0.58, 0.12, 0.28));
-        unit.moveTo(0.28, 0.92);
-        unit.lineTo(0.72, 0.92);
-        unit.lineTo(0.62, 0.80);
-        unit.lineTo(0.38, 0.80);
-        unit.closeSubpath();
+        // 黑桃：整枚用三次贝塞尔画成连续曲线轮廓（牌面风格，无直线多边形）
+        QPainterPath path;
+        // 1. 顶部尖端
+        path.moveTo(0.50, 0.05);
+        // 2. 左瓣
+        path.cubicTo(0.28, 0.18, 0.10, 0.34, 0.10, 0.50);
+        path.cubicTo(0.10, 0.64, 0.22, 0.74, 0.38, 0.68);
+        // 3. 左侧入柄
+        path.cubicTo(0.42, 0.74, 0.43, 0.80, 0.38, 0.86);
+        // 4. 左脚（圆润）
+        path.cubicTo(0.30, 0.90, 0.28, 0.95, 0.34, 0.97);
+        path.cubicTo(0.40, 0.99, 0.46, 0.97, 0.50, 0.93);
+        // 5. 右脚
+        path.cubicTo(0.54, 0.97, 0.60, 0.99, 0.66, 0.97);
+        path.cubicTo(0.72, 0.95, 0.70, 0.90, 0.62, 0.86);
+        // 6. 右侧出柄
+        path.cubicTo(0.57, 0.80, 0.58, 0.74, 0.62, 0.68);
+        // 7. 右瓣回到尖端
+        path.cubicTo(0.78, 0.74, 0.90, 0.64, 0.90, 0.50);
+        path.cubicTo(0.90, 0.34, 0.72, 0.18, 0.50, 0.05);
+        path.closeSubpath();
+        unit = path;
         break;
     }
+
     case ShotWindow::MarkerShape::Club: {
-        // 梅花：三圆 + 柄
-        unit.addEllipse(QPointF(0.50, 0.28), 0.18, 0.18);
-        unit.addEllipse(QPointF(0.30, 0.50), 0.18, 0.18);
-        unit.addEllipse(QPointF(0.70, 0.50), 0.18, 0.18);
-        unit.addRect(QRectF(0.44, 0.52, 0.12, 0.28));
-        unit.moveTo(0.28, 0.92);
-        unit.lineTo(0.72, 0.92);
-        unit.lineTo(0.62, 0.80);
-        unit.lineTo(0.38, 0.80);
-        unit.closeSubpath();
+        // 梅花：三瓣圆（曲线）+ 圆角柄 + 圆润底座，全部曲线
+        QPainterPath top;
+        top.addEllipse(QPointF(0.50, 0.28), 0.20, 0.20);
+        QPainterPath left;
+        left.addEllipse(QPointF(0.33, 0.50), 0.20, 0.20);
+        QPainterPath right;
+        right.addEllipse(QPointF(0.67, 0.50), 0.20, 0.20);
+        QPainterPath core;
+        core.addEllipse(QPointF(0.50, 0.45), 0.12, 0.12);
+
+        // 竖柄：中心线加粗成圆角胶囊（RoundCap 曲线）
+        QPainterPath stemLine;
+        stemLine.moveTo(0.50, 0.52);
+        stemLine.lineTo(0.50, 0.80);
+        const QPainterPath stem = strokeOutline(stemLine, 0.11);
+
+        // 底座：全三次曲线的圆润脚
+        QPainterPath base;
+        base.moveTo(0.34, 0.84);
+        base.cubicTo(0.30, 0.88, 0.30, 0.94, 0.36, 0.97);
+        base.cubicTo(0.42, 0.99, 0.48, 0.99, 0.50, 0.99);
+        base.cubicTo(0.52, 0.99, 0.58, 0.99, 0.64, 0.97);
+        base.cubicTo(0.70, 0.94, 0.70, 0.88, 0.66, 0.84);
+        base.cubicTo(0.60, 0.80, 0.54, 0.80, 0.50, 0.80);
+        base.cubicTo(0.46, 0.80, 0.40, 0.80, 0.34, 0.84);
+        base.closeSubpath();
+
+        unit = uniteParts({top, left, right, core, stem, base});
         break;
     }
+
     case ShotWindow::MarkerShape::Lightning: {
-        // 闪电折线
-        unit.moveTo(0.58, 0.06);
-        unit.lineTo(0.28, 0.50);
-        unit.lineTo(0.48, 0.50);
-        unit.lineTo(0.36, 0.94);
-        unit.lineTo(0.78, 0.42);
+        // 闪电：单调折线多边形，避免自交
+        unit.moveTo(0.58, 0.08);
+        unit.lineTo(0.30, 0.48);
+        unit.lineTo(0.48, 0.48);
+        unit.lineTo(0.38, 0.92);
+        unit.lineTo(0.76, 0.42);
         unit.lineTo(0.56, 0.42);
         unit.closeSubpath();
         break;
     }
+
     case ShotWindow::MarkerShape::Ban: {
-        // 禁止：圆环 + 斜杠
-        QPainterPath outer;
-        outer.addEllipse(QRectF(0.08, 0.08, 0.84, 0.84));
+        // 禁止：外圆/内圆用相反绕组形成圆环，斜杠用圆角曲线加粗
+        // 不使用 united(ring, slash)，否则部分 Qt 版本会把中空填实
+        QPainterPath path;
+        path.setFillRule(Qt::WindingFill);
+
+        // 1. 外圆（正向）
+        path.addEllipse(QRectF(0.08, 0.08, 0.84, 0.84));
+        // 2. 内圆（反向）形成中空
         QPainterPath hole;
-        hole.addEllipse(QRectF(0.20, 0.20, 0.60, 0.60));
-        unit = outer.subtracted(hole);
-        QPainterPath slash;
-        slash.moveTo(0.24, 0.72);
-        slash.lineTo(0.76, 0.28);
-        unit.addPath(strokeOutline(slash, 0.12));
+        hole.addEllipse(QRectF(0.24, 0.24, 0.52, 0.52));
+        path.addPath(hole.toReversed());
+
+        // 3. 圆角斜杠（RoundCap 曲线）
+        QPainterPath slashLine;
+        slashLine.moveTo(0.26, 0.74);
+        slashLine.lineTo(0.74, 0.26);
+        path.addPath(strokeOutline(slashLine, 0.14));
+
+        unit = path;
+        unit.setFillRule(Qt::WindingFill);
         break;
     }
+
     case ShotWindow::MarkerShape::Octagon:
-        unit = regularPolygon(8, 0.46, M_PI / 8.0);
+        unit = regularPolygon(8, 0.45, M_PI / 8.0);
         break;
+
     case ShotWindow::MarkerShape::Crescent: {
-        // 新月：大圆减去偏移小圆
+        // 新月：大圆减偏移圆；subtracted 结果已是实心月牙
         QPainterPath full;
-        full.addEllipse(QRectF(0.10, 0.10, 0.80, 0.80));
+        full.addEllipse(QRectF(0.12, 0.12, 0.76, 0.76));
         QPainterPath cut;
-        cut.addEllipse(QRectF(0.28, 0.08, 0.72, 0.72));
+        cut.addEllipse(QRectF(0.30, 0.08, 0.70, 0.70));
         unit = full.subtracted(cut);
+        unit.setFillRule(Qt::WindingFill);
         break;
     }
     }
 
-    // 2. 映射到目标矩形
+    // 2. 映射到目标矩形；保留各形状自身 fillRule（禁止图标需要 OddEvenFill）
     QTransform transform;
     transform.translate(bounds.left(), bounds.top());
     transform.scale(bounds.width(), bounds.height());
-    return transform.map(unit);
+    const Qt::FillRule fillRule = unit.fillRule();
+    QPainterPath mapped = transform.map(unit);
+    mapped.setFillRule(fillRule);
+    return mapped;
 }
 
 /// @brief 返回形状的稳定配置名。

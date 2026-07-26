@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.42 - 2026-07-26
+
+### Features & Enhancements
+
+- **Shape Marker Tool**: Added a toolbar shape-marker group with triangle, star, check, cross, diamond/heart/spade/club, plus, ban, and other filled markers. Re-clicking the tool opens a shape palette.
+- **Curve Marker Glyphs**: Spade, club, and ban markers now use cubic curves and rounded strokes instead of hard polygons, improving icon readability.
+- **Dual Debian Packages**: Official `.deb` builds keep separate Debian 12 and Ubuntu 26.04 packages so FFmpeg/Qt shared-library generations remain installable on both baselines.
+- **Plugin Dependency Packaging**: Deb packaging now runs `dpkg-shlibdeps` against the main binary and installed plugin modules, so OCR/zxing/layer-shell shared libraries are declared when present.
+
+### Bug Fixes
+
+- **Wayland Exclusive Zone Overlay**: Restored `exclusive_zone=-1` for layer-shell overlays so niri no longer leaves a live waybar gap above the frozen capture frame.
+- **Invert Rectangle Border**: Removed the outer stroke from invert rectangles so inverted regions no longer show a red frame.
+- **FFmpeg Arm64 Channel Layout**: Added FFmpeg 4.4-compatible channel-layout fallbacks for Ubuntu 22.04 arm64 CI and packaging builders.
+- **Settings About Page**: Moved About out of Advanced into its own navigation page and tightened settings sidebar item spacing/alignment.
+
 ## 0.1.41 - 2026-07-16
 
 ### Bug Fixes
