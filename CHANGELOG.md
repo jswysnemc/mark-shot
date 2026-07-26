@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.43 - 2026-07-26
+
+### Features & Enhancements
+
+- **Pause and Resume Recording**: Recordings can be paused and resumed from the floating control bar, the tray menu, a global shortcut, or `--pause-recording`. Capture, encoding, and audio all stop together, and the paused span is subtracted from the output timeline so audio stays in sync.
+- **Recording Control Bar and Region Frame**: Region recordings now show a red frame around the captured area plus a compact floating bar with elapsed time, pause, and stop. Both stay outside the recorded area and let clicks pass through everywhere else. Full-screen recordings skip the overlay because it would be captured, leaving the tray and shortcuts in charge.
+- **Hardware Encoders on More GPUs**: Video encoding now considers VAAPI and Quick Sync on Linux and adds AMF and Quick Sync on Windows, instead of only NVENC. Candidates are probed against the codecs FFmpeg actually ships and the device nodes present on the machine, and multi-GPU systems try each render node so cards without encode support are skipped.
+- **Parallel Pixel Conversion**: BGRA to YUV conversion runs across row slices in a persistent thread pool, removing the single-threaded conversion bottleneck from the writer thread.
+- **GIF Per-Frame Palettes**: GIF recording quantizes through libavfilter `palettegen`/`paletteuse` with a per-frame palette instead of the fixed 3-3-2 palette, cutting average channel error on gradients from over 20 to roughly 3.
+- **MKV Container and Quality Presets**: Video recordings can be written as MKV, which stays playable if a recording is interrupted, and a quality preset (balanced, higher quality, smaller file) drives the constant-quality value, encoder preset, and bitrate.
+- **Recording Countdown**: An optional 3 or 5 second countdown runs before capture starts.
+- **Open Folder from Save Notification**: The recording-saved notification offers to reveal the file through the file manager.
+
+### Bug Fixes
+
+- **KDE Recording on NVIDIA**: KWin cannot export usable DMA-BUF buffers on the NVIDIA proprietary driver, which made recording fail immediately on those systems. Single-GPU KDE sessions with that driver now negotiate shared memory automatically, hybrid-GPU machines keep DMA-BUF, `MARK_SHOT_FORCE_DMABUF` overrides the avoidance, and import failures now say how to work around the problem.
+- **Static Screen Duration**: Event-driven capture backends emit no frames while the screen is unchanged, and the catch-up limit compressed those spans in the output. A heartbeat now writes repeat frames during idle periods so the recording duration matches real time.
+- **GIF Capture Backend**: GIF recording was excluded from wlroots screencopy and fell back to full-path polling captures on niri, sway, and other wlroots compositors. It now shares the video capture path, with the writer dropping frames above the target rate.
+- **Odd Frame Sizes**: Odd capture widths and heights are cropped rather than scaled, removing the slight distortion in the encoded video.
+- **Recording Queue Depth**: The pending-frame queue is sized from frame memory and frame rate instead of a fixed one or two frames, so encoding jitter no longer drops frames unnecessarily.
+
 ## 0.1.42 - 2026-07-26
 
 ### Features & Enhancements

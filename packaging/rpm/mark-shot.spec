@@ -1,5 +1,5 @@
 Name:           mark-shot
-Version:        0.1.42
+Version:        0.1.43
 Release:        1%{?dist}
 Summary:        Qt 6 screenshot selection and annotation tool
 
@@ -19,6 +19,7 @@ BuildRequires:  cmake(Qt6Gui)
 BuildRequires:  cmake(Qt6Widgets)
 BuildRequires:  cmake(LayerShellQt)
 BuildRequires:  pkgconfig(libavcodec)
+BuildRequires:  pkgconfig(libavfilter)
 BuildRequires:  pkgconfig(libavformat)
 BuildRequires:  pkgconfig(libavutil)
 BuildRequires:  pkgconfig(libpipewire-0.3)
@@ -86,6 +87,9 @@ sed -i '1s|^#!/usr/bin/env python3$|#!/usr/bin/python3|' \
 %{_datadir}/gnome-shell/extensions/mark-shot-scroll-helper@snemc.org/
 
 %changelog
+* Sun Jul 26 2026 jswysnemc <snemc@qq.com> - 0.1.43-1
+- Update to version 0.1.43
+
 * Sun Jul 26 2026 jswysnemc <snemc@qq.com> - 0.1.42-1
 - Update to version 0.1.42
 
