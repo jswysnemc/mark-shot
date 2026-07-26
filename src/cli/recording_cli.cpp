@@ -68,4 +68,20 @@ int stopRecordingFromCommandLine()
     return response.stopped ? 0 : 1;
 }
 
+int togglePauseRecordingFromCommandLine()
+{
+    markshot::ipc::SingleInstanceCommand command;
+    command.togglePauseRecording = true;
+
+    markshot::ipc::SingleInstanceResponse response;
+    QString error;
+    if (!markshot::ipc::sendSingleInstanceCommand(command, &response, &error)) {
+        writeResponseJson(inactiveResponse(QStringLiteral("no active recording")));
+        return 1;
+    }
+
+    writeResponseJson(response);
+    return response.recording.active ? 0 : 1;
+}
+
 }  // namespace markshot::cli

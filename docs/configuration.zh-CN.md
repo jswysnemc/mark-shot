@@ -150,11 +150,17 @@ Mark Shot 在 Linux 上从 `~/.config/mark-shot/config.json` 读取应用配置�
 | `save.directoryTemplate` | 字符串 | `""` | 仅指定保存目录模板。指定后，文件名会自动采用默认的 `mark-shot-{datetime}.png`。别名包括：`save.directory`、`save.dir`、`save.folder`。 |
 | `recording.storage.videoDirectory` | 字符串 | `"{pictures}/mark-shot/videos"` | MP4 录制文件默认输出目录。别名包括 `recording.storage.videos`、`recording.storage.videoDir` 和 `recording.output.videoDirectory`。 |
 | `recording.storage.gifDirectory` | 字符串 | `"{pictures}/mark-shot/gifs"` | GIF 录制文件默认输出目录。别名包括 `recording.storage.gifs`、`recording.storage.gifDir` 和 `recording.output.gifDirectory`。 |
+| `recording.dialog.container` | 字符串 | `"mp4"` | 视频录制的封装格式。可选 `mp4` 与 `mkv`；`mkv` 在录制意外中断后仍可播放。 |
+| `recording.dialog.quality` | 字符串 | `"balanced"` | 视频录制画质档位。可选 `balanced`、`high`（画质优先）与 `efficient`（体积优先），影响恒定质量取值与编码预设。 |
+| `recording.dialog.countdownSeconds` | 数值 | `0` | 起录倒计时秒数，取值范围 `0`-`10`，`0` 表示关闭。 |
+| `recording.dialog.backend` | 字符串 | `"auto"` | 录制采集后端。可选 `auto`、`wlroots`、`pipewire`、`windows-wgc` 与 `polling`；`auto` 会按平台顺序尝试并自动回退。 |
 | `export.imageFrame` | 布尔值/对象 | `false` | 用户分享类导出的可选 Mac 风格外框。对象形式支持 `enabled`、`padding` (`0`-`256`，默认 `112`)、`cornerRadius` (`0`-`128`，默认 `18`)、`shadowRadius` (`0`-`128`，默认 `72`)、`shadowOffsetY` (`0`-`128`，默认 `28`) 和 `shadowOpacity` (`0.0`-`1.0`，默认 `0.32`)。作用于保存、另存为、复制、上传、打开方式和扩展命令图片；OCR、扫码、贴图、快速显示器截图和滚动截图保持原始图片。设置 `enabled` 为 `true` 后启用外框导出。 |
 | `shortcuts` | 对象 | - | 自定义快捷键配置。别名：`hotkeys`（或在 `annotation.shortcuts` / `annotation.hotkeys` 下）。详细子节点见折叠说明。 |
 | `windows.tray.enabled` | 布尔值 | Windows 为 `true`，其他平台为 `false` | 自动启动托盘模式。键名出于兼容性保留。可以用 `mark-shot --tray` 在不修改配置时启动托盘模式，也可以用 `mark-shot --capture` 在自动启动托盘时强制执行单次截图。 |
 | `windows.hotkeys.capture` | 字符串 | `"Ctrl+Alt+S"` | 托盘模式运行时触发区域截图的全局快捷键。Windows 使用 RegisterHotKey，支持的 Linux 桌面使用 desktop portal。别名包括 `hotkey`、`captureHotkey` 和 `screenshot` |
 | `windows.hotkeys.fullscreen` | 字符串 | `""` | 可选的全屏标注截图全局快捷键。别名：`fullscreenHotkey`。默认生成配置只写入区域截图快捷键。 |
+| `windows.hotkeys.stopRecording` | 字符串 | `""` | 可选的停止当前录制全局快捷键。别名包括 `stopRecordingHotkey` 与 `recordingStop`。 |
+| `windows.hotkeys.pauseRecording` | 字符串 | `""` | 可选的暂停与继续录制全局快捷键。别名包括 `pauseRecordingHotkey` 与 `recordingPause`。 |
 | `colorPicker.history` | 数组 | `[]` | 启动取色器最近拾取的颜色记录。以 `#RRGGBBAA` 字符串存储，最多保留 7 条。在颜色面板确认颜色时会自动更新。 |
 | `codeScan.command` | 字符串 | `""` | 自定义二维码/条形码扫码命令。支持 `{image}`、`{imagePath}` 和 `{imageUrl}` 占位符；如果没有占位符，Mark Shot 会把临时 PNG 路径追加到命令末尾。命令必须输出与 `mark-shot-code-scan` 相同结构的 JSON。别名：`codeScanner.command`、`barcodeScanner.command`、`barcode.command`。 |
 | `codeScan.timeoutMs` | 数值 | `15000` | 扫码命令超时时间。环境变量 `MARK_SHOT_CODE_SCAN_TIMEOUT_MS` 可以覆盖该值。 |
@@ -348,6 +354,23 @@ Mark Shot 还会在运行时探测当前桌面环境（`XDG_SESSION_TYPE`、`XDG
 ```
 
 </details>
+
+## 录制诊断环境变量
+
+以下环境变量用于排查录制问题，日常使用无需设置。
+
+| 环境变量 | 说明 |
+| --- | --- |
+| `MARK_SHOT_RECORDING_BACKEND` | 强制指定采集后端，取值同 `recording.dialog.backend`，优先级高于配置。 |
+| `MARK_SHOT_RECORDING_SW_ENCODER` | 设置后禁用全部硬件编码候选，只使用软件编码。 |
+| `MARK_SHOT_RECORDING_VAAPI_DEVICE` | 指定 VAAPI 使用的 DRM 渲染节点路径，用于多显卡机器锁定设备。 |
+| `MARK_SHOT_RECORDING_SCALE_THREADS` | 像素格式转换的并行切片数上限，设为 `1` 即退回单线程转换。 |
+| `MARK_SHOT_RECORDING_QUEUE_MIB` | 待编码帧队列可占用的内存预算（MiB），影响队列深度与丢帧行为。 |
+| `MARK_SHOT_RECORDING_OVERLAY` | 设为 `0` 时不显示录制边框与悬浮控制条。 |
+| `MARK_SHOT_DISABLE_DMABUF` | 强制 PipeWire 采集使用共享内存缓冲。KWin 搭配 NVIDIA 专有驱动的单显卡机器会自动启用该行为，无需手动设置。 |
+| `MARK_SHOT_FORCE_DMABUF` | 强制使用 DMA-BUF 缓冲，优先级高于自动规避与 `MARK_SHOT_DISABLE_DMABUF`，用于验证驱动修复。 |
+
+---
 
 手动安装时，必须同时安装 `mark-shot`、`mark-shot-ocr`、`mark-shot-code-scan`、`mark-shot-translate` 和 `mark-shot-upload`。否则 OCR、扫码、翻译或图床上传功能无法调用后端脚本。
 

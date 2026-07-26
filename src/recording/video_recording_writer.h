@@ -21,6 +21,7 @@ public:
     bool start(QSize frameSize, int fps, QString *error) override;
     bool writeFrame(const RecordingFrameSample &sample, QString *error) override;
     bool finish(QString *error) override;
+    void setPaused(bool paused) override;
     void cancel() override;
 
 private:

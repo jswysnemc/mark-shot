@@ -1,5 +1,6 @@
 #include "pipewire/pipewire_buffer_data_types.h"
 
+#include "pipewire/pipewire_dmabuf_policy.h"
 #include "pipewire/pipewire_drm_fourcc.h"
 
 #include <spa/buffer/buffer.h>
@@ -12,7 +13,8 @@ namespace {
 
 bool dmaBufDisabled()
 {
-    return qEnvironmentVariableIsSet("MARK_SHOT_DISABLE_DMABUF");
+    // 环境变量与已知失效组合都会走共享内存，判定集中在 dmabuf policy 中
+    return shouldAvoidDmaBuf();
 }
 
 }  // namespace

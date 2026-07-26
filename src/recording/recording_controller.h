@@ -1,10 +1,13 @@
 #pragma once
 
+#include "recording/recording_frame_heartbeat.h"
 #include "recording/recording_options.h"
+#include "recording/recording_pause_state.h"
 #include "recording/recording_status.h"
 #include "recording/recording_status_throttler.h"
 #include "recording/recording_writer.h"
 
+#include <QElapsedTimer>
 #include <QObject>
 #include <QtGlobal>
 #include <memory>
@@ -40,6 +43,19 @@ public:
     void requestStop();
 
     /**
+     * 设置录制暂停状态。
+     * @param paused 暂停时为 true。
+     * @return 状态发生变化时返回 true。
+     */
+    bool setPaused(bool paused);
+
+    /**
+     * 判断当前是否处于暂停状态。
+     * @return 暂停时返回 true。
+     */
+    bool isPaused() const;
+
+    /**
      * 读取当前录制状态。
      * @return 录制状态。
      */
@@ -56,6 +72,13 @@ private:
      * @return 无返回值。
      */
     void handleFrame(const RecordingFrameSample &sample);
+
+    /**
+     * 画面静止时补写上一帧，保持输出时间轴与真实时长一致。
+     * @param timestampMs 心跳推算出的采集时间戳。
+     * @return 无返回值。
+     */
+    void writeRepeatFrame(qint64 timestampMs);
 
     /**
      * 停止录制并保存文件。
@@ -102,6 +125,10 @@ private:
     RecordingOptions m_options;
     std::unique_ptr<RecordingWriter> m_writer;
     RecordingFrameGrabber *m_grabber = nullptr;
+    RecordingPauseState m_pauseState;
+    RecordingFrameHeartbeat *m_heartbeat = nullptr;
+    RecordingFrameSample m_lastSample;
+    QElapsedTimer m_sessionClock;
     bool m_writerStarted = false;
     bool m_stopping = false;
     bool m_finishEmitted = false;

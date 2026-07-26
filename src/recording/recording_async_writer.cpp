@@ -27,13 +27,39 @@ std::unique_ptr<RecordingWriter> createSynchronousWriter(const RecordingOptions 
 }
 
 /**
- * 按帧率计算待写帧上限。
+ * 读取待写队列可占用的内存预算。
+ * @return 内存预算字节数。
+ */
+qint64 queueMemoryBudgetBytes()
+{
+    bool ok = false;
+    const int configuredMib = qEnvironmentVariableIntValue("MARK_SHOT_RECORDING_QUEUE_MIB", &ok);
+    if (ok && configuredMib > 0) {
+        return static_cast<qint64>(configuredMib) * 1024 * 1024;
+    }
+    return 96LL * 1024 * 1024;
+}
+
+/**
+ * 按帧尺寸与帧率计算待写帧上限。
+ *
+ * 队列的作用是吸收编码耗时抖动，深度受两方面约束：
+ * 一是未编码帧占用的内存，二是停止录制时需要冲刷的延迟。
+ *
+ * @param frameSize 录制帧尺寸。
  * @param fps 录制帧率。
  * @return 队列容量。
  */
-int queueCapacityForFps(int fps)
+int queueCapacityForFrame(QSize frameSize, int fps)
 {
-    return fps >= 48 ? 1 : 2;
+    const qint64 frameBytes = std::max<qint64>(1,
+                                               static_cast<qint64>(frameSize.width())
+                                                   * std::max(1, frameSize.height()) * 4);
+    const int byMemory = static_cast<int>(
+        std::clamp<qint64>(queueMemoryBudgetBytes() / frameBytes, 1, 4));
+    // 高帧率下每帧的冲刷延迟更小，但排队帧数过多会拉长停止响应
+    const int byLatency = fps >= 48 ? 3 : 4;
+    return std::clamp(std::min(byMemory, byLatency), 1, 4);
 }
 
 }  // namespace
@@ -81,6 +107,18 @@ public:
     bool finishWriter(QString *error)
     {
         return m_writer && m_writer->finish(error);
+    }
+
+    /**
+     * 设置底层写出器的暂停状态。
+     * @param paused 暂停时为 true。
+     * @return 无返回值。
+     */
+    void setWriterPaused(bool paused)
+    {
+        if (m_writer) {
+            m_writer->setPaused(paused);
+        }
     }
 
     /**
@@ -143,7 +181,13 @@ bool RecordingAsyncWriter::start(QSize frameSize, int fps, QString *error)
     }
 
     m_queue.reset();
-    m_queue.setCapacity(queueCapacityForFps(fps));
+    m_queue.setCapacity(queueCapacityForFrame(frameSize, fps));
+    markshot::debugLog("recording",
+                       "【录制】【写出队列】capacity=%d frame=%dx%d fps=%d",
+                       m_queue.capacity(),
+                       frameSize.width(),
+                       frameSize.height(),
+                       fps);
     m_started = true;
     m_failed = false;
     m_finishing = false;
@@ -225,6 +269,19 @@ bool RecordingAsyncWriter::finish(QString *error)
         },
         Qt::QueuedConnection);
     return true;
+}
+
+void RecordingAsyncWriter::setPaused(bool paused)
+{
+    if (!m_started || !m_thread.isRunning() || !m_worker) {
+        return;
+    }
+    QMetaObject::invokeMethod(
+        m_worker,
+        [worker = m_worker, paused] {
+            worker->setWriterPaused(paused);
+        },
+        Qt::QueuedConnection);
 }
 
 void RecordingAsyncWriter::cancel()

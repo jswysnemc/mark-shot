@@ -7,6 +7,7 @@
 #endif
 #include "recording/recording_session_manager.h"
 #include "recording/recording_start_flow.h"
+#include "recording/ui/recording_countdown.h"
 #include "recording/recording_status.h"
 #include "settings/settings_dialog.h"
 #include "shot_window.h"
@@ -50,6 +51,10 @@ namespace {
 constexpr int kCaptureHotkeyId = 0x4d53;
 /// @brief Unique identifier for the fullscreen hotkey.
 constexpr int kFullscreenHotkeyId = 0x4d54;
+/// @brief Unique identifier for the stop recording hotkey.
+constexpr int kStopRecordingHotkeyId = 0x4d55;
+/// @brief Unique identifier for the pause recording hotkey.
+constexpr int kPauseRecordingHotkeyId = 0x4d56;
 
 /// @brief Applies system tray configurations from a JSON object.
 /// @param object The JSON object containing tray configuration values.
@@ -96,6 +101,22 @@ void applyHotkeyConfig(const QJsonObject &object, WindowsTrayController::Config 
                                QStringLiteral("hotkey")}) {
         if (const std::optional<QKeySequence> sequence = config::keySequenceValue(object.value(key))) {
             config->captureHotkey = *sequence;
+            break;
+        }
+    }
+    for (const QString &key : {QStringLiteral("stopRecording"),
+                               QStringLiteral("stopRecordingHotkey"),
+                               QStringLiteral("recordingStop")}) {
+        if (const std::optional<QKeySequence> sequence = config::keySequenceValue(object.value(key))) {
+            config->stopRecordingHotkey = *sequence;
+            break;
+        }
+    }
+    for (const QString &key : {QStringLiteral("pauseRecording"),
+                               QStringLiteral("pauseRecordingHotkey"),
+                               QStringLiteral("recordingPause")}) {
+        if (const std::optional<QKeySequence> sequence = config::keySequenceValue(object.value(key))) {
+            config->pauseRecordingHotkey = *sequence;
             break;
         }
     }
@@ -185,6 +206,10 @@ QString recordingStatusText(const markshot::recording::RecordingStatus &status)
 {
     if (!status.active) {
         return MS_TR("Recording: idle");
+    }
+    if (status.paused) {
+        return MS_TR("Recording paused: %1 %2")
+            .arg(recordingModeLabel(status.mode), formatRecordingElapsed(status.elapsedMs));
     }
     return MS_TR("Recording: %1 %2")
         .arg(recordingModeLabel(status.mode), formatRecordingElapsed(status.elapsedMs));
@@ -362,6 +387,10 @@ bool WindowsTrayController::start()
     m_menu->addSeparator();
     m_recordingStatusAction = m_menu->addAction(MS_TR("Recording: idle"));
     m_recordingStatusAction->setEnabled(false);
+    m_pauseRecordingAction = m_menu->addAction(MS_TR("Pause Recording"), this, [this] {
+        togglePauseRecordingFromTray();
+    });
+    m_pauseRecordingAction->setEnabled(false);
     m_stopRecordingAction = m_menu->addAction(MS_TR("Stop Recording"), this, [this] { stopRecordingFromTray(); });
     m_stopRecordingAction->setEnabled(false);
     m_menu->addSeparator();
@@ -418,6 +447,14 @@ bool WindowsTrayController::nativeEventFilter(const QByteArray &eventType, void 
         triggerCapture();
         return true;
     }
+    if (nativeMessage->wParam == kStopRecordingHotkeyId) {
+        stopRecordingFromTray();
+        return true;
+    }
+    if (nativeMessage->wParam == kPauseRecordingHotkeyId) {
+        togglePauseRecordingFromTray();
+        return true;
+    }
     if (nativeMessage->wParam == kFullscreenHotkeyId) {
         triggerFullscreenCapture();
         return true;
@@ -453,18 +490,26 @@ void WindowsTrayController::startRecordingFromTray()
     recording::RecordingStartFlowRequest request;
     request.initialMode = recording::RecordingMode::Video;
     request.stayOnTop = true;
-    request.startDisplayRecording = [this, &manager](recording::RecordingOptions options) {
-        QString error;
-        if (!manager.start(options, m_application, &error)) {
-            if (m_tray) {
-                m_tray->showMessage(QStringLiteral("Mark Shot"),
-                                    error.isEmpty() ? MS_TR("Recording failed to start") : error,
-                                    QSystemTrayIcon::Warning,
-                                    3000);
-            }
-            return;
-        }
-        updateRecordingState();
+    request.startDisplayRecording = [this](recording::RecordingOptions options) {
+        recording::ui::runRecordingCountdown(
+            options.countdownSeconds,
+            options.captureGeometry,
+            QGuiApplication::screenAt(options.captureGeometry.center()),
+            [this, options] {
+                QString error;
+                if (!recording::RecordingSessionManager::instance().start(options,
+                                                                          m_application,
+                                                                          &error)) {
+                    if (m_tray) {
+                        m_tray->showMessage(QStringLiteral("Mark Shot"),
+                                            error.isEmpty() ? MS_TR("Recording failed to start") : error,
+                                            QSystemTrayIcon::Warning,
+                                            3000);
+                    }
+                    return;
+                }
+                updateRecordingState();
+            });
     };
     request.selectRegionRecording = [this](recording::RecordingOptions options) {
         if (m_recordingRegionCallback) {
@@ -500,6 +545,18 @@ void WindowsTrayController::stopRecordingFromTray()
     }
 }
 
+void WindowsTrayController::togglePauseRecordingFromTray()
+{
+    QString error;
+    if (recording::RecordingSessionManager::instance().togglePause(&error)) {
+        updateRecordingState();
+        return;
+    }
+    if (m_tray && !error.isEmpty()) {
+        m_tray->showMessage(QStringLiteral("Mark Shot"), error, QSystemTrayIcon::Information, 3000);
+    }
+}
+
 void WindowsTrayController::updateRecordingState()
 {
     const recording::RecordingStatus status = recording::RecordingSessionManager::instance().status();
@@ -510,6 +567,11 @@ void WindowsTrayController::updateRecordingState()
     }
     if (m_stopRecordingAction) {
         m_stopRecordingAction->setEnabled(status.active);
+    }
+    if (m_pauseRecordingAction) {
+        m_pauseRecordingAction->setEnabled(status.active);
+        m_pauseRecordingAction->setText(status.paused ? MS_TR("Resume Recording")
+                                                      : MS_TR("Pause Recording"));
     }
     if (m_startRecordingAction) {
         m_startRecordingAction->setEnabled(!status.active);
@@ -567,6 +629,8 @@ void WindowsTrayController::registerHotkeys()
     if (m_config.fullscreenHotkey != m_config.captureHotkey) {
         registerSequence(kFullscreenHotkeyId, m_config.fullscreenHotkey, &m_fullscreenHotkeyRegistered);
     }
+    registerSequence(kStopRecordingHotkeyId, m_config.stopRecordingHotkey, &m_stopRecordingHotkeyRegistered);
+    registerSequence(kPauseRecordingHotkeyId, m_config.pauseRecordingHotkey, &m_pauseRecordingHotkeyRegistered);
 #elif defined(MARK_SHOT_WITH_DBUS)
     QList<GlobalShortcutPortal::Shortcut> shortcuts;
     if (!m_config.captureHotkey.isEmpty()) {
@@ -580,6 +644,19 @@ void WindowsTrayController::registerHotkeys()
                           MS_TR("Fullscreen Capture"),
                           m_config.fullscreenHotkey,
                           [this] { triggerFullscreenCapture(); }});
+    }
+
+    if (!m_config.stopRecordingHotkey.isEmpty()) {
+        shortcuts.append({QStringLiteral("stop-recording"),
+                          MS_TR("Stop Recording"),
+                          m_config.stopRecordingHotkey,
+                          [this] { stopRecordingFromTray(); }});
+    }
+    if (!m_config.pauseRecordingHotkey.isEmpty()) {
+        shortcuts.append({QStringLiteral("pause-recording"),
+                          MS_TR("Pause Recording"),
+                          m_config.pauseRecordingHotkey,
+                          [this] { togglePauseRecordingFromTray(); }});
     }
 
     if (!m_globalShortcutPortal) {
@@ -623,6 +700,14 @@ void WindowsTrayController::unregisterHotkeys()
     if (m_fullscreenHotkeyRegistered) {
         UnregisterHotKey(nullptr, kFullscreenHotkeyId);
         m_fullscreenHotkeyRegistered = false;
+    }
+    if (m_stopRecordingHotkeyRegistered) {
+        UnregisterHotKey(nullptr, kStopRecordingHotkeyId);
+        m_stopRecordingHotkeyRegistered = false;
+    }
+    if (m_pauseRecordingHotkeyRegistered) {
+        UnregisterHotKey(nullptr, kPauseRecordingHotkeyId);
+        m_pauseRecordingHotkeyRegistered = false;
     }
     if (m_application && m_nativeEventFilterInstalled) {
         m_application->removeNativeEventFilter(this);

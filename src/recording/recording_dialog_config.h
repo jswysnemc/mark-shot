@@ -10,7 +10,10 @@ struct RecordingDialogConfig {
     RecordingMode mode = RecordingMode::Video;
     RecordingScope scope = RecordingScope::Region;
     RecordingCaptureBackend backend = RecordingCaptureBackend::Auto;
+    RecordingContainerFormat container = RecordingContainerFormat::Mp4;
+    RecordingQuality quality = RecordingQuality::Balanced;
     int fps = 30;
+    int countdownSeconds = 0;
     int videoFps = 30;
     int gifFps = 12;
     bool includeAudio = false;

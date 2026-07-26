@@ -7,21 +7,20 @@
 #include "recording/recording_frame_converter.h"
 
 #include <QByteArray>
-#include <QFile>
 
 #include <algorithm>
 #include <atomic>
 #include <memory>
-#include <mutex>
 
 #ifdef HAVE_LIBAV_RECORDING
+#include "recording/libav/libav_hw_encoder_context.h"
+#include "recording/libav/libav_muxer.h"
+#include "recording/libav/libav_video_encoder_setup.h"
+#include "recording/libav/libav_video_scaler.h"
+
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
-#include <libavutil/imgutils.h>
-#include <libavutil/opt.h>
-#include <libavutil/pixdesc.h>
-#include <libswscale/swscale.h>
 }
 #else
 struct AVFrame;
@@ -45,93 +44,14 @@ bool failWith(QString *error, const QString &text)
 }
 
 /**
- * 把尺寸压到 yuv420p 可接受的偶数宽高。
+ * 把尺寸裁剪到 yuv420p 可接受的偶数宽高。
  * @param size 输入帧尺寸。
- * @return 编码尺寸。
+ * @return 编码尺寸，奇数边按裁剪丢弃最后一行或一列。
  */
 QSize evenEncodedSize(QSize size)
 {
     return {std::max(2, size.width() & ~1), std::max(2, size.height() & ~1)};
 }
-
-#ifdef HAVE_LIBAV_RECORDING
-
-/**
- * 【录制】【库内编码】读取编码器支持的像素格式列表。
- * @param codec 目标编码器。
- * @return 像素格式数组，编码器未声明时返回空指针。
- */
-const enum AVPixelFormat *encoderPixelFormats(const AVCodec *codec)
-{
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
-    const enum AVPixelFormat *formats = nullptr;
-    int count = 0;
-    if (avcodec_get_supported_config(nullptr,
-                                     codec,
-                                     AV_CODEC_CONFIG_PIX_FORMAT,
-                                     0,
-                                     reinterpret_cast<const void **>(&formats),
-                                     &count) < 0) {
-        return nullptr;
-    }
-    return formats;
-#else
-    return codec->pix_fmts;
-#endif
-}
-
-/**
- * 【录制】【库内编码】为编码器选择系统内存输入像素格式。
- * @param codec 目标编码器。
- * @return 优先 yuv420p、其次 nv12，再退到首个非硬件格式。
- */
-AVPixelFormat chooseEncoderPixelFormat(const AVCodec *codec)
-{
-    const enum AVPixelFormat *formats = encoderPixelFormats(codec);
-    if (!formats) {
-        return AV_PIX_FMT_YUV420P;
-    }
-
-    AVPixelFormat firstSoftware = AV_PIX_FMT_NONE;
-    bool hasYuv420p = false;
-    bool hasNv12 = false;
-    for (const enum AVPixelFormat *format = formats; *format != AV_PIX_FMT_NONE; ++format) {
-        const AVPixFmtDescriptor *descriptor = av_pix_fmt_desc_get(*format);
-        if (descriptor && (descriptor->flags & AV_PIX_FMT_FLAG_HWACCEL)) {
-            continue;
-        }
-        if (*format == AV_PIX_FMT_YUV420P) {
-            hasYuv420p = true;
-        }
-        if (*format == AV_PIX_FMT_NV12) {
-            hasNv12 = true;
-        }
-        if (firstSoftware == AV_PIX_FMT_NONE) {
-            firstSoftware = *format;
-        }
-    }
-    if (hasYuv420p) {
-        return AV_PIX_FMT_YUV420P;
-    }
-    if (hasNv12) {
-        return AV_PIX_FMT_NV12;
-    }
-    return firstSoftware != AV_PIX_FMT_NONE ? firstSoftware : AV_PIX_FMT_YUV420P;
-}
-
-/**
- * 【录制】【库内编码】估算需要显式码率的编码器目标码率。
- * @param size 编码尺寸。
- * @param fps 目标帧率。
- * @return 码率（bit/s）。
- */
-qint64 estimatedVideoBitRate(QSize size, int fps)
-{
-    const qint64 pixelRate = static_cast<qint64>(size.width()) * size.height() * std::max(1, fps);
-    return std::max<qint64>(1000000, pixelRate / 10);
-}
-
-#endif
 
 }  // namespace
 
@@ -175,6 +95,13 @@ public:
     bool finish(QString *error);
 
     /**
+     * 设置暂停状态，暂停时停止音频采集。
+     * @param paused 暂停时为 true。
+     * @return 无返回值。
+     */
+    void setPaused(bool paused);
+
+    /**
      * 取消编码并释放资源。
      * @return 无返回值。
      */
@@ -182,21 +109,13 @@ public:
 
 private:
     /**
-     * 初始化输出容器。
-     * @param outputPath 输出路径。
-     * @param error 输出错误信息。
-     * @return 初始化成功时返回 true。
-     */
-    bool openOutput(const QString &outputPath, QString *error);
-
-    /**
-     * 初始化视频编码器。
+     * 初始化视频编码器、编码帧与像素转换器。
      * @param encoder 编码器候选。
      * @param fps 目标帧率。
      * @param error 输出错误信息。
      * @return 初始化成功时返回 true。
      */
-    bool openEncoder(const RecordingVideoEncoderOptions &encoder, int fps, QString *error);
+    bool openVideo(const RecordingVideoEncoderOptions &encoder, int fps, QString *error);
 
     /**
      * 初始化音频编码器和采集器。
@@ -249,27 +168,29 @@ private:
     void cleanup();
 
 #ifdef HAVE_LIBAV_RECORDING
-    AVFormatContext *m_formatContext = nullptr;
+    LibavMuxer m_muxer;
+    LibavHwEncoderContext m_hardware;
+    LibavVideoScaler m_scaler;
     AVCodecContext *m_codecContext = nullptr;
     AVStream *m_stream = nullptr;
     AVFrame *m_frame = nullptr;
     AVPacket *m_packet = nullptr;
-    SwsContext *m_swsContext = nullptr;
-    AVPixelFormat m_encodePixelFormat = AV_PIX_FMT_YUV420P;
+    bool m_hardwareFrames = false;
 #endif
     RecordingFrameConverter m_converter;
     LibavAudioEncoder m_audioEncoder;
     std::unique_ptr<AudioCaptureReader> m_audioReader;
-    QByteArray m_outputPathBytes;
+    RecordingQualityProfile m_quality;
     QSize m_frameSize;
     QSize m_encodedSize;
-    std::mutex m_writeMutex;
     std::atomic<bool> m_audioFailed{false};
     int m_fps = 30;
     int64_t m_nextPts = 0;
     bool m_started = false;
     bool m_enableAudio = false;
     bool m_audioCaptureStarted = false;
+    bool m_audioResumePending = false;
+    bool m_paused = false;
 };
 
 bool LibavRecordingProcessPrivate::start(const RecordingOptions &options,
@@ -300,8 +221,14 @@ bool LibavRecordingProcessPrivate::start(const RecordingOptions &options,
     m_enableAudio = options.includeAudio;
     m_audioFailed = false;
     m_audioCaptureStarted = false;
+    m_audioResumePending = false;
+    m_paused = false;
 
-    if (!openOutput(options.outputPath, error) || !openEncoder(encoder, m_fps, error)) {
+    m_quality = recordingQualityProfile(options.quality, m_fps);
+
+    // 1. 先打开容器，编码器需要据此判断是否输出全局头
+    if (!m_muxer.open(options.outputPath, recordingContainerMuxerName(options.container), error)
+        || !openVideo(encoder, m_fps, error)) {
         cleanup();
         return false;
     }
@@ -310,15 +237,70 @@ bool LibavRecordingProcessPrivate::start(const RecordingOptions &options,
         return false;
     }
 
-    int result = avformat_write_header(m_formatContext, nullptr);
-    if (result < 0) {
+    if (!m_muxer.writeHeader(error)) {
         cleanup();
-        return failWith(error,
-                        QStringLiteral("Failed to write libav output header: %1")
-                            .arg(libavErrorText(result)));
+        return false;
     }
     m_started = true;
     return true;
+#endif
+}
+
+bool LibavRecordingProcessPrivate::openVideo(const RecordingVideoEncoderOptions &encoder,
+                                             int fps,
+                                             QString *error)
+{
+#ifndef HAVE_LIBAV_RECORDING
+    Q_UNUSED(encoder)
+    Q_UNUSED(fps)
+    return failWith(error, QStringLiteral("FFmpeg libraries are not linked"));
+#else
+    // 1. 打开编码器，需要显存帧的编码器在此完成帧池创建与绑定
+    LibavVideoEncoderRequest request;
+    request.encoder = encoder;
+    request.quality = m_quality;
+    request.encodedSize = m_encodedSize;
+    request.fps = fps;
+    request.globalHeader = m_muxer.needsGlobalHeader();
+
+    LibavVideoEncoderResult result;
+    if (!openVideoEncoder(request, &m_hardware, &result, error)) {
+        return false;
+    }
+    m_codecContext = result.codecContext;
+    m_hardwareFrames = result.hardwareFrames;
+
+    // 2. 建立输出流并复制编码参数
+    m_stream = avformat_new_stream(m_muxer.formatContext(), result.codec);
+    if (!m_stream) {
+        return failWith(error, QStringLiteral("Failed to create libav video stream"));
+    }
+    const int parametersResult = avcodec_parameters_from_context(m_stream->codecpar, m_codecContext);
+    if (parametersResult < 0) {
+        return failWith(error,
+                        QStringLiteral("Failed to copy libav codec parameters: %1")
+                            .arg(libavErrorText(parametersResult)));
+    }
+    m_stream->time_base = m_codecContext->time_base;
+
+    // 3. 分配系统内存编码帧，硬件编码时它承担上传前的暂存
+    m_frame = av_frame_alloc();
+    m_packet = av_packet_alloc();
+    if (!m_frame || !m_packet) {
+        return failWith(error, QStringLiteral("Failed to allocate libav frame or packet"));
+    }
+    m_frame->format = result.scalerFormat;
+    m_frame->width = m_encodedSize.width();
+    m_frame->height = m_encodedSize.height();
+    const int bufferResult = av_frame_get_buffer(m_frame, 32);
+    if (bufferResult < 0) {
+        return failWith(error,
+                        QStringLiteral("Failed to allocate libav frame buffer: %1")
+                            .arg(libavErrorText(bufferResult)));
+    }
+
+    // 4. 源与目标尺寸一致，像素转换可按行切片并行
+    return m_scaler.prepare(m_encodedSize, m_encodedSize, result.scalerFormat, error);
 #endif
 }
 
@@ -347,7 +329,16 @@ bool LibavRecordingProcessPrivate::writeFrame(const RecordingFrameSample &sample
         return false;
     }
     m_frame->pts = m_nextPts++;
-    return encodeFrame(m_frame, error);
+
+    // 硬件编码需要把系统内存帧上传到显存后再送入编码器
+    AVFrame *encodeInput = m_frame;
+    if (m_hardwareFrames) {
+        encodeInput = m_hardware.upload(m_frame, error);
+        if (!encodeInput) {
+            return false;
+        }
+    }
+    return encodeFrame(encodeInput, error);
 #endif
 }
 
@@ -365,9 +356,14 @@ bool LibavRecordingProcessPrivate::writeRepeatFrame(QString *error)
     if (m_nextPts <= 0) {
         return failWith(error, QStringLiteral("libav writer has no previous frame to repeat"));
     }
-    // 补帧复用 m_frame 中上一帧已转换像素，只推进 pts，避免重复 sws_scale
-    m_frame->pts = m_nextPts++;
-    return encodeFrame(m_frame, error);
+
+    // 补帧复用上一帧已转换像素，只推进 pts，避免重复执行像素转换与显存上传
+    AVFrame *repeated = m_hardwareFrames ? m_hardware.lastUploadedFrame() : m_frame;
+    if (!repeated) {
+        return failWith(error, QStringLiteral("libav writer has no previous frame to repeat"));
+    }
+    repeated->pts = m_nextPts++;
+    return encodeFrame(repeated, error);
 #endif
 }
 
@@ -393,19 +389,42 @@ bool LibavRecordingProcessPrivate::finish(QString *error)
         cleanup();
         return false;
     }
-    if (m_enableAudio && !m_audioEncoder.flush(m_writeMutex, error)) {
+    if (m_enableAudio && !m_audioEncoder.flush(m_muxer.writeMutex(), error)) {
         cleanup();
         return false;
     }
-    const int result = av_write_trailer(m_formatContext);
+    const bool ok = m_muxer.writeTrailer(error);
     cleanup();
-    if (result < 0) {
-        return failWith(error,
-                        QStringLiteral("Failed to write libav output trailer: %1")
-                            .arg(libavErrorText(result)));
-    }
-    return true;
+    return ok;
 #endif
+}
+
+void LibavRecordingProcessPrivate::setPaused(bool paused)
+{
+    if (m_paused == paused) {
+        return;
+    }
+    m_paused = paused;
+    if (!m_enableAudio || !m_audioReader) {
+        return;
+    }
+
+    // 1. 暂停时停止音频采集，音频编码器的样本计数随之停住，恢复后不会出现错位
+    if (paused) {
+        if (m_audioCaptureStarted) {
+            m_audioReader->stop();
+            m_audioCaptureStarted = false;
+            m_audioResumePending = true;
+        }
+        return;
+    }
+
+    // 2. 只恢复此前确实在采集的音频，尚未收到首帧时保持等待
+    if (m_audioResumePending) {
+        m_audioResumePending = false;
+        m_audioCaptureStarted = true;
+        m_audioReader->start();
+    }
 }
 
 void LibavRecordingProcessPrivate::cancel()
@@ -423,7 +442,7 @@ bool LibavRecordingProcessPrivate::openAudio(QString *error)
         return failWith(error, recordingAudioUnavailableText());
     }
     const int audioSampleRate = m_audioReader->preferredSampleRate();
-    if (!m_audioEncoder.open(m_formatContext, audioSampleRate, error)) {
+    if (!m_audioEncoder.open(m_muxer.formatContext(), audioSampleRate, error)) {
         return false;
     }
     if (!m_audioReader->init(m_audioEncoder.frameBytes(),
@@ -451,133 +470,13 @@ void LibavRecordingProcessPrivate::startAudioCaptureIfNeeded()
 
 void LibavRecordingProcessPrivate::encodeAudioSample(const AudioCaptureSample &sample)
 {
+#ifndef HAVE_LIBAV_RECORDING
+    Q_UNUSED(sample)
+#else
     QString error;
-    if (!m_audioEncoder.encode(sample, m_writeMutex, &error)) {
+    if (!m_audioEncoder.encode(sample, m_muxer.writeMutex(), &error)) {
         m_audioFailed = true;
     }
-}
-
-bool LibavRecordingProcessPrivate::openOutput(const QString &outputPath, QString *error)
-{
-#ifndef HAVE_LIBAV_RECORDING
-    Q_UNUSED(outputPath)
-    return failWith(error, QStringLiteral("FFmpeg libraries are not linked"));
-#else
-    m_outputPathBytes = QFile::encodeName(outputPath);
-    int result = avformat_alloc_output_context2(&m_formatContext,
-                                                nullptr,
-                                                nullptr,
-                                                m_outputPathBytes.constData());
-    if (result < 0 || !m_formatContext) {
-        return failWith(error,
-                        QStringLiteral("Failed to allocate libav output context: %1")
-                            .arg(libavErrorText(result)));
-    }
-    if (!(m_formatContext->oformat->flags & AVFMT_NOFILE)) {
-        result = avio_open(&m_formatContext->pb, m_outputPathBytes.constData(), AVIO_FLAG_WRITE);
-        if (result < 0) {
-            return failWith(error,
-                            QStringLiteral("Failed to open libav output file: %1")
-                                .arg(libavErrorText(result)));
-        }
-    }
-    return true;
-#endif
-}
-
-bool LibavRecordingProcessPrivate::openEncoder(const RecordingVideoEncoderOptions &encoder,
-                                               int fps,
-                                               QString *error)
-{
-#ifndef HAVE_LIBAV_RECORDING
-    Q_UNUSED(encoder)
-    Q_UNUSED(fps)
-    return failWith(error, QStringLiteral("FFmpeg libraries are not linked"));
-#else
-    const QByteArray encoderName = encoder.id.toUtf8();
-    const AVCodec *codec = avcodec_find_encoder_by_name(encoderName.constData());
-    if (!codec) {
-        return failWith(error,
-                        QStringLiteral("encoder %1 is not available in FFmpeg libraries")
-                            .arg(encoder.id));
-    }
-
-    m_stream = avformat_new_stream(m_formatContext, codec);
-    if (!m_stream) {
-        return failWith(error, QStringLiteral("Failed to create libav video stream"));
-    }
-
-    m_codecContext = avcodec_alloc_context3(codec);
-    if (!m_codecContext) {
-        return failWith(error, QStringLiteral("Failed to allocate libav codec context"));
-    }
-    m_encodePixelFormat = chooseEncoderPixelFormat(codec);
-    m_codecContext->width = m_encodedSize.width();
-    m_codecContext->height = m_encodedSize.height();
-    m_codecContext->pix_fmt = m_encodePixelFormat;
-    m_codecContext->time_base = AVRational{1, fps};
-    m_codecContext->framerate = AVRational{fps, 1};
-    m_codecContext->gop_size = fps;
-    m_codecContext->max_b_frames = 0;
-    // 0 表示自动按 CPU 核数分配编码线程，默认值 1 会让 libx264 单线程运行
-    m_codecContext->thread_count = 0;
-    if (m_formatContext->oformat->flags & AVFMT_GLOBALHEADER) {
-        m_codecContext->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
-    }
-    if (encoder.hardware || encoder.id == QStringLiteral("mpeg4")) {
-        m_codecContext->bit_rate = estimatedVideoBitRate(m_encodedSize, fps);
-    }
-
-    AVDictionary *codecOptions = nullptr;
-    if (encoder.id == QStringLiteral("libx264")) {
-        av_dict_set(&codecOptions, "preset", fps >= 48 ? "ultrafast" : "veryfast", 0);
-        av_dict_set(&codecOptions, "crf", "23", 0);
-    }
-    int result = avcodec_open2(m_codecContext, codec, &codecOptions);
-    av_dict_free(&codecOptions);
-    if (result < 0) {
-        return failWith(error,
-                        QStringLiteral("Failed to open libav video encoder %1: %2")
-                            .arg(encoder.id, libavErrorText(result)));
-    }
-
-    result = avcodec_parameters_from_context(m_stream->codecpar, m_codecContext);
-    if (result < 0) {
-        return failWith(error,
-                        QStringLiteral("Failed to copy libav codec parameters: %1")
-                            .arg(libavErrorText(result)));
-    }
-    m_stream->time_base = m_codecContext->time_base;
-
-    m_frame = av_frame_alloc();
-    m_packet = av_packet_alloc();
-    if (!m_frame || !m_packet) {
-        return failWith(error, QStringLiteral("Failed to allocate libav frame or packet"));
-    }
-    m_frame->format = m_codecContext->pix_fmt;
-    m_frame->width = m_codecContext->width;
-    m_frame->height = m_codecContext->height;
-    result = av_frame_get_buffer(m_frame, 32);
-    if (result < 0) {
-        return failWith(error,
-                        QStringLiteral("Failed to allocate libav frame buffer: %1")
-                            .arg(libavErrorText(result)));
-    }
-
-    m_swsContext = sws_getContext(m_frameSize.width(),
-                                  m_frameSize.height(),
-                                  AV_PIX_FMT_BGRA,
-                                  m_encodedSize.width(),
-                                  m_encodedSize.height(),
-                                  m_encodePixelFormat,
-                                  SWS_FAST_BILINEAR,
-                                  nullptr,
-                                  nullptr,
-                                  nullptr);
-    if (!m_swsContext) {
-        return failWith(error, QStringLiteral("Failed to create libav scale context"));
-    }
-    return true;
 #endif
 }
 
@@ -609,22 +508,13 @@ bool LibavRecordingProcessPrivate::fillVideoFrame(RecordingBgraFrame bytes, QStr
                         QStringLiteral("Failed to make libav frame writable: %1")
                             .arg(libavErrorText(result)));
     }
-    const char *source = bytes.data;
-    int sourceStride = bytes.stride > 0 ? bytes.stride : m_frameSize.width() * 4;
-    if (bytes.yInverted) {
-        source += static_cast<qsizetype>(sourceStride) * (m_frameSize.height() - 1);
-        sourceStride = -sourceStride;
-    }
-    const uint8_t *sourceData[] = {reinterpret_cast<const uint8_t *>(source)};
-    const int sourceLineSize[] = {sourceStride};
-    sws_scale(m_swsContext,
-              sourceData,
-              sourceLineSize,
-              0,
-              m_frameSize.height(),
-              m_frame->data,
-              m_frame->linesize);
-    return true;
+    const int stride = bytes.stride > 0 ? bytes.stride : m_frameSize.width() * 4;
+    return m_scaler.convert(bytes.data,
+                            stride,
+                            m_frameSize.height(),
+                            bytes.yInverted,
+                            m_frame,
+                            error);
 #endif
 }
 
@@ -653,15 +543,10 @@ bool LibavRecordingProcessPrivate::encodeFrame(AVFrame *frame, QString *error)
         }
         av_packet_rescale_ts(m_packet, m_codecContext->time_base, m_stream->time_base);
         m_packet->stream_index = m_stream->index;
-        {
-            std::lock_guard<std::mutex> lock(m_writeMutex);
-            result = av_interleaved_write_frame(m_formatContext, m_packet);
-        }
+        const bool written = m_muxer.writePacket(m_packet, error);
         av_packet_unref(m_packet);
-        if (result < 0) {
-            return failWith(error,
-                            QStringLiteral("Failed to write libav packet: %1")
-                                .arg(libavErrorText(result)));
+        if (!written) {
+            return false;
         }
     }
     return true;
@@ -680,26 +565,19 @@ void LibavRecordingProcessPrivate::cleanup()
     if (m_codecContext && m_started) {
         avcodec_flush_buffers(m_codecContext);
     }
+    m_scaler.reset();
     if (m_frame) {
         av_frame_free(&m_frame);
     }
     if (m_packet) {
         av_packet_free(&m_packet);
     }
-    if (m_swsContext) {
-        sws_freeContext(m_swsContext);
-        m_swsContext = nullptr;
-    }
     if (m_codecContext) {
         avcodec_free_context(&m_codecContext);
     }
-    if (m_formatContext) {
-        if (m_formatContext->pb) {
-            avio_closep(&m_formatContext->pb);
-        }
-        avformat_free_context(m_formatContext);
-        m_formatContext = nullptr;
-    }
+    m_hardware.reset();
+    m_hardwareFrames = false;
+    m_muxer.close();
     m_stream = nullptr;
 #endif
     m_started = false;
@@ -734,6 +612,11 @@ bool LibavRecordingProcess::writeRepeatFrame(QString *error)
 bool LibavRecordingProcess::finish(QString *error)
 {
     return m_impl->finish(error);
+}
+
+void LibavRecordingProcess::setPaused(bool paused)
+{
+    m_impl->setPaused(paused);
 }
 
 void LibavRecordingProcess::cancel()

@@ -19,11 +19,15 @@ struct SingleInstanceCommand {
     bool allOutputs = false;
     bool recordingStatus = false;
     bool stopRecording = false;
+    bool pauseRecording = false;
+    bool resumeRecording = false;
+    bool togglePauseRecording = false;
 };
 
 struct SingleInstanceResponse {
     bool handled = false;
     bool stopped = false;
+    bool paused = false;
     QString message;
     markshot::recording::RecordingStatus recording;
 };

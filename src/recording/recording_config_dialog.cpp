@@ -137,6 +137,102 @@ void populateBackendOptions(QComboBox *combo, RecordingCaptureBackend requested)
 }
 
 /**
+ * 填充容器格式下拉框。
+ * @param combo 容器格式下拉框。
+ * @param requested 请求的容器格式。
+ * @return 无返回值。
+ */
+void populateContainerOptions(QComboBox *combo, RecordingContainerFormat requested)
+{
+    if (!combo) {
+        return;
+    }
+    combo->clear();
+    combo->addItem(QStringLiteral("MP4"), static_cast<int>(RecordingContainerFormat::Mp4));
+    combo->addItem(QStringLiteral("MKV"), static_cast<int>(RecordingContainerFormat::Mkv));
+    const int index = combo->findData(static_cast<int>(requested));
+    combo->setCurrentIndex(index >= 0 ? index : 0);
+    combo->setToolTip(MS_TR("MKV keeps a playable file if the recording is interrupted."));
+}
+
+/**
+ * 填充质量档位下拉框。
+ * @param combo 质量档位下拉框。
+ * @param requested 请求的质量档位。
+ * @return 无返回值。
+ */
+void populateQualityOptions(QComboBox *combo, RecordingQuality requested)
+{
+    if (!combo) {
+        return;
+    }
+    combo->clear();
+    combo->addItem(MS_TR("Balanced"), static_cast<int>(RecordingQuality::Balanced));
+    combo->addItem(MS_TR("Higher quality"), static_cast<int>(RecordingQuality::High));
+    combo->addItem(MS_TR("Smaller file"), static_cast<int>(RecordingQuality::Efficient));
+    const int index = combo->findData(static_cast<int>(requested));
+    combo->setCurrentIndex(index >= 0 ? index : 0);
+}
+
+/**
+ * 填充起录倒计时下拉框。
+ * @param combo 倒计时下拉框。
+ * @param requestedSeconds 请求的倒计时秒数。
+ * @return 无返回值。
+ */
+void populateCountdownOptions(QComboBox *combo, int requestedSeconds)
+{
+    if (!combo) {
+        return;
+    }
+    combo->clear();
+    combo->addItem(MS_TR("Off"), 0);
+    for (int seconds : {3, 5}) {
+        combo->addItem(MS_TR("%1 seconds").arg(seconds), seconds);
+    }
+    const int index = combo->findData(requestedSeconds);
+    combo->setCurrentIndex(index >= 0 ? index : 0);
+}
+
+/**
+ * 从下拉框数据读取容器格式。
+ * @param combo 容器格式下拉框。
+ * @return 容器格式。
+ */
+RecordingContainerFormat containerFromCombo(const QComboBox *combo)
+{
+    bool ok = false;
+    const int value = combo ? combo->currentData().toInt(&ok) : 0;
+    if (ok && static_cast<RecordingContainerFormat>(value) == RecordingContainerFormat::Mkv) {
+        return RecordingContainerFormat::Mkv;
+    }
+    return RecordingContainerFormat::Mp4;
+}
+
+/**
+ * 从下拉框数据读取质量档位。
+ * @param combo 质量档位下拉框。
+ * @return 质量档位。
+ */
+RecordingQuality qualityFromCombo(const QComboBox *combo)
+{
+    bool ok = false;
+    const int value = combo ? combo->currentData().toInt(&ok) : 0;
+    if (!ok) {
+        return RecordingQuality::Balanced;
+    }
+    switch (static_cast<RecordingQuality>(value)) {
+    case RecordingQuality::Efficient:
+        return RecordingQuality::Efficient;
+    case RecordingQuality::High:
+        return RecordingQuality::High;
+    case RecordingQuality::Balanced:
+        break;
+    }
+    return RecordingQuality::Balanced;
+}
+
+/**
  * 从下拉框数据读取录制模式。
  * @param combo 录制模式下拉框。
  * @param fallback 默认录制模式。
@@ -234,6 +330,18 @@ RecordingConfigDialog::RecordingConfigDialog(RecordingMode mode, QWidget *parent
     }
     form->addRow(MS_TR("Display"), m_display);
 
+    m_container = new QComboBox(this);
+    populateContainerOptions(m_container, persisted.container);
+    form->addRow(MS_TR("Container"), m_container);
+
+    m_quality = new QComboBox(this);
+    populateQualityOptions(m_quality, persisted.quality);
+    form->addRow(MS_TR("Quality"), m_quality);
+
+    m_countdown = new QComboBox(this);
+    populateCountdownOptions(m_countdown, persisted.countdownSeconds);
+    form->addRow(MS_TR("Countdown"), m_countdown);
+
     m_backend = new QComboBox(this);
     populateBackendOptions(m_backend, persisted.backend);
     form->addRow(MS_TR("Recording Backend"), m_backend);
@@ -246,8 +354,10 @@ RecordingConfigDialog::RecordingConfigDialog(RecordingMode mode, QWidget *parent
     form->addRow(MS_TR("Capture Area"), m_scope);
 
     m_outputPath = new QLineEdit(persisted.outputPath.isEmpty()
-                                     ? defaultRecordingPath(m_mode)
-                                     : normalizedRecordingPath(persisted.outputPath, m_mode),
+                                     ? defaultRecordingPath(m_mode, persisted.container)
+                                     : normalizedRecordingPath(persisted.outputPath,
+                                                               m_mode,
+                                                               persisted.container),
                                  this);
     m_outputPathTouched = false;
     auto *outputRow = new QWidget(this);
@@ -281,11 +391,12 @@ RecordingConfigDialog::RecordingConfigDialog(RecordingMode mode, QWidget *parent
         }
         populateFrameRateOptions(m_fps, m_mode, fpsForMode(m_mode));
         updateAudioControls();
-        if (m_outputPath) {
-            m_outputPath->setText(preserveOutput
-                                      ? normalizedRecordingPath(m_outputPath->text(), m_mode)
-                                      : defaultRecordingPath(m_mode));
-        }
+        updateVideoOnlyControls();
+        refreshOutputExtension(preserveOutput);
+    });
+    connect(m_container, &QComboBox::currentIndexChanged, this, [this] {
+        // 切换容器后输出文件的扩展名要同步跟随
+        refreshOutputExtension(m_outputPathTouched);
     });
     connect(m_outputPath, &QLineEdit::textEdited, this, [this] {
         m_outputPathTouched = true;
@@ -294,6 +405,7 @@ RecordingConfigDialog::RecordingConfigDialog(RecordingMode mode, QWidget *parent
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
     updateAudioControls();
+    updateVideoOnlyControls();
 }
 
 RecordingOptions RecordingConfigDialog::options() const
@@ -306,8 +418,15 @@ RecordingOptions RecordingConfigDialog::options() const
     result.fps = fpsOk ? selectedFps : fallbackFps;
     result.includeAudio = m_audio && m_audio->isEnabled() && m_audio->isChecked();
     result.captureBackend = backendFromCombo(m_backend);
+    bool countdownOk = false;
+    const int countdown = m_countdown ? m_countdown->currentData().toInt(&countdownOk) : 0;
+    result.countdownSeconds = countdownOk ? countdown : 0;
+    result.container = containerFromCombo(m_container);
+    result.quality = qualityFromCombo(m_quality);
     result.scope = static_cast<RecordingScope>(m_scope ? m_scope->currentData().toInt() : static_cast<int>(RecordingScope::Region));
-    result.outputPath = normalizedRecordingPath(m_outputPath ? m_outputPath->text() : QString(), m_mode);
+    result.outputPath = normalizedRecordingPath(m_outputPath ? m_outputPath->text() : QString(),
+                                                m_mode,
+                                                result.container);
 
     const int sourceIndex = m_display ? m_display->currentData().toInt() : -1;
     if (sourceIndex >= 0 && sourceIndex < m_sources.size()) {
@@ -321,16 +440,43 @@ RecordingOptions RecordingConfigDialog::options() const
 
 void RecordingConfigDialog::browseOutputPath()
 {
+    const RecordingContainerFormat container = containerFromCombo(m_container);
+    const QString extension = recordingContainerExtension(container);
     const QString filter = m_mode == RecordingMode::Gif
         ? MS_TR("GIF Images (*.gif)")
-        : MS_TR("MP4 Videos (*.mp4)");
-    const QString path = QFileDialog::getSaveFileName(this,
-                                                      MS_TR("Save Recording"),
-                                                      m_outputPath ? m_outputPath->text() : defaultRecordingPath(m_mode),
-                                                      filter);
+        : MS_TR("Videos (*.%1)").arg(extension);
+    const QString path = QFileDialog::getSaveFileName(
+        this,
+        MS_TR("Save Recording"),
+        m_outputPath ? m_outputPath->text() : defaultRecordingPath(m_mode, container),
+        filter);
     if (!path.isEmpty() && m_outputPath) {
         m_outputPathTouched = true;
-        m_outputPath->setText(normalizedRecordingPath(path, m_mode));
+        m_outputPath->setText(normalizedRecordingPath(path, m_mode, container));
+    }
+}
+
+void RecordingConfigDialog::refreshOutputExtension(bool preserveCurrentPath)
+{
+    if (!m_outputPath) {
+        return;
+    }
+    const RecordingContainerFormat container = containerFromCombo(m_container);
+    const bool reusable = preserveCurrentPath && !m_outputPath->text().trimmed().isEmpty();
+    m_outputPath->setText(reusable
+                              ? normalizedRecordingPath(m_outputPath->text(), m_mode, container)
+                              : defaultRecordingPath(m_mode, container));
+}
+
+void RecordingConfigDialog::updateVideoOnlyControls()
+{
+    // GIF 使用自身容器与逐帧调色板，容器与质量档位仅对视频有效
+    const bool videoMode = m_mode == RecordingMode::Video;
+    if (m_container) {
+        m_container->setEnabled(videoMode);
+    }
+    if (m_quality) {
+        m_quality->setEnabled(videoMode);
     }
 }
 

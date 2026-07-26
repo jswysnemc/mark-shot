@@ -37,6 +37,21 @@ public:
     bool stop(QString *error);
 
     /**
+     * 设置当前录制的暂停状态。
+     * @param paused 暂停时为 true。
+     * @param error 输出错误信息。
+     * @return 状态发生变化时返回 true。
+     */
+    bool setPaused(bool paused, QString *error = nullptr);
+
+    /**
+     * 在暂停与继续之间切换。
+     * @param error 输出错误信息。
+     * @return 切换成功时返回 true。
+     */
+    bool togglePause(QString *error = nullptr);
+
+    /**
      * 读取当前录制状态。
      * @return 录制状态。
      */

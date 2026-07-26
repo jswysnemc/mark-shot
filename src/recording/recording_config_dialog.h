@@ -41,6 +41,19 @@ private:
     void updateAudioControls();
 
     /**
+     * 按录制模式更新容器与质量控件可用状态。
+     * @return 无返回值。
+     */
+    void updateVideoOnlyControls();
+
+    /**
+     * 按当前模式与容器刷新输出路径扩展名。
+     * @param preserveCurrentPath 为 true 时保留用户已输入的路径主体。
+     * @return 无返回值。
+     */
+    void refreshOutputExtension(bool preserveCurrentPath);
+
+    /**
      * 读取指定录制模式的帧率状态。
      * @param mode 录制模式。
      * @return 帧率。
@@ -65,6 +78,9 @@ private:
     QComboBox *m_display = nullptr;
     QComboBox *m_backend = nullptr;
     QComboBox *m_scope = nullptr;
+    QComboBox *m_countdown = nullptr;
+    QComboBox *m_container = nullptr;
+    QComboBox *m_quality = nullptr;
     QLineEdit *m_outputPath = nullptr;
     bool m_outputPathTouched = false;
 };

@@ -57,6 +57,13 @@ public:
      */
     void setBackpressureActive(bool active);
 
+    /**
+     * 设置录制暂停状态，暂停期间采集流不再产生帧。
+     * @param paused 暂停时为 true。
+     * @return 无返回值。
+     */
+    void setPaused(bool paused);
+
 signals:
     void frameReady(const RecordingFrameSample &sample);
     void failed(const QString &error);
@@ -108,6 +115,12 @@ private:
      */
     void continueCaptureFallback(RecordingCaptureStream *stream, const QString &error);
 
+    /**
+     * 把背压与暂停合并后的抑制状态下发到采集流。
+     * @return 无返回值。
+     */
+    void applySuppression();
+
     RecordingOptions m_options;
     RecordingCaptureStreamFactory m_streamFactory;
     QVector<RecordingCaptureBackend> m_captureBackends;
@@ -115,6 +128,7 @@ private:
     RecordingCaptureBackend m_activeBackend = RecordingCaptureBackend::Auto;
     int m_nextBackendIndex = 0;
     bool m_backpressureActive = false;
+    bool m_paused = false;
     bool m_running = false;
     bool m_receivedFirstFrame = false;
     bool m_fallbackPending = false;

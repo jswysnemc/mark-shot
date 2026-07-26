@@ -2,16 +2,21 @@
 
 #include "recording/recording_options.h"
 
+#include <QRect>
 #include <QString>
 
 namespace markshot::recording {
 
 struct RecordingStatus {
     bool active = false;
+    bool paused = false;
     RecordingMode mode = RecordingMode::Gif;
     int fps = 0;
     int frameCount = 0;
     qint64 elapsedMs = 0;
+    RecordingScope scope = RecordingScope::Region;
+    QRect captureGeometry;
+    QString screenName;
     QString outputPath;
 };
 

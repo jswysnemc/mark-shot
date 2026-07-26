@@ -122,7 +122,7 @@ jobs:
           fi
           test -n "$PLUGIN"
           ldd "$PLUGIN" | grep -Ei 'LayerShellQt|layershell'
-          for library in libavcodec libavformat libavutil libswresample libswscale; do
+          for library in libavcodec libavfilter libavformat libavutil libswresample libswscale; do
             ldd "$BINARY" | grep -F "$library"
           done
 

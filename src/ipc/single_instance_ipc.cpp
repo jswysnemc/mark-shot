@@ -19,6 +19,7 @@ QJsonObject recordingStatusToJson(const markshot::recording::RecordingStatus &st
 {
     QJsonObject object;
     object.insert(QStringLiteral("active"), status.active);
+    object.insert(QStringLiteral("paused"), status.paused);
     object.insert(QStringLiteral("mode"), markshot::recording::recordingModeName(status.mode));
     object.insert(QStringLiteral("fps"), status.fps);
     object.insert(QStringLiteral("frameCount"), status.frameCount);
@@ -36,6 +37,7 @@ markshot::recording::RecordingStatus recordingStatusFromJson(const QJsonObject &
 {
     markshot::recording::RecordingStatus status;
     status.active = object.value(QStringLiteral("active")).toBool(false);
+    status.paused = object.value(QStringLiteral("paused")).toBool(false);
     status.mode = object.value(QStringLiteral("mode")).toString() == QStringLiteral("video")
         ? markshot::recording::RecordingMode::Video
         : markshot::recording::RecordingMode::Gif;
@@ -59,6 +61,9 @@ QByteArray encodeCommand(const SingleInstanceCommand &command)
     object.insert(QStringLiteral("allOutputs"), command.allOutputs);
     object.insert(QStringLiteral("recordingStatus"), command.recordingStatus);
     object.insert(QStringLiteral("stopRecording"), command.stopRecording);
+    object.insert(QStringLiteral("pauseRecording"), command.pauseRecording);
+    object.insert(QStringLiteral("resumeRecording"), command.resumeRecording);
+    object.insert(QStringLiteral("togglePauseRecording"), command.togglePauseRecording);
     return QJsonDocument(object).toJson(QJsonDocument::Compact) + '\n';
 }
 
@@ -85,6 +90,9 @@ std::optional<SingleInstanceCommand> decodeCommand(const QByteArray &payload)
     command.allOutputs = object.value(QStringLiteral("allOutputs")).toBool(false);
     command.recordingStatus = object.value(QStringLiteral("recordingStatus")).toBool(false);
     command.stopRecording = object.value(QStringLiteral("stopRecording")).toBool(false);
+    command.pauseRecording = object.value(QStringLiteral("pauseRecording")).toBool(false);
+    command.resumeRecording = object.value(QStringLiteral("resumeRecording")).toBool(false);
+    command.togglePauseRecording = object.value(QStringLiteral("togglePauseRecording")).toBool(false);
     return command;
 }
 
@@ -105,6 +113,7 @@ std::optional<SingleInstanceResponse> decodeResponse(const QByteArray &payload)
     SingleInstanceResponse response;
     response.handled = object.value(QStringLiteral("handled")).toBool(false);
     response.stopped = object.value(QStringLiteral("stopped")).toBool(false);
+    response.paused = object.value(QStringLiteral("paused")).toBool(false);
     response.message = object.value(QStringLiteral("message")).toString();
     response.recording = recordingStatusFromJson(object.value(QStringLiteral("recording")).toObject());
     return response;
@@ -229,6 +238,7 @@ QJsonObject responseToJsonObject(const SingleInstanceResponse &response)
     QJsonObject object;
     object.insert(QStringLiteral("handled"), response.handled);
     object.insert(QStringLiteral("stopped"), response.stopped);
+    object.insert(QStringLiteral("paused"), response.paused);
     object.insert(QStringLiteral("message"), response.message);
     object.insert(QStringLiteral("recording"), recordingStatusToJson(response.recording));
     return object;

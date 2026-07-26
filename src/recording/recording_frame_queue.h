@@ -47,6 +47,12 @@ public:
      */
     int droppedFrames() const;
 
+    /**
+     * 读取当前队列容量。
+     * @return 最大待写帧数。
+     */
+    int capacity() const;
+
 private:
     int m_capacity = 2;
     int m_pending = 0;

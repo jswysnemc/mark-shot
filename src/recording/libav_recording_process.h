@@ -56,6 +56,13 @@ public:
     bool finish(QString *error);
 
     /**
+     * 设置暂停状态，暂停时停止音频采集。
+     * @param paused 暂停时为 true。
+     * @return 无返回值。
+     */
+    void setPaused(bool paused);
+
+    /**
      * 取消当前库内编码任务。
      * @return 无返回值。
      */

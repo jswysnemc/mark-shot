@@ -1,5 +1,6 @@
 #include "notifications/app_notifications.h"
 
+#include "notifications/recording_saved_notifier.h"
 #include "recording/recording_options.h"
 #include "ui/i18n.h"
 
@@ -59,9 +60,8 @@ bool notifyRecordingStarted(const recording::RecordingOptions &options)
 
 bool notifyRecordingSaved(const QString &path)
 {
-    return sendDesktopNotification(MS_TR("Recording saved"),
-                                   MS_TR("Saved to %1").arg(path),
-                                   3500);
+    // 录制完成通知带打开目录的动作按钮
+    return RecordingSavedNotifier::instance().notifySaved(path);
 }
 
 bool notifyRecordingFailed(const QString &message)

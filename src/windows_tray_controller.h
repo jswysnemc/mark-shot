@@ -30,6 +30,8 @@ public:
         bool hotkeysEnabled = true;
         QKeySequence captureHotkey = QKeySequence(QStringLiteral("Ctrl+Alt+S"));
         QKeySequence fullscreenHotkey;
+        QKeySequence stopRecordingHotkey;
+        QKeySequence pauseRecordingHotkey;
     };
 
     using Callback = std::function<void()>;
@@ -64,6 +66,9 @@ private:
      */
     void stopRecordingFromTray();
 
+    /// @brief 在托盘中切换录制暂停状态。
+    void togglePauseRecordingFromTray();
+
     /**
      * 刷新托盘中的录制状态和停止动作。
      * @return 无返回值。
@@ -82,11 +87,14 @@ private:
     QAction *m_startRecordingAction = nullptr;
     QAction *m_recordingStatusAction = nullptr;
     QAction *m_stopRecordingAction = nullptr;
+    QAction *m_pauseRecordingAction = nullptr;
     QTimer *m_recordingStatusTimer = nullptr;
     QString m_errorString;
     bool m_nativeEventFilterInstalled = false;
     bool m_captureHotkeyRegistered = false;
     bool m_fullscreenHotkeyRegistered = false;
+    bool m_stopRecordingHotkeyRegistered = false;
+    bool m_pauseRecordingHotkeyRegistered = false;
     GlobalShortcutPortal *m_globalShortcutPortal = nullptr;
 };
 

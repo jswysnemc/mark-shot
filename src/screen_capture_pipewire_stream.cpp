@@ -1,6 +1,7 @@
 #include "screen_capture_pipewire_screencast.h"
 
 #include "pipewire/pipewire_buffer_data_types.h"
+#include "pipewire/pipewire_dmabuf_policy.h"
 #include "pipewire/pipewire_dmabuf_importer.h"
 
 #ifdef HAVE_PIPEWIRE
@@ -217,9 +218,16 @@ bool PortalPipeWireScreencast::startPipeWire(int fd, QString *error)
             params[paramCount++] = buildRawFormatParam(&builder, format, modifierOrder[1]);
         }
     }
-    if (qEnvironmentVariableIsSet("MARK_SHOT_DISABLE_DMABUF")) {
-        markshot::debugLog("screencast",
-                           "【录制】【PipeWire协商】MARK_SHOT_DISABLE_DMABUF=1 force shared-memory");
+    const markshot::pipewire::DmaBufEnvironment dmaBufEnvironment =
+        markshot::pipewire::currentDmaBufEnvironment();
+    if (markshot::pipewire::shouldAvoidDmaBuf(dmaBufEnvironment)) {
+        markshot::debugLog(
+            "screencast",
+            "【录制】【PipeWire协商】force shared-memory kde=%d nvidia=%d render_nodes=%d env_disabled=%d",
+            dmaBufEnvironment.kdeSession ? 1 : 0,
+            dmaBufEnvironment.nvidiaProprietaryDriver ? 1 : 0,
+            dmaBufEnvironment.renderNodeCount,
+            dmaBufEnvironment.disabledByEnvironment ? 1 : 0);
     }
 
     const pw_stream_flags flags = static_cast<pw_stream_flags>(
@@ -498,7 +506,13 @@ QImage PortalPipeWireScreencast::imageFromBuffer(pw_buffer *pipewireBuffer, QStr
         if (!m_dmaBufImporter) {
             m_dmaBufImporter = std::make_unique<markshot::PipeWireDmaBufImporter>();
         }
-        return m_dmaBufImporter->importBuffer(spaBuffer, m_videoInfo, error);
+        QImage imported = m_dmaBufImporter->importBuffer(spaBuffer, m_videoInfo, error);
+        if (imported.isNull() && error && !error->isEmpty()) {
+            // 部分 compositor 与驱动组合导不出可用的 DMA-BUF，提示可切换到共享内存重试
+            *error = QStringLiteral("%1（可设置 MARK_SHOT_DISABLE_DMABUF=1 改用共享内存后重试）")
+                         .arg(*error);
+        }
+        return imported;
     }
 
     const int width = static_cast<int>(m_videoInfo.size.width);

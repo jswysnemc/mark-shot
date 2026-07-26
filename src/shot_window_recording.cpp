@@ -3,6 +3,7 @@
 #include "recording/recording_config_dialog.h"
 #include "recording/recording_start_flow.h"
 #include "recording/recording_session_manager.h"
+#include "recording/ui/recording_countdown.h"
 
 using namespace markshot::shot;
 
@@ -170,16 +171,23 @@ void ShotWindow::startRecording(markshot::recording::RecordingOptions options)
     QApplication::processEvents();
 
     auto &manager = markshot::recording::RecordingSessionManager::instance();
-    QString error;
-    if (!manager.start(options, qApp, &error)) {
-        QApplication::setQuitOnLastWindowClosed(quitOnLastWindowClosed);
-        show();
-        raise();
-        QMessageBox::warning(this,
-                             QStringLiteral("Mark Shot"),
-                             error.isEmpty() ? MS_TR("Recording failed to start") : error);
-        return;
-    }
+    // 倒计时结束后才真正开始采集，给用户切换窗口的时间
+    markshot::recording::ui::runRecordingCountdown(
+        options.countdownSeconds,
+        options.captureGeometry,
+        QGuiApplication::screenAt(options.captureGeometry.center()),
+        [options, quitOnLastWindowClosed] {
+            auto &sessionManager = markshot::recording::RecordingSessionManager::instance();
+            QString startError;
+            if (sessionManager.start(options, qApp, &startError)) {
+                return;
+            }
+            QApplication::setQuitOnLastWindowClosed(quitOnLastWindowClosed);
+            QMessageBox::warning(nullptr,
+                                 QStringLiteral("Mark Shot"),
+                                 startError.isEmpty() ? MS_TR("Recording failed to start")
+                                                      : startError);
+        });
 
     QObject::connect(&manager,
                      &markshot::recording::RecordingSessionManager::recordingFinished,

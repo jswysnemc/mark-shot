@@ -117,20 +117,23 @@ int fpsForModeFromDialogConfig(const QJsonObject &dialog,
  * 从持久化配置读取输出目录并生成新的默认文件名。
  * @param dialog 录制对话框配置对象。
  * @param mode 录制模式。
+ * @param container 视频容器格式。
  * @return 带新时间戳的输出路径。
  */
-QString generatedOutputPathFromDialogConfig(const QJsonObject &dialog, RecordingMode mode)
+QString generatedOutputPathFromDialogConfig(const QJsonObject &dialog,
+                                            RecordingMode mode,
+                                            RecordingContainerFormat container)
 {
     QString directory = dialog.value(QStringLiteral("outputDirectory")).toString().trimmed();
     if (directory.isEmpty()) {
         const QString legacyPath = dialog.value(QStringLiteral("outputPath")).toString().trimmed();
         if (!legacyPath.isEmpty()) {
-            directory = QFileInfo(normalizedRecordingPath(legacyPath, mode)).absolutePath();
+            directory = QFileInfo(normalizedRecordingPath(legacyPath, mode, container)).absolutePath();
         }
     }
     return directory.isEmpty()
-        ? defaultRecordingPath(mode)
-        : defaultRecordingPathInDirectory(directory, mode);
+        ? defaultRecordingPath(mode, container)
+        : defaultRecordingPathInDirectory(directory, mode, container);
 }
 
 }  // namespace
@@ -149,6 +152,8 @@ RecordingDialogConfig recordingDialogConfigFromRoot(const QJsonObject &root, Rec
     config.mode = mode;
     config.scope = scopeFromName(dialog.value(QStringLiteral("scope")).toString());
     config.backend = backendFromName(dialog.value(QStringLiteral("backend")).toString());
+    config.container = recordingContainerFromName(dialog.value(QStringLiteral("container")).toString());
+    config.quality = recordingQualityFromName(dialog.value(QStringLiteral("quality")).toString());
     config.videoFps = fpsForModeFromDialogConfig(dialog,
                                                  QStringLiteral("videoFps"),
                                                  RecordingMode::Video,
@@ -158,8 +163,9 @@ RecordingDialogConfig recordingDialogConfigFromRoot(const QJsonObject &root, Rec
                                                RecordingMode::Gif,
                                                12);
     config.fps = config.mode == RecordingMode::Gif ? config.gifFps : config.videoFps;
+    config.countdownSeconds = boundedInt(dialog.value(QStringLiteral("countdownSeconds")), 0, 0, 10);
     config.includeAudio = dialog.value(QStringLiteral("includeAudio")).toBool(false);
-    config.outputPath = generatedOutputPathFromDialogConfig(dialog, config.mode);
+    config.outputPath = generatedOutputPathFromDialogConfig(dialog, config.mode, config.container);
     config.displayKey = dialog.value(QStringLiteral("displayKey")).toString().trimmed();
     return config;
 }
@@ -189,8 +195,11 @@ bool saveRecordingDialogConfig(const RecordingDialogConfig &config, QString *err
     dialog.remove(QStringLiteral("fps"));
     dialog.insert(QStringLiteral("scope"), scopeName(config.scope));
     dialog.insert(QStringLiteral("backend"), recordingCaptureBackendName(config.backend));
+    dialog.insert(QStringLiteral("container"), recordingContainerName(config.container));
+    dialog.insert(QStringLiteral("quality"), recordingQualityName(config.quality));
     dialog.insert(config.mode == RecordingMode::Gif ? QStringLiteral("gifFps") : QStringLiteral("videoFps"),
                   config.fps);
+    dialog.insert(QStringLiteral("countdownSeconds"), config.countdownSeconds);
     dialog.insert(QStringLiteral("includeAudio"), config.includeAudio);
     dialog.insert(QStringLiteral("outputDirectory"), QFileInfo(config.outputPath).absolutePath());
     dialog.insert(QStringLiteral("displayKey"), config.displayKey);
@@ -206,13 +215,18 @@ RecordingDialogConfig recordingDialogConfigFromOptions(const RecordingOptions &o
     config.mode = options.mode;
     config.scope = options.scope;
     config.backend = options.captureBackend;
+    config.container = options.container;
+    config.quality = options.quality;
     config.fps = options.fps;
     config.videoFps = options.mode == RecordingMode::Video ? options.fps : 30;
     config.gifFps = options.mode == RecordingMode::Gif ? options.fps : 12;
+    config.countdownSeconds = options.countdownSeconds;
     config.includeAudio = options.includeAudio;
     config.outputPath = options.outputPath.trimmed().isEmpty()
-        ? defaultRecordingPath(options.mode)
-        : defaultRecordingPathInDirectory(QFileInfo(options.outputPath).absolutePath(), options.mode);
+        ? defaultRecordingPath(options.mode, options.container)
+        : defaultRecordingPathInDirectory(QFileInfo(options.outputPath).absolutePath(),
+                                          options.mode,
+                                          options.container);
     config.displayKey = recordingDisplayPersistenceKey(options.display);
     return config;
 }

@@ -32,6 +32,8 @@ build.ninja
 *.tar.*
 *.zip
 
+/deb-root/
+/debian/
 packaging/aur/pkg/
 packaging/aur/src/
 packaging/aur/mark-shot-*/

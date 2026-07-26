@@ -5,6 +5,7 @@
 #include <QImage>
 #include <QSize>
 #include <QString>
+#include <QtGlobal>
 
 namespace markshot::recording {
 
@@ -48,6 +49,16 @@ public:
      * @return 完成成功时返回 true。
      */
     virtual bool finish(QString *error) = 0;
+
+    /**
+     * 设置暂停状态，供写出器停止或恢复音频采集。
+     * @param paused 暂停时为 true。
+     * @return 无返回值。
+     */
+    virtual void setPaused(bool paused)
+    {
+        Q_UNUSED(paused)
+    }
 
     /**
      * 取消写出并终止底层进程。

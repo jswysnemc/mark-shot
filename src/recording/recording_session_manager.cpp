@@ -71,6 +71,42 @@ bool RecordingSessionManager::stop(QString *error)
     return true;
 }
 
+bool RecordingSessionManager::setPaused(bool paused, QString *error)
+{
+    if (error) {
+        error->clear();
+    }
+    if (!m_controller) {
+        if (error) {
+            *error = QStringLiteral("no active recording");
+        }
+        return false;
+    }
+    if (!m_controller->setPaused(paused)) {
+        if (error) {
+            *error = paused ? QStringLiteral("recording is already paused")
+                            : QStringLiteral("recording is not paused");
+        }
+        return false;
+    }
+    emit statusChanged();
+    return true;
+}
+
+bool RecordingSessionManager::togglePause(QString *error)
+{
+    if (error) {
+        error->clear();
+    }
+    if (!m_controller) {
+        if (error) {
+            *error = QStringLiteral("no active recording");
+        }
+        return false;
+    }
+    return setPaused(!m_controller->isPaused(), error);
+}
+
 RecordingStatus RecordingSessionManager::status() const
 {
     return m_controller ? m_controller->status() : RecordingStatus();

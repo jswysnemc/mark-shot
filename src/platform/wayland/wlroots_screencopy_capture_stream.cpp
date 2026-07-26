@@ -161,7 +161,8 @@ std::unique_ptr<RecordingCaptureStream> createWlrootsScreencopyCaptureStream(con
                                                                              QObject *parent)
 {
 #ifdef HAVE_WLROOTS_SCREENCOPY
-    if (options.mode != RecordingMode::Video || !shouldTryWlrootsScreencopy()) {
+    // GIF 与视频共用同一条采集链路，写出层按目标帧率筛除多余帧
+    if (!shouldTryWlrootsScreencopy()) {
         return nullptr;
     }
     return std::make_unique<WlrootsScreencopyCaptureStream>(options, parent);

@@ -112,6 +112,7 @@ jobs:
             file \
             git \
             libavcodec-dev \
+            libavfilter-dev \
             libavformat-dev \
             libgl1-mesa-dev \
             libavutil-dev \

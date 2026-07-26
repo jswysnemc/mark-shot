@@ -1,6 +1,7 @@
 #pragma once
 
 #include "recording/libav_gif_recording_process.h"
+#include "recording/recording_frame_rate_limiter.h"
 #include "recording/recording_options.h"
 #include "recording/recording_writer.h"
 
@@ -22,6 +23,7 @@ public:
 private:
     RecordingOptions m_options;
     LibavGifRecordingProcess m_process;
+    RecordingFrameRateLimiter m_rateLimiter;
 };
 
 }  // namespace markshot::recording

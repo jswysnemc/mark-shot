@@ -9,6 +9,16 @@ set(MARK_SHOT_RECORDING_SOURCES
     src/recording/audio/wasapi_audio_capture_reader.h
     src/recording/gif_recording_writer.cpp
     src/recording/gif_recording_writer.h
+    src/recording/libav/libav_gif_palette_filter.cpp
+    src/recording/libav/libav_gif_palette_filter.h
+    src/recording/libav/libav_hw_encoder_context.cpp
+    src/recording/libav/libav_hw_encoder_context.h
+    src/recording/libav/libav_muxer.cpp
+    src/recording/libav/libav_muxer.h
+    src/recording/libav/libav_video_encoder_setup.cpp
+    src/recording/libav/libav_video_encoder_setup.h
+    src/recording/libav/libav_video_scaler.cpp
+    src/recording/libav/libav_video_scaler.h
     src/recording/libav_error.cpp
     src/recording/libav_error.h
     src/recording/libav_audio_encoder.cpp
@@ -29,16 +39,24 @@ set(MARK_SHOT_RECORDING_SOURCES
     src/recording/recording_controller.h
     src/recording/recording_capture_backend.cpp
     src/recording/recording_capture_backend.h
+    src/recording/recording_container_format.cpp
+    src/recording/recording_container_format.h
     src/recording/recording_display_source.cpp
     src/recording/recording_display_source.h
+    src/recording/recording_encoder_probe.cpp
+    src/recording/recording_encoder_probe.h
     src/recording/recording_file_naming.cpp
     src/recording/recording_file_naming.h
     src/recording/recording_frame_converter.cpp
     src/recording/recording_frame_converter.h
     src/recording/recording_frame_payload.cpp
     src/recording/recording_frame_payload.h
+    src/recording/recording_frame_heartbeat.cpp
+    src/recording/recording_frame_heartbeat.h
     src/recording/recording_frame_pacer.cpp
     src/recording/recording_frame_pacer.h
+    src/recording/recording_frame_rate_limiter.cpp
+    src/recording/recording_frame_rate_limiter.h
     src/recording/recording_frame_queue.cpp
     src/recording/recording_frame_queue.h
     src/recording/recording_frame_grabber.cpp
@@ -47,6 +65,10 @@ set(MARK_SHOT_RECORDING_SOURCES
     src/recording/recording_frame_sample.h
     src/recording/recording_capture_stream.h
     src/recording/recording_options.h
+    src/recording/recording_pause_state.cpp
+    src/recording/recording_pause_state.h
+    src/recording/recording_quality_options.cpp
+    src/recording/recording_quality_options.h
     src/recording/recording_pipewire_capture_stream.cpp
     src/recording/recording_pipewire_capture_stream.h
     src/recording/recording_polling_capture_stream.cpp
@@ -83,6 +105,18 @@ set(MARK_SHOT_RECORDING_SOURCES
     src/platform/windows/windows_wgc_stream.h
     src/platform/windows/windows_wgc_support.cpp
     src/platform/windows/windows_wgc_support.h
+    src/recording/ui/recording_countdown.cpp
+    src/recording/ui/recording_countdown.h
+    src/recording/ui/recording_control_bar.cpp
+    src/recording/ui/recording_control_bar.h
+    src/recording/ui/recording_control_icons.cpp
+    src/recording/ui/recording_control_icons.h
+    src/recording/ui/recording_overlay_layout.cpp
+    src/recording/ui/recording_overlay_layout.h
+    src/recording/ui/recording_overlay_service.cpp
+    src/recording/ui/recording_overlay_service.h
+    src/recording/ui/recording_overlay_window.cpp
+    src/recording/ui/recording_overlay_window.h
     src/shot_window_recording.cpp
     src/shot_window_recording_status_overlay.cpp
 )

@@ -48,6 +48,13 @@ public:
     bool finish(QString *error) override;
 
     /**
+     * 把暂停状态转发到工作线程。
+     * @param paused 暂停时为 true。
+     * @return 无返回值。
+     */
+    void setPaused(bool paused) override;
+
+    /**
      * 取消写出并停止工作线程。
      * @return 无返回值。
      */

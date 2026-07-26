@@ -25,11 +25,19 @@ bool GifRecordingWriter::start(QSize frameSize, int fps, QString *error)
         return false;
     }
 
+    m_rateLimiter.reset(fps);
     return m_process.start(m_options.outputPath, frameSize, fps, error);
 }
 
 bool GifRecordingWriter::writeFrame(const RecordingFrameSample &sample, QString *error)
 {
+    // 事件驱动的采集后端出帧频率高于目标帧率，超出部分直接丢弃
+    if (!m_rateLimiter.shouldWrite(sample.timestampMs)) {
+        if (error) {
+            error->clear();
+        }
+        return true;
+    }
     return m_process.writeFrame(sample, error);
 }
 

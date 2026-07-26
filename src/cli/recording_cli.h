@@ -14,4 +14,10 @@ int printRecordingStatus();
  */
 int stopRecordingFromCommandLine();
 
+/**
+ * 在暂停与继续之间切换当前录制并输出 JSON。
+ * @return 切换成功返回 0，没有活动录制时返回 1。
+ */
+int togglePauseRecordingFromCommandLine();
+
 }  // namespace markshot::cli

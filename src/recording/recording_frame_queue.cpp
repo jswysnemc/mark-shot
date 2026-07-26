@@ -48,4 +48,9 @@ int RecordingFrameQueue::droppedFrames() const
     return m_dropped;
 }
 
+int RecordingFrameQueue::capacity() const
+{
+    return m_capacity;
+}
+
 }  // namespace markshot::recording

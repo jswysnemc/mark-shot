@@ -82,6 +82,12 @@ bool VideoRecordingWriter::finish(QString *error)
     return m_libavProcess.finish(error);
 }
 
+void VideoRecordingWriter::setPaused(bool paused)
+{
+    // 暂停期间停止音频采集，音频与视频时间轴同步跳过该段
+    m_libavProcess.setPaused(paused);
+}
+
 void VideoRecordingWriter::cancel()
 {
     m_libavProcess.cancel();

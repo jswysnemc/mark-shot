@@ -15,5 +15,7 @@ if(MARK_SHOT_LINUX)
     list(INSERT MARK_SHOT_PIPEWIRE_CAPTURE_SOURCES 0
         src/pipewire/pipewire_buffer_data_types.cpp
         src/pipewire/pipewire_buffer_data_types.h
+        src/pipewire/pipewire_dmabuf_policy.cpp
+        src/pipewire/pipewire_dmabuf_policy.h
     )
 endif()

@@ -2,6 +2,7 @@
 #include "recording/libav_audio_encoder.h"
 #include "recording/libav_error.h"
 #include "recording/libav_gif_recording_process.h"
+#include "recording/recording_encoder_probe.h"
 
 #include <QtTest/QtTest>
 
@@ -9,7 +10,10 @@
 #include <QColor>
 #include <QFile>
 #include <QImage>
+#include <QImageReader>
 #include <QTemporaryDir>
+
+#include <cstdlib>
 
 #include <mutex>
 
@@ -106,6 +110,56 @@ private slots:
     }
 
     /**
+     * 验证 VAAPI 硬件编码在有渲染节点的机器上能完整写出视频。
+     * @return 无返回值。
+     */
+    void writesVaapiEncodedVideoWhenAvailable()
+    {
+        if (!markshot::recording::recordingRenderNodeAvailable()
+            || !markshot::recording::recordingEncoderImplementationAvailable(
+                QStringLiteral("h264_vaapi"))) {
+            QSKIP("VAAPI render node or encoder is unavailable");
+        }
+
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+
+        markshot::recording::RecordingOptions options;
+        options.mode = markshot::recording::RecordingMode::Video;
+        options.includeAudio = false;
+        options.outputPath = directory.filePath(QStringLiteral("vaapi.mp4"));
+
+        markshot::recording::RecordingVideoEncoderOptions encoder;
+        encoder.id = QStringLiteral("h264_vaapi");
+        encoder.label = QStringLiteral("h264_vaapi");
+        encoder.hardware = true;
+
+        QString error;
+        markshot::recording::LibavRecordingProcess process;
+        if (!process.start(options, encoder, QSize(320, 240), 15, &error)) {
+            // 容器内或受限环境下打不开 VAAPI 设备时跳过，运行时会回退软件编码
+            QSKIP(qPrintable(QStringLiteral("VAAPI encoder cannot be opened: %1").arg(error)));
+        }
+
+        for (int i = 0; i < 6; ++i) {
+            QImage image(320, 240, QImage::Format_ARGB32);
+            image.fill(QColor(30 + i * 15, 90, 160).rgba());
+
+            markshot::recording::RecordingFrameSample sample;
+            sample.image = image;
+            sample.timestampMs = i * 66;
+            sample.sequence = i + 1;
+            QVERIFY2(process.writeFrame(sample, &error), qPrintable(error));
+        }
+        QVERIFY2(process.writeRepeatFrame(&error), qPrintable(error));
+        QVERIFY2(process.finish(&error), qPrintable(error));
+
+        const QFileInfo output(options.outputPath);
+        QVERIFY(output.exists());
+        QVERIFY(output.size() > 0);
+    }
+
+    /**
      * 验证库内音频编码器可以写入 AAC 音频流。
      * @return 无返回值。
      */
@@ -179,6 +233,66 @@ private slots:
         const QFileInfo output(outputPath);
         QVERIFY(output.exists());
         QVERIFY(output.size() > 0);
+    }
+
+    /**
+     * 验证 GIF 量化后的色彩保真度，逐帧调色板应显著优于固定调色板。
+     * @return 无返回值。
+     */
+    void writesGifWithAccuratePalette()
+    {
+#ifndef HAVE_LIBAVFILTER
+        QSKIP("libavfilter is not available, GIF falls back to a fixed palette");
+#else
+        if (!QImageReader::supportedImageFormats().contains(QByteArrayLiteral("gif"))) {
+            QSKIP("Qt GIF image plugin is unavailable");
+        }
+
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QString outputPath = directory.filePath(QStringLiteral("gradient.gif"));
+
+        // 1. 生成平滑渐变，固定调色板在这类画面上误差最明显
+        QImage source(64, 64, QImage::Format_ARGB32);
+        for (int y = 0; y < source.height(); ++y) {
+            for (int x = 0; x < source.width(); ++x) {
+                source.setPixel(x, y, qRgb(x * 4, y * 4, 128));
+            }
+        }
+
+        QString error;
+        markshot::recording::LibavGifRecordingProcess process;
+        QVERIFY2(process.start(outputPath, source.size(), 10, &error), qPrintable(error));
+        markshot::recording::RecordingFrameSample sample;
+        sample.image = source;
+        sample.timestampMs = 0;
+        sample.sequence = 1;
+        QVERIFY2(process.writeFrame(sample, &error), qPrintable(error));
+        QVERIFY2(process.finish(&error), qPrintable(error));
+
+        // 2. 读回首帧并统计与原图的平均通道误差
+        QImage decoded(outputPath);
+        QVERIFY(!decoded.isNull());
+        QCOMPARE(decoded.size(), source.size());
+        decoded = decoded.convertToFormat(QImage::Format_ARGB32);
+
+        qint64 totalError = 0;
+        for (int y = 0; y < source.height(); ++y) {
+            for (int x = 0; x < source.width(); ++x) {
+                const QRgb expected = source.pixel(x, y);
+                const QRgb actual = decoded.pixel(x, y);
+                totalError += std::abs(qRed(expected) - qRed(actual));
+                totalError += std::abs(qGreen(expected) - qGreen(actual));
+                totalError += std::abs(qBlue(expected) - qBlue(actual));
+            }
+        }
+        const double averageError =
+            static_cast<double>(totalError) / (source.width() * source.height() * 3);
+        qInfo("GIF average channel error: %.2f", averageError);
+        // 3-3-2 固定调色板在该渐变上的平均误差在 20 以上，逐帧调色板应远低于此
+        QVERIFY2(averageError < 10.0,
+                 qPrintable(QStringLiteral("GIF palette error is too high: %1").arg(averageError)));
+#endif
     }
 };
 

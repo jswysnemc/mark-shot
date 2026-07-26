@@ -150,11 +150,17 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
 | `save.directoryTemplate` | String | `""` | Directory-only save template. If set, filename automatically uses `mark-shot-{datetime}.png`. Aliases: `save.directory`, `save.dir`, `save.folder`. |
 | `recording.storage.videoDirectory` | String | `"{pictures}/mark-shot/videos"` | Default output directory for MP4 recordings. Aliases include `recording.storage.videos`, `recording.storage.videoDir`, and `recording.output.videoDirectory`. |
 | `recording.storage.gifDirectory` | String | `"{pictures}/mark-shot/gifs"` | Default output directory for GIF recordings. Aliases include `recording.storage.gifs`, `recording.storage.gifDir`, and `recording.output.gifDirectory`. |
+| `recording.dialog.container` | string | `"mp4"` | Container for video recordings. Accepts `mp4` and `mkv`; `mkv` stays playable when a recording is interrupted. |
+| `recording.dialog.quality` | string | `"balanced"` | Quality preset for video recordings. Accepts `balanced`, `high`, and `efficient`, controlling the constant-quality value and encoder preset. |
+| `recording.dialog.countdownSeconds` | number | `0` | Countdown in seconds before recording starts, clamped to `0`-`10`; `0` disables it. |
+| `recording.dialog.backend` | string | `"auto"` | Recording capture backend. Accepts `auto`, `wlroots`, `pipewire`, `windows-wgc`, and `polling`; `auto` tries the platform order and falls back automatically. |
 | `export.imageFrame` | Boolean/Object | `false` | Optional Mac-style image frame for user-facing exports. Object form supports `enabled`, `padding` (`0`-`256`, default `112`), `cornerRadius` (`0`-`128`, default `18`), `shadowRadius` (`0`-`128`, default `72`), `shadowOffsetY` (`0`-`128`, default `28`), and `shadowOpacity` (`0.0`-`1.0`, default `0.32`). Applies to Save, Save As, Copy, Upload, Open With, and extension-command images; OCR, code scan, pinned windows, quick display capture, and scrolling capture keep the raw image. Set `enabled` to `true` to enable the framed export. |
 | `shortcuts` | Object | - | Customizable keyboard shortcuts. Alias: `hotkeys` (or under `annotation.shortcuts`/`annotation.hotkeys`). See details below. |
 | `windows.tray.enabled` | Boolean | `true` on Windows, `false` elsewhere | Starts tray mode automatically. The key name is kept for compatibility. Use `mark-shot --tray` to start tray mode without changing config, or `mark-shot --capture` to force one-shot capture when autostart is enabled. |
 | `windows.hotkeys.capture` | String | `"Ctrl+Alt+S"` | Global hotkey for region capture while tray mode is running. Windows uses RegisterHotKey; supported Linux desktops use the desktop portal. Aliases include `hotkey`, `captureHotkey`, and `screenshot`. |
 | `windows.hotkeys.fullscreen` | String | `""` | Optional global hotkey for fullscreen annotation capture while tray mode is running. Alias: `fullscreenHotkey`. The generated default config only writes the region capture hotkey. |
+| `windows.hotkeys.stopRecording` | string | `""` | Optional global shortcut that stops the active recording. Aliases include `stopRecordingHotkey` and `recordingStop`. |
+| `windows.hotkeys.pauseRecording` | string | `""` | Optional global shortcut that pauses and resumes the active recording. Aliases include `pauseRecordingHotkey` and `recordingPause`. |
 | `colorPicker.history` | Array | `[]` | Recent colors picked by the startup Color Picker tool. Stored as `#RRGGBBAA` strings, capped at 7 entries. Updated automatically whenever a color is confirmed in the color panel. |
 | `codeScan.command` | String | `""` | Custom QR/barcode scanner command. Supports `{image}`, `{imagePath}`, and `{imageUrl}` placeholders; if none is present, Mark Shot appends the temporary PNG path. The command must print the same JSON shape as `mark-shot-code-scan`. Aliases: `codeScanner.command`, `barcodeScanner.command`, `barcode.command`. |
 | `codeScan.timeoutMs` | Number | `15000` | Timeout for the code scanner command. Environment variable `MARK_SHOT_CODE_SCAN_TIMEOUT_MS` can override it. |
@@ -433,5 +439,22 @@ Each element in the array (or the root object itself) can take one of the follow
 </details>
 
 When installing manually, install `mark-shot`, `mark-shot-ocr`, `mark-shot-code-scan`, `mark-shot-translate`, and `mark-shot-upload` together. Otherwise OCR, code scanning, translation, or image upload cannot call the backend helpers.
+
+---
+
+## Recording Diagnostic Environment Variables
+
+These environment variables exist for troubleshooting recording problems and are not needed for normal use.
+
+| Variable | Description |
+| --- | --- |
+| `MARK_SHOT_RECORDING_BACKEND` | Forces a capture backend, using the same values as `recording.dialog.backend`, taking precedence over the config. |
+| `MARK_SHOT_RECORDING_SW_ENCODER` | Disables every hardware encoder candidate and keeps software encoding only. |
+| `MARK_SHOT_RECORDING_VAAPI_DEVICE` | Pins VAAPI to a specific DRM render node path, useful on multi-GPU machines. |
+| `MARK_SHOT_RECORDING_SCALE_THREADS` | Caps the parallel slice count for pixel format conversion; `1` falls back to single-threaded conversion. |
+| `MARK_SHOT_RECORDING_QUEUE_MIB` | Memory budget in MiB for the pending encode queue, which drives queue depth and frame dropping. |
+| `MARK_SHOT_RECORDING_OVERLAY` | Set to `0` to hide the recording frame and floating control bar. |
+| `MARK_SHOT_DISABLE_DMABUF` | Forces PipeWire capture onto shared-memory buffers. Single-GPU machines running KWin with the NVIDIA proprietary driver enable this automatically, so setting it by hand is not required. |
+| `MARK_SHOT_FORCE_DMABUF` | Forces DMA-BUF buffers, taking precedence over both the automatic avoidance and `MARK_SHOT_DISABLE_DMABUF`; useful for verifying a driver fix. |
 
 ---

@@ -55,6 +55,7 @@ void RecordingFrameGrabber::start()
 void RecordingFrameGrabber::stop()
 {
     m_running = false;
+    m_paused = false;
     m_fallbackPending = false;
     m_receivedFirstFrame = false;
     m_activeBackend = RecordingCaptureBackend::Auto;
@@ -68,9 +69,28 @@ void RecordingFrameGrabber::stop()
 
 void RecordingFrameGrabber::setBackpressureActive(bool active)
 {
+    if (m_backpressureActive == active) {
+        return;
+    }
     m_backpressureActive = active;
+    applySuppression();
+}
+
+void RecordingFrameGrabber::setPaused(bool paused)
+{
+    if (m_paused == paused) {
+        return;
+    }
+    m_paused = paused;
+    markshot::debugLog("recording", "【录制】【暂停】capture_paused=%d", paused ? 1 : 0);
+    applySuppression();
+}
+
+void RecordingFrameGrabber::applySuppression()
+{
+    // 采集流只认识一个抑制开关，暂停与背压在此合流
     if (m_stream) {
-        m_stream->setBackpressureActive(active);
+        m_stream->setBackpressureActive(m_backpressureActive || m_paused);
     }
 }
 
@@ -124,7 +144,7 @@ bool RecordingFrameGrabber::startNextCaptureStream(QString *error)
             markshot::debugLog("recording",
                                "【录制】【采集后端】backend=%s",
                                recordingCaptureBackendName(backend).toUtf8().constData());
-            m_stream->setBackpressureActive(m_backpressureActive);
+            applySuppression();
             return true;
         }
         lastError = streamError;
@@ -169,6 +189,10 @@ void RecordingFrameGrabber::handleFrameReady(RecordingCaptureStream *stream,
         return;
     }
     m_receivedFirstFrame = true;
+    // 暂停期间采集流可能仍有在途帧，这里再拦一次
+    if (m_paused) {
+        return;
+    }
     emit frameReady(sample);
 }
 

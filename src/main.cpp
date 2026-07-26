@@ -8,6 +8,7 @@
 #include "debug_log.h"
 #include "ipc/single_instance_ipc.h"
 #include "recording/recording_session_manager.h"
+#include "recording/ui/recording_overlay_service.h"
 #include "shot_window.h"
 #include "startup_config.h"
 #include "ui/icons.h"
@@ -92,6 +93,8 @@ int main(int argc, char *argv[])
                                              QStringLiteral("Print the current recording status as JSON."));
     QCommandLineOption stopRecordingOption(QStringLiteral("stop-recording"),
                                            QStringLiteral("Stop the active recording through the running instance."));
+    QCommandLineOption pauseRecordingOption(QStringLiteral("pause-recording"),
+                                            QStringLiteral("Toggle pause for the active recording through the running instance."));
     QCommandLineOption defaultToolOption(QStringLiteral("default-tool"),
                                          QStringLiteral("Set the default annotation tool after a selected region. Also seeds fullscreen mode unless overridden. Supported: %1.")
                                              .arg(ShotWindow::supportedToolNames().join(QStringLiteral(", "))),
@@ -122,6 +125,7 @@ int main(int argc, char *argv[])
     parser.addOption(pinImageOption);
     parser.addOption(recordingStatusOption);
     parser.addOption(stopRecordingOption);
+    parser.addOption(pauseRecordingOption);
     parser.addOption(defaultToolOption);
     parser.addOption(fullscreenDefaultToolOption);
     parser.addOption(fileDefaultToolOption);
@@ -133,6 +137,9 @@ int main(int argc, char *argv[])
 
     if (parser.isSet(stopRecordingOption)) {
         return markshot::cli::stopRecordingFromCommandLine();
+    }
+    if (parser.isSet(pauseRecordingOption)) {
+        return markshot::cli::togglePauseRecordingFromCommandLine();
     }
     if (parser.isSet(recordingStatusOption)) {
         return markshot::cli::printRecordingStatus();
@@ -385,6 +392,8 @@ int main(int argc, char *argv[])
     };
 
     auto &recordingManager = markshot::recording::RecordingSessionManager::instance();
+    // 录制期间的悬浮控制条与区域边框跟随会话状态自动出现和消失
+    markshot::recording::ui::RecordingOverlayService::instance().attach();
     markshot::ipc::installSingleInstanceCommandHandler(
         singleInstanceServer.get(),
         &app,
@@ -399,6 +408,20 @@ int main(int argc, char *argv[])
                     ? QStringLiteral("stop requested")
                     : (error.isEmpty() ? QStringLiteral("no active recording") : error);
                 response.recording = recordingManager.status();
+                return response;
+            }
+
+            if (command.pauseRecording || command.resumeRecording || command.togglePauseRecording) {
+                QString error;
+                const bool changed = command.togglePauseRecording
+                    ? recordingManager.togglePause(&error)
+                    : recordingManager.setPaused(command.pauseRecording, &error);
+                response.recording = recordingManager.status();
+                response.paused = response.recording.paused;
+                response.message = changed
+                    ? (response.paused ? QStringLiteral("recording paused")
+                                       : QStringLiteral("recording resumed"))
+                    : (error.isEmpty() ? QStringLiteral("no active recording") : error);
                 return response;
             }
 
