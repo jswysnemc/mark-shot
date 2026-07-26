@@ -129,7 +129,7 @@ if(TARGET mark-shot-translate-openai)
     add_test(NAME translate-openai-plugin COMMAND mark-shot-translate-openai-plugin-test)
 endif()
 
-if(TARGET mark-shot-code-scan-zxing)
+if(TARGET mark-shot-code-scan-zxing AND MARK_SHOT_ZXING_WRITER_SUPPORTED)
     qt_add_executable(mark-shot-code-scan-zxing-plugin-test
         tests/code_scan_zxing_plugin_test.cpp
         plugins/code-scan-zxing/zxing_code_scan_plugin.cpp

@@ -1,4 +1,9 @@
-# zxing-cpp 扫码插件：zxing-cpp 缺失时整体跳过
+# zxing-cpp 扫码插件：zxing-cpp 缺失或版本过旧时整体跳过
+
+if(DEFINED MARK_SHOT_ZXING_READER_SUPPORTED AND NOT MARK_SHOT_ZXING_READER_SUPPORTED)
+    message(STATUS "mark-shot: code-scan-zxing plugin disabled (zxing-cpp is too old)")
+    return()
+endif()
 
 if(NOT TARGET ZXing::ZXing AND NOT TARGET PkgConfig::ZXingCpp)
     find_package(ZXing CONFIG QUIET)
