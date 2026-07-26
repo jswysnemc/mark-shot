@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.44 - 2026-07-26
+
+### Bug Fixes
+
+- **Debian and Ubuntu Packages**: The `.deb` workflow failed on every matrix entry because the code scanner assumed the zxing-cpp 3.x interface, while Debian 12 ships 1.4 and Ubuntu 26.04 ships 2.3. The reader parameter class is now aliased by major version and `ZX_USE_UTF8` keeps `text()` returning `std::string` on every release, so both distributions build again with the built-in scanner enabled. The plugin write-barcode test stays disabled below 3.0, which is the only version with a `CreateBarcode` equivalent.
+
 ## 0.1.43 - 2026-07-26
 
 ### Features & Enhancements
