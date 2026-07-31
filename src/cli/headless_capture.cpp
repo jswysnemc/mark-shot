@@ -4,6 +4,7 @@
 
 #include <QDateTime>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QImageWriter>
@@ -64,14 +65,18 @@ QByteArray displaysJson()
     return QJsonDocument(root).toJson(QJsonDocument::Compact);
 }
 
-// Resolves the final output path. When the user passes a directory, a
-// timestamped file name is generated inside it.
+// Resolves the final output path. When the user passes a directory (or a path
+// ending with a separator that does not yet exist), a timestamped file name is
+// generated inside it.
 QString resolveOutputPath(const QString &captureTo, const QString &outputName, QString *error)
 {
     QFileInfo info(captureTo);
-    if (info.isDir()) {
+    const bool looksLikeDirectory = info.isDir()
+        || (captureTo.endsWith(QLatin1Char('/')) || captureTo.endsWith(QLatin1Char('\\')));
+    if (looksLikeDirectory) {
+        QDir().mkpath(info.absoluteFilePath());
         const QString stamp =
-            QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"));
+            QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss-zzz"));
         QString fileName = QStringLiteral("mark-shot-%1.png").arg(stamp);
         if (!outputName.isEmpty()) {
             fileName = QStringLiteral("mark-shot-%1-%2.png").arg(outputName, stamp);
@@ -87,6 +92,13 @@ QString resolveOutputPath(const QString &captureTo, const QString &outputName, Q
     return info.absoluteFilePath();
 }
 
+// Returns true when captureTo looks like an existing directory (the only form
+// supported for multi-display capture).
+bool isDirectoryTarget(const QString &captureTo)
+{
+    return QFileInfo(captureTo).isDir();
+}
+
 // Builds the base CaptureRequest for headless mode. Shared by the single and
 // multi-display paths.
 CaptureRequest baseCaptureRequest(const QCommandLineParser &parser)
@@ -99,6 +111,31 @@ CaptureRequest baseCaptureRequest(const QCommandLineParser &parser)
     return request;
 }
 
+// Returns the geometry of the named display, or a default-constructed QRect
+// when no such display exists.
+QRect displayGeometry(const QString &displayName)
+{
+    const QList<QScreen *> screens = QGuiApplication::screens();
+    for (QScreen *screen : screens) {
+        if (screen && screen->name() == displayName) {
+            return screen->geometry();
+        }
+    }
+    return {};
+}
+
+// Verifies that every requested display name exists. Returns the first
+// offending name, or an empty string when all names are valid.
+QString firstUnknownDisplay(const QStringList &displayNames)
+{
+    for (const QString &displayName : displayNames) {
+        if (displayGeometry(displayName).isNull()) {
+            return displayName;
+        }
+    }
+    return {};
+}
+
 // Applies a display name: prefers that output and, when no explicit region is
 // given, crops to the output geometry so portal backends capture that monitor
 // instead of the whole virtual desktop.
@@ -109,12 +146,9 @@ void applyDisplayToRequest(CaptureRequest *request, const QString &displayName)
     }
     request->preferredOutputName = displayName;
     if (!request->sourceGeometry.isValid()) {
-        const QList<QScreen *> screens = QGuiApplication::screens();
-        for (QScreen *screen : screens) {
-            if (screen && screen->name() == displayName) {
-                request->sourceGeometry = screen->geometry();
-                break;
-            }
+        const QRect geometry = displayGeometry(displayName);
+        if (!geometry.isNull()) {
+            request->sourceGeometry = geometry;
         }
     }
 }
@@ -155,6 +189,7 @@ QJsonObject captureOneToFile(const CaptureRequest &request,
     QImageWriter writer(outputPath, QByteArrayLiteral("png"));
     if (!writer.write(result.image)) {
         const QString writeError = writer.errorString();
+        QFile::remove(outputPath);
         if (err) {
             *err << "failed to write capture to " << outputPath << ": " << writeError << '\n';
         }
@@ -165,10 +200,17 @@ QJsonObject captureOneToFile(const CaptureRequest &request,
                 {QStringLiteral("error"), writeError}};
     }
 
+    // Propagate the requested display name when the backend did not fill it
+    // (QScreen-based backends return an empty outputName).
+    QString effectiveOutput = result.outputName;
+    if (effectiveOutput.isEmpty() && !request.preferredOutputName.isEmpty()) {
+        effectiveOutput = request.preferredOutputName;
+    }
+
     return {{QStringLiteral("path"), outputPath},
             {QStringLiteral("width"), result.image.width()},
             {QStringLiteral("height"), result.image.height()},
-            {QStringLiteral("output"), result.outputName.isEmpty() ? QJsonValue::Null : QJsonValue(result.outputName)},
+            {QStringLiteral("output"), effectiveOutput.isEmpty() ? QJsonValue::Null : QJsonValue(effectiveOutput)},
             {QStringLiteral("error"), QJsonValue::Null}};
 }
 
@@ -226,24 +268,47 @@ int runHeadlessCaptureIfRequested(const QCommandLineParser &parser)
         return 1;
     }
 
-    CaptureRequest request = baseCaptureRequest(parser);
+    const QStringList displayNames = parser.values(QStringLiteral("display"));
+    const QString captureTo = parser.value(QStringLiteral("capture-to"));
+    const QString outputName = parser.value(QStringLiteral("output-name")).trimmed();
+    const bool hasRegion = parser.isSet(QStringLiteral("region"));
+    const bool allOutputs = parser.isSet(QStringLiteral("all-outputs"));
 
-    if (parser.isSet(QStringLiteral("region"))) {
+    // Reject semantically conflicting option combinations early so the user
+    // gets a clear error instead of silently capturing the wrong pixels.
+    if (allOutputs && !displayNames.isEmpty()) {
+        err << "--all-outputs cannot be combined with --display.\n";
+        return 1;
+    }
+    if (hasRegion && displayNames.size() > 1) {
+        err << "--region cannot be combined with multiple --display options.\n";
+        return 1;
+    }
+    if (displayNames.size() > 1 && !isDirectoryTarget(captureTo)) {
+        err << "--capture-to must be an existing directory when capturing multiple displays.\n";
+        return 1;
+    }
+    const QString unknownDisplay = firstUnknownDisplay(displayNames);
+    if (!unknownDisplay.isEmpty()) {
+        err << "unknown display: " << unknownDisplay << ". Use --list-displays to see valid names.\n";
+        return 1;
+    }
+
+    CaptureRequest request = baseCaptureRequest(parser);
+    request.allOutputs = allOutputs;
+
+    if (hasRegion) {
         const std::optional<QRect> region = parseRegion(parser.value(QStringLiteral("region")));
         if (!region.has_value()) {
             err << "--region expects a comma-separated rectangle x,y,width,height.\n";
             return 1;
         }
-        if (request.allOutputs) {
+        if (allOutputs) {
             err << "--region cannot be combined with --all-outputs.\n";
             return 1;
         }
         request.sourceGeometry = region.value();
     }
-
-    const QStringList displayNames = parser.values(QStringLiteral("display"));
-    const QString captureTo = parser.value(QStringLiteral("capture-to"));
-    const QString outputName = parser.value(QStringLiteral("output-name")).trimmed();
 
     // Multiple --display: capture each monitor to its own PNG and print a
     // {"captures":[...]} JSON array. This enables multi-screen selection for
@@ -253,9 +318,7 @@ int runHeadlessCaptureIfRequested(const QCommandLineParser &parser)
         bool anyFailed = false;
         for (const QString &displayName : displayNames) {
             CaptureRequest displayRequest = request;
-            if (!request.allOutputs) {
-                applyDisplayToRequest(&displayRequest, displayName);
-            }
+            applyDisplayToRequest(&displayRequest, displayName);
             const QString baseName = outputName.isEmpty()
                 ? displayName
                 : QStringLiteral("%1-%2").arg(outputName, displayName);
@@ -273,7 +336,7 @@ int runHeadlessCaptureIfRequested(const QCommandLineParser &parser)
     }
 
     // Single display (or none): keep the original compact single-object JSON.
-    if (!request.allOutputs && !displayNames.isEmpty()) {
+    if (!displayNames.isEmpty()) {
         applyDisplayToRequest(&request, displayNames.first());
     }
 

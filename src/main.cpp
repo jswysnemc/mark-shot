@@ -175,7 +175,6 @@ int main(int argc, char *argv[])
     markshot::debugLog("config",
                        "debug enabled path=%s",
                        markshot::debugLogPath().toUtf8().constData());
-
     const int headlessExitCode = markshot::cli::runHeadlessCaptureIfRequested(parser);
     if (headlessExitCode >= 0) {
         return headlessExitCode;
