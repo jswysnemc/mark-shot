@@ -254,6 +254,13 @@ The right-side action toolbar includes an **Extensions** button. It reads user-d
 
 See [Configuration Reference](docs/configuration.md).
 
+### User Guide
+
+For everyday operation — the window hover-selection feature, annotation
+tools, startup tools, pinned windows, scrolling capture, headless CLI, and a
+feature testing checklist — see the
+[User Guide](docs/user-guide.md) ([中文](docs/user-guide.zh-CN.md)).
+
 ## Compilation & Installation
 
 ### Installation Guide
