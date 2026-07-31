@@ -140,11 +140,6 @@ int main(int argc, char *argv[])
         return markshot::cli::printRecordingStatus();
     }
 
-    const int headlessExitCode = markshot::cli::runHeadlessCaptureIfRequested(parser);
-    if (headlessExitCode >= 0) {
-        return headlessExitCode;
-    }
-
     const QStringList positionalArguments = parser.positionalArguments();
     if (positionalArguments.size() > 1) {
         QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), MS_TR("Only one image file can be opened at a time."));
@@ -180,6 +175,11 @@ int main(int argc, char *argv[])
     markshot::debugLog("config",
                        "debug enabled path=%s",
                        markshot::debugLogPath().toUtf8().constData());
+
+    const int headlessExitCode = markshot::cli::runHeadlessCaptureIfRequested(parser);
+    if (headlessExitCode >= 0) {
+        return headlessExitCode;
+    }
 
     QString configDefaultToolWarning;
     markshot::DefaultTools defaultTools = markshot::configuredDefaultTools(&configDefaultToolWarning);

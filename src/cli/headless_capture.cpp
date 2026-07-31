@@ -13,6 +13,7 @@
 #include <QScreen>
 #include <QTextStream>
 
+#include <cstdio>
 #include <optional>
 
 namespace markshot::cli {
@@ -162,6 +163,18 @@ int runHeadlessCaptureIfRequested(const QCommandLineParser &parser)
     const QString displayName = parser.value(QStringLiteral("display")).trimmed();
     if (!displayName.isEmpty()) {
         request.preferredOutputName = displayName;
+        // When no explicit --region is given, crop to the named output so
+        // portal-based backends capture that monitor instead of the whole
+        // virtual desktop.
+        if (!request.sourceGeometry.isValid()) {
+            const QList<QScreen *> screens = QGuiApplication::screens();
+            for (QScreen *screen : screens) {
+                if (screen && screen->name() == displayName) {
+                    request.sourceGeometry = screen->geometry();
+                    break;
+                }
+            }
+        }
     }
 
     const CaptureResult result = captureScreenFrame(request);
@@ -189,7 +202,7 @@ int runHeadlessCaptureIfRequested(const QCommandLineParser &parser)
         return 1;
     }
 
-    QImageWriter writer(outputPath, QStringLiteral("png"));
+    QImageWriter writer(outputPath, QByteArrayLiteral("png"));
     if (!writer.write(result.image)) {
         const QString writeError = writer.errorString();
         err << "failed to write capture to " << outputPath << ": " << writeError << '\n';
