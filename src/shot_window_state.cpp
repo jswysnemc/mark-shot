@@ -49,6 +49,8 @@ void ShotWindow::loadAnnotationStateFromDisk()
     if (!state.textFontFamily.isEmpty()) {
         m_textFontFamily = state.textFontFamily;
     }
+    m_textWeight = state.textFontWeight;
+    m_textItalic = state.textItalic;
 }
 
 /// @brief 调度一次工具默认值的持久化写盘
@@ -106,6 +108,8 @@ void ShotWindow::flushAnnotationStateNow()
     state.highlighterStyle = m_highlighterStyle;
     state.numberStyle = m_numberStyle;
     state.textFontFamily = m_textFontFamily;
+    state.textFontWeight = m_textWeight;
+    state.textItalic = m_textItalic;
     state.textBackgroundColor = m_textBackgroundColor;
 
     // 写入失败仅记录日志,不影响交互;dirty 已清,等待下次任意修改再次尝试

@@ -75,6 +75,7 @@
 #include <QShowEvent>
 #include <QSignalBlocker>
 #include <QSlider>
+#include <QSpinBox>
 #include <QStandardPaths>
 #include <QStyle>
 #include <QTemporaryFile>
@@ -85,6 +86,7 @@
 #include <QTextOption>
 #include <QThread>
 #include <QTimer>
+#include <QToolButton>
 #include <QTransform>
 #include <QUrl>
 #include <QVBoxLayout>

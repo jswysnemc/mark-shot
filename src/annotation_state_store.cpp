@@ -34,6 +34,8 @@ constexpr const char *kKeyArrowStyle = "arrowStyle";
 constexpr const char *kKeyHighlighterStyle = "highlighterStyle";
 constexpr const char *kKeyNumberStyle = "numberStyle";
 constexpr const char *kKeyTextFontFamily = "textFontFamily";
+constexpr const char *kKeyTextFontWeight = "textFontWeight";
+constexpr const char *kKeyTextItalic = "textItalic";
 constexpr const char *kKeyTextBackgroundColor = "textBackgroundColor";
 
 /// @brief 读取 JSON 中颜色字符串为 QColor
@@ -176,6 +178,16 @@ AnnotationState loadAnnotationState()
     if (fontValue.isString()) {
         state.textFontFamily = fontValue.toString();
     }
+    const QJsonValue fontWeightValue = root.value(QString::fromLatin1(kKeyTextFontWeight));
+    if (fontWeightValue.isDouble()) {
+        const int weight = fontWeightValue.toInt();
+        state.textFontWeight = static_cast<QFont::Weight>(
+            std::clamp(weight, static_cast<int>(QFont::Thin), static_cast<int>(QFont::Black)));
+    }
+    const QJsonValue italicValue = root.value(QString::fromLatin1(kKeyTextItalic));
+    if (italicValue.isBool()) {
+        state.textItalic = italicValue.toBool();
+    }
 
     return state;
 }
@@ -209,6 +221,8 @@ bool saveAnnotationState(const AnnotationState &state)
     root.insert(QString::fromLatin1(kKeyHighlighterStyle), static_cast<int>(state.highlighterStyle));
     root.insert(QString::fromLatin1(kKeyNumberStyle), static_cast<int>(state.numberStyle));
     root.insert(QString::fromLatin1(kKeyTextFontFamily), state.textFontFamily);
+    root.insert(QString::fromLatin1(kKeyTextFontWeight), static_cast<int>(state.textFontWeight));
+    root.insert(QString::fromLatin1(kKeyTextItalic), state.textItalic);
     root.insert(QString::fromLatin1(kKeyTextBackgroundColor), colorToJson(state.textBackgroundColor));
 
     // 2. 通过 QSaveFile 原子写入,避免崩溃时残留半截 JSON
