@@ -602,12 +602,15 @@ void ShotWindow::setSelectedTextFontFamily(const QString &fontFamily)
 
 void ShotWindow::setSelectedTextFontSize(int pointSize)
 {
-    pointSize = std::clamp(pointSize, 8, 300);
+    // Rendered font size = 19 + annotation.width, so the spin box value maps
+    // directly to the final output size. The minimum width of 1.0 therefore
+    // corresponds to 20 pt; anything smaller is not representable.
+    pointSize = std::clamp(pointSize, 20, 300);
     if (m_propertyFontSizeSpin) {
         const QSignalBlocker blocker(m_propertyFontSizeSpin);
         m_propertyFontSizeSpin->setValue(pointSize);
     }
-    const qreal targetWidth = static_cast<qreal>(pointSize) - 20.0;
+    const qreal targetWidth = static_cast<qreal>(pointSize) - 19.0;
     setSelectedAnnotationWidth(qRound(targetWidth));
     if (m_textEditor && m_textEditor->isVisible()) {
         QFont font = m_textEditor->font();

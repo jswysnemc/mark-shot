@@ -407,9 +407,9 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     });
     fontPanelLayout->addWidget(m_propertyFontList);
 
-    // 字号精确输入（最终点大小 = 20 + 文本宽度偏移）
+    // 字号精确输入（最终渲染点大小 = 19 + 文本宽度偏移）
     m_propertyFontSizeSpin = new QSpinBox(m_propertyFontPanel);
-    m_propertyFontSizeSpin->setRange(8, 300);
+    m_propertyFontSizeSpin->setRange(20, 300);
     m_propertyFontSizeSpin->setSingleStep(1);
     m_propertyFontSizeSpin->setSuffix(QStringLiteral(" pt"));
     m_propertyFontSizeSpin->setFocusPolicy(Qt::NoFocus);

@@ -620,7 +620,7 @@ void ShotWindow::updateAnnotationPropertyPanel()
     if (m_propertyFontSizeSpin) {
         const QSignalBlocker blocker(m_propertyFontSizeSpin);
         m_propertyFontSizeSpin->setVisible(isTextPanel);
-        m_propertyFontSizeSpin->setValue(qRound(20.0 + panelWidth));
+        m_propertyFontSizeSpin->setValue(qRound(19.0 + panelWidth));
     }
     if (m_propertyFontBoldButton) {
         const QSignalBlocker blocker(m_propertyFontBoldButton);
