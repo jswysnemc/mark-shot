@@ -184,15 +184,29 @@ mark-shot --capture-to /tmp/region.png --region 0,0,1280,720
 # Capture a specific monitor by name, with the mouse cursor included
 mark-shot --capture-to /tmp/window.png --display DP-1 --include-cursor
 
+# Capture several monitors at once (repeat --display; one PNG per monitor)
+mark-shot --capture-to /tmp/shots/ --display DP-1 --display DP-2
+
 # Print the available outputs as JSON and exit
 mark-shot --list-displays
 ```
 
-The JSON output of `--capture-to` looks like:
+The JSON output of a single-display `--capture-to` looks like:
 
 ```json
 {"path":"/tmp/shot.png","width":2560,"height":1440,"output":"DP-1","error":null}
 ```
+
+When more than one `--display` is requested the output becomes an array of
+captures, one per monitor:
+
+```json
+{"captures":[{"path":"/tmp/shots/mark-shot-DP-1-20260801-000000.png","width":2560,"height":1440,"output":"DP-1","error":null},
+             {"path":"/tmp/shots/mark-shot-DP-2-20260801-000000.png","width":1920,"height":1080,"output":"DP-2","error":null}]}
+```
+
+Each selected monitor is captured with its own source geometry, so portal-based
+backends return exactly that display instead of the whole virtual desktop.
 
 Headless capture reuses the same capture backends as the interactive UI
 (QScreen, xdg-desktop-portal, PipeWire, grim, KWin/GNOME helpers, and Windows
@@ -223,7 +237,7 @@ argument.
 | `--debug-log <path>` | Writes debug logs to the specified path and enables debug logging unless `--no-debug` is also set. |
 | `--capture-to <path>` | Headless capture: writes a PNG to the given file or directory without opening the UI. Prints a JSON summary to stdout. |
 | `--region <x,y,w,h>` | With `--capture-to`: capture only the logical screen region. |
-| `--display <name>` | With `--capture-to`: capture a specific output by monitor name. |
+| `--display <name>` | With `--capture-to`: capture a specific output by monitor name. May be repeated to capture several monitors at once (one PNG each). |
 | `--include-cursor` | With `--capture-to`: draw the mouse cursor into the captured frame. |
 | `--output-name <name>` | With `--capture-to`: base file name (without extension) used when the capture path is a directory. |
 | `--list-displays` | Prints the available outputs as JSON and exits. |
@@ -343,6 +357,22 @@ For other distributions (such as Debian, Ubuntu, or Fedora), download the compil
   ```
 
 The official `.deb` package is built on a Debian 12 compatibility baseline. It intentionally avoids linking the optional LayerShellQt plugin so that Deepin and other Debian-derived systems with Qt 6.8-era packages can install it without Ubuntu `t64` or newer GCC runtime dependencies.
+
+> **Ubuntu 26.04 LTS**: Mark Shot is verified and supported on Ubuntu 26.04 LTS
+> ("Resolute"). Building from source on Ubuntu 26.04 uses the distro Qt 6.10
+> packages directly (no `aqtinstall` step needed):
+>
+> ```bash
+> sudo apt install build-essential cmake ninja-build pkg-config \
+>   qt6-base-dev qt6-wayland libpipewire-0.3-dev libxcb-cursor0 \
+>   xdg-desktop-portal pipewire xclip
+> cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+> cmake --build build
+> ```
+>
+> Headless capture (`--capture-to`), multi-display capture (repeatable
+> `--display`), and the local MCP server all run on Ubuntu 26.04 under both
+> Wayland (GNOME) and X11 sessions.
 
 ### Dependencies
 

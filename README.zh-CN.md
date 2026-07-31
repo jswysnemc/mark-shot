@@ -181,15 +181,28 @@ mark-shot --capture-to /tmp/region.png --region 0,0,1280,720
 # 按显示器名称捕获指定屏幕，并包含鼠标指针
 mark-shot --capture-to /tmp/window.png --display DP-1 --include-cursor
 
+# 同时捕获多个显示器（可重复 --display，每个显示器一张 PNG）
+mark-shot --capture-to /tmp/shots/ --display DP-1 --display DP-2
+
 # 以 JSON 输出当前所有显示器信息并退出
 mark-shot --list-displays
 ```
 
-`--capture-to` 的 JSON 输出示例：
+单显示器 `--capture-to` 的 JSON 输出示例：
 
 ```json
 {"path":"/tmp/shot.png","width":2560,"height":1440,"output":"DP-1","error":null}
 ```
+
+当指定多个 `--display` 时，输出变为每屏一个捕获的数组：
+
+```json
+{"captures":[{"path":"/tmp/shots/mark-shot-DP-1-20260801-000000.png","width":2560,"height":1440,"output":"DP-1","error":null},
+             {"path":"/tmp/shots/mark-shot-DP-2-20260801-000000.png","width":1920,"height":1080,"output":"DP-2","error":null}]}
+```
+
+每个选中的显示器使用各自的源几何进行捕获，因此 portal 类后端会精确返回
+该显示器而不是整个虚拟桌面。
 
 无界面截图复用与交互界面相同的全部捕获后端（QScreen、
 xdg-desktop-portal、PipeWire、grim、KWin/GNOME 辅助、Windows Graphics Capture），
@@ -218,7 +231,7 @@ xdg-desktop-portal、PipeWire、grim、KWin/GNOME 辅助、Windows Graphics Capt
 | `--debug-log <path>` | 将调试日志写入指定路径；除非同时设置 `--no-debug`，否则会启用调试日志。 |
 | `--capture-to <path>` | 无界面截图：将 PNG 写入指定文件或目录，不打开界面；向标准输出打印 JSON 摘要。 |
 | `--region <x,y,w,h>` | 配合 `--capture-to` 使用：只捕获指定逻辑屏幕区域。 |
-| `--display <name>` | 配合 `--capture-to` 使用：按显示器名称捕获指定输出屏幕。 |
+| `--display <name>` | 配合 `--capture-to` 使用：按显示器名称捕获指定输出屏幕。可重复指定以一次捕获多个显示器（每屏一张 PNG）。 |
 | `--include-cursor` | 配合 `--capture-to` 使用：将鼠标指针绘制进捕获帧。 |
 | `--output-name <name>` | 配合 `--capture-to` 使用：当捕获路径为目录时使用的基准文件名（不含扩展名）。 |
 | `--list-displays` | 以 JSON 输出当前所有显示器信息并退出。 |
@@ -337,6 +350,21 @@ home.packages = with pkgs; [
   ```bash
   sudo dnf install ./mark-shot-<version>-1.x86_64.rpm
   ```
+
+> **Ubuntu 26.04 LTS**：Mark Shot 已在 Ubuntu 26.04 LTS（Resolute）上验证并支持。
+> 在 Ubuntu 26.04 上从源码构建可直接使用发行版自带的 Qt 6.10 软件包
+> （无需 `aqtinstall` 步骤）：
+>
+> ```bash
+> sudo apt install build-essential cmake ninja-build pkg-config \
+>   qt6-base-dev qt6-wayland libpipewire-0.3-dev libxcb-cursor0 \
+>   xdg-desktop-portal pipewire xclip
+> cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+> cmake --build build
+> ```
+>
+> 无头截图（`--capture-to`）、多显示器截图（可重复的 `--display`）以及本地
+> MCP 服务均可在 Ubuntu 26.04 的 Wayland（GNOME）与 X11 会话下运行。
 
 ### 系统依赖
 
