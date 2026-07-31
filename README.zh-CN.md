@@ -163,6 +163,38 @@ mark-shot --pin-image path/to/image.png
 mark-shot --xdg-window
 ```
 
+#### 无界面（非交互）截图
+
+脚本、CI 自动化或其它程序可调用 `mark-shot` 完成截图而无需打开标注界面。
+捕获的帧会写入 PNG，并向标准输出打印一行紧凑的 JSON 摘要：
+
+```bash
+# 捕获主屏并写入 PNG
+mark-shot --capture-to /tmp/shot.png
+
+# 写入目录（自动生成带时间戳的文件名）
+mark-shot --capture-to /tmp/shots/
+
+# 捕获逻辑屏幕区域（x,y,宽度,高度）
+mark-shot --capture-to /tmp/region.png --region 0,0,1280,720
+
+# 按显示器名称捕获指定屏幕，并包含鼠标指针
+mark-shot --capture-to /tmp/window.png --display DP-1 --include-cursor
+
+# 以 JSON 输出当前所有显示器信息并退出
+mark-shot --list-displays
+```
+
+`--capture-to` 的 JSON 输出示例：
+
+```json
+{"path":"/tmp/shot.png","width":2560,"height":1440,"output":"DP-1","error":null}
+```
+
+无界面截图复用与交互界面相同的全部捕获后端（QScreen、
+xdg-desktop-portal、PipeWire、grim、KWin/GNOME 辅助、Windows Graphics Capture），
+因此图像质量与区域裁剪行为完全一致。所有无界面参数与位置图片文件参数互斥。
+
 ### CLI 参数说明
 
 | 参数选项 | 功能描述 |
@@ -184,6 +216,12 @@ mark-shot --xdg-window
 | `--debug` | 为本次运行启用调试日志。 |
 | `--no-debug` | 为本次运行禁用调试日志，并覆盖配置文件和环境变量。 |
 | `--debug-log <path>` | 将调试日志写入指定路径；除非同时设置 `--no-debug`，否则会启用调试日志。 |
+| `--capture-to <path>` | 无界面截图：将 PNG 写入指定文件或目录，不打开界面；向标准输出打印 JSON 摘要。 |
+| `--region <x,y,w,h>` | 配合 `--capture-to` 使用：只捕获指定逻辑屏幕区域。 |
+| `--display <name>` | 配合 `--capture-to` 使用：按显示器名称捕获指定输出屏幕。 |
+| `--include-cursor` | 配合 `--capture-to` 使用：将鼠标指针绘制进捕获帧。 |
+| `--output-name <name>` | 配合 `--capture-to` 使用：当捕获路径为目录时使用的基准文件名（不含扩展名）。 |
+| `--list-displays` | 以 JSON 输出当前所有显示器信息并退出。 |
 
 ### 快捷键绑定
 

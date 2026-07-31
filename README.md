@@ -165,6 +165,41 @@ mark-shot --pin-image path/to/image.png
 mark-shot --xdg-window
 ```
 
+#### Headless (non-interactive) capture
+
+Scripts, CI jobs, and other programs can capture the screen without opening
+the annotation UI. The captured frame is written to a PNG and a compact JSON
+summary is printed to stdout:
+
+```bash
+# Capture the primary screen to a PNG
+mark-shot --capture-to /tmp/shot.png
+
+# Capture into a directory (a timestamped file name is generated)
+mark-shot --capture-to /tmp/shots/
+
+# Capture a logical screen region (x,y,width,height)
+mark-shot --capture-to /tmp/region.png --region 0,0,1280,720
+
+# Capture a specific monitor by name, with the mouse cursor included
+mark-shot --capture-to /tmp/window.png --display DP-1 --include-cursor
+
+# Print the available outputs as JSON and exit
+mark-shot --list-displays
+```
+
+The JSON output of `--capture-to` looks like:
+
+```json
+{"path":"/tmp/shot.png","width":2560,"height":1440,"output":"DP-1","error":null}
+```
+
+Headless capture reuses the same capture backends as the interactive UI
+(QScreen, xdg-desktop-portal, PipeWire, grim, KWin/GNOME helpers, and Windows
+Graphics Capture), so image quality and region handling are identical. All
+headless options are mutually exclusive with the positional image-file
+argument.
+
 ### CLI Arguments
 
 | Option | Description |
@@ -186,6 +221,12 @@ mark-shot --xdg-window
 | `--debug` | Enables debug logging for this run. |
 | `--no-debug` | Disables debug logging for this run, overriding config and environment variables. |
 | `--debug-log <path>` | Writes debug logs to the specified path and enables debug logging unless `--no-debug` is also set. |
+| `--capture-to <path>` | Headless capture: writes a PNG to the given file or directory without opening the UI. Prints a JSON summary to stdout. |
+| `--region <x,y,w,h>` | With `--capture-to`: capture only the logical screen region. |
+| `--display <name>` | With `--capture-to`: capture a specific output by monitor name. |
+| `--include-cursor` | With `--capture-to`: draw the mouse cursor into the captured frame. |
+| `--output-name <name>` | With `--capture-to`: base file name (without extension) used when the capture path is a directory. |
+| `--list-displays` | Prints the available outputs as JSON and exits. |
 
 ### Compositor / Desktop Hotkey Integration
 
