@@ -87,6 +87,91 @@ QString resolveOutputPath(const QString &captureTo, const QString &outputName, Q
     return info.absoluteFilePath();
 }
 
+// Builds the base CaptureRequest for headless mode. Shared by the single and
+// multi-display paths.
+CaptureRequest baseCaptureRequest(const QCommandLineParser &parser)
+{
+    CaptureRequest request;
+    request.allOutputs = parser.isSet(QStringLiteral("all-outputs"));
+    request.includeCursor = parser.isSet(QStringLiteral("include-cursor"));
+    request.allowInteractivePortal = false;
+    request.hideOwnWindows = false;
+    return request;
+}
+
+// Applies a display name: prefers that output and, when no explicit region is
+// given, crops to the output geometry so portal backends capture that monitor
+// instead of the whole virtual desktop.
+void applyDisplayToRequest(CaptureRequest *request, const QString &displayName)
+{
+    if (displayName.isEmpty() || !request) {
+        return;
+    }
+    request->preferredOutputName = displayName;
+    if (!request->sourceGeometry.isValid()) {
+        const QList<QScreen *> screens = QGuiApplication::screens();
+        for (QScreen *screen : screens) {
+            if (screen && screen->name() == displayName) {
+                request->sourceGeometry = screen->geometry();
+                break;
+            }
+        }
+    }
+}
+
+// Captures one frame to a PNG and returns a compact JSON summary object.
+// On failure an object with a null path and an error message is returned.
+QJsonObject captureOneToFile(const CaptureRequest &request,
+                             const QString &captureTo,
+                             const QString &baseName,
+                             QTextStream *err)
+{
+    const CaptureResult result = captureScreenFrame(request);
+
+    if (result.image.isNull()) {
+        if (err) {
+            *err << result.error << '\n';
+        }
+        return {{QStringLiteral("path"), QJsonValue::Null},
+                {QStringLiteral("width"), 0},
+                {QStringLiteral("height"), 0},
+                {QStringLiteral("output"), QJsonValue::Null},
+                {QStringLiteral("error"), result.error}};
+    }
+
+    QString resolveError;
+    const QString outputPath = resolveOutputPath(captureTo, baseName, &resolveError);
+    if (outputPath.isEmpty()) {
+        if (err) {
+            *err << resolveError << '\n';
+        }
+        return {{QStringLiteral("path"), QJsonValue::Null},
+                {QStringLiteral("width"), 0},
+                {QStringLiteral("height"), 0},
+                {QStringLiteral("output"), QJsonValue::Null},
+                {QStringLiteral("error"), resolveError}};
+    }
+
+    QImageWriter writer(outputPath, QByteArrayLiteral("png"));
+    if (!writer.write(result.image)) {
+        const QString writeError = writer.errorString();
+        if (err) {
+            *err << "failed to write capture to " << outputPath << ": " << writeError << '\n';
+        }
+        return {{QStringLiteral("path"), QJsonValue::Null},
+                {QStringLiteral("width"), 0},
+                {QStringLiteral("height"), 0},
+                {QStringLiteral("output"), QJsonValue::Null},
+                {QStringLiteral("error"), writeError}};
+    }
+
+    return {{QStringLiteral("path"), outputPath},
+            {QStringLiteral("width"), result.image.width()},
+            {QStringLiteral("height"), result.image.height()},
+            {QStringLiteral("output"), result.outputName.isEmpty() ? QJsonValue::Null : QJsonValue(result.outputName)},
+            {QStringLiteral("error"), QJsonValue::Null}};
+}
+
 } // namespace
 
 void addHeadlessCaptureOptions(QCommandLineParser *parser)
@@ -98,7 +183,7 @@ void addHeadlessCaptureOptions(QCommandLineParser *parser)
                                     QStringLiteral("Capture only the region x,y,width,height in logical screen coordinates."),
                                     QStringLiteral("x,y,w,h"));
     QCommandLineOption displayOption(QStringLiteral("display"),
-                                     QStringLiteral("Capture a specific output by monitor name."),
+                                     QStringLiteral("Capture a specific output by monitor name. May be repeated to capture several monitors at once."),
                                      QStringLiteral("name"));
     QCommandLineOption includeCursorOption(QStringLiteral("include-cursor"),
                                            QStringLiteral("Draw the mouse cursor into the captured image."));
@@ -141,11 +226,7 @@ int runHeadlessCaptureIfRequested(const QCommandLineParser &parser)
         return 1;
     }
 
-    CaptureRequest request;
-    request.allOutputs = parser.isSet(QStringLiteral("all-outputs"));
-    request.includeCursor = parser.isSet(QStringLiteral("include-cursor"));
-    request.allowInteractivePortal = false;
-    request.hideOwnWindows = false;
+    CaptureRequest request = baseCaptureRequest(parser);
 
     if (parser.isSet(QStringLiteral("region"))) {
         const std::optional<QRect> region = parseRegion(parser.value(QStringLiteral("region")));
@@ -160,72 +241,46 @@ int runHeadlessCaptureIfRequested(const QCommandLineParser &parser)
         request.sourceGeometry = region.value();
     }
 
-    const QString displayName = parser.value(QStringLiteral("display")).trimmed();
-    if (!displayName.isEmpty()) {
-        request.preferredOutputName = displayName;
-        // When no explicit --region is given, crop to the named output so
-        // portal-based backends capture that monitor instead of the whole
-        // virtual desktop.
-        if (!request.sourceGeometry.isValid()) {
-            const QList<QScreen *> screens = QGuiApplication::screens();
-            for (QScreen *screen : screens) {
-                if (screen && screen->name() == displayName) {
-                    request.sourceGeometry = screen->geometry();
-                    break;
-                }
+    const QStringList displayNames = parser.values(QStringLiteral("display"));
+    const QString captureTo = parser.value(QStringLiteral("capture-to"));
+    const QString outputName = parser.value(QStringLiteral("output-name")).trimmed();
+
+    // Multiple --display: capture each monitor to its own PNG and print a
+    // {"captures":[...]} JSON array. This enables multi-screen selection for
+    // agents and scripts.
+    if (displayNames.size() > 1) {
+        QJsonArray captures;
+        bool anyFailed = false;
+        for (const QString &displayName : displayNames) {
+            CaptureRequest displayRequest = request;
+            if (!request.allOutputs) {
+                applyDisplayToRequest(&displayRequest, displayName);
             }
+            const QString baseName = outputName.isEmpty()
+                ? displayName
+                : QStringLiteral("%1-%2").arg(outputName, displayName);
+            const QJsonObject one = captureOneToFile(displayRequest, captureTo, baseName, &err);
+            if (one.value(QStringLiteral("error")).isString()) {
+                anyFailed = true;
+            }
+            captures.append(one);
         }
-    }
-
-    const CaptureResult result = captureScreenFrame(request);
-
-    if (result.image.isNull()) {
-        err << result.error << '\n';
-        out << QJsonDocument(QJsonObject{{QStringLiteral("path"), QJsonValue::Null},
-                                         {QStringLiteral("width"), 0},
-                                         {QStringLiteral("height"), 0},
-                                         {QStringLiteral("output"), QJsonValue::Null},
-                                         {QStringLiteral("error"), result.error}})
+        out << QJsonDocument(QJsonObject{{QStringLiteral("captures"), captures}})
                    .toJson(QJsonDocument::Compact)
             << '\n';
         out.flush();
-        return 1;
+        return anyFailed ? 1 : 0;
     }
 
-    QString resolveError;
-    const QString baseName = parser.value(QStringLiteral("output-name")).trimmed();
-    const QString outputPath = resolveOutputPath(parser.value(QStringLiteral("capture-to")),
-                                                 baseName.isEmpty() ? result.outputName : baseName,
-                                                 &resolveError);
-    if (outputPath.isEmpty()) {
-        err << resolveError << '\n';
-        return 1;
+    // Single display (or none): keep the original compact single-object JSON.
+    if (!request.allOutputs && !displayNames.isEmpty()) {
+        applyDisplayToRequest(&request, displayNames.first());
     }
 
-    QImageWriter writer(outputPath, QByteArrayLiteral("png"));
-    if (!writer.write(result.image)) {
-        const QString writeError = writer.errorString();
-        err << "failed to write capture to " << outputPath << ": " << writeError << '\n';
-        out << QJsonDocument(QJsonObject{{QStringLiteral("path"), QJsonValue::Null},
-                                         {QStringLiteral("width"), 0},
-                                         {QStringLiteral("height"), 0},
-                                         {QStringLiteral("output"), QJsonValue::Null},
-                                         {QStringLiteral("error"), writeError}})
-                   .toJson(QJsonDocument::Compact)
-            << '\n';
-        out.flush();
-        return 1;
-    }
-
-    out << QJsonDocument(QJsonObject{{QStringLiteral("path"), outputPath},
-                                     {QStringLiteral("width"), result.image.width()},
-                                     {QStringLiteral("height"), result.image.height()},
-                                     {QStringLiteral("output"), result.outputName.isEmpty() ? QJsonValue::Null : QJsonValue(result.outputName)},
-                                     {QStringLiteral("error"), QJsonValue::Null}})
-               .toJson(QJsonDocument::Compact)
-        << '\n';
+    const QJsonObject single = captureOneToFile(request, captureTo, outputName, &err);
+    out << QJsonDocument(single).toJson(QJsonDocument::Compact) << '\n';
     out.flush();
-    return 0;
+    return single.value(QStringLiteral("error")).isString() ? 1 : 0;
 }
 
 } // namespace markshot::cli
