@@ -53,14 +53,21 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
                 continue;
             }
 
+            // 只要存在任一窗口带 zOrder,本次命中判定统一按 z 序比较,
+            // 缺少 zOrder 的窗口按最底层处理,避免混用面积/深度两套规则。
+            if (info.zOrder.has_value()) {
+                useZOrder = true;
+            }
+
             if (!best.has_value()) {
-                useZOrder = info.zOrder.has_value();
                 best = info;
                 continue;
             }
 
             if (useZOrder) {
-                if (info.zOrder > best->zOrder) {
+                const int infoZ = info.zOrder.value_or(-1);
+                const int bestZ = best->zOrder.value_or(-1);
+                if (infoZ > bestZ) {
                     best = info;
                 }
             } else {
