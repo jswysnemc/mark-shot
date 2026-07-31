@@ -3,6 +3,7 @@
 #include "capture_freeze_scope.h"
 #include "capture_own_windows_policy.h"
 #include "capture_session_launcher.h"
+#include "cli/headless_capture.h"
 #include "cli/image_pin_launch.h"
 #include "cli/recording_cli.h"
 #include "debug_log.h"
@@ -129,6 +130,7 @@ int main(int argc, char *argv[])
     parser.addOption(debugOption);
     parser.addOption(noDebugOption);
     parser.addOption(debugLogOption);
+    markshot::cli::addHeadlessCaptureOptions(&parser);
     parser.process(app);
 
     if (parser.isSet(stopRecordingOption)) {
@@ -136,6 +138,11 @@ int main(int argc, char *argv[])
     }
     if (parser.isSet(recordingStatusOption)) {
         return markshot::cli::printRecordingStatus();
+    }
+
+    const int headlessExitCode = markshot::cli::runHeadlessCaptureIfRequested(parser);
+    if (headlessExitCode >= 0) {
+        return headlessExitCode;
     }
 
     const QStringList positionalArguments = parser.positionalArguments();
