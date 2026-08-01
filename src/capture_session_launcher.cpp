@@ -125,6 +125,13 @@ ShotWindow *showCapturedWindow(QScreen *screen,
         window->beginRegionRecordingSelection(*regionRecordingOptions);
     }
 
+    // 截图覆盖窗口不进入系统任务栏/坞（Windows: WS_EX_TOOLWINDOW；
+    // X11: _NET_WM_STATE_SKIP_TASKBAR；Wayland 层壳覆盖层天然无任务栏项，
+    // 普通 xdg 窗口无标准跳过机制，保持现状）。
+    QTimer::singleShot(0, window, [window] {
+        markshot::windows::setExcludedFromTaskbar(window);
+    });
+
     return window;
 }
 
@@ -684,6 +691,23 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
                                                              defaultTools,
                                                              error,
                                                              regionRecordingOptions);
+        } else if (!mixedDevicePixelRatios) {
+            // 统一 DPR 的 X11/Windows：用单个覆盖整个虚拟桌面的窗口展示全部
+            // 屏幕的冻结画面，允许选区一次跨越多台显示器（与 Flameshot、
+            // Spectacle 等工具的最佳实践一致）。
+            ShotWindow *window =
+                showCaptureWindow(nullptr,
+                                  true,
+                                  includeCursor,
+                                  hideOwnWindows,
+                                  useRegularWindow,
+                                  fullscreenAnnotation,
+                                  defaultTools,
+                                  error,
+                                  regionRecordingOptions);
+            if (window) {
+                windows.append(window);
+            }
         } else {
             windows = showCaptureWindowsFromSingleFrame(screens,
                                                         includeCursor,
