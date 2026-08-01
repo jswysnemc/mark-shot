@@ -35,4 +35,6 @@ set(MARK_SHOT_SETTINGS_SOURCES
     src/settings/settings_page_storage.h
     src/settings/settings_ui_helpers.cpp
     src/settings/settings_ui_helpers.h
+    src/settings/settings_wheel_guard.cpp
+    src/settings/settings_wheel_guard.h
 )
