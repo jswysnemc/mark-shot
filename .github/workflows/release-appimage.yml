@@ -265,6 +265,7 @@ jobs:
             libx11-xcb1 \
             libxcb-dri3-0 \
             libxcb1 \
+            xvfb \
             zlib1g
 
       - name: Download AppImage artifact
@@ -276,11 +277,10 @@ jobs:
         shell: bash
         env:
           APPIMAGE_EXTRACT_AND_RUN: 1
-          QT_QPA_PLATFORM: offscreen
         run: |
           set -euo pipefail
           chmod +x "${{ needs.appimage.outputs.asset }}"
-          "./${{ needs.appimage.outputs.asset }}" --version
+          xvfb-run -a "./${{ needs.appimage.outputs.asset }}" --version
 
       - name: Upload AppImage to release
         if: github.event_name == 'release' || github.event_name == 'push' || inputs.upload_to_release

@@ -82,11 +82,14 @@ class PackagingConfigurationTest(unittest.TestCase):
             "libx11-xcb1",
             "libxcb-dri3-0",
             "libxcb1",
+            "xvfb",
             "zlib1g",
         ):
             with self.subTest(package=package):
                 self.assertIn(package, runtime_job)
-        self.assertIn('"./${{ needs.appimage.outputs.asset }}" --version', workflow)
+        self.assertIn(
+            'xvfb-run -a "./${{ needs.appimage.outputs.asset }}" --version', workflow
+        )
 
     def test_screenshot_desktop_entry_disables_startup_notification(self) -> None:
         """
