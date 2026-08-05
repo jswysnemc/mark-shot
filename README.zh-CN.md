@@ -303,28 +303,9 @@ home.packages = with pkgs; [
 ]
 ```
 
-##### 其他发行版 (预编译安装包)
-对于其他发行版（如 Ubuntu, Debian, Fedora），请在 Releases 页面下载编译好的安装包并运行以下命令安装：
-- **Debian 12 / Deepin**（FFmpeg 5 / 旧 Qt 基线）:
-  ```bash
-  sudo apt install ./mark-shot_<version>_amd64.deb
-  ```
-  > 为兼容 Deepin/旧 Debian，该包默认不链接 LayerShellQt。Wayland 覆盖层在 niri 等环境可能降级为普通窗口。
-- **Ubuntu 26.04 及相近版本**（新 FFmpeg / t64 Qt，含 Ubuntu Budgie）:
-  ```bash
-  sudo apt install ./mark-shot_<version>_amd64.ubuntu26.04.deb
-  ```
-  > 不要在 Ubuntu 26.04 上安装 Debian 12 包：它依赖 `libavcodec59` 等旧库，系统中已不提供，会导致 `apt -f install` 卸载 mark-shot。  
-  > Ubuntu 包会在可用时编入 layer-shell 插件，并把主程序/插件 so 的共享库依赖一并写入 `Depends`。
-- **Fedora**:
-  ```bash
-  sudo dnf install ./mark-shot-<version>-1.x86_64.rpm
-  ```
+##### 其他发行版（预编译安装包）
 
-插件说明：
-- deb/rpm 会尽量打包已构建的 C++ 插件（OCR Rapid / ZXing / OpenAI 翻译 / layer-shell）。
-- 若构建环境缺少 `onnxruntime` / `zxing-cpp`，对应插件会跳过；此时可使用 Python 脚本后端或插件市场。
-- 独立发布的 `mark-shot-plugin-*.so` 资产依赖构建机 so 代际，不适合跨发行版混用。
+Debian 12、Debian 13、Ubuntu 24.04、Ubuntu 26.04、AppImage 与 Fedora 的安装包名称和兼容基线参见 [Linux 安装包选择](docs/linux-packages.zh-CN.md)。
 
 ### 系统依赖
 

@@ -13,6 +13,10 @@ on:
         description: 'Release tag, for example v0.1.16'
         required: true
         type: string
+      checkout_ref:
+        description: 'Optional source ref for manual runs, for example dev'
+        required: false
+        type: string
       upload_to_release:
         description: 'Attach manual-run AppImage assets to the GitHub Release matching tag'
         required: false
@@ -31,7 +35,12 @@ jobs:
   appimage:
     name: Build AppImage
     runs-on: ubuntu-latest
-    container: archlinux:base-devel
+    container:
+      image: debian:12
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      asset: ${{ steps.package.outputs.asset }}
+      checksum: ${{ steps.package.outputs.checksum }}
 
     steps:
       - name: Resolve tag
@@ -44,36 +53,58 @@ jobs:
             exit 1
           fi
           VERSION="${TAG#v}"
+          CHECKOUT_INPUT="${{ inputs.checkout_ref }}"
+          if [ "${{ github.event_name }}" = "release" ] || [ "${{ github.event_name }}" = "push" ]; then
+            CHECKOUT_REF="$TAG"
+          elif [ -n "$CHECKOUT_INPUT" ]; then
+            CHECKOUT_REF="$CHECKOUT_INPUT"
+          else
+            CHECKOUT_REF="${{ github.ref_name }}"
+          fi
           {
             echo "tag=$TAG"
             echo "version=$VERSION"
+            echo "checkout_ref=$CHECKOUT_REF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Checkout release source
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.version.outputs.tag }}
-
       - name: Install dependencies
+        shell: bash
         run: |
-          pacman -Syu --noconfirm --needed \
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
             appstream \
+            build-essential \
             ca-certificates \
             cmake \
             desktop-file-utils \
             file \
             ffmpeg \
-            fuse2 \
-            gcc \
-            layer-shell-qt \
-            ninja \
+            git \
+            libavcodec-dev \
+            libavfilter-dev \
+            libavformat-dev \
+            libavutil-dev \
+            libgl1-mesa-dev \
+            libpipewire-0.3-dev \
+            libswresample-dev \
+            libswscale-dev \
+            libx11-xcb-dev \
+            libxcb1-dev \
+            ninja-build \
             patchelf \
-            pipewire \
-            pkgconf \
-            qt6-base \
-            qt6-tools \
-            qt6-wayland \
+            pkg-config \
+            qt6-base-dev \
+            qt6-base-dev-tools \
+            qt6-tools-dev-tools \
+            qt6-wayland-dev \
             wget
+
+      - name: Checkout release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.version.outputs.checkout_ref }}
 
       - name: Download AppImage tools
         shell: bash
@@ -91,8 +122,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
             -DMARK_SHOT_REQUIRE_FFMPEG=ON \
-            -DMARK_SHOT_WITH_LAYER_SHELL=ON \
-            -DMARK_SHOT_REQUIRE_LAYER_SHELL=ON
+            -DMARK_SHOT_WITH_LAYER_SHELL=OFF
 
       - name: Build
         run: cmake --build build --parallel
@@ -115,13 +145,10 @@ jobs:
         run: |
           set -euo pipefail
           BINARY="$PWD/AppDir/usr/bin/mark-shot"
-          PLUGIN="$(find "$PWD/AppDir/usr" -path '*/mark-shot/libmark-shot-layer-shell.so' -print -quit)"
           if ldd "$BINARY" | grep -Ei 'LayerShellQt|layershell'; then
             echo "main binary unexpectedly links LayerShellQt directly" >&2
             exit 1
           fi
-          test -n "$PLUGIN"
-          ldd "$PLUGIN" | grep -Ei 'LayerShellQt|layershell'
           for library in libavcodec libavfilter libavformat libavutil libswresample libswscale; do
             ldd "$BINARY" | grep -F "$library"
           done
@@ -162,8 +189,35 @@ jobs:
             echo "checksum=$ASSET.sha256"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Assert glibc compatibility
+        shell: bash
+        env:
+          MAX_GLIBC_VERSION: "2.36"
+        run: |
+          set -euo pipefail
+
+          # 【Linux发布】【AppImage兼容】1. 扫描 AppDir 内全部 ELF 文件声明的 glibc 符号版本
+          MAX_REQUIRED="$(
+            while IFS= read -r -d '' path; do
+              if file -b "$path" | grep -q 'ELF'; then
+                strings "$path" | grep -oE 'GLIBC_[0-9]+\.[0-9]+(\.[0-9]+)?' || true
+              fi
+            done < <(find "$PWD/AppDir/usr" -type f -print0)
+          )"
+          MAX_REQUIRED="$(printf '%s\n' "$MAX_REQUIRED" | sed 's/^GLIBC_//' | sort -V | tail -n1)"
+
+          # 【Linux发布】【AppImage兼容】2. 拒绝高于 Debian 12 基线的符号需求
+          if [ -z "$MAX_REQUIRED" ]; then
+            echo "No GLIBC symbol versions found in AppDir" >&2
+            exit 1
+          fi
+          if dpkg --compare-versions "$MAX_REQUIRED" gt "$MAX_GLIBC_VERSION"; then
+            echo "AppImage requires GLIBC_$MAX_REQUIRED, maximum allowed is GLIBC_$MAX_GLIBC_VERSION" >&2
+            exit 1
+          fi
+          echo "AppImage payload requires at most GLIBC_$MAX_REQUIRED"
+
       - name: Upload AppImage artifact
-        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: mark-shot-appimage-${{ steps.version.outputs.tag }}
@@ -172,11 +226,42 @@ jobs:
             ${{ steps.package.outputs.checksum }}
           if-no-files-found: error
 
+  appimage-ubuntu2404:
+    name: Verify AppImage on Ubuntu 24.04
+    needs: appimage
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:24.04
+
+    steps:
+      - name: Install runtime prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates
+
+      - name: Download AppImage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mark-shot-appimage-${{ needs.appimage.outputs.tag }}
+
+      - name: Verify AppImage starts
+        shell: bash
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -euo pipefail
+          chmod +x "${{ needs.appimage.outputs.asset }}"
+          "./${{ needs.appimage.outputs.asset }}" --version
+
       - name: Upload AppImage to release
         if: github.event_name == 'release' || github.event_name == 'push' || inputs.upload_to_release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
+          tag_name: ${{ needs.appimage.outputs.tag }}
           files: |
-            ${{ steps.package.outputs.asset }}
-            ${{ steps.package.outputs.checksum }}
+            ${{ needs.appimage.outputs.asset }}
+            ${{ needs.appimage.outputs.checksum }}

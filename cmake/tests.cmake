@@ -55,6 +55,10 @@ target_link_libraries(mark-shot-capture-session-screen-utils-test
 add_test(NAME capture-session-screen-utils COMMAND mark-shot-capture-session-screen-utils-test)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME packaging-configuration
+    COMMAND ${CMAKE_COMMAND} -E env PYTHONDONTWRITEBYTECODE=1
+        ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/packaging_configuration_test.py
+)
 add_test(NAME niri-window-detection
     COMMAND ${CMAKE_COMMAND} -E env PYTHONDONTWRITEBYTECODE=1
         ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/niri_window_detection_test.py

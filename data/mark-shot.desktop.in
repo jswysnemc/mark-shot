@@ -6,6 +6,7 @@ Comment[zh_CN]=Wayland 截图选区和标注工具
 Exec=@MARK_SHOT_DESKTOP_EXEC@
 Icon=mark-shot
 Terminal=false
+StartupNotify=false
 Categories=Graphics;Utility;
 Keywords=screenshot;screen capture;wayland;niri;grim;
 Keywords[zh_CN]=截图;屏幕捕获;标注;wayland;niri;grim;

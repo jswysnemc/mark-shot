@@ -308,18 +308,14 @@ home.packages = with pkgs; [
 For other distributions (such as Debian, Ubuntu, or Fedora), download the compiled package from the Releases page and install it via:
 - **Debian / Ubuntu**:
   ```bash
-  sudo apt install ./mark-shot_<version>_amd64.deb
+  sudo apt install ./<downloaded-mark-shot-package>.deb
   ```
 - **Fedora**:
   ```bash
   sudo dnf install ./mark-shot-<version>-1.x86_64.rpm
   ```
 
-The official `.deb` packages are built for two targets:
-- **Debian 12** (`mark-shot_<version>_amd64.deb`): Deepin / older Debian-derived systems. Avoids LayerShellQt and newer `t64` / Qt 6.9+ runtime deps so the package remains installable on the older baseline.
-- **Ubuntu 26.04** (`mark-shot_<version>_amd64.ubuntu26.04.deb`): recent Ubuntu (modern FFmpeg / `t64` Qt). Use this on Ubuntu Budgie 26.04 and similar releases. LayerShell is enabled when distro packages are available, and `Depends` includes shared libraries from the main binary plus installed plugins.
-
-A Debian 12 package will fail to install on Ubuntu 26.04 because it depends on FFmpeg 5 libraries (`libavcodec59`, …) that are no longer shipped.
+See the [Linux package selection guide](docs/linux-packages.md) for Debian 12, Debian 13, Ubuntu 24.04, Ubuntu 26.04, AppImage, and Fedora artifact names and compatibility baselines.
 
 Plugin notes:
 - Packages include C++ provider plugins only when their build deps (onnxruntime, zxing-cpp, …) are present on the builder.
