@@ -14,34 +14,14 @@
 
 #include "display_capture/display_capture_target.h"
 #include "recording/recording_options.h"
+#include "shot_window_qt_fwd.h"
 #include "startup_shortcut_hint.h"
 #include "toolbar_appearance_config.h"
 #include "ui/theme.h"
 #include "window_detection.h"
 
-class QListWidget;
-class QSpinBox;
-class QToolButton;
-
 #include <array>
 #include <optional>
-
-class QPainter;
-class QShowEvent;
-class QByteArray;
-class QBoxLayout;
-class QComboBox;
-class QCloseEvent;
-class QKeyEvent;
-class QLabel;
-class QListWidget;
-class QPushButton;
-class QScrollBar;
-class QScreen;
-class QSlider;
-class QTextEdit;
-class QTimer;
-class QWheelEvent;
 
 namespace markshot::ui {
 class ColorPicker;
@@ -319,6 +299,7 @@ private:
     void initializeToolbar();
     void initializeImageScrollBars();
     void initializeActionToolbar();
+    void initializePropertyFontPanel();
     void initializeShortcuts();
     void initializeTransientPanels();
     void initializeTextEditor();
@@ -652,7 +633,8 @@ private:
     qreal m_strokeWidth = 3.0;
     qreal m_highlighterWidth = 6.0;
     qreal m_numberWidth = 3.0;
-    qreal m_textSize = 1.0;  // 默认文本字号 20pt（渲染字号 = 19 + width）
+    // 默认文本字号为 20pt，渲染字号等于 19 加 width
+    qreal m_textSize = 1.0;
     qreal m_mosaicBlockSize = 14.0;
     qreal m_magnifierScale = 2.75;
     MagnifierShape m_magnifierShape = MagnifierShape::Circle;

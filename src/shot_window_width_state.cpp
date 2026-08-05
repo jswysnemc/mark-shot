@@ -84,7 +84,7 @@ bool ShotWindow::setSelectedAnnotationWidth(int width, bool captureHistory)
         case Tool::Number:
             return std::clamp<qreal>(requestedWidth, kMinNumberWidth, kMaxNumberWidth);
         case Tool::Text:
-            return std::clamp<qreal>(requestedWidth, 1.0, 1000.0);
+            return std::clamp<qreal>(requestedWidth, -11.0, 281.0);
         case Tool::Highlighter:
             return std::clamp<qreal>(requestedWidth, kMinStrokeWidth, kMaxHighlighterWidth);
         case Tool::Move:

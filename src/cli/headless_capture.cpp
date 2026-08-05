@@ -20,7 +20,11 @@
 namespace markshot::cli {
 namespace {
 
-// Parses "x,y,w,h" into a QRect. Returns nullopt when malformed or empty.
+/**
+ * 解析逻辑坐标区域参数。
+ * @param value 格式为 x,y,w,h 的区域字符串。
+ * @return 合法区域；格式错误或尺寸无效时返回空值。
+ */
 std::optional<QRect> parseRegion(const QString &value)
 {
     const QStringList parts = value.split(QLatin1Char(','));
@@ -41,6 +45,10 @@ std::optional<QRect> parseRegion(const QString &value)
     return QRect(x, y, w, h);
 }
 
+/**
+ * 序列化当前可用显示器信息。
+ * @return 紧凑格式的 JSON 数据。
+ */
 QByteArray displaysJson()
 {
     QJsonArray displays;
@@ -65,16 +73,26 @@ QByteArray displaysJson()
     return QJsonDocument(root).toJson(QJsonDocument::Compact);
 }
 
-// Resolves the final output path. When the user passes a directory (or a path
-// ending with a separator that does not yet exist), a timestamped file name is
-// generated inside it.
+/**
+ * 解析截图最终输出路径，目录目标会生成带时间戳的文件名。
+ * @param captureTo 用户指定的文件或目录路径。
+ * @param outputName 目录目标使用的文件基础名称。
+ * @param error 输出路径解析错误。
+ * @return 最终输出文件路径；失败时返回空字符串。
+ */
 QString resolveOutputPath(const QString &captureTo, const QString &outputName, QString *error)
 {
     QFileInfo info(captureTo);
     const bool looksLikeDirectory = info.isDir()
         || (captureTo.endsWith(QLatin1Char('/')) || captureTo.endsWith(QLatin1Char('\\')));
     if (looksLikeDirectory) {
-        QDir().mkpath(info.absoluteFilePath());
+        if (!QDir().mkpath(info.absoluteFilePath())) {
+            if (error) {
+                *error = QStringLiteral("failed to create output directory: %1")
+                             .arg(info.absoluteFilePath());
+            }
+            return {};
+        }
         const QString stamp =
             QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss-zzz"));
         QString fileName = QStringLiteral("mark-shot-%1.png").arg(stamp);
@@ -92,15 +110,23 @@ QString resolveOutputPath(const QString &captureTo, const QString &outputName, Q
     return info.absoluteFilePath();
 }
 
-// Returns true when captureTo looks like an existing directory (the only form
-// supported for multi-display capture).
+/**
+ * 判断多显示器截图目标是否明确表示目录。
+ * @param captureTo 用户指定的输出路径。
+ * @return 路径为现有目录或以目录分隔符结尾时返回 true。
+ */
 bool isDirectoryTarget(const QString &captureTo)
 {
-    return QFileInfo(captureTo).isDir();
+    return QFileInfo(captureTo).isDir()
+        || captureTo.endsWith(QLatin1Char('/'))
+        || captureTo.endsWith(QLatin1Char('\\'));
 }
 
-// Builds the base CaptureRequest for headless mode. Shared by the single and
-// multi-display paths.
+/**
+ * 根据命令行参数创建无界面截图基础请求。
+ * @param parser 已完成参数解析的命令行解析器。
+ * @return 单屏和多屏流程共用的截图请求。
+ */
 CaptureRequest baseCaptureRequest(const QCommandLineParser &parser)
 {
     CaptureRequest request;
@@ -111,8 +137,11 @@ CaptureRequest baseCaptureRequest(const QCommandLineParser &parser)
     return request;
 }
 
-// Returns the geometry of the named display, or a default-constructed QRect
-// when no such display exists.
+/**
+ * 查找指定显示器的逻辑坐标范围。
+ * @param displayName 显示器名称。
+ * @return 显示器逻辑坐标；未找到时返回空矩形。
+ */
 QRect displayGeometry(const QString &displayName)
 {
     const QList<QScreen *> screens = QGuiApplication::screens();
@@ -124,8 +153,11 @@ QRect displayGeometry(const QString &displayName)
     return {};
 }
 
-// Verifies that every requested display name exists. Returns the first
-// offending name, or an empty string when all names are valid.
+/**
+ * 查找请求中第一个不存在的显示器名称。
+ * @param displayNames 请求的显示器名称列表。
+ * @return 第一个无效名称；全部有效时返回空字符串。
+ */
 QString firstUnknownDisplay(const QStringList &displayNames)
 {
     for (const QString &displayName : displayNames) {
@@ -136,9 +168,12 @@ QString firstUnknownDisplay(const QStringList &displayNames)
     return {};
 }
 
-// Applies a display name: prefers that output and, when no explicit region is
-// given, crops to the output geometry so portal backends capture that monitor
-// instead of the whole virtual desktop.
+/**
+ * 将显示器名称和逻辑坐标应用到截图请求。
+ * @param request 需要更新的截图请求。
+ * @param displayName 目标显示器名称。
+ * @return 无返回值。
+ */
 void applyDisplayToRequest(CaptureRequest *request, const QString &displayName)
 {
     if (displayName.isEmpty() || !request) {
@@ -153,8 +188,48 @@ void applyDisplayToRequest(CaptureRequest *request, const QString &displayName)
     }
 }
 
-// Captures one frame to a PNG and returns a compact JSON summary object.
-// On failure an object with a null path and an error message is returned.
+/**
+ * 创建统一的截图失败结果对象。
+ * @param error 错误说明。
+ * @return 路径和输出为空、尺寸为零的 JSON 结果。
+ */
+QJsonObject captureErrorObject(const QString &error)
+{
+    return {{QStringLiteral("path"), QJsonValue::Null},
+            {QStringLiteral("width"), 0},
+            {QStringLiteral("height"), 0},
+            {QStringLiteral("output"), QJsonValue::Null},
+            {QStringLiteral("error"), error}};
+}
+
+/**
+ * 向标准输出和标准错误报告参数错误。
+ * @param out 标准输出流。
+ * @param err 标准错误流。
+ * @param error 错误说明。
+ * @return 固定的失败退出码 1。
+ */
+int reportUsageError(QTextStream *out, QTextStream *err, const QString &error)
+{
+    if (out) {
+        *out << QJsonDocument(captureErrorObject(error)).toJson(QJsonDocument::Compact) << '\n';
+        out->flush();
+    }
+    if (err) {
+        *err << error << '\n';
+        err->flush();
+    }
+    return 1;
+}
+
+/**
+ * 捕获一帧并写入 PNG 文件。
+ * @param request 截图请求。
+ * @param captureTo 输出文件或目录路径。
+ * @param baseName 目录目标使用的文件基础名称。
+ * @param err 标准错误输出流。
+ * @return 包含路径、尺寸、显示器和错误的 JSON 结果。
+ */
 QJsonObject captureOneToFile(const CaptureRequest &request,
                              const QString &captureTo,
                              const QString &baseName,
@@ -166,11 +241,7 @@ QJsonObject captureOneToFile(const CaptureRequest &request,
         if (err) {
             *err << result.error << '\n';
         }
-        return {{QStringLiteral("path"), QJsonValue::Null},
-                {QStringLiteral("width"), 0},
-                {QStringLiteral("height"), 0},
-                {QStringLiteral("output"), QJsonValue::Null},
-                {QStringLiteral("error"), result.error}};
+        return captureErrorObject(result.error);
     }
 
     QString resolveError;
@@ -179,11 +250,7 @@ QJsonObject captureOneToFile(const CaptureRequest &request,
         if (err) {
             *err << resolveError << '\n';
         }
-        return {{QStringLiteral("path"), QJsonValue::Null},
-                {QStringLiteral("width"), 0},
-                {QStringLiteral("height"), 0},
-                {QStringLiteral("output"), QJsonValue::Null},
-                {QStringLiteral("error"), resolveError}};
+        return captureErrorObject(resolveError);
     }
 
     QImageWriter writer(outputPath, QByteArrayLiteral("png"));
@@ -193,15 +260,10 @@ QJsonObject captureOneToFile(const CaptureRequest &request,
         if (err) {
             *err << "failed to write capture to " << outputPath << ": " << writeError << '\n';
         }
-        return {{QStringLiteral("path"), QJsonValue::Null},
-                {QStringLiteral("width"), 0},
-                {QStringLiteral("height"), 0},
-                {QStringLiteral("output"), QJsonValue::Null},
-                {QStringLiteral("error"), writeError}};
+        return captureErrorObject(writeError);
     }
 
-    // Propagate the requested display name when the backend did not fill it
-    // (QScreen-based backends return an empty outputName).
+    // 1. 后端未返回显示器名称时保留用户请求的名称
     QString effectiveOutput = result.outputName;
     if (effectiveOutput.isEmpty() && !request.preferredOutputName.isEmpty()) {
         effectiveOutput = request.preferredOutputName;
@@ -253,19 +315,22 @@ int runHeadlessCaptureIfRequested(const QCommandLineParser &parser)
         return -1;
     }
 
+    if (!parser.positionalArguments().isEmpty()) {
+        return reportUsageError(
+            &out,
+            &err,
+            QStringLiteral("headless options cannot be combined with an image file argument."));
+    }
+    if (wantListDisplays && wantCapture) {
+        return reportUsageError(
+            &out,
+            &err,
+            QStringLiteral("--list-displays and --capture-to cannot be combined."));
+    }
     if (wantListDisplays) {
         out << displaysJson() << '\n';
         out.flush();
-        if (wantCapture) {
-            err << "--list-displays and --capture-to cannot be combined.\n";
-            return 1;
-        }
         return 0;
-    }
-
-    if (parser.positionalArguments().size() > 0) {
-        err << "--capture-to cannot be combined with an image file argument.\n";
-        return 1;
     }
 
     const QStringList displayNames = parser.values(QStringLiteral("display"));
@@ -274,24 +339,30 @@ int runHeadlessCaptureIfRequested(const QCommandLineParser &parser)
     const bool hasRegion = parser.isSet(QStringLiteral("region"));
     const bool allOutputs = parser.isSet(QStringLiteral("all-outputs"));
 
-    // Reject semantically conflicting option combinations early so the user
-    // gets a clear error instead of silently capturing the wrong pixels.
+    // 1. 校验互斥参数和多显示器输出目录
     if (allOutputs && !displayNames.isEmpty()) {
-        err << "--all-outputs cannot be combined with --display.\n";
-        return 1;
+        return reportUsageError(
+            &out, &err, QStringLiteral("--all-outputs cannot be combined with --display."));
     }
     if (hasRegion && displayNames.size() > 1) {
-        err << "--region cannot be combined with multiple --display options.\n";
-        return 1;
+        return reportUsageError(
+            &out,
+            &err,
+            QStringLiteral("--region cannot be combined with multiple --display options."));
     }
     if (displayNames.size() > 1 && !isDirectoryTarget(captureTo)) {
-        err << "--capture-to must be an existing directory when capturing multiple displays.\n";
-        return 1;
+        return reportUsageError(
+            &out,
+            &err,
+            QStringLiteral("--capture-to must be a directory when capturing multiple displays."));
     }
     const QString unknownDisplay = firstUnknownDisplay(displayNames);
     if (!unknownDisplay.isEmpty()) {
-        err << "unknown display: " << unknownDisplay << ". Use --list-displays to see valid names.\n";
-        return 1;
+        return reportUsageError(
+            &out,
+            &err,
+            QStringLiteral("unknown display: %1. Use --list-displays to see valid names.")
+                .arg(unknownDisplay));
     }
 
     CaptureRequest request = baseCaptureRequest(parser);
@@ -300,19 +371,21 @@ int runHeadlessCaptureIfRequested(const QCommandLineParser &parser)
     if (hasRegion) {
         const std::optional<QRect> region = parseRegion(parser.value(QStringLiteral("region")));
         if (!region.has_value()) {
-            err << "--region expects a comma-separated rectangle x,y,width,height.\n";
-            return 1;
+            return reportUsageError(
+                &out,
+                &err,
+                QStringLiteral("--region expects a comma-separated rectangle x,y,width,height."));
         }
         if (allOutputs) {
-            err << "--region cannot be combined with --all-outputs.\n";
-            return 1;
+            return reportUsageError(
+                &out,
+                &err,
+                QStringLiteral("--region cannot be combined with --all-outputs."));
         }
         request.sourceGeometry = region.value();
     }
 
-    // Multiple --display: capture each monitor to its own PNG and print a
-    // {"captures":[...]} JSON array. This enables multi-screen selection for
-    // agents and scripts.
+    // 2. 多显示器请求逐屏写入文件并汇总 JSON 结果
     if (displayNames.size() > 1) {
         QJsonArray captures;
         bool anyFailed = false;
@@ -335,7 +408,7 @@ int runHeadlessCaptureIfRequested(const QCommandLineParser &parser)
         return anyFailed ? 1 : 0;
     }
 
-    // Single display (or none): keep the original compact single-object JSON.
+    // 3. 单显示器请求保持单对象 JSON 结果
     if (!displayNames.isEmpty()) {
         applyDisplayToRequest(&request, displayNames.first());
     }

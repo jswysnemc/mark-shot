@@ -30,6 +30,10 @@ namespace {
 ///   被整数除法截断丢失滚动量（Qt 的 offset_accumulated 语义）。
 class WheelGuard final : public QObject {
 public:
+    /**
+     * 创建并安装设置窗口滚轮事件过滤器。
+     * @param dialog 需要防止滚轮误改值的设置窗口。
+     */
     explicit WheelGuard(QWidget *dialog)
         : QObject(dialog)
         , m_dialog(dialog)
@@ -37,6 +41,9 @@ public:
         QApplication::instance()->installEventFilter(this);
     }
 
+    /**
+     * 从应用程序卸载事件过滤器。
+     */
     ~WheelGuard() override
     {
         if (QCoreApplication *app = QCoreApplication::instance()) {
@@ -44,6 +51,12 @@ public:
         }
     }
 
+    /**
+     * 拦截设置窗口内未聚焦数值控件的滚轮事件。
+     * @param watched 原始事件目标。
+     * @param event 待处理事件。
+     * @return 已接管滚轮事件时返回 true。
+     */
     bool eventFilter(QObject *watched, QEvent *event) override
     {
         if (event->type() != QEvent::Wheel || !m_dialog) {
@@ -61,15 +74,13 @@ public:
         }
 
         auto *wheelEvent = static_cast<QWheelEvent *>(event);
-        // 手势开始/结束（macOS 触控板惯性滚动）时清空跨事件分数余量，
-        // 避免残留小数在下一段滚动开头造成跳变。
+        // 1. 手势开始或结束时清空跨事件分数余量
         const Qt::ScrollPhase phase = wheelEvent->phase();
         if (phase == Qt::ScrollBegin || phase == Qt::ScrollEnd) {
             m_verticalRemainder = 0.0;
             m_horizontalRemainder = 0.0;
         }
-        // 换算为对外层滚动区域的滚动，保证设置页仍可滚动翻页；找不到滚动
-        // 区域时也吞掉事件，杜绝悬停滚动篡改控件值。
+        // 2. 将事件换算为外层滚动区域的滚动，找不到区域时直接吞掉事件
         if (!redirectToScrollArea(control, wheelEvent)) {
             event->accept();
         }
@@ -96,7 +107,7 @@ private:
                 || qobject_cast<QAbstractSlider *>(current)) {
                 return current;
             }
-            // 到达滚动区域仍未命中，说明悬停在普通控件上，无需防护。
+            // 到达滚动区域仍未命中，说明悬停在普通控件上，无需防护
             if (qobject_cast<QScrollArea *>(current)) {
                 return nullptr;
             }
@@ -128,8 +139,7 @@ private:
     {
         for (QWidget *current = control; current; current = current->parentWidget()) {
             if (auto *area = qobject_cast<QScrollArea *>(current)) {
-                // 跨滚动区域（切换设置页/重建页面）时清空跨事件分数余量，
-                // 避免残留小数在另一块滚动区域开头造成跳变。
+                // 1. 跨滚动区域时清空余量，避免残留小数造成跳变
                 if (area != m_lastArea) {
                     m_verticalRemainder = 0.0;
                     m_horizontalRemainder = 0.0;
@@ -173,37 +183,34 @@ private:
             return;
         }
 
-        // 与 Qt 原生一致：优先使用角度增量（wheelEvent 只读 angleDelta），
-        // 仅当角度增量为 0（部分合成器/触控板只发像素增量）时回退像素增量。
-        // 注意：不处理 QWheelEvent::inverted()——Qt 的 QScrollBar::wheelEvent
-        // 同样忽略它（自然滚动的方向已由平台在增量中体现），此处再反转会
-        // 造成方向双重翻转。
+        // 1. 优先使用角度增量，仅在缺少角度增量时回退像素增量
+        // Qt 滚动条忽略 inverted 标记，平台已经在增量中体现自然滚动方向
         if (angleDelta != 0) {
             const qreal offset = static_cast<qreal>(angleDelta) / 120.0;
             int stepsToScroll = 0;
 
-            // Ctrl / Shift / 系统配置"整页滚动"时按页滚动。
+            // 2. 根据修饰键和系统配置选择整页滚动或行滚动
             const bool pageMode = modifiers.testFlag(Qt::ControlModifier)
                 || modifiers.testFlag(Qt::ShiftModifier) || QApplication::wheelScrollLines() < 0;
             if (pageMode) {
-                // 与 Qt 一致：int() 向零截断（不是四舍五入），并夹在整页步长内。
+                // int() 向零截断，并将结果限制在整页步长内
                 stepsToScroll =
                     qBound(-bar->pageStep(), static_cast<int>(offset * bar->pageStep()), bar->pageStep());
                 *accumulator = 0.0;
             } else {
-                // 行滚动：分数累积跨事件，避免高分辨率滚轮增量被截断。
+                // 行滚动跨事件累积分数，避免高分辨率滚轮增量被截断
                 const qreal stepsToScrollF =
                     static_cast<qreal>(QApplication::wheelScrollLines()) * offset * bar->singleStep();
                 if (*accumulator != 0.0 && (offset / *accumulator) < 0.0) {
-                    // 滚动方向反转时丢弃残留余量（与 Qt offset_accumulated 语义一致）。
+                    // 滚动方向反转时丢弃残留余量
                     *accumulator = 0.0;
                 }
                 *accumulator += stepsToScrollF;
-                // int() 向零截断并夹在整页步长内，余量仅保留小数部分。
+                // int() 向零截断并限制在整页步长内，余量仅保留小数部分
                 stepsToScroll = qBound(-bar->pageStep(), static_cast<int>(*accumulator), bar->pageStep());
                 *accumulator -= static_cast<int>(*accumulator);
                 if (stepsToScroll == 0) {
-                    // 累计不足一行时保留余量，除非已到滚动边界（与 Qt 一致）。
+                    // 累计不足一行时保留余量，滚动边界除外
                     const qreal effectiveOffset =
                         bar->invertedControls() ? -*accumulator : *accumulator;
                     if (effectiveOffset > 0.0 && bar->value() < bar->maximum()) {
@@ -217,14 +224,13 @@ private:
                 }
             }
 
-            // 与 Qt 一致：invertedControls 应用于最终步长（而不是先反转增量），
-            // 然后用 value += stepsToScroll 完成滚动。
+            // 3. 将 invertedControls 应用于最终步长并更新滚动位置
             if (bar->invertedControls()) {
                 stepsToScroll = -stepsToScroll;
             }
             const int previousValue = bar->value();
             bar->setValue(bar->value() + stepsToScroll);
-            // 到达滚动边界时值不再变化，丢弃残留余量（与 Qt 一致）。
+            // 到达滚动边界时丢弃残留余量
             if (bar->value() == previousValue) {
                 *accumulator = 0.0;
             }

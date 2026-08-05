@@ -78,6 +78,7 @@ private slots:
     /**
      * 验证滚轮防护的基础行为：未聚焦的数值框收到滚轮事件后
      * 值不会被篡改（此前 Qt 默认行为会直接改值）。
+     * @return 无返回值。
      */
     void unfocusedSpinBoxIsNotModifiedByWheel()
     {
@@ -86,27 +87,28 @@ private slots:
         std::unique_ptr<QDialog> dialog(makeDialog(&area, &spin));
         Q_UNUSED(area);
 
-        // 安装滚轮防护。
+        // 1. 安装滚轮防护
         markshot::settings::installSettingsWheelGuard(dialog.get());
 
         dialog->show();
         QVERIFY(QTest::qWaitForWindowExposed(dialog.get()));
 
-        // 确保数值框没有键盘焦点。
+        // 2. 确保数值框没有键盘焦点
         QVERIFY(!spin->hasFocus());
         const int before = spin->value();
 
-        // 向数值框直接派发滚轮事件（角度增量路径）。
+        // 3. 向数值框直接派发角度增量滚轮事件
         QWheelEvent wheel = makeWheelEvent(spin, 120);
         QApplication::sendEvent(spin, &wheel);
 
-        // 未聚焦的数值框内容不应被滚轮改动。
+        // 4. 验证未聚焦的数值框内容保持不变
         QCOMPARE(spin->value(), before);
     }
 
     /**
      * 验证防护把滚轮换算为页面滚动：未聚焦数值框上的滚轮
      * 会滚动外层滚动区域，且方向与 Qt 默认一致（向上滚动）。
+     * @return 无返回值。
      */
     void wheelScrollsPageInExpectedDirection()
     {
@@ -125,7 +127,7 @@ private slots:
         const int scrollBefore = bar->value();
         QVERIFY(!spin->hasFocus());
 
-        // 向上滚动一格（角度 +120，Qt 约定内容上移、滚动条值减小）。
+        // 1. 向上滚动一格，验证页面内容上移
         QWheelEvent wheel = makeWheelEvent(spin, 120);
         QApplication::sendEvent(spin, &wheel);
 
@@ -136,6 +138,7 @@ private slots:
     /**
      * 验证亚格滚轮增量不会被截断：+60（半格）也应按比例滚动页面，
      * 与 Qt 6.11 的 QAccumulator 行为一致。
+     * @return 无返回值。
      */
     void subNotchDeltaScrollsProportionally()
     {
@@ -145,7 +148,7 @@ private slots:
 
         markshot::settings::installSettingsWheelGuard(dialog.get());
 
-        // 固定每格行数，避免依赖平台默认值（macOS 为 1、Windows/X11 为 3）。
+        // 1. 固定每格行数，避免依赖平台默认值
         const int savedLines = QApplication::wheelScrollLines();
         QApplication::setWheelScrollLines(3);
         dialog->show();
@@ -157,21 +160,21 @@ private slots:
         const int before = bar->value();
         QVERIFY(!spin->hasFocus());
 
-        // 半格（+60）应使滚动条移动；连续两次累计为一格。
+        // 2. 发送第一个半格增量并记录位置
         QWheelEvent half = makeWheelEvent(spin, 60);
         QApplication::sendEvent(spin, &half);
         const int afterHalf = bar->value();
         QVERIFY2(afterHalf < before,
                  "half-notch wheel should still scroll the page proportionally");
 
-        // 两个半格累计为一格：第二次 +60 应继续向同一方向滚动。
+        // 3. 发送第二个半格增量并验证累计效果
         QWheelEvent half2 = makeWheelEvent(spin, 60);
         QApplication::sendEvent(spin, &half2);
         const int afterFull = bar->value();
         QVERIFY2(afterFull < afterHalf,
                  "accumulated half-notches should keep scrolling");
 
-        // 一个整格（+120）应比两个半格滚动得更远（跨事件小数余量不丢步）。
+        // 4. 发送整格增量并验证滚动距离
         QWheelEvent full = makeWheelEvent(spin, 120);
         QApplication::sendEvent(spin, &full);
         const int afterFullNotch = bar->value();
@@ -184,6 +187,7 @@ private slots:
     /**
      * 验证像素增量路径：未聚焦数值框上的像素滚轮同样滚动页面，
      * 且数值不被篡改。
+     * @return 无返回值。
      */
     void pixelDeltaScrollsPage()
     {
@@ -214,6 +218,7 @@ private slots:
     /**
      * 验证 Ctrl/Shift + 滚轮走整页滚动路径（与 Qt 原生 scrollByDelta 一致）：
      * 一格的滚动量约等于 pageStep，而不是单步行数。
+     * @return 无返回值。
      */
     void ctrlWheelScrollsByPageStep()
     {
@@ -228,14 +233,14 @@ private slots:
 
         QScrollBar *bar = area->verticalScrollBar();
         QVERIFY(bar->maximum() > 0);
-        bar->setValue(bar->maximum() / 2);
+        bar->setValue(bar->minimum());
         const int before = bar->value();
         QVERIFY(!spin->hasFocus());
 
         QWheelEvent wheel = makeWheelEvent(spin, -120, 0, Qt::ControlModifier);
         QApplication::sendEvent(spin, &wheel);
 
-        // Ctrl+滚轮向下应滚动约一页。
+        // 1. Ctrl+滚轮向下应滚动约一页
         const int delta = bar->value() - before;
         QVERIFY2(delta > 0, "Ctrl+wheel down should scroll the page down");
         QVERIFY2(delta <= bar->pageStep() && delta >= bar->pageStep() - bar->singleStep(),
@@ -246,6 +251,7 @@ private slots:
 
     /**
      * 验证防护对聚焦控件放行：聚焦的数值框仍可通过滚轮调整数值。
+     * @return 无返回值。
      */
     void focusedSpinBoxKeepsWheelAdjustment()
     {
@@ -258,14 +264,15 @@ private slots:
         dialog->show();
         QVERIFY(QTest::qWaitForWindowExposed(dialog.get()));
 
-        spin->setFocus();
-        QVERIFY(spin->hasFocus());
+        dialog->activateWindow();
+        spin->setFocus(Qt::OtherFocusReason);
+        QTRY_VERIFY_WITH_TIMEOUT(spin->hasFocus(), 1000);
         const int before = spin->value();
 
         QWheelEvent wheel = makeWheelEvent(spin, 120);
         QApplication::sendEvent(spin, &wheel);
 
-        // 聚焦控件保留滚轮调值能力。
+        // 1. 聚焦控件保留滚轮调值能力
         QVERIFY2(spin->value() != before,
                  "focused spin box should still adjust its value on wheel");
     }
@@ -275,6 +282,7 @@ private slots:
      * Qt 的 QScrollBar::wheelEvent 忽略 inverted()（方向已由平台在增量中体现），
      * 防护若再次取反会导致方向双重翻转，这里回归锁定与 Qt 原生一致的行为：
      * inverted=true 与 inverted=false 的滚轮向上滚动方向相同。
+     * @return 无返回值。
      */
     void invertedFlagDoesNotReverseScrollDirection()
     {
@@ -291,7 +299,7 @@ private slots:
         QVERIFY(bar->maximum() > 0);
         QVERIFY(!spin->hasFocus());
 
-        // 普通（非反向）事件：滚轮向上 +120 应使滚动条值减小。
+        // 1. 发送普通向上滚轮事件并记录方向
         bar->setValue(bar->maximum() / 2);
         const int plainBefore = bar->value();
         QWheelEvent plain = makeWheelEvent(spin, 120);
@@ -300,7 +308,7 @@ private slots:
         QVERIFY2(plainAfter < plainBefore,
                  "wheel-up should scroll the page up");
 
-        // inverted=true（自然滚动）事件：方向必须与普通事件一致。
+        // 2. 发送带自然滚动标记的事件并验证方向一致
         bar->setValue(bar->maximum() / 2);
         const int invertedBefore = bar->value();
         QWheelEvent inverted = makeWheelEvent(spin, 120, 0, Qt::NoModifier, true);

@@ -130,7 +130,8 @@ AnnotationState loadAnnotationState()
     state.highlighterWidth =
         clampedDouble(root.value(QString::fromLatin1(kKeyHighlighterWidth)), legacyPenWidth * 2.0, 1.0, 48.0);
     state.numberWidth = clampedDouble(root.value(QString::fromLatin1(kKeyNumberWidth)), state.numberWidth, 1.0, 72.0);
-    state.textSize = clampedDouble(root.value(QString::fromLatin1(kKeyTextSize)), state.textSize, 1.0, 1000.0);
+    state.textSize =
+        clampedDouble(root.value(QString::fromLatin1(kKeyTextSize)), state.textSize, -11.0, 281.0);
     state.mosaicBlockSize =
         clampedDouble(root.value(QString::fromLatin1(kKeyMosaicBlockSize)), state.mosaicBlockSize, 4.0, 48.0);
 

@@ -28,4 +28,3 @@ target_link_libraries(mark-shot-settings-wheel-guard-test
         Qt6::Widgets
 )
 add_test(NAME settings-wheel-guard COMMAND mark-shot-settings-wheel-guard-test)
-

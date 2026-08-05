@@ -195,23 +195,6 @@ ShotWindow *showCaptureWindow(QScreen *screen,
                               regionRecordingOptions);
 }
 
-/// @brief 判断普通区域截图是否应冻结全部显示器。
-/// @param allOutputs 是否显式捕获全部输出为一张图片。
-/// @param fullscreenAnnotation 是否直接进入全屏标注。
-/// @param freezeScope 配置的冻结范围。
-/// @param screenCount 当前显示器数量。
-/// @return 需要为每个显示器创建冻结窗口时返回 true。
-bool shouldFreezeAllScreens(bool allOutputs,
-                            bool fullscreenAnnotation,
-                            markshot::CaptureFreezeScope freezeScope,
-                            int screenCount)
-{
-    return !allOutputs
-        && !fullscreenAnnotation
-        && freezeScope == markshot::CaptureFreezeScope::AllScreens
-        && screenCount > 1;
-}
-
 /// @brief 关闭一组截图窗口。
 /// @param windows 需要关闭的截图窗口列表。
 /// @return 无返回值。
@@ -656,10 +639,11 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
     QVector<QPointer<ShotWindow>> windows;
     QScreen *screen = markshot::focusedScreen();
     const QList<QScreen *> screens = QGuiApplication::screens();
-    const bool freezeAllScreens = shouldFreezeAllScreens(allOutputs,
-                                                         fullscreenAnnotation,
-                                                         freezeScope,
-                                                         screens.size());
+    const bool freezeAllScreens = markshot::capture_session::shouldFreezeAllScreens(
+        allOutputs,
+        fullscreenAnnotation,
+        freezeScope,
+        screens.size());
     const bool waylandPlatform = markshot::capture_session::isWaylandPlatform();
     const bool mixedDevicePixelRatios = markshot::capture_session::hasMixedDevicePixelRatios(screens);
     const bool captureIndividually = markshot::capture_session::shouldCaptureScreensIndividually(screens);

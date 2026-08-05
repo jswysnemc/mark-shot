@@ -44,42 +44,9 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
     }
 
     if (m_mode == Mode::Selecting && !m_dragging) {
-        std::optional<markshot::WindowInfo> best;
         const QPoint imgPt = imagePoint.toPoint();
-        bool useZOrder = false;
-
-        for (const markshot::WindowInfo &info : std::as_const(m_windowInfos)) {
-            if (!info.rect.contains(imgPt)) {
-                continue;
-            }
-
-            // 只要存在任一窗口带 zOrder,本次命中判定统一按 z 序比较,
-            // 缺少 zOrder 的窗口按最底层处理,避免混用面积/深度两套规则。
-            if (info.zOrder.has_value()) {
-                useZOrder = true;
-            }
-
-            if (!best.has_value()) {
-                best = info;
-                continue;
-            }
-
-            if (useZOrder) {
-                const int infoZ = info.zOrder.value_or(-1);
-                const int bestZ = best->zOrder.value_or(-1);
-                if (infoZ > bestZ) {
-                    best = info;
-                }
-            } else {
-                qint64 area = static_cast<qint64>(info.rect.width()) * info.rect.height();
-                qint64 bestArea = static_cast<qint64>(best->rect.width()) * best->rect.height();
-                if (area < bestArea) {
-                    best = info;
-                }
-            }
-        }
-
-        const std::optional<QRect> bestRect = best ? std::optional(best->rect) : std::nullopt;
+        const std::optional<QRect> bestRect =
+            markshot::window_selection::topmostWindowRectAt(m_windowInfos, imgPt);
         if (bestRect != m_hoveredWindowRect) {
             m_hoveredWindowRect = bestRect;
             update();

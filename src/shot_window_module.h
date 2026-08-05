@@ -18,6 +18,7 @@
 #include "ui/icons.h"
 #include "ui/theme.h"
 #include "window_detection.h"
+#include "window_hover_selection.h"
 #include "windows_integration.h"
 
 #include <QAbstractItemView>

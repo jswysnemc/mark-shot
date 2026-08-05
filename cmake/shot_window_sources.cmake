@@ -32,6 +32,7 @@ set(MARK_SHOT_WINDOW_SOURCES
     src/shot_window_overlay_panels.cpp
     src/shot_window_pinned_window.cpp
     src/shot_window_property_panels.cpp
+    src/shot_window_qt_fwd.h
     src/shot_window_selection_frame.cpp
     src/shot_window_setup.cpp
     src/shot_window_shortcut_registration.cpp
@@ -39,6 +40,11 @@ set(MARK_SHOT_WINDOW_SOURCES
     src/shot_window_side_panels.cpp
     src/shot_window_startup_color_dialog.cpp
     src/shot_window_state.cpp
+    src/shot_window_text_controls.cpp
+    src/shot_window_text_editor.cpp
+    src/shot_window_text_layout.cpp
     src/shot_window_upload.cpp
     src/shot_window_width_state.cpp
+    src/window_hover_selection.cpp
+    src/window_hover_selection.h
 )

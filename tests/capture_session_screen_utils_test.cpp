@@ -25,6 +25,22 @@ private slots:
         QVERIFY(!markshot::capture_session::shouldCaptureScreensIndividually(true, 1));
         QVERIFY(!markshot::capture_session::shouldCaptureScreensIndividually(false, 2));
     }
+
+    /**
+     * 验证普通区域截图只在多屏全冻结模式下冻结全部显示器。
+     * @return 无返回值。
+     */
+    void regionSelectionFreezesAllConfiguredScreens()
+    {
+        using markshot::CaptureFreezeScope;
+        using markshot::capture_session::shouldFreezeAllScreens;
+
+        QVERIFY(shouldFreezeAllScreens(false, false, CaptureFreezeScope::AllScreens, 2));
+        QVERIFY(!shouldFreezeAllScreens(true, false, CaptureFreezeScope::AllScreens, 2));
+        QVERIFY(!shouldFreezeAllScreens(false, true, CaptureFreezeScope::AllScreens, 2));
+        QVERIFY(!shouldFreezeAllScreens(false, false, CaptureFreezeScope::CursorScreen, 2));
+        QVERIFY(!shouldFreezeAllScreens(false, false, CaptureFreezeScope::AllScreens, 1));
+    }
 };
 
 QTEST_APPLESS_MAIN(CaptureSessionScreenUtilsTest)

@@ -141,7 +141,9 @@ int main(int argc, char *argv[])
     }
 
     const QStringList positionalArguments = parser.positionalArguments();
-    if (positionalArguments.size() > 1) {
+    const bool headlessRequested = parser.isSet(QStringLiteral("capture-to"))
+        || parser.isSet(QStringLiteral("list-displays"));
+    if (!headlessRequested && positionalArguments.size() > 1) {
         QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), MS_TR("Only one image file can be opened at a time."));
         return 1;
     }

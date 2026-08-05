@@ -530,7 +530,11 @@ void ShotWindow::applyPropertyColor(QColor color)
                 editorItalic = annotation->textItalic;
             }
         }
-        m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(editorColor, editorBackgroundColor, qRound(20.0 + editorWidth)));
+        m_textEditor->setStyleSheet(
+            markshot::theme::textEditorStyleSheet(
+                editorColor,
+                editorBackgroundColor,
+                qRound(19.0 + editorWidth)));
         QFont editorFont = m_textEditor->font();
         editorFont.setWeight(editorWeight);
         editorFont.setItalic(editorItalic);
@@ -569,146 +573,4 @@ void ShotWindow::clearAnnotations()
     updateAnnotationPropertyPanel();
     updateCursor();
     update();
-}
-
-void ShotWindow::setSelectedTextFontFamily(const QString &fontFamily)
-{
-    if (fontFamily.isEmpty()) {
-        return;
-    }
-
-    if (m_selectedAnnotationId.has_value()) {
-        Annotation *annotation = annotationById(*m_selectedAnnotationId);
-        if (!annotation || annotation->tool != Tool::Text || annotation->fontFamily == fontFamily) {
-            return;
-        }
-        pushHistorySnapshot();
-        annotation->fontFamily = fontFamily;
-    } else {
-        if (m_tool != Tool::Text || m_textFontFamily == fontFamily) {
-            return;
-        }
-        m_textFontFamily = fontFamily;
-        if (m_textEditor && m_textEditor->isVisible() && !m_editingTextAnnotationId.has_value()) {
-            QFont font = m_textEditor->font();
-            font.setFamily(m_textFontFamily);
-            m_textEditor->setFont(font);
-        }
-    }
-    updateAnnotationPropertyPanel();
-    update();
-    persistAnnotationState();
-}
-
-void ShotWindow::setSelectedTextFontSize(int pointSize)
-{
-    // Rendered font size = 19 + annotation.width, so the spin box value maps
-    // directly to the final output size. The minimum width of 1.0 therefore
-    // corresponds to 20 pt; anything smaller is not representable.
-    pointSize = std::clamp(pointSize, 20, 300);
-    if (m_propertyFontSizeSpin) {
-        const QSignalBlocker blocker(m_propertyFontSizeSpin);
-        m_propertyFontSizeSpin->setValue(pointSize);
-    }
-    const qreal targetWidth = static_cast<qreal>(pointSize) - 19.0;
-    setSelectedAnnotationWidth(qRound(targetWidth));
-    if (m_textEditor && m_textEditor->isVisible()) {
-        QFont font = m_textEditor->font();
-        font.setPointSize(pointSize);
-        m_textEditor->setFont(font);
-    }
-    update();
-}
-
-void ShotWindow::setSelectedTextBold(bool bold)
-{
-    const QFont::Weight targetWeight = bold ? QFont::DemiBold : QFont::Normal;
-    const QVector<int> selectedIds = selectedAnnotationIds();
-    if (!selectedIds.isEmpty()) {
-        bool changed = false;
-        for (int id : selectedIds) {
-            const Annotation *annotation = annotationById(id);
-            if (annotation && annotation->tool == Tool::Text && annotation->fontWeight != targetWeight) {
-                changed = true;
-                break;
-            }
-        }
-        if (!changed) {
-            return;
-        }
-        pushHistorySnapshot();
-        for (int id : selectedIds) {
-            if (Annotation *annotation = annotationById(id);
-                annotation && annotation->tool == Tool::Text) {
-                annotation->fontWeight = targetWeight;
-            }
-        }
-    } else {
-        if (m_textWeight == targetWeight) {
-            return;
-        }
-        m_textWeight = targetWeight;
-    }
-    if (m_textEditor && m_textEditor->isVisible()) {
-        QFont font = m_textEditor->font();
-        if (m_editingTextAnnotationId.has_value()) {
-            if (const Annotation *annotation = annotationById(*m_editingTextAnnotationId)) {
-                font.setWeight(annotation->fontWeight);
-                font.setItalic(annotation->textItalic);
-            }
-        } else {
-            font.setWeight(m_textWeight);
-            font.setItalic(m_textItalic);
-        }
-        m_textEditor->setFont(font);
-    }
-    updateAnnotationPropertyPanel();
-    update();
-    persistAnnotationState();
-}
-
-void ShotWindow::setSelectedTextItalic(bool italic)
-{
-    const QVector<int> selectedIds = selectedAnnotationIds();
-    if (!selectedIds.isEmpty()) {
-        bool changed = false;
-        for (int id : selectedIds) {
-            const Annotation *annotation = annotationById(id);
-            if (annotation && annotation->tool == Tool::Text && annotation->textItalic != italic) {
-                changed = true;
-                break;
-            }
-        }
-        if (!changed) {
-            return;
-        }
-        pushHistorySnapshot();
-        for (int id : selectedIds) {
-            if (Annotation *annotation = annotationById(id);
-                annotation && annotation->tool == Tool::Text) {
-                annotation->textItalic = italic;
-            }
-        }
-    } else {
-        if (m_textItalic == italic) {
-            return;
-        }
-        m_textItalic = italic;
-    }
-    if (m_textEditor && m_textEditor->isVisible()) {
-        QFont font = m_textEditor->font();
-        if (m_editingTextAnnotationId.has_value()) {
-            if (const Annotation *annotation = annotationById(*m_editingTextAnnotationId)) {
-                font.setWeight(annotation->fontWeight);
-                font.setItalic(annotation->textItalic);
-            }
-        } else {
-            font.setWeight(m_textWeight);
-            font.setItalic(m_textItalic);
-        }
-        m_textEditor->setFont(font);
-    }
-    updateAnnotationPropertyPanel();
-    update();
-    persistAnnotationState();
 }

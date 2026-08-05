@@ -521,10 +521,12 @@ void setExcludedFromTaskbar(QWidget *widget, bool excluded)
     event.format = 32;
     event.window = window;
     event.type = s_stateAtom;
-    event.data.data32[0] = excluded ? 1 : 0; // _NET_WM_STATE_ADD / _NET_WM_STATE_REMOVE
+    // 1. 设置添加或移除状态的 EWMH 动作
+    event.data.data32[0] = excluded ? 1 : 0;
     event.data.data32[1] = s_skipTaskbarAtom;
     event.data.data32[2] = 0;
-    event.data.data32[3] = 1; // source indication: 1 = regular application
+    // 2. 标记请求来源为普通应用程序
+    event.data.data32[3] = 1;
     xcb_send_event(connection,
                    false,
                    s_root,

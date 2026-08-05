@@ -1,0 +1,20 @@
+#pragma once
+
+class QByteArray;
+class QBoxLayout;
+class QCloseEvent;
+class QComboBox;
+class QKeyEvent;
+class QLabel;
+class QListWidget;
+class QPainter;
+class QPushButton;
+class QScreen;
+class QScrollBar;
+class QShowEvent;
+class QSlider;
+class QSpinBox;
+class QTextEdit;
+class QTimer;
+class QToolButton;
+class QWheelEvent;

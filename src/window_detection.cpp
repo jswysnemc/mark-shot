@@ -4,6 +4,7 @@
 #include "config_value.h"
 #include "debug_log.h"
 #include "shell_command.h"
+#include "window_detection_session.h"
 
 #include <QDir>
 #include <QFile>
@@ -97,50 +98,15 @@ QString existingAppConfigPath()
     return {};
 }
 
-/// @brief Detects the Wayland session type based on environment variables.
-/// @return "gnome", "kde", "hyprland", "niri" for known Wayland sessions, empty string for X11 or unknown.
-QString detectWaylandSessionType()
-{
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString sessionType = env.value(QStringLiteral("XDG_SESSION_TYPE")).toLower();
-    if (sessionType != QStringLiteral("wayland")) {
-        return {};
-    }
-
-    const QString desktop = (env.value(QStringLiteral("XDG_CURRENT_DESKTOP"))
-        + QLatin1Char(':') + env.value(QStringLiteral("XDG_SESSION_DESKTOP"))
-        + QLatin1Char(':') + env.value(QStringLiteral("DESKTOP_SESSION")))
-        .toLower();
-
-    if (desktop.contains(QStringLiteral("gnome"))) {
-        return QStringLiteral("gnome");
-    }
-    if (desktop.contains(QStringLiteral("kde")) || desktop.contains(QStringLiteral("plasma"))) {
-        return QStringLiteral("kde");
-    }
-    if (desktop.contains(QStringLiteral("hyprland"))) {
-        return QStringLiteral("hyprland");
-    }
-    if (desktop.contains(QStringLiteral("niri"))) {
-        return QStringLiteral("niri");
-    }
-
-    // 未知的 Wayland 合成器(如 sway/river 等)不猜测内置脚本,
-    // 避免在错误的桌面环境上执行不兼容的检测脚本。
-    return {};
-}
-
-/// @brief Returns the appropriate window detection command for the current desktop environment.
+/// @brief 返回当前桌面环境对应的内置窗口检测命令。
+/// @return 已支持 Wayland 合成器的脚本名，其他环境返回空字符串。
 QString defaultWindowDetectionCommand()
 {
 #if defined(Q_OS_WIN)
     return QString();
 #else
-    const QString sessionType = detectWaylandSessionType();
-    if (sessionType.isEmpty()) {
-        return QString();
-    }
-    return QStringLiteral("mark-shot-window-detection-") + sessionType;
+    return window_detection::defaultCommand(
+        window_detection::detectSession(QProcessEnvironment::systemEnvironment()));
 #endif
 }
 
@@ -523,17 +489,9 @@ bool commandMatchesEnvironment(const QString &command)
 #if defined(Q_OS_WIN)
     return true;
 #else
-    const QString sessionType = detectWaylandSessionType();
-    if (sessionType.isEmpty()) {
-        return true;
-    }
-    if (command.isEmpty()) {
-        return false;
-    }
-    if (!command.startsWith(QStringLiteral("mark-shot-window-detection-"))) {
-        return true;
-    }
-    return command.contains(sessionType);
+    const window_detection::Session session =
+        window_detection::detectSession(QProcessEnvironment::systemEnvironment());
+    return window_detection::commandMatchesSession(command, session);
 #endif
 }
 
