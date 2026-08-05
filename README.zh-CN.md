@@ -304,6 +304,12 @@ mark-shot --tray
 
 参见[配置参考](docs/configuration.zh-CN.md)。
 
+### 用户操作手册
+
+日常操作（窗口悬停框选、标注工具、启动工具、贴纸窗口、长截图、headless CLI
+以及功能自测清单）请参见[用户操作手册](docs/user-guide.zh-CN.md)
+（[English](docs/user-guide.md)）。
+
 ## 编译与安装
 
 ### 安装指南

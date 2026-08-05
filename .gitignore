@@ -43,3 +43,6 @@ __pycache__/
 
 # 内部进度台账，不纳入版本控制（避免暴露给用户/上游）
 docs/ITERATION-LOG.md
+
+# 便携版构建产物
+/portable/

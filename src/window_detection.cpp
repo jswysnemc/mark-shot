@@ -125,7 +125,9 @@ QString detectWaylandSessionType()
         return QStringLiteral("niri");
     }
 
-    return QStringLiteral("niri");
+    // 未知的 Wayland 合成器(如 sway/river 等)不猜测内置脚本,
+    // 避免在错误的桌面环境上执行不兼容的检测脚本。
+    return {};
 }
 
 /// @brief Returns the appropriate window detection command for the current desktop environment.
@@ -195,7 +197,8 @@ constexpr int kDefaultWindowDetectionTimeoutMs = 1000;
 /// @brief Minimum allowed timeout value in milliseconds for window detection.
 constexpr int kMinWindowDetectionTimeoutMs = 100;
 /// @brief Maximum allowed timeout value in milliseconds for window detection.
-constexpr int kMaxWindowDetectionTimeoutMs = 10000;
+/// 与设置面板 spin 上限(30000ms)保持一致,避免面板值与实际生效值不一致。
+constexpr int kMaxWindowDetectionTimeoutMs = 30000;
 
 /// @brief Configuration settings for the external window detection process.
 struct WindowDetectionConfig {
@@ -509,17 +512,26 @@ std::optional<bool> configuredWindowDetectionEnabled(const QJsonObject &root)
 /// @brief 判断已配置的窗口检测命令是否匹配当前桌面环境。
 /// @param command 用户配置中的窗口检测命令。
 /// @return 匹配当前桌面环境时返回 true，否则返回 false。
+///
+/// 行为约定:
+/// - 非 Wayland 会话(如 X11)与 Windows:尊重用户配置,空命令交由平台枚举回退。
+/// - Wayland 会话下内置默认脚本(mark-shot-window-detection-*)仅在面向其他
+///   合成器时自动纠正为当前会话对应的脚本;用户自定义命令(非内置脚本名,
+///   例如带路径的脚本)一律保留,不再被静默覆盖。
 bool commandMatchesEnvironment(const QString &command)
 {
 #if defined(Q_OS_WIN)
-    return command.isEmpty();
+    return true;
 #else
     const QString sessionType = detectWaylandSessionType();
     if (sessionType.isEmpty()) {
-        return command.isEmpty();
+        return true;
     }
     if (command.isEmpty()) {
         return false;
+    }
+    if (!command.startsWith(QStringLiteral("mark-shot-window-detection-"))) {
+        return true;
     }
     return command.contains(sessionType);
 #endif
