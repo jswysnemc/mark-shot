@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.45 - 2026-08-06
+
+### Features & Enhancements
+
+- **Linux Package Guide**: Added dedicated English and Chinese package guides that map Debian, Ubuntu, Fedora, AppImage, and Arch users to the correct artifacts and document the AppImage compatibility baseline.
+
+### Bug Fixes
+
+- **Debian 13 and Ubuntu 24.04 Packages**: Added native AMD64 and ARM64 builds for Debian 13 and Ubuntu 24.04 so each package links against the FFmpeg and Qt shared-library generations available on its target distribution. Every DEB is installed, dependency-checked, and started inside its target container before release upload.
+- **AppImage glibc Compatibility**: Moved AppImage builds from Arch Linux to Debian 12, enforced a maximum `GLIBC_2.36` symbol requirement, and added an Ubuntu 24.04 startup test before release upload.
+- **KDE Startup Notification**: Disabled desktop-entry startup notification so KDE no longer shows the Mark Shot launch cursor and icon while a screenshot is starting.
+
 ## 0.1.44 - 2026-07-26
 
 ### Bug Fixes

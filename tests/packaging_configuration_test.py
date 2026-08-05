@@ -114,6 +114,76 @@ class PackagingConfigurationTest(unittest.TestCase):
 
         self.assertIn("StartupNotify=false", desktop_entry)
 
+    def test_release_version_is_synchronized(self) -> None:
+        """
+        验证发布版本在项目配置、打包清单和发布文档中保持一致。
+
+        @return 无返回值。
+        """
+        # 1. 从项目配置和变更日志首项读取发布版本与日期
+        cmake_config = (PROJECT_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        changelog = (PROJECT_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        version_match = re.search(
+            r"project\(mark-shot VERSION (?P<version>[0-9]+\.[0-9]+\.[0-9]+) ",
+            cmake_config,
+        )
+        release_match = re.match(
+            r"# Changelog\n\n## (?P<version>[0-9]+\.[0-9]+\.[0-9]+) "
+            r"- (?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2})",
+            changelog,
+        )
+        self.assertIsNotNone(version_match)
+        self.assertIsNotNone(release_match)
+        version = version_match.group("version")
+        release_date = release_match.group("date")
+        escaped_version = re.escape(version)
+        self.assertEqual(version, release_match.group("version"))
+
+        # 2. 验证项目配置与各打包清单使用同一版本
+        version_patterns = {
+            "flake.nix": rf'version = "{escaped_version}";',
+            "packaging/aur/PKGBUILD": rf"(?m)^pkgver={escaped_version}$",
+            "packaging/aur/.SRCINFO": rf"(?m)^\s*pkgver = {escaped_version}$",
+            "packaging/aur_bin/PKGBUILD": rf"(?m)^pkgver={escaped_version}$",
+            "packaging/local_aur/PKGBUILD": rf"(?m)^pkgver={escaped_version}$",
+            "packaging/local_aur/.SRCINFO": (
+                rf"(?m)^\s*pkgver = {escaped_version}$"
+            ),
+            "packaging/rpm/mark-shot.spec": (
+                rf"(?m)^Version:\s+{escaped_version}$"
+            ),
+        }
+        for relative_path, pattern in version_patterns.items():
+            with self.subTest(relative_path=relative_path):
+                content = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
+                self.assertRegex(content, pattern)
+
+        # 3. 验证发布文档将本次版本放在首项
+        releases_en = (PROJECT_ROOT / "docs/releases.md").read_text(encoding="utf-8")
+        releases_zh = (PROJECT_ROOT / "docs/releases.zh-CN.md").read_text(
+            encoding="utf-8"
+        )
+        metainfo = (
+            PROJECT_ROOT
+            / "packaging/flatpak/io.github.jswysnemc.MarkShot.metainfo.xml"
+        ).read_text(encoding="utf-8")
+
+        self.assertTrue(releases_en.startswith(f"# Release Notes\n\n### {version}"))
+        self.assertTrue(releases_zh.startswith(f"# 发版说明\n\n### {version}"))
+        self.assertIn(
+            f'<release version="{version}" date="{release_date}" />', metainfo
+        )
+
+        # 4. 验证 AUR 源码地址指向本次标签或源码包
+        aur_srcinfo = (PROJECT_ROOT / "packaging/aur/.SRCINFO").read_text(
+            encoding="utf-8"
+        )
+        local_aur_srcinfo = (
+            PROJECT_ROOT / "packaging/local_aur/.SRCINFO"
+        ).read_text(encoding="utf-8")
+        self.assertIn(f"#tag=v{version}", aur_srcinfo)
+        self.assertIn(f"source = mark-shot-{version}.tar.gz", local_aur_srcinfo)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,11 @@
 # Release Notes
 
+### 0.1.45
+
+- **Native Debian 13 and Ubuntu 24.04 Packages**: Added AMD64 and ARM64 packages built and verified inside their target distributions, avoiding FFmpeg and Qt dependency mismatches. The Linux package guide lists the correct artifact for each supported distribution.
+- **Compatible AppImage Baseline**: AppImage payloads are now built on Debian 12, reject symbols newer than `GLIBC_2.36`, and must start successfully on Ubuntu 24.04 before they are uploaded to a release.
+- **KDE Startup Notification**: Disabled desktop-entry startup notification so the launch cursor and application icon no longer interfere with screenshots while Mark Shot starts.
+
 ### 0.1.44
 
 - **Debian and Ubuntu Packages**: The `.deb` workflow failed on every matrix entry because the code scanner assumed the zxing-cpp 3.x interface, while Debian 12 ships 1.4 and Ubuntu 26.04 ships 2.3. The reader parameter class is now aliased by major version and `ZX_USE_UTF8` keeps `text()` returning `std::string` on every release, so both distributions build again with the built-in scanner enabled.
