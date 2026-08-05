@@ -21,7 +21,7 @@ struct AnnotationState {
     qreal strokeWidth = 3.0;
     qreal highlighterWidth = 6.0;
     qreal numberWidth = 3.0;
-    qreal textSize = 3.0;
+    qreal textSize = 1.0;  // 默认文本字号 20pt（渲染字号 = 19 + width）
     qreal mosaicBlockSize = 14.0;
 
     // 矩形相关

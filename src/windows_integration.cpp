@@ -22,6 +22,13 @@
 #include <windows.h>
 #endif
 
+#if defined(Q_OS_LINUX) && defined(HAVE_XCB)
+#include <QtGui/qguiapplication_platform.h>
+
+#include <xcb/xcb.h>
+#include <xcb/xproto.h>
+#endif
+
 namespace markshot::windows {
 namespace {
 
@@ -410,6 +417,123 @@ void raiseTopMostWindow(QWidget *widget)
     }
 #else
     Q_UNUSED(widget);
+#endif
+}
+
+bool isX11QtPlatform()
+{
+#if defined(Q_OS_LINUX) && defined(HAVE_XCB)
+    return QGuiApplication::platformName().compare(QStringLiteral("xcb"), Qt::CaseInsensitive) == 0;
+#else
+    return false;
+#endif
+}
+
+bool isNativeX11Session()
+{
+#if defined(Q_OS_LINUX) && defined(HAVE_XCB)
+    // XWayland 会话下 Qt 平台名也是 "xcb"，但部分原生 X11 能力（如 XGrabKey
+    // 抓取全局按键）在 XWayland 下不可靠，因此要求会话确为 X11/Xorg。
+    return isX11QtPlatform() && !qEnvironmentVariableIsSet("WAYLAND_DISPLAY");
+#else
+    return false;
+#endif
+}
+
+void setExcludedFromTaskbar(QWidget *widget, bool excluded)
+{
+    if (!widget) {
+        return;
+    }
+
+#if defined(Q_OS_WIN)
+    // WS_EX_TOOLWINDOW 让窗口既不出现在任务栏也不出现在 Alt-Tab 列表，
+    // 与截图覆盖层的临时性一致。
+    HWND hwnd = hwndForWidget(widget);
+    if (!hwnd) {
+        return;
+    }
+    const LONG_PTR exStyle = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+    const LONG_PTR updated = excluded ? (exStyle | WS_EX_TOOLWINDOW) : (exStyle & ~WS_EX_TOOLWINDOW);
+    if (updated == exStyle) {
+        return;
+    }
+    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, updated);
+    SetWindowPos(hwnd,
+                 nullptr,
+                 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+#elif defined(Q_OS_LINUX) && defined(HAVE_XCB)
+    // 原生 Wayland (xdg-shell) 没有“跳过任务栏”的标准机制，只有 layer-shell
+    // 覆盖层天然没有任务栏项；XWayland 无法控制宿主合成器。因此这里只在
+    // xcb 平台（含 XWayland）生效。
+    if (!isX11QtPlatform()) {
+        return;
+    }
+    const auto *appInstance = qobject_cast<const QGuiApplication *>(QGuiApplication::instance());
+    auto *x11Application = appInstance
+        ? appInstance->nativeInterface<QNativeInterface::QX11Application>()
+        : nullptr;
+    xcb_connection_t *connection = x11Application ? x11Application->connection() : nullptr;
+    if (!connection) {
+        return;
+    }
+    const xcb_window_t window = static_cast<xcb_window_t>(widget->winId());
+    if (!window) {
+        return;
+    }
+
+    // 原子名与根窗口按连接缓存，避免每次调用都做两次阻塞 intern_atom 往返。
+    static xcb_connection_t *s_cachedConnection = nullptr;
+    static xcb_atom_t s_stateAtom = XCB_ATOM_NONE;
+    static xcb_atom_t s_skipTaskbarAtom = XCB_ATOM_NONE;
+    static xcb_window_t s_root = XCB_WINDOW_NONE;
+    if (s_cachedConnection != connection || s_stateAtom == XCB_ATOM_NONE) {
+        static constexpr char kNetWmStateName[] = "_NET_WM_STATE";
+        static constexpr char kNetWmStateSkipTaskbarName[] = "_NET_WM_STATE_SKIP_TASKBAR";
+        const xcb_intern_atom_cookie_t stateCookie =
+            xcb_intern_atom(connection, 0, sizeof(kNetWmStateName) - 1, kNetWmStateName);
+        const xcb_intern_atom_cookie_t skipCookie =
+            xcb_intern_atom(connection, 0, sizeof(kNetWmStateSkipTaskbarName) - 1, kNetWmStateSkipTaskbarName);
+        xcb_intern_atom_reply_t *stateReply = xcb_intern_atom_reply(connection, stateCookie, nullptr);
+        xcb_intern_atom_reply_t *skipReply = xcb_intern_atom_reply(connection, skipCookie, nullptr);
+        if (!stateReply || !skipReply) {
+            free(stateReply);
+            free(skipReply);
+            return;
+        }
+        s_stateAtom = stateReply->atom;
+        s_skipTaskbarAtom = skipReply->atom;
+        free(stateReply);
+        free(skipReply);
+
+        const xcb_setup_t *setup = xcb_get_setup(connection);
+        const xcb_screen_iterator_t iterator = setup ? xcb_setup_roots_iterator(setup) : xcb_screen_iterator_t{};
+        s_root = iterator.data ? iterator.data->root : XCB_WINDOW_NONE;
+        s_cachedConnection = connection;
+    }
+    if (s_stateAtom == XCB_ATOM_NONE || s_skipTaskbarAtom == XCB_ATOM_NONE || s_root == XCB_WINDOW_NONE) {
+        return;
+    }
+
+    xcb_client_message_event_t event = {};
+    event.response_type = XCB_CLIENT_MESSAGE;
+    event.format = 32;
+    event.window = window;
+    event.type = s_stateAtom;
+    event.data.data32[0] = excluded ? 1 : 0; // _NET_WM_STATE_ADD / _NET_WM_STATE_REMOVE
+    event.data.data32[1] = s_skipTaskbarAtom;
+    event.data.data32[2] = 0;
+    event.data.data32[3] = 1; // source indication: 1 = regular application
+    xcb_send_event(connection,
+                   false,
+                   s_root,
+                   XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY | XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
+                   reinterpret_cast<const char *>(&event));
+    xcb_flush(connection);
+#else
+    Q_UNUSED(widget);
+    Q_UNUSED(excluded);
 #endif
 }
 

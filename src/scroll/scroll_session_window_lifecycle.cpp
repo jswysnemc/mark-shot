@@ -595,6 +595,10 @@ void ScrollSessionWindow::showEvent(QShowEvent *event)
     layoutOverlay();
     updateInputMask();
     markshot::windows::setExcludedFromCapture(this);
+    // 滚动截图覆盖层同样不进入系统任务栏/坞。
+    QTimer::singleShot(0, this, [this] {
+        markshot::windows::setExcludedFromTaskbar(this);
+    });
     syncPreviewWindowVisibility();
     const QRect region = regionLocalRect();
     const QRect panel = previewPanelRect();

@@ -334,9 +334,9 @@ void ShotWindow::paintEvent(QPaintEvent *)
     dimPath.addRect(rect());
     if (hasUsableSelection()) {
         dimPath.addRect(imageRectToWidget(selection));
-        painter.fillPath(dimPath, QColor(2, 6, 12, 128));
+        painter.fillPath(dimPath, QColor(2, 6, 12, 0));
     } else {
-        painter.fillRect(rect(), QColor(2, 6, 12, 88));
+        painter.fillRect(rect(), QColor(2, 6, 12, 0));
     }
 
     if (hasUsableSelection()) {

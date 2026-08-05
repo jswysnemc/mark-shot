@@ -32,6 +32,10 @@ private:
     /// @brief 从配置文件加载设置并更新所有页面。
     void loadConfig();
 
+    /// @brief 将配置应用到全部设置页（并记录为各页的"已保存"基线）。
+    /// @param config 需要应用的设置结构。
+    void applyConfigToPages(const SettingsConfig &config);
+
     /// @brief 从所有页面收集控件值。
     /// @return 设置结构。
     SettingsConfig collectConfig() const;

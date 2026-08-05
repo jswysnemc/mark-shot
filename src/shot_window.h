@@ -652,7 +652,7 @@ private:
     qreal m_strokeWidth = 3.0;
     qreal m_highlighterWidth = 6.0;
     qreal m_numberWidth = 3.0;
-    qreal m_textSize = 3.0;
+    qreal m_textSize = 1.0;  // 默认文本字号 20pt（渲染字号 = 19 + width）
     qreal m_mosaicBlockSize = 14.0;
     qreal m_magnifierScale = 2.75;
     MagnifierShape m_magnifierShape = MagnifierShape::Circle;
