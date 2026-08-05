@@ -57,10 +57,18 @@ class PackagingConfigurationTest(unittest.TestCase):
         self.assertIn("ref: ${{ steps.version.outputs.checkout_ref }}", workflow)
         self.assertIn("appimage-ubuntu2404:", workflow)
         self.assertIn('image: ubuntu:24.04', workflow)
-        self.assertIn(
-            "apt-get install -y --no-install-recommends ca-certificates libxcb1",
-            workflow,
-        )
+        runtime_job = workflow.split("  appimage-ubuntu2404:", maxsplit=1)[1]
+        for package in (
+            "libegl1",
+            "libgl1",
+            "libopengl0",
+            "libpipewire-0.3-0t64",
+            "libstdc++6",
+            "libwayland-client0",
+            "libxcb1",
+        ):
+            with self.subTest(package=package):
+                self.assertIn(package, runtime_job)
         self.assertIn('"./${{ needs.appimage.outputs.asset }}" --version', workflow)
 
     def test_screenshot_desktop_entry_disables_startup_notification(self) -> None:

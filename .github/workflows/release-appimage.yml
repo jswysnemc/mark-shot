@@ -240,7 +240,15 @@ jobs:
           set -euo pipefail
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates libxcb1
+          apt-get install -y --no-install-recommends \
+            ca-certificates \
+            libegl1 \
+            libgl1 \
+            libopengl0 \
+            libpipewire-0.3-0t64 \
+            libstdc++6 \
+            libwayland-client0 \
+            libxcb1
 
       - name: Download AppImage artifact
         uses: actions/download-artifact@v4
