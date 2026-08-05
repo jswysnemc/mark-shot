@@ -406,6 +406,49 @@ ShotWindow::ShotWindow(QImage frozenFrame,
         }
     });
     fontPanelLayout->addWidget(m_propertyFontList);
+
+    // 字号精确输入（最终渲染点大小 = 19 + 文本宽度偏移）
+    m_propertyFontSizeSpin = new QSpinBox(m_propertyFontPanel);
+    m_propertyFontSizeSpin->setRange(20, 300);
+    m_propertyFontSizeSpin->setSingleStep(1);
+    m_propertyFontSizeSpin->setSuffix(QStringLiteral(" pt"));
+    m_propertyFontSizeSpin->setFocusPolicy(Qt::NoFocus);
+    m_propertyFontSizeSpin->setToolTip(MS_TR("Text font size in points"));
+    connect(m_propertyFontSizeSpin, &QSpinBox::valueChanged, this, [this](int value) {
+        setSelectedTextFontSize(value);
+    });
+    fontPanelLayout->addWidget(m_propertyFontSizeSpin);
+
+    auto *fontStyleLayout = new QHBoxLayout;
+    fontStyleLayout->setContentsMargins(0, 4, 0, 0);
+    fontStyleLayout->setSpacing(4);
+    m_propertyFontBoldButton = new QToolButton(m_propertyFontPanel);
+    m_propertyFontBoldButton->setCheckable(true);
+    m_propertyFontBoldButton->setText(QStringLiteral("B"));
+    m_propertyFontBoldButton->setToolTip(MS_TR("Bold"));
+    m_propertyFontBoldButton->setFocusPolicy(Qt::NoFocus);
+    QFont boldButtonFont = m_propertyFontBoldButton->font();
+    boldButtonFont.setBold(true);
+    m_propertyFontBoldButton->setFont(boldButtonFont);
+    connect(m_propertyFontBoldButton, &QToolButton::toggled, this, [this](bool checked) {
+        setSelectedTextBold(checked);
+    });
+    fontStyleLayout->addWidget(m_propertyFontBoldButton);
+    m_propertyFontItalicButton = new QToolButton(m_propertyFontPanel);
+    m_propertyFontItalicButton->setCheckable(true);
+    m_propertyFontItalicButton->setText(QStringLiteral("I"));
+    m_propertyFontItalicButton->setToolTip(MS_TR("Italic"));
+    m_propertyFontItalicButton->setFocusPolicy(Qt::NoFocus);
+    QFont italicButtonFont = m_propertyFontItalicButton->font();
+    italicButtonFont.setItalic(true);
+    m_propertyFontItalicButton->setFont(italicButtonFont);
+    connect(m_propertyFontItalicButton, &QToolButton::toggled, this, [this](bool checked) {
+        setSelectedTextItalic(checked);
+    });
+    fontStyleLayout->addWidget(m_propertyFontItalicButton);
+    fontStyleLayout->addStretch(1);
+    fontPanelLayout->addLayout(fontStyleLayout);
+
     m_propertyFontPanel->hide();
 
     initializeTransientPanels();

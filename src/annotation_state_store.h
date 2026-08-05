@@ -40,6 +40,8 @@ struct AnnotationState {
 
     // 文本相关
     QString textFontFamily;
+    QFont::Weight textFontWeight = QFont::DemiBold;
+    bool textItalic = false;
     QColor textBackgroundColor = QColor(0, 0, 0, 0);
 };
 

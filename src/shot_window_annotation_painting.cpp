@@ -109,8 +109,9 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
         break;
     case Tool::Text: {
         QFont font = markshot::theme::textFont(qRound((19.0 + annotation.width) * scale),
-                                               QFont::DemiBold,
+                                               annotation.fontWeight,
                                                annotation.fontFamily);
+        font.setItalic(annotation.textItalic);
         QRectF backgroundRect = textContentRect(annotation, widgetCoordinates);
         QRectF textRect = backgroundRect.adjusted(kTextBackgroundPaddingX * scale,
                                                   kTextBackgroundPaddingY * scale,
@@ -572,9 +573,11 @@ void ShotWindow::beginTextAnnotation(QPointF imagePoint)
     m_draft.reset();
     m_textEditor->clear();
     m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(m_currentColor, m_textBackgroundColor, qRound(20.0 + m_textSize)));
-    m_textEditor->setFont(markshot::theme::textFont(qRound(20.0 + m_textSize),
-                                                    QFont::DemiBold,
-                                                    m_textFontFamily));
+    QFont editorFont = markshot::theme::textFont(qRound(20.0 + m_textSize),
+                                                 m_textWeight,
+                                                 m_textFontFamily);
+    editorFont.setItalic(m_textItalic);
+    m_textEditor->setFont(editorFont);
     m_textEditor->show();
     m_textEditor->raise();
     updateTextEditorGeometry();
@@ -598,9 +601,11 @@ void ShotWindow::beginEditingSelectedTextAnnotation()
     m_draft.reset();
     m_textEditor->setPlainText(annotation->text);
     m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(annotation->color, annotation->backgroundColor, qRound(20.0 + annotation->width)));
-    m_textEditor->setFont(markshot::theme::textFont(qRound(20.0 + annotation->width),
-                                                    QFont::DemiBold,
-                                                    annotation->fontFamily));
+    QFont editorFont = markshot::theme::textFont(qRound(20.0 + annotation->width),
+                                                 annotation->fontWeight,
+                                                 annotation->fontFamily);
+    editorFont.setItalic(annotation->textItalic);
+    m_textEditor->setFont(editorFont);
     if (m_annotationPropertyPanel) {
         m_annotationPropertyPanel->hide();
     }
@@ -638,6 +643,8 @@ void ShotWindow::commitTextEditor()
             pushHistorySnapshot();
             annotation->text = text;
             annotation->fontFamily = m_textEditor->font().family();
+            annotation->fontWeight = m_textEditor->font().weight();
+            annotation->textItalic = m_textEditor->font().italic();
             annotation->rect = textContentRect(*annotation, false);
             if (!annotation->points.isEmpty()) {
                 annotation->points[0] = annotation->rect.topLeft();
@@ -663,8 +670,12 @@ void ShotWindow::commitTextEditor()
         annotation.backgroundColor = m_textBackgroundColor;
         annotation.width = m_textSize;
         annotation.fontFamily = m_textEditor->font().family();
+        annotation.fontWeight = m_textEditor->font().weight();
+        annotation.textItalic = m_textEditor->font().italic();
         annotation.rect = textContentRect(annotation, false);
         m_textFontFamily = annotation.fontFamily;
+        m_textWeight = annotation.fontWeight;
+        m_textItalic = annotation.textItalic;
         m_annotations.append(annotation);
     }
 

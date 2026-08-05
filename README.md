@@ -47,6 +47,7 @@ It captures screen frames instantly and opens an interactive fullscreen overlay,
   - Supports dynamic, ultra-large font sizing with fluid adjustment via scroll wheel or property sliders.
   - Implements a physical width buffer to prevent unexpected wrapping across extreme scales.
   - **Diagonal handles** scale font size and boundary box proportionally; **side borders** only adjust wrap width.
+  - **Precise font control**: the text font panel provides an exact point-size input (8-300 pt), a font family list, and Bold / Italic toggles. All of them apply to new text, the inline editor, and existing annotations, and persist across sessions.
 - **Laser Pointer**: Dedicated presentation tool with pen traces that dissolve smoothly over time.
 - **Auto-Increment Marker**: Click to stamp sequential numbered markers.
 - **Mosaic**: Applies high-fidelity acrylic frost blur to obscure sensitive information.

@@ -14,8 +14,9 @@ QRectF ShotWindow::textContentRect(const Annotation &annotation, bool widgetCoor
     const qreal wrapWidth = std::max<qreal>(16.0, baseRect.width() * scale - kTextBackgroundPaddingX * 2.0 * scale);
 
     QFont font = markshot::theme::textFont(qRound((19.0 + annotation.width) * scale),
-                                           QFont::DemiBold,
+                                           annotation.fontWeight,
                                            annotation.fontFamily);
+    font.setItalic(annotation.textItalic);
     QTextOption option;
     option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
     option.setAlignment(Qt::AlignLeft | Qt::AlignTop);
@@ -429,6 +430,10 @@ void ShotWindow::updateAnnotationPropertyPanel()
             ? annotation->numberStyle
             : m_numberStyle;
     const QString panelFontFamily = annotation ? annotation->fontFamily : m_textFontFamily;
+    const QFont::Weight panelFontWeight =
+        annotation && annotation->tool == Tool::Text ? annotation->fontWeight : m_textWeight;
+    const bool panelFontItalic =
+        annotation && annotation->tool == Tool::Text ? annotation->textItalic : m_textItalic;
 
     switch (panelTool) {
     case Tool::Move:
@@ -610,6 +615,22 @@ void ShotWindow::updateAnnotationPropertyPanel()
             m_propertyWidthSlider->setRange(qRound(kMinStrokeWidth), qRound(kMaxStrokeWidth));
         }
         m_propertyWidthSlider->setValue(qRound(panelWidth));
+    }
+    const bool isTextPanel = !groupSelection && panelTool == Tool::Text;
+    if (m_propertyFontSizeSpin) {
+        const QSignalBlocker blocker(m_propertyFontSizeSpin);
+        m_propertyFontSizeSpin->setVisible(isTextPanel);
+        m_propertyFontSizeSpin->setValue(qRound(19.0 + panelWidth));
+    }
+    if (m_propertyFontBoldButton) {
+        const QSignalBlocker blocker(m_propertyFontBoldButton);
+        m_propertyFontBoldButton->setVisible(isTextPanel);
+        m_propertyFontBoldButton->setChecked(panelFontWeight >= QFont::Bold);
+    }
+    if (m_propertyFontItalicButton) {
+        const QSignalBlocker blocker(m_propertyFontItalicButton);
+        m_propertyFontItalicButton->setVisible(isTextPanel);
+        m_propertyFontItalicButton->setChecked(panelFontItalic);
     }
     if (m_propertyOpacityLabel) {
         m_propertyOpacityLabel->setText(QStringLiteral("%1%").arg(panelOpacity));
