@@ -17,9 +17,12 @@ class PackagingConfigurationTest(unittest.TestCase):
 
         @return 无返回值。
         """
+        # 1. 读取 DEB 发布工作流
         workflow = (PROJECT_ROOT / ".github/workflows/release-deb.yml").read_text(
             encoding="utf-8"
         )
+
+        # 2. 定义需要原生构建的发行版及产物后缀
         expected_targets = {
             "debian12": ("debian:12", 'asset_suffix: ""'),
             "debian13": ("debian:13", 'asset_suffix: ".debian13"'),
@@ -27,6 +30,7 @@ class PackagingConfigurationTest(unittest.TestCase):
             "ubuntu2604": ("ubuntu:26.04", 'asset_suffix: ".ubuntu26.04"'),
         }
 
+        # 3. 验证各发行版矩阵项和目标容器
         for target, (image, suffix) in expected_targets.items():
             with self.subTest(target=target):
                 target_block = re.search(
@@ -37,6 +41,7 @@ class PackagingConfigurationTest(unittest.TestCase):
                 self.assertIn(f"image: {image}", body)
                 self.assertIn(suffix, body)
 
+        # 4. 验证 DEB 在目标容器中执行安装检查
         self.assertIn("Verify package installs on target", workflow)
 
     def test_appimage_uses_compatible_glibc_baseline(self) -> None:
@@ -45,10 +50,12 @@ class PackagingConfigurationTest(unittest.TestCase):
 
         @return 无返回值。
         """
+        # 1. 读取 AppImage 发布工作流
         workflow = (PROJECT_ROOT / ".github/workflows/release-appimage.yml").read_text(
             encoding="utf-8"
         )
 
+        # 2. 验证构建基线、glibc 上限和源码引用
         self.assertRegex(workflow, r"container:\s*\n\s+image: debian:12")
         self.assertIn("ninja-build", workflow)
         self.assertIn('MAX_GLIBC_VERSION: "2.36"', workflow)
@@ -57,6 +64,8 @@ class PackagingConfigurationTest(unittest.TestCase):
         self.assertIn("ref: ${{ steps.version.outputs.checkout_ref }}", workflow)
         self.assertIn("appimage-ubuntu2404:", workflow)
         self.assertIn('image: ubuntu:24.04', workflow)
+
+        # 3. 验证 Ubuntu 24.04 启动任务包含全部外部系统依赖
         runtime_job = workflow.split("  appimage-ubuntu2404:", maxsplit=1)[1]
         for package in (
             "libasound2t64",
@@ -87,6 +96,8 @@ class PackagingConfigurationTest(unittest.TestCase):
         ):
             with self.subTest(package=package):
                 self.assertIn(package, runtime_job)
+
+        # 4. 验证最终产物在虚拟 X11 会话中实际启动
         self.assertIn(
             'xvfb-run -a "./${{ needs.appimage.outputs.asset }}" --version', workflow
         )

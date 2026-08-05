@@ -49,7 +49,7 @@ jobs:
         run: |
           TAG="${{ github.event.release.tag_name || inputs.tag || github.ref_name }}"
           if [ -z "$TAG" ]; then
-            echo "No release tag was provided" >&2
+            echo "【Linux发布】【AppImage版本】没有提供发布标签" >&2
             exit 1
           fi
           VERSION="${TAG#v}"
@@ -146,7 +146,7 @@ jobs:
           set -euo pipefail
           BINARY="$PWD/AppDir/usr/bin/mark-shot"
           if ldd "$BINARY" | grep -Ei 'LayerShellQt|layershell'; then
-            echo "main binary unexpectedly links LayerShellQt directly" >&2
+            echo "【Linux发布】【AppImage依赖】主程序意外直接链接 LayerShellQt" >&2
             exit 1
           fi
           for library in libavcodec libavfilter libavformat libavutil libswresample libswscale; do
@@ -176,8 +176,8 @@ jobs:
             ! -name 'linuxdeploy-plugin-qt-x86_64.AppImage' \
             -print)
           if [ "${#appimages[@]}" -ne 1 ]; then
-            printf 'Expected one packaged AppImage, found %s\n' "${#appimages[@]}" >&2
-            printf '%s\n' "${appimages[@]}" >&2
+            printf '【Linux发布】【AppImage产物】应生成一个 AppImage，实际生成 %s 个\n' "${#appimages[@]}" >&2
+            printf '【Linux发布】【AppImage产物】%s\n' "${appimages[@]}" >&2
             exit 1
           fi
 
@@ -208,14 +208,14 @@ jobs:
 
           # 【Linux发布】【AppImage兼容】2. 拒绝高于 Debian 12 基线的符号需求
           if [ -z "$MAX_REQUIRED" ]; then
-            echo "No GLIBC symbol versions found in AppDir" >&2
+            echo "【Linux发布】【AppImage兼容】AppDir 中没有找到 GLIBC 符号版本" >&2
             exit 1
           fi
           if dpkg --compare-versions "$MAX_REQUIRED" gt "$MAX_GLIBC_VERSION"; then
-            echo "AppImage requires GLIBC_$MAX_REQUIRED, maximum allowed is GLIBC_$MAX_GLIBC_VERSION" >&2
+            echo "【Linux发布】【AppImage兼容】AppImage 需要 GLIBC_$MAX_REQUIRED，允许的最高版本是 GLIBC_$MAX_GLIBC_VERSION" >&2
             exit 1
           fi
-          echo "AppImage payload requires at most GLIBC_$MAX_REQUIRED"
+          echo "【Linux发布】【AppImage兼容】AppImage 载荷最高需要 GLIBC_$MAX_REQUIRED"
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
@@ -239,7 +239,11 @@ jobs:
         run: |
           set -euo pipefail
           export DEBIAN_FRONTEND=noninteractive
+
+          # 【Linux发布】【AppImage验证】1. 更新 Ubuntu 24.04 软件包索引
           apt-get update
+
+          # 【Linux发布】【AppImage验证】2. 安装 AppImage 外部系统库和虚拟显示服务
           apt-get install -y --no-install-recommends \
             ca-certificates \
             libasound2t64 \
@@ -279,7 +283,11 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: 1
         run: |
           set -euo pipefail
+
+          # 【Linux发布】【AppImage验证】1. 授予 AppImage 执行权限
           chmod +x "${{ needs.appimage.outputs.asset }}"
+
+          # 【Linux发布】【AppImage验证】2. 在虚拟 X11 会话中启动最终产物
           xvfb-run -a "./${{ needs.appimage.outputs.asset }}" --version
 
       - name: Upload AppImage to release
