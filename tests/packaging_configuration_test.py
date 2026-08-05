@@ -59,13 +59,30 @@ class PackagingConfigurationTest(unittest.TestCase):
         self.assertIn('image: ubuntu:24.04', workflow)
         runtime_job = workflow.split("  appimage-ubuntu2404:", maxsplit=1)[1]
         for package in (
+            "libasound2t64",
+            "libcom-err2",
+            "libdrm2",
             "libegl1",
+            "libfontconfig1",
+            "libfreetype6",
+            "libfribidi0",
+            "libgcc-s1",
             "libgl1",
+            "libglx0",
+            "libgmp10",
+            "libgpg-error0",
+            "libharfbuzz0b",
+            "libice6",
             "libopengl0",
             "libpipewire-0.3-0t64",
+            "libsm6",
             "libstdc++6",
             "libwayland-client0",
+            "libx11-6",
+            "libx11-xcb1",
+            "libxcb-dri3-0",
             "libxcb1",
+            "zlib1g",
         ):
             with self.subTest(package=package):
                 self.assertIn(package, runtime_job)
