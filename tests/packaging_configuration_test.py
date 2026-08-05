@@ -57,6 +57,10 @@ class PackagingConfigurationTest(unittest.TestCase):
         self.assertIn("ref: ${{ steps.version.outputs.checkout_ref }}", workflow)
         self.assertIn("appimage-ubuntu2404:", workflow)
         self.assertIn('image: ubuntu:24.04', workflow)
+        self.assertIn(
+            "apt-get install -y --no-install-recommends ca-certificates libxcb1",
+            workflow,
+        )
         self.assertIn('"./${{ needs.appimage.outputs.asset }}" --version', workflow)
 
     def test_screenshot_desktop_entry_disables_startup_notification(self) -> None:
