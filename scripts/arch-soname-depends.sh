@@ -45,11 +45,21 @@ fi
 
 declare -A LIBDEPS=()
 
+# readelf 缺失时下面的循环会静默跳过每个文件并输出空结果，让调用方误以为
+# 安装树没有共享库依赖。这里显式检查，把工具缺失和“确实没有依赖”区分开。
+if ! command -v readelf >/dev/null 2>&1; then
+    echo "readelf was not found; install binutils to generate soname dependencies" >&2
+    exit 1
+fi
+
+ELF_COUNT=0
+
 # 1. 遍历安装树中的所有可执行 ELF 文件，收集 DT_NEEDED 条目
 while IFS= read -r -d '' filename; do
     # readelf -h 读不到 ELF Class 说明不是 ELF 文件，跳过
     soarch="$(LC_ALL=C readelf -h "$filename" 2>/dev/null | sed -n 's/.*Class.*ELF\(32\|64\)/\1/p')"
     [[ -n "$soarch" ]] || continue
+    ELF_COUNT=$((ELF_COUNT + 1))
 
     while IFS= read -r sofile; do
         [[ -n "$sofile" ]] || continue
@@ -78,6 +88,16 @@ while IFS= read -r -d '' filename; do
     done < <(LC_ALL=C readelf -d "$filename" 2>/dev/null \
         | sed -nr 's/.*Shared library: \[(.*)\].*/\1/p')
 done < <(find "$ROOT" -type f -perm -u+x -print0)
+
+# 安装树里一个 ELF 都没有，通常意味着传错了目录或安装步骤没执行
+if [[ "$ELF_COUNT" -eq 0 ]]; then
+    {
+        echo "No ELF binaries were found under $ROOT"
+        echo "Files considered (executable bit set):"
+        find "$ROOT" -type f -perm -u+x -printf '  %M %p\n' 2>/dev/null | head -20
+    } >&2
+    exit 1
+fi
 
 # 3. 按库名排序输出，保证同一安装树生成的依赖顺序稳定
 for soname in $(printf '%s\n' "${!LIBDEPS[@]}" | sort); do
