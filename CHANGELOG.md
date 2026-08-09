@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.47 - 2026-08-10
+
+### Features & Enhancements
+
+- **Headless Capture CLI**: Screenshots can be taken without the interactive overlay, including capturing several displays in one run.
+- **Text Size and Style Control**: The text tool exposes precise font size and style controls, and new annotations default to 20pt.
+
+### Bug Fixes
+
+- **Hover Window Selection**: Hardened window detection when picking a window by hovering, and the Wayland session probe moved into its own module with dedicated tests.
+- **Capture Overlays**: Freezing now covers all screens and keeps overlays out of the taskbar.
+- **Settings Wheel Guard**: Settings controls no longer change values from stray wheel scrolling over the window.
+- **PipeWire Build Guard**: `pipewire_buffer_data_types` compiles without PipeWire headers, with the DMA-BUF avoidance policy kept inside the guards.
+- **AUR Publishing During Maintenance**: Both AUR jobs exited non-zero when `aur.archlinux.org` refused connections during maintenance, marking a release failed even though every package had already been built and uploaded. Those steps now skip with a warning when git reports the maintenance notice, and still fail on real errors such as authentication problems.
+
 ## 0.1.46 - 2026-08-10
 
 ### Features & Enhancements

@@ -1,5 +1,13 @@
 # Release Notes
 
+### 0.1.47
+
+- **Headless Capture CLI**: Screenshots can be taken without the interactive overlay, including capturing several displays in one run.
+- **Text Size and Style Control**: The text tool exposes precise font size and style controls, and new annotations default to 20pt.
+- **Hover Window Selection**: Hardened window detection when picking a window by hovering, with the Wayland session probe moved into its own tested module.
+- **Capture Overlays and Settings**: Freezing covers all screens and keeps overlays out of the taskbar, and settings controls no longer change values from stray wheel scrolling.
+- **AUR Publishing During Maintenance**: A release is no longer marked failed when `aur.archlinux.org` is down for maintenance. The AUR steps skip with a warning in that case and still fail on real errors.
+
 ### 0.1.46
 
 - **Faster Scroll Capture Stitching**: The stitcher grows the long image in place instead of repainting it from scratch on every frame, cutting a 1200x900, 120-frame benchmark from 46.2 ms to 1.68 ms per frame. Fixed headers and footers are detected from consecutive frames and kept exactly once, and overlap verification now excludes bands that are about to be trimmed, fixing footers being stitched into the middle of the long image.
