@@ -46,6 +46,19 @@ bool shouldCaptureScreensIndividually(const QList<QScreen *> &screens);
 bool shouldCaptureScreensIndividually(bool waylandPlatform, int screenCount);
 
 /**
+ * 判断普通区域截图是否需要冻结全部显示器。
+ * @param allOutputs 是否已经显式请求全部输出。
+ * @param fullscreenAnnotation 是否直接进入全屏标注。
+ * @param freezeScope 配置的冻结范围。
+ * @param screenCount 当前有效显示器数量。
+ * @return 需要冻结全部显示器时返回 true。
+ */
+bool shouldFreezeAllScreens(bool allOutputs,
+                            bool fullscreenAnnotation,
+                            CaptureFreezeScope freezeScope,
+                            int screenCount);
+
+/**
  * 记录截图会话中的屏幕缩放诊断信息。
  * @param screens 当前屏幕列表。
  * @return 无返回值。

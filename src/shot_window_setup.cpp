@@ -382,36 +382,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     propertyColorLayout->addWidget(m_propertyColorPicker);
     m_propertyColorDialogPanel->hide();
 
-    m_propertyFontPanel = new QWidget(this);
-    m_propertyFontPanel->setObjectName(QStringLiteral("propertyFontPanel"));
-    m_propertyFontPanel->setCursor(Qt::ArrowCursor);
-    m_propertyFontPanel->setStyleSheet(markshot::theme::openWithPanelStyleSheet());
-    auto *fontPanelLayout = new QVBoxLayout(m_propertyFontPanel);
-    fontPanelLayout->setContentsMargins(6, 6, 6, 6);
-    fontPanelLayout->setSpacing(0);
-    m_propertyFontList = new QListWidget(m_propertyFontPanel);
-    m_propertyFontList->setFocusPolicy(Qt::NoFocus);
-    m_propertyFontList->setUniformItemSizes(true);
-    m_propertyFontList->setMinimumHeight(84);
-    m_propertyFontList->setMaximumHeight(260);
-    m_propertyFontList->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    m_propertyFontList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    for (const QString &family : QFontDatabase::families()) {
-        auto *item = new QListWidgetItem(family, m_propertyFontList);
-        item->setData(Qt::UserRole, family);
-        item->setFont(QFont(family, 12));
-    }
-    connect(m_propertyFontList, &QListWidget::itemClicked, this, [this](QListWidgetItem *item) {
-        if (!item) {
-            return;
-        }
-        setSelectedTextFontFamily(item->data(Qt::UserRole).toString());
-        if (m_propertyFontPanel) {
-            m_propertyFontPanel->hide();
-        }
-    });
-    fontPanelLayout->addWidget(m_propertyFontList);
-    m_propertyFontPanel->hide();
+    initializePropertyFontPanel();
 
     initializeTransientPanels();
     initializeTextEditor();

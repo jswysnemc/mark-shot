@@ -57,6 +57,17 @@ bool shouldCaptureScreensIndividually(bool waylandPlatform, int screenCount)
     return waylandPlatform && screenCount > 1;
 }
 
+bool shouldFreezeAllScreens(bool allOutputs,
+                            bool fullscreenAnnotation,
+                            CaptureFreezeScope freezeScope,
+                            int screenCount)
+{
+    return !allOutputs
+        && !fullscreenAnnotation
+        && freezeScope == CaptureFreezeScope::AllScreens
+        && screenCount > 1;
+}
+
 void logCaptureSessionScreens(const QList<QScreen *> &screens)
 {
     int index = 0;

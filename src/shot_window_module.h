@@ -19,6 +19,7 @@
 #include "ui/icons.h"
 #include "ui/theme.h"
 #include "window_detection.h"
+#include "window_hover_selection.h"
 #include "windows_integration.h"
 
 #include <QAbstractItemView>
@@ -77,6 +78,7 @@
 #include <QShowEvent>
 #include <QSignalBlocker>
 #include <QSlider>
+#include <QSpinBox>
 #include <QStandardPaths>
 #include <QStyle>
 #include <QTemporaryFile>
@@ -87,6 +89,7 @@
 #include <QTextOption>
 #include <QThread>
 #include <QTimer>
+#include <QToolButton>
 #include <QTransform>
 #include <QUrl>
 #include <QVBoxLayout>

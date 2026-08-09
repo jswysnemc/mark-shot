@@ -72,6 +72,7 @@ if(MARK_SHOT_LINUX AND PipeWire_FOUND)
         src/pipewire/pipewire_drm_fourcc.h
     )
     target_include_directories(mark-shot-pipewire-buffer-data-types-test PRIVATE src)
+    target_compile_definitions(mark-shot-pipewire-buffer-data-types-test PRIVATE HAVE_PIPEWIRE)
     target_link_libraries(mark-shot-pipewire-buffer-data-types-test
         PRIVATE
             Qt6::Core

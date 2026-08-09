@@ -3,6 +3,7 @@
 #include "capture_freeze_scope.h"
 #include "capture_own_windows_policy.h"
 #include "capture_session_launcher.h"
+#include "cli/headless_capture.h"
 #include "cli/image_pin_launch.h"
 #include "cli/recording_cli.h"
 #include "debug_log.h"
@@ -134,6 +135,7 @@ int main(int argc, char *argv[])
     parser.addOption(debugOption);
     parser.addOption(noDebugOption);
     parser.addOption(debugLogOption);
+    markshot::cli::addHeadlessCaptureOptions(&parser);
     parser.process(app);
 
     if (parser.isSet(stopRecordingOption)) {
@@ -147,7 +149,9 @@ int main(int argc, char *argv[])
     }
 
     const QStringList positionalArguments = parser.positionalArguments();
-    if (positionalArguments.size() > 1) {
+    const bool headlessRequested = parser.isSet(QStringLiteral("capture-to"))
+        || parser.isSet(QStringLiteral("list-displays"));
+    if (!headlessRequested && positionalArguments.size() > 1) {
         QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), MS_TR("Only one image file can be opened at a time."));
         return 1;
     }
@@ -181,6 +185,10 @@ int main(int argc, char *argv[])
     markshot::debugLog("config",
                        "debug enabled path=%s",
                        markshot::debugLogPath().toUtf8().constData());
+    const int headlessExitCode = markshot::cli::runHeadlessCaptureIfRequested(parser);
+    if (headlessExitCode >= 0) {
+        return headlessExitCode;
+    }
 
     QString configDefaultToolWarning;
     markshot::DefaultTools defaultTools = markshot::configuredDefaultTools(&configDefaultToolWarning);

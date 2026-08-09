@@ -44,35 +44,9 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
     }
 
     if (m_mode == Mode::Selecting && !m_dragging) {
-        std::optional<markshot::WindowInfo> best;
         const QPoint imgPt = imagePoint.toPoint();
-        bool useZOrder = false;
-
-        for (const markshot::WindowInfo &info : std::as_const(m_windowInfos)) {
-            if (!info.rect.contains(imgPt)) {
-                continue;
-            }
-
-            if (!best.has_value()) {
-                useZOrder = info.zOrder.has_value();
-                best = info;
-                continue;
-            }
-
-            if (useZOrder) {
-                if (info.zOrder > best->zOrder) {
-                    best = info;
-                }
-            } else {
-                qint64 area = static_cast<qint64>(info.rect.width()) * info.rect.height();
-                qint64 bestArea = static_cast<qint64>(best->rect.width()) * best->rect.height();
-                if (area < bestArea) {
-                    best = info;
-                }
-            }
-        }
-
-        const std::optional<QRect> bestRect = best ? std::optional(best->rect) : std::nullopt;
+        const std::optional<QRect> bestRect =
+            markshot::window_selection::topmostWindowRectAt(m_windowInfos, imgPt);
         if (bestRect != m_hoveredWindowRect) {
             m_hoveredWindowRect = bestRect;
             update();

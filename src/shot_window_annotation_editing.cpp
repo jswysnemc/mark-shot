@@ -407,7 +407,11 @@ void ShotWindow::setCurrentColor(QColor color)
         m_colorPalette->hide();
     }
     if (m_textEditor && m_textEditor->isVisible() && !m_editingTextAnnotationId.has_value()) {
-        m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(m_currentColor, m_textBackgroundColor, qRound(20.0 + m_textSize)));
+        m_textEditor->setStyleSheet(
+            markshot::theme::textEditorStyleSheet(
+                m_currentColor,
+                m_textBackgroundColor,
+                qRound(19.0 + m_textSize)));
     }
     updateColorPalettePreview();
     updateAnnotationPropertyPanel();

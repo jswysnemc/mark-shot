@@ -4,53 +4,6 @@ namespace cfg = markshot::config;
 namespace shortcuts = markshot::shortcut;
 using namespace markshot::shot;
 
-QRectF ShotWindow::textContentRect(const Annotation &annotation, bool widgetCoordinates) const
-{
-    const qreal scale = annotationSizeScale(widgetCoordinates);
-    const QRectF baseRect = annotation.rect.isEmpty()
-        ? QRectF(annotation.points.value(0), QSizeF(360.0, 140.0))
-        : annotation.rect.normalized();
-    const QPointF topLeft = widgetCoordinates ? imageToWidget(baseRect.topLeft()) : baseRect.topLeft();
-    const qreal wrapWidth = std::max<qreal>(16.0, baseRect.width() * scale - kTextBackgroundPaddingX * 2.0 * scale);
-
-    QFont font = markshot::theme::textFont(qRound((19.0 + annotation.width) * scale),
-                                           QFont::DemiBold,
-                                           annotation.fontFamily);
-    QTextOption option;
-    option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
-    option.setAlignment(Qt::AlignLeft | Qt::AlignTop);
-
-    QTextDocument document;
-    document.setDocumentMargin(0.0);
-    document.setDefaultFont(font);
-    document.setDefaultTextOption(option);
-    document.setPlainText(annotation.text);
-    document.setTextWidth(wrapWidth);
-
-    const QSizeF documentSize = document.size();
-    qreal textWidth = 0.0;
-    qreal textHeight = 0.0;
-    for (QTextBlock block = document.begin(); block.isValid(); block = block.next()) {
-        const QTextLayout *layout = block.layout();
-        if (!layout) {
-            continue;
-        }
-        for (int i = 0; i < layout->lineCount(); ++i) {
-            const QTextLine line = layout->lineAt(i);
-            textWidth = std::max(textWidth, line.naturalTextWidth());
-            textHeight = std::max(textHeight, layout->position().y() + line.y() + line.height());
-        }
-    }
-    if (textWidth <= 0.0 || textHeight <= 0.0) {
-        textWidth = documentSize.width();
-        textHeight = documentSize.height();
-    }
-
-    const qreal rectWidth = std::max<qreal>(1.0, std::ceil(textWidth + kTextBackgroundPaddingX * 2.0 * scale) + 5.0);
-    const qreal rectHeight = std::max<qreal>(1.0, std::ceil(textHeight + kTextBackgroundPaddingY * 2.0 * scale));
-    return QRectF(topLeft, QSizeF(rectWidth, rectHeight));
-}
-
 QRectF ShotWindow::constrainedRect(QPointF start, QPointF end) const
 {
     const qreal dx = end.x() - start.x();
@@ -429,6 +382,10 @@ void ShotWindow::updateAnnotationPropertyPanel()
             ? annotation->numberStyle
             : m_numberStyle;
     const QString panelFontFamily = annotation ? annotation->fontFamily : m_textFontFamily;
+    const QFont::Weight panelFontWeight =
+        annotation && annotation->tool == Tool::Text ? annotation->fontWeight : m_textWeight;
+    const bool panelFontItalic =
+        annotation && annotation->tool == Tool::Text ? annotation->textItalic : m_textItalic;
 
     switch (panelTool) {
     case Tool::Move:
@@ -606,13 +563,29 @@ void ShotWindow::updateAnnotationPropertyPanel()
         } else if (panelTool == Tool::Number) {
             m_propertyWidthSlider->setRange(qRound(kMinNumberWidth), qRound(kMaxNumberWidth));
         } else if (panelTool == Tool::Text) {
-            m_propertyWidthSlider->setRange(1, 1000);
+            m_propertyWidthSlider->setRange(-11, 281);
         } else if (panelTool == Tool::Highlighter) {
             m_propertyWidthSlider->setRange(qRound(kMinStrokeWidth), qRound(kMaxHighlighterWidth));
         } else {
             m_propertyWidthSlider->setRange(qRound(kMinStrokeWidth), qRound(kMaxStrokeWidth));
         }
         m_propertyWidthSlider->setValue(qRound(panelWidth));
+    }
+    const bool isTextPanel = !groupSelection && panelTool == Tool::Text;
+    if (m_propertyFontSizeSpin) {
+        const QSignalBlocker blocker(m_propertyFontSizeSpin);
+        m_propertyFontSizeSpin->setVisible(isTextPanel);
+        m_propertyFontSizeSpin->setValue(qRound(19.0 + panelWidth));
+    }
+    if (m_propertyFontBoldButton) {
+        const QSignalBlocker blocker(m_propertyFontBoldButton);
+        m_propertyFontBoldButton->setVisible(isTextPanel);
+        m_propertyFontBoldButton->setChecked(panelFontWeight >= QFont::DemiBold);
+    }
+    if (m_propertyFontItalicButton) {
+        const QSignalBlocker blocker(m_propertyFontItalicButton);
+        m_propertyFontItalicButton->setVisible(isTextPanel);
+        m_propertyFontItalicButton->setChecked(panelFontItalic);
     }
     if (m_propertyOpacityLabel) {
         m_propertyOpacityLabel->setText(QStringLiteral("%1%").arg(panelOpacity));

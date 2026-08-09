@@ -161,6 +161,7 @@ qt_add_executable(mark-shot
     src/startup_shortcut_hint.h
     src/window_detection.cpp
     src/window_detection.h
+    src/window_detection_session.h
     src/windows_integration.cpp
     src/windows_integration.h
     src/windows_tray_controller.cpp

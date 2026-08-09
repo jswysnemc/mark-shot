@@ -4,6 +4,7 @@
 #include "config_value.h"
 #include "debug_log.h"
 #include "shell_command.h"
+#include "window_detection_session.h"
 
 #include <QDir>
 #include <QFile>
@@ -97,57 +98,15 @@ QString existingAppConfigPath()
     return {};
 }
 
-/// @brief Detects the Wayland session type based on environment variables.
-/// @return "gnome", "kde", "hyprland", "niri" for known Wayland sessions, empty string for X11 or unknown.
-QString detectWaylandSessionType()
-{
-    const QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QString sessionType = env.value(QStringLiteral("XDG_SESSION_TYPE")).toLower();
-    if (sessionType != QStringLiteral("wayland")) {
-        return {};
-    }
-
-    // Prefer compositor-specific sockets over free-form desktop strings so bare
-    // niri/Hyprland sessions still pick the matching detection script.
-    if (!env.value(QStringLiteral("NIRI_SOCKET")).isEmpty()) {
-        return QStringLiteral("niri");
-    }
-    if (!env.value(QStringLiteral("HYPRLAND_INSTANCE_SIGNATURE")).isEmpty()) {
-        return QStringLiteral("hyprland");
-    }
-
-    const QString desktop = (env.value(QStringLiteral("XDG_CURRENT_DESKTOP"))
-        + QLatin1Char(':') + env.value(QStringLiteral("XDG_SESSION_DESKTOP"))
-        + QLatin1Char(':') + env.value(QStringLiteral("DESKTOP_SESSION")))
-        .toLower();
-
-    if (desktop.contains(QStringLiteral("gnome"))) {
-        return QStringLiteral("gnome");
-    }
-    if (desktop.contains(QStringLiteral("kde")) || desktop.contains(QStringLiteral("plasma"))) {
-        return QStringLiteral("kde");
-    }
-    if (desktop.contains(QStringLiteral("hyprland"))) {
-        return QStringLiteral("hyprland");
-    }
-    if (desktop.contains(QStringLiteral("niri"))) {
-        return QStringLiteral("niri");
-    }
-
-    return QStringLiteral("niri");
-}
-
-/// @brief Returns the appropriate window detection command for the current desktop environment.
+/// @brief 返回当前桌面环境对应的内置窗口检测命令。
+/// @return 已支持 Wayland 合成器的脚本名，其他环境返回空字符串。
 QString defaultWindowDetectionCommand()
 {
 #if defined(Q_OS_WIN)
     return QString();
 #else
-    const QString sessionType = detectWaylandSessionType();
-    if (sessionType.isEmpty()) {
-        return QString();
-    }
-    return QStringLiteral("mark-shot-window-detection-") + sessionType;
+    return window_detection::defaultCommand(
+        window_detection::detectSession(QProcessEnvironment::systemEnvironment()));
 #endif
 }
 
@@ -204,7 +163,8 @@ constexpr int kDefaultWindowDetectionTimeoutMs = 1000;
 /// @brief Minimum allowed timeout value in milliseconds for window detection.
 constexpr int kMinWindowDetectionTimeoutMs = 100;
 /// @brief Maximum allowed timeout value in milliseconds for window detection.
-constexpr int kMaxWindowDetectionTimeoutMs = 10000;
+/// 与设置面板 spin 上限(30000ms)保持一致,避免面板值与实际生效值不一致。
+constexpr int kMaxWindowDetectionTimeoutMs = 30000;
 
 /// @brief Configuration settings for the external window detection process.
 struct WindowDetectionConfig {
@@ -518,19 +478,20 @@ std::optional<bool> configuredWindowDetectionEnabled(const QJsonObject &root)
 /// @brief 判断已配置的窗口检测命令是否匹配当前桌面环境。
 /// @param command 用户配置中的窗口检测命令。
 /// @return 匹配当前桌面环境时返回 true，否则返回 false。
+///
+/// 行为约定:
+/// - 非 Wayland 会话(如 X11)与 Windows:尊重用户配置,空命令交由平台枚举回退。
+/// - Wayland 会话下内置默认脚本(mark-shot-window-detection-*)仅在面向其他
+///   合成器时自动纠正为当前会话对应的脚本;用户自定义命令(非内置脚本名,
+///   例如带路径的脚本)一律保留,不再被静默覆盖。
 bool commandMatchesEnvironment(const QString &command)
 {
 #if defined(Q_OS_WIN)
-    return command.isEmpty();
+    return true;
 #else
-    const QString sessionType = detectWaylandSessionType();
-    if (sessionType.isEmpty()) {
-        return command.isEmpty();
-    }
-    if (command.isEmpty()) {
-        return false;
-    }
-    return command.contains(sessionType);
+    const window_detection::Session session =
+        window_detection::detectSession(QProcessEnvironment::systemEnvironment());
+    return window_detection::commandMatchesSession(command, session);
 #endif
 }
 

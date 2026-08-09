@@ -559,14 +559,26 @@ void ShotWindow::applyPropertyColor(QColor color)
         QColor editorColor = m_currentColor;
         QColor editorBackgroundColor = m_textBackgroundColor;
         qreal editorWidth = m_textSize;
+        QFont::Weight editorWeight = m_textWeight;
+        bool editorItalic = m_textItalic;
         if (m_editingTextAnnotationId.has_value()) {
             if (const Annotation *annotation = annotationById(*m_editingTextAnnotationId)) {
                 editorColor = annotation->color;
                 editorBackgroundColor = annotation->backgroundColor;
                 editorWidth = annotation->width;
+                editorWeight = annotation->fontWeight;
+                editorItalic = annotation->textItalic;
             }
         }
-        m_textEditor->setStyleSheet(markshot::theme::textEditorStyleSheet(editorColor, editorBackgroundColor, qRound(20.0 + editorWidth)));
+        m_textEditor->setStyleSheet(
+            markshot::theme::textEditorStyleSheet(
+                editorColor,
+                editorBackgroundColor,
+                qRound(19.0 + editorWidth)));
+        QFont editorFont = m_textEditor->font();
+        editorFont.setWeight(editorWeight);
+        editorFont.setItalic(editorItalic);
+        m_textEditor->setFont(editorFont);
     }
     updateColorPalettePreview();
     updateAnnotationPropertyPanel();
@@ -601,33 +613,4 @@ void ShotWindow::clearAnnotations()
     updateAnnotationPropertyPanel();
     updateCursor();
     update();
-}
-
-void ShotWindow::setSelectedTextFontFamily(const QString &fontFamily)
-{
-    if (fontFamily.isEmpty()) {
-        return;
-    }
-
-    if (m_selectedAnnotationId.has_value()) {
-        Annotation *annotation = annotationById(*m_selectedAnnotationId);
-        if (!annotation || annotation->tool != Tool::Text || annotation->fontFamily == fontFamily) {
-            return;
-        }
-        pushHistorySnapshot();
-        annotation->fontFamily = fontFamily;
-    } else {
-        if (m_tool != Tool::Text || m_textFontFamily == fontFamily) {
-            return;
-        }
-        m_textFontFamily = fontFamily;
-        if (m_textEditor && m_textEditor->isVisible() && !m_editingTextAnnotationId.has_value()) {
-            m_textEditor->setFont(markshot::theme::textFont(qRound(20.0 + m_textSize),
-                                                            QFont::DemiBold,
-                                                            m_textFontFamily));
-        }
-    }
-    updateAnnotationPropertyPanel();
-    update();
-    persistAnnotationState();
 }

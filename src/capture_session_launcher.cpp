@@ -133,6 +133,13 @@ ShotWindow *showCapturedWindow(QScreen *screen,
         window->beginRegionRecordingSelection(*regionRecordingOptions);
     }
 
+    // 截图覆盖窗口不进入系统任务栏/坞（Windows: WS_EX_TOOLWINDOW；
+    // X11: _NET_WM_STATE_SKIP_TASKBAR；Wayland 层壳覆盖层天然无任务栏项，
+    // 普通 xdg 窗口无标准跳过机制，保持现状）。
+    QTimer::singleShot(0, window, [window] {
+        markshot::windows::setExcludedFromTaskbar(window);
+    });
+
     return window;
 }
 
@@ -194,23 +201,6 @@ ShotWindow *showCaptureWindow(QScreen *screen,
                               fullscreenAnnotation,
                               defaultTools,
                               regionRecordingOptions);
-}
-
-/// @brief 判断普通区域截图是否应冻结全部显示器。
-/// @param allOutputs 是否显式捕获全部输出为一张图片。
-/// @param fullscreenAnnotation 是否直接进入全屏标注。
-/// @param freezeScope 配置的冻结范围。
-/// @param screenCount 当前显示器数量。
-/// @return 需要为每个显示器创建冻结窗口时返回 true。
-bool shouldFreezeAllScreens(bool allOutputs,
-                            bool fullscreenAnnotation,
-                            markshot::CaptureFreezeScope freezeScope,
-                            int screenCount)
-{
-    return !allOutputs
-        && !fullscreenAnnotation
-        && freezeScope == markshot::CaptureFreezeScope::AllScreens
-        && screenCount > 1;
 }
 
 /// @brief 关闭一组截图窗口。
@@ -657,10 +647,11 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
     QVector<QPointer<ShotWindow>> windows;
     QScreen *screen = markshot::focusedScreen();
     const QList<QScreen *> screens = QGuiApplication::screens();
-    const bool freezeAllScreens = shouldFreezeAllScreens(allOutputs,
-                                                         fullscreenAnnotation,
-                                                         freezeScope,
-                                                         screens.size());
+    const bool freezeAllScreens = markshot::capture_session::shouldFreezeAllScreens(
+        allOutputs,
+        fullscreenAnnotation,
+        freezeScope,
+        screens.size());
     const bool waylandPlatform = markshot::capture_session::isWaylandPlatform();
     const bool mixedDevicePixelRatios = markshot::capture_session::hasMixedDevicePixelRatios(screens);
     const bool captureIndividually = markshot::capture_session::shouldCaptureScreensIndividually(screens);
@@ -692,6 +683,23 @@ QVector<QPointer<ShotWindow>> showCaptureSession(QApplication *app,
                                                              defaultTools,
                                                              error,
                                                              regionRecordingOptions);
+        } else if (!mixedDevicePixelRatios) {
+            // 统一 DPR 的 X11/Windows：用单个覆盖整个虚拟桌面的窗口展示全部
+            // 屏幕的冻结画面，允许选区一次跨越多台显示器（与 Flameshot、
+            // Spectacle 等工具的最佳实践一致）。
+            ShotWindow *window =
+                showCaptureWindow(nullptr,
+                                  true,
+                                  includeCursor,
+                                  hideOwnWindows,
+                                  useRegularWindow,
+                                  fullscreenAnnotation,
+                                  defaultTools,
+                                  error,
+                                  regionRecordingOptions);
+            if (window) {
+                windows.append(window);
+            }
         } else {
             windows = showCaptureWindowsFromSingleFrame(screens,
                                                         includeCursor,

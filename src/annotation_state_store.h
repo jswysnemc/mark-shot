@@ -21,7 +21,8 @@ struct AnnotationState {
     qreal strokeWidth = 3.0;
     qreal highlighterWidth = 6.0;
     qreal numberWidth = 3.0;
-    qreal textSize = 3.0;
+    // 默认文本字号为 20pt，渲染字号等于 19 加 width
+    qreal textSize = 1.0;
     qreal mosaicBlockSize = 14.0;
 
     // 矩形相关
@@ -41,6 +42,8 @@ struct AnnotationState {
 
     // 文本相关
     QString textFontFamily;
+    QFont::Weight textFontWeight = QFont::DemiBold;
+    bool textItalic = false;
     QColor textBackgroundColor = QColor(0, 0, 0, 0);
 };
 

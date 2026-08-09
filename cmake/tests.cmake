@@ -54,6 +54,31 @@ target_link_libraries(mark-shot-capture-session-screen-utils-test
 )
 add_test(NAME capture-session-screen-utils COMMAND mark-shot-capture-session-screen-utils-test)
 
+qt_add_executable(mark-shot-window-detection-session-test
+    tests/window_detection_session_test.cpp
+    src/window_detection_session.h
+)
+target_include_directories(mark-shot-window-detection-session-test PRIVATE src)
+target_link_libraries(mark-shot-window-detection-session-test
+    PRIVATE
+        Qt6::Core
+        Qt6::Test
+)
+add_test(NAME window-detection-session COMMAND mark-shot-window-detection-session-test)
+
+qt_add_executable(mark-shot-window-hover-selection-test
+    tests/window_hover_selection_test.cpp
+    src/window_hover_selection.cpp
+    src/window_hover_selection.h
+)
+target_include_directories(mark-shot-window-hover-selection-test PRIVATE src)
+target_link_libraries(mark-shot-window-hover-selection-test
+    PRIVATE
+        Qt6::Core
+        Qt6::Test
+)
+add_test(NAME window-hover-selection COMMAND mark-shot-window-hover-selection-test)
+
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(NAME packaging-configuration
     COMMAND ${CMAKE_COMMAND} -E env PYTHONDONTWRITEBYTECODE=1
