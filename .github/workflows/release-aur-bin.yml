@@ -356,15 +356,26 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
+          # AUR 停机维护期间 git/SSH 端会直接拒绝连接，此时包已经构建并上传到
+          # Release，只是 AUR 元数据没同步。把维护停机与真实错误区分开，避免
+          # 整个发布因为上游停机被标记为失败；恢复后重跑本工作流即可补推。
+          CLONE_LOG="$(mktemp)"
           for attempt in 1 2 3; do
-            if git clone ssh://aur@aur.archlinux.org/mark-shot-bin.git aur-bin-repo; then
+            # 输出重定向到文件后再回显，避免管道让 git 的退出码被 tee 覆盖
+            if git clone ssh://aur@aur.archlinux.org/mark-shot-bin.git aur-bin-repo > "$CLONE_LOG" 2>&1; then
+              cat "$CLONE_LOG"
               break
             fi
+            cat "$CLONE_LOG" >&2
             echo "AUR clone failed on attempt ${attempt}" >&2
             rm -rf aur-bin-repo
             sleep $((attempt * 10))
           done
           if [ ! -d aur-bin-repo/.git ]; then
+            if grep -qi 'down due to maintenance' "$CLONE_LOG"; then
+              echo "::warning::AUR is down for maintenance; mark-shot-bin was not published. Re-run this workflow once the AUR is back."
+              exit 0
+            fi
             echo "Failed to clone AUR repository mark-shot-bin" >&2
             exit 1
           fi
@@ -379,14 +390,21 @@ jobs:
           fi
 
           git -C aur-bin-repo commit -m "Update to ${{ steps.version.outputs.version }}-1"
+          PUSH_LOG="$(mktemp)"
           for attempt in 1 2 3; do
-            if git -C aur-bin-repo push origin master; then
+            if git -C aur-bin-repo push origin master > "$PUSH_LOG" 2>&1; then
+              cat "$PUSH_LOG"
               exit 0
             fi
+            cat "$PUSH_LOG" >&2
             echo "AUR push failed on attempt ${attempt}; rebasing and retrying" >&2
-            git -C aur-bin-repo fetch origin master
-            git -C aur-bin-repo rebase origin/master
+            git -C aur-bin-repo fetch origin master || true
+            git -C aur-bin-repo rebase origin/master || true
             sleep $((attempt * 10))
           done
+          if grep -qi 'down due to maintenance' "$PUSH_LOG"; then
+            echo "::warning::AUR is down for maintenance; mark-shot-bin was not published. Re-run this workflow once the AUR is back."
+            exit 0
+          fi
           echo "Failed to push AUR package mark-shot-bin" >&2
           exit 1
