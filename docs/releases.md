@@ -1,5 +1,12 @@
 # Release Notes
 
+### 0.1.46
+
+- **Faster Scroll Capture Stitching**: The stitcher grows the long image in place instead of repainting it from scratch on every frame, cutting a 1200x900, 120-frame benchmark from 46.2 ms to 1.68 ms per frame. Fixed headers and footers are detected from consecutive frames and kept exactly once, and overlap verification now excludes bands that are about to be trimmed, fixing footers being stitched into the middle of the long image.
+- **Blank Tray Icon**: Bitmap icons are now installed alongside the SVG and decode through the plugins bundled with Qt Base, so the tray no longer shows an empty slot on systems without the separate Qt SVG package. Every package now declares that package as a dependency.
+- **Global Shortcuts on X11**: Cinnamon, Xfce, MATE, and other X11 desktops do not implement the Wayland-oriented xdg-desktop-portal `GlobalShortcuts` interface, so registration failed with "no such interface". X11 sessions now grab keys directly from the X server, including under active NumLock or CapsLock.
+- **Arch Package FFmpeg Dependency**: Arch packages declared a bare `ffmpeg` dependency, so the FFmpeg 9 update left them passing the dependency check while failing to load `libavformat.so.62` at startup. Packages now declare versioned soname dependencies, so pacman refuses the install when the library generation does not match.
+
 ### 0.1.45
 
 - **Native Debian 13 and Ubuntu 24.04 Packages**: Added AMD64 and ARM64 packages built and verified inside their target distributions, avoiding FFmpeg and Qt dependency mismatches. The Linux package guide lists the correct artifact for each supported distribution.

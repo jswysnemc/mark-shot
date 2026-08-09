@@ -5,57 +5,12 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdarg>
-#include <limits>
 #include <vector>
 
 namespace markshot::scroll::stitcher_internal {
 
-
-/// @brief Ratio of frame height to ignore at the top of the content field.
-constexpr float kColTopIgnoreRatio = 0.10f;
-/// @brief Ratio of frame height to ignore at the bottom of the content field.
-constexpr float kColBottomIgnoreRatio = 0.08f;
-/// @brief Minimum number of pixels to ignore at the top or bottom of a frame.
-constexpr int kColMinIgnorePx = 16;
-/// @brief Maximum number of sample columns to inspect per row comparison.
-constexpr int kLineMaxSampleCols = 256;
-
-/// @brief Calculates the number of ignore pixels based on height and ratio.
-/// @param height The frame height.
-/// @param ratio The ignore ratio.
-/// @return The number of pixels to ignore.
-int scaledIgnore(int height, float ratio)
-{
-    if (height < 80) {
-        return 0;
-    }
-    return std::min(height / 4, std::max(kColMinIgnorePx, static_cast<int>(height * ratio)));
-}
-
-int contentTopIgnore(int height)
-{
-    return scaledIgnore(height, kColTopIgnoreRatio);
-}
-
-int contentBottomIgnore(int height)
-{
-    return scaledIgnore(height, kColBottomIgnoreRatio);
-}
-
-bool isContentRow(int y, int height)
-{
-    return y >= contentTopIgnore(height) && y < height - contentBottomIgnore(height);
-}
-
-bool shouldCropContentRows(int overlapLen, int frameHeight, int minOverlap)
-{
-    return overlapLen >= minOverlap + contentTopIgnore(frameHeight) + contentBottomIgnore(frameHeight);
-}
-
-int requiredComparedRows(int minOverlap, bool cropped)
-{
-    return cropped ? std::max(24, minOverlap / 2) : minOverlap;
-}
+// 分块转置的块边长,按缓存行友好取值
+constexpr int kTransposeBlock = 32;
 
 std::pair<int, int> bandRange(int width, float startRatio, float endRatio)
 {
@@ -83,105 +38,14 @@ int sideIgnoreWidth(int width)
     return std::min(wide, std::max(0, (width - 1) / 2));
 }
 
-float rowMeanAbsDiff(const QImage &a, int ay, const QImage &b, int by, int startX, int width)
-{
-    if (ay < 0 || ay >= a.height() || by < 0 || by >= b.height() || width <= 0) {
-        return kNoMatchConfidence;
-    }
-
-    const QRgb *aLine = reinterpret_cast<const QRgb *>(a.constScanLine(ay));
-    const QRgb *bLine = reinterpret_cast<const QRgb *>(b.constScanLine(by));
-    const int step = std::max(1, width / kLineMaxSampleCols);
-    float sum = 0.0f;
-    int count = 0;
-    for (int x = startX; x < startX + width; x += step) {
-        const QRgb ap = aLine[x];
-        const QRgb bp = bLine[x];
-        sum += std::abs(qRed(ap) - qRed(bp));
-        sum += std::abs(qGreen(ap) - qGreen(bp));
-        sum += std::abs(qBlue(ap) - qBlue(bp));
-        count += 3;
-    }
-    return count > 0 ? sum / static_cast<float>(count) : kNoMatchConfidence;
-}
-
-// Mean absolute difference of the overlapping region when cols2 (current frame)
-// is shifted down by `offset` relative to cols1 (previous frame). Low-value top
-// and bottom rows are ignored only when enough overlap remains.
-/// @brief Computes the difference metric between column vectors of two frames.
-/// @param cols1 The column pixel values of the first frame.
-/// @param cols2 The column pixel values of the second frame.
-/// @param offset The shift offset of the second frame relative to the first.
-/// @param minOverlap The minimum required overlap between the frames.
-/// @return The computed column difference score.
-float computeColDiff(const QVector<std::array<float, 3>> &cols1,
-                     const QVector<std::array<float, 3>> &cols2,
-                     int offset,
-                     int minOverlap)
-{
-    const int h1 = static_cast<int>(cols1.size());
-    const int h2 = static_cast<int>(cols2.size());
-    if (h1 == 0 || h2 == 0) {
-        return kNoMatchConfidence;
-    }
-
-    const int overlapLen = offset >= 0
-        ? std::min(h1 - offset, h2)
-        : std::min(h1, h2 + offset);
-    if (overlapLen < minOverlap) {
-        return kNoMatchConfidence;
-    }
-
-    const bool cropRows = shouldCropContentRows(overlapLen, std::min(h1, h2), minOverlap);
-    float sum = 0.0f;
-    int count = 0;
-    int rows = 0;
-
-    if (offset >= 0) {
-        const int len = std::min(h1 - offset, h2);
-        for (int i = 0; i < len; ++i) {
-            const int y1 = offset + i;
-            const int y2 = i;
-            if (cropRows && (!isContentRow(y1, h1) || !isContentRow(y2, h2))) {
-                continue;
-            }
-            ++rows;
-            for (int g = 0; g < 3; ++g) {
-                sum += std::abs(cols1[y1][g] - cols2[y2][g]);
-                ++count;
-            }
-        }
-    } else {
-        const int o = -offset;
-        const int len = std::min(h1, h2 - o);
-        for (int i = 0; i < len; ++i) {
-            const int y1 = i;
-            const int y2 = o + i;
-            if (cropRows && (!isContentRow(y1, h1) || !isContentRow(y2, h2))) {
-                continue;
-            }
-            ++rows;
-            for (int g = 0; g < 3; ++g) {
-                sum += std::abs(cols1[y1][g] - cols2[y2][g]);
-                ++count;
-            }
-        }
-    }
-
-    if (count == 0 || rows < requiredComparedRows(minOverlap, cropRows)) {
-        return kNoMatchConfidence;
-    }
-    return sum / static_cast<float>(count);
-}
-
 // Search order centred on the predicted offset, expanding outward:
 // [p, p+1, p-1, p+2, p-2, ...], clamped to [-max, +max]. Signed so reverse
 // scrolling (negative offsets) is searched too: the previous offset carries its
 // sign as the prediction centre, giving reverse momentum just like forward.
-/// @brief Generates search offsets centered on a predicted value.
-/// @param max The maximum search offset (defines search range [-max, max]).
-/// @param predict The predicted search center offset.
-/// @return A vector of integer offsets to search.
+/// @brief 生成以预测值为中心向两侧展开的搜索偏移序列。
+/// @param max 最大搜索偏移,范围为 [-max, max]。
+/// @param predict 预测的中心偏移。
+/// @return 按与预测值距离升序排列的偏移序列。
 std::vector<int> predictOffsetIter(int max, int predict)
 {
     const int m = std::max(0, max);
@@ -203,7 +67,7 @@ std::vector<int> predictOffsetIter(int max, int predict)
 // Swaps the X and Y axes of an image: (x, y) -> (y, x). Self-inverse. Used to
 // run the entire vertical stitching pipeline on horizontally-scrolled frames by
 // transposing on the way in and transposing the accumulated result on the way
-// out.
+// out. Walks the source in cache-friendly blocks.
 QImage transposeImage(const QImage &src)
 {
     if (src.isNull()) {
@@ -215,10 +79,24 @@ QImage transposeImage(const QImage &src)
     const int w = rgb.width();
     const int h = rgb.height();
     QImage dst(h, w, QImage::Format_ARGB32_Premultiplied);
-    for (int y = 0; y < h; ++y) {
-        const QRgb *srcLine = reinterpret_cast<const QRgb *>(rgb.scanLine(y));
-        for (int x = 0; x < w; ++x) {
-            reinterpret_cast<QRgb *>(dst.scanLine(x))[y] = srcLine[x];
+
+    // 1. 预先缓存目标行指针,避免内层循环反复调用 scanLine
+    std::vector<QRgb *> dstLines(static_cast<std::size_t>(w));
+    for (int x = 0; x < w; ++x) {
+        dstLines[static_cast<std::size_t>(x)] = reinterpret_cast<QRgb *>(dst.scanLine(x));
+    }
+
+    // 2. 按块遍历源图,块内行列互换,提升两侧访问的缓存局部性
+    for (int by = 0; by < h; by += kTransposeBlock) {
+        const int yEnd = std::min(by + kTransposeBlock, h);
+        for (int bx = 0; bx < w; bx += kTransposeBlock) {
+            const int xEnd = std::min(bx + kTransposeBlock, w);
+            for (int y = by; y < yEnd; ++y) {
+                const QRgb *srcLine = reinterpret_cast<const QRgb *>(rgb.constScanLine(y));
+                for (int x = bx; x < xEnd; ++x) {
+                    dstLines[static_cast<std::size_t>(x)][y] = srcLine[x];
+                }
+            }
         }
     }
     return dst;
@@ -268,6 +146,5 @@ void logStitchDebug(const char *format, ...)
     markshot::debugLogV("stitch", format, args);
     va_end(args);
 }
-
 
 }  // namespace markshot::scroll::stitcher_internal

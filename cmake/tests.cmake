@@ -149,6 +149,13 @@ qt_add_executable(mark-shot-stitcher-test
     src/scroll/stitcher_internal.cpp
     src/scroll/stitcher_internal.h
     src/scroll/stitcher_algorithm.cpp
+    src/scroll/stitcher_matching.cpp
+    src/scroll/stitcher_frame_profile.cpp
+    src/scroll/stitcher_frame_profile.h
+    src/scroll/stitcher_fixed_regions.cpp
+    src/scroll/stitcher_fixed_regions.h
+    src/scroll/stitcher_long_image.cpp
+    src/scroll/stitcher_long_image.h
 )
 target_include_directories(mark-shot-stitcher-test PRIVATE src)
 target_link_libraries(mark-shot-stitcher-test
@@ -158,3 +165,29 @@ target_link_libraries(mark-shot-stitcher-test
         Qt6::Test
 )
 add_test(NAME stitcher COMMAND mark-shot-stitcher-test)
+
+qt_add_executable(mark-shot-stitcher-fixed-regions-test
+    tests/stitcher_fixed_regions_test.cpp
+    src/debug_log.cpp
+    src/debug_log.h
+    src/scroll/stitcher.cpp
+    src/scroll/stitcher.h
+    src/scroll/stitcher_internal.cpp
+    src/scroll/stitcher_internal.h
+    src/scroll/stitcher_algorithm.cpp
+    src/scroll/stitcher_matching.cpp
+    src/scroll/stitcher_frame_profile.cpp
+    src/scroll/stitcher_frame_profile.h
+    src/scroll/stitcher_fixed_regions.cpp
+    src/scroll/stitcher_fixed_regions.h
+    src/scroll/stitcher_long_image.cpp
+    src/scroll/stitcher_long_image.h
+)
+target_include_directories(mark-shot-stitcher-fixed-regions-test PRIVATE src)
+target_link_libraries(mark-shot-stitcher-fixed-regions-test
+    PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Test
+)
+add_test(NAME stitcher-fixed-regions COMMAND mark-shot-stitcher-fixed-regions-test)

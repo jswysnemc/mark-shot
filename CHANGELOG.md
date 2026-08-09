@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.46 - 2026-08-10
+
+### Features & Enhancements
+
+- **Scroll Capture Stitching Rework**: The stitcher was split into focused modules — match search, row signatures, fixed-region detection, and an incremental long-image buffer — and the long image is now grown in place instead of being repainted from scratch on every frame. On a 1200x900, 120-frame benchmark, stitching dropped from 46.2 ms to 1.68 ms per frame. Fixed headers and footers are detected from consecutive frames and trimmed so each is kept exactly once, and overlap verification now excludes the fixed bands that are about to be trimmed, which is what previously caused footers to be stitched into the middle of the long image and content to be lost.
+- **X11 Global Shortcuts**: Global shortcuts now have a native X11 backend that grabs keys directly from the X server. The backend is selected by session type, with automatic fallback between the native and portal paths.
+
+### Bug Fixes
+
+- **Blank Tray Icon**: The application shipped only SVG icons, and the Qt SVG image plugin lives in a separate package (`qt6-svg` / `libqt6svg6`) that was never declared as a dependency. Without it, icon-theme lookup returned an unrenderable icon and the tray showed an empty slot. Bitmap icons are now installed in eight sizes and decode through the plugins bundled with Qt Base, the tray prefers a named theme icon so StatusNotifierItem hosts can render it themselves, and every package now declares the Qt SVG runtime.
+- **Global Shortcuts on X11 Desktops**: Registration failed on Cinnamon, Xfce, MATE, and other X11 desktops with "no such interface" because the only backend was the xdg-desktop-portal `GlobalShortcuts` interface, which is a Wayland-oriented API those desktops do not implement. X11 sessions now grab keys natively, including under active NumLock or CapsLock.
+- **Arch Package FFmpeg Dependency**: Arch packages declared a bare `ffmpeg` dependency, so the FFmpeg 9 update — which bumps every soname by one — left the package satisfying its dependency check while failing to load `libavformat.so.62` at startup. Packages now declare versioned soname dependencies, generated from the linked binaries for the prebuilt package, so pacman refuses the install outright when the library generation does not match.
+
 ## 0.1.45 - 2026-08-06
 
 ### Features & Enhancements

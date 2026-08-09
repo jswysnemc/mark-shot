@@ -75,16 +75,21 @@ class ReleaseFfmpegPolicyTest(unittest.TestCase):
         self.assertIn("ffmpeg-free-devel", rpm_job)
         self.assert_debian_ffmpeg_development_packages(aur_job)
         self.assertIn(FFMPEG_FLAG, aur_job)
-        self.assertIn("depend = ffmpeg", aur_job)
+        # 预编译包的 .PKGINFO 由 CI 手写，绕过了 makepkg 的 soname 依赖生成。
+        # 这里必须按实际链接的 soname 生成依赖，否则 FFmpeg 大版本升级后
+        # 旧包仍能通过依赖检查却无法加载库。
+        self.assertIn("arch-soname-depends.sh", aur_job)
+        self.assertNotIn("depend = ffmpeg", aur_job)
 
     def test_package_manifests_require_ffmpeg(self) -> None:
-        """验证 RPM、Nix、Flatpak 与 AUR 二进制清单声明 FFmpeg。"""
+        """验证 RPM、Nix、Flatpak 与 AUR 清单声明 FFmpeg。"""
         rpm_spec = read_repository_file("packaging/rpm/mark-shot.spec")
         flake = read_repository_file("flake.nix")
         flatpak = read_repository_file(
             "packaging/flatpak/io.github.jswysnemc.MarkShot.yml"
         )
         aur_bin = read_repository_file("packaging/aur_bin/PKGBUILD")
+        aur_source = read_repository_file("packaging/aur/PKGBUILD")
 
         for component in (
             "libavcodec",
@@ -103,7 +108,20 @@ class ReleaseFfmpegPolicyTest(unittest.TestCase):
         self.assertIn("directory: lib/ffmpeg", flatpak)
         self.assertIn("add-ld-path: .", flatpak)
         self.assertIn("no-autodownload: false", flatpak)
-        self.assertRegex(aur_bin, r"(?m)^depends=.*'ffmpeg'")
+
+        # PKGBUILD 声明 .so 名而不是裸包名 'ffmpeg'：makepkg 会把它展开为
+        # libavformat.so=62-64 形式，FFmpeg 大版本升级后 pacman 直接判定
+        # 依赖不满足，而不是让用户装上一个跑不起来的包。
+        for pkgbuild in (aur_bin, aur_source):
+            for library in (
+                "libavcodec.so",
+                "libavformat.so",
+                "libavutil.so",
+                "libswresample.so",
+                "libswscale.so",
+            ):
+                self.assertRegex(pkgbuild, rf"(?ms)^depends=.*'{re.escape(library)}'")
+            self.assertNotRegex(pkgbuild, r"(?m)^depends=.*'ffmpeg'")
 
 
 if __name__ == "__main__":

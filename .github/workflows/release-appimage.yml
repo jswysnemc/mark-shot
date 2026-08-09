@@ -97,6 +97,7 @@ jobs:
             pkg-config \
             qt6-base-dev \
             qt6-base-dev-tools \
+            qt6-svg-dev \
             qt6-tools-dev-tools \
             qt6-wayland-dev \
             wget

@@ -2,6 +2,14 @@
   <qresource prefix="/icons">
     <file alias="mark-shot.ico">packaging/windows/mark-shot.ico</file>
     <file alias="mark-shot.svg">data/icons/hicolor/scalable/apps/mark-shot.svg</file>
+    <file alias="mark-shot-16.png">data/icons/hicolor/16x16/apps/mark-shot.png</file>
+    <file alias="mark-shot-22.png">data/icons/hicolor/22x22/apps/mark-shot.png</file>
+    <file alias="mark-shot-24.png">data/icons/hicolor/24x24/apps/mark-shot.png</file>
+    <file alias="mark-shot-32.png">data/icons/hicolor/32x32/apps/mark-shot.png</file>
+    <file alias="mark-shot-48.png">data/icons/hicolor/48x48/apps/mark-shot.png</file>
+    <file alias="mark-shot-64.png">data/icons/hicolor/64x64/apps/mark-shot.png</file>
+    <file alias="mark-shot-128.png">data/icons/hicolor/128x128/apps/mark-shot.png</file>
+    <file alias="mark-shot-256.png">data/icons/hicolor/256x256/apps/mark-shot.png</file>
     <file alias="chevron-down.svg">data/icons/chevron-down.svg</file>
     <file alias="chevron-up.svg">data/icons/chevron-up.svg</file>
   </qresource>

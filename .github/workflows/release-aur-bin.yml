@@ -186,7 +186,25 @@ jobs:
               PKGDESC="Qt 6 screenshot tool (prebuilt Ubuntu aarch64 binary; prefer source package mark-shot on Arch aarch64)"
               EXTRA_NOTE="optdepend = mark-shot: preferred source package on Arch aarch64 when runtime libraries mismatch"
           fi
-          FFMPEG_DEP="depend = ffmpeg"
+
+          # FFmpeg 大版本升级会把 soname 整体 +1（libavformat.so.62 -> .so.63），
+          # 只声明裸包名时旧包仍然“满足”依赖检查却链接不上。
+          # 这里按实际链接的 soname 生成 libavformat.so=62-64 形式的依赖，
+          # 让 pacman 在库代际不匹配时直接拒绝安装。
+          chmod +x scripts/arch-soname-depends.sh
+          FFMPEG_DEP=""
+          while IFS= read -r sodep; do
+              [ -n "$sodep" ] || continue
+              FFMPEG_DEP="${FFMPEG_DEP}depend = ${sodep}"$'\n'
+          done < <(./scripts/arch-soname-depends.sh --root "$STAGE/usr" --filter '^lib(av|sw)')
+          if [ -z "$FFMPEG_DEP" ]; then
+              echo "No FFmpeg soname dependencies were detected in the install tree" >&2
+              exit 1
+          fi
+          # 去掉结尾换行，避免 .PKGINFO 中出现空行
+          FFMPEG_DEP="${FFMPEG_DEP%$'\n'}"
+          echo "Detected FFmpeg soname dependencies:"
+          printf '%s\n' "$FFMPEG_DEP"
 
           cat > "$STAGE/.PKGINFO" <<EOF
           pkgname = mark-shot-bin
@@ -199,6 +217,7 @@ jobs:
           arch = ${ARCH}
           license = MIT
           depend = qt6-base
+          depend = qt6-svg
           depend = qt6-wayland
           ${LAYER_SHELL_DEP}
           ${FFMPEG_DEP}

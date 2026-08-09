@@ -1,5 +1,5 @@
 Name:           mark-shot
-Version:        0.1.45
+Version:        0.1.46
 Release:        1%{?dist}
 Summary:        Qt 6 screenshot selection and annotation tool
 
@@ -30,6 +30,9 @@ BuildRequires:  pkgconfig(xcb)
 
 Requires:       python3
 Requires:       qt6-qtwayland
+# qt6-qtsvg 提供 qsvg 图像插件与 qsvgicon 图标引擎，Qt 运行时按需加载，
+# 自动依赖生成器扫不出来；缺失时设置界面的 SVG 图标无法渲染
+Requires:       qt6-qtsvg
 Requires:       grim
 Requires:       wl-clipboard
 Recommends:     xclip
@@ -84,9 +87,14 @@ sed -i '1s|^#!/usr/bin/env python3$|#!/usr/bin/python3|' \
 %{_datadir}/applications/net.local.mark-shot.desktop
 %{_datadir}/icons/hicolor/scalable/apps/mark-shot.svg
 %{_datadir}/icons/hicolor/scalable/apps/mark-shot-edit.svg
+%{_datadir}/icons/hicolor/*x*/apps/mark-shot.png
+%{_datadir}/icons/hicolor/*x*/apps/mark-shot-edit.png
 %{_datadir}/gnome-shell/extensions/mark-shot-scroll-helper@snemc.org/
 
 %changelog
+* Mon Aug 10 2026 jswysnemc <snemc@qq.com> - 0.1.46-1
+- Update to version 0.1.46
+
 * Thu Aug 06 2026 jswysnemc <snemc@qq.com> - 0.1.45-1
 - Update to version 0.1.45
 

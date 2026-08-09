@@ -51,6 +51,16 @@ if(MARK_SHOT_LINUX)
         data/icons/hicolor/scalable/apps/mark-shot-edit.svg
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
     )
+    # 位图图标由 qt6-base 自带的图像插件解码，不依赖独立的 Qt SVG 包
+    # （qt6-svg / libqt6svg6）。只安装 SVG 时，缺少该包的环境下图标主题查找
+    # 会得到无法渲染的空图标，系统托盘因此显示为空白。
+    foreach(icon_size 16 22 24 32 48 64 128 256)
+        install(FILES
+            data/icons/hicolor/${icon_size}x${icon_size}/apps/mark-shot.png
+            data/icons/hicolor/${icon_size}x${icon_size}/apps/mark-shot-edit.png
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${icon_size}x${icon_size}/apps
+        )
+    endforeach()
     install(DIRECTORY
         packaging/gnome-extension/mark-shot-scroll-helper@snemc.org/
         DESTINATION ${CMAKE_INSTALL_DATADIR}/gnome-shell/extensions/mark-shot-scroll-helper@snemc.org

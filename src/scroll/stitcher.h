@@ -1,9 +1,11 @@
 #pragma once
 
-#include <QImage>
-#include <QVector>
+#include "scroll/stitcher_fixed_regions.h"
+#include "scroll/stitcher_frame_profile.h"
+#include "scroll/stitcher_long_image.h"
 
-#include <array>
+#include <QImage>
+
 #include <utility>
 
 // Scrolling screenshot stitcher. Accumulates frames captured while the user
@@ -73,7 +75,8 @@ public:
     StitchResult pushFrame(const QImage &frame);
 
     // The accumulated tall image (ARGB32_Premultiplied), or a null image before
-    // the first frame.
+    // the first frame. Cached per long-image revision, including the transposed
+    // variant for horizontal sessions.
     QImage fullImage() const;
 
     StitchStats stats() const;
@@ -89,47 +92,45 @@ public:
     bool axisLocked() const;
 
 private:
-    // Three luminance samples per row in the normalized vertical pipeline.
-    // The samples are cheap to compare and are resilient to detailed page text.
-    using ColSamples = QVector<std::array<float, 3>>;
-
-    // Pixel-row fallback match used when column samples are ambiguous near the
-    // bottom edge, typically because a sticky footer was captured in both frames.
+    // Pixel-row fallback match used when column samples are ambiguous near an
+    // edge, typically because sticky chrome was captured in both frames. The
+    // trim is the stale fixed band to cut from the matching edge of the long
+    // image: bottom rows for End matches, top rows for Start matches.
     struct EdgeLineMatch {
         int position = 0;
         float diff = kNoMatchConfidence;
-        int bottomTrim = 0;
+        int trim = 0;
         int matchedRows = 0;
+        StitchEdge edge = StitchEdge::None;
     };
 
-    // Builds row signatures used by all overlap searches.
-    ColSamples computeCols(const QImage &frame) const;
     // Finds the current frame offset relative to the previous captured frame.
-    std::pair<int, float> findOffsetColSample(const QImage &frame) const;
-    // Scores a frame placed at an absolute position inside the full image.
-    float knownOverlapDiff(const ColSamples &frameCols, int framePos, int *overlapLen = nullptr) const;
+    std::pair<int, float> findOffsetColSample(const ColSamples &frameCols) const;
+    // Scores a frame placed at an absolute position inside the full image. The
+    // exclude arguments drop the long image's stale fixed bands (about to be
+    // trimmed by the pending append/prepend) from the comparison.
+    float knownOverlapDiff(const ColSamples &frameCols, int framePos, int *overlapLen = nullptr,
+                           int fullTopExclude = 0, int fullBottomExclude = 0) const;
     // Recovers from a bad adjacent-frame match by searching already-stitched content.
     std::pair<int, float> findKnownPosition(const ColSamples &frameCols, int predictedPos) const;
     // Searches placements that reveal new content past either edge of the full image.
     std::pair<int, float> findEdgePosition(const ColSamples &frameCols, int predictedPos) const;
     // Exact row-run fallback for edge matches with repeated bottom chrome.
     EdgeLineMatch findLineRunPosition(const QImage &frame, int predictedPos) const;
-    // Appends the bottom `amount` rows of `frame` below the accumulated image
-    // (forward scroll); prependSlice puts the top `amount` rows above it
-    // (reverse scroll).
-    void appendSlice(const QImage &frame, int amount, int trimBottom = 0);
-    void prependSlice(const QImage &frame, int amount);
-    void rememberFrame(const QImage &frame);
+    // Seeds the long image from the first accepted frame.
+    StitchResult initializeSeed(const QImage &frame, const ColSamples &frameCols);
+    void rememberFrame(const QImage &frame, const ColSamples &frameCols);
 
     StitchConfig m_config;
     ScrollAxis m_axis = ScrollAxis::Vertical;
     bool m_axisLocked = false;  // true once the first directional stitch lands
-    QImage m_full;
+    LongImage m_long;
     QImage m_lastFrame;
-    ColSamples m_fullCols;
     ColSamples m_lastCols;
+    FixedRegionDetector m_fixedRegions;
     int m_lastOffset = 0;
     int m_bestBottomTrim = 0;
+    int m_bestTopTrim = 0;
     StitchEdge m_pendingEdge = StitchEdge::None;
     StitchEdge m_growthEdge = StitchEdge::None;
     // Absolute position of the anchor frame's top edge within the long image,
@@ -139,6 +140,9 @@ private:
     // appended/prepended only when the frame sees past an end of the long image.
     int m_anchorPos = 0;
     StitchStats m_stats;
+    mutable QImage m_fullCache;
+    mutable quint64 m_fullCacheRevision = 0;
+    mutable bool m_fullCacheValid = false;
 };
 
 }  // namespace markshot::scroll

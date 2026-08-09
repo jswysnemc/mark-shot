@@ -96,7 +96,9 @@ fi
 
 # 2. 合并所有 so 的共享库依赖
 SHLIB_DEPS="$(dpkg-shlibdeps -O "${SHLIB_ARGS[@]}" | sed 's/^shlibs:Depends=//')"
-MANUAL_DEPS="python3"
+# Qt SVG 提供 qsvg 图像插件与 qsvgicon 图标引擎，由 Qt 运行时按需加载而非直接
+# 链接，dpkg-shlibdeps 扫不出来。缺少它时设置界面的 SVG 图标无法渲染。
+MANUAL_DEPS="libqt6svg6, python3"
 RECOMMENDS="python3-venv, xdg-desktop-portal, pipewire, qt6-wayland, grim, wl-clipboard, xclip"
 SUGGESTS="gnome-shell, tesseract-ocr, tesseract-ocr-chi-sim, python3-rapidocr, python3-zxing-cpp, python3-pil"
 

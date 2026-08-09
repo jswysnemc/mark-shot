@@ -2,8 +2,8 @@
 
 #include "config_value.h"
 #include "debug_log.h"
-#if defined(MARK_SHOT_WITH_DBUS)
-#include "global_shortcut_portal.h"
+#if !defined(Q_OS_WIN)
+#include "shortcuts/global_shortcut_manager.h"
 #endif
 #include "recording/recording_session_manager.h"
 #include "recording/recording_start_flow.h"
@@ -11,6 +11,7 @@
 #include "recording/recording_status.h"
 #include "settings/settings_dialog.h"
 #include "shot_window.h"
+#include "ui/application_icon.h"
 #include "ui/i18n.h"
 #include "ui/icons.h"
 #include "window_detection.h"
@@ -215,6 +216,24 @@ QString recordingStatusText(const markshot::recording::RecordingStatus &status)
         .arg(recordingModeLabel(status.mode), formatRecordingElapsed(status.elapsedMs));
 }
 
+/**
+ * 返回系统托盘使用的图标。
+ *
+ * Linux 托盘走 StatusNotifierItem 协议时，Qt 会优先把 QIcon::name() 作为图标名
+ * 发给托盘宿主，只有名字为空才退回传像素数据。部分宿主实现拿不到有效像素就显示
+ * 空白，因此这里在主题可解析时显式构造带名字的图标，让宿主自行按名渲染。
+ *
+ * @return 托盘图标。
+ */
+QIcon trayIcon()
+{
+    const QString themeName = markshot::ui::applicationIconThemeName();
+    if (!themeName.isEmpty()) {
+        return QIcon::fromTheme(themeName);
+    }
+    return markshot::ui::applicationIcon();
+}
+
 #if defined(Q_OS_WIN)
 
 /// @brief Native Windows hotkey components derived from a Qt key sequence.
@@ -325,10 +344,8 @@ bool WindowsTrayController::hotkeysSupported()
 {
 #if defined(Q_OS_WIN)
     return true;
-#elif defined(MARK_SHOT_WITH_DBUS)
-    return GlobalShortcutPortal::isAvailable();
 #else
-    return false;
+    return shortcuts::GlobalShortcutManager::isAvailable();
 #endif
 }
 
@@ -374,8 +391,7 @@ bool WindowsTrayController::start()
 
     m_application->setQuitOnLastWindowClosed(false);
 
-    const QIcon icon = markshot::ui::applicationIcon();
-    m_application->setWindowIcon(icon);
+    m_application->setWindowIcon(markshot::ui::applicationIcon());
 
     m_menu = new QMenu;
     m_menu->addAction(MS_TR("Capture"), this, [this] { triggerCapture(); });
@@ -402,7 +418,7 @@ bool WindowsTrayController::start()
         m_application->quit();
     });
 
-    m_tray = new QSystemTrayIcon(icon, this);
+    m_tray = new QSystemTrayIcon(trayIcon(), this);
     m_tray->setToolTip(QStringLiteral("Mark Shot"));
     m_tray->setContextMenu(m_menu);
     connect(m_tray, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
@@ -631,43 +647,45 @@ void WindowsTrayController::registerHotkeys()
     }
     registerSequence(kStopRecordingHotkeyId, m_config.stopRecordingHotkey, &m_stopRecordingHotkeyRegistered);
     registerSequence(kPauseRecordingHotkeyId, m_config.pauseRecordingHotkey, &m_pauseRecordingHotkeyRegistered);
-#elif defined(MARK_SHOT_WITH_DBUS)
-    QList<GlobalShortcutPortal::Shortcut> shortcuts;
+#else
+    QList<shortcuts::Shortcut> shortcutList;
     if (!m_config.captureHotkey.isEmpty()) {
-        shortcuts.append({QStringLiteral("capture"),
-                          MS_TR("Capture"),
-                          m_config.captureHotkey,
-                          [this] { triggerCapture(); }});
+        shortcutList.append({QStringLiteral("capture"),
+                             MS_TR("Capture"),
+                             m_config.captureHotkey,
+                             [this] { triggerCapture(); }});
     }
     if (!m_config.fullscreenHotkey.isEmpty() && m_config.fullscreenHotkey != m_config.captureHotkey) {
-        shortcuts.append({QStringLiteral("fullscreen"),
-                          MS_TR("Fullscreen Capture"),
-                          m_config.fullscreenHotkey,
-                          [this] { triggerFullscreenCapture(); }});
+        shortcutList.append({QStringLiteral("fullscreen"),
+                             MS_TR("Fullscreen Capture"),
+                             m_config.fullscreenHotkey,
+                             [this] { triggerFullscreenCapture(); }});
     }
 
     if (!m_config.stopRecordingHotkey.isEmpty()) {
-        shortcuts.append({QStringLiteral("stop-recording"),
-                          MS_TR("Stop Recording"),
-                          m_config.stopRecordingHotkey,
-                          [this] { stopRecordingFromTray(); }});
+        shortcutList.append({QStringLiteral("stop-recording"),
+                             MS_TR("Stop Recording"),
+                             m_config.stopRecordingHotkey,
+                             [this] { stopRecordingFromTray(); }});
     }
     if (!m_config.pauseRecordingHotkey.isEmpty()) {
-        shortcuts.append({QStringLiteral("pause-recording"),
-                          MS_TR("Pause Recording"),
-                          m_config.pauseRecordingHotkey,
-                          [this] { togglePauseRecordingFromTray(); }});
+        shortcutList.append({QStringLiteral("pause-recording"),
+                             MS_TR("Pause Recording"),
+                             m_config.pauseRecordingHotkey,
+                             [this] { togglePauseRecordingFromTray(); }});
     }
 
-    if (!m_globalShortcutPortal) {
-        m_globalShortcutPortal = new GlobalShortcutPortal(this);
+    if (!m_globalShortcuts) {
+        m_globalShortcuts = new shortcuts::GlobalShortcutManager(this);
     }
-    if (m_globalShortcutPortal->registerShortcuts(shortcuts)) {
-        markshot::debugLog("tray", "【托盘】【全局快捷键】registered through xdg-desktop-portal");
+    if (m_globalShortcuts->registerShortcuts(shortcutList)) {
+        markshot::debugLog("tray",
+                           "【托盘】【全局快捷键】registered through %s backend",
+                           m_globalShortcuts->activeBackendName().toUtf8().constData());
         return;
     }
 
-    m_errorString = m_globalShortcutPortal->errorString();
+    m_errorString = m_globalShortcuts->errorString();
     if (m_errorString.isEmpty()) {
         m_errorString = MS_TR("Global hotkeys are not supported on this platform. "
                               "Use the tray menu or bind a desktop shortcut instead.");
@@ -677,15 +695,6 @@ void WindowsTrayController::registerHotkeys()
                        m_errorString.toUtf8().constData());
     if (m_tray) {
         m_tray->showMessage(QStringLiteral("Mark Shot"), m_errorString, QSystemTrayIcon::Information, 5000);
-    }
-#else
-    m_errorString = MS_TR("Global hotkeys are not supported on this platform. "
-                          "Use the tray menu or bind a desktop shortcut instead.");
-    markshot::debugLog("tray",
-                       "【托盘】【全局快捷键】registration failed: %s",
-                       m_errorString.toUtf8().constData());
-    if (m_tray) {
-        m_tray->showMessage(QStringLiteral("Mark Shot"), m_errorString, QSystemTrayIcon::Information, 4000);
     }
 #endif
 }
@@ -713,9 +722,9 @@ void WindowsTrayController::unregisterHotkeys()
         m_application->removeNativeEventFilter(this);
         m_nativeEventFilterInstalled = false;
     }
-#elif defined(MARK_SHOT_WITH_DBUS)
-    if (m_globalShortcutPortal) {
-        m_globalShortcutPortal->unregisterShortcuts();
+#else
+    if (m_globalShortcuts) {
+        m_globalShortcuts->unregisterShortcuts();
     }
 #endif
 }

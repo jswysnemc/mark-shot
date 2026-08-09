@@ -157,7 +157,7 @@ Mark Shot 在 Linux 上从 `~/.config/mark-shot/config.json` 读取应用配置�
 | `export.imageFrame` | 布尔值/对象 | `false` | 用户分享类导出的可选 Mac 风格外框。对象形式支持 `enabled`、`padding` (`0`-`256`，默认 `112`)、`cornerRadius` (`0`-`128`，默认 `18`)、`shadowRadius` (`0`-`128`，默认 `72`)、`shadowOffsetY` (`0`-`128`，默认 `28`) 和 `shadowOpacity` (`0.0`-`1.0`，默认 `0.32`)。作用于保存、另存为、复制、上传、打开方式和扩展命令图片；OCR、扫码、贴图、快速显示器截图和滚动截图保持原始图片。设置 `enabled` 为 `true` 后启用外框导出。 |
 | `shortcuts` | 对象 | - | 自定义快捷键配置。别名：`hotkeys`（或在 `annotation.shortcuts` / `annotation.hotkeys` 下）。详细子节点见折叠说明。 |
 | `windows.tray.enabled` | 布尔值 | Windows 为 `true`，其他平台为 `false` | 自动启动托盘模式。键名出于兼容性保留。可以用 `mark-shot --tray` 在不修改配置时启动托盘模式，也可以用 `mark-shot --capture` 在自动启动托盘时强制执行单次截图。 |
-| `windows.hotkeys.capture` | 字符串 | `"Ctrl+Alt+S"` | 托盘模式运行时触发区域截图的全局快捷键。Windows 使用 RegisterHotKey，支持的 Linux 桌面使用 desktop portal。别名包括 `hotkey`、`captureHotkey` 和 `screenshot` |
+| `windows.hotkeys.capture` | 字符串 | `"Ctrl+Alt+S"` | 托盘模式运行时触发区域截图的全局快捷键。Windows 使用 RegisterHotKey，X11 会话直接向 X 服务器抓取按键，Wayland 会话使用 desktop portal。别名包括 `hotkey`、`captureHotkey` 和 `screenshot` |
 | `windows.hotkeys.fullscreen` | 字符串 | `""` | 可选的全屏标注截图全局快捷键。别名：`fullscreenHotkey`。默认生成配置只写入区域截图快捷键。 |
 | `windows.hotkeys.stopRecording` | 字符串 | `""` | 可选的停止当前录制全局快捷键。别名包括 `stopRecordingHotkey` 与 `recordingStop`。 |
 | `windows.hotkeys.pauseRecording` | 字符串 | `""` | 可选的暂停与继续录制全局快捷键。别名包括 `pauseRecordingHotkey` 与 `recordingPause`。 |

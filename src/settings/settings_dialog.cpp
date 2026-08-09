@@ -15,6 +15,7 @@
 #include "settings/settings_page_shortcuts.h"
 #include "settings/settings_page_storage.h"
 #include "ui/i18n.h"
+#include "ui/application_icon.h"
 #include "ui/icons.h"
 #include "ui/interface_theme_config.h"
 

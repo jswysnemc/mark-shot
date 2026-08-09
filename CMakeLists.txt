@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(mark-shot VERSION 0.1.45 LANGUAGES C CXX)
+project(mark-shot VERSION 0.1.46 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -211,6 +211,13 @@ qt_add_executable(mark-shot
     src/scroll/stitcher_internal.cpp
     src/scroll/stitcher_internal.h
     src/scroll/stitcher_algorithm.cpp
+    src/scroll/stitcher_matching.cpp
+    src/scroll/stitcher_frame_profile.cpp
+    src/scroll/stitcher_frame_profile.h
+    src/scroll/stitcher_fixed_regions.cpp
+    src/scroll/stitcher_fixed_regions.h
+    src/scroll/stitcher_long_image.cpp
+    src/scroll/stitcher_long_image.h
     src/scroll/scroll_session_window.cpp
     src/scroll/scroll_session_window_capture.cpp
     src/scroll/scroll_session_window_events.cpp
@@ -218,6 +225,8 @@ qt_add_executable(mark-shot
     src/scroll/scroll_session_window_internal.h
     src/scroll/scroll_session_window_lifecycle.cpp
     src/scroll/scroll_session_window_preview.cpp
+    src/ui/application_icon.cpp
+    src/ui/application_icon.h
     src/ui/color_picker.cpp
     src/ui/color_picker.h
     src/ui/color_history_store.cpp
@@ -273,12 +282,24 @@ if(MARK_SHOT_LINUX)
         PRIVATE
             src/global_shortcut_portal.cpp
             src/global_shortcut_portal.h
+            src/shortcuts/global_shortcut_backend.h
+            src/shortcuts/global_shortcut_keymap.cpp
+            src/shortcuts/global_shortcut_keymap.h
+            src/shortcuts/global_shortcut_manager.cpp
+            src/shortcuts/global_shortcut_manager.h
     )
     target_link_libraries(mark-shot PRIVATE Qt6::DBus)
     target_compile_definitions(mark-shot PRIVATE MARK_SHOT_WITH_DBUS)
 endif()
 
 if(MARK_SHOT_LINUX AND X11_xcb_FOUND)
+    # X11 会话下 xdg-desktop-portal 普遍不实现 GlobalShortcuts 接口，
+    # 由该后端直接向 X 服务器抓取按键
+    target_sources(mark-shot
+        PRIVATE
+            src/shortcuts/global_shortcut_x11.cpp
+            src/shortcuts/global_shortcut_x11.h
+    )
     target_link_libraries(mark-shot PRIVATE X11::xcb)
     target_compile_definitions(mark-shot PRIVATE HAVE_XCB)
 endif()
@@ -674,6 +695,20 @@ if(BUILD_TESTING)
             Qt6::Test
     )
     add_test(NAME ui-theme-config COMMAND mark-shot-ui-theme-config-test)
+
+    qt_add_executable(mark-shot-global-shortcut-keymap-test
+        tests/global_shortcut_keymap_test.cpp
+        src/shortcuts/global_shortcut_keymap.cpp
+        src/shortcuts/global_shortcut_keymap.h
+    )
+    target_include_directories(mark-shot-global-shortcut-keymap-test PRIVATE src)
+    target_link_libraries(mark-shot-global-shortcut-keymap-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+    )
+    add_test(NAME global-shortcut-keymap COMMAND mark-shot-global-shortcut-keymap-test)
 
     include(cmake/tests.cmake)
     include(cmake/release_tests.cmake)

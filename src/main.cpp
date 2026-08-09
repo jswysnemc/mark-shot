@@ -11,6 +11,7 @@
 #include "recording/ui/recording_overlay_service.h"
 #include "shot_window.h"
 #include "startup_config.h"
+#include "ui/application_icon.h"
 #include "ui/icons.h"
 #include "ui/i18n.h"
 #include "ui/theme.h"
