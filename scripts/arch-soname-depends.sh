@@ -56,13 +56,19 @@ ELF_COUNT=0
 
 # 1. 遍历安装树中的所有可执行 ELF 文件，收集 DT_NEEDED 条目
 while IFS= read -r -d '' filename; do
-    # readelf -h 读不到 ELF Class 说明不是 ELF 文件，跳过
-    soarch="$(LC_ALL=C readelf -h "$filename" 2>/dev/null | sed -n 's/.*Class.*ELF\(32\|64\)/\1/p')"
-    [[ -n "$soarch" ]] || continue
+    # readelf -h 读不到 ELF Class 说明不是 ELF 文件（脚本、数据文件等），跳过。
+    # readelf 对非 ELF 文件返回非零，在 set -e -o pipefail 下会让这条赋值语句
+    # 直接终止脚本，所以显式接住失败并置空。
+    soarch="$(LC_ALL=C readelf -h "$filename" 2>/dev/null | sed -n 's/.*Class.*ELF\(32\|64\)/\1/p')" || soarch=""
+    if [[ -z "$soarch" ]]; then
+        continue
+    fi
     ELF_COUNT=$((ELF_COUNT + 1))
 
     while IFS= read -r sofile; do
-        [[ -n "$sofile" ]] || continue
+        if [[ -z "$sofile" ]]; then
+            continue
+        fi
         # 2. 按 makepkg 规则拆出库名与主版本：libavformat.so.62 -> libavformat.so + 62
         case "$sofile" in
             *.so.*)
@@ -75,7 +81,9 @@ while IFS= read -r -d '' filename; do
         esac
         # 只接受纯数字主版本，形如 libfoo.so.1.2 的次版本一并忽略
         soversion="${soversion%%.*}"
-        [[ "$soversion" =~ ^[0-9]+$ ]] || continue
+        if [[ ! "$soversion" =~ ^[0-9]+$ ]]; then
+            continue
+        fi
 
         entry="${soversion}-${soarch}"
         if [[ -n "${LIBDEPS[$soname]:-}" ]]; then
@@ -86,7 +94,7 @@ while IFS= read -r -d '' filename; do
             LIBDEPS[$soname]="$entry"
         fi
     done < <(LC_ALL=C readelf -d "$filename" 2>/dev/null \
-        | sed -nr 's/.*Shared library: \[(.*)\].*/\1/p')
+        | sed -nr 's/.*Shared library: \[(.*)\].*/\1/p' || true)
 done < <(find "$ROOT" -type f -perm -u+x -print0)
 
 # 安装树里一个 ELF 都没有，通常意味着传错了目录或安装步骤没执行

@@ -192,18 +192,21 @@ jobs:
           # 这里按实际链接的 soname 生成 libavformat.so=62-64 形式的依赖，
           # 让 pacman 在库代际不匹配时直接拒绝安装。
           chmod +x scripts/arch-soname-depends.sh
-          SONAME_OUTPUT="$(./scripts/arch-soname-depends.sh --root "$STAGE/usr" --filter '^lib(av|sw)')"
+          # 单独捕获退出码：脚本失败时先打印安装树内容再退出，便于定位
+          SONAME_STATUS=0
+          SONAME_OUTPUT="$(./scripts/arch-soname-depends.sh --root "$STAGE/usr" --filter '^lib(av|sw)')" \
+              || SONAME_STATUS=$?
+          if [ "$SONAME_STATUS" -ne 0 ] || [ -z "$SONAME_OUTPUT" ]; then
+              echo "Failed to detect FFmpeg soname dependencies (exit ${SONAME_STATUS})" >&2
+              echo "Install tree contents:" >&2
+              find "$STAGE/usr" -type f -perm -u+x -exec ls -l {} + >&2 || true
+              exit 1
+          fi
           FFMPEG_DEP=""
           while IFS= read -r sodep; do
               [ -n "$sodep" ] || continue
               FFMPEG_DEP="${FFMPEG_DEP}depend = ${sodep}"$'\n'
           done <<< "$SONAME_OUTPUT"
-          if [ -z "$FFMPEG_DEP" ]; then
-              echo "No FFmpeg soname dependencies were detected in the install tree" >&2
-              echo "Install tree contents:" >&2
-              find "$STAGE/usr" -type f -perm -u+x -exec ls -l {} + >&2 || true
-              exit 1
-          fi
           # 去掉结尾换行，避免 .PKGINFO 中出现空行
           FFMPEG_DEP="${FFMPEG_DEP%$'\n'}"
           echo "Detected FFmpeg soname dependencies:"
