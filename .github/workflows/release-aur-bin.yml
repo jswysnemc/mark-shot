@@ -285,7 +285,7 @@ jobs:
       - name: Resolve tag
         id: version
         run: |
-          TAG="${{ github.event.release.tag_name || github.ref_name }}"
+          TAG="${{ github.event.release.tag_name || inputs.tag || github.ref_name }}"
           if [ -z "$TAG" ]; then
             echo "No release tag was provided" >&2
             exit 1
