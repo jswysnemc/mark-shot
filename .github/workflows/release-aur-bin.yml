@@ -22,6 +22,11 @@ on:
         required: false
         default: false
         type: boolean
+      push_to_aur:
+        description: 'Publish mark-shot-bin to the AUR (use to retry after an AUR maintenance window)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -273,7 +278,8 @@ jobs:
     name: Push mark-shot-bin to AUR
     runs-on: ubuntu-latest
     needs: pkg
-    if: github.event_name == 'push' || github.event_name == 'release'
+    # AUR 停机维护会让自动发布跳过推送，push_to_aur 用于服务恢复后手动补推
+    if: github.event_name == 'push' || github.event_name == 'release' || inputs.push_to_aur
 
     steps:
       - name: Resolve tag
