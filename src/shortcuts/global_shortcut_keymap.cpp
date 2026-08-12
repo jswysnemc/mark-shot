@@ -27,6 +27,7 @@ constexpr std::uint32_t kKeysymPageUp = 0xff55;
 constexpr std::uint32_t kKeysymPageDown = 0xff56;
 constexpr std::uint32_t kKeysymEnd = 0xff57;
 constexpr std::uint32_t kKeysymPrint = 0xff61;
+constexpr std::uint32_t kKeysymSysReq = 0xff15;
 constexpr std::uint32_t kKeysymInsert = 0xff63;
 constexpr std::uint32_t kKeysymNumLock = 0xff7f;
 constexpr std::uint32_t kKeysymF1 = 0xffbe;
@@ -211,13 +212,33 @@ X11KeyBinding x11BindingForSequence(const QKeySequence &sequence)
         binding.modifiers |= kMod4Mask;
     }
 
-    // 3. 不带任何修饰键的组合会抢占普通输入，拒绝注册
-    if (binding.modifiers == 0) {
+    // 3. 无修饰键会抢占普通输入，默认拒绝；Print 是截图专用键，允许裸绑
+    //    （与 GNOME accelerator 例外一致；issue #76 Mint/Cinnamon 用户常用 Print）
+    if (binding.modifiers == 0 && combination.key() != Qt::Key_Print) {
         return binding;
     }
 
     binding.valid = true;
     return binding;
+}
+
+/**
+ * 返回抓取某主键时需要尝试的 X11 keysym 列表。
+ *
+ * 部分键盘把 Print 映射为 Sys_Req（或两者互换），只抓 0xff61 会找不到 keycode。
+ *
+ * @param keysym 主 keysym。
+ * @return 按优先级排列的候选 keysym。
+ */
+QList<std::uint32_t> x11KeysymCandidates(std::uint32_t keysym)
+{
+    if (keysym == kKeysymPrint) {
+        return {kKeysymPrint, kKeysymSysReq};
+    }
+    if (keysym == kKeysymSysReq) {
+        return {kKeysymSysReq, kKeysymPrint};
+    }
+    return {keysym};
 }
 
 }  // namespace markshot::shortcuts

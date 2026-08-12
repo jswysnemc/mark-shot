@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QKeySequence>
+#include <QList>
 
 #include <cstdint>
 
@@ -35,12 +36,20 @@ std::uint32_t x11KeysymForQtKey(int key);
 X11KeyBinding x11BindingForSequence(const QKeySequence &sequence);
 
 /**
+ * 返回抓取某主键时需要尝试的 X11 keysym 候选（如 Print / Sys_Req）。
+ *
+ * @param keysym 主 keysym。
+ * @return 候选列表，至少包含自身。
+ */
+QList<std::uint32_t> x11KeysymCandidates(std::uint32_t keysym);
+
+/**
  * 将 Qt 快捷键序列转换为 GNOME/GTK accelerator 字符串。
  *
  * GNOME 的 gsettings 自定义快捷键（media-keys custom-keybinding 的 binding
  * 键）使用 gtk_accelerator_parse 的格式，例如 "<Control><Alt>s"、
- * "<Super>Print"。仅取序列中的第一个组合；无修饰键的组合会抢占普通输入，
- * 与 X11 后端一样拒绝转换。
+ * "<Super>Print"。仅取序列中的第一个组合；无修饰键的普通按键会抢占输入，
+ * 但 Print 屏幕截图键例外（与 X11 后端一致）。
  *
  * @param sequence Qt 快捷键序列。
  * @return accelerator 字符串；无法转换时返回空字符串。
