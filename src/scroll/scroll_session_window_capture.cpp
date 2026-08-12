@@ -21,12 +21,20 @@ void ScrollSessionWindow::captureTick()
     if (m_paused || (m_panelOnlyWindow && m_axisDragging)) {
         return;
     }
+    if (m_captureTickActive) {
+        return;
+    }
+    m_captureTickActive = true;
+    const auto tickGuard = qScopeGuard([this] { m_captureTickActive = false; });
 
     QImage frame;
     auto captureFrame = [&](const char *debugTag) {
         // Scroll capture needs non-interactive, repeatable frames. Request the
         // screencast path when possible and disable portal screenshot fallback
         // so a stalled stream fails instead of opening prompts during scrolling.
+        // The very first frame may still bootstrap a reusable screencast
+        // session through one interactive portal prompt when every silent
+        // route fails (issue #82).
         CaptureRequest request;
         request.preferredOutputName = m_outputName;
         request.sourceGeometry = m_geometry;
@@ -34,6 +42,8 @@ void ScrollSessionWindow::captureTick()
         request.preferScreencast = true;
         request.allowInteractivePortal = false;
         request.allowPortalScreenshotFallback = false;
+        request.allowInteractiveScreencastInit = m_interactiveScreencastInitPending;
+        m_interactiveScreencastInitPending = false;
 
 #if defined(Q_OS_WIN)
         const bool makePanelTransparentForCapture = false;
@@ -201,6 +211,9 @@ void ScrollSessionWindow::togglePause()
     m_paused = !m_paused;
     if (!m_paused) {
         m_lastSignature.clear();
+        // Manual resume re-arms the one-shot interactive screencast bootstrap
+        // so a previously denied or failed authorization can be retried.
+        m_interactiveScreencastInitPending = true;
     } else {
         cancelScrollIdlePause();
     }

@@ -37,6 +37,7 @@
 #include <QPushButton>
 #include <QRegion>
 #include <QResizeEvent>
+#include <QScopeGuard>
 #include <QScreen>
 #include <QShortcut>
 #include <QSize>

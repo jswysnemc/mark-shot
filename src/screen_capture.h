@@ -31,6 +31,11 @@ struct CaptureRequest {
     bool preferScreencast = false; // Prefer reusable stream capture for repeated scroll frames.
     bool allowInteractivePortal = true; // Permit user-facing portal prompts for one-shot capture.
     bool allowPortalScreenshotFallback = true; // Allow slower portal screenshots if streaming fails.
+    // Last-resort interactive screencast bootstrap: when every non-interactive
+    // route fails (KWin skipped, silent screencast denied, grim unsupported),
+    // allow one portal authorization prompt to establish a reusable PipeWire
+    // session. Later frames reuse that session without prompting (issue #82).
+    bool allowInteractiveScreencastInit = false;
     qint64 minimumFrameTimeMs = 0; // Ignore stale stream frames captured before this timestamp.
     // 流式后端可按该帧率限制捕获节奏，0 表示保持后端默认行为
     int targetFps = 0;

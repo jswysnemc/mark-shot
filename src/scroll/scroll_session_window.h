@@ -169,6 +169,15 @@ private:
     bool m_paused = false;
     bool m_layerShell = false;
     bool m_panelOnlyWindow = false;
+    // Guards captureTick against reentry: an interactive portal authorization
+    // can spin a nested event loop, during which the capture timer keeps
+    // firing. A reentrant tick would tear down the screencast session that is
+    // still being initialized (issue #82).
+    bool m_captureTickActive = false;
+    // One-shot permission for the last-resort interactive screencast
+    // bootstrap. Consumed by the first captured frame; re-armed when the user
+    // manually resumes after a capture error so authorization can be retried.
+    bool m_interactiveScreencastInitPending = true;
     QVector<std::uint8_t> m_lastSignature;
     QString m_statusText;
     int m_lastAppend = 0;       // pixels added by the most recent frame

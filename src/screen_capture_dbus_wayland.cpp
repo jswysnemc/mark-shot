@@ -298,8 +298,31 @@ CaptureResult captureWaylandFrame(const CaptureRequest &request)
                                grimCapture.image.width(), grimCapture.image.height());
             return grimCapture;
         }
-        markshot::debugLog("capture", "grim-failed error=%s all-routes-exhausted",
+        markshot::debugLog("capture", "grim-failed error=%s",
                            grimCapture.error.toUtf8().constData());
+
+        // 所有非交互链路都失败（典型场景：KDE Wayland 首次滚动截图，KWin 被
+        // preferScreencast 跳过、静默 screencast 需要授权、grim 不受支持）。
+        // 此时允许弹一次 portal 授权建立可复用的 PipeWire session；之后的
+        // 帧走非交互 screencast 直接复用该 session（issue #82）。
+        if (!request.allowInteractivePortal && request.allowInteractiveScreencastInit) {
+            markshot::debugLog("capture", "fallback=interactive-screencast-init");
+            CaptureRequest interactiveRequest = request;
+            interactiveRequest.allowInteractivePortal = true;
+            CaptureResult interactiveCapture = captureWithPortalScreencast(interactiveRequest);
+            if (!interactiveCapture.image.isNull()) {
+                markshot::debugLog("capture", "interactive-screencast-init-ok frame=%dx%d",
+                                   interactiveCapture.image.width(),
+                                   interactiveCapture.image.height());
+                return interactiveCapture;
+            }
+            markshot::debugLog("capture", "interactive-screencast-init-failed error=%s",
+                               interactiveCapture.error.toUtf8().constData());
+            stopPortalScreencast();
+            screencastCapture.error = interactiveCapture.error;
+        }
+
+        markshot::debugLog("capture", "all-routes-exhausted");
         return {{},
                 QStringLiteral("%1\nPortal screenshot fallback: %2\nGrim fallback: %3")
                     .arg(screencastCapture.error,
