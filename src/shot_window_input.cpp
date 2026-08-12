@@ -422,6 +422,7 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
                 update();
                 return;
             }
+            recordSelectionHistory();
             if (m_startupTool == StartupTool::CodeScanner) {
                 scanCodeSelection();
                 return;
@@ -451,6 +452,7 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
             update();
             return;
         }
+        recordSelectionHistory();
         if (m_startupTool == StartupTool::CodeScanner) {
             scanCodeSelection();
             return;
@@ -637,4 +639,56 @@ void ShotWindow::setTool(Tool tool)
     updateCursor();
     updateToolbarState();
     update();
+}
+
+void ShotWindow::recordSelectionHistory()
+{
+    // 本地图像标注模式的选区是文件内坐标，与屏幕选区历史不同域，不记录。
+    if (m_imageNavigationEnabled) {
+        return;
+    }
+    const QRect globalRect = selectionGlobalRect();
+    if (globalRect.isEmpty()) {
+        return;
+    }
+    markshot::rememberSelection(globalRect);
+    // 使会话内缓存失效，下次浏览时能看到刚写入的记录
+    m_selectionHistoryLoaded = false;
+    m_selectionHistoryIndex = -1;
+}
+
+void ShotWindow::applySelectionHistoryStep(int step)
+{
+    if (!m_selectionHistoryLoaded) {
+        m_selectionHistory = markshot::readSelectionHistory();
+        m_selectionHistoryLoaded = true;
+        m_selectionHistoryIndex = -1;
+    }
+    if (m_selectionHistory.isEmpty()) {
+        showToast(MS_TR("No selection history"), 1400);
+        return;
+    }
+
+    // step=+1 回到更早的记录，step=-1 前进到更新的记录。历史存全局逻辑
+    // 坐标，需换算回当前帧的图像坐标；不落在当前帧内的记录跳过继续找。
+    int index = m_selectionHistoryIndex;
+    while (true) {
+        index += step;
+        if (index < 0 || index >= m_selectionHistory.size()) {
+            return;
+        }
+        const QRect imageRect = markshot::capture::imageRectFromGeometry(
+            m_selectionHistory.at(index), m_sourceGeometry, m_frozenFrame.size());
+        if (imageRect.width() < kMinSelectionSize || imageRect.height() < kMinSelectionSize) {
+            continue;
+        }
+        m_selectionHistoryIndex = index;
+        m_selection = QRectF(imageRect);
+        m_dragging = false;
+        m_selectionDrag = SelectionDrag::None;
+        m_hoveredWindowRect.reset();
+        revealSelectionInfo();
+        update();
+        return;
+    }
 }

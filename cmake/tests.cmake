@@ -24,6 +24,32 @@ target_link_libraries(mark-shot-color-history-store-test
 )
 add_test(NAME color-history-store COMMAND mark-shot-color-history-store-test)
 
+qt_add_executable(mark-shot-selection-history-test
+    tests/selection_history_test.cpp
+    src/selection_history.cpp
+    src/selection_history.h
+    src/app_config_defaults.cpp
+    src/app_config_defaults.h
+    src/app_config_store.cpp
+    src/app_config_store.h
+    src/window_detection.cpp
+    src/window_detection.h
+    src/config_value.cpp
+    src/config_value.h
+    src/debug_log.cpp
+    src/debug_log.h
+    src/shell_command.cpp
+    src/shell_command.h
+)
+target_include_directories(mark-shot-selection-history-test PRIVATE src)
+target_link_libraries(mark-shot-selection-history-test
+    PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Test
+)
+add_test(NAME selection-history COMMAND mark-shot-selection-history-test)
+
 qt_add_executable(mark-shot-app-config-defaults-test
     tests/app_config_defaults_test.cpp
     src/app_config_defaults.cpp

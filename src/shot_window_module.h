@@ -9,6 +9,7 @@
 #include "ocr_result.h"
 #include "screen_capture.h"
 #include "scroll/scroll_session_window.h"
+#include "selection_history.h"
 #include "scroll/stitcher.h"
 #include "shell_command.h"
 #include "shortcut_config.h"

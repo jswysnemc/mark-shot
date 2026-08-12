@@ -651,6 +651,7 @@ The expected result is `('4.2',)`. On GNOME Wayland, restart `mark-shot` after e
 | **R** | Ruler | Measures coordinates before selecting a region. Hover reads the current pixel, and left-drag draws a measured rectangle with pixel ticks, width, height, diagonal, and area. Right click or Esc returns to normal selection. |
 | **Q** | Code Scanner | Enters QR code and barcode scan mode. Select a region to decode codes inside it; the result opens in a copyable window. Right click or Esc returns to normal selection. |
 | **D** | Display Capture | Instantly captures all outputs, crops the snapshot by display, and shows thumbnails with hover actions for copy, edit, and save. |
+| **,** / **.** | Selection History | Restores a previous capture selection before selecting a region: `,` steps back to older recorded selections, `.` steps forward to newer ones. The last 10 confirmed selections are remembered across sessions. |
 
 ### Global Actions
 

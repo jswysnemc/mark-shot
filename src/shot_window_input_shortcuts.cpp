@@ -219,6 +219,19 @@ void ShotWindow::keyPressEvent(QKeyEvent *event)
             event->accept();
             return;
         }
+        // 选区历史浏览（issue #79）：逗号回到上一次截图的选区，句号前进。
+        if (m_startupTool == StartupTool::None && !m_dragging && !event->isAutoRepeat()) {
+            if (event->key() == Qt::Key_Comma) {
+                applySelectionHistoryStep(1);
+                event->accept();
+                return;
+            }
+            if (event->key() == Qt::Key_Period) {
+                applySelectionHistoryStep(-1);
+                event->accept();
+                return;
+            }
+        }
     }
 
     if (imageNavigationAvailable() && event->key() == Qt::Key_Control && !event->isAutoRepeat()) {

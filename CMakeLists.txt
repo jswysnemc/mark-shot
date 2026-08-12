@@ -185,6 +185,8 @@ qt_add_executable(mark-shot
     src/ocr_result.h
     src/save_path_config.cpp
     src/save_path_config.h
+    src/selection_history.cpp
+    src/selection_history.h
     src/shortcut_config.cpp
     src/shortcut_config.h
     src/pinned_window_config.cpp

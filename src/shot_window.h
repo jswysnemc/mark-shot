@@ -351,6 +351,10 @@ private:
     QRectF normalizedSelection() const;
     QString slurpSelectionGeometry() const;
     QRect selectionGlobalRect() const;
+    // 把当前选区写入持久化历史，供后续会话通过 , 和 . 键恢复（issue #79）。
+    void recordSelectionHistory();
+    // 沿历史浏览选区：step 为 +1 时回到更早的记录，-1 时前进到更新的记录。
+    void applySelectionHistoryStep(int step);
     QRectF imageRectToWidget(QRectF rect) const;
     QPointF clampedMagnifierCircleCenter(QPointF center, qreal diameter) const;
     QRectF magnifierCircleRect(QPointF center, qreal diameter) const;
@@ -622,6 +626,11 @@ private:
     // Selection and annotation interaction state. All geometry here is stored in
     // image coordinates so export and live painting share the same data model.
     QRectF m_selection;
+    // 持久化选区历史的会话内缓存与浏览位置（issue #79）。历史存全局逻辑
+    // 坐标，应用到当前帧时经 imageRectFromGeometry 换算回图像坐标。
+    QVector<QRect> m_selectionHistory;
+    int m_selectionHistoryIndex = -1;
+    bool m_selectionHistoryLoaded = false;
     QPointF m_selectionStart;
     QRectF m_selectionBeforeDrag;
     QPointF m_dragStart;
