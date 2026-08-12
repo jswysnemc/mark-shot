@@ -87,6 +87,101 @@ std::uint32_t x11KeysymForQtKey(int key)
     }
 }
 
+namespace {
+
+/**
+ * 返回 Qt 键值对应的 GTK accelerator 键名。
+ *
+ * GTK accelerator 的键名就是 X11 keysym 的字符串名称（gdk_keyval_name），
+ * 字母使用小写，功能键与特殊键使用 keysymdef.h 中的正式名称。
+ *
+ * @param key Qt::Key 键值。
+ * @return 键名；无法映射时返回空字符串。
+ */
+QString gnomeKeyNameForQtKey(int key)
+{
+    if (key >= Qt::Key_A && key <= Qt::Key_Z) {
+        return QChar(QLatin1Char(static_cast<char>('a' + (key - Qt::Key_A))));
+    }
+    if (key >= Qt::Key_0 && key <= Qt::Key_9) {
+        return QChar(QLatin1Char(static_cast<char>('0' + (key - Qt::Key_0))));
+    }
+    if (key >= Qt::Key_F1 && key <= Qt::Key_F24) {
+        return QStringLiteral("F%1").arg(key - Qt::Key_F1 + 1);
+    }
+
+    switch (key) {
+    case Qt::Key_Backspace: return QStringLiteral("BackSpace");
+    case Qt::Key_Tab: return QStringLiteral("Tab");
+    case Qt::Key_Return:
+    case Qt::Key_Enter: return QStringLiteral("Return");
+    case Qt::Key_Escape: return QStringLiteral("Escape");
+    case Qt::Key_Space: return QStringLiteral("space");
+    case Qt::Key_PageUp: return QStringLiteral("Page_Up");
+    case Qt::Key_PageDown: return QStringLiteral("Page_Down");
+    case Qt::Key_End: return QStringLiteral("End");
+    case Qt::Key_Home: return QStringLiteral("Home");
+    case Qt::Key_Left: return QStringLiteral("Left");
+    case Qt::Key_Up: return QStringLiteral("Up");
+    case Qt::Key_Right: return QStringLiteral("Right");
+    case Qt::Key_Down: return QStringLiteral("Down");
+    case Qt::Key_Insert: return QStringLiteral("Insert");
+    case Qt::Key_Delete: return QStringLiteral("Delete");
+    case Qt::Key_Print: return QStringLiteral("Print");
+    case Qt::Key_Pause: return QStringLiteral("Pause");
+    case Qt::Key_Plus: return QStringLiteral("plus");
+    case Qt::Key_Comma: return QStringLiteral("comma");
+    case Qt::Key_Minus: return QStringLiteral("minus");
+    case Qt::Key_Period: return QStringLiteral("period");
+    case Qt::Key_Slash: return QStringLiteral("slash");
+    case Qt::Key_Semicolon: return QStringLiteral("semicolon");
+    case Qt::Key_BracketLeft: return QStringLiteral("bracketleft");
+    case Qt::Key_Backslash: return QStringLiteral("backslash");
+    case Qt::Key_BracketRight: return QStringLiteral("bracketright");
+    case Qt::Key_QuoteLeft: return QStringLiteral("grave");
+    case Qt::Key_Apostrophe: return QStringLiteral("apostrophe");
+    default: return {};
+    }
+}
+
+}  // namespace
+
+QString gnomeAcceleratorForSequence(const QKeySequence &sequence)
+{
+    if (sequence.isEmpty()) {
+        return {};
+    }
+
+    // 1. GNOME 的 binding 只表达单个组合，多段快捷键取首段
+    const QKeyCombination combination = sequence[0];
+    const QString keyName = gnomeKeyNameForQtKey(combination.key());
+    if (keyName.isEmpty()) {
+        return {};
+    }
+
+    // 2. 无修饰键的组合会抢占普通输入，拒绝转换（Print 屏幕截图键除外）
+    const Qt::KeyboardModifiers modifiers = combination.keyboardModifiers();
+    if (modifiers == Qt::NoModifier && combination.key() != Qt::Key_Print) {
+        return {};
+    }
+
+    QString accelerator;
+    if (modifiers.testFlag(Qt::ControlModifier)) {
+        accelerator += QStringLiteral("<Control>");
+    }
+    if (modifiers.testFlag(Qt::AltModifier)) {
+        accelerator += QStringLiteral("<Alt>");
+    }
+    if (modifiers.testFlag(Qt::ShiftModifier)) {
+        accelerator += QStringLiteral("<Shift>");
+    }
+    if (modifiers.testFlag(Qt::MetaModifier)) {
+        accelerator += QStringLiteral("<Super>");
+    }
+    accelerator += keyName;
+    return accelerator;
+}
+
 X11KeyBinding x11BindingForSequence(const QKeySequence &sequence)
 {
     X11KeyBinding binding;

@@ -649,31 +649,39 @@ void WindowsTrayController::registerHotkeys()
     registerSequence(kStopRecordingHotkeyId, m_config.stopRecordingHotkey, &m_stopRecordingHotkeyRegistered);
     registerSequence(kPauseRecordingHotkeyId, m_config.pauseRecordingHotkey, &m_pauseRecordingHotkeyRegistered);
 #else
+    // commandLine 供进程外注册的后端（GNOME gsettings 自定义快捷键）使用：
+    // 桌面环境按键后启动新进程，动作经单实例转发路由回本实例。
+    const QString selfCommand =
+        QStringLiteral("\"%1\"").arg(QCoreApplication::applicationFilePath());
     QList<shortcuts::Shortcut> shortcutList;
     if (!m_config.captureHotkey.isEmpty()) {
         shortcutList.append({QStringLiteral("capture"),
                              MS_TR("Capture"),
                              m_config.captureHotkey,
-                             [this] { triggerCapture(); }});
+                             [this] { triggerCapture(); },
+                             selfCommand + QStringLiteral(" --capture")});
     }
     if (!m_config.fullscreenHotkey.isEmpty() && m_config.fullscreenHotkey != m_config.captureHotkey) {
         shortcutList.append({QStringLiteral("fullscreen"),
                              MS_TR("Fullscreen Capture"),
                              m_config.fullscreenHotkey,
-                             [this] { triggerFullscreenCapture(); }});
+                             [this] { triggerFullscreenCapture(); },
+                             selfCommand + QStringLiteral(" --fullscreen")});
     }
 
     if (!m_config.stopRecordingHotkey.isEmpty()) {
         shortcutList.append({QStringLiteral("stop-recording"),
                              MS_TR("Stop Recording"),
                              m_config.stopRecordingHotkey,
-                             [this] { stopRecordingFromTray(); }});
+                             [this] { stopRecordingFromTray(); },
+                             selfCommand + QStringLiteral(" --stop-recording")});
     }
     if (!m_config.pauseRecordingHotkey.isEmpty()) {
         shortcutList.append({QStringLiteral("pause-recording"),
                              MS_TR("Pause Recording"),
                              m_config.pauseRecordingHotkey,
-                             [this] { togglePauseRecordingFromTray(); }});
+                             [this] { togglePauseRecordingFromTray(); },
+                             selfCommand + QStringLiteral(" --pause-recording")});
     }
 
     if (!m_globalShortcuts) {

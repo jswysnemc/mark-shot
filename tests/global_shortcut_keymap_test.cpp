@@ -2,6 +2,7 @@
 
 #include <QtTest/QtTest>
 
+using markshot::shortcuts::gnomeAcceleratorForSequence;
 using markshot::shortcuts::X11KeyBinding;
 using markshot::shortcuts::x11BindingForSequence;
 using markshot::shortcuts::x11KeysymForQtKey;
@@ -77,6 +78,32 @@ private slots:
     void unmappableKeyIsRejected()
     {
         QVERIFY(!x11BindingForSequence(QKeySequence(QStringLiteral("Ctrl+Massyo"))).valid);
+    }
+
+    void gnomeAcceleratorFormatsModifiers()
+    {
+        QCOMPARE(gnomeAcceleratorForSequence(QKeySequence(QStringLiteral("Ctrl+Alt+S"))),
+                 QStringLiteral("<Control><Alt>s"));
+        QCOMPARE(gnomeAcceleratorForSequence(QKeySequence(QStringLiteral("Meta+Shift+P"))),
+                 QStringLiteral("<Shift><Super>p"));
+        QCOMPARE(gnomeAcceleratorForSequence(QKeySequence(QStringLiteral("Ctrl+F5"))),
+                 QStringLiteral("<Control>F5"));
+    }
+
+    void gnomeAcceleratorUsesKeysymNames()
+    {
+        QCOMPARE(gnomeAcceleratorForSequence(QKeySequence(QStringLiteral("Ctrl+,"))),
+                 QStringLiteral("<Control>comma"));
+        QCOMPARE(gnomeAcceleratorForSequence(QKeySequence(Qt::Key_Print)),
+                 QStringLiteral("Print"));
+    }
+
+    void gnomeAcceleratorRejectsBareKeys()
+    {
+        // 无修饰键的普通按键会抢占输入，仅 Print 屏幕截图键例外
+        QVERIFY(gnomeAcceleratorForSequence(QKeySequence(QStringLiteral("S"))).isEmpty());
+        QVERIFY(gnomeAcceleratorForSequence(QKeySequence()).isEmpty());
+        QVERIFY(gnomeAcceleratorForSequence(QKeySequence(QStringLiteral("Ctrl+Massyo"))).isEmpty());
     }
 };
 

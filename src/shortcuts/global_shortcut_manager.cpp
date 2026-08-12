@@ -9,6 +9,9 @@
 #if defined(HAVE_XCB)
 #include "shortcuts/global_shortcut_x11.h"
 #endif
+#if defined(Q_OS_LINUX)
+#include "shortcuts/global_shortcut_gnome.h"
+#endif
 
 #include <QGuiApplication>
 #include <QStringList>
@@ -20,6 +23,8 @@ namespace {
 const QString kBackendX11 = QStringLiteral("x11");
 /// @brief xdg-desktop-portal 后端的标识。
 const QString kBackendPortal = QStringLiteral("portal");
+/// @brief GNOME gsettings 自定义快捷键后端的标识。
+const QString kBackendGnome = QStringLiteral("gnome");
 
 #if defined(MARK_SHOT_WITH_DBUS)
 
@@ -71,15 +76,17 @@ bool isX11Session()
  *
  * X11 会话优先原生抓键：xdg-desktop-portal 的 GlobalShortcuts 接口面向 Wayland，
  * Cinnamon、Xfce、MATE 等 X11 桌面普遍不实现，直接调用会报接口不存在。
+ * GNOME gsettings 后端排在最后：GNOME Wayland 的 portal 未实现 GlobalShortcuts、
+ * X11 抓键又不可用时（issue #76），改由 GNOME 自身的自定义快捷键机制兜底。
  *
  * @return 后端标识列表，按优先级从高到低排列。
  */
 QStringList backendPriority()
 {
     if (isX11Session()) {
-        return {kBackendX11, kBackendPortal};
+        return {kBackendX11, kBackendPortal, kBackendGnome};
     }
-    return {kBackendPortal, kBackendX11};
+    return {kBackendPortal, kBackendX11, kBackendGnome};
 }
 
 }  // namespace
@@ -106,6 +113,11 @@ std::unique_ptr<GlobalShortcutBackend> GlobalShortcutManager::createBackend(cons
         return std::make_unique<PortalBackendAdapter>();
     }
 #endif
+#if defined(Q_OS_LINUX)
+    if (name == kBackendGnome && GnomeGlobalShortcutBackend::isAvailable()) {
+        return std::make_unique<GnomeGlobalShortcutBackend>();
+    }
+#endif
     return nullptr;
 }
 
@@ -118,6 +130,11 @@ bool GlobalShortcutManager::isAvailable()
 #endif
 #if defined(MARK_SHOT_WITH_DBUS)
     if (GlobalShortcutPortal::isAvailable()) {
+        return true;
+    }
+#endif
+#if defined(Q_OS_LINUX)
+    if (GnomeGlobalShortcutBackend::isAvailable()) {
         return true;
     }
 #endif

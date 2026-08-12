@@ -284,6 +284,8 @@ if(MARK_SHOT_LINUX)
             src/global_shortcut_portal.cpp
             src/global_shortcut_portal.h
             src/shortcuts/global_shortcut_backend.h
+            src/shortcuts/global_shortcut_gnome.cpp
+            src/shortcuts/global_shortcut_gnome.h
             src/shortcuts/global_shortcut_keymap.cpp
             src/shortcuts/global_shortcut_keymap.h
             src/shortcuts/global_shortcut_manager.cpp

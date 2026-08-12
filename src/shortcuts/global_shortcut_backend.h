@@ -18,6 +18,10 @@ struct Shortcut {
     QKeySequence sequence;
     /// @brief 快捷键触发时执行的回调。
     std::function<void()> callback;
+    /// @brief 进程外触发时执行的命令行。桌面环境侧注册的后端（GNOME 的
+    /// gsettings 自定义快捷键等）无法回调进程内函数，转而执行该命令并依赖
+    /// 单实例转发把动作路由回运行中的实例。为空时此类后端跳过该快捷键。
+    QString commandLine;
 };
 
 /**
