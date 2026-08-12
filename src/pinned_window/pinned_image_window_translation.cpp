@@ -6,6 +6,7 @@
 #include "providers/translate/translate_provider_factory.h"
 #include "shell_command.h"
 
+#include <QAbstractTextDocumentLayout>
 #include <QApplication>
 #include <QDir>
 #include <QFile>
@@ -282,7 +283,12 @@ void PinnedImageWindow::drawTranslationOverlay(QPainter &painter) const
         painter.save();
         painter.setClipRect(textRect);
         painter.translate(textRect.topLeft());
-        document.drawContents(&painter, QRectF(QPointF(0.0, 0.0), textRect.size()));
+        // 背景固定为浅色，文字颜色必须显式指定深色；否则 Dark Theme 的全局
+        // palette 会把文字渲染成接近白色，导致译文不可见（issue #81）。
+        QAbstractTextDocumentLayout::PaintContext context;
+        context.palette.setColor(QPalette::Text, QColor(17, 24, 39));
+        context.clip = QRectF(QPointF(0.0, 0.0), textRect.size());
+        document.documentLayout()->draw(&painter, context);
         painter.restore();
     }
     painter.restore();

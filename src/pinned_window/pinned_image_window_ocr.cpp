@@ -152,7 +152,8 @@ void PinnedImageWindow::applyOcrOutput(const QByteArray &output, const QByteArra
     if (translateAfterOcr) {
         startTranslation(true);
     } else if (m_config.autoTranslateAfterOcr) {
-        startTranslation(false, false);
+        // 后台自动翻译不显示忙碌光标，但完成后仍需激活译文显示（issue #80）。
+        startTranslation(true, false);
     } else {
         update();
     }
