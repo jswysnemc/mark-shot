@@ -16,7 +16,6 @@
 #include <QLayoutItem>
 #include <QPlainTextEdit>
 #include <QPushButton>
-#include <QScrollArea>
 #include <QSizePolicy>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -218,6 +217,8 @@ SettingsPagePlugins::SettingsPagePlugins(QWidget *parent)
 {
     auto *layout = createSettingsPageLayout(this);
     buildProviderCard(layout);
+    buildMarketplaceCard(layout);
+    buildOcrModelCard(layout);
     buildDirectoriesCard(layout);
     buildDiagnosticsCard(layout);
     layout->addStretch();
@@ -286,23 +287,17 @@ void SettingsPagePlugins::buildDiagnosticsCard(QVBoxLayout *layout)
                                       MS_TR("Inspect loaded provider plugins and reasons for unavailable plugins."),
                                       this);
     QFormLayout *form = settingsCardForm(card);
-    auto *scroll = new QScrollArea(card);
-    scroll->setObjectName(QStringLiteral("pluginDiagnosticsArea"));
-    scroll->setWidgetResizable(true);
-    scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    scroll->setMinimumHeight(220);
-    scroll->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::MinimumExpanding);
-    scroll->viewport()->setAutoFillBackground(false);
 
-    m_diagnosticsContainer = new QWidget(scroll);
+    // 诊断条目直接放进卡片，由设置页外层滚动区统一滚动。此前这里内嵌了
+    // 一个固定高度的 QScrollArea，悬停其上时滚轮事件被内层吃掉，外层页面
+    // 无法继续滚动。
+    m_diagnosticsContainer = new QWidget(card);
     m_diagnosticsContainer->setObjectName(QStringLiteral("pluginDiagnosticsViewport"));
     m_diagnosticsLayout = new QVBoxLayout(m_diagnosticsContainer);
     m_diagnosticsLayout->setContentsMargins(0, 0, 0, 0);
     m_diagnosticsLayout->setSpacing(8);
-    scroll->setWidget(m_diagnosticsContainer);
 
-    form->addRow(scroll);
+    form->addRow(m_diagnosticsContainer);
     refreshDiagnostics();
     layout->addWidget(card);
 }

@@ -3,6 +3,8 @@
 #include "pipewire/pipewire_dmabuf_importer.h"
 #include "screen_capture_pipewire_libportal.h"
 
+#include <QDateTime>
+
 #ifdef HAVE_PIPEWIRE
 
 PortalPipeWireScreencast::~PortalPipeWireScreencast()

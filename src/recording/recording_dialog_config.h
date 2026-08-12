@@ -17,6 +17,8 @@ struct RecordingDialogConfig {
     int videoFps = 30;
     int gifFps = 12;
     bool includeAudio = false;
+    // 音频采集设备标识；空字符串表示系统默认输入。
+    QString audioDevice;
     QString outputPath;
     QString displayKey;
 };

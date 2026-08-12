@@ -3,6 +3,8 @@ set(MARK_SHOT_RECORDING_SOURCES
     src/recording/audio/audio_capture_reader_factory.cpp
     src/recording/audio/audio_capture_reader_factory.h
     src/recording/audio/audio_capture_sample.h
+    src/recording/audio/audio_input_device_list.cpp
+    src/recording/audio/audio_input_device_list.h
     src/recording/audio/pulse_audio_capture_reader.cpp
     src/recording/audio/pulse_audio_capture_reader.h
     src/recording/audio/wasapi_audio_capture_reader.cpp

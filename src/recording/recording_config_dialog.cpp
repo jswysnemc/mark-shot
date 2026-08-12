@@ -1,10 +1,14 @@
 #include "recording/recording_config_dialog.h"
 
+#include "app_config_store.h"
 #include "recording/audio/audio_capture_reader_factory.h"
+#include "recording/audio/audio_input_device_list.h"
 #include "recording/recording_dialog_config.h"
 #include "recording/recording_display_source.h"
 #include "recording/recording_file_naming.h"
+#include "settings/settings_design_tokens.h"
 #include "ui/i18n.h"
+#include "ui/interface_theme_config.h"
 #include "ui/theme.h"
 
 #include <QCheckBox>
@@ -20,6 +24,8 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QScreen>
+#include <QStringList>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 namespace markshot::recording {
@@ -287,15 +293,19 @@ RecordingConfigDialog::RecordingConfigDialog(RecordingMode mode, QWidget *parent
     setWindowTitle(titleForMode(m_mode));
     setModal(true);
     setMinimumWidth(460);
+    setObjectName(QStringLiteral("recordingConfigDialog"));
+    applyDialogTheme();
 
     auto *root = new QVBoxLayout(this);
-    root->setContentsMargins(18, 18, 18, 18);
-    root->setSpacing(14);
+    root->setContentsMargins(20, 18, 20, 16);
+    root->setSpacing(12);
 
     m_title = new QLabel(titleForMode(m_mode), this);
+    m_title->setObjectName(QStringLiteral("settingsCardTitle"));
     m_title->setFont(markshot::theme::uiFont(16, QFont::DemiBold));
     root->addWidget(m_title);
 
+    // 常用选项：类型、区域、显示器、帧率、音频、输出。
     auto *form = new QFormLayout;
     form->setHorizontalSpacing(16);
     form->setVerticalSpacing(10);
@@ -308,13 +318,12 @@ RecordingConfigDialog::RecordingConfigDialog(RecordingMode mode, QWidget *parent
     m_modeSelector->setCurrentIndex(modeIndex >= 0 ? modeIndex : 0);
     form->addRow(MS_TR("Recording Type"), m_modeSelector);
 
-    m_fps = new QComboBox(this);
-    populateFrameRateOptions(m_fps, m_mode, fpsForMode(m_mode));
-    form->addRow(MS_TR("Frame Rate"), m_fps);
-
-    m_audio = new QCheckBox(MS_TR("Record system default audio input"), this);
-    m_audio->setChecked(persisted.includeAudio);
-    form->addRow(MS_TR("Audio"), m_audio);
+    m_scope = new QComboBox(this);
+    m_scope->addItem(MS_TR("Record selected display"), static_cast<int>(RecordingScope::Display));
+    m_scope->addItem(MS_TR("Select region after this dialog"), static_cast<int>(RecordingScope::Region));
+    const int scopeIndex = m_scope->findData(static_cast<int>(persisted.scope));
+    m_scope->setCurrentIndex(scopeIndex >= 0 ? scopeIndex : 0);
+    form->addRow(MS_TR("Capture Area"), m_scope);
 
     m_display = new QComboBox(this);
     for (int i = 0; i < m_sources.size(); ++i) {
@@ -330,28 +339,24 @@ RecordingConfigDialog::RecordingConfigDialog(RecordingMode mode, QWidget *parent
     }
     form->addRow(MS_TR("Display"), m_display);
 
-    m_container = new QComboBox(this);
-    populateContainerOptions(m_container, persisted.container);
-    form->addRow(MS_TR("Container"), m_container);
+    m_fps = new QComboBox(this);
+    populateFrameRateOptions(m_fps, m_mode, fpsForMode(m_mode));
+    form->addRow(MS_TR("Frame Rate"), m_fps);
 
-    m_quality = new QComboBox(this);
-    populateQualityOptions(m_quality, persisted.quality);
-    form->addRow(MS_TR("Quality"), m_quality);
-
-    m_countdown = new QComboBox(this);
-    populateCountdownOptions(m_countdown, persisted.countdownSeconds);
-    form->addRow(MS_TR("Countdown"), m_countdown);
-
-    m_backend = new QComboBox(this);
-    populateBackendOptions(m_backend, persisted.backend);
-    form->addRow(MS_TR("Recording Backend"), m_backend);
-
-    m_scope = new QComboBox(this);
-    m_scope->addItem(MS_TR("Record selected display"), static_cast<int>(RecordingScope::Display));
-    m_scope->addItem(MS_TR("Select region after this dialog"), static_cast<int>(RecordingScope::Region));
-    const int scopeIndex = m_scope->findData(static_cast<int>(persisted.scope));
-    m_scope->setCurrentIndex(scopeIndex >= 0 ? scopeIndex : 0);
-    form->addRow(MS_TR("Capture Area"), m_scope);
+    // 音频行：启用开关与输入设备选择合并成一行，避免再占一行空间。
+    auto *audioRow = new QWidget(this);
+    auto *audioLayout = new QHBoxLayout(audioRow);
+    audioLayout->setContentsMargins(0, 0, 0, 0);
+    audioLayout->setSpacing(8);
+    m_audio = new QCheckBox(audioRow);
+    m_audio->setChecked(persisted.includeAudio);
+    m_audio->setToolTip(MS_TR("Record audio"));
+    m_audioDevice = new QComboBox(audioRow);
+    m_audioDevice->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    populateAudioDevices(persisted.audioDevice);
+    audioLayout->addWidget(m_audio, 0, Qt::AlignVCenter);
+    audioLayout->addWidget(m_audioDevice, 1);
+    form->addRow(MS_TR("Audio"), audioRow);
 
     m_outputPath = new QLineEdit(persisted.outputPath.isEmpty()
                                      ? defaultRecordingPath(m_mode, persisted.container)
@@ -365,13 +370,58 @@ RecordingConfigDialog::RecordingConfigDialog(RecordingMode mode, QWidget *parent
     outputLayout->setContentsMargins(0, 0, 0, 0);
     outputLayout->setSpacing(8);
     auto *outputBrowse = new QPushButton(MS_TR("Browse"), outputRow);
+    outputBrowse->setCursor(Qt::PointingHandCursor);
     outputLayout->addWidget(m_outputPath, 1);
     outputLayout->addWidget(outputBrowse);
     form->addRow(MS_TR("Output"), outputRow);
 
+    // 低频选项折叠进“高级选项”，默认收起，保持首屏简洁。
+    m_advancedToggle = new QToolButton(this);
+    m_advancedToggle->setObjectName(QStringLiteral("recordingAdvancedToggle"));
+    m_advancedToggle->setText(MS_TR("Advanced Options"));
+    m_advancedToggle->setCheckable(true);
+    m_advancedToggle->setChecked(false);
+    m_advancedToggle->setArrowType(Qt::RightArrow);
+    m_advancedToggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_advancedToggle->setCursor(Qt::PointingHandCursor);
+    root->addWidget(m_advancedToggle);
+
+    m_advancedPanel = new QWidget(this);
+    auto *advancedForm = new QFormLayout(m_advancedPanel);
+    advancedForm->setContentsMargins(0, 0, 0, 0);
+    advancedForm->setHorizontalSpacing(16);
+    advancedForm->setVerticalSpacing(10);
+
+    m_container = new QComboBox(m_advancedPanel);
+    populateContainerOptions(m_container, persisted.container);
+    advancedForm->addRow(MS_TR("Container"), m_container);
+
+    m_quality = new QComboBox(m_advancedPanel);
+    populateQualityOptions(m_quality, persisted.quality);
+    advancedForm->addRow(MS_TR("Quality"), m_quality);
+
+    m_countdown = new QComboBox(m_advancedPanel);
+    populateCountdownOptions(m_countdown, persisted.countdownSeconds);
+    advancedForm->addRow(MS_TR("Countdown"), m_countdown);
+
+    m_backend = new QComboBox(m_advancedPanel);
+    populateBackendOptions(m_backend, persisted.backend);
+    advancedForm->addRow(MS_TR("Recording Backend"), m_backend);
+
+    m_advancedPanel->setVisible(false);
+    root->addWidget(m_advancedPanel);
+    connect(m_advancedToggle, &QToolButton::toggled, this, [this](bool expanded) {
+        m_advancedToggle->setArrowType(expanded ? Qt::DownArrow : Qt::RightArrow);
+        m_advancedPanel->setVisible(expanded);
+        adjustSize();
+    });
+
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel | QDialogButtonBox::Ok, this);
     buttons->button(QDialogButtonBox::Ok)->setText(MS_TR("Start"));
+    buttons->button(QDialogButtonBox::Ok)->setProperty("role", QStringLiteral("primary"));
+    buttons->button(QDialogButtonBox::Ok)->setCursor(Qt::PointingHandCursor);
     buttons->button(QDialogButtonBox::Cancel)->setText(MS_TR("Cancel"));
+    buttons->button(QDialogButtonBox::Cancel)->setCursor(Qt::PointingHandCursor);
     root->addWidget(buttons);
 
     connect(outputBrowse, &QPushButton::clicked, this, [this] { browseOutputPath(); });
@@ -401,11 +451,46 @@ RecordingConfigDialog::RecordingConfigDialog(RecordingMode mode, QWidget *parent
     connect(m_outputPath, &QLineEdit::textEdited, this, [this] {
         m_outputPathTouched = true;
     });
+    connect(m_audio, &QCheckBox::toggled, this, [this] { updateAudioControls(); });
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
     updateAudioControls();
     updateVideoOnlyControls();
+}
+
+void RecordingConfigDialog::applyDialogTheme()
+{
+    // 与设置界面共用同一套主题：深/浅色跟随应用配置，避免录制入口
+    // 出现与主界面割裂的系统原生灰色样式。
+    bool ok = false;
+    const QJsonObject root = markshot::readAppConfigRoot(&ok);
+    const markshot::ui::UiThemeMode configuredMode = ok
+        ? markshot::ui::uiThemeModeFromConfigRoot(root)
+        : markshot::ui::UiThemeMode::System;
+    const markshot::ui::UiThemeMode effectiveMode =
+        markshot::ui::effectiveUiThemeMode(configuredMode);
+    setPalette(markshot::settings::tokens::settingsPalette(effectiveMode));
+    setStyleSheet(markshot::settings::tokens::settingsStyleSheet(effectiveMode));
+}
+
+void RecordingConfigDialog::populateAudioDevices(const QString &persistedDevice)
+{
+    if (!m_audioDevice) {
+        return;
+    }
+    m_audioDevice->clear();
+    m_audioDevice->addItem(MS_TR("System default input"), QString());
+    const QVector<AudioInputDevice> devices = listAudioInputDevices();
+    for (const AudioInputDevice &device : devices) {
+        const QString label = device.isMonitor
+            ? MS_TR("%1 (system audio)").arg(device.description)
+            : device.description;
+        m_audioDevice->addItem(label, device.name);
+        m_audioDevice->setItemData(m_audioDevice->count() - 1, device.name, Qt::ToolTipRole);
+    }
+    const int persistedIndex = m_audioDevice->findData(persistedDevice.trimmed());
+    m_audioDevice->setCurrentIndex(persistedIndex >= 0 ? persistedIndex : 0);
 }
 
 RecordingOptions RecordingConfigDialog::options() const
@@ -417,6 +502,7 @@ RecordingOptions RecordingConfigDialog::options() const
     const int selectedFps = m_fps ? m_fps->currentData().toInt(&fpsOk) : fallbackFps;
     result.fps = fpsOk ? selectedFps : fallbackFps;
     result.includeAudio = m_audio && m_audio->isEnabled() && m_audio->isChecked();
+    result.audioDevice = m_audioDevice ? m_audioDevice->currentData().toString() : QString();
     result.captureBackend = backendFromCombo(m_backend);
     bool countdownOk = false;
     const int countdown = m_countdown ? m_countdown->currentData().toInt(&countdownOk) : 0;
@@ -495,7 +581,10 @@ void RecordingConfigDialog::updateAudioControls()
         m_audio->setChecked(false);
         m_audio->setToolTip(recordingAudioUnavailableText());
     } else {
-        m_audio->setToolTip(QString());
+        m_audio->setToolTip(MS_TR("Record audio"));
+    }
+    if (m_audioDevice) {
+        m_audioDevice->setEnabled(m_audio->isEnabled() && m_audio->isChecked());
     }
 }
 

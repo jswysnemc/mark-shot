@@ -188,6 +188,7 @@ private:
     int64_t m_nextPts = 0;
     bool m_started = false;
     bool m_enableAudio = false;
+    QString m_audioDevice;
     bool m_audioCaptureStarted = false;
     bool m_audioResumePending = false;
     bool m_paused = false;
@@ -219,6 +220,7 @@ bool LibavRecordingProcessPrivate::start(const RecordingOptions &options,
     m_fps = std::max(1, fps);
     m_nextPts = 0;
     m_enableAudio = options.includeAudio;
+    m_audioDevice = options.audioDevice;
     m_audioFailed = false;
     m_audioCaptureStarted = false;
     m_audioResumePending = false;
@@ -447,6 +449,7 @@ bool LibavRecordingProcessPrivate::openAudio(QString *error)
     }
     if (!m_audioReader->init(m_audioEncoder.frameBytes(),
                              audioSampleRate,
+                             m_audioDevice,
                              [this](const AudioCaptureSample &sample) {
                                  encodeAudioSample(sample);
                              },

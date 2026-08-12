@@ -741,7 +741,7 @@ QIcon makeFillIcon(bool filled)
 
 
 
-QIcon makeMarkerShapeIcon(ShotWindow::MarkerShape shape, QColor ink)
+QIcon makeMarkerShapeIcon(ShotWindow::MarkerShape shape, QColor ink, bool filled)
 {
     if (!ink.isValid()) {
         ink = QColor(229, 231, 235);
@@ -751,8 +751,13 @@ QIcon makeMarkerShapeIcon(ShotWindow::MarkerShape shape, QColor ink)
     QPainter p(&pm);
     p.setRenderHint(QPainter::Antialiasing, true);
     const QPainterPath path = markshot::marker::pathForShape(shape, QRectF(5, 5, 22, 22));
-    p.setPen(Qt::NoPen);
-    p.setBrush(ink);
+    if (filled) {
+        p.setPen(Qt::NoPen);
+        p.setBrush(ink);
+    } else {
+        p.setPen(QPen(ink, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.setBrush(Qt::NoBrush);
+    }
     p.drawPath(path);
     return QIcon(pm);
 }

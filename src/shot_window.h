@@ -232,6 +232,12 @@ public:
         Ban,
         Octagon,
         Crescent,
+        Pin,
+        Flag,
+        Bookmark,
+        Shield,
+        Exclamation,
+        SpeechBubble,
     };
 
     // Number badge display styles. Existing annotations keep their own style so
@@ -520,6 +526,8 @@ private:
     void setSelectedAnnotationArrowStyle(ArrowStyle style);
     void setSelectedRectangleStyle(RectangleStyle style);
     void setSelectedMarkerShape(MarkerShape shape);
+    // 设置形状标记的填充模式：filled 为 false 时以描边（空心）绘制。
+    void setSelectedMarkerFill(bool filled);
     void setSelectedHighlighterStyle(HighlighterStyle style);
     void setSelectedNumberStyle(NumberStyle style);
     void resetNumberSequence();
@@ -580,6 +588,10 @@ private:
     bool stopActiveRecordingFromOverlay();
     /// 计算录制中提示组件的停止按钮区域。@return 停止按钮矩形。
     QRectF activeRecordingStopButtonRect() const;
+    /// 判断录制中提示组件当前是否可见。@return 面板可见时返回 true。
+    bool activeRecordingOverlayVisible() const;
+    /// 根据指针位置更新停止按钮悬停状态。@param pointer 指针位置。@return 指针位于停止按钮上时返回 true。
+    bool updateActiveRecordingStopHover(QPointF pointer);
     void drawStartupColorLoupe(QPainter &painter, QPointF imagePoint) const;
     void drawStartupRuler(QPainter &painter) const;
     QVector<markshot::startup_hint::ShortcutHintItem> startupShortcutHintItems() const;
@@ -656,6 +668,8 @@ private:
     std::optional<markshot::recording::RecordingOptions> m_pendingRecordingOptions;
     bool m_recordingConfigDialogOpen = false;
     QTimer *m_activeRecordingOverlayTimer = nullptr;
+    // 录制中提示面板的“停止录制”按钮悬停状态（issue: 手绘按钮无原生 hover）。
+    bool m_activeRecordingStopHovered = false;
     markshot::startup_hint::PanelAnchor m_startupHintAnchor = markshot::startup_hint::PanelAnchor::BottomLeft;
     bool m_dragging = false;
     bool m_annotationHistoryCaptured = false;
@@ -692,6 +706,8 @@ private:
     qreal m_rectangleCornerRadius = 0.0;
     RectangleStyle m_rectangleStyle = RectangleStyle::Stroke;
     MarkerShape m_markerShape = MarkerShape::Triangle;
+    // 形状标记默认填充；false 时新标记以描边（空心）绘制。
+    bool m_markerFilled = true;
     ArrowStyle m_arrowStyle = ArrowStyle::Fletched;
     HighlighterStyle m_highlighterStyle = HighlighterStyle::StraightLine;
     NumberStyle m_numberStyle = NumberStyle::Arabic;

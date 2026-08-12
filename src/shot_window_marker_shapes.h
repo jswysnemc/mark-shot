@@ -159,18 +159,25 @@ inline QPainterPath pathForShape(ShotWindow::MarkerShape shape, const QRectF &re
         break;
 
     case ShotWindow::MarkerShape::Check: {
-        // 对钩：两段厚线段拼成 ✓，不用 stroker，避免圆角自交
-        const QPainterPath a = thickSegment(QPointF(0.18, 0.52), QPointF(0.40, 0.74), 0.075);
-        const QPainterPath b = thickSegment(QPointF(0.40, 0.74), QPointF(0.84, 0.26), 0.075);
-        unit = uniteParts({a, b});
+        // 对钩：圆角中心线加粗成 ✓，端帽与拐角圆润
+        QPainterPath line;
+        line.moveTo(0.16, 0.54);
+        line.lineTo(0.40, 0.76);
+        line.lineTo(0.86, 0.24);
+        unit = strokeOutline(line, 0.17);
+        unit.setFillRule(Qt::WindingFill);
         break;
     }
 
     case ShotWindow::MarkerShape::Cross: {
-        // 叉叉：两条对角厚线段，明确是 X 而不是块状多边形
-        const QPainterPath a = thickSegment(QPointF(0.22, 0.22), QPointF(0.78, 0.78), 0.07);
-        const QPainterPath b = thickSegment(QPointF(0.78, 0.22), QPointF(0.22, 0.78), 0.07);
-        unit = uniteParts({a, b});
+        // 叉叉：两条圆角对角线，端帽圆润
+        QPainterPath a;
+        a.moveTo(0.24, 0.24);
+        a.lineTo(0.76, 0.76);
+        QPainterPath b;
+        b.moveTo(0.76, 0.24);
+        b.lineTo(0.24, 0.76);
+        unit = uniteParts({strokeOutline(a, 0.16), strokeOutline(b, 0.16)});
         break;
     }
 
@@ -289,12 +296,12 @@ inline QPainterPath pathForShape(ShotWindow::MarkerShape shape, const QRectF &re
     }
 
     case ShotWindow::MarkerShape::Lightning: {
-        // 闪电：单调折线多边形，避免自交
-        unit.moveTo(0.58, 0.08);
-        unit.lineTo(0.30, 0.48);
-        unit.lineTo(0.48, 0.48);
-        unit.lineTo(0.38, 0.92);
-        unit.lineTo(0.76, 0.42);
+        // 闪电：更饱满的经典闪电轮廓，折点分明且不自交
+        unit.moveTo(0.62, 0.06);
+        unit.lineTo(0.24, 0.54);
+        unit.lineTo(0.44, 0.54);
+        unit.lineTo(0.36, 0.94);
+        unit.lineTo(0.78, 0.42);
         unit.lineTo(0.56, 0.42);
         unit.closeSubpath();
         break;
@@ -329,13 +336,95 @@ inline QPainterPath pathForShape(ShotWindow::MarkerShape shape, const QRectF &re
         break;
 
     case ShotWindow::MarkerShape::Crescent: {
-        // 新月：大圆减偏移圆；subtracted 结果已是实心月牙
+        // 新月：大圆减偏移圆；裁剪圆上移右移让月牙更饱满弯曲
         QPainterPath full;
-        full.addEllipse(QRectF(0.12, 0.12, 0.76, 0.76));
+        full.addEllipse(QRectF(0.10, 0.10, 0.80, 0.80));
         QPainterPath cut;
-        cut.addEllipse(QRectF(0.30, 0.08, 0.70, 0.70));
+        cut.addEllipse(QRectF(0.32, 0.02, 0.74, 0.74));
         unit = full.subtracted(cut);
         unit.setFillRule(Qt::WindingFill);
+        break;
+    }
+
+    case ShotWindow::MarkerShape::Pin: {
+        // 定位针：圆头 + 底部尖端合并，再挖出中心孔
+        QPainterPath head;
+        head.addEllipse(QPointF(0.50, 0.38), 0.30, 0.30);
+        QPainterPath tail;
+        tail.moveTo(0.50, 0.96);
+        tail.lineTo(0.27, 0.54);
+        tail.lineTo(0.73, 0.54);
+        tail.closeSubpath();
+        QPainterPath hole;
+        hole.addEllipse(QPointF(0.50, 0.38), 0.115, 0.115);
+        unit = uniteParts({head, tail}).subtracted(hole);
+        unit.setFillRule(Qt::WindingFill);
+        break;
+    }
+
+    case ShotWindow::MarkerShape::Flag: {
+        // 旗帜：圆角旗杆 + 三角旗面
+        QPainterPath poleLine;
+        poleLine.moveTo(0.24, 0.10);
+        poleLine.lineTo(0.24, 0.92);
+        const QPainterPath pole = strokeOutline(poleLine, 0.09);
+        QPainterPath banner;
+        banner.moveTo(0.28, 0.12);
+        banner.lineTo(0.86, 0.28);
+        banner.lineTo(0.28, 0.46);
+        banner.closeSubpath();
+        unit = uniteParts({pole, banner});
+        break;
+    }
+
+    case ShotWindow::MarkerShape::Bookmark: {
+        // 书签：竖直圆角带 + 底部 V 形缺口
+        unit.moveTo(0.30, 0.10);
+        unit.cubicTo(0.30, 0.07, 0.33, 0.06, 0.36, 0.06);
+        unit.lineTo(0.64, 0.06);
+        unit.cubicTo(0.67, 0.06, 0.70, 0.07, 0.70, 0.10);
+        unit.lineTo(0.70, 0.93);
+        unit.lineTo(0.50, 0.74);
+        unit.lineTo(0.30, 0.93);
+        unit.closeSubpath();
+        break;
+    }
+
+    case ShotWindow::MarkerShape::Shield: {
+        // 盾牌：顶部平缓曲线，两侧收腰，底部圆尖
+        unit.moveTo(0.50, 0.05);
+        unit.cubicTo(0.62, 0.12, 0.76, 0.15, 0.88, 0.16);
+        unit.cubicTo(0.88, 0.48, 0.78, 0.76, 0.50, 0.95);
+        unit.cubicTo(0.22, 0.76, 0.12, 0.48, 0.12, 0.16);
+        unit.cubicTo(0.24, 0.15, 0.38, 0.12, 0.50, 0.05);
+        unit.closeSubpath();
+        break;
+    }
+
+    case ShotWindow::MarkerShape::Exclamation: {
+        // 感叹号：上粗下细的圆角竖条 + 底部圆点
+        QPainterPath bar;
+        bar.moveTo(0.40, 0.12);
+        bar.cubicTo(0.40, 0.06, 0.60, 0.06, 0.60, 0.12);
+        bar.lineTo(0.55, 0.60);
+        bar.cubicTo(0.55, 0.66, 0.45, 0.66, 0.45, 0.60);
+        bar.closeSubpath();
+        QPainterPath dot;
+        dot.addEllipse(QPointF(0.50, 0.84), 0.095, 0.095);
+        unit = uniteParts({bar, dot});
+        break;
+    }
+
+    case ShotWindow::MarkerShape::SpeechBubble: {
+        // 对话气泡：圆角矩形 + 左下小尾巴
+        QPainterPath body;
+        body.addRoundedRect(QRectF(0.08, 0.12, 0.84, 0.58), 0.14, 0.14);
+        QPainterPath tailPath;
+        tailPath.moveTo(0.26, 0.66);
+        tailPath.lineTo(0.20, 0.92);
+        tailPath.lineTo(0.46, 0.69);
+        tailPath.closeSubpath();
+        unit = uniteParts({body, tailPath});
         break;
     }
     }
@@ -392,6 +481,18 @@ inline QString shapeName(ShotWindow::MarkerShape shape)
         return QStringLiteral("octagon");
     case ShotWindow::MarkerShape::Crescent:
         return QStringLiteral("crescent");
+    case ShotWindow::MarkerShape::Pin:
+        return QStringLiteral("pin");
+    case ShotWindow::MarkerShape::Flag:
+        return QStringLiteral("flag");
+    case ShotWindow::MarkerShape::Bookmark:
+        return QStringLiteral("bookmark");
+    case ShotWindow::MarkerShape::Shield:
+        return QStringLiteral("shield");
+    case ShotWindow::MarkerShape::Exclamation:
+        return QStringLiteral("exclamation");
+    case ShotWindow::MarkerShape::SpeechBubble:
+        return QStringLiteral("speech-bubble");
     }
     return QStringLiteral("triangle");
 }
@@ -438,12 +539,24 @@ inline QString shapeLabel(ShotWindow::MarkerShape shape)
         return QStringLiteral("Octagon");
     case ShotWindow::MarkerShape::Crescent:
         return QStringLiteral("Crescent");
+    case ShotWindow::MarkerShape::Pin:
+        return QStringLiteral("Pin");
+    case ShotWindow::MarkerShape::Flag:
+        return QStringLiteral("Flag");
+    case ShotWindow::MarkerShape::Bookmark:
+        return QStringLiteral("Bookmark");
+    case ShotWindow::MarkerShape::Shield:
+        return QStringLiteral("Shield");
+    case ShotWindow::MarkerShape::Exclamation:
+        return QStringLiteral("Exclamation");
+    case ShotWindow::MarkerShape::SpeechBubble:
+        return QStringLiteral("Speech Bubble");
     }
     return QStringLiteral("Triangle");
 }
 
 /// @brief 全部可用形状，顺序即工具栏弹层网格顺序。
-inline std::array<ShotWindow::MarkerShape, 18> allShapes()
+inline std::array<ShotWindow::MarkerShape, 24> allShapes()
 {
     return {
         ShotWindow::MarkerShape::Triangle,
@@ -464,6 +577,12 @@ inline std::array<ShotWindow::MarkerShape, 18> allShapes()
         ShotWindow::MarkerShape::Lightning,
         ShotWindow::MarkerShape::Ban,
         ShotWindow::MarkerShape::Crescent,
+        ShotWindow::MarkerShape::Pin,
+        ShotWindow::MarkerShape::Flag,
+        ShotWindow::MarkerShape::Bookmark,
+        ShotWindow::MarkerShape::Shield,
+        ShotWindow::MarkerShape::Exclamation,
+        ShotWindow::MarkerShape::SpeechBubble,
     };
 }
 

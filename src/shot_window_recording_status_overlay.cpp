@@ -123,6 +123,24 @@ QRectF ShotWindow::activeRecordingStopButtonRect() const
     return stopButtonRect(panelRect(rect()));
 }
 
+bool ShotWindow::activeRecordingOverlayVisible() const
+{
+    return activeRecordingAvailable() && m_mode == Mode::Selecting && !hasUsableSelection();
+}
+
+bool ShotWindow::updateActiveRecordingStopHover(QPointF pointer)
+{
+    const bool hovered = activeRecordingOverlayVisible()
+        && activeRecordingStopButtonRect().contains(pointer);
+    if (hovered != m_activeRecordingStopHovered) {
+        m_activeRecordingStopHovered = hovered;
+        // updateCursor 统一按交互状态计算光标（含停止按钮悬停的手型）。
+        updateCursor();
+        update(activeRecordingStopButtonRect().toAlignedRect().adjusted(-4, -4, 4, 4));
+    }
+    return hovered;
+}
+
 void ShotWindow::drawActiveRecordingStatus(QPainter &painter)
 {
     const markshot::recording::RecordingStatus status =
@@ -168,9 +186,16 @@ void ShotWindow::drawActiveRecordingStatus(QPainter &painter)
                      Qt::AlignTop | Qt::AlignHCenter,
                      MS_TR("Hold S to stop recording, or continue selecting a screenshot region."));
 
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(220, 38, 38));
-    painter.drawRoundedRect(button, 12.0, 12.0);
+    // 悬停时提亮按钮并加描边光圈，反馈按钮可点击。
+    if (m_activeRecordingStopHovered) {
+        painter.setPen(QPen(QColor(254, 202, 202, 180), 2.0));
+        painter.setBrush(QColor(239, 68, 68));
+        painter.drawRoundedRect(button.adjusted(-1.0, -1.0, 1.0, 1.0), 13.0, 13.0);
+    } else {
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(220, 38, 38));
+        painter.drawRoundedRect(button, 12.0, 12.0);
+    }
     painter.setFont(markshot::theme::uiFont(11, QFont::DemiBold));
     painter.setPen(QColor(255, 255, 255));
     painter.drawText(button, Qt::AlignCenter, MS_TR("Stop Recording"));

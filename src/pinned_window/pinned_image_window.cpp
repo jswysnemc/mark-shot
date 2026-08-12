@@ -21,6 +21,7 @@
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPen>
 #include <QScreen>
 #include <QTimer>
@@ -185,12 +186,41 @@ void PinnedImageWindow::paintEvent(QPaintEvent *)
 
     painter.setRenderHint(QPainter::Antialiasing, false);
     painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(72, 132, 245, 96));
     const auto [first, last] = selectionRange();
     const QVector<OcrToken> &tokens = activeTokens();
+    // 相邻词的 OCR 检测框之间有缝隙、首尾还常常互相重叠：逐框绘制半透明
+    // 高亮会出现断续的空隙和重叠处颜色加深。这里把选中的词框按行合并成
+    // 连续条带，全部并入一条路径后一次填充，效果与浏览器文本选中一致。
+    QPainterPath selectionPath;
+    selectionPath.setFillRule(Qt::WindingFill);
+    QRectF lineBand;
+    const auto flushLineBand = [this, &selectionPath, &lineBand] {
+        if (!lineBand.isNull()) {
+            selectionPath.addRect(imageToWidget(lineBand).intersected(QRectF(rect())));
+            lineBand = QRectF();
+        }
+    };
     for (int i = first; i <= last; ++i) {
-        painter.drawRect(imageToWidget(selectionImageRectForToken(tokens.at(i))).intersected(QRectF(rect())));
+        const QRectF tokenRect = selectionImageRectForToken(tokens.at(i));
+        if (tokenRect.isEmpty()) {
+            continue;
+        }
+        if (lineBand.isNull()) {
+            lineBand = tokenRect;
+            continue;
+        }
+        // 垂直方向重叠超过较矮框一半即视为同一行，合并进当前条带
+        const qreal overlapHeight = std::min(lineBand.bottom(), tokenRect.bottom())
+            - std::max(lineBand.top(), tokenRect.top());
+        if (overlapHeight >= std::min(lineBand.height(), tokenRect.height()) * 0.5) {
+            lineBand = lineBand.united(tokenRect);
+        } else {
+            flushLineBand();
+            lineBand = tokenRect;
+        }
     }
+    flushLineBand();
+    painter.fillPath(selectionPath, QColor(72, 132, 245, 96));
     drawBorder();
 }
 

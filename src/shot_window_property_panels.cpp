@@ -195,6 +195,41 @@ void ShotWindow::setSelectedMarkerShape(MarkerShape shape)
     persistAnnotationState();
 }
 
+void ShotWindow::setSelectedMarkerFill(bool filled)
+{
+    // 1. 选中已有形状标记时批量切换填充模式
+    // 2. 无选中时更新工具默认模式，并刷新工具栏与弹层状态
+    const QVector<int> selectedIds = selectedAnnotationIds();
+    if (!selectedIds.isEmpty()) {
+        bool changed = false;
+        for (int id : selectedIds) {
+            const Annotation *annotation = annotationById(id);
+            if (annotation && annotation->tool == Tool::Marker && annotation->filled != filled) {
+                changed = true;
+                break;
+            }
+        }
+        if (changed) {
+            pushHistorySnapshot();
+            for (int id : selectedIds) {
+                if (Annotation *annotation = annotationById(id);
+                    annotation && annotation->tool == Tool::Marker) {
+                    annotation->filled = filled;
+                }
+            }
+        }
+    }
+
+    if (m_draft.has_value() && m_draft->tool == Tool::Marker) {
+        m_draft->filled = filled;
+    }
+    m_markerFilled = filled;
+    refreshShapeMarkerToolbarButton();
+    updateAnnotationPropertyPanel();
+    update();
+    persistAnnotationState();
+}
+
 void ShotWindow::setSelectedHighlighterStyle(HighlighterStyle style)
 {
     const QVector<int> selectedIds = selectedAnnotationIds();

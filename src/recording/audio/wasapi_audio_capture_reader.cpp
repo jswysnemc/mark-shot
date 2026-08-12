@@ -317,9 +317,12 @@ int WasapiAudioCaptureReader::preferredSampleRate() const
 
 bool WasapiAudioCaptureReader::init(int frameBytes,
                                     int sampleRate,
+                                    const QString &deviceName,
                                     SampleCallback callback,
                                     QString *error)
 {
+    // WASAPI 回环采集目前固定使用默认播放设备。
+    Q_UNUSED(deviceName)
     if (error) {
         error->clear();
     }

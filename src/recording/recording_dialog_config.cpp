@@ -165,6 +165,7 @@ RecordingDialogConfig recordingDialogConfigFromRoot(const QJsonObject &root, Rec
     config.fps = config.mode == RecordingMode::Gif ? config.gifFps : config.videoFps;
     config.countdownSeconds = boundedInt(dialog.value(QStringLiteral("countdownSeconds")), 0, 0, 10);
     config.includeAudio = dialog.value(QStringLiteral("includeAudio")).toBool(false);
+    config.audioDevice = dialog.value(QStringLiteral("audioDevice")).toString().trimmed();
     config.outputPath = generatedOutputPathFromDialogConfig(dialog, config.mode, config.container);
     config.displayKey = dialog.value(QStringLiteral("displayKey")).toString().trimmed();
     return config;
@@ -201,6 +202,7 @@ bool saveRecordingDialogConfig(const RecordingDialogConfig &config, QString *err
                   config.fps);
     dialog.insert(QStringLiteral("countdownSeconds"), config.countdownSeconds);
     dialog.insert(QStringLiteral("includeAudio"), config.includeAudio);
+    dialog.insert(QStringLiteral("audioDevice"), config.audioDevice);
     dialog.insert(QStringLiteral("outputDirectory"), QFileInfo(config.outputPath).absolutePath());
     dialog.insert(QStringLiteral("displayKey"), config.displayKey);
     return markshot::writeAppConfigValue({QStringLiteral("recording"),
@@ -222,6 +224,7 @@ RecordingDialogConfig recordingDialogConfigFromOptions(const RecordingOptions &o
     config.gifFps = options.mode == RecordingMode::Gif ? options.fps : 12;
     config.countdownSeconds = options.countdownSeconds;
     config.includeAudio = options.includeAudio;
+    config.audioDevice = options.audioDevice;
     config.outputPath = options.outputPath.trimmed().isEmpty()
         ? defaultRecordingPath(options.mode, options.container)
         : defaultRecordingPathInDirectory(QFileInfo(options.outputPath).absolutePath(),

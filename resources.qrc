@@ -12,5 +12,7 @@
     <file alias="mark-shot-256.png">data/icons/hicolor/256x256/apps/mark-shot.png</file>
     <file alias="chevron-down.svg">data/icons/chevron-down.svg</file>
     <file alias="chevron-up.svg">data/icons/chevron-up.svg</file>
+    <file alias="check-dark.svg">data/icons/check-dark.svg</file>
+    <file alias="check-light.svg">data/icons/check-light.svg</file>
   </qresource>
 </RCC>

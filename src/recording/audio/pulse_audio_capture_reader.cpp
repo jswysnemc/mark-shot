@@ -20,12 +20,14 @@ PulseAudioCaptureReader::~PulseAudioCaptureReader()
  * 初始化 PulseAudio 采集流。
  * @param frameBytes 每个音频块的字节数。
  * @param sampleRate 采样率。
+ * @param deviceName PulseAudio source 名；空字符串表示系统默认输入。
  * @param callback 音频块回调。
  * @param error 输出错误信息。
  * @return 初始化成功时返回 true。
  */
 bool PulseAudioCaptureReader::init(int frameBytes,
                                    int sampleRate,
+                                   const QString &deviceName,
                                    SampleCallback callback,
                                    QString *error)
 {
@@ -35,6 +37,7 @@ bool PulseAudioCaptureReader::init(int frameBytes,
 #ifndef HAVE_PULSE_RECORDING
     Q_UNUSED(frameBytes)
     Q_UNUSED(sampleRate)
+    Q_UNUSED(deviceName)
     Q_UNUSED(callback)
     if (error) {
         *error = QStringLiteral("PulseAudio recording support is not linked");
@@ -64,10 +67,11 @@ bool PulseAudioCaptureReader::init(int frameBytes,
     attr.fragsize = static_cast<uint32_t>(frameBytes * 4);
 
     int pulseError = 0;
+    const QByteArray deviceUtf8 = deviceName.trimmed().toUtf8();
     m_connection = pa_simple_new(nullptr,
                                  "mark-shot",
                                  PA_STREAM_RECORD,
-                                 nullptr,
+                                 deviceUtf8.isEmpty() ? nullptr : deviceUtf8.constData(),
                                  "mark-shot recording",
                                  &sampleSpec,
                                  &channelMap,
@@ -75,8 +79,12 @@ bool PulseAudioCaptureReader::init(int frameBytes,
                                  &pulseError);
     if (!m_connection) {
         if (error) {
-            *error = QStringLiteral("failed to connect PulseAudio: %1")
-                         .arg(QString::fromLocal8Bit(pa_strerror(pulseError)));
+            *error = deviceUtf8.isEmpty()
+                ? QStringLiteral("failed to connect PulseAudio: %1")
+                      .arg(QString::fromLocal8Bit(pa_strerror(pulseError)))
+                : QStringLiteral("failed to open PulseAudio source \"%1\": %2")
+                      .arg(deviceName.trimmed(),
+                           QString::fromLocal8Bit(pa_strerror(pulseError)));
         }
         return false;
     }

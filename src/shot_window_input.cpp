@@ -25,6 +25,17 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
         update();
     }
 
+    // 录制中提示面板的停止按钮是手绘控件，悬停反馈在此处理；悬停期间
+    // 不再进行窗口预选高亮，避免面板下方的窗口边框闪烁。
+    if (updateActiveRecordingStopHover(event->position())) {
+        if (m_hoveredWindowRect.has_value()) {
+            m_hoveredWindowRect.reset();
+            update();
+        }
+        event->accept();
+        return;
+    }
+
     const QPointF imagePoint = widgetToImage(event->position());
     const bool startupPointerTool = m_startupTool == StartupTool::ColorPicker
         || m_startupTool == StartupTool::Ruler;

@@ -9,6 +9,8 @@ class QCheckBox;
 class QComboBox;
 class QLabel;
 class QLineEdit;
+class QToolButton;
+class QWidget;
 
 namespace markshot::recording {
 
@@ -67,6 +69,19 @@ private:
      */
     void storeCurrentFpsForMode(RecordingMode mode);
 
+    /**
+     * 应用与设置界面一致的主题样式。
+     * @return 无返回值。
+     */
+    void applyDialogTheme();
+
+    /**
+     * 填充音频输入设备下拉框。
+     * @param persistedDevice 上次保存的设备标识。
+     * @return 无返回值。
+     */
+    void populateAudioDevices(const QString &persistedDevice);
+
     RecordingMode m_mode = RecordingMode::Gif;
     int m_videoFps = 30;
     int m_gifFps = 12;
@@ -75,6 +90,7 @@ private:
     QComboBox *m_modeSelector = nullptr;
     QComboBox *m_fps = nullptr;
     QCheckBox *m_audio = nullptr;
+    QComboBox *m_audioDevice = nullptr;
     QComboBox *m_display = nullptr;
     QComboBox *m_backend = nullptr;
     QComboBox *m_scope = nullptr;
@@ -82,6 +98,8 @@ private:
     QComboBox *m_container = nullptr;
     QComboBox *m_quality = nullptr;
     QLineEdit *m_outputPath = nullptr;
+    QToolButton *m_advancedToggle = nullptr;
+    QWidget *m_advancedPanel = nullptr;
     bool m_outputPathTouched = false;
 };
 

@@ -619,6 +619,28 @@ void ShotWindow::initializeTransientPanels()
         // 6 列网格，容纳扑克花色与更多形状
         shapeLayout->addWidget(button, i / 6, i % 6);
     }
+
+    // 末行：填充 / 描边切换，作用于新标记与选中的形状标记
+    const int fillRow = (static_cast<int>(shapes.size()) + 5) / 6;
+    const auto addFillModeButton = [this, shapeLayout, fillRow](bool filled, int column) {
+        auto *button = new QPushButton(m_shapeMarkerPopup);
+        button->setFocusPolicy(Qt::NoFocus);
+        button->setCursor(Qt::ArrowCursor);
+        button->setIcon(markshot::ui::makeMarkerShapeIcon(ShotWindow::MarkerShape::Circle,
+                                                          QColor(),
+                                                          filled));
+        button->setIconSize(QSize(m_toolbarAppearance.toolbarIconSize, m_toolbarAppearance.toolbarIconSize));
+        button->setToolTip(markshot::i18n::translate(filled ? QStringLiteral("Filled")
+                                                            : QStringLiteral("Outline")));
+        button->setProperty("markerFillMode", filled);
+        button->setCheckable(true);
+        connect(button, &QPushButton::clicked, this, [this, filled] {
+            setSelectedMarkerFill(filled);
+        });
+        shapeLayout->addWidget(button, fillRow, column, 1, 3);
+    };
+    addFillModeButton(true, 0);
+    addFillModeButton(false, 3);
     m_shapeMarkerPopup->hide();
 
     m_colorPalette->hide();

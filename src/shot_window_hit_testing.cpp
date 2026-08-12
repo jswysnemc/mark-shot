@@ -6,6 +6,14 @@ using namespace markshot::shot;
 
 void ShotWindow::updateCursor()
 {
+    // 悬停在录制中面板的停止按钮上时保持手型。updateCursor 会被多条
+    // 代码路径高频调用（运行时日志证实悬停后几毫秒内即被覆盖），因此
+    // 该交互状态必须在这里统一处理，而不是只在悬停切换时设置一次。
+    if (m_activeRecordingStopHovered) {
+        setCursor(Qt::PointingHandCursor);
+        return;
+    }
+
     if (m_showWheelPreview && m_wheelPreviewTimer.isValid() && m_wheelPreviewTimer.elapsed() <= 900) {
         setCursor(Qt::BlankCursor);
         return;

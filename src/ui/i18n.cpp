@@ -104,6 +104,14 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Ban"), QStringLiteral("禁止")},
         {QStringLiteral("Octagon"), QStringLiteral("八边形")},
         {QStringLiteral("Crescent"), QStringLiteral("新月")},
+        {QStringLiteral("Pin"), QStringLiteral("定位针")},
+        {QStringLiteral("Flag"), QStringLiteral("旗帜")},
+        {QStringLiteral("Bookmark"), QStringLiteral("书签")},
+        {QStringLiteral("Shield"), QStringLiteral("盾牌")},
+        {QStringLiteral("Exclamation"), QStringLiteral("感叹号")},
+        {QStringLiteral("Speech Bubble"), QStringLiteral("对话气泡")},
+        {QStringLiteral("Filled"), QStringLiteral("填充")},
+        {QStringLiteral("Outline"), QStringLiteral("描边")},
         {QStringLiteral("Marker"), QStringLiteral("形状标记")},
         {QStringLiteral("Ellipse"), QStringLiteral("椭圆")},
         {QStringLiteral("Arrow"), QStringLiteral("箭头")},
@@ -441,6 +449,49 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Unknown"), QStringLiteral("未知")},
         {QStringLiteral("No provider plugins were found in the configured search directories."),
          QStringLiteral("在已配置的搜索目录中没有找到 Provider 插件。")},
+
+        // GitHub 插件市场。
+        {QStringLiteral("Get Plugins from GitHub"), QStringLiteral("从 GitHub 获取插件")},
+        {QStringLiteral("Download official provider plugins (OCR, translation, code scanning) from GitHub "
+                        "Releases. Downloads are verified with SHA-256 and installed into the user plugin "
+                        "folder. Restart Mark Shot to load newly installed plugins. Prebuilt plugins are "
+                        "linked against the build machine's system libraries; if a plugin fails to load "
+                        "(see diagnostics below), use your distribution package or a local build instead."),
+         QStringLiteral("从 GitHub Releases 下载官方 Provider 插件（OCR、翻译、扫码）。"
+                        "下载内容经 SHA-256 校验后安装到用户插件目录，重启 Mark Shot 后生效。"
+                        "预编译插件与构建机的系统库版本绑定；若插件加载失败（见下方插件诊断），"
+                        "请改用发行版软件包或本地构建的插件。")},
+        {QStringLiteral("Fetch Plugin List"), QStringLiteral("获取插件列表")},
+        {QStringLiteral("Plugin list has not been fetched yet."), QStringLiteral("尚未获取插件列表。")},
+        {QStringLiteral("Fetching plugin list from GitHub..."), QStringLiteral("正在从 GitHub 获取插件列表…")},
+        {QStringLiteral("Failed to fetch plugin list: %1"), QStringLiteral("获取插件列表失败：%1")},
+        {QStringLiteral("%1 plugins are available for this platform."),
+         QStringLiteral("当前平台有 %1 个可安装插件。")},
+        {QStringLiteral("No plugins are available for this platform."),
+         QStringLiteral("当前平台没有可安装的插件。")},
+        {QStringLiteral("Install"), QStringLiteral("安装")},
+        {QStringLiteral("Reinstall"), QStringLiteral("重新安装")},
+        {QStringLiteral("Downloading %1..."), QStringLiteral("正在下载 %1…")},
+        {QStringLiteral("Downloading %1... %2%"), QStringLiteral("正在下载 %1… %2%")},
+        {QStringLiteral("%1 installed. Restart Mark Shot to load it."),
+         QStringLiteral("%1 已安装，重启 Mark Shot 后生效。")},
+        {QStringLiteral("Failed to install %1: %2"), QStringLiteral("安装 %1 失败：%2")},
+        {QStringLiteral("Failed to download %1: %2"), QStringLiteral("下载 %1 失败：%2")},
+
+        // OCR 模型下载。
+        {QStringLiteral("OCR Models (PP-OCRv5)"), QStringLiteral("OCR 模型（PP-OCRv5）")},
+        {QStringLiteral("The built-in OCR plugin (PP-OCR with ONNX Runtime) needs the detection and "
+                        "recognition models plus the dictionary. They are downloaded from the official "
+                        "RapidOCR model releases with SHA-256 verification. No Python required."),
+         QStringLiteral("内置 OCR 插件（PP-OCR + ONNX Runtime）需要检测模型、识别模型和字典文件。"
+                        "模型从 RapidOCR 官方发布源下载并经 SHA-256 校验，无需 Python 环境。")},
+        {QStringLiteral("Download Models (~21 MB)"), QStringLiteral("下载模型（约 21 MB）")},
+        {QStringLiteral("Download Again"), QStringLiteral("重新下载")},
+        {QStringLiteral("Models installed at %1"), QStringLiteral("模型已安装：%1")},
+        {QStringLiteral("Models are not downloaded yet."), QStringLiteral("尚未下载模型。")},
+        {QStringLiteral("OCR models are ready at %1. Restart Mark Shot if OCR was already used in "
+                        "this session."),
+         QStringLiteral("OCR 模型已就绪：%1。若本次会话已使用过 OCR，请重启 Mark Shot。")},
         {QStringLiteral("Translation"), QStringLiteral("翻译")},
         {QStringLiteral("Debug"), QStringLiteral("调试")},
         {QStringLiteral("Configure diagnostic logging for troubleshooting."),
@@ -542,6 +593,10 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Countdown"), QStringLiteral("起录倒计时")},
         {QStringLiteral("Off"), QStringLiteral("关闭")},
         {QStringLiteral("%1 seconds"), QStringLiteral("%1 秒")},
+        {QStringLiteral("Advanced Options"), QStringLiteral("高级选项")},
+        {QStringLiteral("Record audio"), QStringLiteral("录制音频")},
+        {QStringLiteral("System default input"), QStringLiteral("系统默认输入")},
+        {QStringLiteral("%1 (system audio)"), QStringLiteral("%1（系统声音）")},
         {QStringLiteral("Recording starts in %1..."), QStringLiteral("%1 秒后开始录制…")},
         {QStringLiteral("Videos (*.%1)"), QStringLiteral("视频文件 (*.%1)")},
         {QStringLiteral("Open Folder"), QStringLiteral("打开目录")},
@@ -553,6 +608,11 @@ const QHash<QString, QString> &chineseTable()
                         "Use the tray menu or bind a desktop shortcut instead."),
          QStringLiteral("当前平台未提供全局快捷键 Portal。请使用托盘菜单或绑定桌面快捷键。")},
         {QStringLiteral("No global shortcuts are configured."), QStringLiteral("未配置全局快捷键。")},
+        {QStringLiteral("No global shortcuts could be registered through GNOME settings."),
+         QStringLiteral("无法通过 GNOME 系统设置注册任何全局快捷键。")},
+        {QStringLiteral("Failed to write GNOME custom keybindings."),
+         QStringLiteral("写入 GNOME 自定义快捷键失败。")},
+        {QStringLiteral("No selection history"), QStringLiteral("没有选区历史")},
         {QStringLiteral("Failed to create global shortcut session: %1"),
          QStringLiteral("创建全局快捷键会话失败：%1")},
         {QStringLiteral("Global shortcuts portal returned an invalid session."),

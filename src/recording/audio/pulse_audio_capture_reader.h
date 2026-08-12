@@ -20,11 +20,16 @@ public:
      * 初始化 PulseAudio 采集流。
      * @param frameBytes 每个音频块的字节数。
      * @param sampleRate 采样率。
+     * @param deviceName PulseAudio source 名；空字符串表示系统默认输入。
      * @param callback 音频块回调。
      * @param error 输出错误信息。
      * @return 初始化成功时返回 true。
      */
-    bool init(int frameBytes, int sampleRate, SampleCallback callback, QString *error) override;
+    bool init(int frameBytes,
+              int sampleRate,
+              const QString &deviceName,
+              SampleCallback callback,
+              QString *error) override;
 
     /**
      * 启动音频采集线程。

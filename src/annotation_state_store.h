@@ -30,6 +30,8 @@ struct AnnotationState {
     qreal rectangleCornerRadius = 0.0;
     ShotWindow::RectangleStyle rectangleStyle = ShotWindow::RectangleStyle::Stroke;
     ShotWindow::MarkerShape markerShape = ShotWindow::MarkerShape::Triangle;
+    /// @brief 形状标记填充模式；false 表示描边（空心）。
+    bool markerFilled = true;
 
     // 放大镜相关
     qreal magnifierScale = 2.75;

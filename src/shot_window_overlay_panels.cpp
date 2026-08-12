@@ -162,19 +162,29 @@ void ShotWindow::refreshShapeMarkerToolbarButton()
     if (!m_shapeMarkerToolbarButton) {
         return;
     }
-    m_shapeMarkerToolbarButton->setIcon(markshot::ui::makeMarkerShapeIcon(m_markerShape));
+    m_shapeMarkerToolbarButton->setIcon(
+        markshot::ui::makeMarkerShapeIcon(m_markerShape, QColor(), m_markerFilled));
     m_shapeMarkerToolbarButton->setToolTip(
         QStringLiteral("%1 (%2)").arg(
             markshot::i18n::translate(markshot::marker::shapeLabel(m_markerShape)),
             shortcutText(Tool::Marker)));
 
-    // 2. 同步弹层中按钮选中态
+    // 2. 同步弹层中按钮选中态；形状按钮图标跟随当前填充模式渲染
     if (!m_shapeMarkerPopup) {
         return;
     }
     const auto buttons = m_shapeMarkerPopup->findChildren<QPushButton *>();
     for (QPushButton *button : buttons) {
-        const bool selected = button->property("markerShape").toInt() == static_cast<int>(m_markerShape);
+        bool selected = false;
+        const QVariant shapeProperty = button->property("markerShape");
+        const QVariant fillProperty = button->property("markerFillMode");
+        if (shapeProperty.isValid()) {
+            selected = shapeProperty.toInt() == static_cast<int>(m_markerShape);
+            button->setIcon(markshot::ui::makeMarkerShapeIcon(
+                static_cast<MarkerShape>(shapeProperty.toInt()), QColor(), m_markerFilled));
+        } else if (fillProperty.isValid()) {
+            selected = fillProperty.toBool() == m_markerFilled;
+        }
         const QSignalBlocker blocker(button);
         button->setChecked(selected);
         button->setProperty("role", selected ? QStringLiteral("primary") : QVariant());

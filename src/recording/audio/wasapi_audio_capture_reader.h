@@ -28,11 +28,16 @@ public:
      * 初始化 WASAPI 默认播放设备回环采集。
      * @param frameBytes 每个音频块的字节数。
      * @param sampleRate 采样率。
+     * @param deviceName 设备标识；WASAPI 回环目前只支持默认播放设备，忽略该值。
      * @param callback 音频块回调。
      * @param error 输出错误信息。
      * @return 初始化成功时返回 true。
      */
-    bool init(int frameBytes, int sampleRate, SampleCallback callback, QString *error) override;
+    bool init(int frameBytes,
+              int sampleRate,
+              const QString &deviceName,
+              SampleCallback callback,
+              QString *error) override;
 
     /**
      * 启动 WASAPI 音频采集线程。

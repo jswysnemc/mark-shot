@@ -721,7 +721,7 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
     annotation.filled = m_shapeFilled;
     annotation.cornerRadius = m_tool == Tool::Rectangle ? m_rectangleCornerRadius : 0.0;
     if (m_tool == Tool::Marker) {
-        annotation.filled = true;
+        annotation.filled = m_markerFilled;
     }
     annotation.arrowStyle = m_arrowStyle;
     annotation.rectangleStyle = m_rectangleStyle;

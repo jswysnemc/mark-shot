@@ -212,7 +212,11 @@ void RecordingController::stop()
         m_heartbeat->stop();
     }
     if (m_grabber) {
-        m_grabber->stop();
+        // 这里只暂停采集，让新帧停止进入写出队列。完全拆除（等待编码侧归还
+        // 共享内存缓冲）推迟到 completeStop：写出收尾完成前队列仍持有缓冲，
+        // 立刻拆除会把主线程阻塞到缓冲池 2 秒超时（运行时日志
+        // grabberStopMs=2002 证实）。
+        m_grabber->setPaused(true);
     }
 
     QString error;
@@ -248,11 +252,13 @@ void RecordingController::fail(const QString &message)
     if (m_heartbeat) {
         m_heartbeat->stop();
     }
-    if (m_grabber) {
-        m_grabber->stop();
-    }
+    // 先取消写出让队列释放采集缓冲，再拆采集流；反过来会让缓冲池等待
+    // 仍被队列持有的缓冲直到超时。
     if (m_writer) {
         m_writer->cancel();
+    }
+    if (m_grabber) {
+        m_grabber->stop();
     }
     markshot::debugLog("recording",
                        "【录制】【失败】frames=%d error=%s",
@@ -281,6 +287,11 @@ void RecordingController::completeStop(bool ok, const QString &error)
         return;
     }
     m_finishEmitted = true;
+    // 写出收尾已完成，编码侧不再持有采集缓冲，此时拆除采集流的缓冲等待
+    // 可以立即通过，不会阻塞主线程。
+    if (m_grabber) {
+        m_grabber->stop();
+    }
     markshot::debugLog("recording",
                        "【录制】【结束】ok=%d frames=%d output=%s error=%s",
                        ok ? 1 : 0,

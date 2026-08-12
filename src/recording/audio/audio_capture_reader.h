@@ -27,11 +27,16 @@ public:
      * 初始化音频采集流。
      * @param frameBytes 每个音频块的字节数。
      * @param sampleRate 采样率。
+     * @param deviceName 采集设备标识；空字符串表示系统默认设备。
      * @param callback 音频块回调。
      * @param error 输出错误信息。
      * @return 初始化成功时返回 true。
      */
-    virtual bool init(int frameBytes, int sampleRate, SampleCallback callback, QString *error) = 0;
+    virtual bool init(int frameBytes,
+                      int sampleRate,
+                      const QString &deviceName,
+                      SampleCallback callback,
+                      QString *error) = 0;
 
     /**
      * 启动音频采集线程。

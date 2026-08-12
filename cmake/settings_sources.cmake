@@ -27,6 +27,7 @@ set(MARK_SHOT_SETTINGS_SOURCES
     src/settings/settings_page_pinned.h
     src/settings/settings_page_plugins.cpp
     src/settings/settings_page_plugins.h
+    src/settings/settings_page_plugins_market.cpp
     src/settings/settings_page_plugins_model.cpp
     src/settings/settings_page_plugins_model.h
     src/settings/settings_page_scroll.cpp
