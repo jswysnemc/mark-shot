@@ -1,0 +1,126 @@
+{
+    "schemaVersion": 1,
+    "generatedAt": "2026-08-12T00:00:00Z",
+    "plugins": [
+        {
+            "id": "mark-shot-ocr-rapid",
+            "name": "PP-OCR (ONNX Runtime)",
+            "version": "0.1.47",
+            "vendor": "mark-shot",
+            "description": "PP-OCR text recognition provider backed by ONNX Runtime. Runs OCR fully in-process without the Python helper.",
+            "markShotMinVersion": "0.1.38",
+            "homepage": "https://github.com/jswysnemc/mark-shot",
+            "license": "MIT",
+            "capabilities": [
+                {
+                    "type": "ocr",
+                    "providerId": "rapid-onnx",
+                    "displayName": "PP-OCR (ONNX Runtime)"
+                }
+            ],
+            "assets": [
+                {
+                    "platform": "linux",
+                    "architecture": "x86_64",
+                    "fileName": "mark-shot-plugin-ocr-rapid-v0.1.47-linux-x86_64.so",
+                    "libraryFileName": "libmark-shot-ocr-rapid.so",
+                    "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.47/mark-shot-plugin-ocr-rapid-v0.1.47-linux-x86_64.so",
+                    "sha256": "9c19485aa2b44ea5ff7cb5f5f42d79f9713dfd2b1d92225eeb8d0438f6868c22",
+                    "size": 151016
+                },
+                {
+                    "platform": "windows",
+                    "architecture": "x86_64",
+                    "fileName": "mark-shot-plugin-ocr-rapid-v0.1.47-windows-x86_64.dll",
+                    "libraryFileName": "mark-shot-ocr-rapid.dll",
+                    "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.47/mark-shot-plugin-ocr-rapid-v0.1.47-windows-x86_64.dll",
+                    "sha256": "70f15884970df9f5362ef8e1965614da1dca0f455f88cb940d849d1fdcfc8ca2",
+                    "size": 220233
+                }
+            ]
+        },
+        {
+            "id": "mark-shot-translate-openai",
+            "name": "OpenAI-Compatible Translation",
+            "version": "0.1.47",
+            "vendor": "mark-shot",
+            "description": "Translation provider for OpenAI-compatible chat completion endpoints, used by pinned window OCR translation.",
+            "markShotMinVersion": "0.1.38",
+            "homepage": "https://github.com/jswysnemc/mark-shot",
+            "license": "MIT",
+            "capabilities": [
+                {
+                    "type": "translation",
+                    "providerId": "openai-compatible",
+                    "displayName": "OpenAI-Compatible API"
+                }
+            ],
+            "assets": [
+                {
+                    "platform": "linux",
+                    "architecture": "x86_64",
+                    "fileName": "mark-shot-plugin-translate-openai-v0.1.47-linux-x86_64.so",
+                    "libraryFileName": "libmark-shot-translate-openai.so",
+                    "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.47/mark-shot-plugin-translate-openai-v0.1.47-linux-x86_64.so",
+                    "sha256": "9a95209297b8d58d91f4728ee334a9f1c45f6d98b624f138ce1e4a092033b323",
+                    "size": 94448
+                },
+                {
+                    "platform": "linux",
+                    "architecture": "arm64",
+                    "fileName": "mark-shot-plugin-translate-openai-v0.1.47-linux-arm64.so",
+                    "libraryFileName": "libmark-shot-translate-openai.so",
+                    "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.47/mark-shot-plugin-translate-openai-v0.1.47-linux-arm64.so",
+                    "sha256": "34549e1f5ef6acae657a5157121f47bfb7e83a6a1c48d6c57ba3001a1ec691f9",
+                    "size": 7736
+                },
+                {
+                    "platform": "windows",
+                    "architecture": "x86_64",
+                    "fileName": "mark-shot-plugin-translate-openai-v0.1.47-windows-x86_64.dll",
+                    "libraryFileName": "mark-shot-translate-openai.dll",
+                    "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.47/mark-shot-plugin-translate-openai-v0.1.47-windows-x86_64.dll",
+                    "sha256": "7c878af1cf81230041c2aa7f504042abdd9c15d8a0d5f56d019bb683867cb5e2",
+                    "size": 178490
+                }
+            ]
+        },
+        {
+            "id": "mark-shot-code-scan-zxing",
+            "name": "ZXing Code Scanner",
+            "version": "0.1.47",
+            "vendor": "mark-shot",
+            "description": "QR code and barcode scanner provider backed by zxing-cpp, covering QR, Data Matrix, Aztec, PDF417, EAN, UPC, and Code 39/93/128.",
+            "markShotMinVersion": "0.1.38",
+            "homepage": "https://github.com/jswysnemc/mark-shot",
+            "license": "MIT",
+            "capabilities": [
+                {
+                    "type": "code-scan",
+                    "providerId": "zxing-cpp",
+                    "displayName": "ZXing (zxing-cpp)"
+                }
+            ],
+            "assets": [
+                {
+                    "platform": "linux",
+                    "architecture": "x86_64",
+                    "fileName": "mark-shot-plugin-code-scan-zxing-v0.1.47-linux-x86_64.so",
+                    "libraryFileName": "libmark-shot-code-scan-zxing.so",
+                    "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.47/mark-shot-plugin-code-scan-zxing-v0.1.47-linux-x86_64.so",
+                    "sha256": "d2b8eced7892937bffa31d6235fff307a740e4463c064fa004945dc786df8455",
+                    "size": 49640
+                },
+                {
+                    "platform": "windows",
+                    "architecture": "x86_64",
+                    "fileName": "mark-shot-plugin-code-scan-zxing-v0.1.47-windows-x86_64.dll",
+                    "libraryFileName": "mark-shot-code-scan-zxing.dll",
+                    "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.47/mark-shot-plugin-code-scan-zxing-v0.1.47-windows-x86_64.dll",
+                    "sha256": "7204a5845b8c425cfba05ac883fb7b50651fea2e306511a18edbc06b4df7a016",
+                    "size": 251895
+                }
+            ]
+        }
+    ]
+}
