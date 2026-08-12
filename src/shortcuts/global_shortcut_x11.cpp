@@ -130,10 +130,13 @@ std::uint8_t X11GlobalShortcutBackend::keycodeForKeysym(std::uint32_t keysym) co
 
     std::uint8_t found = 0;
     if (keysyms && perKeycode > 0) {
-        // 2. 只比对每个键码的第一个 keysym，即未叠加 Shift 时的符号
+        // 2. 扫描每个键码的全部 level：Print 常落在非第 0 档（与 Sys_Req 互换）
         for (int index = 0; index < keysymCount && found == 0; index += perKeycode) {
-            if (keysyms[index] == keysym) {
-                found = static_cast<std::uint8_t>(minKeycode + index / perKeycode);
+            for (int level = 0; level < perKeycode; ++level) {
+                if (keysyms[index + level] == keysym) {
+                    found = static_cast<std::uint8_t>(minKeycode + index / perKeycode);
+                    break;
+                }
             }
         }
     }
@@ -152,34 +155,40 @@ bool X11GlobalShortcutBackend::grabKey(std::uint32_t keysym,
         return false;
     }
 
-    const std::uint8_t keycode = keycodeForKeysym(keysym);
-    if (keycode == 0) {
-        return false;
-    }
-
-    // 1. 对每种锁定键组合各抓取一次，确保 CapsLock / NumLock 打开时仍能触发
-    bool anyGrabbed = false;
-    for (const std::uint16_t lockMask : lockModifierVariants()) {
-        const std::uint16_t effectiveModifiers = static_cast<std::uint16_t>(modifiers | lockMask);
-        xcb_void_cookie_t cookie = xcb_grab_key_checked(connection,
-                                                        1,  // owner_events：事件仍投递给拥有者
-                                                        root,
-                                                        effectiveModifiers,
-                                                        keycode,
-                                                        XCB_GRAB_MODE_ASYNC,
-                                                        XCB_GRAB_MODE_ASYNC);
-        xcb_generic_error_t *error = xcb_request_check(connection, cookie);
-        if (error) {
-            // 已被其他程序占用时该组合抓取失败，跳过但不影响其余组合
-            free(error);
+    // 1. Print 等键可能对应多个 keysym，逐个解析 keycode 再抓取
+    for (const std::uint32_t candidate : x11KeysymCandidates(keysym)) {
+        const std::uint8_t keycode = keycodeForKeysym(candidate);
+        if (keycode == 0) {
             continue;
         }
-        m_grabbedKeys.append({keycode, effectiveModifiers});
-        m_shortcutIdByBinding.insert(bindingKey(keycode, effectiveModifiers), shortcutId);
-        anyGrabbed = true;
+
+        bool anyGrabbed = false;
+        for (const std::uint16_t lockMask : lockModifierVariants()) {
+            const std::uint16_t effectiveModifiers =
+                static_cast<std::uint16_t>(modifiers | lockMask);
+            xcb_void_cookie_t cookie = xcb_grab_key_checked(connection,
+                                                            1,  // owner_events：事件仍投递给拥有者
+                                                            root,
+                                                            effectiveModifiers,
+                                                            keycode,
+                                                            XCB_GRAB_MODE_ASYNC,
+                                                            XCB_GRAB_MODE_ASYNC);
+            xcb_generic_error_t *error = xcb_request_check(connection, cookie);
+            if (error) {
+                // 已被其他程序占用时该组合抓取失败，跳过但不影响其余组合
+                free(error);
+                continue;
+            }
+            m_grabbedKeys.append({keycode, effectiveModifiers});
+            m_shortcutIdByBinding.insert(bindingKey(keycode, effectiveModifiers), shortcutId);
+            anyGrabbed = true;
+        }
+        if (anyGrabbed) {
+            return true;
+        }
     }
 
-    return anyGrabbed;
+    return false;
 }
 
 void X11GlobalShortcutBackend::installEventFilter()
@@ -204,6 +213,7 @@ bool X11GlobalShortcutBackend::registerShortcuts(const QList<Shortcut> &shortcut
 
     // 1. 逐条转换并抓取，单条失败不影响其余快捷键
     QStringList failed;
+    QStringList rejectedBare;
     for (const Shortcut &shortcut : shortcuts) {
         if (shortcut.id.isEmpty() || !shortcut.callback) {
             continue;
@@ -211,11 +221,29 @@ bool X11GlobalShortcutBackend::registerShortcuts(const QList<Shortcut> &shortcut
 
         const X11KeyBinding binding = x11BindingForSequence(shortcut.sequence);
         if (!binding.valid) {
-            failed.append(shortcut.sequence.toString(QKeySequence::NativeText));
+            const QString text = shortcut.sequence.toString(QKeySequence::NativeText);
+            failed.append(text);
+            // 无修饰键且非 Print：明确记入，避免被误报成「被其他程序占用」
+            if (!shortcut.sequence.isEmpty()
+                && shortcut.sequence[0].keyboardModifiers() == Qt::NoModifier
+                && shortcut.sequence[0].key() != Qt::Key_Print) {
+                rejectedBare.append(text);
+            }
+            markshot::debugLog("shortcuts",
+                               "【全局快捷键】【X11】unsupported sequence id=%s sequence=%s",
+                               shortcut.id.toUtf8().constData(),
+                               text.toUtf8().constData());
             continue;
         }
         if (!grabKey(binding.keysym, binding.modifiers, shortcut.id)) {
-            failed.append(shortcut.sequence.toString(QKeySequence::NativeText));
+            const QString text = shortcut.sequence.toString(QKeySequence::NativeText);
+            failed.append(text);
+            markshot::debugLog("shortcuts",
+                               "【全局快捷键】【X11】grab failed id=%s sequence=%s keysym=0x%x mods=0x%x",
+                               shortcut.id.toUtf8().constData(),
+                               text.toUtf8().constData(),
+                               binding.keysym,
+                               binding.modifiers);
             continue;
         }
         m_callbacks.insert(shortcut.id, shortcut.callback);
@@ -226,8 +254,13 @@ bool X11GlobalShortcutBackend::registerShortcuts(const QList<Shortcut> &shortcut
 
     if (m_callbacks.isEmpty()) {
         unregisterShortcuts();
-        m_errorString = MS_TR("Failed to grab any global shortcut from the X server. "
-                              "Another application may already use the same key combination.");
+        if (!rejectedBare.isEmpty() && rejectedBare.size() == failed.size()) {
+            m_errorString = MS_TR("Global shortcuts need a modifier key (Ctrl/Alt/Super), "
+                                  "except the Print key.");
+        } else {
+            m_errorString = MS_TR("Failed to grab any global shortcut from the X server. "
+                                  "Another application may already use the same key combination.");
+        }
         return false;
     }
 

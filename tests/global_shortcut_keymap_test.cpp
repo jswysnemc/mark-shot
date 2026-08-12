@@ -65,9 +65,27 @@ private slots:
 
     void sequenceWithoutModifierIsRejected()
     {
-        // 无修饰键的组合会抢占普通输入，必须拒绝
+        // 无修饰键的普通按键会抢占输入，必须拒绝
         QVERIFY(!x11BindingForSequence(QKeySequence(QStringLiteral("S"))).valid);
         QVERIFY(!x11BindingForSequence(QKeySequence(QStringLiteral("F5"))).valid);
+    }
+
+    void barePrintIsAllowed()
+    {
+        // Print 是截图专用键，X11 与 GNOME 一样允许裸绑（issue #76）
+        const X11KeyBinding binding = x11BindingForSequence(QKeySequence(Qt::Key_Print));
+        QVERIFY(binding.valid);
+        QCOMPARE(binding.keysym, 0xff61u);
+        QCOMPARE(binding.modifiers, static_cast<std::uint16_t>(0));
+    }
+
+    void printKeysymCandidatesIncludeSysReq()
+    {
+        using markshot::shortcuts::x11KeysymCandidates;
+        const QList<std::uint32_t> candidates = x11KeysymCandidates(0xff61u);
+        QCOMPARE(candidates.size(), 2);
+        QCOMPARE(candidates.at(0), 0xff61u);
+        QCOMPARE(candidates.at(1), 0xff15u);
     }
 
     void emptySequenceIsRejected()
