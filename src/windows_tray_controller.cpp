@@ -220,8 +220,9 @@ QString recordingStatusText(const markshot::recording::RecordingStatus &status)
  * 返回系统托盘使用的图标。
  *
  * Linux 托盘走 StatusNotifierItem 协议时，Qt 会优先把 QIcon::name() 作为图标名
- * 发给托盘宿主，只有名字为空才退回传像素数据。部分宿主实现拿不到有效像素就显示
- * 空白，因此这里在主题可解析时显式构造带名字的图标，让宿主自行按名渲染。
+ * 发给托盘宿主，只有名字为空才退回传像素数据。图标名只有在宿主进程也能按名
+ * 找到图标文件时才可用（applicationIconThemeName 会验证标准安装路径）；否则
+ * 必须使用不带名字的纯像素图标，避免宿主按名查找失败显示空白（issue #78）。
  *
  * @return 托盘图标。
  */
@@ -231,7 +232,7 @@ QIcon trayIcon()
     if (!themeName.isEmpty()) {
         return QIcon::fromTheme(themeName);
     }
-    return markshot::ui::applicationIcon();
+    return markshot::ui::applicationTrayPixmapIcon();
 }
 
 #if defined(Q_OS_WIN)

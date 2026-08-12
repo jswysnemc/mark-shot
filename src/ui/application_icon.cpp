@@ -4,9 +4,13 @@
 #include "ui/icons.h"
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QDirIterator>
+#include <QFile>
 #include <QFileIconProvider>
 #include <QFileInfo>
 #include <QPixmap>
+#include <QStandardPaths>
 #include <QStringList>
 
 namespace markshot::ui {
@@ -62,6 +66,54 @@ QIcon bundledPngIcon()
     }
     return icon;
 }
+
+#if !defined(Q_OS_WIN)
+/**
+ * 判断应用图标是否安装在托盘宿主可见的标准图标目录中。
+ *
+ * StatusNotifierItem 宿主（gnome-shell 的 AppIndicator 扩展、plasmashell）
+ * 运行在独立进程中，按 IconName 查找图标时只搜索它自己的标准 XDG 图标
+ * 路径。本进程 QIcon 能解析主题图标（例如 Nix wrapper 注入的私有
+ * XDG_DATA_DIRS、开发目录直接运行）并不代表宿主也能解析；那种情况下
+ * 必须回退为直接传像素，否则托盘显示空白（issue #78）。
+ *
+ * @return 宿主大概率可按名解析时返回 true。
+ */
+bool themeIconVisibleToTrayHost()
+{
+    // 刻意不使用本进程的 XDG_DATA_DIRS：包装器（Nix wrapper 等）注入的私有
+    // 路径恰恰是宿主看不到的。只认三个所有会话进程都会搜索的标准根目录。
+    const QStringList dataRoots = {
+        QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation),
+        QStringLiteral("/usr/local/share"),
+        QStringLiteral("/usr/share"),
+    };
+    const QStringList iconFileNames = {
+        QStringLiteral("%1.svg").arg(QLatin1String(kApplicationIconName)),
+        QStringLiteral("%1.png").arg(QLatin1String(kApplicationIconName)),
+    };
+    for (const QString &root : dataRoots) {
+        if (root.isEmpty()) {
+            continue;
+        }
+        const QDir hicolor(root + QStringLiteral("/icons/hicolor"));
+        if (!hicolor.exists()) {
+            continue;
+        }
+        QDirIterator it(hicolor.absolutePath(), iconFileNames, QDir::Files,
+                        QDirIterator::Subdirectories);
+        if (it.hasNext()) {
+            return true;
+        }
+    }
+    for (const QString &fileName : iconFileNames) {
+        if (QFile::exists(QStringLiteral("/usr/share/pixmaps/") + fileName)) {
+            return true;
+        }
+    }
+    return false;
+}
+#endif
 
 /**
  * 解析 Linux 下的应用图标。
@@ -123,10 +175,30 @@ QString applicationIconThemeName()
     return {};
 #else
     const QIcon themed = QIcon::fromTheme(QLatin1String(kApplicationIconName));
-    if (iconRendersPixels(themed)) {
+    if (iconRendersPixels(themed) && themeIconVisibleToTrayHost()) {
         return QString::fromLatin1(kApplicationIconName);
     }
     return {};
+#endif
+}
+
+QIcon applicationTrayPixmapIcon()
+{
+#if defined(Q_OS_WIN)
+    return applicationIcon();
+#else
+    // 跳过主题查找：主题图标携带 QIcon::name()，Qt 的 StatusNotifierItem
+    // 实现遇到非空名字只传名字不传像素，宿主解析不了名字就显示空白。
+    if (const QIcon png = bundledPngIcon(); iconRendersPixels(png)) {
+        return png;
+    }
+    if (const QIcon svg(QStringLiteral(":/icons/mark-shot.svg")); iconRendersPixels(svg)) {
+        return svg;
+    }
+    if (const QIcon ico(QStringLiteral(":/icons/mark-shot.ico")); iconRendersPixels(ico)) {
+        return ico;
+    }
+    return makeToolIcon(ShotWindow::Action::ToolSelect);
 #endif
 }
 
