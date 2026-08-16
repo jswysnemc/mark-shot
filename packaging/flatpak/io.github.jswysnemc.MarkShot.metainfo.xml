@@ -18,6 +18,7 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.1.48" date="2026-08-16" />
     <release version="0.1.47" date="2026-08-10" />
     <release version="0.1.46" date="2026-08-10" />
     <release version="0.1.45" date="2026-08-06" />

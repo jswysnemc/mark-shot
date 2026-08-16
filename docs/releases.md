@@ -1,5 +1,15 @@
 # Release Notes
 
+### 0.1.48
+
+- **Double Click Action**: Double clicking an empty area inside the selection finishes a capture in one gesture. Pick the action in Settings -> Capture -> Double Click Action: copy and close (default), save to the default folder, save as, pin to screen, cancel, or do nothing. Double clicking a text annotation still opens the inline editor.
+- **Selection History**: Comma and period step back and forth through the last ten capture selections while picking a region, across multi-monitor layouts and both portal- and grim-backed captures.
+- **Recording and Marketplace**: Audio device selection with a cleaner recording dialog, no more lag when stopping a recording, the in-app plugin marketplace with its official plugin index, and more marker shapes.
+- **GNOME Hotkey Fallback**: Tray hotkeys register on GNOME Wayland through GNOME's own custom keybindings when the portal does not provide the GlobalShortcuts interface.
+- **KDE Wayland Scroll Capture**: Scroll capture no longer fails outright on KDE Wayland; a single portal prompt on the first frame establishes a PipeWire session that later frames reuse silently.
+- **Auto Translation Overlay**: Translations produced by Auto Translate After OCR now appear on their own and stay readable under the dark theme.
+- **Bare Print Key and Tray Icon**: Print alone can be bound as a tray hotkey on X11 desktops, and the tray no longer shows a blank slot when the icon is only reachable through process-private lookup paths.
+
 ### 0.1.47
 
 - **Headless Capture CLI**: Screenshots can be taken without the interactive overlay, including capturing several displays in one run.

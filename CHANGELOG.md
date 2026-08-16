@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.48 - 2026-08-16
+
+### Features & Enhancements
+
+- **Double Click Action**: Double clicking an empty area inside the selection finishes a capture in one gesture. The action is configurable through `capture.doubleClickAction` and the Capture settings page — copy and close (default), save to the default folder, save as, pin to screen, cancel, or do nothing. Double clicking a text annotation still opens the inline editor.
+- **Selection History**: Every confirmed capture selection is persisted, and comma / period step back and forth through the last ten selections while picking a region. Entries are stored in global logical coordinates and mapped back into the current frame, so they survive multi-monitor layouts and both portal- and grim-backed captures.
+- **Recording UX**: The recording dialog gained audio device selection and a cleaner layout, and grabber teardown is deferred so stopping a recording no longer lags.
+- **Plugin Marketplace**: The in-app marketplace and its GitHub-hosted plugin index shipped together, listing the OCR, translation, and code-scan provider plugins with per-platform SHA-256 checksums.
+- **Marker Shapes**: The marker tool covers more shapes, with pinned-window OCR highlight fixes alongside.
+- **GNOME Hotkey Fallback**: `xdg-desktop-portal-gnome` does not implement the `GlobalShortcuts` interface and X11 key grabbing is unavailable inside a Wayland session, so tray hotkeys could not be registered on GNOME Wayland at all. A last-resort backend now writes them into GNOME's media-keys custom keybindings through gsettings, cleaning up stale entries from crashed sessions and removing only Mark Shot's own bindings when unregistering.
+
+### Bug Fixes
+
+- **KDE Wayland Scroll Capture**: Scroll capture failed immediately on KDE Wayland because every route was exhausted — KWin routing is skipped for screencast requests, the silent screencast start needs portal authorization, the portal screenshot fallback is disabled during live scrolling, and grim is unsupported by KWin. One interactive portal prompt is now allowed as the last resort of the first captured frame to establish a reusable PipeWire session; later ticks reuse it silently and wlroots setups still succeed through grim before any prompt appears.
+- **Auto Translation Overlay**: Auto Translate After OCR finished in the background without ever activating the overlay, so results stayed hidden until a manual Translate click. The overlay also drew theme-palette text on its fixed light background, leaving translations unreadable under the dark theme. The overlay now activates when background translation finishes and paints its text with an explicit dark foreground.
+- **Bare Print Key on X11**: Mint and Cinnamon users commonly bind Print alone, but the X11 backend rejected every no-modifier sequence before `XGrabKey` ran and reported a misleading "already in use" error. Bare Print now registers, and Sys_Req plus all keysym levels are probed when resolving Print keycodes.
+- **Blank Tray Slot**: StatusNotifierItem hosts run out of process and resolve the advertised icon name in their own standard paths only, so the tray slot stayed empty whenever the icon was reachable only through process-private lookup paths such as Nix wrapper `XDG_DATA_DIRS` or a development checkout. The name is now advertised only when the icon file exists in a shared location, and hosts otherwise receive pixmap data.
+- **Marker Tool Name**: Selecting the marker tool highlighted the Ellipse toolbar button because `currentToolName()` reported markers as ellipses. Thanks to @webfrogs for the fix.
+
 ## 0.1.47 - 2026-08-10
 
 ### Features & Enhancements
