@@ -216,6 +216,12 @@ then be moved, resized, rotated and deleted together.
 | `Ctrl+Z` / `Ctrl+Y` | undo / redo |
 | `F` | toggle the capture scope (selection ↔ full screen) |
 
+Double clicking an empty area inside the selection finishes the capture in one
+gesture, copying to the clipboard and closing by default. Pick another action in
+**Settings → Capture → Double Click Action**: do nothing, copy and close, save to
+the default folder, save as, pin to screen, or cancel the capture. Double
+clicking a text annotation still opens the inline editor.
+
 ### 4.3 Export frame
 
 Enable **Settings → Export → Mac-style frame** to add transparent padding,

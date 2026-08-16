@@ -1,5 +1,6 @@
 #pragma once
 
+#include "capture_double_click_action.h"
 #include "capture_freeze_scope.h"
 #include "clipboard_image_config.h"
 #include "export_image_effect.h"
@@ -30,6 +31,7 @@ struct CaptureSettings {
     CaptureFreezeScope freezeScope = CaptureFreezeScope::AllScreens;
     bool kdeKwinScreenshotEnabled = true;
     bool hideOwnWindows = true;
+    CaptureDoubleClickAction doubleClickAction = CaptureDoubleClickAction::Copy;
 };
 
 struct ShortcutSettings {

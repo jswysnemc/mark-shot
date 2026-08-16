@@ -294,6 +294,11 @@ void ShotWindow::mouseDoubleClickEvent(QMouseEvent *event)
 
     const auto annotationId = annotationAt(imagePoint);
     if (!annotationId) {
+        // 选区内空白处双击执行用户配置的快捷动作（issue #85）
+        if (canRunDoubleClickAction(imagePoint) && runConfiguredDoubleClickAction()) {
+            event->accept();
+            return;
+        }
         QWidget::mouseDoubleClickEvent(event);
         return;
     }

@@ -31,6 +31,22 @@ SettingsPageCapture::SettingsPageCapture(QWidget *parent)
     m_hideOwnWindows = addSwitchRow(form,
                                     MS_TR("Hide Mark Shot Windows While Capturing"),
                                     MS_TR("Hide own windows from screenshots. Turn off to include them."));
+    // 选区内空白处双击执行的快捷动作，省去移动到工具栏按钮的往返
+    m_doubleClickAction = addComboRow(form, MS_TR("Double Click Action"));
+    m_doubleClickAction->setToolTip(
+        MS_TR("Action performed when double clicking an empty area inside the selection."));
+    m_doubleClickAction->addItem(MS_TR("Do Nothing"),
+                                 static_cast<int>(CaptureDoubleClickAction::None));
+    m_doubleClickAction->addItem(MS_TR("Copy And Close"),
+                                 static_cast<int>(CaptureDoubleClickAction::Copy));
+    m_doubleClickAction->addItem(MS_TR("Save To Default Folder"),
+                                 static_cast<int>(CaptureDoubleClickAction::Save));
+    m_doubleClickAction->addItem(MS_TR("Save As"),
+                                 static_cast<int>(CaptureDoubleClickAction::SaveAs));
+    m_doubleClickAction->addItem(MS_TR("Pin To Screen"),
+                                 static_cast<int>(CaptureDoubleClickAction::Pin));
+    m_doubleClickAction->addItem(MS_TR("Cancel Capture"),
+                                 static_cast<int>(CaptureDoubleClickAction::Cancel));
     layout->addWidget(captureCard);
     layout->addStretch();
 }
@@ -42,6 +58,9 @@ void SettingsPageCapture::setConfig(const SettingsConfig &config)
     m_freezeScope->setCurrentIndex(index >= 0 ? index : 0);
     m_kdeKwinScreenshot->setChecked(config.capture.kdeKwinScreenshotEnabled);
     m_hideOwnWindows->setChecked(config.capture.hideOwnWindows);
+    const int doubleClickIndex =
+        m_doubleClickAction->findData(static_cast<int>(config.capture.doubleClickAction));
+    m_doubleClickAction->setCurrentIndex(doubleClickIndex >= 0 ? doubleClickIndex : 0);
 }
 
 void SettingsPageCapture::updateConfig(SettingsConfig *config) const
@@ -55,6 +74,8 @@ void SettingsPageCapture::updateConfig(SettingsConfig *config) const
         static_cast<CaptureFreezeScope>(m_freezeScope->currentData().toInt());
     config->capture.kdeKwinScreenshotEnabled = m_kdeKwinScreenshot->isChecked();
     config->capture.hideOwnWindows = m_hideOwnWindows->isChecked();
+    config->capture.doubleClickAction =
+        static_cast<CaptureDoubleClickAction>(m_doubleClickAction->currentData().toInt());
 }
 
 }  // namespace markshot::settings

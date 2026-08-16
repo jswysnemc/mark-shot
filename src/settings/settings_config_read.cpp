@@ -552,6 +552,7 @@ SettingsConfig readSettingsConfig(QString *error)
     settings.capture.freezeScope = captureFreezeScopeFromConfigRoot(root);
     settings.capture.kdeKwinScreenshotEnabled = kdeKWinScreenshotEnabledFromConfigRoot(root);
     settings.capture.hideOwnWindows = hideOwnWindowsDuringCaptureFromConfigRoot(root);
+    settings.capture.doubleClickAction = captureDoubleClickActionFromConfigRoot(root);
     settings.shortcuts = readShortcutSettings();
     settings.annotation = readAnnotationSettings(root);
     settings.pinned = readPinnedSettings(root);

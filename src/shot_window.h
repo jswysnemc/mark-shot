@@ -13,6 +13,7 @@
 #include <QVector>
 #include <QWidget>
 
+#include "capture_double_click_action.h"
 #include "display_capture/display_capture_target.h"
 #include "recording/recording_options.h"
 #include "shot_window_qt_fwd.h"
@@ -355,6 +356,10 @@ private:
     QPointF widgetToImage(QPointF point) const;
     QPointF imageToWidget(QPointF point) const;
     QRectF normalizedSelection() const;
+    // 选区内双击手势：判定是否可触发、执行配置动作、回滚第一击留下的草稿（issue #85）。
+    bool canRunDoubleClickAction(QPointF imagePoint) const;
+    bool runConfiguredDoubleClickAction();
+    void discardDraftForDoubleClick();
     QString slurpSelectionGeometry() const;
     QRect selectionGlobalRect() const;
     // 把当前选区写入持久化历史，供后续会话通过 , 和 . 键恢复（issue #79）。
@@ -657,6 +662,9 @@ private:
     Tool m_tool = Tool::Pen;
     Tool m_defaultTool = Tool::Pen;
     Tool m_fullscreenDefaultTool = Tool::Pen;
+    // 选区内双击手势执行的动作，会话启动时从应用配置读入一次（issue #85）。
+    markshot::CaptureDoubleClickAction m_doubleClickAction =
+        markshot::CaptureDoubleClickAction::Copy;
     std::array<QKeySequence, static_cast<int>(Action::Cancel) + 1> m_actionShortcuts;
     std::array<QKeySequence, static_cast<int>(Tool::Marker) + 1> m_toolShortcuts;
     QKeySequence m_startupColorPickerShortcut;

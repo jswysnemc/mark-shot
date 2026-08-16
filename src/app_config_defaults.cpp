@@ -55,6 +55,7 @@ QJsonObject defaultAppConfigRoot(const QString &windowDetectionCommand)
 
     QJsonObject capture;
     capture.insert(QStringLiteral("wayland"), wayland);
+    capture.insert(QStringLiteral("doubleClickAction"), QStringLiteral("copy"));
     root.insert(QStringLiteral("capture"), capture);
 
     QJsonObject shortcutTools;

@@ -17,6 +17,7 @@ set(MARK_SHOT_WINDOW_SOURCES
     src/shot_window_code_scan_result_window.cpp
     src/shot_window_config.cpp
     src/shot_window_display_capture.cpp
+    src/shot_window_double_click_action.cpp
     src/shot_window_hit_testing.cpp
     src/shot_window_input.cpp
     src/shot_window_input_shortcuts.cpp

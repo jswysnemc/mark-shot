@@ -137,6 +137,9 @@ qt_add_executable(mark-shot
     src/display_capture/display_capture_snapshot.h
     src/display_capture/display_capture_target.h
     src/capture_cursor_policy_config.cpp
+    src/capture_double_click_action.cpp
+    src/capture_double_click_action.h
+    src/capture_double_click_action_config.cpp
     src/capture_freeze_scope.cpp
     src/capture_freeze_scope.h
     src/capture_freeze_scope_config.cpp
@@ -555,6 +558,22 @@ if(BUILD_TESTING)
             Qt6::Test
     )
     add_test(NAME capture-freeze-scope COMMAND mark-shot-capture-freeze-scope-test)
+
+    qt_add_executable(mark-shot-capture-double-click-action-test
+        tests/capture_double_click_action_test.cpp
+        src/capture_double_click_action.cpp
+        src/capture_double_click_action.h
+        src/config_value.cpp
+        src/config_value.h
+    )
+    target_include_directories(mark-shot-capture-double-click-action-test PRIVATE src)
+    target_link_libraries(mark-shot-capture-double-click-action-test
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Test
+    )
+    add_test(NAME capture-double-click-action COMMAND mark-shot-capture-double-click-action-test)
 
     qt_add_executable(mark-shot-capture-cursor-policy-test
         tests/capture_cursor_policy_test.cpp
