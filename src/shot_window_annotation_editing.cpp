@@ -525,8 +525,9 @@ QString ShotWindow::currentToolName() const
     case Tool::Rectangle:
         return QStringLiteral("Rect");
     case Tool::Ellipse:
-    case Tool::Marker:
         return QStringLiteral("Ellipse");
+    case Tool::Marker:
+        return QStringLiteral("Marker");
     case Tool::Arrow:
         return QStringLiteral("Arrow");
     case Tool::Text:
