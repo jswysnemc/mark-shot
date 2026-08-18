@@ -145,6 +145,25 @@ bool writeKeybindingList(const QStringList &paths, QString *errorText)
 }
 
 /**
+ * 把字符串转义为 gsettings 可接受的 GVariant 字符串字面量。
+ *
+ * gsettings set 的键值按 GVariant 语法解析，裸值在遇到空格或引号等
+ * 语法边界时会被截断（例如 selfCommand 生成的 "…/mark-shot" --capture
+ * 会报 expected end of input）。用单引号包裹并转义反斜杠与单引号后，
+ * 任意字符串都能原样写入 dconf。
+ *
+ * @param value 原始字符串。
+ * @return 可作为 gsettings set 键值参数传入的 GVariant 字符串字面量。
+ */
+QString escapeGvariantString(const QString &value)
+{
+    QString escaped = value;
+    escaped.replace(QLatin1Char('\\'), QStringLiteral("\\\\"));
+    escaped.replace(QLatin1Char('\''), QStringLiteral("\\'"));
+    return QStringLiteral("'%1'").arg(escaped);
+}
+
+/**
  * 设置一条 keybinding 的单个键值。
  *
  * @param path keybinding 路径。
@@ -161,7 +180,7 @@ bool writeKeybindingValue(const QString &path,
     return runGsettings({QStringLiteral("set"),
                          QStringLiteral("%1:%2").arg(QLatin1String(kCustomKeybindingSchema), path),
                          key,
-                         value},
+                         escapeGvariantString(value)},
                         nullptr, errorText);
 }
 
