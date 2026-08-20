@@ -118,6 +118,19 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     m_annotationStateTimer->setInterval(250);
     connect(m_annotationStateTimer, &QTimer::timeout, this, [this] { flushAnnotationStateNow(); });
 
+    // A full-screen selection overlay is expensive to rasterize.  Pointer
+    // events may arrive at 200 Hz while the display only needs a bounded UI
+    // cadence, so batch initial-selection damage into at most 120 repaints/s.
+    m_initialSelectionRepaintTimer = new QTimer(this);
+    m_initialSelectionRepaintTimer->setSingleShot(true);
+    m_initialSelectionRepaintTimer->setInterval(8);
+    connect(m_initialSelectionRepaintTimer, &QTimer::timeout, this, [this] {
+        const QRegion pending = std::exchange(m_pendingInitialSelectionRepaint, QRegion());
+        if (!pending.isEmpty()) {
+            update(pending);
+        }
+    });
+
     // 选中标注的滚轮改粗细需要进入撤销历史,但连续滚轮只应对应一次撤销
     m_annotationWidthWheelHistoryTimer = new QTimer(this);
     m_annotationWidthWheelHistoryTimer->setSingleShot(true);
