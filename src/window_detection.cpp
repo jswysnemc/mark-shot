@@ -7,6 +7,7 @@
 #include "window_detection_session.h"
 
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -165,6 +166,8 @@ constexpr int kMinWindowDetectionTimeoutMs = 100;
 /// @brief Maximum allowed timeout value in milliseconds for window detection.
 /// 与设置面板 spin 上限(30000ms)保持一致,避免面板值与实际生效值不一致。
 constexpr int kMaxWindowDetectionTimeoutMs = 30000;
+/// @brief Backoff for a missing GNOME Shell helper after a failed probe.
+constexpr int kGnomeHelperFailureBackoffMs = 30000;
 
 /// @brief Configuration settings for the external window detection process.
 struct WindowDetectionConfig {
@@ -177,6 +180,59 @@ struct WindowDetectionConfig {
     /// @brief Maximum time in milliseconds to wait for the detection process to finish.
     int timeoutMs = kDefaultWindowDetectionTimeoutMs;
 };
+
+/// @brief Holds the process-local backoff state for the bundled GNOME helper.
+struct GnomeHelperFailureBackoff {
+    QElapsedTimer timer;
+    bool active = false;
+};
+
+GnomeHelperFailureBackoff &gnomeHelperFailureBackoff()
+{
+    static GnomeHelperFailureBackoff state;
+    return state;
+}
+
+bool isBundledGnomeHelper(const WindowDetectionConfig &config)
+{
+#if defined(Q_OS_WIN)
+    Q_UNUSED(config)
+    return false;
+#else
+    const window_detection::Session session =
+        window_detection::detectSession(QProcessEnvironment::systemEnvironment());
+    return session.wayland && session.compositor == QStringLiteral("gnome")
+        && config.command == QStringLiteral("mark-shot-window-detection-gnome");
+#endif
+}
+
+bool bundledGnomeHelperBackoffActive(const WindowDetectionConfig &config)
+{
+    if (!isBundledGnomeHelper(config)) {
+        return false;
+    }
+
+    GnomeHelperFailureBackoff &backoff = gnomeHelperFailureBackoff();
+    if (!backoff.active) {
+        return false;
+    }
+    if (backoff.timer.elapsed() < kGnomeHelperFailureBackoffMs) {
+        return true;
+    }
+    backoff.active = false;
+    return false;
+}
+
+void recordBundledGnomeHelperFailure(const WindowDetectionConfig &config)
+{
+    if (!isBundledGnomeHelper(config)) {
+        return;
+    }
+
+    GnomeHelperFailureBackoff &backoff = gnomeHelperFailureBackoff();
+    backoff.active = true;
+    backoff.timer.restart();
+}
 
 /// @brief Expands tilde (~) prefixes in file paths to the user's home directory path.
 /// @param path The input path string.
@@ -582,6 +638,9 @@ QVector<WindowInfo> collectConfiguredWindowInfos(const QRect &captureGeometry,
     if (!config.has_value()) {
         return {};
     }
+    if (bundledGnomeHelperBackoffActive(*config)) {
+        return {};
+    }
 
     QProcess process;
     process.setProgram(commandShellProgram());
@@ -596,12 +655,14 @@ QVector<WindowInfo> collectConfiguredWindowInfos(const QRect &captureGeometry,
     process.start(QIODevice::ReadOnly);
 
     if (!process.waitForStarted(1000)) {
+        recordBundledGnomeHelperFailure(*config);
         markshot::debugLog("window-detection", "script did not start");
         return {};
     }
     if (!process.waitForFinished(config->timeoutMs)) {
         process.kill();
         process.waitForFinished(1000);
+        recordBundledGnomeHelperFailure(*config);
         markshot::debugLog("window-detection",
                            "script timed out timeout_ms=%d",
                            config->timeoutMs);
@@ -609,6 +670,7 @@ QVector<WindowInfo> collectConfiguredWindowInfos(const QRect &captureGeometry,
     }
     if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
         const QByteArray stderrText = process.readAllStandardError().trimmed().left(512);
+        recordBundledGnomeHelperFailure(*config);
         markshot::debugLog("window-detection",
                            "script failed exit_code=%d stderr=%s",
                            process.exitCode(),
