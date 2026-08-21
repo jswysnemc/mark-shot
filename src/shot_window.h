@@ -7,6 +7,7 @@
 #include <QKeySequence>
 #include <QPointer>
 #include <QPointF>
+#include <QRegion>
 #include <QRect>
 #include <QRectF>
 #include <QStringList>
@@ -163,6 +164,11 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 private:
+    void scheduleInitialSelectionRepaint(const QRegion &region);
+    void flushInitialSelectionRepaint();
+    QRegion initialSelectionDirtyRegion(const QRectF &previousSelection,
+                                        bool previousSelectionUsable) const;
+
     // High-level interaction mode: first pick a capture region, then edit the
     // selected image area and its annotations.
     enum class Mode {
@@ -680,6 +686,11 @@ private:
     bool m_activeRecordingStopHovered = false;
     markshot::startup_hint::PanelAnchor m_startupHintAnchor = markshot::startup_hint::PanelAnchor::BottomLeft;
     bool m_dragging = false;
+    // Pointer input can arrive at the native refresh rate (200 Hz on some
+    // Wayland displays). Keep selection geometry current for precision, but
+    // coalesce expensive raster repaint requests to a bounded cadence.
+    QTimer *m_initialSelectionRepaintTimer = nullptr;
+    QRegion m_pendingInitialSelectionRepaint;
     bool m_annotationHistoryCaptured = false;
     bool m_annotationSelectionBoxActive = false;
     bool m_fullscreenAnnotation = false;

@@ -284,9 +284,12 @@ void ShotWindow::drawStartupToolOverlay(QPainter &painter)
     }
 }
 
-void ShotWindow::paintEvent(QPaintEvent *)
+void ShotWindow::paintEvent(QPaintEvent *event)
 {
     QPainter painter(this);
+    if (event) {
+        painter.setClipRegion(event->region());
+    }
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.fillRect(rect(), QColor(0, 0, 0));
     const qreal imageScale = m_frozenFrame.isNull()

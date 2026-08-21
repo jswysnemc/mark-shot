@@ -6,6 +6,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QPluginLoader>
+#include <QProcessEnvironment>
 
 #include <memory>
 
@@ -23,6 +24,25 @@ QString pluginFileName()
 #else
     return QStringLiteral("libmark-shot-layer-shell.so");
 #endif
+}
+
+/// @brief Returns whether the active session is GNOME running on Wayland.
+/// GNOME does not advertise the layer-shell protocol to regular clients.
+bool isGnomeWaylandSession()
+{
+    const QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    if (environment.value(QStringLiteral("XDG_SESSION_TYPE"))
+            .compare(QStringLiteral("wayland"), Qt::CaseInsensitive)
+        != 0) {
+        return false;
+    }
+
+    const QString desktop =
+        (environment.value(QStringLiteral("XDG_CURRENT_DESKTOP")) + QLatin1Char(':')
+         + environment.value(QStringLiteral("XDG_SESSION_DESKTOP")) + QLatin1Char(':')
+         + environment.value(QStringLiteral("DESKTOP_SESSION")))
+            .toLower();
+    return desktop.contains(QStringLiteral("gnome"));
 }
 
 /// @brief Adds a search directory to the list if it is not already present.
@@ -63,6 +83,16 @@ QStringList pluginSearchDirs()
 /// @return Pointer to the loaded PluginInterface, or nullptr on failure.
 PluginInterface *loadPlugin()
 {
+    // Do this before QPluginLoader touches LayerShellQt.  Checking only in the
+    // plugin implementation is too late on GNOME: Qt may already have assigned
+    // an xdg-shell integration to the native window and emit role-conflict
+    // warnings while LayerShellQt is loaded.
+    if (isGnomeWaylandSession()) {
+        markshot::debugLog("layershell",
+                           "skipping optional layer-shell plugin: GNOME Wayland does not support layer-shell");
+        return nullptr;
+    }
+
     /// @brief Struct maintaining the state of the loaded plugin.
     struct LoaderState {
         /// @brief Flag indicating whether a plugin loading attempt has been made.
