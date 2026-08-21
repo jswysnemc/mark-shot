@@ -1,8 +1,10 @@
 #include "ui/theme.h"
 
+#include <QApplication>
 #include <QFontDatabase>
 #include <QStringLiteral>
 #include <QStringList>
+#include <QToolTip>
 
 #include <algorithm>
 
@@ -139,6 +141,23 @@ QFont textFont(int pointSize, QFont::Weight weight, QString family)
 QFont monospaceFont(int pointSize, QFont::Weight weight)
 {
     return makeFont(monospaceFontFamily(), pointSize, weight);
+}
+
+void synchronizeToolTipPalette(const QPalette &palette)
+{
+    QToolTip::setPalette(palette);
+
+    const QColor background = palette.color(QPalette::Active, QPalette::ToolTipBase);
+    const QColor foreground = palette.color(QPalette::Active, QPalette::ToolTipText);
+    qApp->setStyleSheet(QStringLiteral(
+        "QToolTip {"
+        " color: %1;"
+        " background-color: %2;"
+        " border: 1px solid rgba(255, 255, 255, 42);"
+        " border-radius: 6px;"
+        " padding: 4px 6px;"
+        "}")
+        .arg(foreground.name(QColor::HexRgb), background.name(QColor::HexRgb)));
 }
 
 QString panelStyleSheet(int buttonSize, int fontSize)

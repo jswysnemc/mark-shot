@@ -709,6 +709,8 @@ if(BUILD_TESTING)
         tests/ui_theme_config_test.cpp
         src/ui/interface_theme_config.cpp
         src/ui/interface_theme_config.h
+        src/ui/theme.cpp
+        src/ui/theme.h
     )
     target_include_directories(mark-shot-ui-theme-config-test PRIVATE src)
     target_link_libraries(mark-shot-ui-theme-config-test

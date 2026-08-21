@@ -2,6 +2,7 @@
 
 #include <QColor>
 #include <QFont>
+#include <QPalette>
 #include <QString>
 #include <QVector>
 
@@ -30,6 +31,11 @@ QString monospaceFontFamilyCss();
 QFont uiFont(int pointSize = -1, QFont::Weight weight = QFont::Normal);
 QFont textFont(int pointSize = -1, QFont::Weight weight = QFont::Normal, QString family = {});
 QFont monospaceFont(int pointSize = -1, QFont::Weight weight = QFont::Normal);
+
+// Keep Qt's process-wide tooltip palette and stylesheet aligned with the
+// application palette. This avoids platform styles rendering a dark tooltip
+// frame with an unreadable dark text color.
+void synchronizeToolTipPalette(const QPalette &palette);
 
 // Stylesheet for the main toolbar, action toolbar, and annotation property
 // panel. They share an object-name-scoped rule set so the same string can be

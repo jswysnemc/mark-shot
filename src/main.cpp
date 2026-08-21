@@ -71,6 +71,7 @@ int main(int argc, char *argv[])
     QFont applicationFont = app.font();
     applicationFont.setFamily(markshot::theme::uiFontFamily());
     app.setFont(applicationFont);
+    markshot::theme::synchronizeToolTipPalette(app.palette());
 
     markshot::i18n::initialize();
 
