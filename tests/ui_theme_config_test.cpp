@@ -1,5 +1,7 @@
 #include "ui/interface_theme_config.h"
+#include "ui/theme.h"
 
+#include <QToolTip>
 #include <QtTest/QtTest>
 
 /**
@@ -74,6 +76,27 @@ private slots:
         QCOMPARE(markshot::ui::effectiveUiThemeMode(markshot::ui::UiThemeMode::System, lightPalette),
                  markshot::ui::UiThemeMode::Light);
     }
+
+    /**
+     * 验证提示框的静态调色板与显式样式均从应用主题取得，避免样式插件
+     * 用深色背景覆盖提示框时留下黑色文字。
+     */
+    void appliesReadableToolTipTheme()
+    {
+        QPalette palette;
+        const QColor expectedBase(15, 17, 23);
+        const QColor expectedText(229, 231, 235);
+        palette.setColor(QPalette::ToolTipBase, expectedBase);
+        palette.setColor(QPalette::ToolTipText, expectedText);
+
+        markshot::theme::synchronizeToolTipPalette(palette);
+
+        QCOMPARE(QToolTip::palette().color(QPalette::ToolTipBase), expectedBase);
+        QCOMPARE(QToolTip::palette().color(QPalette::ToolTipText), expectedText);
+        QVERIFY(qApp->styleSheet().contains(QStringLiteral("QToolTip")));
+        QVERIFY(qApp->styleSheet().contains(QStringLiteral("color: #e5e7eb")));
+        QVERIFY(qApp->styleSheet().contains(QStringLiteral("background-color: #0f1117")));
+    }
 };
 
 /**
@@ -82,6 +105,6 @@ private slots:
  * @param argv 参数数组。
  * @return 进程退出码。
  */
-QTEST_APPLESS_MAIN(UiThemeConfigTest)
+QTEST_MAIN(UiThemeConfigTest)
 
 #include "ui_theme_config_test.moc"
