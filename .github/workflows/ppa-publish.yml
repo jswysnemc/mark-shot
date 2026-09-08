@@ -59,9 +59,16 @@ jobs:
             debhelper \
             devscripts \
             dput \
+            equivs \
             gnupg \
             lintian \
             python3
+
+      - name: Install declared build dependencies
+        run: |
+          mk-build-deps --install --remove \
+            --tool 'apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends -y' \
+            debian/control
 
       - name: Verify the canonical stable release
         id: release
