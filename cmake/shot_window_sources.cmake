@@ -5,6 +5,9 @@ set(MARK_SHOT_WINDOW_SOURCES
     src/capture_cross_cursor.h
     src/ocr_result_window.cpp
     src/ocr_result_window.h
+    src/ocr_result_window_config.cpp
+    src/ocr_result_window_config.h
+    src/ocr_result_window_placement.cpp
     src/ocr_result_window_geometry.cpp
     src/ocr_result_window_geometry.h
     src/ocr_result_window_translation.cpp
@@ -40,10 +43,14 @@ set(MARK_SHOT_WINDOW_SOURCES
     src/shot_window_qt_fwd.h
     src/selection_cursor_nudge.cpp
     src/selection_cursor_nudge.h
+    src/selection_adjustment.cpp
+    src/selection_adjustment.h
     src/selection_loupe.cpp
     src/selection_loupe.h
     src/shot_window_selection_frame.cpp
     src/shot_window_selection_repaint.cpp
+    src/shot_window_selection_input.cpp
+    src/shot_window_selection_overlay.cpp
     src/shot_window_setup.cpp
     src/shot_window_shortcut_registration.cpp
     src/shot_window_shortcuts.cpp
@@ -56,6 +63,7 @@ set(MARK_SHOT_WINDOW_SOURCES
     src/shot_window_upload.cpp
     src/shot_window_viewport_rendering.cpp
     src/shot_window_width_state.cpp
+    src/shot_window_types.h
     src/window_hover_selection.cpp
     src/window_hover_selection.h
 )

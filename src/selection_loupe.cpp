@@ -40,7 +40,8 @@ SelectionLoupeLayout selectionLoupeLayout(QPointF widgetPoint,
                                           QSize viewport,
                                           qreal loupeSize,
                                           QPointF imagePoint,
-                                          QSize imageSize)
+                                          QSize imageSize,
+                                          const QVector<QRect> &obstacles)
 {
     SelectionLoupeLayout layout;
     const qreal size = std::max(48.0, loupeSize);
@@ -56,6 +57,34 @@ SelectionLoupeLayout selectionLoupeLayout(QPointF widgetPoint,
     }
     layout.loupe = clampLoupeRect(loupe, viewport);
 
+    // 1. 【截图】【选区放大镜】在指针四周选择遮挡最少的位置，避开编辑工具栏
+    const auto overlapArea = [&obstacles](QRectF candidate) {
+        qreal area = 0.0;
+        for (const QRect &obstacle : obstacles) {
+            const QRectF overlap = candidate.adjusted(-8.0, -8.0, 8.0, 8.0).intersected(obstacle);
+            if (!overlap.isEmpty()) {
+                area += overlap.width() * overlap.height();
+            }
+        }
+        return area;
+    };
+    qreal bestOverlap = overlapArea(layout.loupe);
+    for (const QPointF offset : {QPointF(kLoupeOffset, kLoupeOffset),
+                                 QPointF(-kLoupeOffset - size, kLoupeOffset),
+                                 QPointF(kLoupeOffset, -kLoupeOffset - size),
+                                 QPointF(-kLoupeOffset - size, -kLoupeOffset - size)}) {
+        if (bestOverlap == 0.0) {
+            break;
+        }
+        const QRectF candidate = clampLoupeRect(QRectF(widgetPoint + offset, QSizeF(size, size)), viewport);
+        const qreal overlap = overlapArea(candidate);
+        if (overlap < bestOverlap) {
+            layout.loupe = candidate;
+            bestOverlap = overlap;
+        }
+    }
+
+    // 2. 【截图】【选区放大镜】显示位置变化不影响指针附近的原图像素取样
     const QPoint center(qRound(imagePoint.x()), qRound(imagePoint.y()));
     const QRect candidate(center.x() - kSampleRadius,
                           center.y() - kSampleRadius,

@@ -61,6 +61,15 @@ QJsonObject defaultAppConfigRoot(const QString &windowDetectionCommand)
     capture.insert(QStringLiteral("selectionLoupe"), selectionLoupe);
     root.insert(QStringLiteral("capture"), capture);
 
+    QJsonObject captureHistory;
+    captureHistory.insert(QStringLiteral("enabled"), true);
+    captureHistory.insert(QStringLiteral("limit"), 50);
+    root.insert(QStringLiteral("captureHistory"), captureHistory);
+
+    QJsonObject ocrResultWindow;
+    ocrResultWindow.insert(QStringLiteral("alwaysOnTop"), false);
+    root.insert(QStringLiteral("ocrResultWindow"), ocrResultWindow);
+
     QJsonObject shortcutTools;
     shortcutTools.insert(QStringLiteral("pen"), QStringLiteral("P"));
     shortcutTools.insert(QStringLiteral("rectangle"), QStringLiteral("R"));

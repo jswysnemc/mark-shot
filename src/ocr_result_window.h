@@ -36,6 +36,11 @@ public:
     ~OcrResultWindow() override;
 
 protected:
+    /// @brief 窗口显示后重试依赖桌面扩展的置顶请求
+    /// @param event 显示事件
+    /// @return 无返回值
+    void showEvent(QShowEvent *event) override;
+
     /// @brief 处理标题栏拖动或普通鼠标按下。
     /// @param event 鼠标事件。
     void mousePressEvent(QMouseEvent *event) override;
@@ -130,6 +135,10 @@ private:
     /// @param alwaysOnTop 是否保持窗口置顶。
     void setAlwaysOnTop(bool alwaysOnTop);
 
+    /// @brief 按当前置顶模式重新创建协议窗口并恢复位置和拖动状态
+    /// @return 无返回值
+    void recreateWindowSurface();
+
     QWidget *m_titleBar = nullptr;
     QLabel *m_titleLabel = nullptr;
     QTextEdit *m_editor = nullptr;
@@ -140,8 +149,9 @@ private:
     markshot::providers::ProviderTask *m_translationTask = nullptr;
     QString m_translationInputPath;
     QPoint m_dragOffset;
+    QRect m_logicalGeometry;
     PinnedWindowConfig m_config;
-    bool m_alwaysOnTop = true;
+    bool m_alwaysOnTop = false;
     bool m_dragging = false;
 };
 

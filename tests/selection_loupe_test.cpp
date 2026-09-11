@@ -42,6 +42,20 @@ private slots:
         QVERIFY(layout.loupe.right() < 760.0);
         QVERIFY(layout.loupe.bottom() < 560.0);
     }
+
+    /// @brief 验证已有选区的工具栏不会遮挡放大镜，且取样坐标保持不变
+    /// @return 无返回值
+    void avoidsEditingToolbars()
+    {
+        const QVector<QRect> toolbars{{720, 290, 40, 360}, {95, 460, 615, 45}};
+        const auto layout = markshot::shot::selectionLoupeLayout(
+            QPointF(610, 315), QSize(1067, 667), 112, QPointF(731, 378), QSize(1280, 800), toolbars);
+        for (const QRect &toolbar : toolbars) {
+            QVERIFY(!layout.loupe.intersects(toolbar));
+        }
+        QVERIFY(QRectF(0, 0, 1067, 667).contains(layout.loupe));
+        QCOMPARE(layout.sourceRect, QRect(725, 372, 13, 13));
+    }
 };
 
 QTEST_APPLESS_MAIN(SelectionLoupeTest)

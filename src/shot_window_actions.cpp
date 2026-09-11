@@ -3,6 +3,7 @@
 #include "notifications/app_notifications.h"
 
 #include "app_config_store.h"
+#include "capture_history/history_store.h"
 #include "export_image_effect.h"
 #include "providers/ocr/ocr_provider_factory.h"
 #include "providers/provider_task.h"
@@ -149,6 +150,7 @@ void ShotWindow::pinSelection()
         ? std::nullopt
         : std::optional<QPoint>(logicalSelection.topLeft());
     auto *window = createPinnedImageWindow(output, pinnedTopLeft);
+    markshot::history::rememberScreenshot(output);
     window->show();
     window->raise();
     window->activateWindow();
@@ -342,6 +344,7 @@ void ShotWindow::saveSelection()
 
     const QString path = defaultSavePath();
     if (markshot::ensureSavePathDirectory(path) && output.save(path, "PNG")) {
+        markshot::history::rememberScreenshot(output);
         const QString message = MS_TR("Saved to %1").arg(path);
         // Keyboard save should finish without another dialog round-trip.
         if (!markshot::notifications::notifyScreenshotSaved(path)) {
@@ -404,6 +407,7 @@ void ShotWindow::saveSelectionAs()
         if (!files.isEmpty()
             && markshot::ensureSavePathDirectory(files.first())
             && output.save(files.first(), "PNG")) {
+            markshot::history::rememberScreenshot(output);
             const QString message = MS_TR("Saved to %1").arg(files.first());
             // Prefer desktop notifications because the window may close immediately after saving.
             if (!markshot::notifications::notifyScreenshotSaved(files.first())) {
@@ -442,7 +446,11 @@ void ShotWindow::copySelection()
         return;
     }
 
-    markshot::copyImageToClipboard(output);
+    if (!markshot::copyImageToClipboard(output)) {
+        showToast(MS_TR("Copy failed"));
+        return;
+    }
+    markshot::history::rememberScreenshot(output);
 
     close();
 }

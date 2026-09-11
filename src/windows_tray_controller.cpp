@@ -10,6 +10,7 @@
 #include "recording/ui/recording_countdown.h"
 #include "recording/recording_status.h"
 #include "settings/settings_dialog.h"
+#include "capture_history/history_window.h"
 #include "shot_window.h"
 #include "ui/application_icon.h"
 #include "ui/i18n.h"
@@ -401,6 +402,7 @@ bool WindowsTrayController::start()
         startRecordingFromTray();
     });
     m_menu->addAction(MS_TR("Settings"), this, [] { settings::showSettingsDialog(); });
+    m_menu->addAction(MS_TR("Screenshot History"), this, [] { history::showHistoryWindow(); });
     m_menu->addSeparator();
     m_recordingStatusAction = m_menu->addAction(MS_TR("Recording: idle"));
     m_recordingStatusAction->setEnabled(false);

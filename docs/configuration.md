@@ -51,6 +51,13 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
       }
     }
   },
+  "captureHistory": {
+    "enabled": true,
+    "limit": 50
+  },
+  "ocrResultWindow": {
+    "alwaysOnTop": false
+  },
   "shortcuts": {
     "tools": {
       "pen": "P",
@@ -175,7 +182,10 @@ To enable thinking, change `"disabled"` to `"enabled"`; do not use the literal v
 | `capture.hideOwnWindows` | Boolean | `true` | Whether the screenshot backend should exclude Mark Shot windows from captured frames. The Capture settings switch applies to the next screenshot immediately without restarting the application. Alias: `screenshot.hideOwnWindowsDuringCapture`. |
 | `capture.wayland.kde.kwinScreenshot.enabled` | Boolean | `true` | Whether to enable KWin `org.kde.KWin.ScreenShot2` restricted D-Bus interface screenshot capture on KDE Wayland. If disabled, fallback to standard Portal capture. |
 | `capture.doubleClickAction` | String | `"copy"` | Action performed when double clicking an empty area inside the selection, so a capture can be finished without moving to the toolbar. Supported values: `none` (keep the previous behavior), `copy` (copy to clipboard and close), `save` (save to the configured folder and close), `save-as` (open the save dialog), `pin` (pin the selection to the screen) and `cancel` (discard the capture). Double clicking a text annotation still opens the text editor and the Select tool still inserts a polyline anchor. Setting the value to `false` also disables the gesture. Configurable from the Capture settings page. |
-| `capture.selectionLoupe.enabled` | Boolean | `false` | Whether region selection shows a cursor loupe and allows arrow-key pointer nudging. Disabled by default. On Wayland, if the compositor rejects cursor warping, Mark Shot hides the system pointer and draws a software crosshair at the logical position; clicks and drags use that point. Configurable from the Capture settings page. `capture.selectionLoupeEnabled` is also accepted. |
+| `capture.selectionLoupe.enabled` | Boolean | `false` | Shows a cursor loupe while creating, moving, or resizing a selection. Enables arrow-key pointer nudging during initial selection; existing selections can always be adjusted by arrows with the Move tool. On Wayland, a software crosshair is used when the compositor rejects cursor warping. Configurable from the Capture settings page. `capture.selectionLoupeEnabled` is also accepted. |
+| `captureHistory.enabled` | Boolean | `true` | Automatically stores completed Copy, Save, Save As, and Pin images from the capture editor. Can be toggled in Screenshot History. Turning it off preserves existing entries. |
+| `captureHistory.limit` | Integer | `50` | Maximum number of history images, clamped to 1–200. The fixed total size limit is 256 MiB. Oldest entries are removed when a new image is stored. |
+| `ocrResultWindow.alwaysOnTop` | Boolean | `false` | Keeps the separate OCR result window above other windows. Independent of `pinnedWindow.alwaysOnTop`; the OCR pin button persists this setting. Leave it disabled for normal niri window detection and window rules. |
 | `debug.enabled` | Boolean | `false` | Enables debug logging on Linux and Windows. CLI `--debug` / `--no-debug` override this value; `DEBUG=1` still enables logging unless `--no-debug` is set. |
 | `debug.logPath` | String | system temp `mark-shot-scroll.log` | Debug log destination. CLI `--debug-log` overrides this value; `MARK_SHOT_DEBUG_LOG` remains supported when no config or CLI path is set. |
 | `annotation.defaultTool` | String | `"move"` | The default annotation tool active after selecting a region. Supported values: `move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, `magnifier`, `laser`. Overridden by CLI `--default-tool`. |
