@@ -1,6 +1,8 @@
 set(MARK_SHOT_WINDOW_SOURCES
     src/annotation_state_store.cpp
     src/annotation_state_store.h
+    src/capture_cross_cursor.cpp
+    src/capture_cross_cursor.h
     src/ocr_result_window.cpp
     src/ocr_result_window.h
     src/ocr_result_window_geometry.cpp
@@ -52,6 +54,7 @@ set(MARK_SHOT_WINDOW_SOURCES
     src/shot_window_text_editor.cpp
     src/shot_window_text_layout.cpp
     src/shot_window_upload.cpp
+    src/shot_window_viewport_rendering.cpp
     src/shot_window_width_state.cpp
     src/window_hover_selection.cpp
     src/window_hover_selection.h

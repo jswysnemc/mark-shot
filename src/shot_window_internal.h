@@ -1,5 +1,6 @@
 #pragma once
 
+#include "capture_cross_cursor.h"
 #include "shot_window.h"
 #include "scroll/scroll_session_window.h"
 
@@ -100,9 +101,6 @@ qreal clampedMagnifierScale(qreal scale);
 int magnifierScaleSliderValue(qreal scale);
 qreal magnifierScaleFromSliderValue(int value);
 QString magnifierScaleText(qreal scale);
-/// @brief Creates the high-contrast cross cursor used during capture.
-/// @return Cursor used for selection and annotation drawing modes.
-QCursor captureCrossCursor();
 qreal normalizedRotationDegrees(qreal degrees);
 std::optional<bool> boolFromText(QString value);
 std::optional<bool> boolFromConfigValue(const QJsonValue &value);
