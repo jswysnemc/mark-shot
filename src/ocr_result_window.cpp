@@ -4,6 +4,7 @@
 #include "clipboard_image.h"
 #include "debug_log.h"
 #include "ocr_result_window_geometry.h"
+#include "ocr_result_window_config.h"
 #include "pinned_window_top.h"
 #include "shot_window.h"
 #include "ui/i18n.h"
@@ -78,6 +79,7 @@ QAction *addEditorMenuAction(QWidget *owner,
 
 OcrResultWindow::OcrResultWindow(QString text, QScreen *targetScreen)
     : m_config(pinnedWindowConfig())
+    , m_alwaysOnTop(ocrResultWindowAlwaysOnTopFromRoot(markshot::readAppConfigRoot()))
 {
     setWindowTitle(MS_TR("OCR Result"));
     setAttribute(Qt::WA_DeleteOnClose);
@@ -167,12 +169,12 @@ OcrResultWindow::OcrResultWindow(QString text, QScreen *targetScreen)
     m_pinButton = new QPushButton(m_titleBar);
     m_pinButton->setObjectName(QStringLiteral("ocrPinButton"));
     m_pinButton->setCheckable(true);
-    m_pinButton->setChecked(m_config.alwaysOnTop);
+    m_pinButton->setChecked(m_alwaysOnTop);
     m_pinButton->setIcon(markshot::ui::makeToolIcon(ShotWindow::Action::Pin));
     m_pinButton->setIconSize(QSize(16, 16));
     m_pinButton->setFixedSize(24, 24);
     m_pinButton->setStyleSheet(markshot::theme::ocrPinButtonStyleSheet());
-    m_pinButton->setToolTip(MS_TR("Always on Top"));
+    m_pinButton->setToolTip(m_alwaysOnTop ? MS_TR("Always on Top: On") : MS_TR("Always on Top: Off"));
     m_pinButton->setFocusPolicy(Qt::NoFocus);
     connect(m_pinButton, &QPushButton::toggled, this, [this](bool checked) {
         setAlwaysOnTop(checked);
@@ -242,7 +244,9 @@ OcrResultWindow::OcrResultWindow(QString text, QScreen *targetScreen)
                        placement.topLeft.y(),
                        placement.size.width(),
                        placement.size.height());
-    applyPinnedWindowTopState(this, m_config.alwaysOnTop);
+    m_logicalGeometry = QRect(placement.topLeft, placement.size);
+    setProperty("markShotPinnedGeometry", m_logicalGeometry);
+    applyPinnedWindowTopState(this, m_alwaysOnTop);
     m_editor->setFocus(Qt::MouseFocusReason);
 }
 
@@ -321,53 +325,6 @@ bool OcrResultWindow::titleControlContains(QPoint windowPoint) const
     return false;
 }
 
-bool OcrResultWindow::beginWindowDrag(QMouseEvent *event)
-{
-    if (!event || event->button() != Qt::LeftButton) {
-        return false;
-    }
-
-    if (QWindow *window = windowHandle()) {
-        if (window->startSystemMove()) {
-            event->accept();
-            return true;
-        }
-    }
-
-    m_dragging = true;
-    m_dragOffset = event->globalPosition().toPoint() - frameGeometry().topLeft();
-    setCursor(Qt::SizeAllCursor);
-    grabMouse();
-    event->accept();
-    return true;
-}
-
-bool OcrResultWindow::updateWindowDrag(QMouseEvent *event)
-{
-    if (!event || !m_dragging) {
-        return false;
-    }
-
-    move(event->globalPosition().toPoint() - m_dragOffset);
-    event->accept();
-    return true;
-}
-
-bool OcrResultWindow::finishWindowDrag(QMouseEvent *event)
-{
-    if (!event || event->button() != Qt::LeftButton || !m_dragging) {
-        return false;
-    }
-
-    m_dragging = false;
-    if (QWidget::mouseGrabber() == this) {
-        releaseMouse();
-    }
-    unsetCursor();
-    event->accept();
-    return true;
-}
-
 void OcrResultWindow::showToast(const QString &text, int durationMs)
 {
     auto *label = new QLabel(text, this);
@@ -429,48 +386,4 @@ void OcrResultWindow::showEditorContextMenu(const QPoint &globalPosition)
     menu.exec(globalPosition);
 }
 
-void OcrResultWindow::setAlwaysOnTop(bool alwaysOnTop)
-{
-    if (m_alwaysOnTop == alwaysOnTop) {
-        return;
-    }
-
-    const bool previous = m_alwaysOnTop;
-    m_alwaysOnTop = alwaysOnTop;
-    m_config.alwaysOnTop = alwaysOnTop;
-
-    QString error;
-    if (!markshot::writeAppConfigValue({QStringLiteral("pinnedWindow"), QStringLiteral("alwaysOnTop")},
-                                       QJsonValue(alwaysOnTop),
-                                       &error)) {
-        m_alwaysOnTop = previous;
-        m_config.alwaysOnTop = previous;
-        if (m_pinButton) {
-            QSignalBlocker blocker(m_pinButton);
-            m_pinButton->setChecked(previous);
-        }
-        if (!error.isEmpty()) {
-            markshot::debugLog("config",
-                               "cannot save pinnedWindow.alwaysOnTop: %s",
-                               error.toUtf8().constData());
-        }
-        return;
-    }
-
-    applyPinnedWindowTopState(this, alwaysOnTop);
-    if (alwaysOnTop) {
-        for (int delayMs : {0, 80, 250, 600}) {
-            QTimer::singleShot(delayMs, this, [this] {
-                if (m_alwaysOnTop) {
-                    raisePinnedWindowOnPlatform(this);
-                }
-            });
-        }
-    }
-    if (m_pinButton) {
-        m_pinButton->setToolTip(alwaysOnTop ? MS_TR("Always on Top: On")
-                                            : MS_TR("Always on Top: Off"));
-    }
 }
-
-}  // namespace markshot::shot

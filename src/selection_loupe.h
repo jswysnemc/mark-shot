@@ -7,6 +7,7 @@
 #include <QRectF>
 #include <QSize>
 #include <QString>
+#include <QVector>
 
 class QPainter;
 
@@ -24,13 +25,15 @@ struct SelectionLoupeLayout {
  * @param loupeSize 放大镜直径。
  * @param imagePoint 光标对应的图像坐标。
  * @param imageSize 冻结帧尺寸。
+ * @param obstacles 放大镜需要避开的工具栏等窗口区域
  * @return 放大镜窗口矩形和源图像取样矩形。
  */
 SelectionLoupeLayout selectionLoupeLayout(QPointF widgetPoint,
                                           QSize viewport,
                                           qreal loupeSize,
                                           QPointF imagePoint,
-                                          QSize imageSize);
+                                          QSize imageSize,
+                                          const QVector<QRect> &obstacles = {});
 
 /**
  * 返回放大镜需要重绘的窗口区域。

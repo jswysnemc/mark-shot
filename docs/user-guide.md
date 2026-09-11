@@ -166,6 +166,12 @@ pixel (Shift+arrow by ten). On Wayland, if the compositor cannot warp the
 system cursor, a software crosshair is drawn at the logical point and clicks
 follow that point. The mouse wheel resizes the loupe.
 
+After selecting a region, use the Move tool to adjust it. Dragging its edges,
+corners, or interior also shows the enabled loupe. Arrow keys adjust the hovered
+edge or corner by one image pixel; away from a handle they move the whole region.
+Hold Shift for ten pixels. Arrow keys also work during a drag and remain available
+when the loupe is disabled.
+
 ---
 
 ## 4. Annotation Tools
@@ -255,6 +261,16 @@ On KDE Plasma Wayland, `pinnedWindow.alwaysOnTop` is applied through a session
 KWin script so the sticker stays above other windows. The window remains a
 normal xdg-toplevel, so dragging and resizing are unchanged.
 
+The separate OCR result window opens as a regular window by default, so niri can
+identify it with `niri msg pick-window` and apply window rules. Drag its title bar
+or use your window manager's move controls. Its pin button saves the independent
+`ocrResultWindow.alwaysOnTop` setting. On compositors that use layer-shell for
+always-on-top windows, enabling the pin makes the OCR window a layer surface;
+turn it off to restore normal window management.
+When entering layer-shell mode from a regular Wayland window, the OCR panel is
+centered on its current screen because Wayland does not expose the managed
+window's global position. Its title bar remains draggable in that mode.
+
 ---
 
 ## 6. Scrolling Screenshot
@@ -302,7 +318,7 @@ See the README for the full argument table.
 ## 8. Desktop Hotkeys & Tray
 
 Tray mode (`mark-shot --tray`) registers `Ctrl+Alt+S` for region capture and
-provides capture / recording / settings / quit menu entries. Desktop hotkeys:
+provides capture / screenshot history / recording / settings / quit menu entries. Desktop hotkeys:
 
 - **GNOME**: Settings → Keyboard → Shortcuts → Custom Shortcuts → bind to `mark-shot`.
 - **KDE**: custom shortcut bound to `mark-shot` (plus the KWin ScreenShot2
@@ -310,6 +326,28 @@ provides capture / recording / settings / quit menu entries. Desktop hotkeys:
 - **Hyprland**: `bind = SUPER SHIFT, S, exec, mark-shot` and `bind = , Print, exec, mark-shot`.
 - **niri**: `binds { Mod+Shift+S { spawn "mark-shot"; } }`.
 - **Sway / i3**: `bindsym Mod4+Shift+S exec mark-shot`.
+
+### 8.1 Screenshot history
+
+Open **Screenshot History** from the tray menu, run `mark-shot --history`, or
+press `Ctrl+H` in the capture overlay. Opening history from the overlay ends the
+current capture. History stores the image contents from successful Copy, Save,
+Save As, and Pin actions in the capture editor, including annotations and export
+effects. It is separate from selection-rectangle history.
+
+Select a thumbnail to preview it, then copy, edit, pin, save, or delete it.
+**Clear History** asks for confirmation and only removes the stored history
+copies; separately saved files remain. Copying, pinning, or saving directly from
+history does not create another entry. Editing and exporting it creates a new
+entry with the updated image.
+
+Automatic recording is enabled by default and can be turned off in the history
+window. The latest 50 screenshots are retained, with a total size limit of
+256 MiB; the oldest entries are removed as needed. `captureHistory.limit` sets
+the count from 1 to 200. Images persist across restarts in the application's
+`capture-history` data directory (`~/.local/share/mark-shot/capture-history` on
+Linux with the default XDG paths). Upload-only, OCR-only, display-picker, and
+headless captures do not add entries.
 
 ---
 

@@ -1,6 +1,7 @@
 #include "annotation_launch.h"
 #include "capture_cursor_policy.h"
 #include "capture_freeze_scope.h"
+#include "capture_history/history_window.h"
 #include "capture_own_windows_policy.h"
 #include "capture_session_launcher.h"
 #include "cli/headless_capture.h"
@@ -52,10 +53,10 @@ std::unique_ptr<QLocalServer> createSingleInstanceServer(QString *error)
 
 } // namespace
 
-/// @brief Main entry point of the application.
-/// @param argc The count of command line arguments.
-/// @param argv The array of command line arguments.
-/// @return Exit code of the application.
+/// @brief 初始化应用并启动所选截图、历史或录制入口
+/// @param argc 命令行参数数量
+/// @param argv 命令行参数数组
+/// @return 应用退出码
 int main(int argc, char *argv[])
 {
     markshot::applyConfiguredEnvironment();
@@ -113,6 +114,8 @@ int main(int argc, char *argv[])
     QCommandLineOption defaultColorOption(QStringLiteral("default-color"),
                                           QStringLiteral("Set the default annotation color. Supported formats: #RRGGBB or #RRGGBBAA."),
                                           QStringLiteral("color"));
+    QCommandLineOption historyOption(QStringLiteral("history"),
+                                     QStringLiteral("Open screenshot history without taking a screenshot."));
     QCommandLineOption debugOption(QStringLiteral("debug"),
                                    QStringLiteral("Enable debug logging."));
     QCommandLineOption noDebugOption(QStringLiteral("no-debug"),
@@ -136,8 +139,21 @@ int main(int argc, char *argv[])
     parser.addOption(debugOption);
     parser.addOption(noDebugOption);
     parser.addOption(debugLogOption);
+    parser.addOption(historyOption);
     markshot::cli::addHeadlessCaptureOptions(&parser);
     parser.process(app);
+
+    // 1. 【应用】【截图历史】历史入口独立运行，拒绝与截图或录制控制参数混用
+    if (parser.isSet(historyOption)) {
+        if (!parser.positionalArguments().isEmpty() || parser.isSet(pinImageOption)
+            || parser.isSet(captureOption) || parser.isSet(trayOption)
+            || parser.isSet(allOutputsOption) || parser.isSet(fullscreenAnnotationOption)
+            || parser.isSet(stopRecordingOption) || parser.isSet(pauseRecordingOption)
+            || parser.isSet(recordingStatusOption) || parser.isSet(QStringLiteral("capture-to"))
+            || parser.isSet(QStringLiteral("list-displays"))) {
+            parser.showHelp(1);
+        }
+    }
 
     if (parser.isSet(stopRecordingOption)) {
         return markshot::cli::stopRecordingFromCommandLine();
@@ -186,6 +202,10 @@ int main(int argc, char *argv[])
     markshot::debugLog("config",
                        "debug enabled path=%s",
                        markshot::debugLogPath().toUtf8().constData());
+    if (parser.isSet(historyOption)) {
+        markshot::history::showHistoryWindow();
+        return QApplication::exec();
+    }
     const int headlessExitCode = markshot::cli::runHeadlessCaptureIfRequested(parser);
     if (headlessExitCode >= 0) {
         return headlessExitCode;

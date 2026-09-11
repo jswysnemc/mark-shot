@@ -51,6 +51,13 @@ Mark Shot 在 Linux 上从 `~/.config/mark-shot/config.json` 读取应用配置�
       }
     }
   },
+  "captureHistory": {
+    "enabled": true,
+    "limit": 50
+  },
+  "ocrResultWindow": {
+    "alwaysOnTop": false
+  },
   "shortcuts": {
     "tools": {
       "pen": "P",
@@ -175,7 +182,10 @@ Mark Shot 在 Linux 上从 `~/.config/mark-shot/config.json` 读取应用配置�
 | `capture.hideOwnWindows` | 布尔值 | `true` | 控制截图后端是否从冻结画面中排除 Mark Shot 自身窗口。截图设置页的开关会在下一次截图时立即生效，不需要重启应用。别名：`screenshot.hideOwnWindowsDuringCapture`。 |
 | `capture.wayland.kde.kwinScreenshot.enabled` | 布尔值 | `true` | 是否在 KDE Wayland 环境下启用 KWin 的 `org.kde.KWin.ScreenShot2` 限制级别 DBus 接口截屏功能。如果关闭，将自动回退到常规 Portal 截屏。 |
 | `capture.doubleClickAction` | 字符串 | `"copy"` | 在选区内空白处双击时执行的动作，用于免去移动到工具栏按钮的往返。支持的值包括：`none`（保持旧行为，不执行动作）、`copy`（复制到剪贴板并关闭）、`save`（保存到已配置目录并关闭）、`save-as`（打开另存为对话框）、`pin`（把选区钉到屏幕）、`cancel`（放弃本次截图）。双击文本标注仍然进入文字编辑，Select 工具双击折线仍然插入锚点。该字段填 `false` 同样表示关闭手势。可在设置截图页配置。 |
-| `capture.selectionLoupe.enabled` | 布尔 | `false` | 框选时是否显示光标旁放大镜，并用方向键微调指针。默认关闭。Wayland 无法移动系统光标时会隐藏系统指针并绘制软件十字光标，点击与拖选用该逻辑位置。可在设置截图页配置。也可写成 `capture.selectionLoupeEnabled`。 |
+| `capture.selectionLoupe.enabled` | 布尔 | `false` | 创建、移动和缩放选区时显示光标旁放大镜，并在首次框选时启用方向键指针微调。已有选区在移动工具下始终支持方向键调整。Wayland 无法移动系统光标时使用软件十字光标。可在设置截图页配置，也可写成 `capture.selectionLoupeEnabled`。 |
+| `captureHistory.enabled` | 布尔 | `true` | 自动记录截图编辑器完成复制、保存、另存为和钉图时的图像。可在截图历史窗口切换；关闭后保留已有记录。 |
+| `captureHistory.limit` | 整数 | `50` | 历史截图保留数量，限制为 1 至 200。总容量固定不超过 256 MiB，保存新记录时按需删除最早的截图。 |
+| `ocrResultWindow.alwaysOnTop` | 布尔 | `false` | 控制独立 OCR 结果窗口置顶，不继承 `pinnedWindow.alwaysOnTop`。OCR 置顶按钮会保存此设置。关闭时支持正常的 niri 窗口检测和窗口规则。 |
 | `debug.enabled` | 布尔值 | `false` | 在 Linux 和 Windows 上启用调试日志。命令行参数 `--debug` / `--no-debug` 会覆盖此项；除非设置 `--no-debug`，否则 `DEBUG=1` 仍会启用日志。 |
 | `debug.logPath` | 字符串 | 系统临时目录 `mark-shot-scroll.log` | 调试日志输出路径。命令行参数 `--debug-log` 会覆盖此项；未设置配置或命令行路径时，`MARK_SHOT_DEBUG_LOG` 仍然有效。 |
 | `annotation.defaultTool` | 字符串 | `"move"` | 选区完成后默认激活的标注工具。支持的值包括：`move`、`select`、`pen`、`line`、`highlighter`、`rectangle`、`ellipse`、`arrow`、`text`、`number`、`mosaic`、`magnifier`、`laser`。命令行参数 `--default-tool` 会覆盖此项。 |

@@ -19,6 +19,7 @@
 #include "display_capture/display_capture_target.h"
 #include "recording/recording_options.h"
 #include "shot_window_qt_fwd.h"
+#include "shot_window_types.h"
 #include "startup_shortcut_hint.h"
 #include "toolbar_appearance_config.h"
 #include "ui/theme.h"
@@ -44,77 +45,10 @@ class ShotWindow final : public QWidget {
     Q_OBJECT
 
 public:
-    // Toolbar and shortcut commands. The enum is intentionally dense because
-    // m_actionShortcuts indexes it by the underlying integer value.
-    enum class Action {
-        ToolMove,
-        ToolSelect,
-        ToolPen,
-        ToolLine,
-        ToolHighlighter,
-        ToolRectangle,
-        ToolEllipse,
-        ToolArrow,
-        ToolText,
-        ToolNumber,
-        ToolMosaic,
-        ToolMagnifier,
-        ToolLaser,
-        ToolMarker,
-        ToggleCaptureScope,
-        ToggleToolbarLayout,
-        Clear,
-        Undo,
-        Redo,
-        OpenWith,
-        Extensions,
-        Pin,
-        ScrollCapture,
-        OcrCopy,
-        Copy,
-        Save,
-        Upload,
-        Settings,
-        Cancel,
-    };
-
-    // Editing tools available after a region is selected. These values are also
-    // used as stable config names and shortcut-table indexes.
-    enum class Tool {
-        Move,
-        Select,
-        Pen,
-        Line,
-        Highlighter,
-        Rectangle,
-        Ellipse,
-        Arrow,
-        Text,
-        Number,
-        Mosaic,
-        Magnifier,
-        Laser,
-        Marker,
-    };
-
-    // Desktop file entry used by the Open With panel.
-    struct DesktopApp {
-        QString name;
-        QString desktopPath;
-        QString exec;
-        QString icon;
-    };
-
-    // User-configured external command. Placeholders can receive the current
-    // selection geometry or a temporary PNG rendered from the selection.
-    struct ExtensionCommand {
-        QString name;
-        QString command;
-        QString workingDirectory;
-        QString description;
-        bool saveImage = false;
-        bool closeOnStart = true;
-    };
+    using Action = markshot::shot::types::Action;
+    using Tool = markshot::shot::types::Tool;
+    using DesktopApp = markshot::shot::types::DesktopApp;
+    using ExtensionCommand = markshot::shot::types::ExtensionCommand;
 
     explicit ShotWindow(QImage frozenFrame,
                         QString outputName,
@@ -172,179 +106,43 @@ private:
     QPointF selectingPointerImagePoint(QPointF widgetPos);
     void attachSelectionPointer();
     void detachSelectionPointerIfWarpFailed(QPoint widgetPoint);
+    /// @brief 判断当前是否允许调整已完成的截图选区
+    /// @return 移动工具处于可调整状态时返回 true
+    bool canAdjustSelection() const;
+    /// @brief 处理已完成选区的方向键调整
+    /// @param event 当前键盘事件
+    /// @return 已处理时返回 true
+    bool handleSelectionAdjustmentKey(QKeyEvent *event);
+    /// @brief 根据当前拖动点更新选区
+    /// @param imagePoint 图像坐标中的指针位置
+    /// @return 无返回值
+    void updateSelectionDrag(QPointF imagePoint);
+    /// @brief 更新选区调整后的附属控件和画面
+    /// @return 无返回值
+    void refreshAdjustedSelection();
+    /// @brief 绘制选区创建及再次调整时的放大镜和软件指针
+    /// @param painter 当前绘制器
+    /// @return 无返回值
+    void drawSelectionAdjustmentOverlay(QPainter &painter) const;
 
-    // High-level interaction mode: first pick a capture region, then edit the
-    // selected image area and its annotations.
-    enum class Mode {
-        Selecting,
-        Editing,
-    };
-
-    // Startup-only tools run before regular selection/editing gestures.
-    enum class StartupTool {
-        None,
-        ColorPicker,
-        Ruler,
-        CodeScanner,
-        GifRecorder,
-        VideoRecorder,
-    };
+    using Mode = markshot::shot::types::Mode;
+    using StartupTool = markshot::shot::types::StartupTool;
 
 public:
-    // Arrow renderer variants. The default uses a filled tapered shaft; KDE uses
-    // a constant-width open arrow to match Spectacle-style annotations.
-    enum class ArrowStyle {
-        Fletched,
-        Kde,
-        BidirectionalFletched,
-        BidirectionalKde,
-    };
+    using ArrowStyle = markshot::shot::types::ArrowStyle;
+    using HighlighterStyle = markshot::shot::types::HighlighterStyle;
+    using MagnifierShape = markshot::shot::types::MagnifierShape;
+    using RectangleStyle = markshot::shot::types::RectangleStyle;
+    using MarkerShape = markshot::shot::types::MarkerShape;
+    using NumberStyle = markshot::shot::types::NumberStyle;
 
-    // Highlighter can either follow the freehand stroke path or constrain to a
-    // single editable line.
-    enum class HighlighterStyle {
-        Freehand,
-        StraightLine,
-    };
-
-    // Magnifier lens shape. Circle keeps the classic round loupe; Rectangle
-    // draws a box lens that can have independent width/height when resized.
-    enum class MagnifierShape {
-        Circle,
-        Rectangle,
-    };
-
-    // 矩形工具的视觉风格。Stroke 即默认描边/填充样式;Highlight 类似荧光笔,
-    // 在矩形区域用半透明色 Multiply 混合;Invert 对矩形覆盖区域做像素反色（无外描边）。
-    enum class RectangleStyle {
-        Stroke,
-        Highlight,
-        Invert,
-    };
-
-    // 形状标记工具使用的图章种类。几何统一以 Annotation::rect 存储，绘制时按形状填充路径。
-    // 枚举序号一经发布不可重排，新增形状只能追加到末尾。
-    enum class MarkerShape {
-        Triangle = 0,
-        Star,
-        Check,
-        Cross,
-        Diamond,
-        Heart,
-        Hexagon,
-        Circle,
-        Square,
-        Pentagon,
-        Plus,
-        ArrowUp,
-        Spade,
-        Club,
-        Lightning,
-        Ban,
-        Octagon,
-        Crescent,
-        Pin,
-        Flag,
-        Bookmark,
-        Shield,
-        Exclamation,
-        SpeechBubble,
-    };
-
-    // Number badge display styles. Existing annotations keep their own style so
-    // changing the active tool default does not rewrite old markers.
-    enum class NumberStyle {
-        Arabic,
-        UpperAlpha,
-        LowerAlpha,
-        UpperRoman,
-        LowerRoman,
-        HeavenlyStem,
-        Chinese,
-    };
 
 private:
 
-    // Active drag target for selected annotations. Line and magnifier controls
-    // live beside the usual resize/move handles.
-    enum class SelectionDrag {
-        None,
-        Move,
-        Rotate,
-        LineControl,
-        LineStart,
-        LineEnd,
-        MagnifierSource,
-        MagnifierLens,
-        NumberTip,
-        NumberBubble,
-        Left,
-        Right,
-        Top,
-        Bottom,
-        TopLeft,
-        TopRight,
-        BottomLeft,
-        BottomRight,
-        // 放大镜小框(source 取景框)的 8 向 resize 把手,与 lens 大框的把手区分开,
-        // 以便交互层独立处理小框/大框的尺寸调整。
-        MagnifierSourceLeft,
-        MagnifierSourceRight,
-        MagnifierSourceTop,
-        MagnifierSourceBottom,
-        MagnifierSourceTopLeft,
-        MagnifierSourceTopRight,
-        MagnifierSourceBottomLeft,
-        MagnifierSourceBottomRight,
-    };
-
-    // Canonical annotation record. Geometry is stored in image pixels, not
-    // widget coordinates; painting maps it through imageToWidget() only when
-    // rendering the live window. The meaning of rect and points depends on tool:
-    // shapes use rect, strokes/lines/arrows use points, and magnifier uses both.
-    struct Annotation {
-        int id = 0;            // Stable id used for selection and history.
-        Tool tool = Tool::Pen;
-        QRectF rect;           // Image-space bounds for area-based tools.
-        QVector<QPointF> points; // Image-space control points for path tools.
-        QString text;
-        int number = 0;
-        QColor color = QColor(255, 77, 77);
-        QColor backgroundColor = QColor(0, 0, 0, 0);
-        qreal width = 4.0;     // Tool-specific size: stroke width, font scale, or mosaic block size.
-        bool filled = false;
-        qreal cornerRadius = 0.0;
-        ArrowStyle arrowStyle = ArrowStyle::Fletched;
-        HighlighterStyle highlighterStyle = HighlighterStyle::StraightLine;
-        qreal rotationDegrees = 0.0;
-        qreal magnifierScale = 2.75;
-        MagnifierShape magnifierShape = MagnifierShape::Circle;
-        NumberStyle numberStyle = NumberStyle::Arabic;
-        QString fontFamily = markshot::theme::textFontFamily();
-        QFont::Weight fontWeight = QFont::DemiBold;
-        bool textItalic = false;
-        RectangleStyle rectangleStyle = RectangleStyle::Stroke;
-        MarkerShape markerShape = MarkerShape::Triangle;
-    };
-
-    // Undo/redo captures only the annotation graph and id counters. The frozen
-    // image and selected capture region remain immutable for a ShotWindow.
-    struct HistorySnapshot {
-        QVector<Annotation> annotations;
-        std::optional<int> selectedAnnotationId;
-        QVector<int> selectedAnnotationIds;
-        int nextNumber = 1;
-        int nextAnnotationId = 1;
-    };
-
-    // Transient laser strokes are painted on top of annotations and expire by
-    // timer, so they are intentionally excluded from HistorySnapshot.
-    struct LaserStroke {
-        QVector<QPointF> points;
-        QColor color;
-        qreal width = 10.0;
-        qint64 expiresAt = 0;
-    };
+    using SelectionDrag = markshot::shot::types::SelectionDrag;
+    using Annotation = markshot::shot::types::Annotation;
+    using HistorySnapshot = markshot::shot::types::HistorySnapshot;
+    using LaserStroke = markshot::shot::types::LaserStroke;
 
     void initializeToolbar();
     void initializeImageScrollBars();
@@ -643,6 +441,7 @@ private:
     QPointF m_startupHoverImagePoint;
     bool m_selectionLoupeEnabled = false;
     bool m_selectionPointerDetached = false;
+    bool m_selectionKeyboardAdjusting = false;
     QPoint m_selectionPointerHardwareAnchor;
     QPointF m_startupRulerStart;
     QPointF m_startupRulerEnd;
