@@ -118,7 +118,7 @@ HistoryWindow::HistoryWindow()
 
     m_enabled = new QCheckBox(MS_TR("Keep screenshot history"), this);
     m_enabled->setChecked(historyConfigFromRoot(markshot::readAppConfigRoot()).enabled);
-    connect(m_enabled, &QCheckBox::clicked, this, [this](bool enabled) { setRecordingEnabled(enabled); });
+    connect(m_enabled, &QCheckBox::toggled, this, [this](bool enabled) { setRecordingEnabled(enabled); });
     layout->addWidget(m_enabled);
     m_status = new QLabel(this);
     m_status->setWordWrap(true);
