@@ -2,6 +2,7 @@
 
 #include "annotation_launch.h"
 #include "capture_geometry.h"
+#include "capture_session_screen_frames.h"
 #include "capture_session_screen_utils.h"
 #include "debug_log.h"
 #include "display_capture/display_capture_snapshot.h"
@@ -25,14 +26,7 @@
 
 namespace {
 
-struct CapturedScreenFrame {
-    QPointer<QScreen> screen;
-    QImage image;
-    QString outputName;
-    QRect sourceGeometry;
-    QVector<markshot::WindowInfo> windowInfos;
-    bool detectWindows = false;
-};
+using markshot::capture_session::CapturedScreenFrame;
 
 /// @brief 根据已经捕获的图像创建并显示截图窗口。
 /// @param screen 要显示窗口的屏幕。
@@ -324,6 +318,22 @@ void connectCaptureWindowSession(QApplication *app,
             *closingSession = false;
         });
         QObject::connect(window,
+                         &ShotWindow::peerOverlaysSuspendRequested,
+                         app,
+                         [windows](ShotWindow *activeWindow, bool suspended) {
+            // layer-shell 覆盖层以 Exclusive 方式独占键盘，弹出对话框前需要隐藏全部屏幕的覆盖层
+            for (const QPointer<ShotWindow> &peerWindow : std::as_const(windows)) {
+                if (!peerWindow || peerWindow.data() == activeWindow) {
+                    continue;
+                }
+                if (suspended) {
+                    peerWindow->hide();
+                } else if (!peerWindow->isVisible()) {
+                    peerWindow->show();
+                }
+            }
+        });
+        QObject::connect(window,
                          &ShotWindow::displayCaptureSnapshotRequested,
                          app,
                          [windows, closingSession, includeCursor](ShotWindow *activeWindow) {
@@ -404,80 +414,6 @@ void connectCaptureWindowSession(QApplication *app,
     }
 }
 
-/// @brief 逐个显示器捕获冻结图,但暂不创建覆盖窗口。
-/// @param screens 当前屏幕列表。
-/// @param includeCursor 冻结图是否包含鼠标。
-/// @param hideOwnWindows 是否让截屏后端隐藏 mark-shot 自身窗口。
-/// @param error 输出错误信息。
-/// @return 捕获成功的逐屏冻结帧列表。
-QVector<CapturedScreenFrame> captureScreensIndividually(const QList<QScreen *> &screens,
-                                                        bool includeCursor,
-                                                        bool hideOwnWindows,
-                                                        QString *error)
-{
-    QVector<CapturedScreenFrame> frames;
-    const bool detectWindows = markshot::windowDetectionEnabled();
-
-    for (QScreen *screen : screens) {
-        if (!screen || screen->geometry().isEmpty()) {
-            continue;
-        }
-
-        const QRect captureGeometry = screen->geometry();
-        const QString outputName = screen->name();
-
-        CaptureRequest request;
-        request.preferredOutputName = outputName;
-        request.sourceGeometry = captureGeometry;
-        request.allOutputs = false;
-        request.includeCursor = includeCursor;
-        request.hideOwnWindows = hideOwnWindows;
-
-        markshot::debugLog("capture-session",
-                           "【截图会话】【缩放诊断】individual-request screen=%s geom=%d,%d %dx%d "
-                           "dpr=%.3f include_cursor=%d",
-                           outputName.toUtf8().constData(),
-                           captureGeometry.x(), captureGeometry.y(),
-                           captureGeometry.width(), captureGeometry.height(),
-                           screen->devicePixelRatio(),
-                           includeCursor ? 1 : 0);
-
-        // 1. 先捕获所有屏幕图像,避免已显示的截图覆盖层进入后续屏幕截图
-        CaptureResult capture = captureScreenFrame(request);
-        if (capture.image.isNull()) {
-            if (error) {
-                *error = capture.error;
-            }
-            return {};
-        }
-
-        CapturedScreenFrame frame;
-        frame.screen = screen;
-        frame.image = std::move(capture.image);
-        frame.outputName = capture.outputName.isEmpty() ? outputName : capture.outputName;
-        frame.sourceGeometry = capture.sourceGeometry.isValid() && !capture.sourceGeometry.isEmpty()
-            ? capture.sourceGeometry
-            : captureGeometry;
-        frame.windowInfos = detectWindows
-            ? markshot::collectConfiguredWindowInfos(frame.sourceGeometry, frame.outputName, false)
-            : QVector<markshot::WindowInfo>();
-        frame.detectWindows = detectWindows;
-        markshot::debugLog("capture-session",
-                           "【截图会话】【缩放诊断】individual-result screen=%s output=%s "
-                           "source=%d,%d %dx%d image=%dx%d scale=%.6fx%.6f",
-                           outputName.toUtf8().constData(),
-                           frame.outputName.toUtf8().constData(),
-                           frame.sourceGeometry.x(), frame.sourceGeometry.y(),
-                           frame.sourceGeometry.width(), frame.sourceGeometry.height(),
-                           frame.image.width(), frame.image.height(),
-                           static_cast<qreal>(frame.image.width()) / std::max(1, frame.sourceGeometry.width()),
-                           static_cast<qreal>(frame.image.height()) / std::max(1, frame.sourceGeometry.height()));
-        frames.append(std::move(frame));
-    }
-
-    return frames;
-}
-
 /// @brief 通过逐屏捕获创建多显示器冻结窗口。
 /// @param screens 当前屏幕列表。
 /// @param includeCursor 冻结图是否包含鼠标。
@@ -498,7 +434,7 @@ QVector<QPointer<ShotWindow>> showCaptureWindowsFromIndividualFrames(const QList
                                                                      const std::optional<markshot::recording::RecordingOptions> &regionRecordingOptions)
 {
     QVector<QPointer<ShotWindow>> windows;
-    QVector<CapturedScreenFrame> frames = captureScreensIndividually(screens, includeCursor, hideOwnWindows, error);
+    QVector<CapturedScreenFrame> frames = markshot::capture_session::captureScreensIndividually(screens, includeCursor, hideOwnWindows, error);
     if (frames.isEmpty()) {
         return windows;
     }

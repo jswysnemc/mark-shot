@@ -89,6 +89,10 @@ signals:
     void displayCaptureSnapshotRequested(ShotWindow *window);
     void displayCaptureEditRequested(ShotWindow *window, markshot::display_capture::Target target);
     void sessionCancelRequested();
+    /// @brief 请求暂时隐藏或恢复同一会话中其他屏幕的截图覆盖层
+    /// @param window 发起请求的窗口
+    /// @param suspended true 表示隐藏，false 表示恢复显示
+    void peerOverlaysSuspendRequested(ShotWindow *window, bool suspended);
 
 protected:
     /// @brief 在实际输入处理后同步光标，并处理抓取中断
