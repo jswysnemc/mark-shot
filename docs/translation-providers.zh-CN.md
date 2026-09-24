@@ -7,11 +7,13 @@ Mark Shot 的贴图窗口 OCR 结果可以直接翻译。翻译能力由 provide
 | providerId | 展示名 | 接口类型 | 需要的凭据 |
 | :--- | :--- | :--- | :--- |
 | `openai-compatible` | OpenAI Compatible | 大模型 chat/completions | apiBase、apiKey、model |
+| `gemini` | Google Gemini | Google Gemini API (generateContent) | apiKey、model |
+| `anthropic` | Anthropic Claude | Anthropic Messages API | apiKey、model |
 | `tencent-tmt` | Tencent Machine Translation | 腾讯云 API 3.0（TC3-HMAC-SHA256） | SecretId、SecretKey |
 | `baidu-fanyi` | Baidu Translate | 百度翻译通用文本翻译（MD5 签名） | APPID、密钥 |
 | `youdao-nmt` | Youdao Translate | 有道智云文本翻译（v3 签名） | 应用 ID、应用密钥 |
 
-四个插件都以独立动态库形式安装到 `<libdir>/mark-shot/plugins/`，缺少凭据的插件在设置界面显示为不可用，不会影响其他 provider。
+各插件均以独立动态库形式安装到 `<libdir>/mark-shot/plugins/`，缺少凭据的插件在设置界面显示为不可用，不会影响其他 provider。
 
 ## 选择 provider
 
@@ -20,14 +22,14 @@ Mark Shot 的贴图窗口 OCR 结果可以直接翻译。翻译能力由 provide
 ```json
 {
   "translation": {
-    "provider": "plugin:baidu-fanyi"
+    "provider": "plugin:gemini"
   }
 }
 ```
 
 取值形式：
 
-- `auto`（默认）：按 `openai-compatible` → `tencent-tmt` → `baidu-fanyi` → `youdao-nmt` 的固定顺序，选中第一个凭据完整的插件。这个顺序是写死的，不随插件加载顺序变化。
+- `auto`（默认）：按 `openai-compatible` → `gemini` → `anthropic` → `tencent-tmt` → `baidu-fanyi` → `youdao-nmt` 的固定顺序，选中第一个凭据完整的插件。这个顺序是写死的，不随插件加载顺序变化。
 - `plugin:<providerId>`：显式指定某个插件；该插件不可用时回退到 helper 脚本。
 - `builtin`：使用主程序内置的 OpenAI 兼容实现。
 - `helper`：使用 `mark-shot-translate` Python 脚本。
@@ -36,7 +38,7 @@ Mark Shot 的贴图窗口 OCR 结果可以直接翻译。翻译能力由 provide
 
 ## 凭据配置
 
-三家云翻译的凭据写在 `translation` 下的厂商子节，也可以在设置窗口的「集成」页填写。字段留空时插件会去读环境变量，凭据可以不落盘。
+云翻译与大模型服务的凭据写在 `translation` 下的厂商子节，也可以在设置窗口的「集成」页填写。字段留空时插件会去读环境变量，凭据可以不落盘。
 
 ```json
 {
@@ -59,10 +61,52 @@ Mark Shot 的贴图窗口 OCR 结果可以直接翻译。翻译能力由 provide
       "appKey": "",
       "appSecret": "",
       "timeoutMs": 30000
+    },
+    "gemini": {
+      "apiKey": "",
+      "model": "gemini-3.5-flash-lite",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta",
+      "timeoutMs": 60000
+    },
+    "anthropic": {
+      "apiKey": "",
+      "model": "claude-haiku-4-5",
+      "endpoint": "https://api.anthropic.com/v1",
+      "timeoutMs": 60000
     }
   }
 }
 ```
+
+### Google Gemini
+
+| 字段 | 环境变量（按顺序） | 默认值 |
+| :--- | :--- | :--- |
+| `apiKey` | `GEMINI_API_KEY`、`MARK_SHOT_GEMINI_API_KEY` | 无，必填 |
+| `model` | `GEMINI_MODEL`、`MARK_SHOT_GEMINI_MODEL` | `gemini-3.5-flash-lite` |
+| `endpoint` | `GEMINI_API_BASE`、`MARK_SHOT_GEMINI_API_BASE` | `https://generativelanguage.googleapis.com/v1beta` |
+| `systemPrompt` | 无 | 内置翻译提示词 |
+| `temperature` | 无 | 不下发，使用模型默认值 |
+| `thinkingLevel` | 无 | 不下发，使用模型默认值 |
+| `timeoutMs` | 无 | `60000` |
+
+插件直连 Google Gemini 原生 REST API（`:generateContent`），鉴权头为 `x-goog-api-key`，启用 `responseMimeType: "application/json"`。`thinkingLevel` 可取 `minimal`、`low`、`medium`、`high`，各模型支持的档位不同，因此只在显式配置时下发。
+
+### Anthropic Claude
+
+| 字段 | 环境变量（按顺序） | 默认值 |
+| :--- | :--- | :--- |
+| `apiKey` | `ANTHROPIC_API_KEY`、`MARK_SHOT_ANTHROPIC_API_KEY` | 无，必填 |
+| `model` | `ANTHROPIC_MODEL`、`MARK_SHOT_ANTHROPIC_MODEL` | `claude-haiku-4-5` |
+| `endpoint` | `ANTHROPIC_API_BASE`、`MARK_SHOT_ANTHROPIC_API_BASE` | `https://api.anthropic.com/v1` |
+| `systemPrompt` | 无 | 内置翻译提示词 |
+| `maxTokens` | 无 | `4096` |
+| `temperature` | 无 | 不下发，使用模型默认值 |
+| `timeoutMs` | 无 | `60000` |
+
+插件直连 Anthropic Messages API（`/v1/messages`），鉴权头为 `x-api-key` 与 `anthropic-version: 2023-06-01`。Claude Opus 4.7 及更新的模型不接受 `temperature`，因此该字段只在显式配置时下发。
+
+两个插件只读取各自的 `translation.gemini` / `translation.anthropic` 子节。公共节中的 `translation.apiKey`、`translation.model`、`translation.systemPrompt` 属于 OpenAI 兼容服务，不会被继承。
 
 ### 腾讯云机器翻译
 

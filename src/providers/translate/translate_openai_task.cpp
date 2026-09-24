@@ -162,8 +162,11 @@ void TranslateOpenAiTask::start(int timeoutMs)
     const QString systemPrompt = firstNonEmpty(
         config.value(QStringLiteral("systemPrompt")).toString(),
         {},
-        QStringLiteral("You translate OCR text segments. Preserve meaning, keep segment count and ids "
-                       "unchanged, and return only valid JSON."));
+        QStringLiteral(
+            "You are a professional native translator. Fluently translate OCR text segments into the target language. "
+            "Preserve original meaning, keep segment count and ids unchanged. "
+            "Keep proper nouns, brand names, code snippets, formulas, and numbers intact. "
+            "Return only valid JSON without extra text or explanations."));
     QJsonArray segmentArray;
     for (const TranslateSourceSegment &segment : m_segments) {
         segmentArray.append(QJsonObject{{QStringLiteral("id"), segment.id},

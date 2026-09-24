@@ -241,6 +241,54 @@ if(TARGET mark-shot-translate-youdao)
     add_test(NAME translate-youdao-plugin COMMAND mark-shot-translate-youdao-plugin-test)
 endif()
 
+if(TARGET mark-shot-translate-gemini)
+    qt_add_executable(mark-shot-translate-gemini-plugin-test
+        tests/translate_gemini_plugin_test.cpp
+        plugins/translate-gemini/gemini_translate_config.cpp
+        plugins/translate-gemini/gemini_translate_config.h
+        plugins/translate-gemini/gemini_translate_plugin.cpp
+        plugins/translate-gemini/gemini_translate_plugin.h
+        plugins/translate-gemini/gemini_translate_request.cpp
+        plugins/translate-gemini/gemini_translate_request.h
+    )
+    target_include_directories(mark-shot-translate-gemini-plugin-test PRIVATE
+        plugins/translate-gemini
+        plugin-sdk
+    )
+    target_link_libraries(mark-shot-translate-gemini-plugin-test
+        PRIVATE
+            mark-shot-translate-common
+            Qt6::Core
+            Qt6::Network
+            Qt6::Test
+    )
+    add_test(NAME translate-gemini-plugin COMMAND mark-shot-translate-gemini-plugin-test)
+endif()
+
+if(TARGET mark-shot-translate-anthropic)
+    qt_add_executable(mark-shot-translate-anthropic-plugin-test
+        tests/translate_anthropic_plugin_test.cpp
+        plugins/translate-anthropic/anthropic_translate_config.cpp
+        plugins/translate-anthropic/anthropic_translate_config.h
+        plugins/translate-anthropic/anthropic_translate_plugin.cpp
+        plugins/translate-anthropic/anthropic_translate_plugin.h
+        plugins/translate-anthropic/anthropic_translate_request.cpp
+        plugins/translate-anthropic/anthropic_translate_request.h
+    )
+    target_include_directories(mark-shot-translate-anthropic-plugin-test PRIVATE
+        plugins/translate-anthropic
+        plugin-sdk
+    )
+    target_link_libraries(mark-shot-translate-anthropic-plugin-test
+        PRIVATE
+            mark-shot-translate-common
+            Qt6::Core
+            Qt6::Network
+            Qt6::Test
+    )
+    add_test(NAME translate-anthropic-plugin COMMAND mark-shot-translate-anthropic-plugin-test)
+endif()
+
 if(TARGET mark-shot-code-scan-zxing AND MARK_SHOT_ZXING_WRITER_SUPPORTED)
     qt_add_executable(mark-shot-code-scan-zxing-plugin-test
         tests/code_scan_zxing_plugin_test.cpp

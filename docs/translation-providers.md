@@ -7,11 +7,13 @@ Mark Shot can translate OCR results directly in the pinned window. Translation i
 | providerId | Display name | API style | Required credentials |
 | :--- | :--- | :--- | :--- |
 | `openai-compatible` | OpenAI Compatible | LLM chat/completions | apiBase, apiKey, model |
+| `gemini` | Google Gemini | Google Gemini API (generateContent) | apiKey, model |
+| `anthropic` | Anthropic Claude | Anthropic Messages API | apiKey, model |
 | `tencent-tmt` | Tencent Machine Translation | Tencent Cloud API 3.0 (TC3-HMAC-SHA256) | SecretId, SecretKey |
 | `baidu-fanyi` | Baidu Translate | Baidu general text translation (MD5 signature) | APPID, secret key |
 | `youdao-nmt` | Youdao Translate | Youdao text translation (v3 signature) | app key, app secret |
 
-All four ship as separate shared libraries under `<libdir>/mark-shot/plugins/`. A plugin without credentials reports itself as unavailable in the settings window and does not affect the others.
+All provider plugins ship as separate shared libraries under `<libdir>/mark-shot/plugins/`. A plugin without credentials reports itself as unavailable in the settings window and does not affect the others.
 
 ## Selecting a provider
 
@@ -20,14 +22,14 @@ The Plugins page of the settings window has a `Translation Provider` combo box. 
 ```json
 {
   "translation": {
-    "provider": "plugin:baidu-fanyi"
+    "provider": "plugin:gemini"
   }
 }
 ```
 
 Accepted values:
 
-- `auto` (default): picks the first plugin with complete credentials, in the fixed order `openai-compatible` → `tencent-tmt` → `baidu-fanyi` → `youdao-nmt`. This order is hard-coded and does not depend on plugin load order.
+- `auto` (default): picks the first plugin with complete credentials, in the fixed order `openai-compatible` → `gemini` → `anthropic` → `tencent-tmt` → `baidu-fanyi` → `youdao-nmt`. This order is hard-coded and does not depend on plugin load order.
 - `plugin:<providerId>`: selects one plugin explicitly, falling back to the helper script if that plugin is unavailable.
 - `builtin`: uses the OpenAI-compatible implementation built into the main binary.
 - `helper`: uses the `mark-shot-translate` Python script.
@@ -59,10 +61,52 @@ Credentials for the three cloud services live in per-vendor sub-objects under `t
       "appKey": "",
       "appSecret": "",
       "timeoutMs": 30000
+    },
+    "gemini": {
+      "apiKey": "",
+      "model": "gemini-3.5-flash-lite",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta",
+      "timeoutMs": 60000
+    },
+    "anthropic": {
+      "apiKey": "",
+      "model": "claude-haiku-4-5",
+      "endpoint": "https://api.anthropic.com/v1",
+      "timeoutMs": 60000
     }
   }
 }
 ```
+
+### Google Gemini
+
+| Field | Environment variables (in order) | Default |
+| :--- | :--- | :--- |
+| `apiKey` | `GEMINI_API_KEY`, `MARK_SHOT_GEMINI_API_KEY` | none, required |
+| `model` | `GEMINI_MODEL`, `MARK_SHOT_GEMINI_MODEL` | `gemini-3.5-flash-lite` |
+| `endpoint` | `GEMINI_API_BASE`, `MARK_SHOT_GEMINI_API_BASE` | `https://generativelanguage.googleapis.com/v1beta` |
+| `systemPrompt` | none | built-in translator prompt |
+| `temperature` | none | not sent, model default |
+| `thinkingLevel` | none | not sent, model default |
+| `timeoutMs` | none | `60000` |
+
+The plugin connects to the native Google Gemini REST API (`:generateContent`), authenticates via `x-goog-api-key`, and requests `responseMimeType: "application/json"`. `thinkingLevel` accepts `minimal`, `low`, `medium` or `high`; supported levels differ per model, so it is only sent when set explicitly.
+
+### Anthropic Claude
+
+| Field | Environment variables (in order) | Default |
+| :--- | :--- | :--- |
+| `apiKey` | `ANTHROPIC_API_KEY`, `MARK_SHOT_ANTHROPIC_API_KEY` | none, required |
+| `model` | `ANTHROPIC_MODEL`, `MARK_SHOT_ANTHROPIC_MODEL` | `claude-haiku-4-5` |
+| `endpoint` | `ANTHROPIC_API_BASE`, `MARK_SHOT_ANTHROPIC_API_BASE` | `https://api.anthropic.com/v1` |
+| `systemPrompt` | none | built-in translator prompt |
+| `maxTokens` | none | `4096` |
+| `temperature` | none | not sent, model default |
+| `timeoutMs` | none | `60000` |
+
+The plugin connects to the Anthropic Messages API (`/v1/messages`), passing `x-api-key` and `anthropic-version: 2023-06-01`. `temperature` is only sent when set explicitly, because Claude Opus 4.7 and newer reject it.
+
+Both plugins read only their own `translation.gemini` / `translation.anthropic` sub-object. The shared `translation.apiKey`, `translation.model` and `translation.systemPrompt` keys belong to the OpenAI-compatible provider and are not inherited.
 
 ### Tencent Machine Translation
 

@@ -23,6 +23,8 @@ namespace {
 int translateProviderRank(const QString &providerId)
 {
     static const QStringList order = {QStringLiteral("openai-compatible"),
+                                      QStringLiteral("gemini"),
+                                      QStringLiteral("anthropic"),
                                       QStringLiteral("tencent-tmt"),
                                       QStringLiteral("baidu-fanyi"),
                                       QStringLiteral("youdao-nmt")};

@@ -431,6 +431,8 @@ add_subdirectory(plugins/translate-openai)
 add_subdirectory(plugins/translate-tencent)
 add_subdirectory(plugins/translate-baidu)
 add_subdirectory(plugins/translate-youdao)
+add_subdirectory(plugins/translate-gemini)
+add_subdirectory(plugins/translate-anthropic)
 add_subdirectory(plugins/code-scan-zxing)
 
 include(CTest)

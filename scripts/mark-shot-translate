@@ -107,8 +107,10 @@ def chat_completion(config, target_language, segments):
 
     timeout = float(translation_config.get("timeoutSeconds") or os.environ.get("MARK_SHOT_LLM_TIMEOUT_SECONDS") or 60)
     system_prompt = translation_config.get("systemPrompt") or (
-        "You translate OCR text segments. Preserve meaning, keep segment count and ids unchanged, "
-        "and return only valid JSON."
+        "You are a professional native translator. Fluently translate OCR text segments into the target language. "
+        "Preserve original meaning, keep segment count and ids unchanged. "
+        "Keep proper nouns, brand names, code snippets, formulas, and numbers intact. "
+        "Return only valid JSON without extra text or explanations."
     )
     user_prompt = {
         "target_language": target_language,
