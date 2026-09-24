@@ -155,6 +155,8 @@ qt_add_executable(mark-shot
     src/capture_geometry.h
     src/capture_session_launcher.cpp
     src/capture_session_launcher.h
+    src/capture_session_screen_frames.cpp
+    src/capture_session_screen_frames.h
     src/layer_shell_plugin_interface.h
     src/layer_shell_runtime.cpp
     src/layer_shell_runtime.h

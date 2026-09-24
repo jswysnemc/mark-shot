@@ -60,6 +60,7 @@ void ShotWindow::beginStartupRecording(markshot::recording::RecordingMode mode)
 
     auto restoreOverlay = [this, overlayWasVisible, quitOnLastWindowClosed] {
         QApplication::setQuitOnLastWindowClosed(quitOnLastWindowClosed);
+        emit peerOverlaysSuspendRequested(this, false);
         if (overlayWasVisible && !isVisible()) {
             show();
             raise();
@@ -70,8 +71,10 @@ void ShotWindow::beginStartupRecording(markshot::recording::RecordingMode mode)
 
     if (overlayWasVisible) {
         hide();
-        QApplication::processEvents();
     }
+    // 多屏时其他屏幕的覆盖层同样独占键盘，需要一并隐藏，否则配置对话框无法获得焦点（issue #114）
+    emit peerOverlaysSuspendRequested(this, true);
+    QApplication::processEvents();
 
     markshot::recording::RecordingStartFlowRequest request;
     request.initialMode = mode;
