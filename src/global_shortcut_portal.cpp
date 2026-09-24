@@ -96,6 +96,16 @@ struct PortalShortcutIdResult {
     QSet<QString> ids;
 };
 
+/// @brief 获取全局快捷键专用的会话总线连接。
+/// @return 独立于 QDBusConnection::sessionBus() 的会话总线连接。
+QDBusConnection shortcutPortalBus()
+{
+    // Portal 以连接上的第一次调用确定 app id；共享连接可能已被 Qt 平台主题等读取过
+    // portal.Settings，之后 Registry.Register 会被拒绝，CreateSession 报 "An app id is required"
+    return QDBusConnection::connectToBus(QDBusConnection::SessionBus,
+                                         QStringLiteral("mark-shot-global-shortcuts"));
+}
+
 /// @brief 生成可用于 Portal handle_token 的随机标识。
 /// @return Portal 请求标识。
 QString shortcutPortalToken()
@@ -111,7 +121,7 @@ QString shortcutPortalToken()
 QString shortcutPortalRequestPath(const QString &handleToken)
 {
     const QString connectionName =
-        QDBusConnection::sessionBus().baseService().mid(1).replace(QLatin1Char('.'), QLatin1Char('_'));
+        shortcutPortalBus().baseService().mid(1).replace(QLatin1Char('.'), QLatin1Char('_'));
     return QStringLiteral("/org/freedesktop/portal/desktop/request/%1/%2").arg(connectionName, handleToken);
 }
 
@@ -183,7 +193,7 @@ void registerShortcutHostPortalApplication()
                                                               QStringLiteral("Register"));
         message << desktopFileName << QVariantMap();
 
-        const QDBusMessage reply = QDBusConnection::sessionBus().call(message, QDBus::Block, 3000);
+        const QDBusMessage reply = shortcutPortalBus().call(message, QDBus::Block, 3000);
         if (reply.type() != QDBusMessage::ErrorMessage) {
             return;
         }
@@ -208,7 +218,7 @@ void registerShortcutHostPortalApplication()
 /// @return 连接成功返回 true，否则返回 false。
 bool connectShortcutPortalResponse(const QString &signalPath, ShortcutPortalResponseReceiver *receiver)
 {
-    return QDBusConnection::sessionBus().connect(QStringLiteral("org.freedesktop.portal.Desktop"),
+    return shortcutPortalBus().connect(QStringLiteral("org.freedesktop.portal.Desktop"),
                                                  signalPath,
                                                  QStringLiteral("org.freedesktop.portal.Request"),
                                                  QStringLiteral("Response"),
@@ -221,7 +231,7 @@ bool connectShortcutPortalResponse(const QString &signalPath, ShortcutPortalResp
 /// @param receiver 接收 Response 的对象。
 void disconnectShortcutPortalResponse(const QString &signalPath, ShortcutPortalResponseReceiver *receiver)
 {
-    QDBusConnection::sessionBus().disconnect(QStringLiteral("org.freedesktop.portal.Desktop"),
+    shortcutPortalBus().disconnect(QStringLiteral("org.freedesktop.portal.Desktop"),
                                              signalPath,
                                              QStringLiteral("org.freedesktop.portal.Request"),
                                              QStringLiteral("Response"),
@@ -434,7 +444,7 @@ QDBusInterface createGlobalShortcutsInterface()
     return QDBusInterface(QStringLiteral("org.freedesktop.portal.Desktop"),
                           QStringLiteral("/org/freedesktop/portal/desktop"),
                           QStringLiteral("org.freedesktop.portal.GlobalShortcuts"),
-                          QDBusConnection::sessionBus());
+                          shortcutPortalBus());
 }
 
 }  // namespace
@@ -451,7 +461,7 @@ GlobalShortcutPortal::~GlobalShortcutPortal()
 
 bool GlobalShortcutPortal::isAvailable()
 {
-    if (!QDBusConnection::sessionBus().isConnected()) {
+    if (!shortcutPortalBus().isConnected()) {
         return false;
     }
     QDBusInterface portal = createGlobalShortcutsInterface();
@@ -504,7 +514,7 @@ bool GlobalShortcutPortal::registerShortcuts(const QList<Shortcut> &shortcuts)
 void GlobalShortcutPortal::unregisterShortcuts()
 {
     if (m_activationSignalConnected) {
-        QDBusConnection::sessionBus().disconnect(QStringLiteral("org.freedesktop.portal.Desktop"),
+        shortcutPortalBus().disconnect(QStringLiteral("org.freedesktop.portal.Desktop"),
                                                  QStringLiteral("/org/freedesktop/portal/desktop"),
                                                  QStringLiteral("org.freedesktop.portal.GlobalShortcuts"),
                                                  QStringLiteral("Activated"),
@@ -518,7 +528,7 @@ void GlobalShortcutPortal::unregisterShortcuts()
                                                                    m_sessionHandle.path(),
                                                                    QStringLiteral("org.freedesktop.portal.Session"),
                                                                    QStringLiteral("Close"));
-        QDBusConnection::sessionBus().asyncCall(closeMessage);
+        shortcutPortalBus().asyncCall(closeMessage);
         m_sessionHandle = QDBusObjectPath();
     }
     m_callbacks.clear();
@@ -640,7 +650,7 @@ bool GlobalShortcutPortal::connectActivationSignal()
     }
 
     m_activationSignalConnected =
-        QDBusConnection::sessionBus().connect(QStringLiteral("org.freedesktop.portal.Desktop"),
+        shortcutPortalBus().connect(QStringLiteral("org.freedesktop.portal.Desktop"),
                                               QStringLiteral("/org/freedesktop/portal/desktop"),
                                               QStringLiteral("org.freedesktop.portal.GlobalShortcuts"),
                                               QStringLiteral("Activated"),
