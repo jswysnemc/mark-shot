@@ -55,13 +55,13 @@ private slots:
     }
 
     /**
-     * 验证实时流请求绕过一次性 KWin 截图后端。
+     * 验证滚动截图等流式偏好请求亦可复用 KWin 接口（支持 hide-caller-windows）。
      * @return 无返回值。
      */
-    void kwinScreenShotIsSkippedForReusableScreencast()
+    void kwinScreenShotIsAllowedForReusableScreencast()
     {
-        QCOMPARE(markshot::kwinScreenShotSupportsOwnWindowPolicy(true, true), false);
-        QCOMPARE(markshot::kwinScreenShotSupportsOwnWindowPolicy(false, true), false);
+        QCOMPARE(markshot::kwinScreenShotSupportsOwnWindowPolicy(true, true), true);
+        QCOMPARE(markshot::kwinScreenShotSupportsOwnWindowPolicy(false, true), true);
     }
 };
 

@@ -43,11 +43,12 @@ bool hideOwnWindowsDuringCaptureFromConfigRoot(const QJsonObject &root)
 
 bool kwinScreenShotSupportsOwnWindowPolicy(bool hideOwnWindows, bool preferScreencast)
 {
-    // KWin still accepts still captures when own windows should stay visible:
-    // captureWithKWinScreenShot passes hide-caller-windows=false in that case.
-    // Screencast sessions keep using the portal path instead.
+    // KWin 支持 hide-caller-windows=false/true 表达自身窗口保留/隐藏策略；
+    // 无论是单帧捕获还是滚动截图的高频采集，均可优先走 KWin CaptureArea 接口，
+    // 避免在多席位或双 GPU 拓扑下被错误分流至 PipeWire Screencast。
     Q_UNUSED(hideOwnWindows);
-    return !preferScreencast;
+    Q_UNUSED(preferScreencast);
+    return true;
 }
 
 }  // namespace markshot

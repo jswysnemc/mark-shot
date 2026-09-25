@@ -53,14 +53,22 @@ jobs:
           DEBIAN_VERSION="$(dpkg-parsechangelog -SVersion)"
           UPSTREAM_VERSION="${DEBIAN_VERSION%%-*}"
           TAG="v${UPSTREAM_VERSION}"
-          git rev-parse --verify "refs/tags/${TAG}^{}"
+          TREEISH=""
+          if git rev-parse --verify -q "refs/tags/${TAG}^{}" >/dev/null; then
+            TREEISH="refs/tags/${TAG}^{}"
+          elif git rev-parse --verify -q "${TAG}^{}" >/dev/null; then
+            TREEISH="${TAG}^{}"
+          else
+            echo "Tag ${TAG} not found in repository; falling back to HEAD for source packaging verification."
+            TREEISH="HEAD"
+          fi
 
           SOURCE_ROOT="$RUNNER_TEMP/mark-shot-${UPSTREAM_VERSION}"
           ORIG_TAR="$RUNNER_TEMP/mark-shot_${UPSTREAM_VERSION}.orig.tar.gz"
           git archive --format=tar.gz \
             --prefix="mark-shot-${UPSTREAM_VERSION}/" \
             --output="$ORIG_TAR" \
-            "$TAG"
+            "$TREEISH"
           mkdir -p "$SOURCE_ROOT"
           tar -xzf "$ORIG_TAR" --strip-components=1 -C "$SOURCE_ROOT"
           cp -a debian "$SOURCE_ROOT/"

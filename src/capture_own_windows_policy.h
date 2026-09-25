@@ -17,9 +17,9 @@ bool hideOwnWindowsDuringCaptureFromConfigRoot(const QJsonObject &root);
 /// @return 配置的策略。
 bool configuredHideOwnWindowsDuringCapture();
 
-/// @brief 判断 KWin ScreenShot2 是否支持当前自身窗口策略。
+/// @brief 判断 KWin ScreenShot2 是否支持当前自身窗口策略与请求。
 /// @param hideOwnWindows 是否隐藏 mark-shot 自身窗口。
-/// @param preferScreencast 是否优先使用可复用的实时流。
+/// @param preferScreencast 是否优先使用可复用的实时流（KWin 截图仍支持单帧与滚动帧捕获）。
 /// @return KWin ScreenShot2 可以正确执行该策略时返回 true。
 bool kwinScreenShotSupportsOwnWindowPolicy(bool hideOwnWindows,
                                            bool preferScreencast = false);

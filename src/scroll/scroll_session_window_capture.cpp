@@ -49,6 +49,9 @@ void ScrollSessionWindow::captureTick()
         // 会话 tick 为 45ms（约 22fps），限制采集频率让 PipeWire 线程在
         // 拷贝前丢弃过密帧，避免按合成器刷新率做无谓的整帧读回
         request.targetFps = std::max(1, 1000 / std::max(1, kCaptureIntervalMs));
+        // 滚动截图时，工具面板及选区外框已在选区外部或由专用层呈现；向截屏后端传递
+        // hideOwnWindows=false，避免 KWin 在每一帧高频隐藏/恢复调用者窗口造成画面剧烈闪烁并阻断滚轮输入
+        request.hideOwnWindows = false;
 
 #if defined(Q_OS_WIN)
         const bool makePanelTransparentForCapture = false;
@@ -58,6 +61,7 @@ void ScrollSessionWindow::captureTick()
             && isWaylandPlatform()
             && !m_layerShell
             && isVisible()
+            && !m_panelOnlyWindow
             && (m_previewPanelVisible || floatingDragHandleActive() || !framePaintRegion().isEmpty());
 #endif
         if (makePanelTransparentForCapture) {
