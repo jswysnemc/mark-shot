@@ -141,6 +141,8 @@ Mark Shot 在 Linux 上从 `~/.config/mark-shot/config.json` 读取应用配置�
     "timeoutSeconds": 60,
     "systemPrompt": "",
     "command": "",
+    "gemini": { "apiKey": "", "model": "gemini-3.5-flash-lite" },
+    "anthropic": { "apiKey": "", "model": "claude-haiku-4-5" },
     "tencent": { "secretId": "", "secretKey": "", "region": "ap-guangzhou" },
     "baidu": { "appId": "", "appKey": "" },
     "youdao": { "appKey": "", "appSecret": "" }
@@ -148,7 +150,7 @@ Mark Shot 在 Linux 上从 `~/.config/mark-shot/config.json` 读取应用配置�
 }
 ```
 
-翻译能力由 provider 插件提供。`translation.provider` 的取值顺序、腾讯与百度与有道的凭据字段、对应环境变量以及各家语言代码，见[翻译服务提供方文档](translation-providers.zh-CN.md)。
+翻译能力由 provider 插件提供。`translation.provider` 的取值顺序、Gemini、Claude、腾讯、百度与有道的凭据字段、对应环境变量以及各家语言代码，见[翻译服务提供方文档](translation-providers.zh-CN.md)。
 
 `translation.extraBody` 用于向 OpenAI-compatible 请求体顶层添加 JSON 字段，同时适用于插件和内置实现。直接编辑 `config.json` 中的该字段即可，没有对应的设置页面控件。例如，在支持该参数的 API 上，可填写 `"extraBody": {"enable_thinking": false}` 请求关闭思考；其他 API 可能要求 `"extraBody": {"reasoning_effort": "none"}`。具体字段和值取决于服务商和模型，并非通用协议，可能被拒绝或忽略。
 

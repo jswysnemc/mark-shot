@@ -1,3 +1,13 @@
+mark-shot (0.1.54-0ppa1~resolute1) resolute; urgency=medium
+
+  * Add Google Gemini and Anthropic Claude translation provider plugins.
+  * Add a configurable system prompt for LLM translation providers.
+  * Use logical coordinates for the HiDPI capture crosshair hotspot.
+  * Register the portal shortcut app id on a dedicated D-Bus connection.
+  * Hide capture overlays on every screen while the recording dialog is open.
+
+ -- Mark Shot maintainers <snemc@qq.com>  Fri, 25 Sep 2026 00:00:00 +0000
+
 mark-shot (0.1.53-0ppa1~resolute1) resolute; urgency=medium
 
   * Stage plugin updates on Windows to prevent DLL overwrite locking conflicts.

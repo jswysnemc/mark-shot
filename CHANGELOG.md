@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.54 - 2026-09-25
+
+### Features & Enhancements
+
+- **Google Gemini and Anthropic Claude Translation**: OCR translation adds two LLM provider plugins — `gemini` (Google Gemini `generateContent`) and `anthropic` (Anthropic Messages API). Credentials live in `translation.gemini` and `translation.anthropic`, or in environment variables, and can be entered on the Integrations settings page, which now offers provider selection and tabbed LLM credentials. `auto` resolves in the fixed order `openai-compatible` → `gemini` → `anthropic` → `tencent-tmt` → `baidu-fanyi` → `youdao-nmt`. Each plugin reads only its own config object, so the shared OpenAI-compatible `apiKey`, `model`, and `systemPrompt` are not inherited. `temperature` and Gemini `thinkingLevel` are sent only when set explicitly. Defaults are `gemini-3.5-flash-lite` and `claude-haiku-4-5`. See [docs/translation-providers.md](docs/translation-providers.md).
+- **Configurable Translation System Prompt**: LLM providers accept a per-provider `systemPrompt`. Leaving it empty keeps the built-in translator prompt.
+
+### Bug Fixes
+
+- **HiDPI Crosshair Hotspot**: The capture crosshair hotspot is specified in logical coordinates. On HiDPI Wayland outputs the selection and annotations stay under the pointer instead of jumping away from the visual center. Fixes #116.
+- **Portal Global Shortcuts App ID**: Shortcut registration uses a dedicated D-Bus connection so xdg-desktop-portal can bind the application id. `GlobalShortcuts.CreateSession` no longer fails with "An app id is required" when another portal call already used the shared session bus. Fixes #115.
+- **Recording Dialog Focus on Multiple Screens**: Opening the recording dialog hides capture overlays on every screen. Leftover layer-shell overlays no longer keep exclusive keyboard focus, so the dialog can be focused and clicked. Fixes #114.
+- **Debian Source Tag Fallback**: The debian-source workflow checks out `HEAD` when the upstream release tag is not present yet.
+
 ## 0.1.53 - 2026-09-21
 
 ### Features & Enhancements

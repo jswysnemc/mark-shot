@@ -227,7 +227,7 @@ Shift+方向键按 10 像素。Wayland 无法挪动系统光标时，会在逻�
 | 右键 | 上下文菜单（旋转、缩放、置顶、复制文字、翻译、保存、复制、关闭） |
 
 贴纸窗口内的 OCR 文字可直接选择复制（`Ctrl+C` / 右键菜单）。翻译
-（OpenAI 兼容接口、腾讯云机器翻译、百度翻译或网易有道）会把译文按原布局位置
+（OpenAI 兼容接口、Google Gemini、Anthropic Claude、腾讯云机器翻译、百度翻译或网易有道）会把译文按原布局位置
 渲染回图片上，服务选择与凭据配置见[翻译服务提供方文档](translation-providers.zh-CN.md)。
 
 KDE Plasma Wayland 下，`pinnedWindow.alwaysOnTop` 通过会话内 KWin 脚本生效，

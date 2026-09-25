@@ -1,6 +1,6 @@
 # Translation providers
 
-Mark Shot can translate OCR results directly in the pinned window. Translation is supplied by provider plugins. Besides the original OpenAI-compatible endpoint, Tencent Machine Translation, Baidu Translate, and Youdao are now supported.
+Mark Shot can translate OCR results directly in the pinned window. Translation is supplied by provider plugins. Besides the original OpenAI-compatible endpoint, Google Gemini, Anthropic Claude, Tencent Machine Translation, Baidu Translate, and Youdao are supported.
 
 ## Available providers
 

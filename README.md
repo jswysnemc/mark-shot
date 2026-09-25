@@ -62,7 +62,7 @@ It captures screen frames instantly and opens an interactive fullscreen overlay,
 ### Pinned Window Stickers
 - Pins any cropped region or annotated screenshot as an independent, frameless, and top-level floating window.
 - Supports direct selection of OCR-recognized text in the pinned window, with `Ctrl + C` and context-menu copying.
-- Translates OCR text through OpenAI-compatible LLM endpoints or the Tencent, Baidu, and Youdao machine translation APIs, rendering translated text back onto the image at the original layout positions. See the [translation provider guide](docs/translation-providers.md) for credentials and provider selection.
+- Translates OCR text through OpenAI-compatible, Google Gemini, and Anthropic Claude endpoints, or the Tencent, Baidu, and Youdao machine translation APIs, rendering translated text back onto the image at the original layout positions. See the [translation provider guide](docs/translation-providers.md) for credentials and provider selection.
 - **Interactive Gestures**:
   - Drag with left click to reposition.
   - Scroll mouse wheel to scale.

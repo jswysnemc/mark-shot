@@ -61,7 +61,7 @@
 ### 贴图悬浮固定（Pin）
 - 支持将截图或标注区域作为一个独立、无边框且置顶的悬浮贴图窗口固定在屏幕上。
 - 支持在贴图窗口中直接选择 OCR 识别出的文字，使用 `Ctrl + C` 或右键菜单复制图片文字。
-- 支持通过 OpenAI 兼容接口、腾讯云机器翻译、百度翻译与网易有道翻译 OCR 文本，并将译文按原图位置覆盖渲染到贴图上。凭据配置与 provider 选择见[翻译服务提供方文档](docs/translation-providers.zh-CN.md)。
+- 支持通过 OpenAI 兼容接口、Google Gemini、Anthropic Claude、腾讯云机器翻译、百度翻译与网易有道翻译 OCR 文本，并将译文按原图位置覆盖渲染到贴图上。凭据配置与 provider 选择见[翻译服务提供方文档](docs/translation-providers.zh-CN.md)。
 - **便捷交互**：
   - 鼠标左键拖动可自由平移贴图位置。
   - 滚动鼠标滚轮可等比例缩放贴图。

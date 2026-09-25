@@ -1,6 +1,6 @@
 # 翻译服务提供方
 
-Mark Shot 的贴图窗口 OCR 结果可以直接翻译。翻译能力由 provider 插件提供，除原有的 OpenAI 兼容接口外，现在还支持腾讯云机器翻译、百度翻译开放平台与网易有道智云三家传统机器翻译接口。
+Mark Shot 的贴图窗口 OCR 结果可以直接翻译。翻译能力由 provider 插件提供，除原有的 OpenAI 兼容接口外，还支持 Google Gemini、Anthropic Claude，以及腾讯云机器翻译、百度翻译开放平台与网易有道智云。
 
 ## 可用的 provider
 

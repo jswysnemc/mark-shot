@@ -252,9 +252,9 @@ rounded corners, and a soft shadow to saved / copied / uploaded images.
 | right click | context menu (rotate, zoom, always-on-top, copy text, translate, save, copy, close) |
 
 OCR text inside a pinned window is selectable and copyable (`Ctrl+C` /
-context menu). Translation (OpenAI-compatible endpoint, Tencent, Baidu, or
-Youdao) renders the translated text back onto the image at the original layout
-positions. See the [translation provider guide](translation-providers.md) for
+context menu). Translation (OpenAI-compatible, Google Gemini, Anthropic
+Claude, Tencent, Baidu, or Youdao) renders the translated text back onto the
+image at the original layout positions. See the [translation provider guide](translation-providers.md) for
 provider selection and credentials.
 
 On KDE Plasma Wayland, `pinnedWindow.alwaysOnTop` is applied through a session

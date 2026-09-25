@@ -141,6 +141,8 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
     "timeoutSeconds": 60,
     "systemPrompt": "",
     "command": "",
+    "gemini": { "apiKey": "", "model": "gemini-3.5-flash-lite" },
+    "anthropic": { "apiKey": "", "model": "claude-haiku-4-5" },
     "tencent": { "secretId": "", "secretKey": "", "region": "ap-guangzhou" },
     "baidu": { "appId": "", "appKey": "" },
     "youdao": { "appKey": "", "appSecret": "" }
@@ -148,7 +150,7 @@ Mark Shot reads application settings from `~/.config/mark-shot/config.json` on L
 }
 ```
 
-Translation runs through provider plugins. See the [translation provider guide](translation-providers.md) for the `translation.provider` selection order, the Tencent, Baidu, and Youdao credential fields, their environment variables, and the per-vendor language codes.
+Translation runs through provider plugins. See the [translation provider guide](translation-providers.md) for the `translation.provider` selection order, the Gemini, Claude, Tencent, Baidu, and Youdao credential fields, their environment variables, and the per-vendor language codes.
 
 `translation.extraBody` adds JSON fields to the top level of OpenAI-compatible request bodies, for both the plugin and the built-in implementation. Edit this field directly in `config.json`; there is no settings control. For an API that supports it, use `"extraBody": {"enable_thinking": false}` to request disabling thinking. Other APIs may require `"extraBody": {"reasoning_effort": "none"}` instead. These fields and values depend on the API provider and model; they are not universal and may be rejected or ignored.
 

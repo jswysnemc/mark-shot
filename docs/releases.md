@@ -1,5 +1,14 @@
 # Release Notes
 
+### 0.1.54
+
+- **Gemini and Claude Translation**: OCR translation adds Google Gemini and Anthropic Claude plugins. Enter credentials in Settings -> Integrations or through environment variables, and pick the service in Settings -> Plugins. Each plugin keeps its own config and does not inherit the OpenAI-compatible key, model, or system prompt. See the [translation provider guide](translation-providers.md).
+- **Configurable System Prompt**: LLM providers accept a custom system prompt. Leaving it empty keeps the built-in translator prompt.
+- **HiDPI Crosshair Hotspot**: The crosshair hotspot uses logical coordinates, so selections stay under the pointer on high-density displays.
+- **Portal Shortcut Registration**: Global shortcuts register the portal app id on a dedicated D-Bus connection, so session creation no longer fails after another portal call has already used the session bus.
+- **Recording Dialog on Multiple Screens**: Opening the recording dialog hides overlays on every screen, so the dialog can be focused and clicked.
+- **Debian Source Tag Fallback**: The debian-source workflow uses `HEAD` when the upstream release tag is missing.
+
 ### 0.1.53
 
 - **Staged Windows Plugin Updates**: Loaded DLLs remain locked safely; updates stage under `.pending-updates` and apply before plugin discovery upon restart. See the [plugin distribution guide](plugin-distribution.md).
