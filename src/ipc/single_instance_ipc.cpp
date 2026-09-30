@@ -2,12 +2,18 @@
 
 #include "debug_log.h"
 
+#include <QDir>
 #include <QJsonDocument>
 #include <QJsonParseError>
 #include <QLocalSocket>
 #include <QObject>
+#include <QStandardPaths>
 
 #include <algorithm>
+
+#if defined(Q_OS_UNIX)
+#include <unistd.h>
+#endif
 
 namespace markshot::ipc {
 namespace {
@@ -137,7 +143,15 @@ QByteArray encodeResponse(const SingleInstanceResponse &response)
 
 QString singleInstanceServerName()
 {
+#if defined(Q_OS_UNIX)
+    const QString runtimeDir = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+    if (!runtimeDir.isEmpty()) {
+        return QDir(runtimeDir).filePath(QStringLiteral("mark-shot-single-instance"));
+    }
+    return QStringLiteral("mark-shot-%1-single-instance").arg(::getuid());
+#else
     return QStringLiteral("mark-shot-single-instance");
+#endif
 }
 
 bool sendSingleInstanceCommand(const SingleInstanceCommand &command,
