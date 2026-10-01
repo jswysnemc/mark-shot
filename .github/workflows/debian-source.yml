@@ -44,7 +44,7 @@ jobs:
             --tool 'apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends -y' \
             debian/control
 
-      - name: Create source package from the stable upstream tag
+      - name: Create source package from the checked-out revision
         id: source
         shell: bash
         run: |
@@ -52,15 +52,15 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           DEBIAN_VERSION="$(dpkg-parsechangelog -SVersion)"
           UPSTREAM_VERSION="${DEBIAN_VERSION%%-*}"
-          TAG="v${UPSTREAM_VERSION}"
-          git rev-parse --verify "refs/tags/${TAG}^{}"
+          # 1. 【源码打包】【持续集成】验证当前提交，避免遗漏新改动或依赖尚未发布的标签
+          SOURCE_REF="$(git rev-parse --verify HEAD)"
 
           SOURCE_ROOT="$RUNNER_TEMP/mark-shot-${UPSTREAM_VERSION}"
           ORIG_TAR="$RUNNER_TEMP/mark-shot_${UPSTREAM_VERSION}.orig.tar.gz"
           git archive --format=tar.gz \
             --prefix="mark-shot-${UPSTREAM_VERSION}/" \
             --output="$ORIG_TAR" \
-            "$TAG"
+            "$SOURCE_REF"
           mkdir -p "$SOURCE_ROOT"
           tar -xzf "$ORIG_TAR" --strip-components=1 -C "$SOURCE_ROOT"
           cp -a debian "$SOURCE_ROOT/"
