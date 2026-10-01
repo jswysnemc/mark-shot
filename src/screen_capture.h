@@ -19,6 +19,8 @@ struct CaptureResult {
     bool cursorIncluded = false;
     // 流式后端产生该帧的时间，0 表示后端没有提供
     qint64 frameTimeMs = 0;
+    // 【Wayland捕获】【流回退】本次采集的流已失败，连续采集方可在当前会话内停用重试
+    bool screencastFailed = false;
 };
 
 // Backend-independent capture request. Callers can ask for all outputs, one
@@ -43,6 +45,8 @@ struct CaptureRequest {
     bool includeCursor = false;
     // 截屏时是否让后端隐藏调用者自身窗口（KWin hide-caller-windows 选项）
     bool hideOwnWindows = true;
+    // 【Wayland捕获】【流重试】会话内流失败后设为 false，保留连续采集的自身窗口策略
+    bool allowScreencast = true;
 };
 
 // Captures one frame and normalizes the image for downstream painting/stitching.

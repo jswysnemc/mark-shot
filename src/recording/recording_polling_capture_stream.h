@@ -75,6 +75,7 @@ private:
     bool m_capturing = false;
     bool m_running = false;
     bool m_backpressureActive = false;
+    bool m_screencastFailed = false;
 };
 
 }  // namespace markshot::recording
