@@ -2,6 +2,7 @@
 
 #include "pipewire/pipewire_dmabuf_importer.h"
 #include "recording/recording_bgra_buffer_pool.h"
+#include "portal/screencast_persistence.h"
 #include "screen_capture_internal.h"
 
 #include <QByteArray>
@@ -68,20 +69,21 @@ public:
 private:
     /**
      * 启动可用的 Portal 截屏会话。
-     * @param includeCursor 是否请求合成鼠标。
+     * @param request 采集目标、鼠标策略和授权范围。
      * @param error 输出错误信息。
      * @return 启动成功时返回 true。
      */
-    bool start(bool includeCursor, QString *error);
+    bool start(const CaptureRequest &request, QString *error);
 
 #ifdef HAVE_LIBPORTAL
     /**
      * 使用 libportal 启动截屏会话。
      * @param includeCursor 是否请求合成鼠标。
+     * @param requestSubmitted 是否已经提交可能触发授权的门户请求。
      * @param error 输出错误信息。
      * @return 启动成功时返回 true。
      */
-    bool startWithLibportal(bool includeCursor, QString *error);
+    bool startWithLibportal(bool includeCursor, bool *requestSubmitted, QString *error);
 #endif
 
     /**
@@ -188,6 +190,7 @@ private:
     uint m_nodeId = 0;
     QString m_targetObject;
     QString m_sessionHandle;
+    std::unique_ptr<markshot::portal::ScreenCastPersistence> m_persistence;
     bool m_ownsDbusSessionHandle = false;
     bool m_cursorIncluded = false;
     int m_targetFps = 0;

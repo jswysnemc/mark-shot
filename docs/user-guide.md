@@ -309,6 +309,15 @@ Scrolling capture is production-ready on niri and similar wlroots/Wayland
 compositors; on KDE, X11 and other stacks it is a test feature. If it fails,
 use normal screenshots or a custom extension command.
 
+On KDE Wayland, Mark Shot first tries available non-interactive capture paths,
+including native KWin screenshots. When screen-sharing permission is needed,
+it asks the desktop to remember the authorization. If the desktop supports and
+grants persistent permission, later scrolling captures on the same display can
+restore it, including after restarting Mark Shot. Closing the scrolling capture
+ends the sharing session. Revoked permissions, display changes, or desktops
+without persistence support may require confirmation again. Cancelling an
+authorization request does not open a second prompt through another portal API.
+
 ---
 
 ## 7. Headless Capture (CLI)
