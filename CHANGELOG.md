@@ -12,6 +12,7 @@
 - **Secondary-Display Recording Prompts**: Polling recordings use native fallbacks before portal screenshots, disable per-frame interactive requests, and stop retrying failed screencasts for the current recording. Fixes #126.
 - **Multi-User Single Instance**: Isolate Unix sockets through the user's runtime directory or UID to prevent cross-user permission collisions. Merges #124.
 - **Portal Cancellation and Recording Fallback**: Do not submit a second authorization request through D-Bus after libportal has submitted one. Preserve raw recording callbacks when libportal initialization falls back before submitting a request.
+- **Pre-Release Source Package Checks**: Debian CI builds the checked-out revision instead of requiring the next release tag or silently testing an older tagged source tree.
 
 ## 0.1.55 - 2026-09-30
 
