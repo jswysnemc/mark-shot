@@ -27,6 +27,7 @@ bool RecordingPollingCaptureStream::start(QString *error)
     m_intervalUs = std::max<qint64>(1, 1000000 / std::max(1, m_options.fps));
     m_nextCaptureUs = 0;
     m_sequence = 0;
+    m_screencastFailed = false;
     m_running = true;
     m_clock.restart();
     scheduleNextCapture(0);
@@ -69,12 +70,15 @@ void RecordingPollingCaptureStream::captureFrame()
     request.preferredOutputName = m_options.display.outputName;
     request.allOutputs = m_options.display.allOutputs && m_options.scope == RecordingScope::Display;
     request.preferScreencast = true;
-    request.allowInteractivePortal = m_options.mode != RecordingMode::Video;
-    request.allowPortalScreenshotFallback = m_options.mode != RecordingMode::Video;
+    // 1. 【录制】【轮询授权】逐帧采集只走非交互路径，GIF 首帧可在原生回退失败后授权一次
+    request.allowInteractivePortal = false;
+    request.allowPortalScreenshotFallback = false;
+    request.allowInteractiveScreencastInit = m_options.mode == RecordingMode::Gif && m_sequence == 0;
+    request.allowScreencast = !m_screencastFailed;
     request.includeCursor = true;
     request.targetFps = m_options.mode == RecordingMode::Video ? m_options.fps : 0;
 
-    // 1. Wayland 抓帧可能进入门户请求等嵌套事件循环，期间录制可被停止并销毁本对象
+    // 2. 【录制】【轮询采集】门户请求可能进入嵌套事件循环，期间录制可被停止并销毁本对象
     QPointer<RecordingPollingCaptureStream> self(this);
     const CaptureResult result = captureScreenFrame(request);
     if (!self) {
@@ -84,6 +88,7 @@ void RecordingPollingCaptureStream::captureFrame()
     if (!m_running) {
         return;
     }
+    m_screencastFailed = m_screencastFailed || result.screencastFailed;
     const qint64 captureMs = captureElapsed.elapsed();
     if (result.image.isNull()) {
         emit failed(result.error.isEmpty()
@@ -98,7 +103,7 @@ void RecordingPollingCaptureStream::captureFrame()
     sample.sequence = ++m_sequence;
     advanceNextCaptureTime();
     updateAdaptivePacing(captureMs);
-    // 2. 接收方处理帧时可能同步停止录制并销毁采集流，发射后需再次确认对象存活
+    // 3. 【录制】【帧分发】接收方可能同步停止录制并销毁采集流，发射后需再次确认对象存活
     emit frameReady(sample);
     if (!self) {
         return;
