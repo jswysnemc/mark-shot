@@ -1,5 +1,13 @@
 # Release Notes
 
+### 0.1.56
+
+- **Remembered Screen-Sharing Authorization**: When the desktop grants persistent permission, scrolling captures on the same display restore authorization across sessions and application restarts. Sharing ends when the capture closes. Revoked permissions, display changes, or unsupported portals may still require confirmation. See the [user guide](user-guide.md#6-scrolling-screenshot).
+- **KDE Capture Fallback**: A failed preferred screencast can recover through KWin ScreenShot2 before requesting interactive authorization, preserving the KWin configuration and own-window policy.
+- **Secondary-Display Recording**: GIF and video polling no longer open portal screenshot prompts for every frame. Native fallbacks run first, and a failed screencast is not retried during that recording.
+- **Multi-User IPC**: Single-instance sockets are isolated by the user's runtime directory or UID, preventing permission collisions between users and seats.
+- **Portal Cancellation**: Cancelling or failing a submitted libportal request does not open a second prompt through D-Bus. Falling back before submission preserves recording frame callbacks.
+
 ### 0.1.55
 
 - **Delayed Capture**: Pass `--delay <seconds>` to schedule captures after a pause (0–60s). Presets are also available in the tray menu.

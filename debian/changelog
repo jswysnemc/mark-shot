@@ -1,3 +1,12 @@
+mark-shot (0.1.56-0ppa1~resolute1) resolute; urgency=medium
+
+  * Persist screen-sharing authorization across capture sessions and restarts.
+  * Recover KDE capture through KWin and stop repeated polling portal prompts.
+  * Isolate single-instance sockets by user runtime directory or UID.
+  * Preserve recording callbacks when libportal initialization falls back.
+
+ -- Mark Shot maintainers <snemc@qq.com>  Fri, 02 Oct 2026 04:30:13 +0800
+
 mark-shot (0.1.55-0ppa1~resolute1) resolute; urgency=medium
 
   * Add delayed capture CLI option and system tray presets.
