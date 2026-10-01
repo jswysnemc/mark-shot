@@ -43,6 +43,7 @@ target_link_libraries(mark-shot-config-value-test
 add_test(NAME config-value COMMAND mark-shot-config-value-test)
 
 include(cmake/recording_tests.cmake)
+include(cmake/ipc_tests.cmake)
 include(cmake/capture_tests.cmake)
 include(cmake/capture_history_tests.cmake)
 include(cmake/shot_window_tests.cmake)
