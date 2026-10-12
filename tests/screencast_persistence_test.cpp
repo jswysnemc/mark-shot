@@ -82,8 +82,32 @@ private slots:
         cursor.includeCursor = true;
         QVERIFY(!ScreenCastPersistence(cursor, false, path).prepare(4).contains("restore_token"));
         QVERIFY(!ScreenCastPersistence(scrollRequest(), true, path).prepare(4).contains("restore_token"));
+        CaptureRequest window = scrollRequest();
+        window.windowCapture = true;
+        QVERIFY(!ScreenCastPersistence(window, false, path).prepare(4).contains("restore_token"));
         QCOMPARE(ScreenCastPersistence(scrollRequest(), false, path).prepare(4).value("restore_token").toString(),
                  QStringLiteral("primary-grant"));
+    }
+
+    /** Ensure a saved window grant does not replace an existing monitor grant. */
+    void windowAuthorizationIsSeparateFromMonitorAuthorization()
+    {
+        QTemporaryDir directory;
+        const QString path = directory.filePath("tokens.json");
+        CaptureRequest window = scrollRequest();
+        window.windowCapture = true;
+        {
+            ScreenCastPersistence monitorGrant(scrollRequest(), false, path);
+            monitorGrant.prepare(4);
+            monitorGrant.accept("monitor-grant");
+            ScreenCastPersistence windowGrant(window, false, path);
+            QVERIFY(!windowGrant.prepare(4).contains("restore_token"));
+            windowGrant.accept("window-grant");
+        }
+        QCOMPARE(ScreenCastPersistence(window, false, path).prepare(4).value("restore_token").toString(),
+                 QStringLiteral("window-grant"));
+        QCOMPARE(ScreenCastPersistence(scrollRequest(), false, path).prepare(4).value("restore_token").toString(),
+                 QStringLiteral("monitor-grant"));
     }
 
     /** @return 无返回值；验证版本 4 以前的门户不收到新参数，也不会消费已保存令牌。 */

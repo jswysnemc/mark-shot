@@ -30,6 +30,7 @@ struct CaptureRequest {
     QString preferredOutputName; // Best-effort monitor name when a single output is desired.
     QRect sourceGeometry;        // Global capture rectangle before backend-specific cropping.
     bool allOutputs = false;     // Capture the virtual desktop instead of one output/rectangle.
+    bool windowCapture = false;  // Ask the Wayland ScreenCast portal to select one native window.
     bool preferScreencast = false; // Prefer reusable stream capture for repeated scroll frames.
     bool allowInteractivePortal = true; // Permit user-facing portal prompts for one-shot capture.
     bool allowPortalScreenshotFallback = true; // Allow slower portal screenshots if streaming fails.

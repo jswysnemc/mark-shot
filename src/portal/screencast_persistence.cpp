@@ -13,13 +13,17 @@ namespace markshot::portal {
 ScreenCastPersistence::ScreenCastPersistence(const CaptureRequest &request, bool recording, QString storePath)
     : m_store(std::move(storePath))
 {
-    const QJsonArray scope{
+    QJsonArray scope{
         qEnvironmentVariable("XDG_CURRENT_DESKTOP").trimmed().toLower(),
         request.preferredOutputName,
         request.allOutputs,
         request.includeCursor,
         recording,
     };
+    // Preserve existing monitor restore-token scopes; window permissions are separate.
+    if (request.windowCapture) {
+        scope.append(QStringLiteral("window"));
+    }
     m_scope = QString::fromLatin1(QCryptographicHash::hash(
         QJsonDocument(scope).toJson(QJsonDocument::Compact), QCryptographicHash::Sha256).toHex());
 }

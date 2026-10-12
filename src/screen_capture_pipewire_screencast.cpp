@@ -99,6 +99,12 @@ CaptureResult PortalPipeWireScreencast::capture(const CaptureRequest &request)
     const qint64 frameTimeMs = m_latestFrameTimeMs;
     locker.unlock();
 
+    // A portal-selected window has its own pixel coordinate space. Window
+    // streams do not provide a reliable global output position for cropping.
+    if (request.windowCapture) {
+        return {frame, {}, {}, QRect(QPoint(0, 0), frame.size()), m_cursorIncluded, frameTimeMs};
+    }
+
     const QRect requested = request.sourceGeometry;
     const bool wantCrop = requested.isValid() && !requested.isEmpty();
     QImage image = wantCrop
@@ -304,7 +310,7 @@ bool PortalPipeWireScreencast::start(const CaptureRequest &request, QString *err
 #ifdef HAVE_LIBPORTAL
     QString libportalError;
     bool requestSubmitted = false;
-    if (startWithLibportal(request.includeCursor, &requestSubmitted, &libportalError)) {
+    if (startWithLibportal(request, &requestSubmitted, &libportalError)) {
         m_started = true;
         return true;
     }
@@ -321,7 +327,7 @@ bool PortalPipeWireScreencast::start(const CaptureRequest &request, QString *err
 #endif
 
     QString dbusError;
-    if (!startWithDbusPortal(request.includeCursor, &dbusError)) {
+    if (!startWithDbusPortal(request, &dbusError)) {
         if (error) {
 #ifdef HAVE_LIBPORTAL
             *error = libportalError.isEmpty()

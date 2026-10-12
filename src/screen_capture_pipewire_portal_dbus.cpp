@@ -2,7 +2,7 @@
 
 #ifdef HAVE_PIPEWIRE
 
-bool PortalPipeWireScreencast::startWithDbusPortal(bool includeCursor, QString *error)
+bool PortalPipeWireScreencast::startWithDbusPortal(const CaptureRequest &request, QString *error)
 {
     static bool dbusTypesRegistered = [] {
         qRegisterMetaType<PortalStream>("PortalStream");
@@ -74,9 +74,12 @@ bool PortalPipeWireScreencast::startWithDbusPortal(bool includeCursor, QString *
     const QString screenCastInterface = QStringLiteral("org.freedesktop.portal.ScreenCast");
     const uint sourceTypes =
         portalUintProperty(screenCastInterface, QStringLiteral("AvailableSourceTypes"));
-    if (sourceTypes != 0 && !(sourceTypes & kPortalSourceMonitor)) {
+    const uint wantedSource = request.windowCapture ? kPortalSourceWindow : kPortalSourceMonitor;
+    if (sourceTypes != 0 && !(sourceTypes & wantedSource)) {
         if (error) {
-            *error = QStringLiteral("ScreenCast portal does not advertise monitor capture");
+            *error = request.windowCapture
+                ? QStringLiteral("ScreenCast portal does not advertise window capture")
+                : QStringLiteral("ScreenCast portal does not advertise monitor capture");
         }
         return false;
     }
@@ -85,15 +88,15 @@ bool PortalPipeWireScreencast::startWithDbusPortal(bool includeCursor, QString *
     const uint portalVersion = portalUintProperty(screenCastInterface, QStringLiteral("version"));
     QVariantMap selectOptions = m_persistence->prepare(portalVersion);
     selectOptions.insert(QStringLiteral("handle_token"), portalToken());
-    selectOptions.insert(QStringLiteral("types"), kPortalSourceMonitor);
+    selectOptions.insert(QStringLiteral("types"), wantedSource);
     selectOptions.insert(QStringLiteral("multiple"), false);
     const uint availableCursorModes =
         portalUintProperty(screenCastInterface, QStringLiteral("AvailableCursorModes"));
-    const uint cursorMode = preferredPortalCursorMode(availableCursorModes, includeCursor);
+    const uint cursorMode = preferredPortalCursorMode(availableCursorModes, request.includeCursor);
     if (cursorMode != 0) {
         selectOptions.insert(QStringLiteral("cursor_mode"), cursorMode);
     }
-    m_cursorIncluded = includeCursor && cursorMode == kPortalCursorEmbedded;
+    m_cursorIncluded = request.includeCursor && cursorMode == kPortalCursorEmbedded;
     markshot::debugLog("capture",
                        "【屏幕共享】【会话协商】screencast negotiate source_types=0x%x cursor_modes=0x%x chosen_cursor=%u",
                        sourceTypes, availableCursorModes, cursorMode);

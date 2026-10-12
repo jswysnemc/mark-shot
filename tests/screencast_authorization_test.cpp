@@ -60,10 +60,10 @@ bool authorize(markshot::portal::ScreenCastPersistence *persistence, QString *er
 /** @return 无返回值；测试不向真实桌面注册应用。 */
 void registerHostPortalApplication() {}
 
-/** @param includeCursor 鼠标策略。 @param error 错误输出。 @return 模拟 D-Bus 门户建流结果。 */
-bool PortalPipeWireScreencast::startWithDbusPortal(bool includeCursor, QString *error)
+/** @param request 捕获策略。 @param error 错误输出。 @return 模拟 D-Bus 门户建流结果。 */
+bool PortalPipeWireScreencast::startWithDbusPortal(const CaptureRequest &request, QString *error)
 {
-    Q_UNUSED(includeCursor);
+    Q_UNUSED(request);
     ++g_dbusCalls;
     g_rawCallbackPresent = bool(m_rawFrameCallback);
     if (!authorize(m_persistence.get(), error)) {
@@ -76,10 +76,10 @@ bool PortalPipeWireScreencast::startWithDbusPortal(bool includeCursor, QString *
 }
 
 #ifdef HAVE_LIBPORTAL
-/** @param includeCursor 鼠标策略。 @param submitted 是否提交请求。 @param error 错误输出。 @return 模拟 libportal 建流结果。 */
-bool PortalPipeWireScreencast::startWithLibportal(bool includeCursor, bool *submitted, QString *error)
+/** @param request 捕获策略。 @param submitted 是否提交请求。 @param error 错误输出。 @return 模拟 libportal 建流结果。 */
+bool PortalPipeWireScreencast::startWithLibportal(const CaptureRequest &request, bool *submitted, QString *error)
 {
-    Q_UNUSED(includeCursor);
+    Q_UNUSED(request);
     ++g_libportalCalls;
     *submitted = g_useLibportal;
     if (!g_useLibportal) {
@@ -162,6 +162,19 @@ private slots:
         QCOMPARE(g_dbusCalls, useLibportal ? 0 : 3);
         QCOMPARE(g_prompts, 1);
         QCOMPARE(g_tokenSequence, 3);
+    }
+
+    /** Window portal frames must be returned whole, not cropped to desktop coordinates. */
+    void nativeWindowCaptureUsesFullWindowFrame()
+    {
+        CaptureRequest request = authorizedRequest();
+        request.windowCapture = true;
+        PortalPipeWireScreencast capture;
+        const CaptureResult frame = capture.capture(request);
+        QVERIFY2(!frame.image.isNull(), qPrintable(frame.error));
+        QCOMPARE(frame.image.size(), QSize(16, 16));
+        QCOMPARE(frame.sourceGeometry, QRect(0, 0, 16, 16));
+        QCOMPARE(g_prompts, 1);
     }
 
     /** @return 无返回值；验证已有令牌也不会在非交互逐帧请求中尝试可能弹窗的恢复。 */

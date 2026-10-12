@@ -120,6 +120,7 @@ QDBusArgument &operator<<(QDBusArgument &argument, const PortalStream &stream);
 const QDBusArgument &operator>>(const QDBusArgument &argument, PortalStream &stream);
 
 inline constexpr uint kPortalSourceMonitor = 1u;
+inline constexpr uint kPortalSourceWindow = 2u;
 inline constexpr uint kPortalCursorHidden = 1u;
 inline constexpr uint kPortalCursorEmbedded = 2u;
 inline constexpr uint kPortalCursorMetadata = 4u;

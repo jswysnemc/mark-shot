@@ -13,6 +13,15 @@
  */
 CaptureResult captureWaylandFrame(const CaptureRequest &request)
 {
+    // Window selection must go straight to ScreenCast: grim and Screenshot
+    // cannot capture an individual native Wayland toplevel. A fresh portal
+    // session also avoids accidentally reusing a previous monitor stream.
+    if (request.windowCapture) {
+        stopPortalScreencast();
+        CaptureResult result = captureWithPortalScreencast(request);
+        stopPortalScreencast();
+        return result;
+    }
     std::optional<markshot::CaptureOwnWindowsGuard> ownWindowsGuard;
     if (request.hideOwnWindows && !request.preferScreencast) {
         ownWindowsGuard.emplace();

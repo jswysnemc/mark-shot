@@ -224,7 +224,9 @@ argument.
 | `-h`, `--help` | Displays help information and exits. |
 | `-v`, `--version` | Displays version information and exits. |
 | `--all-outputs` | Captures all screens on the virtual display environment instead of only the active one. |
+| `--window` | Selects a native Wayland window using the ScreenCast portal window picker, then opens the captured window in the annotation editor. Requires a portal with window capture support (e.g., xdg-desktop-portal-wlr on recent labwc). Unlike hover-to-snap, this does not require compositor window geometry. |
 | `--xdg-window` | Forces the use of a standard XDG fullscreen window (xdg-shell) instead of layer-shell. |
+
 | `--fullscreen` | Skips region selection and opens annotation mode on the full screen frame directly. |
 | `--tray` | Keeps Mark Shot running in the system tray and registers global capture hotkeys when supported. |
 | `--capture` | Forces one-shot capture when tray autostart is enabled in the config. |
@@ -244,6 +246,15 @@ argument.
 | `--include-cursor` | With `--capture-to`: draw the mouse cursor into the captured frame. |
 | `--output-name <name>` | With `--capture-to`: base file name (without extension) used when the capture path is a directory. |
 | `--list-displays` | Prints the available outputs as JSON and exits. |
+
+For Wayland compositors without a window geometry enumeration API (including
+labwc), `mark-shot --window` opens the desktop portal window picker. It captures
+the selected native Wayland or XWayland window directly, then enters annotation
+mode. The normal screenshot hover-to-snap behavior remains dependent on a
+compositor-specific geometry provider. This feature does **not** attempt to
+infer window coordinates from the portal toplevel-list protocol, which does not
+expose them. The portal must advertise `AvailableSourceTypes` with the Window
+bit (2), and PipeWire must be available.
 
 ### Compositor / Desktop Hotkey Integration
 

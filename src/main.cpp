@@ -11,6 +11,7 @@
 #include "cli/recording_cli.h"
 #include "debug_log.h"
 #include "screen_capture_portal_guard.h"
+#include "screen_capture.h"
 #include "ipc/single_instance_ipc.h"
 #include "recording/recording_session_manager.h"
 #include "recording/ui/recording_overlay_service.h"
@@ -87,6 +88,8 @@ int main(int argc, char *argv[])
     parser.addHelpOption();
     parser.addVersionOption();
     parser.addPositionalArgument(QStringLiteral("file"), QStringLiteral("Open an existing image file for annotation instead of capturing the screen."), QStringLiteral("[file]"));
+    QCommandLineOption windowCaptureOption(QStringLiteral("window"),
+                                           QStringLiteral("Select a native Wayland window via the ScreenCast portal and annotate it."));
     QCommandLineOption allOutputsOption({QStringLiteral("all-outputs"), QStringLiteral("all-output")},
                                         QStringLiteral("Capture all outputs instead of the current Qt screen."));
     QCommandLineOption xdgWindowOption(QStringLiteral("xdg-window"), QStringLiteral("Use a regular fullscreen xdg window instead of layer-shell."));
@@ -132,6 +135,7 @@ int main(int argc, char *argv[])
     QCommandLineOption debugLogOption(QStringLiteral("debug-log"),
                                       QStringLiteral("Write debug logs to the specified file path."),
                                       QStringLiteral("path"));
+    parser.addOption(windowCaptureOption);
     parser.addOption(allOutputsOption);
     parser.addOption(xdgWindowOption);
     parser.addOption(fullscreenAnnotationOption);
@@ -157,7 +161,7 @@ int main(int argc, char *argv[])
     if (parser.isSet(historyOption)) {
         if (!parser.positionalArguments().isEmpty() || parser.isSet(pinImageOption)
             || parser.isSet(captureOption) || parser.isSet(trayOption)
-            || parser.isSet(allOutputsOption) || parser.isSet(fullscreenAnnotationOption)
+            || parser.isSet(allOutputsOption) || parser.isSet(windowCaptureOption) || parser.isSet(fullscreenAnnotationOption)
             || parser.isSet(stopRecordingOption) || parser.isSet(pauseRecordingOption)
             || parser.isSet(recordingStatusOption) || parser.isSet(QStringLiteral("capture-to"))
             || parser.isSet(QStringLiteral("list-displays")) || parser.isSet(delayOption)) {
@@ -193,6 +197,9 @@ int main(int argc, char *argv[])
     const QStringList positionalArguments = parser.positionalArguments();
     const bool headlessRequested = parser.isSet(QStringLiteral("capture-to"))
         || parser.isSet(QStringLiteral("list-displays"));
+    if (parser.isSet(windowCaptureOption) && headlessRequested) {
+        parser.showHelp(1);
+    }
     if (!headlessRequested && positionalArguments.size() > 1) {
         QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), MS_TR("Only one image file can be opened at a time."));
         return 1;
@@ -303,6 +310,13 @@ int main(int argc, char *argv[])
     }
 
     const QString imagePath = positionalArguments.isEmpty() ? QString() : positionalArguments.first();
+    if (parser.isSet(windowCaptureOption)
+        && (!imagePath.isEmpty() || parser.isSet(pinImageOption) || headlessRequested
+            || parser.isSet(trayOption) || parser.isSet(allOutputsOption)
+            || parser.isSet(fullscreenAnnotationOption))) {
+        parser.showHelp(1);
+    }
+
     if (parser.isSet(pinImageOption)) {
         if (!positionalArguments.isEmpty()) {
             QMessageBox::critical(nullptr,
@@ -320,25 +334,10 @@ int main(int argc, char *argv[])
         return QApplication::exec();
     }
 
-    const bool fileMode = !imagePath.isEmpty();
-    if (fileMode) {
-        QFileInfo imageFile(imagePath);
-        if (!imageFile.exists() || !imageFile.isFile()) {
-            QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), MS_TR("Image file does not exist: %1").arg(imagePath));
-            return 1;
-        }
-
-        QImageReader reader(imageFile.absoluteFilePath());
-        reader.setAutoTransform(true);
-        const QImage image = reader.read();
-        if (image.isNull()) {
-            QMessageBox::critical(nullptr,
-                                  QStringLiteral("Mark Shot"),
-                                  MS_TR("Failed to load image: %1\n%2").arg(imageFile.absoluteFilePath(), reader.errorString()));
-            return 1;
-        }
-
-        ShotWindow *window = new ShotWindow(image, imageFile.fileName());
+    // Both file editing and portal window capture use the regular image editor.
+    // A native window is its own image, not a rectangle on the virtual desktop.
+    auto showImageEditor = [&](const QImage &image, const QString &name) -> int {
+        ShotWindow *window = new ShotWindow(image, name);
         window->setDefaultTools(defaultTools.normal, defaultTools.file);
         if (markshot::shouldApplyDefaultColor(defaultTools)) {
             window->setDefaultColor(defaultTools.color);
@@ -360,6 +359,49 @@ int main(int argc, char *argv[])
             window->startFullscreenAnnotation();
         });
         return QApplication::exec();
+    };
+
+    if (parser.isSet(windowCaptureOption)) {
+        if (qEnvironmentVariable("XDG_SESSION_TYPE").compare(QStringLiteral("wayland"), Qt::CaseInsensitive) != 0) {
+            QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"),
+                                  QStringLiteral("--window requires a Wayland session with ScreenCast window support."));
+            return 1;
+        }
+        CaptureRequest request;
+        request.windowCapture = true;
+        request.includeCursor = markshot::configuredCaptureIncludeCursor();
+        if (captureDelayMs > 0) {
+            QThread::msleep(static_cast<unsigned long>(captureDelayMs));
+        }
+        // Do not silently fall back to a screenshot of the full desktop.
+        CaptureResult capture = captureScreenFrame(request);
+        if (capture.image.isNull()) {
+            QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"),
+                                  capture.error.isEmpty() ? QStringLiteral("Window capture failed") : capture.error);
+            return 1;
+        }
+        return showImageEditor(capture.image, QStringLiteral("Window capture"));
+    }
+
+    const bool fileMode = !imagePath.isEmpty();
+    if (fileMode) {
+        QFileInfo imageFile(imagePath);
+        if (!imageFile.exists() || !imageFile.isFile()) {
+            QMessageBox::critical(nullptr, QStringLiteral("Mark Shot"), MS_TR("Image file does not exist: %1").arg(imagePath));
+            return 1;
+        }
+
+        QImageReader reader(imageFile.absoluteFilePath());
+        reader.setAutoTransform(true);
+        const QImage image = reader.read();
+        if (image.isNull()) {
+            QMessageBox::critical(nullptr,
+                                  QStringLiteral("Mark Shot"),
+                                  MS_TR("Failed to load image: %1\n%2").arg(imageFile.absoluteFilePath(), reader.errorString()));
+            return 1;
+        }
+
+        return showImageEditor(image, imageFile.fileName());
     }
 
     const bool allOutputs = parser.isSet(allOutputsOption);

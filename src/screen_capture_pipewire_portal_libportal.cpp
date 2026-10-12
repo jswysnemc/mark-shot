@@ -5,7 +5,7 @@
 #ifdef HAVE_PIPEWIRE
 
 #ifdef HAVE_LIBPORTAL
-bool PortalPipeWireScreencast::startWithLibportal(bool includeCursor, bool *requestSubmitted, QString *error)
+bool PortalPipeWireScreencast::startWithLibportal(const CaptureRequest &request, bool *requestSubmitted, QString *error)
 {
     *requestSubmitted = false;
 
@@ -36,13 +36,14 @@ bool PortalPipeWireScreencast::startWithLibportal(bool includeCursor, bool *requ
     const uint availableCursorModes =
         portalUintProperty(QStringLiteral("org.freedesktop.portal.ScreenCast"),
                            QStringLiteral("AvailableCursorModes"));
-    uint cursorMode = preferredPortalCursorMode(availableCursorModes, includeCursor);
+    uint cursorMode = preferredPortalCursorMode(availableCursorModes, request.includeCursor);
     if (cursorMode == 0) {
         cursorMode = XDP_CURSOR_MODE_HIDDEN;
     }
-    m_cursorIncluded = includeCursor && cursorMode == kPortalCursorEmbedded;
+    m_cursorIncluded = request.includeCursor && cursorMode == kPortalCursorEmbedded;
     markshot::debugLog("screencast",
-                       "【屏幕共享】【会话协商】libportal-start source=monitor cursor_modes=0x%x chosen_cursor=%u",
+                       "【屏幕共享】【会话协商】libportal-start source=%s cursor_modes=0x%x chosen_cursor=%u",
+                       request.windowCapture ? "window" : "monitor",
                        availableCursorModes, cursorMode);
 
     // 1. 【屏幕共享】【授权恢复】与直接 D-Bus 路径共享版本兼容和令牌消费规则
@@ -60,7 +61,7 @@ bool PortalPipeWireScreencast::startWithLibportal(bool includeCursor, bool *requ
         markshot::debugLog("screencast", "【屏幕共享】【会话协商】libportal-create-session");
         *requestSubmitted = true;
         xdp_portal_create_screencast_session(portal,
-                                             XDP_OUTPUT_MONITOR,
+                                             request.windowCapture ? XDP_OUTPUT_WINDOW : XDP_OUTPUT_MONITOR,
                                              XDP_SCREENCAST_FLAG_NONE,
                                              static_cast<XdpCursorMode>(cursorMode),
                                              persistMode,

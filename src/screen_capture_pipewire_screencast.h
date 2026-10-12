@@ -83,7 +83,7 @@ private:
      * @param error 输出错误信息。
      * @return 启动成功时返回 true。
      */
-    bool startWithLibportal(bool includeCursor, bool *requestSubmitted, QString *error);
+    bool startWithLibportal(const CaptureRequest &request, bool *requestSubmitted, QString *error);
 #endif
 
     /**
@@ -92,7 +92,7 @@ private:
      * @param error 输出错误信息。
      * @return 启动成功时返回 true。
      */
-    bool startWithDbusPortal(bool includeCursor, QString *error);
+    bool startWithDbusPortal(const CaptureRequest &request, QString *error);
 
     /**
      * 连接 PipeWire 流。
