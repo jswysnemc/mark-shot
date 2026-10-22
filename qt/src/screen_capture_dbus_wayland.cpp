@@ -123,6 +123,21 @@ bool isKWinScreenShotAvailable()
     return available;
 }
 
+/// @brief 判断请求是否恰好覆盖单个完整输出。
+/// @param request 捕获请求。
+/// @return 整输出捕获时返回该输出名称，否则返回空。
+static std::optional<QString> wholeOutputCaptureName(const CaptureRequest &request)
+{
+    if (request.allOutputs || request.preferredOutputName.isEmpty()) {
+        return std::nullopt;
+    }
+    const QRect outputGeometry = screenGeometryForRequest(request);
+    if (outputGeometry.isEmpty() || outputGeometry != request.sourceGeometry.normalized()) {
+        return std::nullopt;
+    }
+    return request.preferredOutputName;
+}
+
 /// @brief 使用 KWin ScreenShot2 接口截取指定 Wayland 区域。
 /// @param request 捕获请求，包含源区域、输出名称和鼠标包含策略。
 /// @return 捕获成功时返回图像，失败时返回错误信息供后续回退链路使用。
@@ -159,23 +174,28 @@ CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
     // KWin sends the D-Bus reply with the buffer metadata first, then writes the
     // pixels to the pipe, so this synchronous call does not deadlock even when
     // the image is larger than the pipe buffer.
+    const std::optional<QString> wholeOutputName = wholeOutputCaptureName(request);
+    const QString method = wholeOutputName.has_value() ? QStringLiteral("CaptureScreen")
+                                                      : QStringLiteral("CaptureArea");
     QDBusReply<QVariantMap> reply =
-        kwin.call(QStringLiteral("CaptureArea"),
-                  geometry.x(), geometry.y(),
-                  static_cast<uint>(geometry.width()), static_cast<uint>(geometry.height()),
-                  options,
-                  QVariant::fromValue(QDBusUnixFileDescriptor(fds[1])));
+        wholeOutputName.has_value()
+        ? kwin.call(method, *wholeOutputName, options,
+                    QVariant::fromValue(QDBusUnixFileDescriptor(fds[1])))
+        : kwin.call(method, geometry.x(), geometry.y(),
+                    static_cast<uint>(geometry.width()), static_cast<uint>(geometry.height()),
+                    options, QVariant::fromValue(QDBusUnixFileDescriptor(fds[1])));
     ::close(fds[1]);
 
     if (!reply.isValid()) {
         ::close(fds[0]);
-        markshot::debugLog("kwin", "capture-area-error geom=%d,%d %dx%d name=%s msg=%s",
+        markshot::debugLog("kwin", "capture-error method=%s geom=%d,%d %dx%d name=%s msg=%s",
+                           method.toUtf8().constData(),
                            geometry.x(), geometry.y(), geometry.width(), geometry.height(),
                            reply.error().name().toUtf8().constData(),
                            reply.error().message().toUtf8().constData());
         return {{},
-                QStringLiteral("KWin ScreenShot2 CaptureArea failed: %1: %2")
-                    .arg(reply.error().name(), reply.error().message()),
+                QStringLiteral("KWin ScreenShot2 %1 failed: %2: %3")
+                    .arg(method, reply.error().name(), reply.error().message()),
                 {},
                 request.sourceGeometry};
     }
@@ -229,7 +249,8 @@ CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
         return {{}, QStringLiteral("KWin ScreenShot2 frame could not be wrapped as an image"), {}, request.sourceGeometry};
     }
 
-    markshot::debugLog("kwin", "capture-area-ok geom=%d,%d %dx%d -> frame=%dx%d stride=%d format=%u",
+    markshot::debugLog("kwin", "capture-ok method=%s geom=%d,%d %dx%d -> frame=%dx%d stride=%d format=%u",
+                       method.toUtf8().constData(),
                        geometry.x(), geometry.y(), geometry.width(), geometry.height(),
                        width, height, stride, format);
     // Detach from the soon-to-be-freed buffer and normalize the format.
