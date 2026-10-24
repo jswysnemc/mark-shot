@@ -45,9 +45,10 @@ private slots:
         qputenv("MARK_SHOT_CONFIG_DIR", path.toUtf8());
     }
 
-    /** 对照迁移前 Qt 输出核对全部默认配置字段，无参数、无返回值。 */
+    /** 【配置测试】【默认配置】保留迁移前字段基准，并核对新增区域识别默认值，无参数、无返回值。 */
     void defaultsMatchOriginalQtObject()
     {
+        // 1. 【配置测试】【默认配置】保留迁移前 Qt 配置基准及平台默认值
         QJsonObject expected = QJsonDocument::fromJson(readFile(QStringLiteral(MARK_SHOT_DEFAULTS_FIXTURE))).object();
         QVERIFY(!expected.isEmpty());
 #if defined(Q_OS_WIN)
@@ -55,6 +56,10 @@ private slots:
         windows.insert(QStringLiteral("tray"), QJsonObject{{QStringLiteral("enabled"), true}});
         expected.insert(QStringLiteral("windows"), windows);
 #endif
+        // 2. 【配置测试】【默认配置】仅补充新增字段，不改写历史迁移样本
+        auto capture = expected.value(QStringLiteral("capture")).toObject();
+        capture.insert(QStringLiteral("regionDetection"), QJsonObject{{QStringLiteral("enabled"), true}});
+        expected.insert(QStringLiteral("capture"), capture);
         QCOMPARE(markshot::defaultAppConfigRoot(QStringLiteral("test-window-helper")), expected);
     }
 

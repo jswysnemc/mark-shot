@@ -32,6 +32,13 @@ target_link_libraries(mark-shot-capture-delay-test
 )
 add_test(NAME capture-delay COMMAND mark-shot-capture-delay-test)
 
+qt_add_executable(mark-shot-kwin-capture-request-test
+    tests/kwin_capture_request_test.cpp
+    src/display_capture/kwin_capture_request.cpp)
+target_include_directories(mark-shot-kwin-capture-request-test PRIVATE src)
+target_link_libraries(mark-shot-kwin-capture-request-test PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
+add_test(NAME kwin-capture-request COMMAND mark-shot-kwin-capture-request-test)
+
 if(MARK_SHOT_LINUX)
     qt_add_executable(mark-shot-screen-capture-wayland-routing-test
         tests/screen_capture_wayland_routing_test.cpp

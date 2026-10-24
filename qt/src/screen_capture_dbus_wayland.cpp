@@ -1,4 +1,5 @@
 #include "screen_capture_internal.h"
+#include "display_capture/kwin_capture_request.h"
 
 #ifdef MARK_SHOT_WITH_DBUS
 // QtDBus 在 Windows 构建中不可用，D-Bus 专属头文件必须跟随开关引入
@@ -123,16 +124,27 @@ bool isKWinScreenShotAvailable()
     return available;
 }
 
-/// @brief 使用 KWin ScreenShot2 接口截取指定 Wayland 区域。
+/// @brief 【KWin】【屏幕捕获】使用 ScreenShot2 接口截取指定输出或 Wayland 区域。
 /// @param request 捕获请求，包含源区域、输出名称和鼠标包含策略。
 /// @return 捕获成功时返回图像，失败时返回错误信息供后续回退链路使用。
 CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
 {
+    // 1. 【KWin】【屏幕捕获】拒绝空区域，不建立无效捕获请求
     const QRect geometry = request.sourceGeometry.normalized();
     if (geometry.isEmpty()) {
         return {{}, QStringLiteral("KWin ScreenShot2 requires a non-empty geometry"), {}, request.sourceGeometry};
     }
 
+    // 2. 【KWin】【屏幕捕获】仅收集当前输出，避免过期名称按坐标回退后误判为整输出
+    QMap<QString, QRect> outputGeometries;
+    for (QScreen *screen : QGuiApplication::screens()) {
+        if (screen) {
+            outputGeometries.insert(screen->name(), screen->geometry());
+        }
+    }
+    auto captureRequest = markshot::capture::buildKWinCaptureRequest(request, outputGeometries);
+
+    // 3. 【KWin】【屏幕捕获】建立 D-Bus 接口和像素管道，失败时保留原有回退链路
     QDBusInterface kwin(QStringLiteral("org.kde.KWin.ScreenShot2"),
                         QStringLiteral("/org/kde/KWin/ScreenShot2"),
                         QStringLiteral("org.kde.KWin.ScreenShot2"),
@@ -146,40 +158,28 @@ CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
         return {{}, QStringLiteral("failed to create pipe for KWin ScreenShot2"), {}, request.sourceGeometry};
     }
 
-    QVariantMap options;
-    options.insert(QStringLiteral("include-cursor"), request.includeCursor);
-    // native-resolution keeps device pixels on HiDPI instead of downscaling to
-    // logical size, so the stitched result stays sharp.
-    options.insert(QStringLiteral("native-resolution"), true);
-    // KWin ScreenShot2 defaults to hide-caller-windows=true, which drops pinned
-    // mark-shot windows. Pass false when the user wants own windows included.
-    if (!request.hideOwnWindows) {
-        options.insert(QStringLiteral("hide-caller-windows"), false);
-    }
-    // KWin sends the D-Bus reply with the buffer metadata first, then writes the
-    // pixels to the pipe, so this synchronous call does not deadlock even when
-    // the image is larger than the pipe buffer.
+    // 4. 【KWin】【屏幕捕获】KWin 先返回元数据再写入像素，同步回复后释放发送参数中的描述符副本
+    captureRequest.arguments.append(QVariant::fromValue(QDBusUnixFileDescriptor(fds[1])));
     QDBusReply<QVariantMap> reply =
-        kwin.call(QStringLiteral("CaptureArea"),
-                  geometry.x(), geometry.y(),
-                  static_cast<uint>(geometry.width()), static_cast<uint>(geometry.height()),
-                  options,
-                  QVariant::fromValue(QDBusUnixFileDescriptor(fds[1])));
+        kwin.callWithArgumentList(QDBus::Block, captureRequest.method, captureRequest.arguments);
+    captureRequest.arguments.removeLast();
     ::close(fds[1]);
 
     if (!reply.isValid()) {
         ::close(fds[0]);
-        markshot::debugLog("kwin", "capture-area-error geom=%d,%d %dx%d name=%s msg=%s",
+        markshot::debugLog("kwin", "【KWin】【屏幕捕获】capture-error method=%s geom=%d,%d %dx%d name=%s msg=%s",
+                           captureRequest.method.toUtf8().constData(),
                            geometry.x(), geometry.y(), geometry.width(), geometry.height(),
                            reply.error().name().toUtf8().constData(),
                            reply.error().message().toUtf8().constData());
         return {{},
-                QStringLiteral("KWin ScreenShot2 CaptureArea failed: %1: %2")
-                    .arg(reply.error().name(), reply.error().message()),
+                QStringLiteral("KWin ScreenShot2 %1 failed: %2: %3")
+                    .arg(captureRequest.method, reply.error().name(), reply.error().message()),
                 {},
                 request.sourceGeometry};
     }
 
+    // 5. 【KWin】【屏幕捕获】校验帧尺寸和步长，按返回元数据分配像素缓冲
     const QVariantMap results = reply.value();
     const int width = results.value(QStringLiteral("width")).toInt();
     const int height = results.value(QStringLiteral("height")).toInt();
@@ -196,24 +196,25 @@ CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
 
     const qulonglong total = static_cast<qulonglong>(stride) * static_cast<qulonglong>(height);
     QByteArray buffer(static_cast<int>(total), Qt::Uninitialized);
+    // 6. 【KWin】【屏幕捕获】分段读取像素，超时或短帧仍返回错误交由后端回退
     qulonglong received = 0;
     while (received < total) {
         struct pollfd pfd { fds[0], POLLIN, 0 };
         const int polled = ::poll(&pfd, 1, 2000);
         if (polled <= 0) {
-            break;  // timeout or poll error
+            break;
         }
         const ssize_t bytes = ::read(fds[0], buffer.data() + received, total - received);
         if (bytes <= 0) {
-            break;  // EOF or read error
+            break;
         }
         received += static_cast<qulonglong>(bytes);
     }
     ::close(fds[0]);
 
     if (received < total) {
-        markshot::debugLog("kwin", "short-read got=%llu want=%llu %dx%d stride=%d",
-                           received, total, width, height, stride);
+        markshot::debugLog("kwin", "【KWin】【屏幕捕获】short-read method=%s got=%llu want=%llu %dx%d stride=%d",
+                           captureRequest.method.toUtf8().constData(), received, total, width, height, stride);
         return {{},
                 QStringLiteral("KWin ScreenShot2 delivered a truncated frame (%1/%2 bytes)")
                     .arg(received).arg(total),
@@ -221,6 +222,7 @@ CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
                 request.sourceGeometry};
     }
 
+    // 7. 【KWin】【屏幕捕获】复制像素后统一格式，避免返回图像引用临时缓冲
     const QImage::Format imageFormat =
         format != 0 ? static_cast<QImage::Format>(format) : QImage::Format_ARGB32_Premultiplied;
     const QImage view(reinterpret_cast<const uchar *>(buffer.constData()),
@@ -229,10 +231,10 @@ CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
         return {{}, QStringLiteral("KWin ScreenShot2 frame could not be wrapped as an image"), {}, request.sourceGeometry};
     }
 
-    markshot::debugLog("kwin", "capture-area-ok geom=%d,%d %dx%d -> frame=%dx%d stride=%d format=%u",
+    markshot::debugLog("kwin", "【KWin】【屏幕捕获】capture-ok method=%s geom=%d,%d %dx%d -> frame=%dx%d stride=%d format=%u",
+                       captureRequest.method.toUtf8().constData(),
                        geometry.x(), geometry.y(), geometry.width(), geometry.height(),
                        width, height, stride, format);
-    // Detach from the soon-to-be-freed buffer and normalize the format.
     return {view.copy().convertToFormat(QImage::Format_ARGB32_Premultiplied),
             {},
             request.allOutputs ? QString() : request.preferredOutputName,

@@ -11,6 +11,7 @@ bool g_kde = false;
 bool g_kwinAvailable = false;
 bool g_kwinConfigured = true;
 bool g_kwinSucceeds = false;
+QString g_kwinError;
 bool g_screencastSucceeds = false;
 bool g_interactiveScreencastSucceeds = false;
 bool g_grimSucceeds = false;
@@ -85,7 +86,7 @@ CaptureResult captureWithKWinScreenShot(const CaptureRequest &request)
 {
     g_routes.append(QStringLiteral("kwin"));
     g_kwinRequests.append(request);
-    return backendResult(request, g_kwinSucceeds, QStringLiteral("KWin capture failed"));
+    return backendResult(request, g_kwinSucceeds, g_kwinError);
 }
 
 /** @param request 采集请求。 @return 模拟流不覆盖副屏或正常返回帧。 */
@@ -137,6 +138,7 @@ private slots:
         g_kwinAvailable = false;
         g_kwinConfigured = true;
         g_kwinSucceeds = false;
+        g_kwinError = QStringLiteral("KWin capture failed");
         g_screencastSucceeds = false;
         g_interactiveScreencastSucceeds = false;
         g_grimSucceeds = false;
@@ -212,6 +214,37 @@ private slots:
         QVERIFY(result.image.isNull());
         QCOMPARE(g_routes, QStringList({"screencast", "stop", "kwin", "grim"}));
         QVERIFY(result.error.contains(QStringLiteral("KWin capture failed")));
+    }
+
+    /** 【KWin测试】【授权回退】提供门户恢复成功和全部后端失败两种场景，无参数和返回值。 */
+    void unauthorizedKwinContinuesPortalFallback_data()
+    {
+        QTest::addColumn<bool>("portalSucceeds");
+        QTest::newRow("portal-recovers") << true;
+        QTest::newRow("errors-retained") << false;
+    }
+
+    /** 【KWin测试】【授权回退】验证 NoAuthorized 不阻断原有门户回退，并保留失败诊断，无参数和返回值。 */
+    void unauthorizedKwinContinuesPortalFallback()
+    {
+        QFETCH(bool, portalSucceeds);
+        // 1. 【KWin测试】【授权回退】模拟 CaptureScreen 授权拒绝，允许门户截图作为后续回退
+        g_kde = true;
+        g_kwinError = QStringLiteral("KWin ScreenShot2 CaptureScreen failed: org.kde.kwin.Screenshot.Error.NoAuthorized");
+        g_portalSucceeds = portalSucceeds;
+        CaptureRequest request = secondaryOutputRequest();
+        request.allowPortalScreenshotFallback = true;
+
+        // 2. 【KWin测试】【授权回退】验证后端顺序不变，成功时返回帧，全部失败时保留授权错误
+        const CaptureResult result = captureWaylandFrame(request);
+        QCOMPARE(g_routes, QStringList({"screencast", "stop", "kwin", "grim", "screenshot"}));
+        QCOMPARE(result.image.isNull(), !portalSucceeds);
+        if (portalSucceeds) {
+            QCOMPARE(result.sourceGeometry, request.sourceGeometry);
+            QCOMPARE(result.outputName, request.preferredOutputName);
+        } else {
+            QVERIFY(result.error.contains(QStringLiteral("NoAuthorized")));
+        }
     }
 
     /** @return 无返回值；验证 grim 成功时无需请求交互式截图。 */
