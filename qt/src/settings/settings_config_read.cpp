@@ -9,6 +9,7 @@
 #include "recording/recording_storage_config.h"
 #include "save_path_config.h"
 #include "selection_loupe_config.h"
+#include "region_detection/region_detection_config.h"
 #include "settings/provider_preference_config.h"
 #include "startup_config.h"
 #include "toolbar_appearance_config.h"
@@ -560,6 +561,7 @@ SettingsConfig readSettingsConfig(QString *error)
     settings.capture.hideOwnWindows = hideOwnWindowsDuringCaptureFromConfigRoot(root);
     settings.capture.doubleClickAction = captureDoubleClickActionFromConfigRoot(root);
     settings.capture.selectionLoupeEnabled = selectionLoupeEnabledFromConfigRoot(root);
+    settings.capture.regionDetectionEnabled = region_detection::regionDetectionEnabledFromConfigRoot(root);
     settings.shortcuts = readShortcutSettings();
     settings.annotation = readAnnotationSettings(root);
     settings.pinned = readPinnedSettings(root);

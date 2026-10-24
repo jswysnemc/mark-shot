@@ -1,6 +1,8 @@
 #include "shot_window_module.h"
 
 #include "debug_log.h"
+#include "app_config_store.h"
+#include "region_detection/region_detection_config.h"
 #include "region_detection/region_detection_scheduler.h"
 
 #include <QCursor>
@@ -17,6 +19,11 @@
  */
 void ShotWindow::initializeRegionDetection()
 {
+    // 1. 【截图】【区域识别】关闭图像分析时保留窗口矩形，不创建后台任务
+    if (!markshot::region_detection::regionDetectionEnabledFromConfigRoot(markshot::readAppConfigRoot())) {
+        markshot::debugLog("region-detection", "【截图】【区域识别】图像分析已关闭，仅使用窗口识别候选");
+        return;
+    }
     if (m_regionDetector || m_regionDetectorWatcher
         || m_frozenFrame.isNull() || m_frozenFrame.width() < 3 || m_frozenFrame.height() < 3) {
         return;
@@ -34,7 +41,7 @@ void ShotWindow::initializeRegionDetection()
                 applyRegionDetector(m_regionDetectorWatcher->result());
             });
 
-    // 1. 【选区识别】【任务调度】原图只读共享，临时缓冲由固定工作线程重复使用
+    // 2. 【选区识别】【任务调度】原图只读共享，临时缓冲由固定工作线程重复使用
     m_regionDetectorWatcher->setFuture(markshot::region_detection::scheduleRegionDetection(m_frozenFrame));
 }
 

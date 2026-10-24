@@ -148,6 +148,7 @@ target_link_libraries(mark-shot-region-detector-test
         Qt6::Test
 )
 add_test(NAME region-detector COMMAND mark-shot-region-detector-test)
+include(cmake/region_detection_tests.cmake)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(NAME packaging-configuration

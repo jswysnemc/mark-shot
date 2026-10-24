@@ -159,6 +159,9 @@ void writeCaptureSettings(QJsonObject *root, const CaptureSettings &settings)
                     QStringLiteral("selectionLoupe"),
                     QStringLiteral("enabled")},
                    settings.selectionLoupeEnabled);
+    setNestedValue(root,
+                   {QStringLiteral("capture"), QStringLiteral("regionDetection"), QStringLiteral("enabled")},
+                   settings.regionDetectionEnabled);
 }
 
 /// @brief 写入快捷键设置。

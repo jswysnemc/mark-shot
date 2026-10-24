@@ -13,6 +13,8 @@ set(MARK_SHOT_WINDOW_SOURCES
     ${MARK_SHOT_REGION_DETECTION_SOURCES}
     src/region_detection/region_detection_scheduler.cpp
     src/region_detection/region_detection_scheduler.h
+    src/region_detection/region_detection_config.cpp
+    src/region_detection/region_detection_config.h
     src/annotation_state_store.cpp
     src/annotation_state_store.h
     src/capture_cross_cursor.cpp

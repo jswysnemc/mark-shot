@@ -35,6 +35,7 @@ struct CaptureSettings {
     bool hideOwnWindows = true;
     CaptureDoubleClickAction doubleClickAction = CaptureDoubleClickAction::Copy;
     bool selectionLoupeEnabled = false;
+    bool regionDetectionEnabled = true;
 };
 
 struct ShortcutSettings {

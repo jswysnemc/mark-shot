@@ -54,6 +54,7 @@ class DisplayCapturePicker;
 class ShotWindow final : public QWidget {
     Q_OBJECT
     friend class SelectionHoverRepaintTest;
+    friend class RegionDetectionToggleTest;
     friend class CanvasImageMemoryTest;
 
 public:

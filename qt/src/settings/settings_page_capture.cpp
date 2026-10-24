@@ -33,6 +33,10 @@ SettingsPageCapture::SettingsPageCapture(QWidget *parent)
     m_hideOwnWindows = addSwitchRow(compatibilityForm,
                                     MS_TR("Hide Mark Shot Windows While Capturing"),
                                     MS_TR("Hide own windows from screenshots. Turn off to include them."));
+    m_regionDetection = addSwitchRow(compatibilityForm,
+                                     MS_TR("Region Detection"),
+                                     MS_TR("Analyze image regions for hover selection. Turn off to debug KDE window detection without disabling window recognition."));
+    m_regionDetection->setObjectName(QStringLiteral("captureRegionDetection"));
     // 选区内空白处双击执行的快捷动作，省去移动到工具栏按钮的往返
     m_doubleClickAction = addComboRow(form, MS_TR("Double Click Action"),
         MS_TR("Action performed when double clicking an empty area inside the selection."));
@@ -67,6 +71,7 @@ void SettingsPageCapture::setConfig(const SettingsConfig &config)
         m_doubleClickAction->findData(static_cast<int>(config.capture.doubleClickAction));
     m_doubleClickAction->setCurrentIndex(doubleClickIndex >= 0 ? doubleClickIndex : 0);
     m_selectionLoupe->setChecked(config.capture.selectionLoupeEnabled);
+    m_regionDetection->setChecked(config.capture.regionDetectionEnabled);
 }
 
 void SettingsPageCapture::updateConfig(SettingsConfig *config) const
@@ -83,6 +88,7 @@ void SettingsPageCapture::updateConfig(SettingsConfig *config) const
     config->capture.doubleClickAction =
         static_cast<CaptureDoubleClickAction>(m_doubleClickAction->currentData().toInt());
     config->capture.selectionLoupeEnabled = m_selectionLoupe->isChecked();
+    config->capture.regionDetectionEnabled = m_regionDetection->isChecked();
 }
 
 }  // namespace markshot::settings

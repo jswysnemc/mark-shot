@@ -30,6 +30,7 @@ private:
     QComboBox *m_freezeScope = nullptr;
     QComboBox *m_doubleClickAction = nullptr;
     QCheckBox *m_selectionLoupe = nullptr;
+    QCheckBox *m_regionDetection = nullptr;
 };
 
 }  // namespace markshot::settings
