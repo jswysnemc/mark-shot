@@ -2,9 +2,11 @@
 #include "shot_window.h"
 #include "shortcut_config.h"
 #include "support/isolated_config.h"
+#include "support/offscreen_screen_config.h"
 
 #include <QApplication>
 #include <QCursor>
+#include <QDir>
 #include <QEnterEvent>
 #include <QFile>
 #include <QKeyEvent>
@@ -127,17 +129,22 @@ private slots:
 /** 【截图测试】【环境隔离】用两块虚拟屏幕运行真实覆盖层事件测试，argc/argv 为命令行参数，返回测试退出码。 */
 int main(int argc, char **argv)
 {
-    QTemporaryDir isolated;
+    // 1. 【截图测试】【路径回归】保留空格路径，并在非 Windows 系统模拟盘符中的冒号
+#if defined(Q_OS_WIN)
+    const QString directoryName = QStringLiteral("mark-shot screen-routing-XXXXXX");
+#else
+    const QString directoryName = QStringLiteral("mark-shot screen-routing:-XXXXXX");
+#endif
+    QTemporaryDir isolated(QDir(QDir::tempPath()).filePath(directoryName));
     if (!markshot::test::isolateConfig(isolated)) {
         return 1;
     }
-    QFile config(isolated.filePath(QStringLiteral("screens.json")));
-    if (!config.open(QIODevice::WriteOnly)) {
+    // 2. 【截图测试】【虚拟屏幕】共享配置负责安全传参，并在应用销毁后恢复工作目录
+    markshot::test::OffscreenScreenConfig config(isolated,
+        R"({"synchronousWindowSystemEvents":true,"screens":[{"name":"primary","x":0,"y":0,"width":800,"height":600},{"name":"secondary","x":800,"y":0,"width":800,"height":600}]})");
+    if (!config.isValid()) {
         return 1;
     }
-    config.write(R"({"synchronousWindowSystemEvents":true,"screens":[{"name":"primary","x":0,"y":0,"width":800,"height":600},{"name":"secondary","x":800,"y":0,"width":800,"height":600}]})");
-    config.close();
-    qputenv("QT_QPA_PLATFORM", QByteArray("offscreen:configfile=") + config.fileName().toUtf8());
     qputenv("XDG_SESSION_TYPE", "x11");
     qputenv("XDG_CURRENT_DESKTOP", "");
     QApplication app(argc, argv);

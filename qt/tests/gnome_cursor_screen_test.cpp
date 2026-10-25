@@ -1,6 +1,7 @@
 #include "annotation_launch.h"
 #include "platform/wayland/compositor_pointer.h"
 #include "support/isolated_config.h"
+#include "support/offscreen_screen_config.h"
 
 #include <QApplication>
 #include <QCursor>
@@ -119,17 +120,17 @@ private slots:
 /** 【GNOME测试】【环境隔离】使用私有总线和多屏配置，argc/argv 为命令行参数，返回测试退出码。 */
 int main(int argc, char **argv)
 {
-    QTemporaryDir isolated;
+    // 1. 【GNOME测试】【路径回归】覆盖包含空格和冒号的配置目录
+    QTemporaryDir isolated(QDir(QDir::tempPath()).filePath(QStringLiteral("mark-shot gnome:pointer-XXXXXX")));
     if (!markshot::test::isolateConfig(isolated)) {
         return 1;
     }
-    QFile config(isolated.filePath(QStringLiteral("screens.json")));
-    if (!config.open(QIODevice::WriteOnly)) {
+    // 2. 【GNOME测试】【虚拟屏幕】通过相对配置文件名加载三块屏幕
+    markshot::test::OffscreenScreenConfig config(isolated,
+        R"({"synchronousWindowSystemEvents":true,"screens":[{"name":"primary","x":0,"y":0,"width":800,"height":600},{"name":"secondary","x":800,"y":0,"width":800,"height":600},{"name":"negative","x":-800,"y":-600,"width":800,"height":600}]})");
+    if (!config.isValid()) {
         return 1;
     }
-    config.write(R"({"synchronousWindowSystemEvents":true,"screens":[{"name":"primary","x":0,"y":0,"width":800,"height":600},{"name":"secondary","x":800,"y":0,"width":800,"height":600},{"name":"negative","x":-800,"y":-600,"width":800,"height":600}]})");
-    config.close();
-    qputenv("QT_QPA_PLATFORM", QByteArray("offscreen:configfile=") + config.fileName().toUtf8());
     qputenv("XDG_SESSION_TYPE", "wayland");
     qputenv("XDG_CURRENT_DESKTOP", "GNOME");
     qputenv("PATH", isolated.path().toUtf8());
