@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.61 - 2026-10-25
+
+### Features & Enhancements
+
+- **Configurable UI Region Detection**: Added the `regionDetection.enabled` configuration toggle (enabled by default) and a corresponding checkbox under Settings → Capture. Users can disable fine-grained control and card detection while keeping top-level window boundaries, reducing background CPU load on complex desktops.
+- **Startup Tool Cursor-Screen Routing**: Standalone tools launched via CLI flags (`--color-picker`, `--ruler`, `--code-scan`, `--snapshot-panel`) query active pointer positions across Wayland compositors (including GNOME Shell extension bridge and virtual pointers) and open directly on the screen where the mouse cursor resides.
+- **Bundled Window-Detection Scripts**: Window detection scripts for KDE, Hyprland, Niri, and GNOME are embedded directly as compiled Qt resources and extracted on demand, providing built-in fallbacks when external scripts are missing.
+- **Private Libexec Directory for Helper Scripts**: Packaging rules install helper scripts (`mark-shot-ocr`, `mark-shot-translate`, `mark-shot-code-scan`, `mark-shot-upload`, and detection helpers) into private `/usr/libexec/mark-shot/` rather than public `/usr/bin/` to prevent PATH namespace pollution.
+
+### Bug Fixes
+
+- **KWin Mixed-Scale Capture Resolution**: KWin ScreenShot2 routes full-output captures through `CaptureScreen` instead of `CaptureArea`, applying the scale factor of the requested monitor and preventing distorted pixel dimensions on multi-display setups with mixed scaling factors.
+- **Offscreen Test Drive-Letter Normalization**: Test harness avoids parsing ambiguous Windows drive letters when synthesizing multi-screen layout geometries.
+
 ## 0.1.60 - 2026-10-19
 
 ### Features & Enhancements

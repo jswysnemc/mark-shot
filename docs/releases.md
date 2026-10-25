@@ -1,5 +1,13 @@
 # Release Notes
 
+### 0.1.61
+
+- **KWin Mixed-Scale Capture Resolution**: KWin ScreenShot2 routes whole-output captures through `CaptureScreen` rather than `CaptureArea`, respecting individual monitor scales and avoiding stretched or squished captures on mixed-scale setups.
+- **Configurable UI Region Detection**: Introduced `regionDetection.enabled` (defaults to true) and a settings toggle under Settings → Capture to allow disabling sub-window control outline detection while retaining window boundary snapping.
+- **Startup Tool Cursor-Screen Routing**: Standalone tools launched via CLI flags (`--color-picker`, `--ruler`, `--code-scan`, `--snapshot-panel`) locate the active pointer across Wayland compositors (including GNOME Shell extension bridge and virtual pointers) and appear directly on the active cursor's monitor.
+- **Bundled Window-Detection Scripts**: Embeds KDE, Hyprland, Niri, and GNOME detection helpers directly into application binaries as Qt resources, auto-extracting on demand to guarantee window detection even if external scripts are missing.
+- **Private Libexec Directory for Helper Scripts**: Installs backend helper scripts (`mark-shot-ocr`, `mark-shot-translate`, `mark-shot-code-scan`, `mark-shot-upload`, and detection scripts) into private `/usr/libexec/mark-shot/` to avoid polluting the public PATH.
+
 ### 0.1.60
 
 - **Pinned Image Sub-Character Selection & OCR Plates**: Pinned stickers display subtle rounded plate underlays behind recognized text while keeping original image pixels intact. Text selection splits tokens into character-level bounds weighted by display column widths, zero-width characters merge into their neighbor, and double-clicking any token selects the entire line. Text highlight rendering fills continuous text bands in a single pass at uniform opacity without overlapping seams.
