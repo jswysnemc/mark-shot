@@ -607,7 +607,7 @@ LayerShellQt 会被自动检测。找到时启用完整 Wayland layer-shell 支�
 cmake --install build --prefix "$HOME/.local"
 ```
 
-此命令会安装可执行文件、辅助脚本（`mark-shot-ocr`、`mark-shot-code-scan`、`mark-shot-translate`、`mark-shot-upload`）、桌面快捷方式和图标。
+此命令会安装可执行文件、辅助脚本（`mark-shot-ocr`、`mark-shot-code-scan`、`mark-shot-translate`、`mark-shot-upload`）、桌面快捷方式和图标。Linux 下，`<安装前缀>/bin` 中只安装主程序 `mark-shot`；辅助脚本和窗口检测脚本安装到 `<安装前缀>/libexec/mark-shot/`，共享 Python 模块位于该目录下的 `lib/`。程序自动查找这些脚本，无需将专用目录加入 `$PATH`。
 
 ### GNOME Wayland 滚动截图扩展
 

@@ -33,10 +33,12 @@ if(MARK_SHOT_LINUX)
         scripts/mark-shot-window-detection-hyprland
         scripts/mark-shot-window-detection-gnome
         scripts/mark-shot-window-detection-kde
-        DESTINATION ${CMAKE_INSTALL_BINDIR}
+        DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/mark-shot
+        COMPONENT mark-shot-helpers
     )
     install(DIRECTORY scripts/lib/mark_shot_window_detection
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/mark-shot/python
+        DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/mark-shot/lib
+        COMPONENT mark-shot-helpers
         FILES_MATCHING
             PATTERN "*.py"
             PATTERN "__pycache__" EXCLUDE

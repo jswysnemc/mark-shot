@@ -12,6 +12,7 @@ override_dh_auto_configure:
 	dh_auto_configure -- \
 		-DBUILD_TESTING=ON \
 		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DCMAKE_INSTALL_LIBEXECDIR=libexec \
 		-DMARK_SHOT_CARGO_VENDOR_DIR=vendor \
 		-DMARK_SHOT_REQUIRE_FFMPEG=ON \
 		-DMARK_SHOT_REQUIRE_LAYER_SHELL=ON \
@@ -22,14 +23,14 @@ override_dh_auto_configure:
 override_dh_auto_install:
 	dh_auto_install
 	sed -i '1s|^#!/usr/bin/env python3$$|#!/usr/bin/python3|' \
-		debian/mark-shot/usr/bin/mark-shot-ocr \
-		debian/mark-shot/usr/bin/mark-shot-code-scan \
-		debian/mark-shot/usr/bin/mark-shot-translate \
-		debian/mark-shot/usr/bin/mark-shot-upload \
-		debian/mark-shot/usr/bin/mark-shot-window-detection-niri \
-		debian/mark-shot/usr/bin/mark-shot-window-detection-hyprland \
-		debian/mark-shot/usr/bin/mark-shot-window-detection-gnome \
-		debian/mark-shot/usr/bin/mark-shot-window-detection-kde
+		debian/mark-shot/usr/libexec/mark-shot/mark-shot-ocr \
+		debian/mark-shot/usr/libexec/mark-shot/mark-shot-code-scan \
+		debian/mark-shot/usr/libexec/mark-shot/mark-shot-translate \
+		debian/mark-shot/usr/libexec/mark-shot/mark-shot-upload \
+		debian/mark-shot/usr/libexec/mark-shot/mark-shot-window-detection-niri \
+		debian/mark-shot/usr/libexec/mark-shot/mark-shot-window-detection-hyprland \
+		debian/mark-shot/usr/libexec/mark-shot/mark-shot-window-detection-gnome \
+		debian/mark-shot/usr/libexec/mark-shot/mark-shot-window-detection-kde
 	rm -f debian/mark-shot/usr/share/doc/mark-shot/CHANGELOG.md
 
 # dh_clean 默认删除 *.orig，会破坏 vendor/ 中 crate 自带的 Cargo.toml.orig 及其校验和

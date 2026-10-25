@@ -107,6 +107,7 @@ private slots:
         QVERIFY(directories.contains(QStringLiteral("/opt/mark-shot/scripts")));
         QVERIFY(directories.contains(QStringLiteral("/opt/mark-shot/qt/scripts")));
         QVERIFY(directories.contains(QStringLiteral("/opt/mark-shot/libexec/mark-shot")));
+        QCOMPARE(directories.first(), QStringLiteral("/opt/mark-shot/libexec/mark-shot"));
         QVERIFY(directories.contains(QStringLiteral("/usr/bin")));
         QVERIFY(directories.contains(QStringLiteral("/home/user/.local/bin")));
         QVERIFY(directories.contains(QStringLiteral("/src/mark-shot/scripts")));

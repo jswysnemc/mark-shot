@@ -94,9 +94,9 @@ inline QString defaultCommand(const Session &session)
 }
 
 /**
- * 在给定目录中查找与可执行文件放在一起的内置窗口检测脚本。
+ * 在给定目录中查找内置窗口检测脚本。
  * @param command 配置中的命令。
- * @param directories 按顺序查找的目录，通常是应用程序所在目录。
+ * @param directories 按优先级排列的安装目录和构建目录。
  * @return 找到可执行脚本时返回绝对路径，否则返回原命令。
  */
 inline QString resolveBundledCommand(const QString &command, const QStringList &directories)
@@ -136,7 +136,7 @@ inline QString quoteShellWord(const QString &word)
 
 /**
  * 列出内置窗口检测脚本的查找目录。
- * 安装前缀、本地构建树和用户 bin 都覆盖，避免只查可执行文件同目录时出现 command not found。
+ * 优先使用应用专用安装目录，并兼容本地构建树及旧版 bin 布局。
  * @param applicationDirectory 可执行文件所在目录。
  * @param homeDirectory 当前用户主目录。
  * @param currentDirectory 进程工作目录。
@@ -153,11 +153,11 @@ inline QStringList bundledCommandSearchDirectories(const QString &applicationDir
             directories.append(cleaned);
         }
     };
+    append(QDir(applicationDirectory).filePath(QStringLiteral("../libexec/mark-shot")));
     append(applicationDirectory);
     append(QDir(applicationDirectory).filePath(QStringLiteral("scripts")));
     append(QDir(applicationDirectory).filePath(QStringLiteral("../scripts")));
     append(QDir(applicationDirectory).filePath(QStringLiteral("../qt/scripts")));
-    append(QDir(applicationDirectory).filePath(QStringLiteral("../libexec/mark-shot")));
     append(QDir(applicationDirectory).filePath(QStringLiteral("../lib/mark-shot")));
     append(QDir(currentDirectory).filePath(QStringLiteral("scripts")));
     append(QDir(homeDirectory).filePath(QStringLiteral(".local/bin")));

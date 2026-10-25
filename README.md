@@ -520,7 +520,7 @@ LayerShellQt is detected automatically. When found, full Wayland layer-shell sup
 cmake --install build --prefix "$HOME/.local"
 ```
 
-This installs the binary, helper scripts (`mark-shot-ocr`, `mark-shot-code-scan`, `mark-shot-translate`, `mark-shot-upload`), desktop entries, and icons.
+This installs the binary, helper scripts (`mark-shot-ocr`, `mark-shot-code-scan`, `mark-shot-translate`, `mark-shot-upload`), desktop entries, and icons. On Linux, only `mark-shot` goes into `<prefix>/bin`; helper and window-detection scripts go into `<prefix>/libexec/mark-shot/`, with shared Python modules in its `lib/` subdirectory. Mark Shot finds these scripts automatically without adding their directory to `$PATH`.
 
 ### GNOME Wayland Scrolling Capture Extension
 

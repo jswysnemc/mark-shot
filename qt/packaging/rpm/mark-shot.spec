@@ -55,6 +55,7 @@ stickers, and provides OCR and translation helpers for pinned image text.
 
 %build
 %cmake -G Ninja \
+    -DCMAKE_INSTALL_LIBEXECDIR=%{_libexecdir} \
     -DMARK_SHOT_REQUIRE_FFMPEG=ON \
     -DMARK_SHOT_WITH_LAYER_SHELL=ON \
     -DMARK_SHOT_REQUIRE_LAYER_SHELL=ON
@@ -63,29 +64,21 @@ stickers, and provides OCR and translation helpers for pinned image text.
 %install
 %cmake_install
 sed -i '1s|^#!/usr/bin/env python3$|#!/usr/bin/python3|' \
-    %{buildroot}%{_bindir}/mark-shot-ocr \
-    %{buildroot}%{_bindir}/mark-shot-code-scan \
-    %{buildroot}%{_bindir}/mark-shot-translate \
-    %{buildroot}%{_bindir}/mark-shot-upload \
-    %{buildroot}%{_bindir}/mark-shot-window-detection-niri \
-    %{buildroot}%{_bindir}/mark-shot-window-detection-hyprland \
-    %{buildroot}%{_bindir}/mark-shot-window-detection-gnome \
-    %{buildroot}%{_bindir}/mark-shot-window-detection-kde
+    %{buildroot}%{_libexecdir}/mark-shot/mark-shot-ocr \
+    %{buildroot}%{_libexecdir}/mark-shot/mark-shot-code-scan \
+    %{buildroot}%{_libexecdir}/mark-shot/mark-shot-translate \
+    %{buildroot}%{_libexecdir}/mark-shot/mark-shot-upload \
+    %{buildroot}%{_libexecdir}/mark-shot/mark-shot-window-detection-niri \
+    %{buildroot}%{_libexecdir}/mark-shot/mark-shot-window-detection-hyprland \
+    %{buildroot}%{_libexecdir}/mark-shot/mark-shot-window-detection-gnome \
+    %{buildroot}%{_libexecdir}/mark-shot/mark-shot-window-detection-kde
 
 %files
 %license LICENSE
 %doc %{_docdir}/mark-shot/
 %{_bindir}/mark-shot
-%{_bindir}/mark-shot-ocr
-%{_bindir}/mark-shot-code-scan
-%{_bindir}/mark-shot-translate
-%{_bindir}/mark-shot-upload
-%{_bindir}/mark-shot-window-detection-niri
-%{_bindir}/mark-shot-window-detection-hyprland
-%{_bindir}/mark-shot-window-detection-gnome
-%{_bindir}/mark-shot-window-detection-kde
+%{_libexecdir}/mark-shot/
 %{_libdir}/mark-shot/
-%{_datadir}/mark-shot/python/
 %{_datadir}/applications/mark-shot.desktop
 %{_datadir}/applications/mark-shot-edit.desktop
 %{_datadir}/applications/net.local.mark-shot.desktop

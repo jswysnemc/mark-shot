@@ -155,6 +155,17 @@ include(cmake/region_detection_tests.cmake)
 include(cmake/issue_regression_tests.cmake)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+if(MARK_SHOT_LINUX)
+    add_test(NAME helper-script-install
+        COMMAND ${CMAKE_COMMAND} -E env PYTHONDONTWRITEBYTECODE=1
+            ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/helper_script_install_test.py
+            --cmake ${CMAKE_COMMAND}
+            --build-dir ${CMAKE_BINARY_DIR}
+            --helper-directory ${CMAKE_INSTALL_FULL_LIBEXECDIR}/mark-shot
+            --bin-directory ${CMAKE_INSTALL_FULL_BINDIR}
+    )
+    set_tests_properties(helper-script-install PROPERTIES TIMEOUT 30)
+endif()
 add_test(NAME packaging-configuration
     COMMAND ${CMAKE_COMMAND} -E env PYTHONDONTWRITEBYTECODE=1
         ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/packaging_configuration_test.py

@@ -1,4 +1,5 @@
 #include "window_detection_bundled_script.h"
+#include "window_detection_session.h"
 
 #include <QDir>
 #include <QFile>
@@ -10,6 +11,32 @@ class WindowDetectionBundleTest final : public QObject {
     Q_OBJECT
 
 private slots:
+    /** 【窗口识别测试】【安装目录】专用目录中的脚本优先于旧版 bin 副本，无参数和返回值。 */
+    void privateInstallDirectoryTakesPrecedence()
+    {
+        // 1. 【窗口识别测试】【安装目录】在同一前缀下创建专用目录和旧版 bin 副本
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QString command = QStringLiteral("mark-shot-window-detection-kde");
+        const QDir prefix(directory.path());
+        const QString applicationDirectory = prefix.filePath(QStringLiteral("bin"));
+        const QString privateDirectory = prefix.filePath(QStringLiteral("libexec/mark-shot"));
+        for (const QString &scriptDirectory : {applicationDirectory, privateDirectory}) {
+            QVERIFY(QDir().mkpath(scriptDirectory));
+            QFile file(QDir(scriptDirectory).filePath(command));
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            QVERIFY(file.write("#!/usr/bin/env python3\n") > 0);
+            file.close();
+            QVERIFY(file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                        | QFileDevice::ExeOwner));
+        }
+        // 2. 【窗口识别测试】【路径解析】验证查找结果使用专用目录中的脚本
+        const QStringList directories = markshot::window_detection::bundledCommandSearchDirectories(
+            applicationDirectory, directory.path(), directory.path());
+        QCOMPARE(markshot::window_detection::resolveBundledWindowDetectionScript(command, directories),
+                 QDir(privateDirectory).filePath(command));
+    }
+
     /** 【窗口识别测试】【内置脚本】模拟只下载主程序而没有安装检测脚本，无参数和返回值。 */
     void missingKdeScriptUsesBundledCopy()
     {

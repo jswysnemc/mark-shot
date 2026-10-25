@@ -371,7 +371,7 @@ To ensure precise window boundary detection across different Wayland compositors
 
 Mark Shot also auto-selects the matching detection script at runtime by probing the current desktop environment (`XDG_SESSION_TYPE`, `XDG_CURRENT_DESKTOP`, etc.). Supported environments are GNOME, KDE Plasma, Hyprland, and Niri; other Wayland sessions fall back to the niri script, and X11 sessions use the built-in native X11 detector (empty command). If the configured `windowDetection.command` does not match the current environment, Mark Shot corrects it in memory without modifying your `config.json`, so manual configuration is optional.
 
-Built-in detection scripts and their shared Python modules are embedded in the executable. Mark Shot prefers installed scripts and scripts in `$PATH`; if none are available, it extracts its bundled copy into a private temporary directory and runs it with `python3`. Downloading only the executable therefore no longer requires installing these detection scripts separately. Python 3 and the compositor-specific command or D-Bus service are still required. Custom commands do not use this fallback.
+Built-in detection scripts and their shared Python modules are embedded in the executable. Linux packages install detection and helper scripts into `<prefix>/libexec/mark-shot/`, with shared modules in its `lib/` subdirectory; only `mark-shot` is installed into `bin`. Mark Shot prefers this private directory and still supports scripts in legacy locations and `$PATH`; if none are available, it extracts its bundled copy into a private temporary directory and runs it with `python3`. Downloading only the executable therefore no longer requires installing these detection scripts separately. Python 3 and the compositor-specific command or D-Bus service are still required. Custom commands do not use this fallback.
 
 On GNOME Wayland, `capture.freezeScope: "cursor-screen"` queries the actual pointer through the `mark-shot-scroll-helper@snemc.org` extension (helper API version 6 or newer). Update the extension together with Mark Shot and enable it with `gnome-extensions enable mark-shot-scroll-helper@snemc.org`. For a source installation, copy `qt/packaging/gnome-extension/mark-shot-scroll-helper@snemc.org` into `~/.local/share/gnome-shell/extensions/`, then log out and back in so GNOME loads the updated interface. Without the extension or with an older interface, Mark Shot falls back to Qt's cached pointer position, which may still select the primary screen when launched by a global shortcut.
 
@@ -397,18 +397,18 @@ If the script fails to execute or times out (default: `1000ms`), Mark Shot will 
 
 #### How to Use & Configure:
 The default configuration uses the bundled script automatically. To install or override a script manually:
-1. Copy the script corresponding to your compositor from the `qt/scripts/` directory in the repository to a folder in your system `$PATH` (e.g. `~/.local/bin/` or `/usr/local/bin/`). For niri, also copy `qt/scripts/lib/mark_shot_window_detection/` into `lib/mark_shot_window_detection/` beside the installed script.
+1. Copy the script corresponding to your compositor from `qt/scripts/` to a private directory such as `~/.local/libexec/mark-shot/`. Do not add this directory to `$PATH`. For niri, also copy `qt/scripts/lib/mark_shot_window_detection/` into `lib/mark_shot_window_detection/` beside the installed script.
 2. Make the script executable:
    ```bash
-   chmod +x ~/.local/bin/mark-shot-window-detection-niri
+   chmod +x ~/.local/libexec/mark-shot/mark-shot-window-detection-niri
    # or
-   chmod +x ~/.local/bin/mark-shot-window-detection-hyprland
+   chmod +x ~/.local/libexec/mark-shot/mark-shot-window-detection-hyprland
    # or
-   chmod +x ~/.local/bin/mark-shot-window-detection-gnome
+   chmod +x ~/.local/libexec/mark-shot/mark-shot-window-detection-gnome
    # or
-   chmod +x ~/.local/bin/mark-shot-window-detection-kde
+   chmod +x ~/.local/libexec/mark-shot/mark-shot-window-detection-kde
    ```
-3. Update your `~/.config/mark-shot/config.json` configuration file, specifying the script name or its absolute path in the `windowDetection.command` field:
+3. Update `windowDetection.command` in `~/.config/mark-shot/config.json`. Installed built-in scripts can still be selected by name, as shown below. To use a manually installed or modified script, specify its absolute path instead; the directory does not need to be in `$PATH`:
    ```json
    "windowDetection": {
      "command": "mark-shot-window-detection-gnome"

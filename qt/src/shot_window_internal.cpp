@@ -488,6 +488,11 @@ QStringList expandDesktopExec(const ShotWindow::DesktopApp &app, const QString &
     return expanded;
 }
 
+/**
+ * 【辅助脚本】【路径解析】优先定位专用安装目录中的脚本，并兼容旧版布局。
+ * @param programName 辅助脚本名称。
+ * @return 可执行脚本的绝对路径，未找到时返回原名称。
+ */
 QString helperProgramPath(const QString &programName)
 {
     const QString appDir = QCoreApplication::applicationDirPath();
@@ -519,9 +524,9 @@ QString helperProgramPath(const QString &programName)
     }
 #else
     const QStringList candidates = {
+        QDir(appDir).filePath(QStringLiteral("../libexec/mark-shot/%1").arg(programName)),
         QDir(appDir).filePath(programName),
         QDir(appDir).filePath(QStringLiteral("../scripts/%1").arg(programName)),
-        QDir(appDir).filePath(QStringLiteral("../libexec/mark-shot/%1").arg(programName)),
         QDir(appDir).filePath(QStringLiteral("../lib/mark-shot/%1").arg(programName)),
         QDir::current().filePath(QStringLiteral("scripts/%1").arg(programName)),
         QDir(configDir).filePath(programName),
