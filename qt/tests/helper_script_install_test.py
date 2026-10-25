@@ -3,6 +3,7 @@
 import argparse
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -85,6 +86,41 @@ class HelperScriptInstallTest(unittest.TestCase):
                     timeout=5,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_debian_smoke_compiles_installed_scripts(self) -> None:
+        """【打包测试】【安装检查】使用 Debian 检查脚本中的实际路径编译已安装文件，无参数和返回值。"""
+        # 1. 【打包测试】【路径读取】读取检查脚本的文件参数，保留旧版 bin 路径以复现目录错配
+        repository_root = Path(__file__).resolve().parents[2]
+        smoke_script = (repository_root / "debian/tests/smoke").read_text(encoding="utf-8")
+        helper_paths = re.findall(
+            r"/usr/(?:bin|libexec/mark-shot)/mark-shot-[a-z-]+", smoke_script
+        )
+        self.assertEqual(sorted(Path(path).name for path in helper_paths), sorted(HELPER_NAMES))
+        module_paths = re.findall(
+            r"/usr/libexec/mark-shot/lib/mark_shot_window_detection/[a-z_]+\.py", smoke_script
+        )
+        self.assertEqual(
+            sorted(Path(path).name for path in module_paths),
+            ["__init__.py", "niri_dms.py", "niri_geometry.py"],
+        )
+
+        # 2. 【打包测试】【暂存映射】将 Debian 安装前缀映射到当前构建的隔离前缀
+        install_prefix = self.bin_directory.parent
+        installed_paths = [
+            str(install_prefix / path.removeprefix("/usr/"))
+            for path in helper_paths + module_paths
+        ]
+
+        # 3. 【打包测试】【语法编译】执行与安装检查相同的编译命令，路径不存在时必须失败
+        with tempfile.TemporaryDirectory(prefix="mark-shot-smoke-cache.") as cache_directory:
+            result = subprocess.run(
+                [sys.executable, "-m", "py_compile", *installed_paths],
+                env={**os.environ, "PYTHONPYCACHEPREFIX": cache_directory},
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":
