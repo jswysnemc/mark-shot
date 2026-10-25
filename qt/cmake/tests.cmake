@@ -7,6 +7,7 @@ qt_add_executable(mark-shot-color-history-store-test
     src/app_config_store.cpp
     src/app_config_store.h
     src/window_detection.cpp
+    src/window_detection_bundled_script.cpp
     src/window_detection.h
     src/config_value.cpp
     src/config_value.h
@@ -33,6 +34,7 @@ qt_add_executable(mark-shot-recent-font-store-test
     src/app_config_store.cpp
     src/app_config_store.h
     src/window_detection.cpp
+    src/window_detection_bundled_script.cpp
     src/window_detection.h
     src/config_value.cpp
     src/config_value.h
@@ -59,6 +61,7 @@ qt_add_executable(mark-shot-selection-history-test
     src/app_config_store.cpp
     src/app_config_store.h
     src/window_detection.cpp
+    src/window_detection_bundled_script.cpp
     src/window_detection.h
     src/config_value.cpp
     src/config_value.h
@@ -149,6 +152,7 @@ target_link_libraries(mark-shot-region-detector-test
 )
 add_test(NAME region-detector COMMAND mark-shot-region-detector-test)
 include(cmake/region_detection_tests.cmake)
+include(cmake/issue_regression_tests.cmake)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(NAME packaging-configuration

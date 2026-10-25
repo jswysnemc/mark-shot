@@ -140,6 +140,7 @@ qt_add_executable(mark-shot-recording-dialog-config-test
     src/shell_command.cpp
     src/shell_command.h
     src/window_detection.cpp
+    src/window_detection_bundled_script.cpp
     src/window_detection.h
 )
 target_include_directories(mark-shot-recording-dialog-config-test PRIVATE src)

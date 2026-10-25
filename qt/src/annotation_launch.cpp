@@ -1,6 +1,8 @@
 #include "annotation_launch.h"
 
 #include "shot_window.h"
+#include "platform/wayland/compositor_pointer.h"
+#include "window_detection_session.h"
 
 #include <QCursor>
 #include <QGuiApplication>
@@ -61,9 +63,20 @@ QScreen *screenByName(const QString &name)
 
 QScreen *focusedScreen()
 {
-    if (QScreen *screen = screenByName(niriFocusedOutputName())) {
-        return screen;
+    // 1. 【截图会话】【屏幕选择】GNOME 全局快捷键启动时优先使用扩展提供的真实指针位置
+    if (const auto pointer = wayland::compositorPointerPosition()) {
+        if (QScreen *screen = QGuiApplication::screenAt(*pointer)) {
+            return screen;
+        }
     }
+    // 2. 【截图会话】【屏幕选择】仅在 niri 会话询问聚焦输出，其他桌面不调用 niri
+    const auto session = window_detection::detectSession(QProcessEnvironment::systemEnvironment());
+    if (session.compositor == QStringLiteral("niri")) {
+        if (QScreen *screen = screenByName(niriFocusedOutputName())) {
+            return screen;
+        }
+    }
+    // 3. 【截图会话】【屏幕选择】保留 X11 和已收到客户端指针事件时的 Qt 回退
     if (QScreen *screen = QGuiApplication::screenAt(QCursor::pos())) {
         return screen;
     }

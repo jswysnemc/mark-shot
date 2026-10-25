@@ -178,6 +178,8 @@ qt_add_executable(mark-shot
     src/startup_shortcut_hint.h
     src/window_detection.cpp
     src/window_detection.h
+    src/window_detection_bundled_script.cpp
+    src/window_detection_bundled_script.h
     src/window_detection_session.h
     src/windows_integration.cpp
     src/windows_integration.h
@@ -246,6 +248,8 @@ qt_add_executable(mark-shot
     src/pinned_window/pinned_kde_keep_above_bridge.h
     src/annotation_launch.cpp
     src/annotation_launch.h
+    src/platform/wayland/compositor_pointer.cpp
+    src/platform/wayland/compositor_pointer.h
     src/scroll/stitcher.cpp
     src/scroll/stitcher.h
     src/scroll/stitcher_fixed_regions.cpp

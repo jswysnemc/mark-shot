@@ -6,6 +6,7 @@
 #include "json_bridge.h"
 #include "shell_command.h"
 #include "window_detection_session.h"
+#include "window_detection_bundled_script.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -29,9 +30,6 @@
 
 namespace markshot {
 namespace {
-
-/// 关闭时只在可执行文件同目录查找内置窗口检测脚本
-inline constexpr bool FEATURE_WINDOW_DETECTION_SCRIPT_SEARCH_ENABLED = true;
 
 #if defined(Q_OS_WIN)
 QString envConfigDir(const QString &name, const QString &relativePath = QStringLiteral("mark-shot"))
@@ -610,54 +608,6 @@ QProcessEnvironment scriptEnvironment(const QRect &captureGeometry,
     return environment;
 }
 
-/// @brief 在安装目录、构建树和 PATH 中解析内置窗口检测脚本。
-/// @param command 配置中的窗口检测命令。
-/// @return 可执行脚本的绝对路径；找不到时返回原命令。
-QString resolveInstalledBundledCommand(const QString &command)
-{
-    // 1. 关闭扩展查找时只保留可执行文件同目录，行为与旧版一致
-    if (!FEATURE_WINDOW_DETECTION_SCRIPT_SEARCH_ENABLED) {
-        return window_detection::resolveBundledCommand(
-            command, {QCoreApplication::applicationDirPath()});
-    }
-    const QString resolved = window_detection::resolveBundledCommand(
-        command,
-        window_detection::bundledCommandSearchDirectories(QCoreApplication::applicationDirPath(),
-                                                         QDir::homePath(),
-                                                         QDir::currentPath()));
-    if (resolved != command) {
-        return resolved;
-    }
-    const QString onPath = QStandardPaths::findExecutable(command);
-    return onPath.isEmpty() ? command : onPath;
-}
-
-/// @brief 内置脚本按名字启动时，先改用应用程序目录里的副本。
-/// @param command 配置中的窗口检测命令。
-/// @return 传给 shell 的命令；自定义命令保持原样。
-QString windowDetectionInvocation(const QString &command)
-{
-#if defined(Q_OS_WIN)
-    return command;
-#else
-    if (!window_detection::isBundledCommand(command)) {
-        return command;
-    }
-    const QString resolved = resolveInstalledBundledCommand(command);
-    if (resolved == command) {
-        markshot::debugLog("window-detection",
-                           "bundled script not found beside executable dir=%s command=%s",
-                           QCoreApplication::applicationDirPath().toUtf8().constData(),
-                           command.toUtf8().constData());
-        return command;
-    }
-    markshot::debugLog("window-detection",
-                       "bundled script resolved path=%s",
-                       resolved.toUtf8().constData());
-    return window_detection::quoteShellWord(resolved);
-#endif
-}
-
 } // namespace
 
 bool windowDetectionEnabled()
@@ -686,7 +636,7 @@ QVector<WindowInfo> collectConfiguredWindowInfos(const QRect &captureGeometry,
         return {};
     }
 
-    const QString command = windowDetectionInvocation(config->command);
+    const QString command = window_detection::windowDetectionInvocation(config->command);
     QProcess process;
     setShellCommand(&process, command);
     process.setProcessEnvironment(scriptEnvironment(captureGeometry,

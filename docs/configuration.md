@@ -371,6 +371,10 @@ To ensure precise window boundary detection across different Wayland compositors
 
 Mark Shot also auto-selects the matching detection script at runtime by probing the current desktop environment (`XDG_SESSION_TYPE`, `XDG_CURRENT_DESKTOP`, etc.). Supported environments are GNOME, KDE Plasma, Hyprland, and Niri; other Wayland sessions fall back to the niri script, and X11 sessions use the built-in native X11 detector (empty command). If the configured `windowDetection.command` does not match the current environment, Mark Shot corrects it in memory without modifying your `config.json`, so manual configuration is optional.
 
+Built-in detection scripts and their shared Python modules are embedded in the executable. Mark Shot prefers installed scripts and scripts in `$PATH`; if none are available, it extracts its bundled copy into a private temporary directory and runs it with `python3`. Downloading only the executable therefore no longer requires installing these detection scripts separately. Python 3 and the compositor-specific command or D-Bus service are still required. Custom commands do not use this fallback.
+
+On GNOME Wayland, `capture.freezeScope: "cursor-screen"` queries the actual pointer through the `mark-shot-scroll-helper@snemc.org` extension (helper API version 6 or newer). Update the extension together with Mark Shot and enable it with `gnome-extensions enable mark-shot-scroll-helper@snemc.org`. For a source installation, copy `qt/packaging/gnome-extension/mark-shot-scroll-helper@snemc.org` into `~/.local/share/gnome-shell/extensions/`, then log out and back in so GNOME loads the updated interface. Without the extension or with an older interface, Mark Shot falls back to Qt's cached pointer position, which may still select the primary screen when launched by a global shortcut.
+
 The project bundles default window detection scripts for the following window managers:
 - **Niri**: `mark-shot-window-detection-niri`
 - **Hyprland**: `mark-shot-window-detection-hyprland`
@@ -392,7 +396,8 @@ We highly welcome and encourage community members to contribute adapter scripts 
 If the script fails to execute or times out (default: `1000ms`), Mark Shot will proceed with screenshot capture normally and fall back to its internal X11-based window detector where applicable.
 
 #### How to Use & Configure:
-1. Copy the script corresponding to your compositor from the `scripts/` directory in the repository to a folder in your system `$PATH` (e.g. `~/.local/bin/` or `/usr/local/bin/`).
+The default configuration uses the bundled script automatically. To install or override a script manually:
+1. Copy the script corresponding to your compositor from the `qt/scripts/` directory in the repository to a folder in your system `$PATH` (e.g. `~/.local/bin/` or `/usr/local/bin/`). For niri, also copy `qt/scripts/lib/mark_shot_window_detection/` into `lib/mark_shot_window_detection/` beside the installed script.
 2. Make the script executable:
    ```bash
    chmod +x ~/.local/bin/mark-shot-window-detection-niri

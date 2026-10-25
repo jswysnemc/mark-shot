@@ -4,6 +4,10 @@ export const DBUS_XML = `
     <method name="Version">
       <arg type="s" name="version" direction="out"/>
     </method>
+    <method name="PointerPosition">
+      <arg type="i" name="x" direction="out"/>
+      <arg type="i" name="y" direction="out"/>
+    </method>
     <method name="ScreenshotArea">
       <arg type="i" name="x" direction="in"/>
       <arg type="i" name="y" direction="in"/>

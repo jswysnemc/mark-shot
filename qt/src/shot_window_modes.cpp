@@ -637,7 +637,7 @@ void ShotWindow::setStartupTool(StartupTool tool)
     }
     updateCursor();
     update();
-    routeCodeScannerToCursorScreenIfEnabled();
+    routeStartupToolToCursorScreenIfEnabled();
 }
 
 void ShotWindow::leaveStartupTool()

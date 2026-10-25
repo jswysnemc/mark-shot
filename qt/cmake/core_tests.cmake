@@ -100,6 +100,7 @@ qt_add_executable(mark-shot-clipboard-image-config-test
     src/shell_command.cpp
     src/shell_command.h
     src/window_detection.cpp
+    src/window_detection_bundled_script.cpp
     src/window_detection.h
 )
 target_include_directories(mark-shot-clipboard-image-config-test PRIVATE src)
@@ -221,6 +222,7 @@ qt_add_executable(mark-shot-kde-capture-config-test
     src/shell_command.cpp
     src/shell_command.h
     src/window_detection.cpp
+    src/window_detection_bundled_script.cpp
     src/window_detection.h
 )
 target_include_directories(mark-shot-kde-capture-config-test PRIVATE src)

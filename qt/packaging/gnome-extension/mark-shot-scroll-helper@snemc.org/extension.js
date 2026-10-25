@@ -10,7 +10,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { ScrollPreviewOverlay } from './scroll-preview-overlay.js';
 const IFACE = 'org.gnome.Shell.Extensions.MarkShotScrollHelper';
 const OBJECT_PATH = '/org/gnome/Shell/Extensions/MarkShotScrollHelper';
-const API_VERSION = '5';
+const API_VERSION = '6';
 
 const PANEL_WIDTH = 340;
 const DEFAULT_PREVIEW_GAP = 5;
@@ -186,10 +186,23 @@ export default class MarkShotScrollHelper extends Extension {
         console.log('[MarkShotScrollHelper] Extension disabled.');
     }
 
+    /**
+     * 【GNOME】【扩展接口】处理截图、指针查询和窗口操作请求。
+     * @param methodName D-Bus 方法名称。
+     * @param parameters 方法入参。
+     * @param invocation 方法回复上下文。
+     * @return 无返回值。
+     */
     _handleMethod(methodName, parameters, invocation) {
         try {
             if (methodName === 'Version') {
                 invocation.return_value(new GLib.Variant('(s)', [API_VERSION]));
+                return;
+            }
+
+            if (methodName === 'PointerPosition') {
+                const [pointerX, pointerY] = global.get_pointer();
+                invocation.return_value(new GLib.Variant('(ii)', [pointerX, pointerY]));
                 return;
             }
 

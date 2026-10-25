@@ -4,6 +4,7 @@
 #include "capture_geometry.h"
 #include "capture_session_screen_frames.h"
 #include "capture_session_screen_utils.h"
+#include "capture_session_startup_routing.h"
 #include "debug_log.h"
 #include "display_capture/display_capture_snapshot.h"
 #include "screen_capture.h"
@@ -271,65 +272,6 @@ ShotWindow *showDisplayCaptureTarget(const markshot::display_capture::Target &ta
                               regionRecordingOptions);
 }
 
-/// @brief 多屏时把扫码模式转到光标所在覆盖层。
-/// @param app 应用对象，用作信号接收者。
-/// @param window 当前覆盖层。
-/// @param windows 同一会话的覆盖层。
-/// @return 无返回值。
-void connectCodeScannerScreenRouting(QApplication *app,
-                                     ShotWindow *window,
-                                     const QVector<QPointer<ShotWindow>> &windows)
-{
-    if (!app || !window) {
-        return;
-    }
-    QObject::connect(window,
-                     &ShotWindow::codeScannerRouteRequested,
-                     app,
-                     [windows](ShotWindow *source) {
-        if (!source) {
-            return;
-        }
-        QScreen *cursorScreen = QGuiApplication::screenAt(QCursor::pos());
-        if (!cursorScreen) {
-            return;
-        }
-        for (const QPointer<ShotWindow> &peerWindow : windows) {
-            ShotWindow *peer = peerWindow.data();
-            if (!peer || peer == source || peer->captureScreen() != cursorScreen) {
-                continue;
-            }
-            // 1. 先退出快捷键落点，再在光标屏幕进入扫码
-            source->applyRoutedStartupTool(markshot::shot::types::StartupTool::None);
-            peer->applyRoutedStartupTool(markshot::shot::types::StartupTool::CodeScanner);
-            peer->raise();
-            return;
-        }
-    });
-    QObject::connect(window,
-                     &ShotWindow::codeScannerClaimRequested,
-                     app,
-                     [windows](ShotWindow *claimer) {
-        if (!claimer) {
-            return;
-        }
-        ShotWindow *donor = nullptr;
-        for (const QPointer<ShotWindow> &peerWindow : windows) {
-            ShotWindow *peer = peerWindow.data();
-            if (peer && peer != claimer
-                && peer->startupTool() == markshot::shot::types::StartupTool::CodeScanner) {
-                donor = peer;
-                break;
-            }
-        }
-        if (!donor) {
-            return;
-        }
-        donor->applyRoutedStartupTool(markshot::shot::types::StartupTool::None);
-        claimer->applyRoutedStartupTool(markshot::shot::types::StartupTool::CodeScanner);
-    });
-}
-
 /// @brief 为截图冻结窗口绑定互斥关闭和显示器快速截取逻辑。
 /// @param app 应用对象。
 /// @param windows 冻结窗口列表。
@@ -357,7 +299,7 @@ void connectCaptureWindowSession(QApplication *app,
         if (!window) {
             continue;
         }
-        connectCodeScannerScreenRouting(app, window, windows);
+        markshot::capture_session::connectStartupToolScreenRouting(app, window, windows);
         QObject::connect(window, &ShotWindow::selectionActivated, app, [windows, closingSession](ShotWindow *activeWindow) {
             if (*closingSession) {
                 return;

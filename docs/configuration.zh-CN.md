@@ -281,6 +281,10 @@ Mark Shot 会记住最近一次使用的标注工具默认值，并在下次启�
 
 Mark Shot 还会在运行时探测当前桌面环境（`XDG_SESSION_TYPE`、`XDG_CURRENT_DESKTOP` 等），自动选择匹配的检测脚本。支持 GNOME、KDE Plasma、Hyprland、Niri；其他 Wayland 会话回退到 niri 脚本，X11 会话使用内置原生 X11 检测（空命令）。若已配置的 `windowDetection.command` 与当前环境不匹配，Mark Shot 会在内存中纠正而不修改 `config.json`，因此手动配置并非必需。
 
+内置检测脚本及共享 Python 模块已经嵌入主程序。Mark Shot 优先使用安装目录和 `$PATH` 中的脚本，未找到时会将内置副本释放到进程专用临时目录，通过 `python3` 执行。因此，仅下载主程序也不再需要单独安装这些检测脚本；系统仍需提供 Python 3，以及对应合成器的命令或 D-Bus 服务。自定义命令不使用此回退机制。
+
+GNOME Wayland 下，`capture.freezeScope: "cursor-screen"` 通过 `mark-shot-scroll-helper@snemc.org` 扩展查询真实指针位置，需要辅助接口版本 6 或更新版本。请随主程序更新扩展，并执行 `gnome-extensions enable mark-shot-scroll-helper@snemc.org` 启用。从源码安装时，将 `qt/packaging/gnome-extension/mark-shot-scroll-helper@snemc.org` 复制到 `~/.local/share/gnome-shell/extensions/`，然后注销并重新登录，使 GNOME 加载更新后的接口。未安装扩展或接口版本过旧时，程序回退到 Qt 缓存的指针位置；全局快捷键启动时仍可能选择主屏。
+
 项目已内置了针对以下窗口管理器的边界检测脚本：
 - **Niri**：`mark-shot-window-detection-niri`
 - **Hyprland**：`mark-shot-window-detection-hyprland`
@@ -302,7 +306,8 @@ Mark Shot 还会在运行时探测当前桌面环境（`XDG_SESSION_TYPE`、`XDG
 若脚本执行失败或超时（默认为 `1000ms`），Mark Shot 将继续截图流程，并在 X11 模式下自动回退至内置的窗口检测器。
 
 #### 如何使用与配置：
-1. 将项目仓库 `scripts/` 目录下的相应脚本复制到系统的 `$PATH` 路径目录下（例如 `~/.local/bin/` 或 `/usr/local/bin/`）。
+默认配置会自动使用内置脚本。需要手动安装或替换脚本时：
+1. 将项目仓库 `qt/scripts/` 目录下的相应脚本复制到系统的 `$PATH` 路径目录下（例如 `~/.local/bin/` 或 `/usr/local/bin/`）。使用 niri 时，还需将 `qt/scripts/lib/mark_shot_window_detection/` 复制到安装脚本旁边的 `lib/mark_shot_window_detection/`。
 2. 为该脚本赋予可执行权限：
    ```bash
    chmod +x ~/.local/bin/mark-shot-window-detection-niri

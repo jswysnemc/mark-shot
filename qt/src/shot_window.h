@@ -107,6 +107,8 @@ public:
     markshot::shot::types::StartupTool startupTool() const;
     QScreen *captureScreen() const;
     void applyRoutedStartupTool(markshot::shot::types::StartupTool tool);
+    /** 【截图会话】【工具转移】判断当前工具能否跟随指针跨屏，拖动或录制时返回 false，无参数。 */
+    bool startupToolCanFollowPointer() const;
     void translateSelection();
 
 signals:
@@ -115,8 +117,8 @@ signals:
     void displayCaptureEditRequested(ShotWindow *window, markshot::display_capture::Target target);
     void sessionCancelRequested();
     void peerOverlaysSuspendRequested(ShotWindow *window, bool suspended);
-    void codeScannerRouteRequested(ShotWindow *window);
-    void codeScannerClaimRequested(ShotWindow *window);
+    void startupToolRouteRequested(ShotWindow *window);
+    void startupToolClaimRequested(ShotWindow *window);
 
 protected:
     /// @brief 在实际输入处理后同步光标，并处理抓取中断
@@ -695,8 +697,8 @@ private:
     QPointF m_selectionClickStart;
 
     bool m_applyingRoutedStartupTool = false;
-    void routeCodeScannerToCursorScreenIfEnabled();
-    void claimCodeScannerFromPeersIfEnabled(QEvent *event);
+    void routeStartupToolToCursorScreenIfEnabled();
+    void claimStartupToolFromPeersIfEnabled(QEvent *event);
     void rememberRecentTextFontIfEnabled(const QString &fontFamily);
     void refreshRecentTextFontsIfEnabled();
     bool ignoreRecentFontHeaderClickIfEnabled(QListWidgetItem *item) const;

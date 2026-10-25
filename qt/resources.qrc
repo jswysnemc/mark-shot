@@ -70,4 +70,13 @@
     <file alias="unlock.svg">data/icons/ui/unlock.svg</file>
     <file alias="upload.svg">data/icons/ui/upload.svg</file>
   </qresource>
+  <qresource prefix="/window-detection">
+    <file alias="mark-shot-window-detection-kde">scripts/mark-shot-window-detection-kde</file>
+    <file alias="mark-shot-window-detection-gnome">scripts/mark-shot-window-detection-gnome</file>
+    <file alias="mark-shot-window-detection-hyprland">scripts/mark-shot-window-detection-hyprland</file>
+    <file alias="mark-shot-window-detection-niri">scripts/mark-shot-window-detection-niri</file>
+    <file alias="lib/mark_shot_window_detection/__init__.py">scripts/lib/mark_shot_window_detection/__init__.py</file>
+    <file alias="lib/mark_shot_window_detection/niri_geometry.py">scripts/lib/mark_shot_window_detection/niri_geometry.py</file>
+    <file alias="lib/mark_shot_window_detection/niri_dms.py">scripts/lib/mark_shot_window_detection/niri_dms.py</file>
+  </qresource>
 </RCC>

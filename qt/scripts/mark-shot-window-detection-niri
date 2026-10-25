@@ -365,20 +365,22 @@ def window_rect(window, outputs, layers, layout_config, workspace_outputs, works
 
     tile_pos = pair(layout.get("tile_pos_in_workspace_view"))
     window_size = pair(layout.get("window_size"))
-    if tile_pos is None or window_size is None:
+    if tile_pos is None or window_size is None or min(window_size) <= 1:
         return None
 
-    offset = pair(layout.get("window_offset_in_tile")) or (0.0, 0.0)
+    # 1. 【niri】【窗口坐标】tile 包含边框，只有旧版缺少 tile 尺寸时才回退到内容区域
+    tile_size = pair(layout.get("tile_size"))
+    size = tile_size if tile_size is not None else window_size
+    offset = (0.0, 0.0) if tile_size is not None else (
+        pair(layout.get("window_offset_in_tile")) or (0.0, 0.0))
     workspace_info = workspace_outputs.get(workspace_id)
     output_name = workspace_info["output"]
     origin_x, origin_y = output_origin(outputs, output_name)
-    # niri's tile_pos_in_workspace_view is already relative to the output's
-    # workspace view. Adding the DMS/strut-adjusted work area would double
-    # apply top/left reserved space for floating windows.
+    # 2. 【niri】【窗口坐标】可见坐标已相对输出原点，不再重复增加面板或 struts 独占区
     x = int(round(origin_x + tile_pos[0] + offset[0]))
     y = int(round(origin_y + tile_pos[1] + offset[1]))
-    width = int(round(window_size[0]))
-    height = int(round(window_size[1]))
+    width = int(round(size[0]))
+    height = int(round(size[1]))
     if width <= 1 or height <= 1:
         return None
 
@@ -569,28 +571,27 @@ def tiled_rects_for_workspace(windows, outputs, layers, layout_config,
             elif active_end + gaps > view_x + work_x_rel + work_width:
                 view_x = active_end + gaps - work_x_rel - work_width
 
-    # 3. DMS/niri reserves the top edge before the first tile; the regular gap
-    # is applied between stacked tiles and at the bottom edge.
+    # 3. 【niri】【窗口坐标】工作区仅扣除独占区，第一块 tile 仍需保留上方间隙
     result = []
     for column, column_entries in columns.items():
         ordered = sorted(column_entries, key=lambda entry: entry["row"])
         column_x = origin_x + column_starts[column] - view_x
-        y = work_y
+        y = work_y + gaps
         for entry in ordered:
-            width = int(round(entry["window_size"][0]))
-            height = int(round(entry["window_size"][1]))
             tile_width, tile_height = entry["tile_size"]
-            skip = entry["window"].get("id") in skip_ids or width <= 1 or height <= 1
-            # 全屏 tile 直接占满输出矩形，不参与常规堆叠
+            width = int(round(tile_width))
+            height = int(round(tile_height))
+            skip = (entry["window"].get("id") in skip_ids
+                    or min(entry["window_size"]) <= 1 or width <= 1 or height <= 1)
+            # 4. 【niri】【窗口坐标】全屏 tile 直接占满输出矩形，不参与常规堆叠
             if tile_width >= output_width and tile_height >= output_height:
                 if not skip:
                     result.append((origin_x, origin_y, width, height))
                 continue
-            offset = pair(entry["layout"].get("window_offset_in_tile")) or (0.0, 0.0)
             if not skip:
                 result.append((
-                    int(round(column_x + offset[0])),
-                    int(round(y + offset[1])),
+                    int(round(column_x)),
+                    int(round(y)),
                     width,
                     height,
                 ))

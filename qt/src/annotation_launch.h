@@ -10,9 +10,10 @@ class QScreen;
 
 namespace markshot {
 
-// Resolves the screen that should host new windows (niri focused output,
-// else the screen under the cursor, else primary). Shared by the capture
-// entrypoint and the file/scroll annotation launchers.
+/**
+ * 【截图会话】【屏幕选择】优先使用 GNOME 合成器指针或 niri 聚焦输出，再回退到 Qt 指针和主屏。
+ * @return 新窗口应使用的屏幕，无参数。
+ */
 QScreen *focusedScreen();
 
 QRect centeredImageWindowGeometry(const QSize &imageSize, QScreen *screen);
