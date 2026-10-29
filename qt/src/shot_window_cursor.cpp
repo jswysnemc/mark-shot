@@ -165,6 +165,11 @@ void ShotWindow::updatePointerCursor(QPointF widgetPoint)
         return;
     }
 
-    // 5. 【截图】【标注工具】文字使用插入光标，其余绘制工具使用统一十字
-    setCursor(m_tool == Tool::Text ? Qt::IBeamCursor : captureCrossCursor(devicePixelRatioF()));
+    // 5. 【截图】【标注工具】文字在可输入位置使用插入光标，选区外不能输入时用箭头
+    if (m_tool == Tool::Text) {
+        setCursor(textToolAcceptsPoint(imagePoint) ? Qt::IBeamCursor : Qt::ArrowCursor);
+        return;
+    }
+    // 6. 【截图】【标注工具】其余绘制工具使用统一十字
+    setCursor(captureCrossCursor(devicePixelRatioF()));
 }

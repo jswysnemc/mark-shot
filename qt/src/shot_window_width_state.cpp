@@ -1,5 +1,7 @@
 #include "shot_window_module.h"
 
+#include "text_annotation_layout.h"
+
 using namespace markshot::shot;
 
 /// @brief 返回当前工具使用的默认粗细或尺寸
@@ -159,15 +161,21 @@ bool ShotWindow::setSelectedAnnotationWidth(int width, bool captureHistory)
                     annotation->width = clampedWidthForTool(annotation->tool, width);
                 } else if (annotation->tool == Tool::Text) {
                     const qreal oldWidth = annotation->width;
+                    const bool wrapped = textAnnotationWraps(*annotation);
                     annotation->width = clampedWidthForTool(annotation->tool, width);
-                    // 1. 只按字号比例缩放换行宽度，不再每格额外乘 1.05
-                    const qreal oldFont = std::max<qreal>(1.0, 19.0 + oldWidth);
-                    const qreal factor = std::max<qreal>(1.0, 19.0 + annotation->width) / oldFont;
-                    const QRectF current = annotation->rect.normalized();
-                    const qreal scaledWidth = std::max<qreal>(1.0, current.width() * factor);
-                    annotation->rect.setWidth(scaledWidth);
-                    const QRectF measured = textContentRect(*annotation, false);
-                    annotation->rect = QRectF(current.topLeft(), QSizeF(scaledWidth, measured.height()));
+                    if (!wrapped) {
+                        // 1. 单行文字按新字号的自然宽度收框，字号变化不引入换行
+                        fitTextAnnotationRect(*annotation);
+                    } else {
+                        // 2. 已换行的文字只按字号比例缩放换行宽度，不再每格额外乘 1.05
+                        const qreal oldFont = std::max<qreal>(1.0, 19.0 + oldWidth);
+                        const qreal factor = std::max<qreal>(1.0, 19.0 + annotation->width) / oldFont;
+                        const QRectF current = annotation->rect.normalized();
+                        const qreal scaledWidth = std::max<qreal>(1.0, current.width() * factor);
+                        annotation->rect.setWidth(scaledWidth);
+                        const QRectF measured = textContentRect(*annotation, false);
+                        annotation->rect = QRectF(current.topLeft(), QSizeF(scaledWidth, measured.height()));
+                    }
                     if (!annotation->points.isEmpty()) {
                         annotation->points[0] = annotation->rect.topLeft();
                     }

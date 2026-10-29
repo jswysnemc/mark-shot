@@ -57,6 +57,7 @@ class ShotWindow final : public QWidget {
     friend class RegionDetectionToggleTest;
     friend class CanvasImageMemoryTest;
     friend class SelectionHistoryRestoreTest;
+    friend class TextAnnotationEditingTest;
 
 public:
     using Action = markshot::shot::types::Action;
@@ -709,6 +710,9 @@ private:
     bool ignoreRecentFontHeaderClickIfEnabled(QListWidgetItem *item) const;
     void updateAnnotationDeleteButtonHoverIfEnabled(QPointF pointer);
     bool paintAnnotationDeleteButtonIfEnabled(QPainter &painter, const QRectF &deleteButton) const;
+    void handleTextToolPress(QPointF imagePoint, bool committedEditor);
+    bool textToolAcceptsPoint(QPointF imagePoint) const;
+    bool handleTextEditorActionShortcut(QObject *watched, QEvent *event);
     bool handleSnowTextEditorKeyIfEnabled(QObject *watched, QEvent *event);
     void connectSnowTextEditorGeometryIfEnabled();
     void applySnowTextEditorChromeIfEnabled();

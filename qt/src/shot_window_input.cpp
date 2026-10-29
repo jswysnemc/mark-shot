@@ -142,8 +142,9 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
         return;
     }
 
+    // 2. 【截图】【悬停光标】文字工具随指针进出选区和已有文字切换光标
     if (m_mode == Mode::Editing && !m_dragging
-        && (m_tool == Tool::Select || (m_tool == Tool::Move && !m_fullscreenAnnotation))) {
+        && (m_tool == Tool::Select || m_tool == Tool::Text || (m_tool == Tool::Move && !m_fullscreenAnnotation))) {
         updatePointerCursor(event->position());
         return;
     }
@@ -307,9 +308,11 @@ void ShotWindow::mouseDoubleClickEvent(QMouseEvent *event)
         m_laserDraft.reset();
         break;
     case Tool::Text:
-        // First press opened a fresh, empty text editor at the click point.
-        // setTool(Select) below will call commitTextEditor() and tear it
-        // down without producing an empty annotation.
+        // 第一击已经打开这段文字的编辑器，这里不再重复打开，避免提交后又重建输入框
+        if (m_textEditor && m_textEditor->isVisible() && m_editingTextAnnotationId == targetId) {
+            event->accept();
+            return;
+        }
         break;
     case Tool::Move:
     case Tool::Select:
@@ -321,7 +324,10 @@ void ShotWindow::mouseDoubleClickEvent(QMouseEvent *event)
     m_annotationDrag = SelectionDrag::None;
     m_annotationHistoryCaptured = false;
 
-    if (m_tool != Tool::Select) {
+    // 文字工具保持当前工具，提交后仍可继续新建文字
+    if (m_tool == Tool::Text) {
+        commitTextEditor();
+    } else if (m_tool != Tool::Select) {
         setTool(Tool::Select);
     }
     setSelectedAnnotations({targetId});

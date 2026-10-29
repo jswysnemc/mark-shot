@@ -24,8 +24,8 @@ bool ShotWindow::canRunDoubleClickAction(QPointF imagePoint) const
         return false;
     }
 
-    // 4. 文字编辑框打开时双击属于文本操作，不触发手势
-    if (m_textEditor && m_textEditor->isVisible()) {
+    // 4. 文字工具或文字编辑框打开时双击属于文本操作，不触发手势
+    if (m_tool == Tool::Text || (m_textEditor && m_textEditor->isVisible())) {
         return false;
     }
 

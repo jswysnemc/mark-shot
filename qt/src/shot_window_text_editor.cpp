@@ -1,6 +1,40 @@
 #include "shot_window_module.h"
 
+#include "text_annotation_layout.h"
 #include "ui/context_menu.h"
+
+using namespace markshot::shot;
+
+namespace {
+
+/**
+ * 去掉文字末尾的空白，保留开头的缩进和空行。
+ * @param text 编辑器中的原始文字。
+ * @return 去掉末尾空白后的文字，全为空白时返回空字符串。
+ */
+QString trimTrailingWhitespace(const QString &text)
+{
+    qsizetype end = text.size();
+    while (end > 0 && text.at(end - 1).isSpace()) {
+        --end;
+    }
+    return text.left(end);
+}
+
+/**
+ * 判断两次提交的文字标注内容与排版是否完全一致。
+ * @param left 提交前的标注。
+ * @param right 提交后的标注。
+ * @return 一致时返回 true。
+ */
+bool sameTextSubmission(const types::Annotation &left, const types::Annotation &right)
+{
+    return left.text == right.text && left.fontFamily == right.fontFamily
+        && left.fontWeight == right.fontWeight && left.textItalic == right.textItalic
+        && left.rect == right.rect && left.points == right.points;
+}
+
+}  // namespace
 
 void ShotWindow::initializeTextEditor()
 {
@@ -105,30 +139,47 @@ void ShotWindow::commitTextEditor()
     }
 
     m_committingText = true;
-    const QString text = m_textEditor->toPlainText().trimmed();
+    // 1. 隐藏前记下编辑器实际换行宽度，提交结果与编辑时看到的换行一致
+    const QString text = trimTrailingWhitespace(m_textEditor->toPlainText());
     const QRect editorGeometry = m_textEditor->geometry();
+    const std::optional<qreal> wrappedBoxWidth =
+        wrappedEditorBoxWidth(m_textEditor->document(), annotationSizeScale(true));
     m_textEditor->hide();
     m_textEditor->clear();
     setFocus(Qt::OtherFocusReason);
     updateLayerShellForIme();
 
-    // 1. 编辑现有标注时保留标注身份并更新文字样式
+    // 2. 编辑现有标注时保留标注身份，清空文字即删除，内容未变不写历史
     if (m_editingTextAnnotationId.has_value()) {
-        if (Annotation *annotation = annotationById(*m_editingTextAnnotationId)) {
-            pushHistorySnapshot();
-            annotation->text = text;
-            annotation->fontFamily = m_textEditor->font().family();
-            annotation->fontWeight = m_textEditor->font().weight();
-            annotation->textItalic = m_textEditor->font().italic();
-            copyEditorFontToAnnotationIfEnabled(*annotation);
-            // 2. 提交时按文字自然宽度收框，避免用编辑器外框把单行挤成两行
-            annotation->rect.setWidth(std::max(annotation->rect.width(), 100000.0));
-            annotation->rect = textContentRect(*annotation, false);
-            if (!annotation->points.isEmpty()) {
-                annotation->points[0] = annotation->rect.topLeft();
+        const int annotationId = *m_editingTextAnnotationId;
+        m_editingTextAnnotationId.reset();
+        bool removed = false;
+        if (const Annotation *original = annotationById(annotationId)) {
+            Annotation edited = *original;
+            edited.text = text;
+            edited.fontFamily = m_textEditor->font().family();
+            edited.fontWeight = m_textEditor->font().weight();
+            edited.textItalic = m_textEditor->font().italic();
+            copyEditorFontToAnnotationIfEnabled(edited);
+            fitTextAnnotationRect(edited, wrappedBoxWidth);
+            if (!edited.points.isEmpty()) {
+                edited.points[0] = edited.rect.topLeft();
+            }
+            if (text.isEmpty()) {
+                pushHistorySnapshot();
+                m_annotations.removeIf([annotationId](const Annotation &item) { return item.id == annotationId; });
+                removed = true;
+            } else if (!sameTextSubmission(*original, edited)) {
+                pushHistorySnapshot();
+                if (Annotation *target = annotationById(annotationId)) {
+                    *target = edited;
+                }
             }
         }
-        m_editingTextAnnotationId.reset();
+        // 3. 文字工具下提交后回到新建状态，选择工具保留选中以便继续调整
+        if (removed || m_tool != Tool::Select) {
+            setSelectedAnnotations({});
+        }
         m_committingText = false;
         updateAnnotationPropertyPanel();
         updateCursor();
@@ -136,7 +187,7 @@ void ShotWindow::commitTextEditor()
         return;
     }
 
-    // 2. 新内容非空时创建文字标注并同步默认样式
+    // 4. 新内容非空时创建文字标注并同步默认样式
     if (!text.isEmpty()) {
         pushHistorySnapshot();
         Annotation annotation;
@@ -153,9 +204,8 @@ void ShotWindow::commitTextEditor()
         annotation.fontWeight = m_textEditor->font().weight();
         annotation.textItalic = m_textEditor->font().italic();
         copyEditorFontToAnnotationIfEnabled(annotation);
-        // 3. 新文字同样按自然宽度收框，编辑器宽度不作为换行限制
-        annotation.rect.setWidth(std::max(annotation.rect.width(), 100000.0));
-        annotation.rect = textContentRect(annotation, false);
+        // 5. 编辑器未换行时按单行自然宽度收框，换行时沿用编辑器的换行宽度
+        fitTextAnnotationRect(annotation, wrappedBoxWidth);
         m_textFontFamily = annotation.fontFamily;
         m_textWeight = annotation.fontWeight;
         m_textItalic = annotation.textItalic;
@@ -339,20 +389,33 @@ void ShotWindow::applySnowTextEditorGeometryIfEnabled()
     }
     m_updatingSnowTextEditorGeometry = true;
 
-    // 1. 先按单行自然宽度测量，超出窗口后再换行并增高
+    // 1. 先按单行自然宽度测量，超出选区右边界后再换行并增高
     QTextDocument *document = m_textEditor->document();
     constexpr int kPad = 2;
     const int minWidth = std::max(28, m_textEditor->fontMetrics().height() * 2);
     const int minHeight = std::max(18, m_textEditor->fontMetrics().height());
     const QPoint anchor = m_textEditor->geometry().topLeft();
-    const int maxWidth = std::max(minWidth, width() - anchor.x() - 8);
+    // 2. 提交后背景框连同左右内边距都要留在选区内，导出时才不会被裁掉
+    const qreal scale = annotationSizeScale(true);
+    const qreal selectionRight = imageRectToWidget(normalizedSelection()).right();
+    int widthLimit = qFloor(std::min<qreal>(width() - 8, selectionRight - kTextBackgroundPaddingX * 2.0 * scale))
+        - anchor.x();
+    // 3. 重新编辑已换行的文字时沿用原换行宽度，进入编辑不改变排版
+    if (m_editingTextAnnotationId.has_value()) {
+        if (const Annotation *annotation = annotationById(*m_editingTextAnnotationId);
+            annotation && textAnnotationWraps(*annotation)) {
+            const qreal wrapWidth = annotation->rect.normalized().width() - kTextBackgroundPaddingX * 2.0;
+            widthLimit = std::min(widthLimit, qCeil(wrapWidth * scale) + kPad);
+        }
+    }
+    const int maxWidth = std::max(minWidth, widthLimit);
     const int maxHeight = std::max(minHeight, height() - anchor.y() - 8);
     document->setTextWidth(-1);
     const int editorWidth = std::clamp(qCeil(document->idealWidth()) + kPad, minWidth, maxWidth);
     document->setTextWidth(std::max(1, editorWidth - kPad));
     const int editorHeight = std::clamp(qCeil(document->size().height()) + kPad, minHeight, maxHeight);
 
-    // 2. 保持左上角锚点，只把超出窗口的部分移回可见区域
+    // 4. 保持左上角锚点，只把超出窗口的部分移回可见区域
     QRect editorRect(anchor, QSize(editorWidth, editorHeight));
     const int maxLeft = std::max(8, width() - editorRect.width() - 8);
     const int maxTop = std::max(8, height() - editorRect.height() - 8);

@@ -80,6 +80,9 @@ set(MARK_SHOT_WINDOW_SOURCES
     src/shot_window_text_controls.cpp
     src/shot_window_text_editor.cpp
     src/shot_window_text_layout.cpp
+    src/shot_window_text_tool_input.cpp
+    src/text_annotation_layout.cpp
+    src/text_annotation_layout.h
     src/shot_window_upload.cpp
     src/shot_window_viewport_rendering.cpp
     src/shot_window_width_state.cpp

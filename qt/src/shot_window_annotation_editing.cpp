@@ -1,5 +1,7 @@
 #include "shot_window_module.h"
 
+#include "text_annotation_layout.h"
+
 namespace cfg = markshot::config;
 namespace shortcuts = markshot::shortcut;
 using namespace markshot::shot;
@@ -49,7 +51,8 @@ void ShotWindow::transformAnnotation(Annotation &annotation, QRectF oldBounds, Q
             point = mapPoint(point);
         }
         break;
-    case Tool::Text:
+    case Tool::Text: {
+        const bool wrapped = textAnnotationWraps(annotation);
         annotation.rect = QRectF(mapPoint(annotation.rect.normalized().topLeft()),
                                  mapPoint(annotation.rect.normalized().bottomRight())).normalized();
         if (m_annotationDrag == SelectionDrag::TopLeft ||
@@ -57,11 +60,16 @@ void ShotWindow::transformAnnotation(Annotation &annotation, QRectF oldBounds, Q
             m_annotationDrag == SelectionDrag::TopRight ||
             m_annotationDrag == SelectionDrag::BottomLeft) {
             annotation.width = std::clamp((19.0 + annotation.width) * scaleFactor - 19.0, 1.0, 1000.0);
+            // 拖角只缩放字号，原本单行的文字按新字号收框，不因宽高比例不同而换行
+            if (!wrapped) {
+                fitTextAnnotationRect(annotation);
+            }
             if (!annotation.points.isEmpty()) {
                 annotation.points[0] = annotation.rect.topLeft();
             }
         }
         break;
+    }
     case Tool::Pen:
     case Tool::Highlighter:
     case Tool::Line:

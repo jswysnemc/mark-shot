@@ -15,8 +15,9 @@ void ShotWindow::drawSelectedAnnotationFrame(QPainter &painter) const
         return;
     }
 
+    // 文字工具下选中只用于定位正在编辑的文字，控制点和删除按钮在该工具下不可操作，不绘制
     const QVector<int> selectedIds = selectedAnnotationIds();
-    if (selectedIds.isEmpty()) {
+    if (selectedIds.isEmpty() || m_tool == Tool::Text) {
         return;
     }
 

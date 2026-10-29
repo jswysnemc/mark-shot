@@ -3,6 +3,7 @@
 #include <QLineEdit>
 
 // ===== 新增 import =====
+#include "text_annotation_layout.h"
 #include "ui/recent_font_store.h"
 
 #include <QColor>
@@ -19,6 +20,22 @@ constexpr int kMaxTextPointSize = 300;
 constexpr int kTextPointSizeOffset = 19;
 // 字体弹层底部字号输入框与 B/I 按钮的统一高度
 constexpr int kFontPanelControlHeight = 26;
+
+/**
+ * 修改文字样式，并让修改前的单行文字保持单行。
+ * @param annotation 文字标注。
+ * @param applyStyle 修改字体样式的函数。
+ * @return 无返回值。
+ */
+template <typename ApplyStyle>
+void applyTextStyleKeepingLines(markshot::shot::types::Annotation &annotation, ApplyStyle applyStyle)
+{
+    const bool wrapped = markshot::shot::textAnnotationWraps(annotation);
+    applyStyle(annotation);
+    if (!wrapped) {
+        markshot::shot::fitTextAnnotationRect(annotation);
+    }
+}
 
 }  // namespace
 
@@ -143,7 +160,7 @@ void ShotWindow::setSelectedTextFontFamily(const QString &fontFamily)
             return;
         }
         pushHistorySnapshot();
-        annotation->fontFamily = fontFamily;
+        applyTextStyleKeepingLines(*annotation, [&fontFamily](Annotation &item) { item.fontFamily = fontFamily; });
     } else {
         if (m_tool != Tool::Text || m_textFontFamily == fontFamily) {
             return;
@@ -214,7 +231,9 @@ void ShotWindow::setSelectedTextBold(bool bold)
         for (int id : selectedIds) {
             if (Annotation *annotation = annotationById(id);
                 annotation && annotation->tool == Tool::Text) {
-                annotation->fontWeight = targetWeight;
+                applyTextStyleKeepingLines(*annotation, [targetWeight](Annotation &item) {
+                    item.fontWeight = targetWeight;
+                });
             }
         }
     } else {
@@ -266,7 +285,7 @@ void ShotWindow::setSelectedTextItalic(bool italic)
         for (int id : selectedIds) {
             if (Annotation *annotation = annotationById(id);
                 annotation && annotation->tool == Tool::Text) {
-                annotation->textItalic = italic;
+                applyTextStyleKeepingLines(*annotation, [italic](Annotation &item) { item.textItalic = italic; });
             }
         }
     } else {

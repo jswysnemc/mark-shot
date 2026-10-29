@@ -365,7 +365,9 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
         && (!m_controls.m_toolbar || !m_controls.m_toolbar->geometry().contains(event->pos()))) {
         m_controls.m_propertyFontPanel->hide();
     }
-    if (m_textEditor && m_textEditor->isVisible() && !m_textEditor->geometry().contains(event->pos())) {
+    const bool committedTextEditor = m_textEditor && m_textEditor->isVisible()
+        && !m_textEditor->geometry().contains(event->pos());
+    if (committedTextEditor) {
         commitTextEditor();
     }
 
@@ -437,8 +439,7 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
     }
 
     if (m_tool == Tool::Text) {
-        commitTextEditor();
-        beginTextAnnotation(imagePoint);
+        handleTextToolPress(imagePoint, committedTextEditor);
         return;
     }
 
