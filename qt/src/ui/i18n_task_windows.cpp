@@ -37,6 +37,7 @@ const QHash<QString, QString> &taskWindowChineseTable()
         {QStringLiteral("Where the toolbars appear after selecting a region."),
          QStringLiteral("选定区域后两条工具栏的显示位置。")},
         {QStringLiteral("Follow Selection"), QStringLiteral("跟随选区")},
+        {QStringLiteral("Screen Top"), QStringLiteral("屏幕顶部")},
         {QStringLiteral("Screen Bottom"), QStringLiteral("屏幕底部")},
         {QStringLiteral("Screen Right"), QStringLiteral("屏幕右侧")},
         {QStringLiteral("Region Detection"), QStringLiteral("区域识别")},

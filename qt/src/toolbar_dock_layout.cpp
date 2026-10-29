@@ -20,27 +20,30 @@ QRect clampedInto(QRect rect, const QRect &bounds, int margin)
     return rect;
 }
 
-/// @brief 计算两条工具栏停靠底部时的几何
+/// @brief 计算两条工具栏停靠顶部或底部时的几何
+/// @param atTop 为 true 时停靠顶部，否则停靠底部
 /// @param bounds 可用区域
 /// @param toolbarSize 主工具栏尺寸
 /// @param actionSize 副工具栏尺寸，为空时只摆放主工具栏
 /// @param edgeMargin 与屏幕边缘的距离
 /// @param spacing 两条工具栏之间的间距
 /// @return 停靠后的几何
-markshot::DockedToolbarLayout bottomDockedLayout(const QRect &bounds,
-                                                 const QSize &toolbarSize,
-                                                 const QSize &actionSize,
-                                                 int edgeMargin,
-                                                 int spacing)
+markshot::DockedToolbarLayout rowDockedLayout(bool atTop,
+                                              const QRect &bounds,
+                                              const QSize &toolbarSize,
+                                              const QSize &actionSize,
+                                              int edgeMargin,
+                                              int spacing)
 {
     markshot::DockedToolbarLayout layout;
     const bool hasAction = !actionSize.isEmpty();
+    const int top = bounds.y() + edgeMargin;
     const int bottom = bounds.y() + bounds.height() - edgeMargin;
     const int rowWidth = toolbarSize.width() + (hasAction ? spacing + actionSize.width() : 0);
     if (!hasAction || rowWidth <= bounds.width() - 2 * edgeMargin) {
         // 1. 一行放得下时两条工具栏整体水平居中，并按行高垂直居中对齐
         const int rowHeight = std::max(toolbarSize.height(), hasAction ? actionSize.height() : 0);
-        const int rowTop = bottom - rowHeight;
+        const int rowTop = atTop ? top : bottom - rowHeight;
         const int rowLeft = bounds.x() + (bounds.width() - rowWidth) / 2;
         layout.toolbar = clampedInto(
             QRect(QPoint(rowLeft, rowTop + (rowHeight - toolbarSize.height()) / 2), toolbarSize), bounds, edgeMargin);
@@ -52,11 +55,13 @@ markshot::DockedToolbarLayout bottomDockedLayout(const QRect &bounds,
         return layout;
     }
 
-    // 2. 宽度不足时主工具栏贴底居中，副工具栏移到其上方并与右端对齐
+    // 2. 宽度不足时主工具栏贴边居中，副工具栏移到其靠屏幕内侧的一边并与右端对齐
     const int left = bounds.x() + (bounds.width() - toolbarSize.width()) / 2;
-    layout.toolbar = clampedInto(QRect(QPoint(left, bottom - toolbarSize.height()), toolbarSize), bounds, edgeMargin);
-    const QPoint actionTopLeft(layout.toolbar.x() + toolbarSize.width() - actionSize.width(),
-                               layout.toolbar.y() - spacing - actionSize.height());
+    const int toolbarTop = atTop ? top : bottom - toolbarSize.height();
+    layout.toolbar = clampedInto(QRect(QPoint(left, toolbarTop), toolbarSize), bounds, edgeMargin);
+    const int actionTop = atTop ? layout.toolbar.y() + toolbarSize.height() + spacing
+                                : layout.toolbar.y() - spacing - actionSize.height();
+    const QPoint actionTopLeft(layout.toolbar.x() + toolbarSize.width() - actionSize.width(), actionTop);
     layout.actionToolbar = clampedInto(QRect(actionTopLeft, actionSize), bounds, edgeMargin);
     return layout;
 }
@@ -107,17 +112,22 @@ markshot::DockedToolbarLayout rightDockedLayout(const QRect &bounds,
 
 namespace markshot {
 
-DockedToolbarLayout dockedToolbarLayout(Qt::Orientation edge,
+DockedToolbarLayout dockedToolbarLayout(ToolbarDockEdge edge,
                                         const QRect &bounds,
                                         const QSize &toolbarSize,
                                         const QSize &actionToolbarSize,
                                         int edgeMargin,
                                         int spacing)
 {
-    if (edge == Qt::Vertical) {
+    switch (edge) {
+    case ToolbarDockEdge::Right:
         return rightDockedLayout(bounds, toolbarSize, actionToolbarSize, edgeMargin, spacing);
+    case ToolbarDockEdge::Top:
+        return rowDockedLayout(true, bounds, toolbarSize, actionToolbarSize, edgeMargin, spacing);
+    case ToolbarDockEdge::Bottom:
+        break;
     }
-    return bottomDockedLayout(bounds, toolbarSize, actionToolbarSize, edgeMargin, spacing);
+    return rowDockedLayout(false, bounds, toolbarSize, actionToolbarSize, edgeMargin, spacing);
 }
 
 }  // namespace markshot

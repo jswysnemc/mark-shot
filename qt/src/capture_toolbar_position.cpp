@@ -65,6 +65,12 @@ std::optional<CaptureToolbarPosition> captureToolbarPositionFromText(QString val
         return CaptureToolbarPosition::ScreenRight;
     }
 
+    if (text == QStringLiteral("top")
+        || text == QStringLiteral("screentop")
+        || text == QStringLiteral("docktop")) {
+        return CaptureToolbarPosition::ScreenTop;
+    }
+
     return std::nullopt;
 }
 
@@ -89,6 +95,8 @@ QString captureToolbarPositionName(CaptureToolbarPosition position)
         return QStringLiteral("bottom");
     case CaptureToolbarPosition::ScreenRight:
         return QStringLiteral("right");
+    case CaptureToolbarPosition::ScreenTop:
+        return QStringLiteral("top");
     }
     return QStringLiteral("selection");
 }

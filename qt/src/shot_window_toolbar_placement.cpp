@@ -10,16 +10,17 @@ namespace {
 // 停靠时工具栏与屏幕边缘的距离，与全屏纵向贴边保持一致
 constexpr int kDockedToolbarEdgeMargin = 12;
 
-/// @brief 【截图工具栏】【停靠布局】按当前排列方向计算两条工具栏停靠后的几何
+/// @brief 【截图工具栏】【停靠布局】计算两条工具栏停靠到指定边缘后的几何
 /// @param controls 截图窗口控件组合
+/// @param edge 停靠的屏幕边缘
 /// @param bounds 截图窗口矩形
 /// @return 停靠几何；副工具栏被隐藏时只摆放主工具栏
-markshot::DockedToolbarLayout currentDockedToolbarLayout(const ShotWindowControls &controls, const QRect &bounds)
+markshot::DockedToolbarLayout currentDockedToolbarLayout(const ShotWindowControls &controls,
+                                                         markshot::ToolbarDockEdge edge,
+                                                         const QRect &bounds)
 {
-    // 1. 纵向排列停靠右侧，横向排列停靠底部；全屏切换排列方向即切换停靠边
-    const Qt::Orientation edge = controls.m_toolbarVerticalLayout ? Qt::Vertical : Qt::Horizontal;
     const QSize toolbarSize = controls.m_toolbar ? controls.m_toolbar->sizeHint() : QSize();
-    // 2. 副工具栏只在选区编辑时显示，全屏标注时其动作并入主工具栏
+    // 1. 副工具栏只在选区编辑时显示，全屏标注时其动作并入主工具栏
     const QSize actionSize = controls.m_actionToolbar && !controls.m_actionToolbar->isHidden()
         ? controls.m_actionToolbar->sizeHint()
         : QSize();
@@ -29,12 +30,23 @@ markshot::DockedToolbarLayout currentDockedToolbarLayout(const ShotWindowControl
 
 }  // namespace
 
-/// @brief 【截图工具栏】【停靠布局】判断当前窗口是否按配置把工具栏停靠到屏幕边缘
-/// @return 截图会话且配置为底部或右侧时返回 true；打开图片的独立窗口保留原有的顶部居中布局
-bool ShotWindow::toolbarDockActive() const
+/// @brief 【截图工具栏】【停靠布局】返回当前窗口工具栏停靠的屏幕边缘
+///
+/// 纵向排列停靠右侧，横向排列停靠配置的顶部或底部；配置为右侧时横向排列停靠底部，
+/// 因此全屏切换排列方向即在右侧与该横向边缘之间切换。
+/// @return 截图会话且配置为固定位置时返回停靠边；跟随选区或打开图片的独立窗口返回空
+std::optional<markshot::ToolbarDockEdge> ShotWindow::toolbarDockEdge() const
 {
-    return m_controls.m_toolbarPosition != markshot::CaptureToolbarPosition::FollowSelection
-        && !m_imageNavigationEnabled;
+    if (m_controls.m_toolbarPosition == markshot::CaptureToolbarPosition::FollowSelection
+        || m_imageNavigationEnabled) {
+        return std::nullopt;
+    }
+    if (m_controls.m_toolbarVerticalLayout) {
+        return markshot::ToolbarDockEdge::Right;
+    }
+    return m_controls.m_toolbarPosition == markshot::CaptureToolbarPosition::ScreenTop
+        ? markshot::ToolbarDockEdge::Top
+        : markshot::ToolbarDockEdge::Bottom;
 }
 
 /// @brief 【截图工具栏】【排列方向】切换主工具栏横纵方向；停靠模式下同时切换停靠边
@@ -64,20 +76,21 @@ void ShotWindow::applyToolbarLayout()
     m_controls.m_toolbarPanel->setOrientation(m_controls.m_toolbarVerticalLayout ? Qt::Vertical : Qt::Horizontal);
     m_controls.m_toolbarPanel->adjustSize();
     if (m_controls.m_actionToolbarPanel) {
-        // 1. 副工具栏默认纵向；停靠底部时改为横向，与主工具栏排在同一行
-        const bool dockedBottom = toolbarDockActive() && !m_controls.m_toolbarVerticalLayout;
-        m_controls.m_actionToolbarPanel->setOrientation(dockedBottom ? Qt::Horizontal : Qt::Vertical);
+        // 1. 副工具栏默认纵向；停靠顶部或底部时改为横向，与主工具栏排在同一行
+        const std::optional<markshot::ToolbarDockEdge> edge = toolbarDockEdge();
+        const bool dockedInRow = edge && *edge != markshot::ToolbarDockEdge::Right;
+        m_controls.m_actionToolbarPanel->setOrientation(dockedInRow ? Qt::Horizontal : Qt::Vertical);
     }
 }
 
 /// @brief 【截图工具栏】【停靠布局】按配置的摆放方式恢复初始排列方向
 ///
-/// 停靠右侧时主工具栏纵向排列，停靠底部和跟随选区时主工具栏横向排列。
+/// 停靠右侧时主工具栏纵向排列，停靠顶部、底部和跟随选区时主工具栏横向排列。
 /// 窗口创建、切换图片导航和退出全屏标注时调用，覆盖会话内的临时横纵切换。
 /// @return 无返回值
 void ShotWindow::restoreConfiguredToolbarLayout()
 {
-    m_controls.m_toolbarVerticalLayout = toolbarDockActive()
+    m_controls.m_toolbarVerticalLayout = !m_imageNavigationEnabled
         && m_controls.m_toolbarPosition == markshot::CaptureToolbarPosition::ScreenRight;
     applyToolbarLayout();
 }
@@ -111,9 +124,9 @@ void ShotWindow::updateToolbarGeometry()
         updateAnnotationPropertyPanelGeometry();
         return;
     }
-    if (toolbarDockActive()) {
-        // 1. 【截图工具栏】【停靠布局】按配置停靠屏幕底部或右侧，位置不随选区变化
-        m_controls.m_toolbar->setGeometry(currentDockedToolbarLayout(m_controls, rect()).toolbar);
+    if (const std::optional<markshot::ToolbarDockEdge> edge = toolbarDockEdge()) {
+        // 1. 【截图工具栏】【停靠布局】按配置停靠屏幕顶部、底部或右侧，位置不随选区变化
+        m_controls.m_toolbar->setGeometry(currentDockedToolbarLayout(m_controls, *edge, rect()).toolbar);
         updateAnnotationPropertyPanelGeometry();
         return;
     }
@@ -163,9 +176,9 @@ void ShotWindow::updateActionToolbarGeometry()
         m_controls.m_actionToolbar->setGeometry(clampedToolbarGeometry(toolbarGeometry));
         return;
     }
-    if (toolbarDockActive()) {
+    if (const std::optional<markshot::ToolbarDockEdge> edge = toolbarDockEdge()) {
         // 1. 【截图工具栏】【停靠布局】与主工具栏一起停靠屏幕边缘，不再避让选区
-        m_controls.m_actionToolbar->setGeometry(currentDockedToolbarLayout(m_controls, rect()).actionToolbar);
+        m_controls.m_actionToolbar->setGeometry(currentDockedToolbarLayout(m_controls, *edge, rect()).actionToolbar);
         return;
     }
 
@@ -222,10 +235,10 @@ void ShotWindow::updateAnnotationPropertyPanelGeometry()
     const QSize panelSize = m_controls.m_annotationPropertyPanel->sizeHint();
     const bool toolbarVisible = m_controls.m_toolbar && m_controls.m_toolbar->isVisible();
     QRect toolbarRect = toolbarVisible ? m_controls.m_toolbar->geometry() : QRect(8, 8, 0, 0);
-    if (toolbarVisible && !m_toolbarUserPlaced && !m_actionToolbarUserPlaced
-        && toolbarDockActive()) {
+    const std::optional<markshot::ToolbarDockEdge> edge = toolbarDockEdge();
+    if (toolbarVisible && !m_toolbarUserPlaced && !m_actionToolbarUserPlaced && edge) {
         // 1. 【截图工具栏】【停靠布局】两条工具栏并排停靠时按合并区域避让，取计算值以免依赖副工具栏的刷新顺序
-        toolbarRect |= currentDockedToolbarLayout(m_controls, rect()).actionToolbar;
+        toolbarRect |= currentDockedToolbarLayout(m_controls, *edge, rect()).actionToolbar;
     }
     int x = toolbarRect.left();
     int y = toolbarRect.bottom() + kToolbarMargin;

@@ -231,9 +231,9 @@ Drawing tips:
 - Under `Select`, scroll to zoom the canvas and hold the middle button to pan;
   double-tap `Ctrl` to reset.
 - The toolbars follow the selection by default. Set **Settings → Capture →
-  Toolbar Position** to *Screen Bottom* or *Screen Right* to keep both toolbars
-  at a fixed screen edge on every capture; dragging a toolbar grip still moves
-  it for the current capture.
+  Toolbar Position** to *Screen Top*, *Screen Bottom* or *Screen Right* to
+  keep both toolbars at a fixed screen edge on every capture; dragging a
+  toolbar grip still moves it for the current capture.
 
 ### 4.1 Editing an existing annotation
 

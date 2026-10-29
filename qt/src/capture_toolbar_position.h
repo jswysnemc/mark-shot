@@ -12,6 +12,7 @@ enum class CaptureToolbarPosition {
     FollowSelection,
     ScreenBottom,
     ScreenRight,
+    ScreenTop,
 };
 
 /// @brief 返回工具栏摆放方式的内置默认值。

@@ -57,6 +57,8 @@ SettingsPageCapture::SettingsPageCapture(QWidget *parent)
         MS_TR("Where the toolbars appear after selecting a region."));
     m_toolbarPosition->addItem(MS_TR("Follow Selection"),
                                static_cast<int>(CaptureToolbarPosition::FollowSelection));
+    m_toolbarPosition->addItem(MS_TR("Screen Top"),
+                               static_cast<int>(CaptureToolbarPosition::ScreenTop));
     m_toolbarPosition->addItem(MS_TR("Screen Bottom"),
                                static_cast<int>(CaptureToolbarPosition::ScreenBottom));
     m_toolbarPosition->addItem(MS_TR("Screen Right"),

@@ -188,7 +188,7 @@ Mark Shot 在 Linux 上从 `~/.config/mark-shot/config.json` 读取应用配置�
 | `capture.hideOwnWindows` | 布尔值 | `true` | 控制截图后端是否从冻结画面中排除 Mark Shot 自身窗口。截图设置页的开关会在下一次截图时立即生效，不需要重启应用。别名：`screenshot.hideOwnWindowsDuringCapture`。 |
 | `capture.wayland.kde.kwinScreenshot.enabled` | 布尔值 | `true` | 是否在 KDE Wayland 环境下启用 KWin 的 `org.kde.KWin.ScreenShot2` 限制级别 DBus 接口截屏功能。如果关闭，将自动回退到常规 Portal 截屏。 |
 | `capture.doubleClickAction` | 字符串 | `"copy"` | 在选区内空白处双击时执行的动作，用于免去移动到工具栏按钮的往返。支持的值包括：`none`（保持旧行为，不执行动作）、`copy`（复制到剪贴板并关闭）、`save`（保存到已配置目录并关闭）、`save-as`（打开另存为对话框）、`pin`（把选区钉到屏幕）、`cancel`（放弃本次截图）。双击文本标注仍然进入文字编辑，Select 工具双击折线仍然插入锚点。该字段填 `false` 同样表示关闭手势。可在设置截图页配置。 |
-| `capture.toolbarPosition` | 字符串 | `"selection"` | 选区编辑时两条截图工具栏的位置。`selection` 表示工具栏贴着选区并随选区避让；`bottom` 表示两条工具栏并排停靠在屏幕底部居中；`right` 表示两条工具栏纵向停靠在屏幕右侧。停靠后工具栏位置不随选区变化；屏幕宽度（或高度）放不下一行（或一列）时，副工具栏移到主工具栏上方（或左侧）。全屏标注沿用同一边缘，切换排列方向会在本次截图中于底部和右侧之间切换。打开图片文件的窗口保留原有布局。可在设置截图页配置。 |
+| `capture.toolbarPosition` | 字符串 | `"selection"` | 选区编辑时两条截图工具栏的位置。`selection` 表示工具栏贴着选区并随选区避让；`top` 和 `bottom` 表示两条工具栏并排停靠在屏幕顶部或底部居中；`right` 表示两条工具栏纵向停靠在屏幕右侧。停靠后工具栏位置不随选区变化；屏幕宽度（或高度）放不下一行（或一列）时，主工具栏保持贴边，副工具栏移到主工具栏靠屏幕内侧的一边（`top` 时在下方，`bottom` 时在上方，`right` 时在左侧）。全屏标注沿用同一边缘，切换排列方向会在本次截图中于右侧和顶部或底部之间切换（`right` 切换到底部）。打开图片文件的窗口保留原有布局。可在设置截图页配置。 |
 | `capture.selectionLoupe.enabled` | 布尔 | `false` | 创建、移动和缩放选区时显示光标旁放大镜，并在首次框选时启用方向键指针微调。已有选区在移动工具下始终支持方向键调整。Wayland 无法移动系统光标时使用软件十字光标。可在设置截图页配置，也可写成 `capture.selectionLoupeEnabled`。 |
 | `capture.regionDetection.enabled` | 布尔 | `true` | 分析图像内容，生成悬停候选区域并支持滚轮切换父子区域。可在“截图 → 截图兼容性”中关闭，排查 KDE 窗口识别时避免图像候选干扰。窗口识别仍由 `windowDetection.enabled` 独立控制，手动框选不受影响。保存后对后续截图生效。 |
 | `captureHistory.enabled` | 布尔 | `true` | 自动记录截图编辑器完成复制、保存、另存为和钉图时的图像。可在截图历史窗口切换；关闭后保留已有记录。 |

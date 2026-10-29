@@ -226,7 +226,7 @@ void ShotWindow::updateExtensionPanelGeometry()
 
 /// @brief 【截图工具栏】【侧边面板】计算"打开方式"与扩展面板相对锚点工具栏的几何
 ///
-/// 默认放在锚点工具栏左侧顶端，左侧放不下时移到右侧；工具栏横向停靠底部时改放其上方并右对齐，
+/// 默认放在锚点工具栏左侧顶端，左侧放不下时移到右侧；工具栏横向停靠底部或顶部时改放其上方或下方并右对齐，
 /// 避免面板压住同一行的另一条工具栏。
 /// @param panelSize 面板尺寸
 /// @return 限制在窗口内的面板几何
@@ -238,12 +238,15 @@ QRect ShotWindow::sidePanelGeometry(QSize panelSize) const
         ? m_controls.m_toolbar->geometry()
         : (m_controls.m_actionToolbar ? m_controls.m_actionToolbar->geometry() : QRect(width() - 64, height() / 2 - 80, 56, 160));
     const bool anchorUserPlaced = anchorIsMainToolbar ? m_toolbarUserPlaced : m_actionToolbarUserPlaced;
+    const std::optional<markshot::ToolbarDockEdge> edge = toolbarDockEdge();
     int x = toolbarRect.left() - panelSize.width() - kToolbarMargin;
     int y = toolbarRect.top();
-    if (toolbarDockActive() && !m_controls.m_toolbarVerticalLayout && !anchorUserPlaced) {
-        // 2. 【截图工具栏】【停靠布局】停靠底部时左右两侧都是工具栏，面板改放锚点上方
+    if (edge && *edge != markshot::ToolbarDockEdge::Right && !anchorUserPlaced) {
+        // 2. 【截图工具栏】【停靠布局】横向停靠时左右两侧都是工具栏，面板改放锚点靠屏幕内侧的一边
         x = toolbarRect.right() - panelSize.width();
-        y = toolbarRect.top() - panelSize.height() - kToolbarMargin;
+        y = *edge == markshot::ToolbarDockEdge::Top
+            ? toolbarRect.bottom() + qRound(kToolbarMargin)
+            : toolbarRect.top() - panelSize.height() - qRound(kToolbarMargin);
     } else if (x < 8) {
         x = toolbarRect.right() + kToolbarMargin;
     }

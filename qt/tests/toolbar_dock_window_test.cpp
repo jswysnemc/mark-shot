@@ -110,6 +110,45 @@ private slots:
         QCOMPARE(actionRect(*window), action);
     }
 
+    /** 验证顶部停靠时两条工具栏横向贴顶居中排成一行，切换排列方向在右侧与顶部之间往返，无参数和返回值。 */
+    void topDockPinsBothToolbars()
+    {
+        auto window = createWindow(markshot::CaptureToolbarPosition::ScreenTop, QRectF(600, 20, 400, 300));
+        QVERIFY(window);
+        QCOMPARE(window->m_controls.m_toolbarPanel->orientation(), Qt::Horizontal);
+        QCOMPARE(window->m_controls.m_actionToolbarPanel->orientation(), Qt::Horizontal);
+        const QRect toolbar = toolbarRect(*window);
+        const QRect action = actionRect(*window);
+        QCOMPARE(std::min(toolbar.top(), action.top()), kEdge);
+        QCOMPARE(action.left(), toolbar.right() + 11);
+        QVERIFY(qAbs(toolbar.left() - (window->width() - 1 - action.right())) <= 1);
+
+        // 1. 换到右下角的选区后，两条工具栏仍停在顶部原位
+        window->m_selection = kCornerSelection;
+        window->refreshViewGeometry();
+        QCOMPARE(toolbarRect(*window), toolbar);
+        QCOMPARE(actionRect(*window), action);
+
+        // 2. 切换排列方向先停靠右侧，再切回时回到顶部而不是底部
+        window->toggleToolbarLayout();
+        QCOMPARE(window->width() - 1 - std::max(toolbarRect(*window).right(), actionRect(*window).right()), kEdge);
+        window->toggleToolbarLayout();
+        QCOMPARE(window->m_controls.m_actionToolbarPanel->orientation(), Qt::Horizontal);
+        QCOMPARE(toolbarRect(*window), toolbar);
+        QCOMPARE(actionRect(*window), action);
+    }
+
+    /** 验证顶部停靠进入全屏标注后主工具栏仍贴顶居中，无参数和返回值。 */
+    void fullscreenKeepsTopEdge()
+    {
+        auto window = createWindow(markshot::CaptureToolbarPosition::ScreenTop);
+        QVERIFY(window);
+        window->enterFullscreenAnnotation(false);
+        const QRect toolbar = toolbarRect(*window);
+        QCOMPARE(toolbar.top(), kEdge);
+        QVERIFY(qAbs(toolbar.left() - (window->width() - 1 - toolbar.right())) <= 1);
+    }
+
     /** 验证右侧停靠时两条工具栏纵向贴右排成一列，无参数和返回值。 */
     void rightDockPinsBothToolbars()
     {
@@ -169,31 +208,48 @@ private slots:
         auto window = createWindow(markshot::CaptureToolbarPosition::ScreenRight);
         QVERIFY(window);
         window->setImageNavigationEnabled(true);
-        QVERIFY(!window->toolbarDockActive());
+        QVERIFY(!window->toolbarDockEdge().has_value());
         QVERIFY(!window->m_controls.m_toolbarVerticalLayout);
         QCOMPARE(window->m_controls.m_actionToolbarPanel->orientation(), Qt::Vertical);
         window->enterFullscreenAnnotation(true);
         QCOMPARE(toolbarRect(*window).top(), kEdge);
     }
 
-    /** 验证选区贴着右侧停靠的工具栏、状态条只能与工具栏重叠时，重叠处仍由工具栏响应点击，无参数和返回值。 */
+    /** 提供停靠位置与贴着工具栏的选区，无参数和返回值。 */
+    void sizeHudStaysUnderDockedToolbars_data()
+    {
+        QTest::addColumn<int>("position");
+        QTest::addColumn<QRectF>("selection");
+        QTest::newRow("right") << static_cast<int>(markshot::CaptureToolbarPosition::ScreenRight)
+                               << QRectF(1300, 500, 280, 200);
+        QTest::newRow("top") << static_cast<int>(markshot::CaptureToolbarPosition::ScreenTop)
+                             << QRectF(500, 10, 600, 985);
+    }
+
+    /** 验证选区贴着停靠的工具栏、状态条只能与工具栏重叠时，重叠处仍由工具栏响应点击，无参数和返回值。 */
     void sizeHudStaysUnderDockedToolbars()
     {
-        auto window = createWindow(markshot::CaptureToolbarPosition::ScreenRight, QRectF(1300, 500, 280, 200));
+        QFETCH(int, position);
+        QFETCH(QRectF, selection);
+        auto window = createWindow(static_cast<markshot::CaptureToolbarPosition>(position), selection);
         QVERIFY(window);
         // 1. 状态条在工具栏移动后的下一轮事件循环重新避让
         QTest::qWait(20);
         QWidget *sizePanel = window->m_selectionSizePanel;
         QVERIFY(sizePanel && sizePanel->isVisible());
+        bool overlapped = false;
         for (const QRect &toolbar : {toolbarRect(*window), actionRect(*window)}) {
             const QRect overlap = sizePanel->geometry() & toolbar;
             if (overlap.isEmpty()) {
                 continue;
             }
+            overlapped = true;
             QWidget *hit = window->childAt(overlap.center());
             QVERIFY(hit);
             QVERIFY(hit != sizePanel && !sizePanel->isAncestorOf(hit));
         }
+        // 2. 选区上方、内侧与下方都没有空位，状态条必然与工具栏重叠，确保覆盖到层级处理
+        QVERIFY(overlapped);
     }
 
     /** 提供停靠位置参数，无参数和返回值。 */
@@ -202,6 +258,7 @@ private slots:
         QTest::addColumn<int>("position");
         QTest::newRow("bottom") << static_cast<int>(markshot::CaptureToolbarPosition::ScreenBottom);
         QTest::newRow("right") << static_cast<int>(markshot::CaptureToolbarPosition::ScreenRight);
+        QTest::newRow("top") << static_cast<int>(markshot::CaptureToolbarPosition::ScreenTop);
     }
 
     /** 验证停靠时属性面板与侧边面板都不压住任一工具栏，无参数和返回值。 */

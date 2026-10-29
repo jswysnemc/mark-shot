@@ -24,6 +24,7 @@
 #include "shot_window_types.h"
 #include "startup_shortcut_hint.h"
 #include "toolbar_appearance_config.h"
+#include "toolbar_dock_layout.h"
 #include "region_detection/region_detector.h"
 #include "ui/theme.h"
 #include "window_detection.h"
@@ -357,7 +358,7 @@ private:
     void toggleToolbarLayout();
     void applyToolbarLayout();
     void restoreConfiguredToolbarLayout();
-    bool toolbarDockActive() const;
+    std::optional<markshot::ToolbarDockEdge> toolbarDockEdge() const;
     void enterFullscreenAnnotation(bool resetAnnotations);
     void leaveFullscreenAnnotation();
     void toggleColorPalette(QPoint position);
