@@ -320,6 +320,21 @@ target_link_libraries(mark-shot-clipboard-publish-policy-test
 )
 add_test(NAME clipboard-publish-policy COMMAND mark-shot-clipboard-publish-policy-test)
 
+qt_add_executable(mark-shot-clipboard-image-mime-data-test
+    tests/clipboard_image_mime_data_test.cpp
+    src/clipboard_image_mime_data.cpp
+    src/clipboard_image_mime_data.h
+)
+target_include_directories(mark-shot-clipboard-image-mime-data-test PRIVATE src)
+target_link_libraries(mark-shot-clipboard-image-mime-data-test
+    PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Test
+)
+add_test(NAME clipboard-image-mime-data COMMAND mark-shot-clipboard-image-mime-data-test)
+set_tests_properties(clipboard-image-mime-data PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 qt_add_executable(mark-shot-selection-cursor-nudge-test
     tests/selection_cursor_nudge_test.cpp
     src/selection_cursor_nudge.cpp

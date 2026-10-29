@@ -16,4 +16,16 @@ ClipboardPublishPath chooseClipboardPublishPath(bool persistentOwnerAvailable,
     return ClipboardPublishPath::None;
 }
 
+ClipboardPublishPath chooseImageClipboardPublishPath(bool persistentOwnerAvailable,
+                                                     bool qtClipboardAvailable,
+                                                     bool longLivedProcess)
+{
+    // 1. 常驻进程自己持有选择，才能同时声明 image/png 与 image/bmp
+    if (longLivedProcess && qtClipboardAvailable) {
+        return ClipboardPublishPath::QtClipboard;
+    }
+    // 2. 单次进程沿用文字与链接的发布规则
+    return chooseClipboardPublishPath(persistentOwnerAvailable, qtClipboardAvailable);
+}
+
 }  // namespace markshot

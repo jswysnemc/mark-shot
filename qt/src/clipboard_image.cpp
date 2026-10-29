@@ -1,6 +1,7 @@
 #include "clipboard_image.h"
 
 #include "clipboard_image_config.h"
+#include "clipboard_image_mime_data.h"
 #include "clipboard_publish_policy.h"
 
 #include <QApplication>
@@ -19,6 +20,9 @@
 
 namespace markshot {
 namespace {
+
+/// @brief 当前进程是否会在截图窗口关闭后继续运行（托盘模式）。
+bool g_clipboardOwnershipLongLived = false;
 
 enum class ClipboardBackend {
     None,
@@ -228,6 +232,64 @@ bool copyToPersistentClipboardOwner(const QByteArray &payload, const QString &su
 #endif
 }
 
+#if !defined(Q_OS_WIN) && !defined(Q_OS_MACOS)
+/**
+ * 【剪贴板】【退出转交】进程退出前把仍由本进程持有的图片交给 wl-copy / xclip。
+ *
+ * 托盘进程退出后 Qt 持有的选择随之消失，转交后剪贴板里仍保留 PNG。
+ * @return 无返回值。
+ */
+void handOffClipboardImageBeforeQuit()
+{
+    QClipboard *clipboard = QApplication::clipboard();
+    if (!clipboard || !clipboard->ownsClipboard()) {
+        return;
+    }
+    const auto *data = qobject_cast<const ClipboardImageMimeData *>(clipboard->mimeData());
+    const std::optional<ClipboardOwnerCommand> owner =
+        clipboardOwnerCommand(ClipboardPayload::ImagePng);
+    if (!data || !owner.has_value()) {
+        return;
+    }
+    copyToPersistentClipboardOwner(data->png(), QStringLiteral(".png"), *owner);
+}
+
+/**
+ * 【剪贴板】【退出转交】首次由本进程持有图片时登记退出前的转交。
+ * @return 无返回值。
+ */
+void ensureClipboardQuitHandoff()
+{
+    static bool connected = false;
+    if (connected || !QCoreApplication::instance()) {
+        return;
+    }
+    connected = true;
+    QObject::connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit,
+                     &handOffClipboardImageBeforeQuit);
+}
+#endif
+
+/**
+ * 【剪贴板】【多格式图片】通过 QClipboard 发布图片。
+ * @param clipboard Qt 剪贴板。
+ * @param image 原始图片，Windows 与 macOS 由平台插件转换为系统位图。
+ * @param png 图片的 PNG 编码字节，Linux 只保存这一份数据。
+ * @return 无返回值。
+ */
+void publishImageWithQtClipboard(QClipboard *clipboard, const QImage &image, const QByteArray &png)
+{
+#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+    Q_UNUSED(png);
+    clipboard->setImage(image);
+#else
+    // 1. 同时声明 image/png 与 image/bmp，BMP 在被请求时再转换
+    Q_UNUSED(image);
+    clipboard->setMimeData(new ClipboardImageMimeData(png));
+    ensureClipboardQuitHandoff();
+#endif
+}
+
 /// @brief Copies an image and its PNG byte array representation to the system clipboard and persistent owner.
 /// @param image The QImage to be set on the system clipboard.
 /// @param png The encoded PNG byte data to be saved to the persistent clipboard owner.
@@ -237,11 +299,12 @@ bool copyImageDataToClipboard(const QImage &image, const QByteArray &png)
     QClipboard *clipboard = QApplication::clipboard();
     const std::optional<ClipboardOwnerCommand> owner =
         clipboardOwnerCommand(ClipboardPayload::ImagePng);
-    switch (chooseClipboardPublishPath(owner.has_value(), clipboard != nullptr)) {
+    switch (chooseImageClipboardPublishPath(owner.has_value(), clipboard != nullptr,
+                                            g_clipboardOwnershipLongLived)) {
     case ClipboardPublishPath::PersistentOwner:
         return copyToPersistentClipboardOwner(png, QStringLiteral(".png"), *owner);
     case ClipboardPublishPath::QtClipboard:
-        clipboard->setImage(image);
+        publishImageWithQtClipboard(clipboard, image, png);
         return true;
     case ClipboardPublishPath::None:
         break;
@@ -286,6 +349,11 @@ bool copyImageUrlToClipboard(const QByteArray &png)
 }
 
 } // namespace
+
+void setClipboardOwnershipLongLived(bool longLived)
+{
+    g_clipboardOwnershipLongLived = longLived;
+}
 
 bool copyTextToClipboard(const QString &text)
 {

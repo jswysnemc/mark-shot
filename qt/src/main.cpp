@@ -9,6 +9,7 @@
 #include "capture_delay/capture_delay_option.h"
 #include "capture_delay/capture_delay_scheduler.h"
 #include "cli/recording_cli.h"
+#include "clipboard_image.h"
 #include "debug_log.h"
 #include "screen_capture_portal_guard.h"
 #include "ipc/single_instance_ipc.h"
@@ -550,6 +551,8 @@ int main(int argc, char *argv[])
         });
 
     if (trayMode) {
+        // 【剪贴板】【常驻持有】托盘进程常驻，图片由本进程持有以同时提供 PNG 与 BMP
+        markshot::setClipboardOwnershipLongLived(true);
         auto *trayController = new markshot::WindowsTrayController(&app, trayConfig, &app);
         trayController->setCaptureCallbacks([launchCapture, allOutputs] { launchCapture(false, allOutputs); },
                                             [launchCapture, allOutputs] { launchCapture(true, allOutputs); });

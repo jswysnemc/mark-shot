@@ -37,6 +37,22 @@ private slots:
         QCOMPARE(markshot::chooseClipboardPublishPath(false, false),
                  markshot::ClipboardPublishPath::None);
     }
+
+    /**
+     * 验证托盘常驻进程的图片改由 Qt 剪贴板持有，单次进程保持原有路径。
+     * @return 无返回值。
+     */
+    void longLivedProcessKeepsImageOwnership()
+    {
+        QCOMPARE(markshot::chooseImageClipboardPublishPath(true, true, true),
+                 markshot::ClipboardPublishPath::QtClipboard);
+        QCOMPARE(markshot::chooseImageClipboardPublishPath(true, true, false),
+                 markshot::ClipboardPublishPath::PersistentOwner);
+        QCOMPARE(markshot::chooseImageClipboardPublishPath(true, false, true),
+                 markshot::ClipboardPublishPath::PersistentOwner);
+        QCOMPARE(markshot::chooseImageClipboardPublishPath(false, false, true),
+                 markshot::ClipboardPublishPath::None);
+    }
 };
 
 QTEST_APPLESS_MAIN(ClipboardPublishPolicyTest)
