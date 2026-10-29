@@ -33,6 +33,8 @@ struct PluginIndexAsset {
     QString downloadUrl;
     QString sha256;
     qint64 size = 0;
+    /// 构建插件时使用的 Qt 版本；为空表示未声明，按兼容处理
+    QString qtVersion;
 };
 
 struct PluginIndexEntry {
@@ -92,6 +94,15 @@ PluginIndexParseResult parsePluginIndexDocument(const QJsonDocument &document);
 QString currentPlatformKey();
 
 /**
+ * 把 CPU 架构名称标准化为插件索引使用的架构标识。
+ *
+ * `amd64` 归一为 `x86_64`，`arm64` 归一为 `aarch64`，其余名称只转为小写。
+ * @param architecture 原始架构名称。
+ * @return 标准化后的架构标识。
+ */
+QString normalizeArchitectureKey(const QString &architecture);
+
+/**
  * 读取当前 CPU 架构在插件索引中的架构标识。
  * @return 标准化后的架构标识。
  */
@@ -99,9 +110,20 @@ QString currentArchitectureKey();
 
 /**
  * 筛选当前平台可安装的插件资产。
+ *
+ * 除平台与架构外，还按资产声明的 qtVersion 排除当前 Qt 无法加载的动态库。
  * @param entry 插件索引条目。
  * @return 当前平台匹配的资产列表。
  */
 QVector<PluginIndexAsset> assetsForCurrentPlatform(const PluginIndexEntry &entry);
+
+/**
+ * 按指定运行时 Qt 版本筛选当前平台可安装的插件资产。
+ * @param entry 插件索引条目。
+ * @param runtimeQtVersion 运行时 Qt 版本。
+ * @return 平台、架构与 Qt 版本均兼容的资产列表。
+ */
+QVector<PluginIndexAsset> assetsForCurrentPlatform(const PluginIndexEntry &entry,
+                                                   const QString &runtimeQtVersion);
 
 }  // namespace markshot::marketplace

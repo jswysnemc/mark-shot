@@ -2,6 +2,8 @@ qt_add_executable(mark-shot-plugin-index-parser-test
     tests/plugin_index_parser_test.cpp
     src/marketplace/plugin_index_parser.cpp
     src/marketplace/plugin_index_parser.h
+    src/marketplace/plugin_qt_compat.cpp
+    src/marketplace/plugin_qt_compat.h
 )
 target_include_directories(mark-shot-plugin-index-parser-test PRIVATE src)
 target_compile_definitions(mark-shot-plugin-index-parser-test

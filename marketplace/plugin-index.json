@@ -26,7 +26,8 @@
                     "libraryFileName": "libmark-shot-ocr-rapid.so",
                     "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.61/mark-shot-plugin-ocr-rapid-v0.1.61-linux-x86_64.so",
                     "sha256": "c29a800b254166a74f2f8ba7037962af9fd5ee24be47f5822b09d37db6e1e136",
-                    "size": 148536
+                    "size": 148536,
+                    "qtVersion": "6.12.0"
                 },
                 {
                     "platform": "windows",
@@ -63,7 +64,8 @@
                     "libraryFileName": "libmark-shot-code-scan-zxing.so",
                     "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.61/mark-shot-plugin-code-scan-zxing-v0.1.61-linux-x86_64.so",
                     "sha256": "dd5131d98372f70df6413b9d6d8046daec021491eb9074d7d01dfa1924005e47",
-                    "size": 45224
+                    "size": 45224,
+                    "qtVersion": "6.12.0"
                 },
                 {
                     "platform": "windows",
@@ -100,16 +102,18 @@
                     "libraryFileName": "libmark-shot-translate-openai.so",
                     "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.61/mark-shot-plugin-translate-openai-v0.1.61-linux-x86_64.so",
                     "sha256": "615663349fafb6f4c57636766b55369448527726cfa79e96f24bfe424a326822",
-                    "size": 104464
+                    "size": 104464,
+                    "qtVersion": "6.12.0"
                 },
                 {
                     "platform": "linux",
-                    "architecture": "arm64",
+                    "architecture": "aarch64",
                     "fileName": "mark-shot-plugin-translate-openai-v0.1.61-linux-arm64.so",
                     "libraryFileName": "libmark-shot-translate-openai.so",
                     "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.61/mark-shot-plugin-translate-openai-v0.1.61-linux-arm64.so",
                     "sha256": "46388c088a451197cccac68236b6b71598e7ceefb9fa93bc1430bc4031e591f0",
-                    "size": 153264
+                    "size": 153264,
+                    "qtVersion": "6.4.2"
                 },
                 {
                     "platform": "windows",
@@ -146,16 +150,18 @@
                     "libraryFileName": "libmark-shot-translate-gemini.so",
                     "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.61/mark-shot-plugin-translate-gemini-v0.1.61-linux-x86_64.so",
                     "sha256": "27030582d8bf89343817207d144632ef40f27820ddec6785413d0c37b229e295",
-                    "size": 109256
+                    "size": 109256,
+                    "qtVersion": "6.12.0"
                 },
                 {
                     "platform": "linux",
-                    "architecture": "arm64",
+                    "architecture": "aarch64",
                     "fileName": "mark-shot-plugin-translate-gemini-v0.1.61-linux-arm64.so",
                     "libraryFileName": "libmark-shot-translate-gemini.so",
                     "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.61/mark-shot-plugin-translate-gemini-v0.1.61-linux-arm64.so",
                     "sha256": "edf112b84c516a884b60094a861d6ac941f003a0efb4b724be5623b0cbcf7c44",
-                    "size": 153800
+                    "size": 153800,
+                    "qtVersion": "6.4.2"
                 },
                 {
                     "platform": "windows",
@@ -192,16 +198,18 @@
                     "libraryFileName": "libmark-shot-translate-anthropic.so",
                     "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.61/mark-shot-plugin-translate-anthropic-v0.1.61-linux-x86_64.so",
                     "sha256": "9ab267e42bb0dad324a9453cb7be6ecbdbf1b363cdc489ef468aa074132bec8e",
-                    "size": 105544
+                    "size": 105544,
+                    "qtVersion": "6.12.0"
                 },
                 {
                     "platform": "linux",
-                    "architecture": "arm64",
+                    "architecture": "aarch64",
                     "fileName": "mark-shot-plugin-translate-anthropic-v0.1.61-linux-arm64.so",
                     "libraryFileName": "libmark-shot-translate-anthropic.so",
                     "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.61/mark-shot-plugin-translate-anthropic-v0.1.61-linux-arm64.so",
                     "sha256": "c21d5424fb639615e1be3e37d629049060b0254c48c112719b491319a4a204df",
-                    "size": 154080
+                    "size": 154080,
+                    "qtVersion": "6.4.2"
                 },
                 {
                     "platform": "windows",
@@ -238,16 +246,18 @@
                     "libraryFileName": "libmark-shot-translate-tencent.so",
                     "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.61/mark-shot-plugin-translate-tencent-v0.1.61-linux-x86_64.so",
                     "sha256": "dbf048d77af5de64b5990af013abf358535e3f0aae8c88e84e1799e1b53accce",
-                    "size": 183472
+                    "size": 183472,
+                    "qtVersion": "6.12.0"
                 },
                 {
                     "platform": "linux",
-                    "architecture": "arm64",
+                    "architecture": "aarch64",
                     "fileName": "mark-shot-plugin-translate-tencent-v0.1.61-linux-arm64.so",
                     "libraryFileName": "libmark-shot-translate-tencent.so",
                     "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.61/mark-shot-plugin-translate-tencent-v0.1.61-linux-arm64.so",
                     "sha256": "dc4ca6c37711d06585d64c198101c834eab133b1fa054dec5e89fdea4999dec8",
-                    "size": 159856
+                    "size": 159856,
+                    "qtVersion": "6.4.2"
                 },
                 {
                     "platform": "windows",
@@ -284,16 +294,18 @@
                     "libraryFileName": "libmark-shot-translate-baidu.so",
                     "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.61/mark-shot-plugin-translate-baidu-v0.1.61-linux-x86_64.so",
                     "sha256": "7fb7984bbb8f9a57b84ee4031aa1d235585a7d29f5f359a3f65ef8a382f9d345",
-                    "size": 170192
+                    "size": 170192,
+                    "qtVersion": "6.12.0"
                 },
                 {
                     "platform": "linux",
-                    "architecture": "arm64",
+                    "architecture": "aarch64",
                     "fileName": "mark-shot-plugin-translate-baidu-v0.1.61-linux-arm64.so",
                     "libraryFileName": "libmark-shot-translate-baidu.so",
                     "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.61/mark-shot-plugin-translate-baidu-v0.1.61-linux-arm64.so",
                     "sha256": "dd4355f5158a1d56b2ffe27a14196ff6dbaabdbebe82964fbffdd9c2aad36fd0",
-                    "size": 156040
+                    "size": 156040,
+                    "qtVersion": "6.4.2"
                 },
                 {
                     "platform": "windows",
@@ -330,16 +342,18 @@
                     "libraryFileName": "libmark-shot-translate-youdao.so",
                     "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.61/mark-shot-plugin-translate-youdao-v0.1.61-linux-x86_64.so",
                     "sha256": "edf3be3bea81ceedaa5dd520a0333a9dc27b7a339c36e97fa32b2b6173040aa4",
-                    "size": 170152
+                    "size": 170152,
+                    "qtVersion": "6.12.0"
                 },
                 {
                     "platform": "linux",
-                    "architecture": "arm64",
+                    "architecture": "aarch64",
                     "fileName": "mark-shot-plugin-translate-youdao-v0.1.61-linux-arm64.so",
                     "libraryFileName": "libmark-shot-translate-youdao.so",
                     "downloadUrl": "https://github.com/jswysnemc/mark-shot/releases/download/v0.1.61/mark-shot-plugin-translate-youdao-v0.1.61-linux-arm64.so",
                     "sha256": "dafc8dabc63a0255c6ab4b43eea5cffc35bc16ea2f6d722680634ae772b4cc5f",
-                    "size": 156032
+                    "size": 156032,
+                    "qtVersion": "6.4.2"
                 },
                 {
                     "platform": "windows",

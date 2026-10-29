@@ -123,6 +123,10 @@ jobs:
             cp "$plugin" "plugin-assets/$asset"
             (cd plugin-assets && sha256sum "$asset" > "$asset.sha256")
           done
+          # 插件市场索引的 qtVersion 取自这里；运行时 Qt 次版本低于该值的发行版无法加载这些插件
+          qt_version="$(pkg-config --modversion Qt6Core)"
+          echo "Linux x86_64 plugins were built with Qt $qt_version"
+          echo "Linux x86_64 plugin assets: qtVersion=$qt_version" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload binaries to release
         if: github.event_name == 'release' || github.event_name == 'push' || inputs.upload_to_release
@@ -241,6 +245,10 @@ jobs:
             cp "$plugin" "plugin-assets/$asset"
             (cd plugin-assets && sha256sum "$asset" > "$asset.sha256")
           done
+          # 插件市场索引的 qtVersion 取自这里；运行时 Qt 次版本低于该值的发行版无法加载这些插件
+          qt_version="$(pkg-config --modversion Qt6Core)"
+          echo "Linux arm64 plugins were built with Qt $qt_version"
+          echo "Linux arm64 plugin assets: qtVersion=$qt_version" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload binaries to release
         if: github.event_name == 'release' || github.event_name == 'push' || inputs.upload_to_release

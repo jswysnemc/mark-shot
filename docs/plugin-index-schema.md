@@ -90,12 +90,18 @@
 | 字段 | 必填 | 说明 |
 |---|---:|---|
 | `platform` | 是 | `windows`、`linux`、`macos` |
-| `architecture` | 是 | 推荐 `x86_64` 或 `aarch64` |
+| `architecture` | 是 | 推荐 `x86_64` 或 `aarch64`。客户端把 `amd64` 视为 `x86_64`、`arm64` 视为 `aarch64`，但 0.1.61 及更早的客户端只认 `x86_64` 和 `aarch64` |
 | `fileName` | 是 | Release 资产文件名，也是默认安装文件名 |
 | `libraryFileName` | 否 | 资产名和安装库名不一致时使用 |
 | `downloadUrl` | 是 | GitHub Release 资产 HTTPS URL |
 | `sha256` | 是 | 资产 SHA-256 摘要 |
 | `size` | 是 | 资产字节数 |
+| `qtVersion` | 否 | 构建插件时使用的 Qt 版本，例如 `6.12.0`。运行时 Qt 主版本不同，或次版本低于该值时，客户端不提供此资产 |
+
+Qt 插件只能被主版本相同、次版本不低于构建版本的 Qt 加载。Linux 资产通常在 Arch 容器中
+使用较新的 Qt 构建，发布时应填写 `qtVersion`（CI 的 Step Summary 会输出该值），避免
+Fedora、Debian 等 Qt 较旧的发行版安装后出现“使用了不兼容的 Qt 库”。
+Linux arm64 资产在 Ubuntu 24.04 中构建，对应 Qt 6.4.2。
 
 当前市场一键安装只支持动态库资产：Windows `.dll`、Linux `.so`、macOS `.dylib`。
 

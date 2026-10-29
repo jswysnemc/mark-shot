@@ -1,5 +1,7 @@
 #include "marketplace/plugin_index_parser.h"
 
+#include "marketplace/plugin_qt_compat.h"
+
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonParseError>
@@ -211,6 +213,7 @@ PluginIndexAsset parseAsset(const QJsonObject &object, const QString &path, Plug
     asset.libraryFileName = optionalString(object, QStringLiteral("libraryFileName"));
     asset.downloadUrl = requiredString(object, QStringLiteral("downloadUrl"), path, result);
     asset.sha256 = requiredString(object, QStringLiteral("sha256"), path, result).toLower();
+    asset.qtVersion = optionalString(object, QStringLiteral("qtVersion")).trimmed();
 
     const QJsonValue sizeValue = object.value(QStringLiteral("size"));
     if (!sizeValue.isDouble() || sizeValue.toDouble() <= 0) {
@@ -243,6 +246,11 @@ PluginIndexAsset parseAsset(const QJsonObject &object, const QString &path, Plug
         addError(result,
                  QStringLiteral("%1.sha256").arg(path),
                  QStringLiteral("must be a SHA-256 hex digest"));
+    }
+    if (!asset.qtVersion.isEmpty() && !isValidPluginQtVersion(asset.qtVersion)) {
+        addError(result,
+                 QStringLiteral("%1.qtVersion").arg(path),
+                 QStringLiteral("must be a Qt version such as 6.12.0"));
     }
     return asset;
 }
@@ -394,9 +402,9 @@ QString currentPlatformKey()
 #endif
 }
 
-QString currentArchitectureKey()
+QString normalizeArchitectureKey(const QString &architecture)
 {
-    const QString arch = QSysInfo::currentCpuArchitecture().toLower();
+    const QString arch = architecture.trimmed().toLower();
     if (arch == QStringLiteral("amd64") || arch == QStringLiteral("x86_64")) {
         return QStringLiteral("x86_64");
     }
@@ -406,13 +414,29 @@ QString currentArchitectureKey()
     return arch;
 }
 
+QString currentArchitectureKey()
+{
+    return normalizeArchitectureKey(QSysInfo::currentCpuArchitecture());
+}
+
 QVector<PluginIndexAsset> assetsForCurrentPlatform(const PluginIndexEntry &entry)
+{
+    return assetsForCurrentPlatform(entry, QString::fromLatin1(qVersion()));
+}
+
+QVector<PluginIndexAsset> assetsForCurrentPlatform(const PluginIndexEntry &entry,
+                                                   const QString &runtimeQtVersion)
 {
     QVector<PluginIndexAsset> assets;
     const QString platform = currentPlatformKey();
     const QString architecture = currentArchitectureKey();
     for (const PluginIndexAsset &asset : entry.assets) {
-        if (asset.platform == platform && asset.architecture == architecture) {
+        // 1. 【插件市场】【架构匹配】索引里的 arm64、amd64 等别名与客户端标识按同一规则归一后再比较
+        if (asset.platform != platform || normalizeArchitectureKey(asset.architecture) != architecture) {
+            continue;
+        }
+        // 2. 【插件市场】【Qt兼容】构建 Qt 高于运行时的动态库装上也无法加载，直接不提供
+        if (pluginQtVersionCompatible(asset.qtVersion, runtimeQtVersion)) {
             assets.append(asset);
         }
     }
