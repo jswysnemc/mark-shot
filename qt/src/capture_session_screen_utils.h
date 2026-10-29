@@ -59,6 +59,19 @@ bool shouldFreezeAllScreens(bool allOutputs,
                             int screenCount);
 
 /**
+ * 【截图会话】【窗口放置】判断跨屏冻结覆盖层是否需要绕过窗口管理器。
+ * 原生 X11 窗口管理器（如 Muffin、Mutter）会把非全屏的普通窗口约束到扣除面板 strut 后的工作区，
+ * 跨越整个虚拟桌面的覆盖层因此被下移或缩小，冻结画面与实时面板同时可见（issue #148）。
+ * @param nativeX11Session 当前是否为原生 X11 会话（非 XWayland）。
+ * @param spansAllOutputs 覆盖层是否以单个窗口跨越整个虚拟桌面。
+ * @param useRegularWindow 是否通过 --xdg-window 显式要求普通窗口。
+ * @return 需要设置 Qt::X11BypassWindowManagerHint 时返回 true。
+ */
+bool shouldBypassWindowManagerForSpanningOverlay(bool nativeX11Session,
+                                                 bool spansAllOutputs,
+                                                 bool useRegularWindow);
+
+/**
  * 记录截图会话中的屏幕缩放诊断信息。
  * @param screens 当前屏幕列表。
  * @return 无返回值。

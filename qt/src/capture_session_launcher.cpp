@@ -30,12 +30,12 @@ namespace {
 
 using markshot::capture_session::CapturedScreenFrame;
 
-/// @brief 根据已经捕获的图像创建并显示截图窗口。
+/// @brief 根据已经捕获的图像创建并显示截图窗口；原生 X11 的跨屏窗口绕过窗口管理器放置。
 /// @param screen 要显示窗口的屏幕。
 /// @param image 截图图像。
 /// @param outputName 输出名称。
 /// @param sourceGeometry 图像对应的全局逻辑几何。
-/// @param windowGeometries 窗口检测得到的边界列表。
+/// @param windowInfos 窗口检测得到的窗口信息列表。
 /// @param detectWindows 是否启用窗口检测。
 /// @param allOutputs 是否显示为跨屏窗口。
 /// @param useRegularWindow 是否使用普通窗口。
@@ -68,6 +68,8 @@ ShotWindow *showCapturedWindow(QScreen *screen,
     }
 
     const bool layerShellReady = !allOutputs && !useRegularWindow && window->configureLayerShell(screen);
+    const bool bypassWindowManager = markshot::capture_session::shouldBypassWindowManagerForSpanningOverlay(
+        markshot::windows::isNativeX11Session(), allOutputs, useRegularWindow);
     if (layerShellReady) {
         window->show();
     } else {
@@ -78,6 +80,10 @@ ShotWindow *showCapturedWindow(QScreen *screen,
         markshot::debugLog("capture-session",
                            "layer-shell unavailable; using xdg window fallback "
                            "(tiling compositors may reflow other windows)");
+        // 1. 【截图会话】【窗口放置】跨屏窗口无法使用单屏全屏状态，Muffin 等会把普通窗口推出面板 strut，改为 override-redirect 精确覆盖虚拟桌面
+        if (bypassWindowManager) {
+            window->setWindowFlag(Qt::X11BypassWindowManagerHint, true);
+        }
         if (sourceGeometry.isValid() && !sourceGeometry.isEmpty()) {
             window->setGeometry(sourceGeometry);
         }
@@ -93,13 +99,14 @@ ShotWindow *showCapturedWindow(QScreen *screen,
     QScreen *actualScreen = window->windowHandle() ? window->windowHandle()->screen() : window->screen();
     markshot::debugLog("capture-session",
                        "【截图会话】【窗口放置】target=%s target_dpr=%.3f target_geom=%d,%d %dx%d "
-                           "image=%dx%d layer_shell=%d actual=%s actual_dpr=%.3f",
+                           "image=%dx%d layer_shell=%d bypass_wm=%d actual=%s actual_dpr=%.3f",
                        screen ? screen->name().toUtf8().constData() : "(none)",
                        screen ? screen->devicePixelRatio() : 0.0,
                        sourceGeometry.x(), sourceGeometry.y(),
                        sourceGeometry.width(), sourceGeometry.height(),
                        imageSize.width(), imageSize.height(),
                        layerShellReady ? 1 : 0,
+                       bypassWindowManager ? 1 : 0,
                        actualScreen ? actualScreen->name().toUtf8().constData() : "(none)",
                        actualScreen ? actualScreen->devicePixelRatio() : 0.0);
 

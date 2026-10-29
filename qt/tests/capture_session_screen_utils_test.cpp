@@ -41,6 +41,22 @@ private slots:
         QVERIFY(!shouldFreezeAllScreens(false, false, CaptureFreezeScope::CursorScreen, 2));
         QVERIFY(!shouldFreezeAllScreens(false, false, CaptureFreezeScope::AllScreens, 1));
     }
+
+    /**
+     * 【截图会话】【窗口放置】验证只有原生 X11 跨屏覆盖层绕过窗口管理器，避免被约束到工作区（issue #148）。
+     * @return 无返回值。
+     */
+    void nativeX11SpanningOverlayBypassesWindowManager()
+    {
+        using markshot::capture_session::shouldBypassWindowManagerForSpanningOverlay;
+
+        QVERIFY(shouldBypassWindowManagerForSpanningOverlay(true, true, false));
+        // 1. 单屏覆盖层通过 _NET_WM_STATE_FULLSCREEN 覆盖面板，继续交给窗口管理器
+        QVERIFY(!shouldBypassWindowManagerForSpanningOverlay(true, false, false));
+        // 2. XWayland、Windows 以及显式要求普通窗口时保持原有行为
+        QVERIFY(!shouldBypassWindowManagerForSpanningOverlay(false, true, false));
+        QVERIFY(!shouldBypassWindowManagerForSpanningOverlay(true, true, true));
+    }
 };
 
 QTEST_APPLESS_MAIN(CaptureSessionScreenUtilsTest)

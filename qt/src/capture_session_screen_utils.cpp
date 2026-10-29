@@ -68,6 +68,13 @@ bool shouldFreezeAllScreens(bool allOutputs,
         && screenCount > 1;
 }
 
+bool shouldBypassWindowManagerForSpanningOverlay(bool nativeX11Session,
+                                                 bool spansAllOutputs,
+                                                 bool useRegularWindow)
+{
+    return nativeX11Session && spansAllOutputs && !useRegularWindow;
+}
+
 void logCaptureSessionScreens(const QList<QScreen *> &screens)
 {
     int index = 0;
