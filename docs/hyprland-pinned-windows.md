@@ -46,6 +46,10 @@ cmake --build build --target mark-shot mark-shot-hyprland-virtual-pointer --para
 ctest --test-dir build -R '^hyprland-pinned-windows-' --output-on-failure --parallel 3
 ```
 
+NVIDIA 专有驱动无法为 Hyprland 的 HEADLESS 输出分配 GBM 缓冲，输出尺寸会停留在 0×0。
+多显卡机器上，脚本让 KWin 虚拟父显示使用第一个非 NVIDIA 渲染节点；也可以用
+`MARK_SHOT_HYPRLAND_TEST_RENDER_NODE=/dev/dri/renderD129` 指定节点。
+
 每档缩放执行 25 个行为检查：四向拖动采用 10 ms、1 ms 和 0 ms 额外间隔；
 另测单次跳移、同一次抓取中的斜向反转、左侧和顶部裁切及恢复、边框缩放、滚轮锚点，
 以及混合缩放跨屏往返。0 ms 输入仍逐次确认协议帧，不等待额外定时器。

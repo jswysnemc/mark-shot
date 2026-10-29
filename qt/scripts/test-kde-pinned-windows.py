@@ -42,8 +42,9 @@ def run_check(args, root):
     """在临时目录 root 内运行 args 指定的检查，返回退出码并保存验证日志。"""
     # 1. 【KDE测试】【会话隔离】所有写入和显示连接均使用本次创建的临时目录
     env = os.environ.copy()
+    # KWin 6.8 的虚拟后端不再支持 QPainter，强制合成模式会让合成器退出，窗口收不到帧回调
     for key in ("DISPLAY", "WAYLAND_DISPLAY", "WAYLAND_SOCKET", "NIRI_SOCKET", "SWAYSOCK",
-                "QT_PLUGIN_PATH", "QT_QPA_PLATFORM", "QT_WAYLAND_SHELL_INTEGRATION"):
+                "QT_PLUGIN_PATH", "QT_QPA_PLATFORM", "QT_WAYLAND_SHELL_INTEGRATION", "KWIN_COMPOSE"):
         env.pop(key, None)
     for key, folder in (("XDG_CONFIG_HOME", "config"), ("XDG_DATA_HOME", "data"),
                         ("XDG_CACHE_HOME", "cache"), ("XDG_RUNTIME_DIR", "runtime"), ("TMPDIR", "tmp")):
@@ -51,8 +52,9 @@ def run_check(args, root):
         path.mkdir(mode=0o700)
         env[key] = str(path)
     env.update(XDG_CURRENT_DESKTOP="KDE", XDG_SESSION_DESKTOP="KDE", DESKTOP_SESSION="plasma",
-               XDG_SESSION_TYPE="wayland", KWIN_COMPOSE="Q", QT_QPA_PLATFORMTHEME="generic",
+               XDG_SESSION_TYPE="wayland", QT_QPA_PLATFORMTHEME="generic",
                QT_STYLE_OVERRIDE="Fusion", QT_NO_XDG_DESKTOP_PORTAL="1",
+               GIO_USE_VFS="local", GVFS_DISABLE_FUSE="1",
                MARK_SHOT_KDE_TEST_RUNTIME=str(root), MARK_SHOT_KDE_TEST_LANGUAGE=args.language,
                MARK_SHOT_LANG=args.language)
     env.pop("MARK_SHOT_KDE_IDLE_CHECK", None)

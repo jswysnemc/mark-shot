@@ -26,12 +26,27 @@ def isolated_environment(root):
         path = root / folder
         path.mkdir(mode=0o700)
         env[key] = str(path)
+    # gvfs 会在运行目录挂载 FUSE，会话结束后残留的挂载点会让临时目录无法删除
+    env.update(GIO_USE_VFS="local", GVFS_DISABLE_FUSE="1")
     env.update(WLR_RENDERER_ALLOW_SOFTWARE="1", HYPRLAND_NO_SD_NOTIFY="1", HYPRLAND_NO_SD_VARS="1",
                XDG_SESSION_TYPE="wayland", XDG_CURRENT_DESKTOP="Hyprland",
                XDG_SESSION_DESKTOP="Hyprland", DESKTOP_SESSION="hyprland",
                QT_QPA_PLATFORMTHEME="generic", QT_STYLE_OVERRIDE="Fusion",
                QT_NO_XDG_DESKTOP_PORTAL="1", MARK_SHOT_HYPRLAND_TEST_RUNTIME=str(root / "r"))
     return env
+
+
+def parent_render_node():
+    """选择虚拟父显示使用的渲染节点，返回节点路径；没有可选节点时返回 None，交给 KWin 默认选择。"""
+    override = os.environ.get("MARK_SHOT_HYPRLAND_TEST_RENDER_NODE")
+    if override:
+        return override
+    # NVIDIA 专有驱动无法为 Hyprland 的 HEADLESS 输出分配 GBM 缓冲，多显卡时改用其他显卡
+    for node in sorted(Path("/dev/dri").glob("renderD*")):
+        driver = Path("/sys/class/drm") / node.name / "device/driver"
+        if driver.exists() and driver.resolve().name != "nvidia":
+            return str(node)
+    return None
 
 
 def stop_process_group(process):
@@ -165,6 +180,9 @@ class HyprlandTestSession:
 
         # 1. 【Hyprland测试】【显示隔离】虚拟 KWin 提供 allocator，不连接用户的桌面或输入设备
         parent_env = dict(self.env, KWIN_COMPOSE="O2")
+        render_node = parent_render_node()
+        if render_node:
+            parent_env["KWIN_RENDER_NODES"] = render_node
         self.spawn("parent", [self.args.kwin, "--virtual", "--socket", "kwin-test", "--width", "1280",
                               "--height", "900", "--no-lockscreen", "--no-global-shortcuts",
                               "--no-kactivities"], parent_env)
@@ -198,6 +216,9 @@ class HyprlandTestSession:
         self.control("keyword", "monitor", f"{monitor['name']},2880x1800@120,0x0,{self.args.scale}")
         time.sleep(0.3)
         self.monitor = next(m for m in self.query("monitors") if m["name"] == monitor["name"])
+        if not self.monitor["width"] or not self.monitor["height"]:
+            raise RuntimeError("Hyprland could not allocate the headless output; set "
+                               "MARK_SHOT_HYPRLAND_TEST_RENDER_NODE to a render node with GBM support")
         if abs(self.monitor["scale"] - self.args.scale) > 0.01:
             raise RuntimeError("The compositor did not apply the requested output scale")
         self.control("dispatch", "movecursor", "700 450")

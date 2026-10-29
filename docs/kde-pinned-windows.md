@@ -57,6 +57,10 @@ cmake --build build --target mark-shot-kde-pinned-windows-test mark-shot-pinned-
 ctest --test-dir build -R '^(pinned-kde-keep-above|kde-pinned-windows-)' --output-on-failure -j 3
 ```
 
+测试会话不设置 `KWIN_COMPOSE`，由 KWin 自行选择合成方式。KWin 6.8 的虚拟后端不再支持 QPainter，
+强制 `KWIN_COMPOSE=Q` 时合成器初始化失败，窗口收不到帧回调，Qt 不再提交新尺寸，XWayland 也会因
+dmabuf 导入失败断开。
+
 每次检查创建独立显示服务、会话总线和临时配置，结束时回收测试进程。运行日志及环境记录保存在 `build/kde-test-results/`。
 
 本轮完整执行 `QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure -j 6`，82 项全部通过。其中三项 KWin 集成检查的结果如下：

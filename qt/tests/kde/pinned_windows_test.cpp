@@ -74,6 +74,29 @@ QJsonObject expectAbove(KWinScriptProbe &probe, int width, bool expected, const 
     return {};
 }
 
+/// @brief 等待 KWin 确认窗口的实际高度，XWayland 窗口的尺寸变更需要额外一次往返
+/// @param probe 状态探针
+/// @param width 待观察窗口的宽度
+/// @param height 预期窗口高度
+/// @param label 检查名称
+/// @return 无返回值，超时后抛出异常
+void expectHeight(KWinScriptProbe &probe, int width, int height, const char *label)
+{
+    QElapsedTimer timer;
+    timer.start();
+    QJsonObject window;
+    do {
+        QTest::qWait(20);
+        window = windowWithWidth(probe.snapshot(), width);
+        if (qAbs(window.value(QStringLiteral("height")).toDouble() - height) < 0.75) {
+            require(true, label);
+            return;
+        }
+    } while (timer.elapsed() < 3000);
+    std::fprintf(stderr, "Observed: %s\n", QJsonDocument(window).toJson(QJsonDocument::Compact).constData());
+    require(false, label);
+}
+
 /// @brief 创建使用正式置顶入口的无边框窗口
 /// @param title 原始应用标题
 /// @param width 独立测试宽度
@@ -190,9 +213,7 @@ void checkWindows(KWinScriptProbe &probe)
     expectAbove(probe, 410, false, "rapid toggles preserve the final requested state");
     expectAbove(probe, 470, true, "rapid toggles preserve sibling top state");
     first->resize(410, 360);
-    QTest::qWait(100);
-    require(qAbs(windowWithWidth(probe.snapshot(), 410).value(QStringLiteral("height")).toDouble() - 360) < 0.75,
-            "normal KDE window remains resizable");
+    expectHeight(probe, 410, 360, "normal KDE window remains resizable");
 
     // 4. 【KDE测试】【进程隔离】相同标题来自其他进程时不修改其层级
     QProcess foreign;
