@@ -1,6 +1,8 @@
 #include "shot_window.h"
 #include "support/isolated_config.h"
 #include "text_annotation_layout.h"
+#include "shot_window_internal.h"
+#include "text_editor_box_layout.h"
 
 #include <QApplication>
 #include <QInputMethodEvent>
@@ -287,7 +289,7 @@ private slots:
         QTest::newRow("cjk") << QStringLiteral("输入文字测试");
     }
 
-    /** 验证输入时编辑器从光标宽度起逐字加宽，行尾光标右侧始终留有间隙，无参数和返回值。 */
+    /** 验证输入时输入框逐字加宽，行尾光标右侧始终留有间隙，无参数和返回值。 */
     void editorGrowsWithEachCharacter()
     {
         QFETCH(QString, text);
@@ -313,6 +315,105 @@ private slots:
             previousWidth = editor->width();
         }
         QVERIFY(!documentWrapped(editor->document()));
+    }
+
+    /** 提供屏幕与图像同尺寸、HiDPI 半尺寸两种缩放，无参数和返回值。 */
+    void editorBoxMatchesCommittedBox_data()
+    {
+        QTest::addColumn<int>("imageScale");
+        QTest::newRow("1x") << 1;
+        QTest::newRow("hidpi") << 2;
+    }
+
+    /** 验证输入框与提交后的背景框重合，提交和再编辑时框与文字都不跳动，无参数和返回值。 */
+    void editorBoxMatchesCommittedBox()
+    {
+        QFETCH(int, imageScale);
+        auto window = createTextWindow(imageScale);
+        QVERIFY(window);
+        clickAt(*window, QPoint(150, 150));
+        QTextEdit *editor = window->m_textEditor;
+        editor->insertPlainText(QStringLiteral("Hello"));
+        const QRect editingBox = editor->geometry();
+        const QPoint editingText = editingBox.topLeft() + editor->viewport()->geometry().topLeft();
+
+        // 1. 提交后的背景框与输入框位置尺寸一致，文字左上角也一致
+        window->commitTextEditor();
+        QCOMPARE(window->m_annotations.size(), 1);
+        const markshot::shot::types::Annotation committed = window->m_annotations.first();
+        const QRectF committedBox = window->textContentRect(committed, true);
+        const qreal scale = window->annotationSizeScale(true);
+        const QPointF committedText = committedBox.topLeft()
+            + QPointF(markshot::shot::kTextBackgroundPaddingX, markshot::shot::kTextBackgroundPaddingY) * scale;
+        const QString detail = QStringLiteral("editing %1,%2 %3x%4 committed %5,%6 %7x%8")
+                                   .arg(editingBox.x()).arg(editingBox.y())
+                                   .arg(editingBox.width()).arg(editingBox.height())
+                                   .arg(committedBox.x()).arg(committedBox.y())
+                                   .arg(committedBox.width()).arg(committedBox.height());
+        QVERIFY2(std::abs(committedBox.left() - editingBox.left()) <= 0.5, qPrintable(detail));
+        QVERIFY2(std::abs(committedBox.top() - editingBox.top()) <= 0.5, qPrintable(detail));
+        QVERIFY2(std::abs(committedBox.width() - editingBox.width()) <= 2.0, qPrintable(detail));
+        QVERIFY2(std::abs(committedBox.height() - editingBox.height()) <= 2.0, qPrintable(detail));
+        QVERIFY(std::abs(committedText.x() - editingText.x()) <= 1.0);
+        QVERIFY(std::abs(committedText.y() - editingText.y()) <= 1.0);
+
+        // 2. 点进已有文字再编辑，输入框回到同一个背景框上
+        clickAt(*window, committedBox.center().toPoint());
+        QVERIFY(window->m_editingTextAnnotationId.has_value());
+        QCOMPARE(editor->geometry().topLeft(), editingBox.topLeft());
+        QVERIFY(std::abs(editor->width() - editingBox.width()) <= 1);
+    }
+
+    /** 验证按在输入框内边距上只移动光标，输入框保持打开且不提交，无参数和返回值。 */
+    void paddingClickKeepsEditorOpen()
+    {
+        auto window = createTextWindow();
+        QVERIFY(window);
+        clickAt(*window, QPoint(150, 150));
+        QTextEdit *editor = window->m_textEditor;
+        editor->insertPlainText(QStringLiteral("Hello"));
+        QVERIFY(editor->viewport()->geometry().left() > 1);
+        QTest::mouseClick(editor, Qt::LeftButton, Qt::NoModifier, QPoint(1, editor->height() / 2));
+        QVERIFY(editor->isVisible());
+        QVERIFY(window->m_annotations.isEmpty());
+        QCOMPARE(editor->textCursor().position(), 0);
+    }
+
+    /** 验证输入框背景由窗口画在编辑器下方，内边距区域也显示文字背景色，无参数和返回值。 */
+    void editorBoxPaintsTextBackground()
+    {
+        auto window = createTextWindow();
+        QVERIFY(window);
+        window->m_textBackgroundColor = QColor(200, 30, 30);
+        clickAt(*window, QPoint(150, 150));
+        QTextEdit *editor = window->m_textEditor;
+        editor->insertPlainText(QStringLiteral("Hello"));
+        const QPoint padding = editor->geometry().topLeft()
+            + QPoint(editor->viewport()->geometry().left() / 2 + 1, editor->height() / 2);
+        const QImage frame = window->grab().toImage();
+        QCOMPARE(frame.pixelColor(padding * frame.devicePixelRatio()).rgb(), QColor(200, 30, 30).rgb());
+    }
+
+    /** 验证靠近选区右下角新建文字时输入框向选区内回移，不越出选区，无参数和返回值。 */
+    void editorBoxShiftsInsideSelectionNearEdge()
+    {
+        // 1. 纯函数：放得下时从点击处开始，放不下时回移且不越过选区左上边界
+        const QRect selection(100, 100, 400, 300);
+        using markshot::shot::newTextEditorBoxTopLeft;
+        QCOMPARE(newTextEditorBoxTopLeft(QPoint(150, 150), selection, QSize(80, 40)), QPoint(150, 150));
+        QCOMPARE(newTextEditorBoxTopLeft(QPoint(490, 395), selection, QSize(80, 40)), QPoint(420, 360));
+        QCOMPARE(newTextEditorBoxTopLeft(QPoint(120, 120), QRect(100, 100, 50, 20), QSize(80, 40)),
+                 QPoint(100, 100));
+
+        // 2. 真实窗口：右下角点击后输入框仍在选区内
+        auto window = createTextWindow();
+        QVERIFY(window);
+        clickAt(*window, QPoint(490, 390));
+        QTextEdit *editor = window->m_textEditor;
+        QVERIFY(editor->isVisible());
+        editor->insertPlainText(QStringLiteral("Hi"));
+        QVERIFY(editor->geometry().right() < kSelection.x() + kSelection.width());
+        QVERIFY(editor->geometry().bottom() < kSelection.y() + kSelection.height());
     }
 
     /** 验证输入法预编辑文字同样撑开编辑器，预编辑光标留在框内，无参数和返回值。 */

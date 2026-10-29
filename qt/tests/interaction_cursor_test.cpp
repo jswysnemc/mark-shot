@@ -102,6 +102,28 @@ private slots:
         QCOMPARE(handle.cursor().shape(), Qt::OpenHandCursor);
     }
 
+    /// @brief 验证标记了内边距输入范围的文本编辑器整框显示插入光标，禁用后恢复箭头
+    /// @return 无返回值
+    void textCursorCoversMarkedEditorPadding()
+    {
+        // 1. 普通文本编辑器的边框区域仍是箭头，标记后整框都是插入光标
+        QWidget window;
+        auto *layout = new QVBoxLayout(&window);
+        auto *plain = new QTextEdit(&window);
+        auto *inlineEditor = new QTextEdit(&window);
+        inlineEditor->setProperty("textCursorInPadding", true);
+        layout->addWidget(plain);
+        layout->addWidget(inlineEditor);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+        QCOMPARE(plain->cursor().shape(), Qt::ArrowCursor);
+        QCOMPARE(inlineEditor->cursor().shape(), Qt::IBeamCursor);
+        QCOMPARE(inlineEditor->viewport()->cursor().shape(), Qt::IBeamCursor);
+        // 2. 禁用后与其他控件一致显示箭头
+        inlineEditor->setEnabled(false);
+        QCOMPARE(inlineEditor->cursor().shape(), Qt::ArrowCursor);
+    }
+
     /// @brief 验证标签页和导航列表仅在可操作项目上显示手型
     /// @return 无返回值
     void distinguishesActiveItemsFromEmptySpace()

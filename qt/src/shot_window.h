@@ -718,10 +718,10 @@ private:
     void handleTextToolPress(QPointF imagePoint, bool committedEditor);
     bool textToolAcceptsPoint(QPointF imagePoint) const;
     bool handleTextEditorActionShortcut(QObject *watched, QEvent *event);
-    bool handleSnowTextEditorKeyIfEnabled(QObject *watched, QEvent *event);
+    bool handleSnowTextEditorEventIfEnabled(QObject *watched, QEvent *event);
     void connectSnowTextEditorGeometryIfEnabled();
     void applySnowTextEditorChromeIfEnabled();
-    void applySnowTextEditorGeometryIfEnabled();
+    bool applySnowTextEditorGeometryIfEnabled();
     void applyEditorDisplayFontIfEnabled();
     void copyEditorFontToAnnotationIfEnabled(Annotation &annotation);
     bool selectLatestDrawnAnnotationForWheel();

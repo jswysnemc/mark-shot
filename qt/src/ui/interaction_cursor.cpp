@@ -74,7 +74,9 @@ protected:
         } else if (qobject_cast<QLineEdit *>(widget)) {
             widget->setCursor(widget->isEnabled() ? Qt::IBeamCursor : Qt::ArrowCursor);
         } else if (auto *edit = qobject_cast<QTextEdit *>(widget)) {
-            widget->setCursor(Qt::ArrowCursor);
+            // 内联输入框的内边距也属于输入范围，由 textCursorInPadding 标记后同样显示插入光标
+            const bool paddingIsText = edit->property("textCursorInPadding").toBool() && edit->isEnabled();
+            widget->setCursor(paddingIsText ? Qt::IBeamCursor : Qt::ArrowCursor);
             edit->viewport()->setCursor(edit->isEnabled() ? Qt::IBeamCursor : Qt::ArrowCursor);
         } else if (auto *edit = qobject_cast<QPlainTextEdit *>(widget)) {
             widget->setCursor(Qt::ArrowCursor);

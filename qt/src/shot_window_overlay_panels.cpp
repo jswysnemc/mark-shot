@@ -87,6 +87,10 @@ void ShotWindow::updateTextEditorGeometry()
     if (!m_textEditor || !m_textEditor->isVisible()) {
         return;
     }
+    // 1. 【标注】【文字编辑】snow 输入框按文字内容摆放，不再使用固定尺寸的旧输入框
+    if (applySnowTextEditorGeometryIfEnabled()) {
+        return;
+    }
     auto keepEditorInsideWindow = [this](QRect editorRect) {
         const int minLeft = 8;
         const int minTop = 8;
@@ -126,7 +130,6 @@ void ShotWindow::updateTextEditorGeometry()
     }
     m_textEditor->setGeometry(keepEditorInsideWindow(QRect(editorTopLeft, QSize(editorWidth, editorHeight))));
     m_textEditor->ensureCursorVisible();
-    applySnowTextEditorGeometryIfEnabled();
 }
 
 /// @brief 根据当前工具和窗口状态刷新工具栏按钮选中态

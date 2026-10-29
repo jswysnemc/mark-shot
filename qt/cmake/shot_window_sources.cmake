@@ -84,6 +84,10 @@ set(MARK_SHOT_WINDOW_SOURCES
     src/shot_window_text_tool_input.cpp
     src/text_annotation_layout.cpp
     src/text_annotation_layout.h
+    src/text_editor_box_chrome.cpp
+    src/text_editor_box_chrome.h
+    src/text_editor_box_layout.cpp
+    src/text_editor_box_layout.h
     src/shot_window_upload.cpp
     src/shot_window_viewport_rendering.cpp
     src/shot_window_width_state.cpp

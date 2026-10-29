@@ -1,6 +1,8 @@
 #include "shot_window_module.h"
 
 #include "text_annotation_layout.h"
+#include "text_editor_box_chrome.h"
+#include "text_editor_box_layout.h"
 #include "ui/context_menu.h"
 
 using namespace markshot::shot;
@@ -280,42 +282,40 @@ namespace {
 constexpr bool FEATURE_TEXT_EDITOR_SNOW_INPUT_ENABLED = true;
 
 /**
- * 生成与 snow 画布输入一致的编辑器样式：无边框，字号字重交给 QFont。
+ * 生成与 snow 画布输入一致的编辑器样式：编辑器透明，背景与边框由窗口绘制，字号字重交给 QFont。
  * @param color 文字颜色。
- * @param backgroundColor 文字背景色。
+ * @param font 编辑器字体。
+ * @param insets 输入框内边距，只把左上两边写入样式，右下两边留在视口内放光标。
  * @return 样式表。
  */
-QString snowTextEditorStyleSheet(const QColor &color, const QColor &backgroundColor, const QFont &font)
+QString snowTextEditorStyleSheet(const QColor &color, const QFont &font, const TextEditorBoxInsets &insets)
 {
     const QString foreground = QStringLiteral("rgba(%1, %2, %3, %4)")
                                    .arg(color.red())
                                    .arg(color.green())
                                    .arg(color.blue())
                                    .arg(color.alpha());
-    const QString background = QStringLiteral("rgba(%1, %2, %3, %4)")
-                                   .arg(backgroundColor.red())
-                                   .arg(backgroundColor.green())
-                                   .arg(backgroundColor.blue())
-                                   .arg(backgroundColor.alpha());
     QString family = font.family();
     family.replace(QLatin1Char('\\'), QStringLiteral("\\\\"));
     family.replace(QLatin1Char('\''), QStringLiteral("\\'"));
     return QStringLiteral(
                "QTextEdit#textEditor {"
                " color: %1;"
-               " background: %2;"
+               " background: transparent;"
                " border: 0;"
-               " padding: 0;"
-               " font-family: '%3';"
-               " font-size: %4pt;"
-               " font-weight: %5;"
-               " font-style: %6;"
+               " padding: %3px 0px 0px %4px;"
+               " font-family: '%2';"
+               " font-size: %5pt;"
+               " font-weight: %6;"
+               " font-style: %7;"
                " selection-background-color: rgba(51, 153, 255, 120);"
                " selection-color: #FFFFFF;"
                "}"
                "QTextEdit#textEditor QAbstractScrollArea { background: transparent; border: 0; }"
-               "QTextEdit#textEditor QWidget { background: %2; font-family: '%3'; }")
-        .arg(foreground, background, family)
+               "QTextEdit#textEditor QWidget { background: transparent; font-family: '%2'; }")
+        .arg(foreground, family)
+        .arg(insets.top)
+        .arg(insets.left)
         .arg(std::max(1, font.pointSize()))
         .arg(static_cast<int>(font.weight()))
         .arg(font.italic() ? QStringLiteral("italic") : QStringLiteral("normal"));
@@ -324,22 +324,26 @@ QString snowTextEditorStyleSheet(const QColor &color, const QColor &backgroundCo
 }  // namespace
 
 /**
- * 按 snow 的文字输入规则处理按键。开关关闭时直接返回。
+ * 按 snow 的文字输入规则处理编辑器事件：内边距上的鼠标留在输入框内，Esc 与 Ctrl+回车提交。开关关闭时直接返回。
  * @param watched 事件来源。
  * @param event 当前事件。
  * @return 已处理时返回 true。
  */
-bool ShotWindow::handleSnowTextEditorKeyIfEnabled(QObject *watched, QEvent *event)
+bool ShotWindow::handleSnowTextEditorEventIfEnabled(QObject *watched, QEvent *event)
 {
     if (!FEATURE_TEXT_EDITOR_SNOW_INPUT_ENABLED) {
         return false;
+    }
+    // 1. 输入框内边距不属于视口，按在上面时不能被当成框外点击而提交
+    if (handleTextEditorBoxPaddingMouse(m_textEditor, watched, event)) {
+        return true;
     }
     if (!m_textEditor || !m_textEditor->isVisible() || watched != m_textEditor
         || !event || event->type() != QEvent::KeyPress) {
         return false;
     }
 
-    // 1. Esc 与 Ctrl+回车结束输入；单独回车仍由编辑器换行
+    // 2. Esc 与 Ctrl+回车结束输入；单独回车仍由编辑器换行
     const auto *keyEvent = static_cast<const QKeyEvent *>(event);
     const bool commitByEscape = keyEvent->key() == Qt::Key_Escape;
     const bool commitByEnter = (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter)
@@ -376,64 +380,79 @@ void ShotWindow::applySnowTextEditorChromeIfEnabled()
     }
     // 1. 空输入框只留光标宽度，占位提示放不下，统一不显示
     m_textEditor->setPlaceholderText(QString());
-    // 2. 字体与成图保持一致
+    // 2. 内边距也属于输入框，鼠标指针与文字区一致，全局光标策略按该属性处理
+    m_textEditor->setProperty("textCursorInPadding", true);
+    m_textEditor->setCursor(Qt::IBeamCursor);
+    // 3. 字体与成图保持一致
     applyEditorDisplayFontIfEnabled();
 }
 
 /**
- * 按文字内容调整编辑器尺寸。开关关闭时直接返回。
- * @return 无返回值。
+ * 按文字内容摆放输入框：框即提交后的背景框，逐字加宽，右侧留出行尾光标。开关关闭时直接返回。
+ * @return 已按 snow 规则摆放时返回 true，开关关闭或编辑器未显示时返回 false。
  */
-void ShotWindow::applySnowTextEditorGeometryIfEnabled()
+bool ShotWindow::applySnowTextEditorGeometryIfEnabled()
 {
-    if (!FEATURE_TEXT_EDITOR_SNOW_INPUT_ENABLED || !m_textEditor || !m_textEditor->isVisible()
-        || m_updatingSnowTextEditorGeometry) {
-        return;
+    if (!FEATURE_TEXT_EDITOR_SNOW_INPUT_ENABLED || !m_textEditor || !m_textEditor->isVisible()) {
+        return false;
+    }
+    if (m_updatingSnowTextEditorGeometry) {
+        return true;
     }
     m_updatingSnowTextEditorGeometry = true;
 
-    // 1. 文字右侧固定留出光标宽度和一点间隙，行尾光标不贴边也不被裁掉
+    // 1. 内边距与提交后的背景一致，右侧内边距同时放得下行尾光标
     QTextDocument *document = m_textEditor->document();
-    constexpr int kPad = 2;
-    constexpr int kCaretGap = 2;
-    const int caretReserve = std::max(1, m_textEditor->cursorWidth()) + kCaretGap;
-    const int fontHeight = m_textEditor->fontMetrics().height();
-    const int minHeight = std::max(18, fontHeight);
-    const QPoint anchor = m_textEditor->geometry().topLeft();
-    // 2. 提交后背景框连同左右内边距都要留在选区内，导出时才不会被裁掉
     const qreal scale = annotationSizeScale(true);
-    const qreal selectionRight = imageRectToWidget(normalizedSelection()).right();
-    int widthLimit = qFloor(std::min<qreal>(width() - 8, selectionRight - kTextBackgroundPaddingX * 2.0 * scale))
-        - anchor.x();
-    // 3. 重新编辑已换行的文字时沿用原换行宽度，进入编辑不改变排版
-    if (m_editingTextAnnotationId.has_value()) {
-        if (const Annotation *annotation = annotationById(*m_editingTextAnnotationId);
-            annotation && textAnnotationWraps(*annotation)) {
-            const qreal wrapWidth = annotation->rect.normalized().width() - kTextBackgroundPaddingX * 2.0;
-            widthLimit = std::min(widthLimit, qCeil(wrapWidth * scale) + caretReserve);
-        }
+    const TextEditorBoxInsets insets = textEditorBoxInsets(scale, m_textEditor->cursorWidth());
+    const int insetWidth = insets.left + insets.right;
+    const int insetHeight = insets.top + insets.bottom;
+    const int fontHeight = m_textEditor->fontMetrics().height();
+    const int minTextWidth = std::max(1, fontHeight / 2);
+    const QRectF selection = imageRectToWidget(normalizedSelection());
+
+    // 2. 已有文字从原背景框左上角开始，新文字从点击处开始，放不下最小输入框时向选区内回移
+    QPoint boxTopLeft;
+    const Annotation *editingAnnotation =
+        m_editingTextAnnotationId.has_value() ? annotationById(*m_editingTextAnnotationId) : nullptr;
+    if (editingAnnotation) {
+        boxTopLeft = textContentRect(*editingAnnotation, true).topLeft().toPoint();
+    } else {
+        const QSize minimumBox(fontHeight * 2 + insetWidth, fontHeight + insetHeight);
+        boxTopLeft = newTextEditorBoxTopLeft(imageToWidget(m_textEditorImagePoint).toPoint(),
+                                             selection.toRect(), minimumBox);
     }
-    const int maxTextWidth = std::max({1, fontHeight, widthLimit - caretReserve});
-    const int maxHeight = std::max(minHeight, height() - anchor.y() - 8);
-    // 4. 按单行自然宽度逐字加宽，含输入法预编辑文字；超出上限后换行并增高
+
+    // 3. 提交后背景框要留在选区内，导出时才不会被裁掉；多减 1px 吸收换算取整
+    const int boxRightLimit = qFloor(std::min<qreal>(width() - 8, selection.right()));
+    int maxTextWidth = boxRightLimit - boxTopLeft.x() - insetWidth - 1;
+    // 4. 重新编辑已换行的文字时沿用原换行宽度，进入编辑不改变排版
+    if (editingAnnotation && textAnnotationWraps(*editingAnnotation)) {
+        const qreal wrapWidth = editingAnnotation->rect.normalized().width() - kTextBackgroundPaddingX * 2.0;
+        maxTextWidth = std::min(maxTextWidth, qCeil(wrapWidth * scale));
+    }
+    maxTextWidth = std::max({minTextWidth, fontHeight, maxTextWidth});
+    const int maxTextHeight = std::max(fontHeight, height() - boxTopLeft.y() - 8 - insetHeight);
+
+    // 5. 按单行自然宽度逐字加宽，含输入法预编辑文字；超出上限后换行并增高
     // 换行宽度用固定像素值，编辑器改尺寸时 QTextEdit 不会再把它改回视口宽度
     m_textEditor->setLineWrapMode(QTextEdit::FixedPixelWidth);
     document->setTextWidth(-1);
-    const int textWidth = std::clamp(qCeil(document->idealWidth()), 1, maxTextWidth);
+    const int textWidth = std::clamp(qCeil(document->idealWidth()), minTextWidth, maxTextWidth);
     m_textEditor->setLineWrapColumnOrWidth(textWidth);
-    const int editorWidth = textWidth + caretReserve;
-    const int editorHeight = std::clamp(qCeil(document->size().height()) + kPad, minHeight, maxHeight);
+    const int textHeight = std::clamp(qCeil(document->size().height()), fontHeight, maxTextHeight);
 
-    // 5. 保持左上角锚点，只把超出窗口的部分移回可见区域
-    QRect editorRect(anchor, QSize(editorWidth, editorHeight));
-    const int maxLeft = std::max(8, width() - editorRect.width() - 8);
-    const int maxTop = std::max(8, height() - editorRect.height() - 8);
-    editorRect.moveLeft(std::clamp(editorRect.left(), 8, maxLeft));
-    editorRect.moveTop(std::clamp(editorRect.top(), 8, maxTop));
-    if (m_textEditor->geometry() != editorRect) {
-        m_textEditor->setGeometry(editorRect);
+    // 6. 编辑器就是整个输入框，保持左上角锚点，只把超出窗口的部分移回可见区域
+    QRect boxRect(boxTopLeft, QSize(textWidth + insetWidth, textHeight + insetHeight));
+    const int maxLeft = std::max(8, width() - boxRect.width() - 8);
+    const int maxTop = std::max(8, height() - boxRect.height() - 8);
+    boxRect.moveLeft(std::clamp(boxRect.left(), 8, maxLeft));
+    boxRect.moveTop(std::clamp(boxRect.top(), 8, maxTop));
+    if (m_textEditor->geometry() != boxRect) {
+        m_textEditor->setGeometry(boxRect);
     }
     m_updatingSnowTextEditorGeometry = false;
+    return true;
 }
 
 /**
@@ -488,7 +507,10 @@ void ShotWindow::applyEditorDisplayFontIfEnabled()
     m_textEditor->setProperty("markShotFontFamily", family.isEmpty() ? font.family() : family);
     m_textEditor->setProperty("markShotFontWeight", static_cast<int>(weight));
     m_textEditor->setProperty("markShotFontItalic", italic);
-    m_textEditor->setStyleSheet(snowTextEditorStyleSheet(color, background, font));
+    // 3. 编辑器只负责文字，背景与内边距按提交后的样子由窗口在下方绘制
+    setTextEditorBoxBackground(m_textEditor, background);
+    m_textEditor->setStyleSheet(snowTextEditorStyleSheet(
+        color, font, textEditorBoxInsets(annotationSizeScale(true), m_textEditor->cursorWidth())));
 }
 
 /**

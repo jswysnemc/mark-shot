@@ -532,7 +532,7 @@ bool ShotWindow::eventFilter(QObject *watched, QEvent *event)
         return true;
     }
 
-    if (handleSnowTextEditorKeyIfEnabled(watched, event) || handleTextEditorActionShortcut(watched, event)) {
+    if (handleSnowTextEditorEventIfEnabled(watched, event) || handleTextEditorActionShortcut(watched, event)) {
         return true;
     }
 

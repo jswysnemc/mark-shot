@@ -5,6 +5,7 @@
 #include "debug_log.h"
 #include "ui/transparency_background.h"
 #include "selection_loupe.h"
+#include "text_editor_box_chrome.h"
 
 namespace cfg = markshot::config;
 namespace shortcuts = markshot::shortcut;
@@ -99,6 +100,9 @@ void ShotWindow::paintEvent(QPaintEvent *event)
             drawLaserStroke(painter, *m_laserDraft, true, 1.0);
         }
         drawSelectedAnnotationFrame(painter);
+        // 文字输入框的背景和虚线边框画在编辑器下方，编辑器本身透明；选择工具已画出选中框时只画背景
+        const bool selectionFrameShown = m_tool != Tool::Text && !selectedAnnotationIds().isEmpty();
+        paintTextEditorBox(painter, m_textEditor, annotationSizeScale(true), !selectionFrameShown);
         if (m_annotationSelectionBoxActive) {
             const QRectF box = imageRectToWidget(m_annotationSelectionBox.normalized());
             painter.setPen(QPen(QColor(45, 212, 191), 1.5, Qt::DashLine));
