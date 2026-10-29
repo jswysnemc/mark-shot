@@ -22,6 +22,10 @@ BuildRequires:  cmake(Qt6Network)
 BuildRequires:  cmake(Qt6Svg)
 BuildRequires:  cmake(Qt6Widgets)
 BuildRequires:  cmake(LayerShellQt)
+# OCR 与扫码插件必须在打包时与本机 Qt 一起构建；插件市场的 Linux 资产基于 Arch 的 Qt，
+# 版本高于 Fedora 时 QPluginLoader 会拒绝加载
+BuildRequires:  pkgconfig(libonnxruntime)
+BuildRequires:  pkgconfig(zxing)
 BuildRequires:  pkgconfig(libavcodec)
 BuildRequires:  pkgconfig(libavfilter)
 BuildRequires:  pkgconfig(libavformat)

@@ -85,6 +85,7 @@ jobs:
             libX11-devel \
             libxcb-devel \
             ninja-build \
+            onnxruntime-devel \
             pipewire-devel \
             pkgconf-pkg-config \
             qt6-qtbase-devel \
@@ -92,7 +93,8 @@ jobs:
             qt6-qtwayland \
             redhat-rpm-config \
             rpm-build \
-            rust
+            rust \
+            zxing-cpp-devel
 
       - name: Build rpm package
         id: package
@@ -134,6 +136,14 @@ jobs:
             printf '%s\n' "${rpms[@]}" >&2
             exit 1
           fi
+
+          # 依赖缺失时 CMake 会静默跳过 OCR 与扫码插件，这里拦截不完整的包
+          for plugin in libmark-shot-ocr-rapid.so libmark-shot-code-scan-zxing.so; do
+            if ! rpm -qlp "${rpms[0]}" | grep -q "/mark-shot/plugins/$plugin\$"; then
+              echo "rpm package is missing $plugin" >&2
+              exit 1
+            fi
+          done
 
           cp "${rpms[0]}" "$ASSET"
           sha256sum "$ASSET" > "$ASSET.sha256"
