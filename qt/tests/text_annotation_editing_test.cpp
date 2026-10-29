@@ -10,6 +10,7 @@
 #include <QTextDocument>
 #include <QTextEdit>
 #include <QTextLayout>
+#include <QWheelEvent>
 #include <QtTest>
 
 #include <memory>
@@ -33,6 +34,22 @@ void clickAt(ShotWindow &window, QPoint position)
     QMouseEvent release(QEvent::MouseButtonRelease, QPointF(position), QPointF(window.mapToGlobal(position)),
                         Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
     QCoreApplication::sendEvent(&window, &release);
+}
+
+/**
+ * 在窗口坐标上发送若干格向上的滚轮事件。
+ * @param window 截图窗口。
+ * @param position 窗口坐标。
+ * @param ticks 滚轮格数。
+ * @return 无返回值。
+ */
+void wheelAt(ShotWindow &window, QPoint position, int ticks)
+{
+    for (int i = 0; i < ticks; ++i) {
+        QWheelEvent event(QPointF(position), QPointF(window.mapToGlobal(position)), QPoint(), QPoint(0, 120),
+                          Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+        QCoreApplication::sendEvent(&window, &event);
+    }
 }
 
 /**
@@ -179,6 +196,58 @@ private slots:
         QVERIFY(window->m_annotations.isEmpty());
         QVERIFY(window->selectedAnnotationIds().isEmpty());
         QCOMPARE(undoCountOf(*window), before + 1);
+    }
+
+    /** 验证输入中滚动滚轮时编辑器立即换用新字号，提交结果与编辑时一致，无参数和返回值。 */
+    void wheelResizesEditorWhileTyping()
+    {
+        auto window = createTextWindow();
+        QVERIFY(window);
+        clickAt(*window, QPoint(150, 150));
+        window->m_textEditor->insertPlainText(QStringLiteral("hello"));
+        const qreal sizeBefore = window->m_textSize;
+        const int pointBefore = window->m_textEditor->font().pointSize();
+        const int widthBefore = window->m_textEditor->width();
+
+        // 1. 文字每格 1.5，四格累计 +6
+        wheelAt(*window, window->m_textEditor->geometry().center(), 4);
+        QCOMPARE(window->m_textSize, sizeBefore + 6);
+        QCOMPARE(window->m_textEditor->font().pointSize(), pointBefore + 6);
+        QVERIFY(window->m_textEditor->width() > widthBefore);
+
+        window->commitTextEditor();
+        QCOMPARE(window->m_annotations.size(), 1);
+        QCOMPARE(window->m_annotations.first().width, sizeBefore + 6);
+    }
+
+    /** 验证文字工具编辑已有文字时滚轮按该文字自身字号调整，且可一步撤销，无参数和返回值。 */
+    void wheelResizesEditedTextFromItsOwnSize()
+    {
+        auto window = createTextWindow();
+        QVERIFY(window);
+        clickAt(*window, QPoint(150, 150));
+        window->m_textEditor->insertPlainText(QStringLiteral("hello"));
+        window->commitTextEditor();
+        const qreal ownSize = window->m_annotations.first().width;
+        // 1. 默认字号与已有文字不同时，滚轮不能从默认字号起算
+        window->m_textSize = ownSize + 20;
+
+        const QPoint inside = window->textContentRect(window->m_annotations.first(), true).center().toPoint();
+        clickAt(*window, inside);
+        QVERIFY(window->m_editingTextAnnotationId.has_value());
+        const int pointBefore = window->m_textEditor->font().pointSize();
+        const size_t undoBefore = undoCountOf(*window);
+        wheelAt(*window, inside, 2);
+        QCOMPARE(window->m_annotations.first().width, ownSize + 3);
+        QCOMPARE(window->m_textEditor->font().pointSize(), pointBefore + 3);
+
+        // 2. 提交后字号保留，滚轮改动合并为一步撤销
+        window->commitTextEditor();
+        window->commitAnnotationWidthWheelHistory();
+        QCOMPARE(window->m_annotations.first().width, ownSize + 3);
+        QCOMPARE(undoCountOf(*window), undoBefore + 1);
+        window->undoAnnotationEdit();
+        QCOMPARE(window->m_annotations.first().width, ownSize);
     }
 
     /** 验证进入编辑后原样提交不会新增撤销记录，无参数和返回值。 */

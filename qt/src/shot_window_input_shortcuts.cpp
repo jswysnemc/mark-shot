@@ -124,7 +124,10 @@ void ShotWindow::wheelEvent(QWheelEvent *event)
     // 1. 【标注】【滚轮选中】粗细滚轮生效前，先选中当前工具刚画完的图形
     selectLatestDrawnAnnotationForWheel();
     const QVector<int> selectedIds = selectedAnnotationIds();
-    const bool editingAnnotationWidth = m_tool == Tool::Select && !selectedIds.isEmpty();
+    // 2. 【标注】【文字编辑】文字工具编辑已有文字时也按该文字自身字号调整，并写入撤销历史
+    const bool editingExistingText = m_textEditor && m_textEditor->isVisible()
+        && m_editingTextAnnotationId.has_value() && selectedIds.contains(*m_editingTextAnnotationId);
+    const bool editingAnnotationWidth = (m_tool == Tool::Select && !selectedIds.isEmpty()) || editingExistingText;
 
     if (!editingAnnotationWidth && wheelZoomsImage()) {
         const qreal factor = imageNavigationWheelFactor(event);
@@ -139,7 +142,9 @@ void ShotWindow::wheelEvent(QWheelEvent *event)
     }
 
     const Annotation *firstSelectedAnnotation = nullptr;
-    if (m_tool == Tool::Select && !selectedIds.isEmpty()) {
+    if (editingExistingText) {
+        firstSelectedAnnotation = annotationById(*m_editingTextAnnotationId);
+    } else if (editingAnnotationWidth) {
         firstSelectedAnnotation = annotationById(selectedIds.first());
     }
     const Tool widthTool = firstSelectedAnnotation ? firstSelectedAnnotation->tool : m_tool;
@@ -169,6 +174,11 @@ void ShotWindow::wheelEvent(QWheelEvent *event)
     }
     if (editingAnnotationWidth) {
         queueAnnotationWidthWheelHistory(wheelContext, historyBeforeChange);
+    }
+    if (m_textEditor && m_textEditor->isVisible()) {
+        // 3. 【标注】【文字编辑】输入中的编辑器立即换用新字号并重新排版，与提交后的结果一致
+        applyEditorDisplayFontIfEnabled();
+        applySnowTextEditorGeometryIfEnabled();
     }
 
     startWheelPreview(event->position(), WheelPreview::ToolSize);
