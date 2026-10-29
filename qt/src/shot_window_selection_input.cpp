@@ -156,6 +156,47 @@ void ShotWindow::recordSelectionHistory()
     m_selectionHistoryIndex = -1;
 }
 
+/// @brief 确认当前选区并进入编辑状态，显示标注与动作工具栏
+/// @param widgetPoint 用于刷新界面光标的窗口坐标
+/// @return 无返回值
+void ShotWindow::enterSelectionEditing(QPointF widgetPoint)
+{
+    m_mode = Mode::Editing;
+    attachSelectionPointer();
+    m_fullscreenAnnotation = false;
+    m_toolbarUserPlaced = false;
+    m_actionToolbarUserPlaced = false;
+    setTool(defaultEditingTool());
+    setFullscreenActionButtonsVisible(false);
+    m_controls.m_toolbar->show();
+    m_controls.m_actionToolbar->show();
+    emit selectionActivated(this);
+    revealSelectionInfo();
+    updateToolbarGeometry();
+    updateActionToolbarGeometry();
+    scheduleUiCursorRefresh(widgetPoint);
+    update();
+}
+
+/// @brief 判断按键是否用于浏览选区历史
+/// @param event 键盘事件
+/// @return 逗号或句号且当前允许替换选区时返回 true
+bool ShotWindow::isSelectionHistoryKey(const QKeyEvent *event) const
+{
+    if ((event->key() != Qt::Key_Comma && event->key() != Qt::Key_Period) || event->isAutoRepeat()
+        || m_dragging || m_imageNavigationEnabled) {
+        return false;
+    }
+    // 1. 【截图】【选区历史】选择阶段沿用原有条件，启动工具（取色、录制等）占用时不处理
+    if (m_mode == Mode::Selecting) {
+        return m_startupTool == StartupTool::None;
+    }
+    // 2. 【截图】【选区历史】编辑阶段只在尚未标注时切换，避免丢弃已画内容
+    return m_mode == Mode::Editing && !m_fullscreenAnnotation && m_annotations.isEmpty()
+        && !m_draft.has_value() && !(m_textEditor && m_textEditor->isVisible())
+        && (event->modifiers() & ~Qt::KeypadModifier) == Qt::NoModifier;
+}
+
 /// @brief 沿历史恢复之前使用的屏幕选区
 /// @param step 正值读取更早的记录，负值读取更新的记录
 /// @return 无返回值
@@ -189,8 +230,12 @@ void ShotWindow::applySelectionHistoryStep(int step)
         m_dragging = false;
         m_selectionDrag = SelectionDrag::None;
         m_hoveredWindowRect.reset();
-        revealSelectionInfo();
-        update();
+        // 1. 【截图】【选区历史】恢复后与手动框选一样进入编辑，点击不会再被当作重新框选或窗口识别
+        if (m_mode == Mode::Selecting) {
+            enterSelectionEditing(mapFromGlobal(QCursor::pos()));
+        } else {
+            refreshAdjustedSelection();
+        }
         return;
     }
 }

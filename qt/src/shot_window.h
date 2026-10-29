@@ -56,6 +56,7 @@ class ShotWindow final : public QWidget {
     friend class SelectionHoverRepaintTest;
     friend class RegionDetectionToggleTest;
     friend class CanvasImageMemoryTest;
+    friend class SelectionHistoryRestoreTest;
 
 public:
     using Action = markshot::shot::types::Action;
@@ -211,6 +212,8 @@ private:
     void recordSelectionHistory();
     // 沿历史浏览选区：step 为 +1 时回到更早的记录，-1 时前进到更新的记录。
     void applySelectionHistoryStep(int step);
+    bool isSelectionHistoryKey(const QKeyEvent *event) const;
+    void enterSelectionEditing(QPointF widgetPoint);
     QRectF imageRectToWidget(QRectF rect) const;
     QPointF clampedMagnifierCircleCenter(QPointF center, qreal diameter) const;
     QRectF magnifierCircleRect(QPointF center, qreal diameter) const;

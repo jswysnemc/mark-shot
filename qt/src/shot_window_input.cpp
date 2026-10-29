@@ -424,21 +424,7 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
             if (handleStartupRecordingSelection()) {
                 return;
             }
-            m_mode = Mode::Editing;
-            attachSelectionPointer();
-            m_fullscreenAnnotation = false;
-            m_toolbarUserPlaced = false;
-            m_actionToolbarUserPlaced = false;
-            setTool(defaultEditingTool());
-            setFullscreenActionButtonsVisible(false);
-            m_controls.m_toolbar->show();
-            m_controls.m_actionToolbar->show();
-            emit selectionActivated(this);
-            revealSelectionInfo();
-            updateToolbarGeometry();
-            updateActionToolbarGeometry();
-            scheduleUiCursorRefresh(event->position());
-            update();
+            enterSelectionEditing(event->position());
             return;
         }
         m_hoveredWindowRect.reset();
@@ -456,21 +442,7 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
         if (handleStartupRecordingSelection()) {
             return;
         }
-        m_mode = Mode::Editing;
-        attachSelectionPointer();
-        m_fullscreenAnnotation = false;
-        m_toolbarUserPlaced = false;
-        m_actionToolbarUserPlaced = false;
-        setTool(defaultEditingTool());
-        setFullscreenActionButtonsVisible(false);
-        m_controls.m_toolbar->show();
-        m_controls.m_actionToolbar->show();
-        emit selectionActivated(this);
-        revealSelectionInfo();
-        updateToolbarGeometry();
-        updateActionToolbarGeometry();
-        scheduleUiCursorRefresh(event->position());
-        update();
+        enterSelectionEditing(event->position());
         return;
     }
 

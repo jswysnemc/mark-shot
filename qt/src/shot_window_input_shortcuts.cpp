@@ -188,6 +188,13 @@ void ShotWindow::keyPressEvent(QKeyEvent *event)
         return;
     }
 
+    // 选区历史浏览（issue #79）：逗号回到上一次截图的选区，句号前进；恢复后可继续切换
+    if (isSelectionHistoryKey(event)) {
+        applySelectionHistoryStep(event->key() == Qt::Key_Comma ? 1 : -1);
+        event->accept();
+        return;
+    }
+
     // 【截图】【选区尺寸】Ctrl+R 直接编辑左上角 HUD 的宽度，不再弹出独立面板
     if (event->key() == Qt::Key_R && event->modifiers() == Qt::ControlModifier && !m_dragging
         && m_mode == Mode::Editing && !m_fullscreenAnnotation) {
@@ -271,19 +278,6 @@ void ShotWindow::keyPressEvent(QKeyEvent *event)
             beginStartupRecording(markshot::recording::RecordingMode::Video);
             event->accept();
             return;
-        }
-        // 选区历史浏览（issue #79）：逗号回到上一次截图的选区，句号前进。
-        if (m_startupTool == StartupTool::None && !m_dragging && !event->isAutoRepeat()) {
-            if (event->key() == Qt::Key_Comma) {
-                applySelectionHistoryStep(1);
-                event->accept();
-                return;
-            }
-            if (event->key() == Qt::Key_Period) {
-                applySelectionHistoryStep(-1);
-                event->accept();
-                return;
-            }
         }
         if (m_selectionLoupeEnabled
             && m_startupTool != StartupTool::Ruler
