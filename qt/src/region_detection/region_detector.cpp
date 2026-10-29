@@ -31,6 +31,22 @@ bool isWindowCandidate(const RegionCandidate &candidate)
     return candidate.sources.contains(QStringLiteral("window"));
 }
 
+/// 图像候选越出所在窗口时允许的边界误差，覆盖阴影与描边的抗锯齿像素
+constexpr int kWindowContainmentTolerance = 4;
+
+/**
+ * 判断图像候选是否落在合成器窗口内。
+ * @param window 合成器窗口矩形。
+ * @param candidate 图像分析得到的矩形。
+ * @return 候选未越出窗口边界（含容差）时返回 true。
+ */
+bool insideWindow(QRect window, QRect candidate)
+{
+    const QRect relaxed = window.adjusted(-kWindowContainmentTolerance, -kWindowContainmentTolerance,
+                                          kWindowContainmentTolerance, kWindowContainmentTolerance);
+    return containsRect(relaxed, candidate);
+}
+
 } // namespace
 
 /**
@@ -195,6 +211,22 @@ QRect RegionDetector::regionAt(QPoint point) const
         if (!bestUi || rank < bestUiRank) {
             bestUi = &candidate;
             bestUiRank = rank;
+        }
+    }
+    // 1. 【截图】【区域识别】越出所在窗口的图像候选来自深色内容、面板与壁纸连成一片，不能压过合成器窗口
+    if (bestUi && bestWindow && !insideWindow(bestWindow->rect, bestUi->rect)) {
+        bestUi = nullptr;
+        bestUiRank = 0.0f;
+        for (const RegionCandidate &candidate : m_candidates) {
+            if (!candidate.rect.contains(point) || isWindowCandidate(candidate)
+                || !insideWindow(bestWindow->rect, candidate.rect)) {
+                continue;
+            }
+            const float rank = candidateRank(candidate);
+            if (!bestUi || rank < bestUiRank) {
+                bestUi = &candidate;
+                bestUiRank = rank;
+            }
         }
     }
     if (bestUi) {

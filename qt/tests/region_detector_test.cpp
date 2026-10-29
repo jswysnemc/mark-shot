@@ -368,6 +368,33 @@ private slots:
     }
 
     /**
+     * 验证越出合成器窗口的图像候选不会取代窗口矩形，窗口内的控件仍优先（issue #140）。
+     * @return 无返回值。
+     */
+    void uiRegionsCrossingTheWindowDoNotReplaceIt()
+    {
+        // 1. 终端几乎占满屏幕，深色内容与顶栏、壁纸连成一块越出窗口的高质量候选
+        RegionCandidate overflow;
+        overflow.rect = QRect(20, 0, 3820, 2160);
+        overflow.quality = 0.9f;
+        overflow.sides = {0.9f, 0.9f, 0.9f, 0.9f};
+        overflow.sources.append(QStringLiteral("contour"));
+        RegionCandidate prompt;
+        prompt.rect = QRect(60, 140, 360, 60);
+        prompt.quality = 0.85f;
+        prompt.sides = {0.85f, 0.85f, 0.85f, 0.85f};
+        prompt.sources.append(QStringLiteral("contour"));
+        const QRect window(22, 84, 3794, 2050);
+        RegionDetector detector(3840, 2160, {overflow, prompt});
+        detector.addWindowRects({window});
+
+        QCOMPARE(detector.regionAt(QPoint(1900, 1000)), window);
+        QCOMPARE(detector.regionAt(QPoint(200, 170)), prompt.rect);
+        // 2. 没有窗口覆盖的位置仍沿用图像候选
+        QCOMPARE(detector.regionAt(QPoint(1900, 30)), overflow.rect);
+    }
+
+    /**
      * 验证真实工具栏截图优先选中完整工具栏而不是文字碎片。
      * @return 无返回值。
      */
