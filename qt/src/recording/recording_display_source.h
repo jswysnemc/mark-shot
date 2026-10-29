@@ -48,7 +48,9 @@ inline QString containedRecordingScreenName(const QRect &region,
 }
 
 /**
- * 区域录制选了「全部显示器」时，改绑到实际包含该区域的那块屏幕。
+ * 区域录制改绑到实际包含该区域的那块屏幕。
+ * 对话框选中的显示器只是默认值，用户可在另一块屏幕框选区域，输出名必须以选区所在屏幕为准，
+ * 否则 wlroots/WGC 会按名称选错输出，门户授权令牌也会按错误输出保存和恢复。
  * 整屏录制和跨屏区域保持原样，避免单输出后端误走交互式门户。
  * @param options 录制配置，命中单屏时会改写 display。
  * @param screens 候选屏幕。
@@ -57,7 +59,7 @@ inline QString containedRecordingScreenName(const QRect &region,
 inline void bindRegionRecordingDisplay(RecordingOptions *options,
                                        const QVector<RecordingScreenCandidate> &screens)
 {
-    if (!options || options->scope != RecordingScope::Region || !options->display.allOutputs) {
+    if (!options || options->scope != RecordingScope::Region) {
         return;
     }
 

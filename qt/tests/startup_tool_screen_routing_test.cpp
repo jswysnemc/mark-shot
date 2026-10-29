@@ -124,6 +124,60 @@ private slots:
         QCOMPARE(source.startupTool(), StartupTool::None);
         QCOMPARE(target.startupTool(), startupTool);
     }
+
+    /** 【截图测试】【录制转移】提供 GIF 和视频两种录制模式及指针初始位置，无参数和返回值。 */
+    void routesRegionRecordingWithOptions_data()
+    {
+        QTest::addColumn<int>("mode");
+        QTest::addColumn<bool>("pointerOnTarget");
+        QTest::newRow("gif-pointer-entry") << static_cast<int>(markshot::recording::RecordingMode::Gif) << false;
+        QTest::newRow("video-pointer-entry") << static_cast<int>(markshot::recording::RecordingMode::Video) << false;
+        QTest::newRow("gif-pointer-screen") << static_cast<int>(markshot::recording::RecordingMode::Gif) << true;
+        QTest::newRow("video-pointer-screen") << static_cast<int>(markshot::recording::RecordingMode::Video) << true;
+    }
+
+    /** 【截图测试】【录制转移】录制配置确认后在错误屏幕进入选区时，工具和配置一起转到指针屏幕（issue #139），无参数和返回值。 */
+    void routesRegionRecordingWithOptions()
+    {
+        QFETCH(int, mode);
+        QFETCH(bool, pointerOnTarget);
+        const auto recordingMode = static_cast<markshot::recording::RecordingMode>(mode);
+        const auto recorderTool = recordingMode == markshot::recording::RecordingMode::Gif
+            ? StartupTool::GifRecorder : StartupTool::VideoRecorder;
+        const auto screens = QGuiApplication::screens();
+        QCOMPARE(screens.size(), 2);
+        QImage image(800, 600, QImage::Format_RGB32);
+        image.fill(Qt::white);
+        ShotWindow source(image, {}, screens.first()->geometry(), {}, false);
+        ShotWindow target(image, {}, screens.last()->geometry(), {}, false);
+        source.setCaptureScreen(screens.first());
+        target.setCaptureScreen(screens.last());
+        const QVector<QPointer<ShotWindow>> windows{&source, &target};
+        auto *app = qobject_cast<QApplication *>(QApplication::instance());
+        markshot::capture_session::connectStartupToolScreenRouting(app, &source, windows);
+        markshot::capture_session::connectStartupToolScreenRouting(app, &target, windows);
+
+        // 1. 【截图测试】【录制转移】模拟键盘焦点所在覆盖层收到已确认的区域录制配置
+        QCursor::setPos(pointerOnTarget ? QPoint(900, 100) : QPoint(100, 100));
+        markshot::recording::RecordingOptions options;
+        options.mode = recordingMode;
+        options.scope = markshot::recording::RecordingScope::Region;
+        source.beginRegionRecordingSelection(options);
+
+        // 2. 【截图测试】【录制转移】指针不在焦点屏幕时，由进入事件把工具交给指针所在覆盖层
+        if (!pointerOnTarget) {
+            QCOMPARE(source.startupTool(), recorderTool);
+            QVERIFY(source.startupToolCanFollowPointer());
+            QEnterEvent enter(QPointF(20, 20), QPointF(20, 20), QPointF(820, 20));
+            QCoreApplication::sendEvent(&target, &enter);
+        }
+
+        // 3. 【截图测试】【录制转移】目标覆盖层必须同时持有录制工具和待选区配置，原覆盖层退出录制模式
+        QCOMPARE(source.startupTool(), StartupTool::None);
+        QVERIFY(!source.startupToolCanFollowPointer());
+        QCOMPARE(target.startupTool(), recorderTool);
+        QVERIFY(target.startupToolCanFollowPointer());
+    }
 };
 
 /** 【截图测试】【环境隔离】用两块虚拟屏幕运行真实覆盖层事件测试，argc/argv 为命令行参数，返回测试退出码。 */

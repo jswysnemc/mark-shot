@@ -34,6 +34,42 @@ private slots:
     }
 
     /**
+     * 【录制测试】【输出绑定】对话框默认选中 DP-1，但区域框在 HDMI-A-1 时必须改绑到 HDMI-A-1（issue #139）。
+     * @return 无返回值。
+     */
+    void explicitDisplayRegionBindsToContainingOutput()
+    {
+        const QVector<markshot::recording::RecordingScreenCandidate> screens = {
+            {QStringLiteral("DP-1"), QRect(0, 0, 2560, 1440)},
+            {QStringLiteral("HDMI-A-1"), QRect(2560, 0, 2560, 1440)},
+        };
+
+        // 1. 【录制测试】【输出绑定】单屏区域落在另一块屏幕，输出名和几何都以区域所在屏幕为准
+        markshot::recording::RecordingOptions options;
+        options.scope = markshot::recording::RecordingScope::Region;
+        options.display.screenName = QStringLiteral("DP-1");
+        options.display.outputName = QStringLiteral("DP-1");
+        options.display.geometry = QRect(0, 0, 2560, 1440);
+        options.captureGeometry = QRect(3167, 239, 791, 742);
+        markshot::recording::bindRegionRecordingDisplay(&options, screens);
+        QVERIFY(!options.display.allOutputs);
+        QCOMPARE(options.display.outputName, QStringLiteral("HDMI-A-1"));
+        QCOMPARE(options.display.screenName, QStringLiteral("HDMI-A-1"));
+        QCOMPARE(options.display.geometry, QRect(2560, 0, 2560, 1440));
+
+        // 2. 【录制测试】【输出绑定】跨屏区域无法归属单屏，保留对话框选择
+        markshot::recording::RecordingOptions spanning;
+        spanning.scope = markshot::recording::RecordingScope::Region;
+        spanning.display.screenName = QStringLiteral("DP-1");
+        spanning.display.outputName = QStringLiteral("DP-1");
+        spanning.display.geometry = QRect(0, 0, 2560, 1440);
+        spanning.captureGeometry = QRect(2000, 100, 1200, 400);
+        markshot::recording::bindRegionRecordingDisplay(&spanning, screens);
+        QCOMPARE(spanning.display.outputName, QStringLiteral("DP-1"));
+        QCOMPARE(spanning.display.geometry, QRect(0, 0, 2560, 1440));
+    }
+
+    /**
      * 跨屏区域和整屏全部显示器保持原样，不能假装成单输出。
      * @return 无返回值。
      */

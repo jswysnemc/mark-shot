@@ -109,6 +109,8 @@ public:
     void applyRoutedStartupTool(markshot::shot::types::StartupTool tool);
     /** 【截图会话】【工具转移】判断当前工具能否跟随指针跨屏，拖动或录制时返回 false，无参数。 */
     bool startupToolCanFollowPointer() const;
+    /** 【截图会话】【工具转移】把当前工具及待选区录制配置转给 target 覆盖层，返回是否已转移。 */
+    bool transferStartupToolTo(ShotWindow *target);
     void translateSelection();
 
 signals:

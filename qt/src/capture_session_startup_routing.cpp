@@ -9,13 +9,20 @@
 
 namespace markshot::capture_session {
 
+/**
+ * 【截图会话】【工具转移】为覆盖层连接同一会话中的工具转移信号，录制工具连同待选区配置一起转移。
+ * @param app 应用对象，作为信号接收上下文。
+ * @param window 当前覆盖层。
+ * @param windows 同一会话的覆盖层列表。
+ * @return 无返回值。
+ */
 void connectStartupToolScreenRouting(QApplication *app, ShotWindow *window,
                                      const QVector<QPointer<ShotWindow>> &windows)
 {
     if (!app || !window) {
         return;
     }
-    // 1. 【截图会话】【工具转移】快捷键落点与指针屏幕不一致时转移原工具
+    // 1. 【截图会话】【工具转移】快捷键落点与指针屏幕不一致时转移原工具，录制工具连同配置一起转移
     QObject::connect(window, &ShotWindow::startupToolRouteRequested, app,
                      [windows](ShotWindow *source) {
         if (!source || !source->startupToolCanFollowPointer()) {
@@ -30,10 +37,9 @@ void connectStartupToolScreenRouting(QApplication *app, ShotWindow *window,
             if (!peer || peer == source || peer->captureScreen() != cursorScreen) {
                 continue;
             }
-            const auto tool = source->startupTool();
-            source->applyRoutedStartupTool(markshot::shot::types::StartupTool::None);
-            peer->applyRoutedStartupTool(tool);
-            peer->raise();
+            if (source->transferStartupToolTo(peer)) {
+                peer->raise();
+            }
             return;
         }
     });
@@ -55,9 +61,7 @@ void connectStartupToolScreenRouting(QApplication *app, ShotWindow *window,
         if (!donor) {
             return;
         }
-        const auto tool = donor->startupTool();
-        donor->applyRoutedStartupTool(markshot::shot::types::StartupTool::None);
-        claimer->applyRoutedStartupTool(tool);
+        donor->transferStartupToolTo(claimer);
     });
 }
 

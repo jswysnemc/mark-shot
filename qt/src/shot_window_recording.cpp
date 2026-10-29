@@ -106,6 +106,7 @@ void ShotWindow::beginStartupRecording(markshot::recording::RecordingMode mode)
 
 /**
  * 使用已确认录制配置进入区域录制选区状态。
+ * 多屏时 setStartupTool 可能把录制工具和配置转到指针所在覆盖层，此时提示由目标覆盖层显示。
  * @param options 已确认的录制配置。
  * @return 无返回值。
  */
@@ -115,6 +116,7 @@ void ShotWindow::beginRegionRecordingSelection(markshot::recording::RecordingOpt
         return;
     }
 
+    // 1. 【录制】【区域选区】先保存配置再切换工具，工具转移时需要连同配置一起交给目标覆盖层
     options.scope = markshot::recording::RecordingScope::Region;
     m_pendingRecordingOptions = std::move(options);
     const StartupTool targetTool = m_pendingRecordingOptions->mode == markshot::recording::RecordingMode::Gif
@@ -122,6 +124,10 @@ void ShotWindow::beginRegionRecordingSelection(markshot::recording::RecordingOpt
         : StartupTool::VideoRecorder;
     if (m_startupTool != targetTool) {
         setStartupTool(targetTool);
+    }
+    // 2. 【录制】【区域选区】工具已转到其他屏幕时不在当前屏幕提示
+    if (m_startupTool != targetTool) {
+        return;
     }
     showToast(MS_TR("Select recording region"), 1800);
 }

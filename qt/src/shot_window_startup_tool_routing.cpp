@@ -1,5 +1,7 @@
 #include "shot_window_module.h"
 
+#include "debug_log.h"
+
 #include <QCursor>
 #include <QGuiApplication>
 #include <QScreen>
@@ -19,12 +21,59 @@ markshot::shot::types::StartupTool ShotWindow::startupTool() const
     return m_startupTool;
 }
 
-/** 【截图会话】【工具转移】仅允许未开始拖动的扫码、取色及测量模式跨屏，无参数，返回是否允许转移。 */
+/**
+ * 【截图会话】【工具转移】判断当前启动工具能否跟随指针跨屏。
+ * 扫码、取色、测量在未拖动时可转移；GIF 和视频录制仅在已确认配置、等待选区时可转移。
+ * @return 允许转移时返回 true，无参数。
+ */
 bool ShotWindow::startupToolCanFollowPointer() const
 {
-    return m_mode == Mode::Selecting && !m_dragging && !m_startupRulerDragging
-        && (m_startupTool == StartupTool::CodeScanner || m_startupTool == StartupTool::ColorPicker
-            || m_startupTool == StartupTool::Ruler);
+    if (m_mode != Mode::Selecting || m_dragging || m_startupRulerDragging) {
+        return false;
+    }
+    if (recordingModeForStartupTool(m_startupTool).has_value()) {
+        return m_pendingRecordingOptions.has_value();
+    }
+    return m_startupTool == StartupTool::CodeScanner || m_startupTool == StartupTool::ColorPicker
+        || m_startupTool == StartupTool::Ruler;
+}
+
+/**
+ * 【截图会话】【工具转移】把当前启动工具转给同一会话中的另一个覆盖层。
+ * 录制工具必须连同已确认的录制配置一起转移，否则目标屏幕完成选区时没有配置可用。
+ * @param target 接收工具的覆盖层。
+ * @return 已完成转移返回 true，目标无效或当前工具不可转移时返回 false。
+ */
+bool ShotWindow::transferStartupToolTo(ShotWindow *target)
+{
+    if (!target || target == this || !startupToolCanFollowPointer()) {
+        return false;
+    }
+    // 1. 【截图会话】【工具转移】先取出工具和录制配置，leaveStartupTool 会清空待处理配置
+    const StartupTool tool = m_startupTool;
+    std::optional<markshot::recording::RecordingOptions> recordingOptions;
+    if (recordingModeForStartupTool(tool).has_value()) {
+        recordingOptions = m_pendingRecordingOptions;
+    }
+    QScreen *sourceScreen = captureScreen();
+    QScreen *targetScreen = target->captureScreen();
+    markshot::debugLog("capture-session",
+                       "【截图会话】【工具转移】tool=%d source=%s target=%s recording=%d",
+                       static_cast<int>(tool),
+                       sourceScreen ? sourceScreen->name().toUtf8().constData() : "(none)",
+                       targetScreen ? targetScreen->name().toUtf8().constData() : "(none)",
+                       recordingOptions.has_value() ? 1 : 0);
+    // 2. 【截图会话】【工具转移】原覆盖层退出工具，避免两块屏幕同时处于同一工具
+    applyRoutedStartupTool(StartupTool::None);
+    // 3. 【截图会话】【工具转移】录制工具在目标覆盖层重新进入区域选区，其他工具直接切换
+    if (recordingOptions.has_value()) {
+        target->m_applyingRoutedStartupTool = true;
+        target->beginRegionRecordingSelection(std::move(*recordingOptions));
+        target->m_applyingRoutedStartupTool = false;
+    } else {
+        target->applyRoutedStartupTool(tool);
+    }
+    return true;
 }
 
 /** 【截图会话】【屏幕状态】读取截图屏幕，无参数，返回指定屏幕或窗口当前屏幕。 */
