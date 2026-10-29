@@ -3,6 +3,7 @@
 #include "text_annotation_layout.h"
 
 #include <QApplication>
+#include <QInputMethodEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QTemporaryDir>
@@ -50,6 +51,17 @@ void wheelAt(ShotWindow &window, QPoint position, int ticks)
                           Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
         QCoreApplication::sendEvent(&window, &event);
     }
+}
+
+/**
+ * 计算光标右侧到编辑器可见区域右边缘的空白宽度。
+ * @param editor 文字编辑器。
+ * @return 光标右侧剩余的像素数，光标越出可见区域时为负数。
+ */
+int caretRightGap(QTextEdit *editor)
+{
+    const QRect caret = editor->cursorRect();
+    return editor->viewport()->width() - (caret.right() + 1);
 }
 
 /**
@@ -265,6 +277,84 @@ private slots:
         window->beginEditingSelectedTextAnnotation();
         window->commitTextEditor();
         QCOMPARE(undoCountOf(*window), before);
+    }
+
+    /** 提供英文与中文两组逐字输入的文字，无参数和返回值。 */
+    void editorGrowsWithEachCharacter_data()
+    {
+        QTest::addColumn<QString>("text");
+        QTest::newRow("latin") << QStringLiteral("Hello world");
+        QTest::newRow("cjk") << QStringLiteral("输入文字测试");
+    }
+
+    /** 验证输入时编辑器从光标宽度起逐字加宽，行尾光标右侧始终留有间隙，无参数和返回值。 */
+    void editorGrowsWithEachCharacter()
+    {
+        QFETCH(QString, text);
+        auto window = createTextWindow();
+        QVERIFY(window);
+        clickAt(*window, QPoint(150, 150));
+        QTextEdit *editor = window->m_textEditor;
+        QVERIFY(editor->isVisible());
+        QVERIFY(editor->placeholderText().isEmpty());
+        QVERIFY(caretRightGap(editor) >= 2);
+
+        // 1. 每输入一个字符框都要变宽，包括空格，光标不贴边也不被裁掉
+        int previousWidth = editor->width();
+        for (const QChar character : text) {
+            editor->insertPlainText(QString(character));
+            QVERIFY2(editor->width() > previousWidth,
+                     qPrintable(QStringLiteral("%1: width %2 -> %3")
+                                    .arg(editor->toPlainText())
+                                    .arg(previousWidth)
+                                    .arg(editor->width())));
+            QVERIFY2(caretRightGap(editor) >= 2,
+                     qPrintable(QStringLiteral("%1: caret gap %2").arg(editor->toPlainText()).arg(caretRightGap(editor))));
+            previousWidth = editor->width();
+        }
+        QVERIFY(!documentWrapped(editor->document()));
+    }
+
+    /** 验证输入法预编辑文字同样撑开编辑器，预编辑光标留在框内，无参数和返回值。 */
+    void editorGrowsWithPreeditText()
+    {
+        auto window = createTextWindow();
+        QVERIFY(window);
+        clickAt(*window, QPoint(150, 150));
+        QTextEdit *editor = window->m_textEditor;
+        const int emptyWidth = editor->width();
+        const QString preeditText = QStringLiteral("nihao");
+        QInputMethodEvent preedit(
+            preeditText, {QInputMethodEvent::Attribute(QInputMethodEvent::Cursor, preeditText.size(), 1)});
+        QCoreApplication::sendEvent(editor, &preedit);
+        QVERIFY(editor->width() > emptyWidth);
+        QVERIFY2(caretRightGap(editor) >= 2, qPrintable(QString::number(caretRightGap(editor))));
+    }
+
+    /** 验证换行后换行宽度保持不变，光标留在框内，框也不超出选区，无参数和返回值。 */
+    void caretStaysInsideWrappedEditor()
+    {
+        auto window = createTextWindow();
+        QVERIFY(window);
+        clickAt(*window, QPoint(300, 150));
+        QTextEdit *editor = window->m_textEditor;
+        qreal wrapWidth = -1.0;
+        for (int i = 0; i < 16; ++i) {
+            editor->insertPlainText(QStringLiteral("测"));
+            QVERIFY2(caretRightGap(editor) >= 2, qPrintable(QStringLiteral("char %1: caret gap %2")
+                                                                .arg(i + 1)
+                                                                .arg(caretRightGap(editor))));
+            if (!documentWrapped(editor->document())) {
+                continue;
+            }
+            // 1. 编辑器尺寸变化不能改写换行宽度，否则提交时的换行会和看到的不同
+            if (wrapWidth < 0.0) {
+                wrapWidth = editor->document()->textWidth();
+            }
+            QCOMPARE(editor->document()->textWidth(), wrapWidth);
+        }
+        QVERIFY(wrapWidth > 0.0);
+        QVERIFY(editor->geometry().x() + editor->width() <= kSelection.x() + kSelection.width());
     }
 
     /** 提供屏幕与图像同尺寸、HiDPI 半尺寸两种缩放，无参数和返回值。 */

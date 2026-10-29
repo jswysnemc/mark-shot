@@ -366,7 +366,7 @@ void ShotWindow::connectSnowTextEditorGeometryIfEnabled()
 }
 
 /**
- * 去掉文字编辑器的虚线框，改用实际字体绘制。开关关闭时直接返回。
+ * 去掉文字编辑器的虚线框和占位提示，改用实际字体绘制。开关关闭时直接返回。
  * @return 无返回值。
  */
 void ShotWindow::applySnowTextEditorChromeIfEnabled()
@@ -374,6 +374,9 @@ void ShotWindow::applySnowTextEditorChromeIfEnabled()
     if (!FEATURE_TEXT_EDITOR_SNOW_INPUT_ENABLED || !m_textEditor) {
         return;
     }
+    // 1. 空输入框只留光标宽度，占位提示放不下，统一不显示
+    m_textEditor->setPlaceholderText(QString());
+    // 2. 字体与成图保持一致
     applyEditorDisplayFontIfEnabled();
 }
 
@@ -389,11 +392,13 @@ void ShotWindow::applySnowTextEditorGeometryIfEnabled()
     }
     m_updatingSnowTextEditorGeometry = true;
 
-    // 1. 先按单行自然宽度测量，超出选区右边界后再换行并增高
+    // 1. 文字右侧固定留出光标宽度和一点间隙，行尾光标不贴边也不被裁掉
     QTextDocument *document = m_textEditor->document();
     constexpr int kPad = 2;
-    const int minWidth = std::max(28, m_textEditor->fontMetrics().height() * 2);
-    const int minHeight = std::max(18, m_textEditor->fontMetrics().height());
+    constexpr int kCaretGap = 2;
+    const int caretReserve = std::max(1, m_textEditor->cursorWidth()) + kCaretGap;
+    const int fontHeight = m_textEditor->fontMetrics().height();
+    const int minHeight = std::max(18, fontHeight);
     const QPoint anchor = m_textEditor->geometry().topLeft();
     // 2. 提交后背景框连同左右内边距都要留在选区内，导出时才不会被裁掉
     const qreal scale = annotationSizeScale(true);
@@ -405,17 +410,21 @@ void ShotWindow::applySnowTextEditorGeometryIfEnabled()
         if (const Annotation *annotation = annotationById(*m_editingTextAnnotationId);
             annotation && textAnnotationWraps(*annotation)) {
             const qreal wrapWidth = annotation->rect.normalized().width() - kTextBackgroundPaddingX * 2.0;
-            widthLimit = std::min(widthLimit, qCeil(wrapWidth * scale) + kPad);
+            widthLimit = std::min(widthLimit, qCeil(wrapWidth * scale) + caretReserve);
         }
     }
-    const int maxWidth = std::max(minWidth, widthLimit);
+    const int maxTextWidth = std::max({1, fontHeight, widthLimit - caretReserve});
     const int maxHeight = std::max(minHeight, height() - anchor.y() - 8);
+    // 4. 按单行自然宽度逐字加宽，含输入法预编辑文字；超出上限后换行并增高
+    // 换行宽度用固定像素值，编辑器改尺寸时 QTextEdit 不会再把它改回视口宽度
+    m_textEditor->setLineWrapMode(QTextEdit::FixedPixelWidth);
     document->setTextWidth(-1);
-    const int editorWidth = std::clamp(qCeil(document->idealWidth()) + kPad, minWidth, maxWidth);
-    document->setTextWidth(std::max(1, editorWidth - kPad));
+    const int textWidth = std::clamp(qCeil(document->idealWidth()), 1, maxTextWidth);
+    m_textEditor->setLineWrapColumnOrWidth(textWidth);
+    const int editorWidth = textWidth + caretReserve;
     const int editorHeight = std::clamp(qCeil(document->size().height()) + kPad, minHeight, maxHeight);
 
-    // 4. 保持左上角锚点，只把超出窗口的部分移回可见区域
+    // 5. 保持左上角锚点，只把超出窗口的部分移回可见区域
     QRect editorRect(anchor, QSize(editorWidth, editorHeight));
     const int maxLeft = std::max(8, width() - editorRect.width() - 8);
     const int maxTop = std::max(8, height() - editorRect.height() - 8);
