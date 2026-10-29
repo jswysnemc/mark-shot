@@ -154,6 +154,8 @@ void writeCaptureSettings(QJsonObject *root, const CaptureSettings &settings)
                    settings.hideOwnWindows);
     setNestedValue(root, {QStringLiteral("capture"), QStringLiteral("doubleClickAction")},
                    captureDoubleClickActionName(settings.doubleClickAction));
+    setNestedValue(root, {QStringLiteral("capture"), QStringLiteral("toolbarPosition")},
+                   captureToolbarPositionName(settings.toolbarPosition));
     setNestedValue(root,
                    {QStringLiteral("capture"),
                     QStringLiteral("selectionLoupe"),

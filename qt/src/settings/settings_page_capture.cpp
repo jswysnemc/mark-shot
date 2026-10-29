@@ -52,6 +52,15 @@ SettingsPageCapture::SettingsPageCapture(QWidget *parent)
                                  static_cast<int>(CaptureDoubleClickAction::Pin));
     m_doubleClickAction->addItem(MS_TR("Cancel Capture"),
                                  static_cast<int>(CaptureDoubleClickAction::Cancel));
+    // 两条工具栏停靠屏幕边缘时位置固定，免去每次截图后寻找菜单（issue #146）
+    m_toolbarPosition = addComboRow(form, MS_TR("Toolbar Position"),
+        MS_TR("Where the toolbars appear after selecting a region."));
+    m_toolbarPosition->addItem(MS_TR("Follow Selection"),
+                               static_cast<int>(CaptureToolbarPosition::FollowSelection));
+    m_toolbarPosition->addItem(MS_TR("Screen Bottom"),
+                               static_cast<int>(CaptureToolbarPosition::ScreenBottom));
+    m_toolbarPosition->addItem(MS_TR("Screen Right"),
+                               static_cast<int>(CaptureToolbarPosition::ScreenRight));
     m_selectionLoupe = addSwitchRow(form,
                                     MS_TR("Selection Loupe"),
                                     MS_TR("Show a magnifier near the cursor and nudge the pointer with arrow keys."));
@@ -70,6 +79,9 @@ void SettingsPageCapture::setConfig(const SettingsConfig &config)
     const int doubleClickIndex =
         m_doubleClickAction->findData(static_cast<int>(config.capture.doubleClickAction));
     m_doubleClickAction->setCurrentIndex(doubleClickIndex >= 0 ? doubleClickIndex : 0);
+    const int toolbarPositionIndex =
+        m_toolbarPosition->findData(static_cast<int>(config.capture.toolbarPosition));
+    m_toolbarPosition->setCurrentIndex(toolbarPositionIndex >= 0 ? toolbarPositionIndex : 0);
     m_selectionLoupe->setChecked(config.capture.selectionLoupeEnabled);
     m_regionDetection->setChecked(config.capture.regionDetectionEnabled);
 }
@@ -87,6 +99,8 @@ void SettingsPageCapture::updateConfig(SettingsConfig *config) const
     config->capture.hideOwnWindows = m_hideOwnWindows->isChecked();
     config->capture.doubleClickAction =
         static_cast<CaptureDoubleClickAction>(m_doubleClickAction->currentData().toInt());
+    config->capture.toolbarPosition =
+        static_cast<CaptureToolbarPosition>(m_toolbarPosition->currentData().toInt());
     config->capture.selectionLoupeEnabled = m_selectionLoupe->isChecked();
     config->capture.regionDetectionEnabled = m_regionDetection->isChecked();
 }

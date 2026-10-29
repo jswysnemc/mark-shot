@@ -187,6 +187,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     if (appConfigOk) {
         m_toolbarAppearance = markshot::toolbarAppearanceFromConfigRoot(appConfigRoot);
         m_doubleClickAction = markshot::captureDoubleClickActionFromConfigRoot(appConfigRoot);
+        m_controls.m_toolbarPosition = markshot::captureToolbarPositionFromConfigRoot(appConfigRoot);
         m_selectionLoupeEnabled = markshot::selectionLoupeEnabledFromConfigRoot(appConfigRoot);
     }
     // 在初始化 UI 之前先加载上次会话的工具默认值,使后续 toolbar/属性面板按
@@ -241,6 +242,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     initializeToolbar();
     initializeImageScrollBars();
     initializeActionToolbar();
+    restoreConfiguredToolbarLayout();
     initializeShortcuts();
     initializeActiveRecordingOverlay();
 
@@ -666,6 +668,8 @@ void ShotWindow::startFullscreenAnnotation()
 void ShotWindow::setImageNavigationEnabled(bool enabled)
 {
     m_imageNavigationEnabled = enabled;
+    // 打开图片的独立窗口不停靠工具栏，切换后按新状态恢复排列方向
+    restoreConfiguredToolbarLayout();
     if (!enabled) {
         m_imageZoom = 1.0;
         m_imageCenterInitialized = false;

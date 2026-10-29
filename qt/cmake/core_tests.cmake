@@ -175,6 +175,24 @@ target_link_libraries(mark-shot-capture-double-click-action-test
 )
 add_test(NAME capture-double-click-action COMMAND mark-shot-capture-double-click-action-test)
 
+qt_add_executable(mark-shot-capture-toolbar-position-test
+    tests/capture_toolbar_position_test.cpp
+    src/capture_toolbar_position.cpp
+    src/capture_toolbar_position.h
+    src/config_value.cpp
+    src/config_value.h
+    src/toolbar_dock_layout.cpp
+    src/toolbar_dock_layout.h
+)
+target_include_directories(mark-shot-capture-toolbar-position-test PRIVATE src)
+target_link_libraries(mark-shot-capture-toolbar-position-test
+    PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Test
+)
+add_test(NAME capture-toolbar-position COMMAND mark-shot-capture-toolbar-position-test)
+
 qt_add_executable(mark-shot-capture-cursor-policy-test
     tests/capture_cursor_policy_test.cpp
     src/capture_cursor_policy.cpp

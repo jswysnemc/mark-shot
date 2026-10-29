@@ -9,6 +9,7 @@
         "selectionLoupe": {
             "enabled": false
         },
+        "toolbarPosition": "selection",
         "wayland": {
             "kde": {
                 "kwinScreenshot": {

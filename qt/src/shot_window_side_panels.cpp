@@ -107,17 +107,7 @@ void ShotWindow::updateOpenWithPanelGeometry()
     m_controls.m_openWithPanel->adjustSize();
     const QSize panelSize(std::min(340, std::max(280, m_controls.m_openWithPanel->sizeHint().width())),
                           std::min(540, std::max(80, m_controls.m_openWithPanel->sizeHint().height())));
-    const QRect toolbarRect = m_fullscreenAnnotation && m_controls.m_toolbar
-        ? m_controls.m_toolbar->geometry()
-        : (m_controls.m_actionToolbar ? m_controls.m_actionToolbar->geometry() : QRect(width() - 64, height() / 2 - 80, 56, 160));
-    int x = toolbarRect.left() - panelSize.width() - kToolbarMargin;
-    int y = toolbarRect.top();
-    if (x < 8) {
-        x = toolbarRect.right() + kToolbarMargin;
-    }
-    x = std::clamp(x, 8, std::max(8, width() - panelSize.width() - 8));
-    y = std::clamp(y, 8, std::max(8, height() - panelSize.height() - 8));
-    m_controls.m_openWithPanel->setGeometry(x, y, panelSize.width(), panelSize.height());
+    m_controls.m_openWithPanel->setGeometry(sidePanelGeometry(panelSize));
 }
 
 /// @brief 切换扩展命令面板的显示状态
@@ -231,15 +221,33 @@ void ShotWindow::updateExtensionPanelGeometry()
     m_controls.m_extensionPanel->adjustSize();
     const QSize panelSize(std::min(380, std::max(300, m_controls.m_extensionPanel->sizeHint().width())),
                           std::min(540, std::max(80, m_controls.m_extensionPanel->sizeHint().height())));
-    const QRect toolbarRect = m_fullscreenAnnotation && m_controls.m_toolbar
+    m_controls.m_extensionPanel->setGeometry(sidePanelGeometry(panelSize));
+}
+
+/// @brief 【截图工具栏】【侧边面板】计算"打开方式"与扩展面板相对锚点工具栏的几何
+///
+/// 默认放在锚点工具栏左侧顶端，左侧放不下时移到右侧；工具栏横向停靠底部时改放其上方并右对齐，
+/// 避免面板压住同一行的另一条工具栏。
+/// @param panelSize 面板尺寸
+/// @return 限制在窗口内的面板几何
+QRect ShotWindow::sidePanelGeometry(QSize panelSize) const
+{
+    // 1. 全屏标注只有主工具栏，选区编辑时锚定副工具栏
+    const bool anchorIsMainToolbar = m_fullscreenAnnotation && m_controls.m_toolbar;
+    const QRect toolbarRect = anchorIsMainToolbar
         ? m_controls.m_toolbar->geometry()
         : (m_controls.m_actionToolbar ? m_controls.m_actionToolbar->geometry() : QRect(width() - 64, height() / 2 - 80, 56, 160));
+    const bool anchorUserPlaced = anchorIsMainToolbar ? m_toolbarUserPlaced : m_actionToolbarUserPlaced;
     int x = toolbarRect.left() - panelSize.width() - kToolbarMargin;
     int y = toolbarRect.top();
-    if (x < 8) {
+    if (toolbarDockActive() && !m_controls.m_toolbarVerticalLayout && !anchorUserPlaced) {
+        // 2. 【截图工具栏】【停靠布局】停靠底部时左右两侧都是工具栏，面板改放锚点上方
+        x = toolbarRect.right() - panelSize.width();
+        y = toolbarRect.top() - panelSize.height() - kToolbarMargin;
+    } else if (x < 8) {
         x = toolbarRect.right() + kToolbarMargin;
     }
     x = std::clamp(x, 8, std::max(8, width() - panelSize.width() - 8));
     y = std::clamp(y, 8, std::max(8, height() - panelSize.height() - 8));
-    m_controls.m_extensionPanel->setGeometry(x, y, panelSize.width(), panelSize.height());
+    return QRect(QPoint(x, y), panelSize);
 }

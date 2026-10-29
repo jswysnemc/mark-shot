@@ -105,7 +105,8 @@ void ShotWindow::updateSelectionSizePanelGeometry()
                        visibleChildRect(this, m_controls.m_actionToolbar),
                        visibleChildRect(this, m_controls.m_annotationPropertyPanel)};
     std::optional<QRect> placed = aspect::placeSelectionHud(input);
-    if (!placed.has_value()) {
+    const bool overlapsToolbars = !placed.has_value();
+    if (overlapsToolbars) {
         input.obstacles = {textEditorRect, shapePopupRect};
         placed = aspect::placeSelectionHud(input);
     }
@@ -117,6 +118,10 @@ void ShotWindow::updateSelectionSizePanelGeometry()
     if (!panel->isVisible()) {
         panel->show();
         panel->raise();
+    }
+    if (overlapsToolbars && m_controls.m_toolbar) {
+        // 4. 只能与工具栏重叠时把状态条压到工具栏下层，选区贴着停靠的工具栏时按钮仍可点击
+        panel->stackUnder(m_controls.m_toolbar);
     }
 }
 

@@ -58,6 +58,7 @@ class ShotWindow final : public QWidget {
     friend class CanvasImageMemoryTest;
     friend class SelectionHistoryRestoreTest;
     friend class TextAnnotationEditingTest;
+    friend class ToolbarDockWindowTest;
 
 public:
     using Action = markshot::shot::types::Action;
@@ -355,6 +356,8 @@ private:
     void toggleCaptureScope();
     void toggleToolbarLayout();
     void applyToolbarLayout();
+    void restoreConfiguredToolbarLayout();
+    bool toolbarDockActive() const;
     void enterFullscreenAnnotation(bool resetAnnotations);
     void leaveFullscreenAnnotation();
     void toggleColorPalette(QPoint position);
@@ -491,6 +494,7 @@ private:
     void updateToolbarState();
     void setFullscreenActionButtonsVisible(bool visible);
     QRect clampedToolbarGeometry(QRect toolbarGeometry) const;
+    QRect sidePanelGeometry(QSize panelSize) const;
     void setStartupTool(StartupTool tool);
     void leaveStartupTool();
     void beginStartupRecording(markshot::recording::RecordingMode mode);

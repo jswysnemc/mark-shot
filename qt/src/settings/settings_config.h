@@ -2,6 +2,7 @@
 
 #include "capture_double_click_action.h"
 #include "capture_freeze_scope.h"
+#include "capture_toolbar_position.h"
 #include "clipboard_image_config.h"
 #include "export_image_effect.h"
 #include "settings/cloud_translate_settings.h"
@@ -34,6 +35,7 @@ struct CaptureSettings {
     bool kdeKwinScreenshotEnabled = true;
     bool hideOwnWindows = true;
     CaptureDoubleClickAction doubleClickAction = CaptureDoubleClickAction::Copy;
+    CaptureToolbarPosition toolbarPosition = CaptureToolbarPosition::FollowSelection;
     bool selectionLoupeEnabled = false;
     bool regionDetectionEnabled = true;
 };

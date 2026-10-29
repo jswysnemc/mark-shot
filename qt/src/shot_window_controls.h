@@ -1,5 +1,6 @@
 #pragma once
 #include "shot_window_qt_fwd.h"
+#include "capture_toolbar_position.h"
 #include "display_capture/display_capture_target.h"
 #include <QPoint>
 #include <QRect>
@@ -72,5 +73,7 @@ struct ShotWindowControls {
     // 主工具栏中仅在全屏标注时显示的分组索引
     QVector<int> m_fullscreenActionGroups;
     bool m_toolbarVerticalLayout = false;
+    // 两条工具栏的摆放方式，会话启动时从应用配置读入一次（issue #146）
+    markshot::CaptureToolbarPosition m_toolbarPosition = markshot::CaptureToolbarPosition::FollowSelection;
 
 };

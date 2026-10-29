@@ -12,7 +12,7 @@ add_dependencies(mark-shot-shell-command-test mark-shot-ocr-fixture)
 add_test(NAME shell-command COMMAND mark-shot-shell-command-test -o -,txt)
 
 # 2. 【窗口测试】【真实入口】复用应用对象，按功能分别检查实际窗口行为
-foreach(window_test IN ITEMS pinned-text-selection capture-history-window settings-idle-repaint settings-card-pages arrow-properties selection-hover-repaint selection-history-restore text-annotation-editing capture-memory canvas-image-memory)
+foreach(window_test IN ITEMS pinned-text-selection capture-history-window settings-idle-repaint settings-card-pages arrow-properties selection-hover-repaint selection-history-restore text-annotation-editing toolbar-dock-window capture-memory canvas-image-memory)
     string(REPLACE "-" "_" source_name "${window_test}")
     qt_add_executable(mark-shot-${window_test}-test
         tests/${source_name}_test.cpp

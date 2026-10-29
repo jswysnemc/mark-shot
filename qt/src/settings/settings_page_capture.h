@@ -29,6 +29,7 @@ private:
     QCheckBox *m_hideOwnWindows = nullptr;
     QComboBox *m_freezeScope = nullptr;
     QComboBox *m_doubleClickAction = nullptr;
+    QComboBox *m_toolbarPosition = nullptr;
     QCheckBox *m_selectionLoupe = nullptr;
     QCheckBox *m_regionDetection = nullptr;
 };

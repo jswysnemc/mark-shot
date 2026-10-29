@@ -130,6 +130,8 @@ qt_add_executable(mark-shot
     src/config_value.h
     src/toolbar_appearance_config.cpp
     src/toolbar_appearance_config.h
+    src/toolbar_dock_layout.cpp
+    src/toolbar_dock_layout.h
     src/translation_language_options.cpp
     src/translation_language_options.h
     src/capture_cursor_policy.cpp
@@ -152,6 +154,8 @@ qt_add_executable(mark-shot
     src/capture_double_click_action.cpp
     src/capture_double_click_action.h
     src/capture_double_click_action_config.cpp
+    src/capture_toolbar_position.cpp
+    src/capture_toolbar_position.h
     src/selection_loupe_config.cpp
     src/selection_loupe_config.h
     src/capture_freeze_scope.cpp

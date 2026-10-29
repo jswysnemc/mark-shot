@@ -106,8 +106,7 @@ void ShotWindow::leaveFullscreenAnnotation()
     m_toolbarUserPlaced = false;
     m_actionToolbarUserPlaced = false;
     m_fullscreenAnnotation = false;
-    m_controls.m_toolbarVerticalLayout = false;
-    applyToolbarLayout();
+    restoreConfiguredToolbarLayout();
     m_selectionDrag = SelectionDrag::None;
     m_annotationDrag = SelectionDrag::None;
     m_annotationSelectionBoxActive = false;
@@ -160,31 +159,6 @@ void ShotWindow::toggleCaptureScope()
     } else {
         enterFullscreenAnnotation(false);
     }
-}
-
-void ShotWindow::toggleToolbarLayout()
-{
-    m_controls.m_toolbarVerticalLayout = !m_controls.m_toolbarVerticalLayout;
-    m_toolbarUserPlaced = false;
-    m_actionToolbarUserPlaced = false;
-    applyToolbarLayout();
-    updateToolbarGeometry();
-    updateOpenWithPanelGeometry();
-    updateExtensionPanelGeometry();
-    updateAnnotationPropertyPanelGeometry();
-    updateToolbarState();
-}
-
-/// @brief 【截图工具栏】【排列方向】按当前横纵状态切换主工具栏组件方向
-/// @return 无返回值
-void ShotWindow::applyToolbarLayout()
-{
-    if (!m_controls.m_toolbarPanel) {
-        return;
-    }
-
-    m_controls.m_toolbarPanel->setOrientation(m_controls.m_toolbarVerticalLayout ? Qt::Vertical : Qt::Horizontal);
-    m_controls.m_toolbarPanel->adjustSize();
 }
 
 /// @brief 【截图工具栏】【动作映射】向指定工具栏组件当前分组添加按钮，并连接业务动作

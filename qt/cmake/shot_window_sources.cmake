@@ -48,6 +48,7 @@ set(MARK_SHOT_WINDOW_SOURCES
     src/shot_window_internal.cpp
     src/shot_window_internal.h
     src/shot_window_layout.cpp
+    src/shot_window_toolbar_placement.cpp
     src/shot_window_lifecycle.cpp
     src/shot_window_line_anchors.cpp
     src/shot_window_line_constraint.cpp
