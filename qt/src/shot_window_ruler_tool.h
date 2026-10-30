@@ -85,8 +85,8 @@ public:
     bool rotateInGroup(Annotation &annotation, const Annotation &before, QPointF center, qreal degrees) const;
 
     /**
-     * 判断指针在尺子上命中的调整方式：先看旋转把手，再看控制点和边框；
-     * 选择工具下尺子内部也可拖动，尺子工具下内部留给新的测量。
+     * 判断指针在选中的尺子上命中的调整方式：先看旋转把手，再看控制点和边框；
+     * 选择工具下长度尺内部也可拖动，尺子工具下内部留给新的测量；角度尺在选中框内任意位置都可拖动。
      * @param window 截图窗口。
      * @param annotation 尺子标注。
      * @param imagePoint 指针位置，图像像素坐标。

@@ -130,12 +130,14 @@ private slots:
         QVERIFY(window->m_ruler.enteredFromSelection);
     }
 
-    /** 验证拖出的尺子成为标注，尺子内部可以再量一把，单击不留下尺子，并可撤销，无参数和返回值。 */
+    /** 验证拖出的尺子成为标注，选中的尺子内部也可以再量一把，单击不留下尺子，并可撤销，无参数和返回值。 */
     void dragCreatesLengthRulers()
     {
         auto window = createRulerWindow();
         QVERIFY(window);
         drag(*window, QPoint(100, 100), QPoint(300, 260));
+        click(*window, QPoint(150, 100));
+        QCOMPARE(window->selectedAnnotationIds().size(), 1);
         drag(*window, QPoint(150, 150), QPoint(200, 180));
         click(*window, QPoint(500, 400));
         const auto drawn = rulers(*window);
@@ -224,6 +226,39 @@ private slots:
         // 3. 拖动顶点只移动顶点，两条边端点保持原位
         drag(*window, QPoint(300, 300), QPoint(320, 310));
         QCOMPARE(rulers(*window).first().points, (QVector<QPointF>{{320, 310}, {400, 300}, {300, 200}}));
+    }
+
+    /** 验证选中的角度尺在选中框内离开两条边的位置也能整体拖动，未选中时那里仍开始新的测量，无参数和返回值。 */
+    void angleRulerMovesFromSelectionFrame()
+    {
+        auto window = createRulerWindow();
+        QVERIFY(window);
+        pressKey(*window, Qt::Key_U);
+        drag(*window, QPoint(300, 300), QPoint(400, 300));
+        sendMouse(*window, QEvent::MouseMove, QPoint(300, 200), Qt::NoButton);
+        click(*window, QPoint(300, 200));
+        const int id = rulers(*window).first().id;
+
+        // 1. 未选中时外接矩形内部没有选中框，单击放下新角度尺的顶点
+        click(*window, QPoint(360, 240));
+        QVERIFY(window->m_draft.has_value());
+        pressKey(*window, Qt::Key_Escape);
+        QVERIFY(!window->m_draft.has_value());
+
+        // 2. 单击边选中后，在选中框内离开两条边的位置拖动，三个点一起平移
+        click(*window, QPoint(350, 300));
+        QCOMPARE(window->selectedAnnotationIds(), QVector<int>{id});
+        drag(*window, QPoint(360, 240), QPoint(390, 260));
+        QVERIFY(!window->m_draft.has_value());
+        QCOMPARE(rulers(*window).size(), 1);
+        QCOMPARE(rulers(*window).first().points, (QVector<QPointF>{{330, 320}, {430, 320}, {330, 220}}));
+
+        // 3. 选择工具下选中后同样可以在选中框内拖动
+        window->setTool(Tool::Select);
+        click(*window, QPoint(380, 320));
+        QCOMPARE(window->selectedAnnotationIds(), QVector<int>{id});
+        drag(*window, QPoint(390, 260), QPoint(370, 250));
+        QCOMPARE(rulers(*window).first().points, (QVector<QPointF>{{310, 310}, {410, 310}, {310, 210}}));
     }
 
     /** 验证只单击也能逐点放下角度尺的三个点，无参数和返回值。 */

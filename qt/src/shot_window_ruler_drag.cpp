@@ -115,7 +115,15 @@ ShotWindowRulerTool::SelectionDrag ShotWindowRulerTool::dragAt(const ShotWindow 
     if (rotationHandleHit(window, annotation, imagePoint)) {
         return SelectionDrag::Rotate;
     }
-    return markshot::ruler::rulerDragAt(annotation, imagePoint, imageTolerance(window), window.m_tool != Tool::Ruler);
+    const qreal tolerance = imageTolerance(window);
+    const SelectionDrag drag =
+        markshot::ruler::rulerDragAt(annotation, imagePoint, tolerance, window.m_tool != Tool::Ruler);
+    if (drag != SelectionDrag::None || annotation.rulerMode != RulerMode::Angle) {
+        return drag;
+    }
+    // 2. 选中的角度尺画出了选中框，框内任意位置都可整体拖动
+    const QRectF frame = markshot::ruler::rulerBounds(annotation).adjusted(-tolerance, -tolerance, tolerance, tolerance);
+    return frame.contains(imagePoint) ? SelectionDrag::Move : SelectionDrag::None;
 }
 
 ShotWindowRulerTool::SelectionDrag ShotWindowRulerTool::hoverDragAt(QPointF imagePoint, qreal *rotationDegrees) const

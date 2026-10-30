@@ -58,34 +58,34 @@ QPointF ShotWindowRulerTool::anglePoint(const QVector<QPointF> &points, QPointF 
 }
 
 /**
- * 查找尺子工具下命中的已有尺子：选中尺子的旋转把手最先，其次是选中的尺子，再从上到下，内部不算命中。
+ * 查找尺子工具下命中的已有尺子：选中的尺子最先，旋转把手和角度尺选中框只在选中时命中；
+ * 其余尺子从上到下，内部不算命中。
  * @param imagePoint 指针位置，图像像素坐标。
  * @return 命中的尺子编号和调整方式，未命中时为空。
  */
 std::optional<std::pair<int, ShotWindowRulerTool::SelectionDrag>> ShotWindowRulerTool::hitAt(QPointF imagePoint) const
 {
-    const qreal tolerance = imageTolerance(m_window);
-    QVector<int> order;
+    // 1. 选中的尺子画出了旋转把手，角度尺还画出了选中框，先按选中尺子判断
     const QVector<int> selected = m_window.selectedAnnotationIds();
     if (selected.size() == 1) {
-        // 1. 旋转把手只画在选中的尺子上，也只在选中时命中
         const Annotation *annotation = m_window.annotationById(selected.first());
-        if (annotation && annotation->tool == Tool::Ruler && rotationHandleHit(m_window, *annotation, imagePoint)) {
-            return std::make_pair(annotation->id, SelectionDrag::Rotate);
+        if (annotation && annotation->tool == Tool::Ruler) {
+            const SelectionDrag drag = dragAt(m_window, *annotation, imagePoint);
+            if (drag != SelectionDrag::None) {
+                return std::make_pair(annotation->id, drag);
+            }
         }
-        order.append(selected.first());
     }
+    // 2. 其余尺子从上到下只按控制点、边框和边命中
+    const qreal tolerance = imageTolerance(m_window);
     for (int i = m_window.m_annotations.size() - 1; i >= 0; --i) {
-        order.append(m_window.m_annotations.at(i).id);
-    }
-    for (int id : std::as_const(order)) {
-        const Annotation *annotation = m_window.annotationById(id);
-        if (!annotation || annotation->tool != Tool::Ruler) {
+        const Annotation &annotation = m_window.m_annotations.at(i);
+        if (annotation.tool != Tool::Ruler) {
             continue;
         }
-        const SelectionDrag drag = markshot::ruler::rulerDragAt(*annotation, imagePoint, tolerance, false);
+        const SelectionDrag drag = markshot::ruler::rulerDragAt(annotation, imagePoint, tolerance, false);
         if (drag != SelectionDrag::None) {
-            return std::make_pair(id, drag);
+            return std::make_pair(annotation.id, drag);
         }
     }
     return std::nullopt;
@@ -116,7 +116,7 @@ bool ShotWindowRulerTool::press(QPointF widgetPoint, QPointF imagePoint, Qt::Key
         return true;
     }
 
-    // 3. 命中选中尺子的旋转把手，或已有尺子的控制点、边框时调整这把尺子
+    // 3. 命中选中尺子的旋转把手、角度尺选中框，或已有尺子的控制点、边框时调整这把尺子
     if (const auto hit = hitAt(point)) {
         window.beginAnnotationDrag(hit->first, hit->second, point);
         return true;
