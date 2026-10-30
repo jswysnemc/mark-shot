@@ -12,7 +12,7 @@ markshot::shot::types::HistorySnapshot sample(int index)
     using namespace markshot::shot::types;
     Annotation annotation;
     annotation.id = index;
-    annotation.tool = Tool::Marker;
+    annotation.tool = Tool::Ruler;
     annotation.rect = QRectF(3745.1561043464453, 2.75, 40.5, 70.25);
     annotation.points = {{1.25, -2.5}, {70.75, 80.125}};
     annotation.text = QStringLiteral("第一行\nsecond line");
@@ -35,6 +35,7 @@ markshot::shot::types::HistorySnapshot sample(int index)
     annotation.rectangleStyle = RectangleStyle::Spotlight;
     annotation.markerShape = MarkerShape::SpeechBubble;
     annotation.mosaicStyle = MosaicStyle::Brighten;
+    annotation.rulerMode = RulerMode::Angle;
     HistorySnapshot snapshot;
     snapshot.annotations = {annotation};
     snapshot.selectedAnnotationId = index;

@@ -1,4 +1,5 @@
 #include "shot_window_module.h"
+#include "shot_window_ruler_tool.h"
 
 #include "settings/settings_dialog.h"
 #include "ui/compact_toolbar.h"
@@ -106,6 +107,7 @@ void ShotWindow::leaveFullscreenAnnotation()
     m_toolbarUserPlaced = false;
     m_actionToolbarUserPlaced = false;
     m_fullscreenAnnotation = false;
+    m_ruler.enteredFromSelection = false;
     restoreConfiguredToolbarLayout();
     m_selectionDrag = SelectionDrag::None;
     m_annotationDrag = SelectionDrag::None;
@@ -237,6 +239,9 @@ QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcut
             }
         });
         m_controls.m_shapeMarkerToolbarButton = button;
+    } else if (action == Action::ToolRuler) {
+        // 再次点击已激活的尺子按钮时在长度和角度之间切换
+        connect(button, &QPushButton::clicked, this, [this] { ShotWindowRulerTool(*this).activate(); });
     } else if (action == Action::ToggleCaptureScope) {
         connect(button, &QPushButton::clicked, this, [this] { toggleCaptureScope(); });
     } else if (action == Action::ToggleToolbarLayout) {
@@ -603,8 +608,6 @@ void ShotWindow::setStartupTool(StartupTool tool)
     m_hoveredWindowRect.reset();
     hideDisplayCapturePicker();
     m_startupHoverValid = false;
-    m_startupRulerDragging = false;
-    m_startupRulers.clear();
     m_startupHintAnchor = markshot::startup_hint::PanelAnchor::BottomLeft;
     if (m_controls.m_startupColorPanel) {
         m_controls.m_startupColorPanel->hide();
@@ -612,6 +615,10 @@ void ShotWindow::setStartupTool(StartupTool tool)
     updateCursor();
     update();
     routeStartupToolToCursorScreenIfEnabled();
+    // 1. 【截图】【尺子】尺子留在本屏时直接进入整屏标注；已转到指针屏幕时由目标覆盖层进入
+    if (m_startupTool == StartupTool::Ruler) {
+        ShotWindowRulerTool(*this).enterFromSelection();
+    }
 }
 
 void ShotWindow::leaveStartupTool()
@@ -622,8 +629,6 @@ void ShotWindow::leaveStartupTool()
     m_startupTool = StartupTool::None;
     hideDisplayCapturePicker();
     m_startupHoverValid = false;
-    m_startupRulerDragging = false;
-    m_startupRulers.clear();
     m_dragging = false;
     m_startupHintAnchor = markshot::startup_hint::PanelAnchor::BottomLeft;
     if (m_controls.m_startupColorPanel) {

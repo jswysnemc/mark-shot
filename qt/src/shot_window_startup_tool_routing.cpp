@@ -23,12 +23,13 @@ markshot::shot::types::StartupTool ShotWindow::startupTool() const
 
 /**
  * 【截图会话】【工具转移】判断当前启动工具能否跟随指针跨屏。
- * 扫码、取色、测量在未拖动时可转移；GIF 和视频录制仅在已确认配置、等待选区时可转移。
+ * 扫码、取色在未拖动时可转移；尺子只在按下快捷键的瞬间按指针屏幕转移，随后进入整屏标注；
+ * GIF 和视频录制仅在已确认配置、等待选区时可转移。
  * @return 允许转移时返回 true，无参数。
  */
 bool ShotWindow::startupToolCanFollowPointer() const
 {
-    if (m_mode != Mode::Selecting || m_dragging || m_startupRulerDragging) {
+    if (m_mode != Mode::Selecting || m_dragging) {
         return false;
     }
     if (recordingModeForStartupTool(m_startupTool).has_value()) {

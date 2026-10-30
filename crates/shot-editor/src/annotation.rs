@@ -29,6 +29,7 @@ pub struct Annotation {
     pub rectangle_style: i32,
     pub marker_shape: i32,
     pub mosaic_style: i32,
+    pub ruler_mode: i32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

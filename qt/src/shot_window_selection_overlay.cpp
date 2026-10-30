@@ -1,7 +1,6 @@
 #include "shot_window_module.h"
 
 #include "selection_loupe.h"
-#include "startup_ruler/ruler_painter.h"
 
 using namespace markshot::shot;
 
@@ -11,7 +10,7 @@ void ShotWindow::drawSelectionAdjustmentOverlay(QPainter &painter) const
         && ((m_dragging && m_selectionDrag != SelectionDrag::None) || m_selectionKeyboardAdjusting);
     if ((m_mode != Mode::Selecting && !adjusting)
         || !m_startupHoverValid || m_frozenFrame.isNull()
-        || m_startupTool == StartupTool::ColorPicker || m_startupTool == StartupTool::Ruler) {
+        || m_startupTool == StartupTool::ColorPicker) {
         return;
     }
 
@@ -130,71 +129,6 @@ void ShotWindow::drawStartupShortcutHint(QPainter &painter) const
     markshot::startup_hint::drawPanel(painter, items, layout);
 }
 
-/// @brief 绘制启动阶段的尺寸测量辅助层，悬停十字线之外逐把绘制已拖出的尺子
-/// @param painter 当前绘制器
-/// @return 无返回值
-void ShotWindow::drawStartupRuler(QPainter &painter) const
-{
-    if (!m_startupHoverValid && m_startupRulers.isEmpty()) {
-        return;
-    }
-
-    painter.save();
-    painter.setFont(markshot::theme::uiFont(10, QFont::DemiBold));
-    painter.setPen(QPen(QColor(45, 212, 191, 150), 1.0, Qt::DashLine));
-    const QSizeF windowSize(size());
-
-    // 1. 悬停十字线和坐标取色标签，标签位置登记后尺寸说明会避开它
-    QVector<QRectF> occupiedAreas;
-    if (m_startupHoverValid) {
-        const QPointF hover = imageToWidget(m_startupHoverImagePoint);
-        painter.drawLine(QPointF(m_frozenImageRect.left(), hover.y()), QPointF(m_frozenImageRect.right(), hover.y()));
-        painter.drawLine(QPointF(hover.x(), m_frozenImageRect.top()), QPointF(hover.x(), m_frozenImageRect.bottom()));
-
-        const QColor color = sampledImageColor(m_startupHoverImagePoint);
-        const QString hoverText = QStringLiteral("x %1  y %2  %3")
-                                      .arg(qRound(m_startupHoverImagePoint.x()))
-                                      .arg(qRound(m_startupHoverImagePoint.y()))
-                                      .arg(colorHexRgb(color));
-        const QFontMetrics metrics(painter.font());
-        QRectF hoverLabel(hover.x() + 14.0,
-                          hover.y() + 14.0,
-                          metrics.horizontalAdvance(hoverText) + 18.0,
-                          metrics.height() + 10.0);
-        if (hoverLabel.right() > width() - 8.0) {
-            hoverLabel.moveRight(hover.x() - 14.0);
-        }
-        if (hoverLabel.bottom() > height() - 8.0) {
-            hoverLabel.moveBottom(hover.y() - 14.0);
-        }
-        hoverLabel = markshot::startup_ruler::clampRulerFloatingRect(hoverLabel, windowSize);
-        occupiedAreas.append(hoverLabel);
-        drawRoundedLabel(painter, hoverLabel, hoverText, QColor(8, 13, 19, 225));
-    }
-
-    // 2. 按拖出的先后换算每把尺子，刚按下还没拖开的尺子先不画
-    QVector<markshot::startup_ruler::RulerGeometry> rulers;
-    for (const QLineF &line : m_startupRulers) {
-        const QRectF imageRect = normalizedRect(line.p1(), line.p2());
-        if (imageRect.width() < 1.0 && imageRect.height() < 1.0) {
-            continue;
-        }
-        rulers.append({imageRect, imageRectToWidget(imageRect)});
-    }
-
-    // 3. 先画全部测量框和刻度，再画尺寸说明，说明避开每把尺子的刻度且不会被后画的尺子压住
-    for (const markshot::startup_ruler::RulerGeometry &ruler : std::as_const(rulers)) {
-        markshot::startup_ruler::drawRulerScale(painter, ruler);
-    }
-    const QVector<QRectF> infoLabels = markshot::startup_ruler::layoutRulerInfoLabels(
-        rulers, QFontMetricsF(painter.font()), windowSize, occupiedAreas);
-    for (int i = 0; i < rulers.size(); ++i) {
-        drawRoundedLabel(painter, infoLabels.at(i), markshot::startup_ruler::rulerInfoText(rulers.at(i).imageRect));
-    }
-
-    painter.restore();
-}
-
 /// @brief 绘制当前启动辅助工具
 /// @param painter 当前绘制器
 /// @return 无返回值
@@ -202,7 +136,5 @@ void ShotWindow::drawStartupToolOverlay(QPainter &painter)
 {
     if (m_startupTool == StartupTool::ColorPicker) {
         drawStartupColorLoupe(painter, m_startupHoverImagePoint);
-    } else if (m_startupTool == StartupTool::Ruler) {
-        drawStartupRuler(painter);
     }
 }

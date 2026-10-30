@@ -13,7 +13,7 @@ fn snapshot(id: i32) -> Snapshot {
             "highlighterStyle": 1, "rotationDegrees": 42.25, "magnifierScale": 3.5,
             "magnifierShape": 1, "numberStyle": 6, "fontFamily": "Noto Sans CJK SC",
             "fontWeight": 700, "textItalic": true, "rectangleStyle": 3, "markerShape": 23,
-            "mosaicStyle": 4}]
+            "mosaicStyle": 4, "rulerMode": 1}]
     }))
     .unwrap()
 }

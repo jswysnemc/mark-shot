@@ -1,4 +1,5 @@
 #include "shot_window_module.h"
+#include "shot_window_ruler_tool.h"
 
 namespace shortcuts = markshot::shortcut;
 using namespace markshot::shot;
@@ -133,6 +134,10 @@ bool ShotWindow::eventMatchesDisplayCaptureShortcut(const QKeyEvent *event) cons
 bool ShotWindow::handleConfiguredActionShortcut(QKeyEvent *event)
 {
     if (eventMatchesShortcut(event, Action::Cancel)) {
+        // 1. 尺子工具先撤去草稿；由选区阶段进入时回到选区阶段，不关闭截图
+        if (ShotWindowRulerTool(*this).leaveToSelection()) {
+            return true;
+        }
         emit sessionCancelRequested();
         close();
         return true;
@@ -209,7 +214,7 @@ bool ShotWindow::handleConfiguredActionShortcut(QKeyEvent *event)
  */
 bool ShotWindow::handleConfiguredToolShortcut(QKeyEvent *event)
 {
-    const std::array<Tool, static_cast<int>(Tool::Marker) + 1> tools = {
+    const std::array<Tool, static_cast<int>(Tool::Ruler) + 1> tools = {
         Tool::Move,
         Tool::Select,
         Tool::Pen,
@@ -224,10 +229,16 @@ bool ShotWindow::handleConfiguredToolShortcut(QKeyEvent *event)
         Tool::Magnifier,
         Tool::Laser,
         Tool::Marker,
+        Tool::Ruler,
     };
     for (Tool tool : tools) {
         if (eventMatchesShortcut(event, tool)) {
-            setTool(tool);
+            // 1. 尺子工具再次按快捷键时在长度和角度之间切换
+            if (tool == Tool::Ruler) {
+                ShotWindowRulerTool(*this).activate();
+            } else {
+                setTool(tool);
+            }
             return true;
         }
     }

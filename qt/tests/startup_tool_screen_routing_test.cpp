@@ -21,13 +21,12 @@ class StartupToolScreenRoutingTest final : public QObject {
     Q_OBJECT
 
 private slots:
-    /** 【截图测试】【工具转移】提供扫码、取色和测量三种现有工具，无参数和返回值。 */
+    /** 【截图测试】【工具转移】提供扫码和取色两种停留在选区阶段的工具，尺子会立即进入整屏标注，无参数和返回值。 */
     void followsPointerEntry_data()
     {
         QTest::addColumn<int>("tool");
         QTest::newRow("code-scanner") << static_cast<int>(StartupTool::CodeScanner);
         QTest::newRow("color-picker") << static_cast<int>(StartupTool::ColorPicker);
-        QTest::newRow("ruler") << static_cast<int>(StartupTool::Ruler);
     }
 
     /** 【截图测试】【工具转移】通过实际覆盖层事件验证工具跟随指针进入另一屏幕，无参数和返回值。 */
@@ -119,9 +118,18 @@ private slots:
         const auto sequence = startupTool == StartupTool::ColorPicker ? shortcuts.startupColorPicker
             : startupTool == StartupTool::Ruler ? shortcuts.startupRuler : shortcuts.startupCodeScanner;
         QVERIFY(!sequence.isEmpty());
+        QSignalSpy sourceActivated(&source, &ShotWindow::selectionActivated);
+        QSignalSpy targetActivated(&target, &ShotWindow::selectionActivated);
         QKeyEvent keyPress(QEvent::KeyPress, sequence[0].key(), sequence[0].keyboardModifiers());
         QCoreApplication::sendEvent(&source, &keyPress);
         QCOMPARE(source.startupTool(), StartupTool::None);
+        // 3. 【截图测试】【工具转移】尺子转到指针屏幕后直接进入整屏标注，原屏不进入
+        if (startupTool == StartupTool::Ruler) {
+            QCOMPARE(target.startupTool(), StartupTool::None);
+            QCOMPARE(targetActivated.count(), 1);
+            QCOMPARE(sourceActivated.count(), 0);
+            return;
+        }
         QCOMPARE(target.startupTool(), startupTool);
     }
 

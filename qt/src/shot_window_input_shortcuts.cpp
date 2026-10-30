@@ -51,6 +51,7 @@ qreal annotationWidthWheelStepSize(ShotWindow::Tool tool)
     case ShotWindow::Tool::Arrow:
     case ShotWindow::Tool::Magnifier:
     case ShotWindow::Tool::Laser:
+    case ShotWindow::Tool::Ruler:
         return 1.0;
     }
 
@@ -110,7 +111,7 @@ void ShotWindow::wheelEvent(QWheelEvent *event)
     }
 
     // 1. 【标注】【滚轮输入】正在绘制或拖动时保持当前操作，避免预览覆盖抓取光标
-    if (m_dragging || m_imagePanning || m_toolbarDragging || m_startupRulerDragging) {
+    if (m_dragging || m_imagePanning || m_toolbarDragging) {
         event->accept();
         return;
     }
@@ -127,7 +128,8 @@ void ShotWindow::wheelEvent(QWheelEvent *event)
     // 2. 【标注】【文字编辑】文字工具编辑已有文字时也按该文字自身字号调整，并写入撤销历史
     const bool editingExistingText = m_textEditor && m_textEditor->isVisible()
         && m_editingTextAnnotationId.has_value() && selectedIds.contains(*m_editingTextAnnotationId);
-    const bool editingAnnotationWidth = (m_tool == Tool::Select && !selectedIds.isEmpty()) || editingExistingText;
+    const bool editingAnnotationWidth =
+        ((m_tool == Tool::Select || m_tool == Tool::Ruler) && !selectedIds.isEmpty()) || editingExistingText;
 
     if (!editingAnnotationWidth && wheelZoomsImage()) {
         const qreal factor = imageNavigationWheelFactor(event);
@@ -238,19 +240,6 @@ void ShotWindow::keyPressEvent(QKeyEvent *event)
         && m_startupTool != StartupTool::None
         && eventMatchesShortcut(event, Action::Cancel)) {
         leaveStartupTool();
-        event->accept();
-        return;
-    }
-
-    // 【截图】【尺子】Backspace/Delete 撤掉最后拖出的一把尺子，其余尺子保留
-    if (m_mode == Mode::Selecting
-        && m_startupTool == StartupTool::Ruler
-        && !m_startupRulerDragging
-        && (event->key() == Qt::Key_Backspace || event->key() == Qt::Key_Delete)) {
-        if (!m_startupRulers.isEmpty()) {
-            m_startupRulers.removeLast();
-            update();
-        }
         event->accept();
         return;
     }
@@ -376,7 +365,7 @@ void ShotWindow::keyPressEvent(QKeyEvent *event)
 
     if ((event->key() == Qt::Key_Backspace || event->key() == Qt::Key_Delete)
         && m_mode == Mode::Editing
-        && m_tool == Tool::Select
+        && (m_tool == Tool::Select || m_tool == Tool::Ruler)
         && !selectedAnnotationIds().isEmpty()) {
         commitTextEditor();
         if (removeSelectedLineSkeletonPoint()) {
@@ -442,6 +431,7 @@ bool ShotWindow::selectLatestDrawnAnnotationForWheel()
     case Tool::Text:
     case Tool::Mosaic:
     case Tool::Laser:
+    case Tool::Ruler:
         return false;
     }
     // 2. 【标注】【滚轮选中】切到选择工具后再写入选中，避免切换工具时清掉选中

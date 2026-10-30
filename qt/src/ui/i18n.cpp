@@ -1,4 +1,5 @@
 #include "ui/i18n.h"
+#include "ui/i18n_annotation_tools.h"
 #include "ui/i18n_task_windows.h"
 
 #include "app_config_store.h"
@@ -732,13 +733,12 @@ Language language()
 QString translate(const QString &source)
 {
     if (g_language == Language::Chinese) {
-        const auto taskText = taskWindowChineseTable().constFind(source);
-        if (taskText != taskWindowChineseTable().constEnd()) {
-            return taskText.value();
-        }
-        const auto it = chineseTable().constFind(source);
-        if (it != chineseTable().constEnd()) {
-            return it.value();
+        for (const QHash<QString, QString> *table :
+             {&taskWindowChineseTable(), &annotationToolChineseTable(), &chineseTable()}) {
+            const auto it = table->constFind(source);
+            if (it != table->constEnd()) {
+                return it.value();
+            }
         }
     }
     return source;

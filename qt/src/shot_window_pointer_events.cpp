@@ -1,5 +1,5 @@
 #include "shot_window.h"
-#include "startup_ruler/ruler_set.h"
+#include "shot_window_ruler_tool.h"
 
 #include <QApplication>
 #include <QEnterEvent>
@@ -18,7 +18,7 @@ bool ShotWindow::event(QEvent *event)
         const Qt::MouseButtons buttons = static_cast<QMouseEvent *>(event)->buttons();
         // 1. 【标注】【抓取恢复】先处理丢失的释放事件，避免把无按键悬停继续作为拖动
         if ((m_imagePanning && !buttons.testFlag(Qt::MiddleButton))
-            || ((m_dragging || m_startupRulerDragging) && !buttons.testFlag(Qt::LeftButton))) {
+            || (m_dragging && !buttons.testFlag(Qt::LeftButton))) {
             cancelPointerInteraction();
         }
     } else if (type == QEvent::Hide || type == QEvent::WindowDeactivate) {
@@ -26,10 +26,10 @@ bool ShotWindow::event(QEvent *event)
         clearWheelPreview();
         m_selectionPointerDetached = false;
     } else if (type == QEvent::UngrabMouse) {
-        // 2. 【标注】【抓取恢复】正常释放先提交结果；延后清理仅针对仍未结束的同一次抓取
+        // 2. 【标注】【抓取恢复】正常释放先提交结果；延后清理仅针对仍未结束的同一次抓取，等待单击定点的角度尺不在其中
         const quint64 serial = m_pointerInteractionSerial;
         QTimer::singleShot(0, this, [this, serial] {
-            if (serial == m_pointerInteractionSerial) {
+            if (serial == m_pointerInteractionSerial && !ShotWindowRulerTool(*this).anglePending()) {
                 cancelPointerInteraction();
                 updateCursor();
             }
@@ -57,6 +57,7 @@ bool ShotWindow::event(QEvent *event)
         updatePointerCursor(static_cast<QEnterEvent *>(event)->position());
         break;
     case QEvent::Leave:
+        ShotWindowRulerTool(*this).clearHover();
         clearWheelPreview();
         m_selectionPointerDetached = false;
         updatePointerCursor(QPointF(-1, -1));
@@ -82,7 +83,7 @@ bool ShotWindow::event(QEvent *event)
 
 void ShotWindow::cancelPointerInteraction()
 {
-    if (!m_dragging && !m_imagePanning && !m_toolbarDragging && !m_startupRulerDragging
+    if (!m_dragging && !m_imagePanning && !m_toolbarDragging
         && !m_annotationSelectionBoxActive && !m_draft.has_value() && !m_laserDraft.has_value()) {
         return;
     }
@@ -91,10 +92,6 @@ void ShotWindow::cancelPointerInteraction()
     m_dragging = false;
     m_imagePanning = false;
     m_toolbarDragging = false;
-    if (m_startupRulerDragging) {
-        markshot::startup_ruler::dropUnmeasuredLastRuler(m_startupRulers);
-    }
-    m_startupRulerDragging = false;
     m_selectionDrag = SelectionDrag::None;
     m_annotationDrag = SelectionDrag::None;
     m_annotationHistoryCaptured = false;

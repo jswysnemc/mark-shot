@@ -1,4 +1,5 @@
 #include "shot_window_module.h"
+#include "shot_window_ruler_painter.h"
 
 #include <QScopedValueRollback>
 #include <QScopeGuard>
@@ -307,6 +308,7 @@ QImage ShotWindow::renderedSelection() const
     for (const Annotation &annotation : m_annotations) {
         drawAnnotation(painter, annotation, false);
     }
+    ShotWindowRulerPainter(*this).drawLabels(painter, false);
     painter.end();
     return output;
 }

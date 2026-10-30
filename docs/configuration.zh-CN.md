@@ -196,7 +196,7 @@ Mark Shot 在 Linux 上从 `~/.config/mark-shot/config.json` 读取应用配置�
 | `ocrResultWindow.alwaysOnTop` | 布尔 | `false` | 控制独立 OCR 结果窗口置顶，不继承 `pinnedWindow.alwaysOnTop`。OCR 置顶按钮会保存此设置。关闭时支持正常的 niri 窗口检测和窗口规则。 |
 | `debug.enabled` | 布尔值 | `false` | 在 Linux 和 Windows 上启用调试日志。命令行参数 `--debug` / `--no-debug` 会覆盖此项；除非设置 `--no-debug`，否则 `DEBUG=1` 仍会启用日志。 |
 | `debug.logPath` | 字符串 | 系统临时目录 `mark-shot-scroll.log` | 调试日志输出路径。命令行参数 `--debug-log` 会覆盖此项；未设置配置或命令行路径时，`MARK_SHOT_DEBUG_LOG` 仍然有效。 |
-| `annotation.defaultTool` | 字符串 | `"move"` | 选区完成后默认激活的标注工具。支持的值包括：`move`、`select`、`pen`、`line`、`highlighter`、`rectangle`、`ellipse`、`arrow`、`text`、`number`、`mosaic`、`magnifier`、`laser`。命令行参数 `--default-tool` 会覆盖此项。 |
+| `annotation.defaultTool` | 字符串 | `"move"` | 选区完成后默认激活的标注工具。支持的值包括：`move`、`select`、`pen`、`line`、`highlighter`、`rectangle`、`ellipse`、`arrow`、`text`、`number`、`mosaic`、`magnifier`、`laser`、`marker`、`ruler`。命令行参数 `--default-tool` 会覆盖此项。 |
 | `annotation.fullscreenDefaultTool` | 字符串 | `"laser"` | 全屏标注模式下默认激活的工具。命令行参数 `--fullscreen-default-tool` 会覆盖此项。若在全屏模式下配置为 `move`，系统会自动降级为使用 `select`。 |
 | `annotation.defaultColor` | 字符串 | `"#FF4D4D"` | 初始标注颜色。支持不透明的十六进制格式 `#RRGGBB` 或包含透明度的 `#RRGGBBAA`。命令行参数 `--default-color` 会覆盖此项。 |
 | `save.pathTemplate` | 字符串 | `"{pictures}/mark-shot/mark-shot-{datetime}.png"` | 保存截图文件的路径模板（包括保存动作和另存为的初始文件名）。父级目录在保存时若不存在会自动创建。别名包括：`save.path`、`save.location`、最外层的 `savePathTemplate` 以及 `save.directory`（目录模板）。 |
@@ -250,7 +250,7 @@ Mark Shot 在 Linux 上从 `~/.config/mark-shot/config.json` 读取应用配置�
 ##### 快捷键配置项子节点说明
 
 `shortcuts` 节点支持以下子项配置：
-- **`tools`**（别名：`tool`、`toolShortcuts`）：工具切换快捷键，对应 `defaultTool` 支持的各种工具。
+- **`tools`**（别名：`tool`、`toolShortcuts`）：工具切换快捷键，对应 `defaultTool` 支持的各种工具。尺子工具的 `ruler` 只在 `tools` 中读取；写在顶层的 `ruler` 仍表示选区阶段的尺子快捷键。
 - **`actions`**（别名：`action`、`actionShortcuts`）：全局动作快捷键，支持 `copy`、`save`、`pin`、`upload`、`undo`、`redo`、`cancel`、`openWith`、`extensions`、`scrollCapture`、`ocrCopy`、`clear`、`toggleCaptureScope`、`toggleToolbarLayout`。
 - **`startup`**（别名：`startupTools`、`selection`）：选区前辅助工具的快捷键，支持 `colorPicker`（取色器）、`ruler`（测量尺）、`codeScanner`（扫码）与 `displayCapture`（显示器截取）。
 

@@ -31,6 +31,8 @@ QString toolConfigName(ShotWindow::Tool tool)
     case ShotWindow::Tool::Mosaic: return QStringLiteral("mosaic");
     case ShotWindow::Tool::Magnifier: return QStringLiteral("magnifier");
     case ShotWindow::Tool::Laser: return QStringLiteral("laser");
+    case ShotWindow::Tool::Marker: return QStringLiteral("marker");
+    case ShotWindow::Tool::Ruler: return QStringLiteral("ruler");
     }
     return QStringLiteral("pen");
 }
@@ -67,6 +69,8 @@ QString actionConfigName(ShotWindow::Action action)
     case ShotWindow::Action::ToolMosaic: return QStringLiteral("toolMosaic");
     case ShotWindow::Action::ToolMagnifier: return QStringLiteral("toolMagnifier");
     case ShotWindow::Action::ToolLaser: return QStringLiteral("toolLaser");
+    case ShotWindow::Action::ToolMarker: return QStringLiteral("toolMarker");
+    case ShotWindow::Action::ToolRuler: return QStringLiteral("toolRuler");
     }
     return QStringLiteral("copy");
 }

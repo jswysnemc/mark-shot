@@ -1,4 +1,5 @@
 #include "shot_window_module.h"
+#include "shot_window_ruler_tool.h"
 
 using namespace markshot::shot;
 
@@ -59,6 +60,10 @@ void ShotWindow::initializeShortcuts()
                 beginStartupRecording(markshot::recording::RecordingMode::Video);
                 return;
             }
+            if (tool == Tool::Ruler) {
+                ShotWindowRulerTool(*this).activate();
+                return;
+            }
             setTool(tool);
         });
     };
@@ -75,7 +80,8 @@ void ShotWindow::initializeShortcuts()
                       Tool::Mosaic,
                       Tool::Magnifier,
                       Tool::Laser,
-                       Tool::Marker}) {
+                       Tool::Marker,
+                       Tool::Ruler}) {
         addToolShortcut(tool);
     }
     auto sequenceUsedByTool = [this](const QKeySequence &sequence) {
@@ -154,6 +160,9 @@ void ShotWindow::initializeShortcuts()
     addActionShortcut(Action::Cancel, [this] {
         if (m_mode == Mode::Selecting && m_startupTool != StartupTool::None) {
             leaveStartupTool();
+            return;
+        }
+        if (ShotWindowRulerTool(*this).leaveToSelection()) {
             return;
         }
         emit sessionCancelRequested();

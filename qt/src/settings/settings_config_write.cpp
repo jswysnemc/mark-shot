@@ -66,7 +66,7 @@ void setNestedValue(QJsonObject *object, const QStringList &path, const QJsonVal
 
 /// @brief 返回设置界面支持编辑的标注工具列表。
 /// @return 标注工具数组。
-std::array<ShotWindow::Tool, static_cast<int>(ShotWindow::Tool::Laser) + 1> configurableTools()
+std::array<ShotWindow::Tool, static_cast<int>(ShotWindow::Tool::Ruler) + 1> configurableTools()
 {
     return {ShotWindow::Tool::Move,
             ShotWindow::Tool::Select,
@@ -80,7 +80,9 @@ std::array<ShotWindow::Tool, static_cast<int>(ShotWindow::Tool::Laser) + 1> conf
             ShotWindow::Tool::Number,
             ShotWindow::Tool::Mosaic,
             ShotWindow::Tool::Magnifier,
-            ShotWindow::Tool::Laser};
+            ShotWindow::Tool::Laser,
+            ShotWindow::Tool::Marker,
+            ShotWindow::Tool::Ruler};
 }
 
 /// @brief 返回设置界面支持编辑的动作列表。

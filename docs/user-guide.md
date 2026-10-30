@@ -167,7 +167,7 @@ Before the region is committed you can use the startup overlay tools:
 | Hotkey | Tool | Behaviour |
 | :---: | :--- | :--- |
 | `C` | Color Picker | Sample a pixel; wheel resizes the loupe; left click opens a color panel (HEX / RGB / HSL / HSV / Qt formats); right click or `Esc` exits |
-| `R` | Ruler | Hover reads pixel coordinates; left-drag measures a rectangle with width, height, diagonal and area; right click or `Esc` exits |
+| `R` | Ruler | Opens fullscreen annotation with the Ruler tool selected (see `U` below); `Esc` discards the measurements and returns to region selection |
 | `Q` | Code Scanner | Drag a region around a QR / barcode; the decoded result opens in a copyable window |
 | `D` | Display Capture | Captures all outputs, crops per display, shows hoverable thumbnails (copy / edit / save) |
 | `S` | Stop active GIF / video recording | stops the recording shown in the overlay |
@@ -216,6 +216,7 @@ the annotation toolbar. Tools are switched with the number keys or the toolbar:
 | `N` | Number | sequential numbered markers (Arabic, alpha, roman, Chinese, …) |
 | `M` | Mosaic | switch between `Pixelate` / `Blur` / `Grayscale` / `Invert` / `Brighten` in the property panel; the wheel sets strength |
 | `G` | Laser | temporary strokes that dissolve automatically |
+| `U` | Ruler | `Length` drags a box labelled with width, height, diagonal and area; `Angle` places the vertex, drags the first arm, then clicks the second arm end. Press `U` again or use the property panel to switch. Drag corners, edges or points to adjust, drag the frame or an arm to move, `Delete` removes the selected ruler; the hover crosshair shows coordinates and color. Rulers are included in copied and saved images |
 
 Drawing tips:
 

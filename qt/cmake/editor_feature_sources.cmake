@@ -1,4 +1,4 @@
-# 截图编辑器的滤镜、聚光灯、选区比例、启动尺子与 OCR 表格模块
+# 截图编辑器的滤镜、聚光灯、选区比例、尺子与 OCR 表格模块
 set(MARK_SHOT_EDITOR_FEATURE_SOURCES
     src/annotation_filters/image_filter_effects.cpp
     src/annotation_filters/image_filter_effects.h
@@ -20,10 +20,20 @@ set(MARK_SHOT_EDITOR_FEATURE_SOURCES
     src/selection_aspect/selection_ratio_popup.h
     src/selection_aspect/selection_size_field.cpp
     src/selection_aspect/selection_size_field.h
-    src/startup_ruler/ruler_painter.cpp
-    src/startup_ruler/ruler_painter.h
-    src/startup_ruler/ruler_set.cpp
-    src/startup_ruler/ruler_set.h
+    src/ruler/angle_draft.cpp
+    src/ruler/angle_draft.h
+    src/ruler/angle_painter.cpp
+    src/ruler/angle_painter.h
+    src/ruler/ruler_geometry.cpp
+    src/ruler/ruler_geometry.h
+    src/ruler/ruler_painter.cpp
+    src/ruler/ruler_painter.h
+    src/ruler/ruler_tool_state.h
+    src/shot_window_ruler_painter.cpp
+    src/shot_window_ruler_painter.h
+    src/shot_window_ruler_session.cpp
+    src/shot_window_ruler_tool.cpp
+    src/shot_window_ruler_tool.h
     src/shot_window_filter_rendering.cpp
     src/shot_window_selection_size.cpp
     src/shot_window_style_combos.cpp

@@ -352,7 +352,7 @@ bool ocrResultPanelEnabled()
     return true;
 }
 
-using AutoSelectTools = std::array<bool, static_cast<int>(ShotWindow::Tool::Marker) + 1>;
+using AutoSelectTools = std::array<bool, static_cast<int>(ShotWindow::Tool::Ruler) + 1>;
 
 bool isAutoSelectDefaultKey(const QString &key)
 {

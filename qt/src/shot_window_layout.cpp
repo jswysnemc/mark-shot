@@ -1,4 +1,5 @@
 #include "shot_window_module.h"
+#include "shot_window_ruler_tool.h"
 
 #include <QCursor>
 
@@ -377,6 +378,8 @@ void ShotWindow::updateAnnotationPropertyPanel()
         }
     }
     updateArrowPropertyControls(annotation, !groupSelection && panelTool == Tool::Arrow);
+    // 测量方式只决定新画的尺子，只在尺子工具下显示
+    ShotWindowRulerTool(*this).syncPanel(!groupSelection && m_tool == Tool::Ruler);
     if (m_controls.m_propertyHighlighterStyleCombo) {
         const bool supportsHighlighterStyle = !groupSelection && panelTool == Tool::Highlighter;
         m_controls.m_propertyHighlighterStyleCombo->setVisible(supportsHighlighterStyle);

@@ -40,6 +40,7 @@ struct ShotWindowControls {
     QComboBox *m_propertyNumberStyleCombo = nullptr;
     QComboBox *m_propertyRectangleStyleCombo = nullptr;
     QComboBox *m_propertyMosaicStyleCombo = nullptr;
+    QComboBox *m_propertyRulerModeCombo = nullptr;
     QPushButton *m_propertyResetNumberButton = nullptr;
     QLabel *m_propertyMagnifierScaleGlyphLabel = nullptr;
     QLabel *m_propertyMagnifierScaleLabel = nullptr;

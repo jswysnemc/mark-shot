@@ -5,7 +5,6 @@
 #include <QFont>
 #include <QImage>
 #include <QKeySequence>
-#include <QLineF>
 #include <QPointer>
 #include <QPoint>
 #include <QPointF>
@@ -27,6 +26,7 @@
 #include "toolbar_appearance_config.h"
 #include "toolbar_dock_layout.h"
 #include "region_detection/region_detector.h"
+#include "ruler/ruler_tool_state.h"
 #include "ui/theme.h"
 #include "window_detection.h"
 
@@ -61,7 +61,9 @@ class ShotWindow final : public QWidget {
     friend class SelectionHistoryRestoreTest;
     friend class TextAnnotationEditingTest;
     friend class ToolbarDockWindowTest;
-    friend class StartupRulerTest;
+    friend class RulerAnnotationTest;
+    friend class ShotWindowRulerTool;
+    friend class ShotWindowRulerPainter;
 
 public:
     using Action = markshot::shot::types::Action;
@@ -533,7 +535,6 @@ private:
     /// 根据指针位置更新停止按钮悬停状态。@param pointer 指针位置。@return 指针位于停止按钮上时返回 true。
     bool updateActiveRecordingStopHover(QPointF pointer);
     void drawStartupColorLoupe(QPainter &painter, QPointF imagePoint) const;
-    void drawStartupRuler(QPainter &painter) const;
     QVector<markshot::startup_hint::ShortcutHintItem> startupShortcutHintItems() const;
     bool updateStartupShortcutHintAnchor(QPointF pointer);
     QKeySequence shortcutForAction(Action action) const;
@@ -562,15 +563,14 @@ private:
     bool m_syncingImageScrollBars = false;
     StartupTool m_startupTool = StartupTool::None;
     bool m_startupHoverValid = false;
-    bool m_startupRulerDragging = false;
     qreal m_startupColorLoupeSize = 112.0;
     QPointF m_startupHoverImagePoint;
     bool m_selectionLoupeEnabled = false;
     bool m_selectionPointerDetached = false;
     bool m_selectionKeyboardAdjusting = false;
     QPoint m_selectionPointerHardwareAnchor;
-    // 尺子工具已拖出的尺子，起点和终点为图像坐标，拖动中的尺子在最后
-    QVector<QLineF> m_startupRulers;
+    // 尺子工具的测量方式、粗细、悬停位置和入口
+    markshot::ruler::RulerToolState m_ruler;
     QImage m_sharpViewportCache;
     QRectF m_sharpViewportCacheSourceRect;
     QSize m_sharpViewportCacheTargetSize;
@@ -603,8 +603,8 @@ private:
     // 选区内双击手势执行的动作，会话启动时从应用配置读入一次（issue #85）。
     markshot::CaptureDoubleClickAction m_doubleClickAction =
         markshot::CaptureDoubleClickAction::Copy;
-    std::array<QKeySequence, static_cast<int>(Action::Translate) + 1> m_actionShortcuts;
-    std::array<QKeySequence, static_cast<int>(Tool::Marker) + 1> m_toolShortcuts;
+    std::array<QKeySequence, static_cast<int>(Action::ToolRuler) + 1> m_actionShortcuts;
+    std::array<QKeySequence, static_cast<int>(Tool::Ruler) + 1> m_toolShortcuts;
     QKeySequence m_startupColorPickerShortcut;
     QKeySequence m_startupRulerShortcut;
     QKeySequence m_startupCodeScannerShortcut;
@@ -656,7 +656,7 @@ private:
     qreal m_magnifierScale = 2.75;
     MagnifierShape m_magnifierShape = MagnifierShape::Circle;
     bool m_shapeFilled = false;
-    std::array<bool, static_cast<int>(Tool::Marker) + 1> m_autoSelectAfterDrawByTool = {};
+    std::array<bool, static_cast<int>(Tool::Ruler) + 1> m_autoSelectAfterDrawByTool = {};
     qreal m_rectangleCornerRadius = 0.0;
     RectangleStyle m_rectangleStyle = RectangleStyle::Stroke;
     MosaicStyle m_mosaicStyle = MosaicStyle::Pixelate;

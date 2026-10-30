@@ -64,6 +64,7 @@
     <file alias="tool-number.svg">data/icons/ui/tool-number.svg</file>
     <file alias="tool-pen.svg">data/icons/ui/tool-pen.svg</file>
     <file alias="tool-rectangle.svg">data/icons/ui/tool-rectangle.svg</file>
+    <file alias="tool-ruler.svg">data/icons/ui/tool-ruler.svg</file>
     <file alias="tool-select.svg">data/icons/ui/tool-select.svg</file>
     <file alias="tool-text.svg">data/icons/ui/tool-text.svg</file>
     <file alias="undo.svg">data/icons/ui/undo.svg</file>

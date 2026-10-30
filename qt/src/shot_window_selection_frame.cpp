@@ -1,4 +1,5 @@
 #include "shot_window_module.h"
+#include "shot_window_ruler_painter.h"
 
 namespace cfg = markshot::config;
 namespace shortcuts = markshot::shortcut;
@@ -76,7 +77,10 @@ void ShotWindow::drawSelectedAnnotationFrame(QPainter &painter) const
             }
         }
     }
-    if (rotatedSingleSelection) {
+    if (singleSelectedAnnotation && singleSelectedAnnotation->tool == Tool::Ruler) {
+        // 尺子不旋转，控制点按测量方式画在角点或三个定点上
+        ShotWindowRulerPainter(*this).drawSelectedFrame(painter, *singleSelectedAnnotation);
+    } else if (rotatedSingleSelection) {
         const QRectF localBounds = imageRectToWidget(annotationUnrotatedBounds(*singleSelectedAnnotation));
         const QPointF center = annotationRotationCenter(*singleSelectedAnnotation, true);
         const qreal angle = singleSelectedAnnotation->rotationDegrees;
@@ -470,6 +474,9 @@ QRectF ShotWindow::resizedBounds(QRectF start, SelectionDrag drag, QPointF image
         case SelectionDrag::LineEnd:
         case SelectionDrag::NumberTip:
         case SelectionDrag::NumberBubble:
+        case SelectionDrag::AngleVertex:
+        case SelectionDrag::AngleFirstArm:
+        case SelectionDrag::AngleSecondArm:
         case SelectionDrag::Move:
         case SelectionDrag::None:
             break;
@@ -510,7 +517,7 @@ void ShotWindow::updateAnnotationDeleteButtonHoverIfEnabled(QPointF pointer)
         return;
     }
     const QRectF button = selectedAnnotationDeleteButtonRect();
-    const bool hovered = m_tool == Tool::Select && !m_dragging && button.contains(pointer);
+    const bool hovered = (m_tool == Tool::Select || m_tool == Tool::Ruler) && !m_dragging && button.contains(pointer);
     if (hovered == m_annotationDeleteButtonHovered) {
         return;
     }

@@ -33,6 +33,7 @@ std::optional<ShotWindow::Tool> toolForToolbarAction(ToolbarAction action)
     case ToolbarAction::ToolMosaic: return ShotWindow::Tool::Mosaic;
     case ToolbarAction::ToolMagnifier: return ShotWindow::Tool::Magnifier;
     case ToolbarAction::ToolLaser: return ShotWindow::Tool::Laser;
+    case ToolbarAction::ToolRuler: return ShotWindow::Tool::Ruler;
     default: return std::nullopt;
     }
 }
@@ -66,7 +67,7 @@ constexpr ToolbarAction kMainShapeGroup[] = {ToolbarAction::ToolRectangle, Toolb
                                              ToolbarAction::ToolMarker, ToolbarAction::ToolArrow};
 constexpr ToolbarAction kMainMarkupGroup[] = {ToolbarAction::ToolText, ToolbarAction::ToolNumber,
                                               ToolbarAction::ToolMosaic, ToolbarAction::ToolMagnifier,
-                                              ToolbarAction::ToolLaser};
+                                              ToolbarAction::ToolRuler, ToolbarAction::ToolLaser};
 constexpr ToolbarAction kMainHistoryGroup[] = {ToolbarAction::Clear, ToolbarAction::Undo, ToolbarAction::Redo};
 // 全屏标注时主工具栏追加的分组：视图、输出、会话
 constexpr ToolbarAction kFullscreenViewGroup[] = {ToolbarAction::ToggleCaptureScope,
@@ -138,6 +139,9 @@ std::optional<ShotWindow::Tool> ShotWindow::toolFromName(QString name)
         || key == QStringLiteral("stamp") || key == QStringLiteral("shape-marker")) {
         return Tool::Marker;
     }
+    if (key == QStringLiteral("ruler") || key == QStringLiteral("measure")) {
+        return Tool::Ruler;
+    }
     return std::nullopt;
 }
 
@@ -158,6 +162,7 @@ QStringList ShotWindow::supportedToolNames()
         QStringLiteral("mosaic"),
         QStringLiteral("laser"),
         QStringLiteral("marker"),
+        QStringLiteral("ruler"),
     };
 }
 

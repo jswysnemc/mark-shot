@@ -20,6 +20,8 @@ qreal ShotWindow::currentToolWidth() const
         return m_numberWidth;
     case Tool::Mosaic:
         return m_mosaicBlockSize;
+    case Tool::Ruler:
+        return m_ruler.width;
     case Tool::Pen:
     case Tool::Line:
     case Tool::Arrow:
@@ -51,6 +53,7 @@ qreal ShotWindow::currentToolPreviewSize() const
     case Tool::Ellipse:
     case Tool::Marker:
     case Tool::Magnifier:
+    case Tool::Ruler:
         return std::max<qreal>(1.5, currentToolWidth() * scale);
     case Tool::Highlighter:
         return std::max<qreal>(6.0, currentToolWidth() * scale);
@@ -101,6 +104,7 @@ bool ShotWindow::setSelectedAnnotationWidth(int width, bool captureHistory)
         case Tool::Arrow:
         case Tool::Magnifier:
         case Tool::Laser:
+        case Tool::Ruler:
             return std::clamp<qreal>(requestedWidth, kMinStrokeWidth, kMaxStrokeWidth);
         }
 
@@ -119,6 +123,9 @@ bool ShotWindow::setSelectedAnnotationWidth(int width, bool captureHistory)
             break;
         case Tool::Number:
             m_numberWidth = appliedWidth;
+            break;
+        case Tool::Ruler:
+            m_ruler.width = appliedWidth;
             break;
         case Tool::Move:
         case Tool::Select:
@@ -203,6 +210,9 @@ bool ShotWindow::setSelectedAnnotationWidth(int width, bool captureHistory)
             break;
         case Tool::Number:
             m_numberWidth = newWidth;
+            break;
+        case Tool::Ruler:
+            m_ruler.width = newWidth;
             break;
         case Tool::Move:
         case Tool::Select:

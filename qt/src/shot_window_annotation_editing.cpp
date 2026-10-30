@@ -1,4 +1,5 @@
 #include "shot_window_module.h"
+#include "shot_window_ruler_tool.h"
 
 #include "text_annotation_layout.h"
 
@@ -45,6 +46,7 @@ void ShotWindow::transformAnnotation(Annotation &annotation, QRectF oldBounds, Q
                                  mapPoint(annotation.rect.normalized().bottomRight())).normalized();
         break;
     case Tool::Magnifier:
+    case Tool::Ruler:
         annotation.rect = QRectF(mapPoint(annotation.rect.normalized().topLeft()),
                                  mapPoint(annotation.rect.normalized().bottomRight())).normalized();
         for (QPointF &point : annotation.points) {
@@ -185,6 +187,7 @@ void ShotWindow::updateAnnotationDrag(QPointF imagePoint, bool keepAspectRatio)
         // 放大镜的小框/大框 resize 与平移交互独立处理,逻辑见 shot_window_magnifier_drag.cpp
         updateMagnifierDrag(imagePoint);
     } else if (updateLineAnchorDrag(imagePoint)) {
+    } else if (ShotWindowRulerTool(*this).updateDrag(imagePoint)) {
     } else if (selectedIds.size() == 1
         && (m_annotationDrag == SelectionDrag::NumberTip
             || m_annotationDrag == SelectionDrag::NumberBubble)) {
@@ -533,6 +536,8 @@ QString ShotWindow::currentToolName() const
         return QStringLiteral("Magnifier");
     case Tool::Laser:
         return QStringLiteral("Laser");
+    case Tool::Ruler:
+        return QStringLiteral("Ruler");
     }
 
     return QStringLiteral("Tool");

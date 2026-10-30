@@ -1,4 +1,6 @@
 #include "shot_window_module.h"
+#include "shot_window_ruler_painter.h"
+#include "shot_window_ruler_tool.h"
 
 #include "selection_aspect/selection_aspect_ratio.h"
 
@@ -89,6 +91,7 @@ void ShotWindow::paintEvent(QPaintEvent *event)
         if (m_draft.has_value()) {
             drawAnnotation(painter, *m_draft, true);
         }
+        ShotWindowRulerPainter(*this).drawLabels(painter, true);
         const qint64 now = m_laserClock.isValid() ? m_laserClock.elapsed() : 0;
         for (const LaserStroke &stroke : m_laserStrokes) {
             const qreal opacity = std::clamp(static_cast<qreal>(stroke.expiresAt - now) / kLaserLifetimeMs, 0.0, 1.0);
@@ -169,6 +172,7 @@ void ShotWindow::paintEvent(QPaintEvent *event)
     }
 
     drawStartupToolOverlay(painter);
+    ShotWindowRulerPainter(*this).drawHover(painter);
     drawSelectionAdjustmentOverlay(painter);
     drawStartupShortcutHint(painter);
     drawActiveRecordingStatus(painter);
@@ -257,9 +261,7 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
         return;
     }
 
-    const bool startupPointerTool = m_startupTool == StartupTool::ColorPicker
-        || m_startupTool == StartupTool::Ruler;
-    if (m_mode == Mode::Selecting && startupPointerTool) {
+    if (m_mode == Mode::Selecting && m_startupTool == StartupTool::ColorPicker) {
         if (event->button() != Qt::LeftButton) {
             event->accept();
             return;
@@ -272,21 +274,11 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
         const QPointF imagePoint = clampImagePoint(selectingPointerImagePoint(event->position()));
         m_startupHoverImagePoint = imagePoint;
         m_startupHoverValid = true;
-        if (m_startupTool == StartupTool::ColorPicker) {
-            showStartupColorDialog(sampledImageColor(imagePoint),
-                                   imageToWidget(imagePoint).toPoint());
-            update();
-            event->accept();
-            return;
-        }
-        if (m_startupTool == StartupTool::Ruler) {
-            // 每次按下都新拖一把尺子，之前量好的尺子保留在画面上
-            m_startupRulerDragging = true;
-            m_startupRulers.append(QLineF(imagePoint, imagePoint));
-            update();
-            event->accept();
-            return;
-        }
+        showStartupColorDialog(sampledImageColor(imagePoint),
+                               imageToWidget(imagePoint).toPoint());
+        update();
+        event->accept();
+        return;
     }
 
     if (event->button() != Qt::LeftButton) {
@@ -385,6 +377,9 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
 
     if (m_tool == Tool::Select && selectedAnnotationDeleteButtonRect().contains(event->position())) {
         deleteSelectedAnnotation();
+        return;
+    }
+    if (ShotWindowRulerTool(*this).press(event->position(), imagePoint)) {
         return;
     }
 

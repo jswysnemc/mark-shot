@@ -128,7 +128,8 @@ private slots:
         m_window = std::make_unique<ShotWindow>(image, QString(), QRect(0, 0, 640, 400),
                                                 QVector<markshot::WindowInfo>{}, false);
         m_window->setAttribute(Qt::WA_DeleteOnClose, false);
-        m_window->resize(960, 700);
+        // 窗口高度留足余量：全屏工具栏决定最小宽度，加宽后图片按宽度缩放，上下仍留出画布外的区域
+        m_window->resize(960, 800);
         m_window->startFullscreenAnnotation();
         m_window->setImageNavigationEnabled(true);
         m_window->show();

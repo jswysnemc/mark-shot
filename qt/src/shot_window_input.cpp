@@ -2,7 +2,7 @@
 
 #include "selection_cursor_nudge.h"
 #include "selection_loupe.h"
-#include "startup_ruler/ruler_set.h"
+#include "shot_window_ruler_tool.h"
 
 namespace cfg = markshot::config;
 namespace shortcuts = markshot::shortcut;
@@ -60,15 +60,10 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
         m_startupHoverValid = true;
     }
 
-    const bool startupPointerTool = m_startupTool == StartupTool::ColorPicker
-        || m_startupTool == StartupTool::Ruler;
-    if (m_mode == Mode::Selecting && startupPointerTool) {
-        if (m_frozenImageRect.contains(event->position()) || m_startupRulerDragging) {
+    if (m_mode == Mode::Selecting && m_startupTool == StartupTool::ColorPicker) {
+        if (m_frozenImageRect.contains(event->position())) {
             m_startupHoverImagePoint = clampImagePoint(imagePoint);
             m_startupHoverValid = true;
-            if (m_startupTool == StartupTool::Ruler && m_startupRulerDragging && !m_startupRulers.isEmpty()) {
-                m_startupRulers.last().setP2(m_startupHoverImagePoint);
-            }
         } else {
             m_startupHoverValid = false;
         }
@@ -140,6 +135,10 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
 
     if (m_mode == Mode::Editing && m_tool == Tool::Select && m_dragging && m_annotationSelectionBoxActive) {
         updateAnnotationSelectionBox(imagePoint);
+        return;
+    }
+
+    if (ShotWindowRulerTool(*this).move(event->position(), imagePoint)) {
         return;
     }
 
@@ -240,6 +239,11 @@ void ShotWindow::mouseDoubleClickEvent(QMouseEvent *event)
         QWidget::mouseDoubleClickEvent(event);
         return;
     }
+    // 1. 尺子工具连续单击定点时会被识别为双击，按普通按下处理，不触发双击动作
+    if (m_tool == Tool::Ruler) {
+        mousePressEvent(event);
+        return;
+    }
 
     const QPointF imagePoint = widgetToImage(event->position());
     if (!m_frozenImageRect.contains(event->position())) {
@@ -308,6 +312,9 @@ void ShotWindow::mouseDoubleClickEvent(QMouseEvent *event)
     case Tool::Laser:
         m_laserDraft.reset();
         break;
+    case Tool::Ruler:
+        m_draft.reset();
+        break;
     case Tool::Text:
         // 第一击已经打开这段文字的编辑器，这里不再重复打开，避免提交后又重建输入框
         if (m_textEditor && m_textEditor->isVisible() && m_editingTextAnnotationId == targetId) {
@@ -342,22 +349,6 @@ void ShotWindow::mouseDoubleClickEvent(QMouseEvent *event)
 /// @return 无返回值
 void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
 {
-    if (m_mode == Mode::Selecting
-        && m_startupTool == StartupTool::Ruler
-        && event->button() == Qt::LeftButton
-        && m_startupRulerDragging) {
-        m_startupRulerDragging = false;
-        if (m_frozenImageRect.contains(event->position()) && !m_startupRulers.isEmpty()) {
-            m_startupRulers.last().setP2(clampImagePoint(widgetToImage(event->position())));
-            m_startupHoverImagePoint = m_startupRulers.last().p2();
-            m_startupHoverValid = true;
-        }
-        // 只单击没有拖开时不留下尺子，已量好的尺子不受影响
-        markshot::startup_ruler::dropUnmeasuredLastRuler(m_startupRulers);
-        update();
-        event->accept();
-        return;
-    }
 
     if (m_imagePanning) {
         if (event->button() == Qt::MiddleButton) {
@@ -382,6 +373,11 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
         updateOpenWithPanelGeometry();
         updateExtensionPanelGeometry();
         updateAnnotationPropertyPanelGeometry();
+        return;
+    }
+
+    if (m_mode == Mode::Editing && ShotWindowRulerTool(*this).release(widgetToImage(event->position()))) {
+        updatePointerCursor(event->position());
         return;
     }
 
@@ -507,6 +503,7 @@ void ShotWindow::commitDraft()
 
     if (m_draft->tool != Tool::Pen && !highlighterFreehandDraft && !highlighterLineDraft && m_draft->tool != Tool::Line
         && m_draft->tool != Tool::Arrow && m_draft->tool != Tool::Text && m_draft->tool != Tool::Number
+        && m_draft->tool != Tool::Ruler
         && (m_draft->rect.width() < 2.0 || m_draft->rect.height() < 2.0)) {
         m_draft.reset();
         update();
@@ -547,6 +544,7 @@ void ShotWindow::commitDraft()
         case Tool::Text:
         case Tool::Mosaic:
         case Tool::Laser:
+        case Tool::Ruler:
             break;
         }
     }

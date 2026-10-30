@@ -1,4 +1,5 @@
 #include "shot_window_module.h"
+#include "shot_window_ruler_tool.h"
 
 #include "ui/compact_combo_box.h"
 
@@ -111,4 +112,6 @@ void ShotWindow::initializePropertyStyleCombos(QHBoxLayout *propertyLayout)
         setSelectedNumberStyle(static_cast<NumberStyle>(m_controls.m_propertyNumberStyleCombo->itemData(index).toInt()));
     });
     propertyLayout->addWidget(m_controls.m_propertyNumberStyleCombo);
+    // 6. 尺子测量方式
+    ShotWindowRulerTool(*this).initializePanel(propertyLayout);
 }

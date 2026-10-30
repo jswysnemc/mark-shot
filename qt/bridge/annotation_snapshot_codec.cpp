@@ -41,6 +41,7 @@ QJsonObject encodeAnnotation(const Annotation &annotation)
         {QStringLiteral("rectangleStyle"), static_cast<int>(annotation.rectangleStyle)},
         {QStringLiteral("markerShape"), static_cast<int>(annotation.markerShape)},
         {QStringLiteral("mosaicStyle"), static_cast<int>(annotation.mosaicStyle)},
+        {QStringLiteral("rulerMode"), static_cast<int>(annotation.rulerMode)},
     };
 }
 
@@ -49,7 +50,7 @@ std::optional<Annotation> decodeAnnotation(const QJsonObject &root)
 {
     const QJsonArray rect = root.value(QStringLiteral("rect")).toArray();
     const QJsonValue pointsValue = root.value(QStringLiteral("points"));
-    if (rect.size() != 4 || !pointsValue.isArray() || root.size() != 24) {
+    if (rect.size() != 4 || !pointsValue.isArray() || root.size() != 25) {
         return std::nullopt;
     }
     Annotation annotation;
@@ -85,6 +86,7 @@ std::optional<Annotation> decodeAnnotation(const QJsonObject &root)
     annotation.rectangleStyle = static_cast<RectangleStyle>(root.value(QStringLiteral("rectangleStyle")).toInt());
     annotation.markerShape = static_cast<MarkerShape>(root.value(QStringLiteral("markerShape")).toInt());
     annotation.mosaicStyle = static_cast<MosaicStyle>(root.value(QStringLiteral("mosaicStyle")).toInt());
+    annotation.rulerMode = static_cast<RulerMode>(root.value(QStringLiteral("rulerMode")).toInt());
     return annotation;
 }
 

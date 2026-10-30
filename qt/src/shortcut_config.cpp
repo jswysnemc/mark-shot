@@ -47,6 +47,7 @@ ToolShortcuts defaultToolShortcuts()
     shortcuts[toolIndex(ShotWindow::Tool::Magnifier)] = QKeySequence(Qt::Key_Z);
     shortcuts[toolIndex(ShotWindow::Tool::Laser)] = QKeySequence(Qt::Key_G);
     shortcuts[toolIndex(ShotWindow::Tool::Marker)] = QKeySequence(Qt::Key_K);
+    shortcuts[toolIndex(ShotWindow::Tool::Ruler)] = QKeySequence(Qt::Key_U);
     return shortcuts;
 }
 
@@ -162,7 +163,9 @@ void applyShortcutObject(const QJsonObject &object, ShortcutConfig *config)
         if (!sequence.has_value()) {
             continue;
         }
-        if (const std::optional<ShotWindow::Tool> tool = toolFromConfigName(it.key())) {
+        // 1. 平铺写法中的 ruler 沿用选区阶段尺子的含义，标注工具中的尺子只认 tools 分组
+        const std::optional<ShotWindow::Tool> tool = toolFromConfigName(it.key());
+        if (tool.has_value() && *tool != ShotWindow::Tool::Ruler) {
             config->tools[toolIndex(*tool)] = *sequence;
             continue;
         }
@@ -272,6 +275,9 @@ std::optional<ShotWindow::Tool> toolFromConfigName(QString name)
     if (key == QStringLiteral("marker") || key == QStringLiteral("shape")
         || key == QStringLiteral("stamp") || key == QStringLiteral("shapemarker")) {
         return ShotWindow::Tool::Marker;
+    }
+    if (key == QStringLiteral("ruler")) {
+        return ShotWindow::Tool::Ruler;
     }
     return std::nullopt;
 }

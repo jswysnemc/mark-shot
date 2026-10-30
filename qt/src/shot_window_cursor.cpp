@@ -1,4 +1,5 @@
 #include "shot_window_module.h"
+#include "shot_window_ruler_tool.h"
 
 using namespace markshot::shot;
 
@@ -49,6 +50,9 @@ Qt::CursorShape cursorForSelectionDrag(types::SelectionDrag drag, bool pressed, 
     case Drag::LineStart:
     case Drag::LineEnd:
     case Drag::NumberTip:
+    case Drag::AngleVertex:
+    case Drag::AngleFirstArm:
+    case Drag::AngleSecondArm:
         return Qt::SizeAllCursor;
     case Drag::Move:
     case Drag::Rotate:
@@ -98,7 +102,8 @@ void ShotWindow::updatePointerCursor(QPointF widgetPoint)
         return;
     }
     if (!m_dragging && ((m_mode == Mode::Selecting && m_activeRecordingStopHovered)
-        || (m_tool == Tool::Select && selectedAnnotationDeleteButtonRect().contains(widgetPoint)))) {
+        || ((m_tool == Tool::Select || m_tool == Tool::Ruler)
+            && selectedAnnotationDeleteButtonRect().contains(widgetPoint)))) {
         setCursor(Qt::PointingHandCursor);
         return;
     }
@@ -164,12 +169,19 @@ void ShotWindow::updatePointerCursor(QPointF widgetPoint)
         setCursor(Qt::ArrowCursor);
         return;
     }
+    // 5. 【截图】【尺子】命中尺子控制点或边框时显示调整光标，其余位置用十字开始新的测量
+    if (m_tool == Tool::Ruler) {
+        const SelectionDrag drag = m_dragging ? m_annotationDrag : ShotWindowRulerTool(*this).hoverDragAt(imagePoint);
+        setCursor(drag == SelectionDrag::None ? captureCrossCursor(devicePixelRatioF())
+                                              : cursorForSelectionDrag(drag, m_dragging));
+        return;
+    }
 
-    // 5. 【截图】【标注工具】文字在可输入位置使用插入光标，选区外不能输入时用箭头
+    // 6. 【截图】【标注工具】文字在可输入位置使用插入光标，选区外不能输入时用箭头
     if (m_tool == Tool::Text) {
         setCursor(textToolAcceptsPoint(imagePoint) ? Qt::IBeamCursor : Qt::ArrowCursor);
         return;
     }
-    // 6. 【截图】【标注工具】其余绘制工具使用统一十字
+    // 7. 【截图】【标注工具】其余绘制工具使用统一十字
     setCursor(captureCrossCursor(devicePixelRatioF()));
 }

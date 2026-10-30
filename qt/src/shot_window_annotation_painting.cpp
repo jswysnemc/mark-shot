@@ -1,5 +1,6 @@
 #include "shot_window_module.h"
 #include "annotation/arrow_rendering.h"
+#include "shot_window_ruler_painter.h"
 
 #include "shot_window_marker_shapes.h"
 
@@ -97,6 +98,9 @@ void ShotWindow::drawAnnotation(QPainter &painter, const Annotation &annotation,
         drawMarker(painter, annotation, widgetCoordinates);
         break;
     }
+    case Tool::Ruler:
+        ShotWindowRulerPainter(*this).drawBody(painter, annotation, widgetCoordinates);
+        break;
     case Tool::Ellipse:
         painter.setBrush(annotation.filled ? QBrush(annotation.color) : QBrush(Qt::NoBrush));
         painter.drawEllipse(mapRect(annotation.rect));

@@ -196,7 +196,7 @@ To enable thinking, change `"disabled"` to `"enabled"`; do not use the literal v
 | `ocrResultWindow.alwaysOnTop` | Boolean | `false` | Keeps the separate OCR result window above other windows. Independent of `pinnedWindow.alwaysOnTop`; the OCR pin button persists this setting. Leave it disabled for normal niri window detection and window rules. |
 | `debug.enabled` | Boolean | `false` | Enables debug logging on Linux and Windows. CLI `--debug` / `--no-debug` override this value; `DEBUG=1` still enables logging unless `--no-debug` is set. |
 | `debug.logPath` | String | system temp `mark-shot-scroll.log` | Debug log destination. CLI `--debug-log` overrides this value; `MARK_SHOT_DEBUG_LOG` remains supported when no config or CLI path is set. |
-| `annotation.defaultTool` | String | `"move"` | The default annotation tool active after selecting a region. Supported values: `move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, `magnifier`, `laser`. Overridden by CLI `--default-tool`. |
+| `annotation.defaultTool` | String | `"move"` | The default annotation tool active after selecting a region. Supported values: `move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, `magnifier`, `laser`, `marker`, `ruler`. Overridden by CLI `--default-tool`. |
 | `annotation.fullscreenDefaultTool` | String | `"laser"` | The default tool active in fullscreen annotation mode. Overridden by CLI `--fullscreen-default-tool`. If configured as `move` in fullscreen, the program defaults to `select`. |
 | `annotation.defaultColor` | String | `"#FF4D4D"` | Initial annotation color. Supports `#RRGGBB` (opaque) or `#RRGGBBAA` (with alpha). Overridden by CLI `--default-color`. |
 | `save.pathTemplate` | String | `"{pictures}/mark-shot/mark-shot-{datetime}.png"` | Default PNG path used by Save and as the initial Save As filename. Parent directories are created before saving. Aliases include `save.path`, `save.location`, root `savePathTemplate`, and directory-only `save.directory`. |
@@ -243,7 +243,7 @@ Path values: `{home}` (user home), `{pictures}` (pictures directory), `{desktop}
 ##### Keyboard Shortcut Config Details
 
 The `shortcuts` node supports the following sub-nodes:
-- **`tools`** (alias: `tool`, `toolShortcuts`): Keyboard shortcuts for switching tools (`move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, `magnifier`, `laser`).
+- **`tools`** (alias: `tool`, `toolShortcuts`): Keyboard shortcuts for switching tools (`move`, `select`, `pen`, `line`, `highlighter`, `rectangle`, `ellipse`, `arrow`, `text`, `number`, `mosaic`, `magnifier`, `laser`, `marker`, `ruler`). The `ruler` tool shortcut is only read inside `tools`; a top-level `ruler` key keeps setting the selection-phase ruler shortcut.
 - **`actions`** (alias: `action`, `actionShortcuts`): Keyboard shortcuts for global actions (`copy`, `save`, `pin`, `upload`, `undo`, `redo`, `cancel`, `openWith`, `extensions`, `scrollCapture`, `ocrCopy`, `clear`, `toggleCaptureScope`, `toggleToolbarLayout`).
 - **`startup`** (alias: `startupTools`, `selection`): Keyboard shortcuts for selection-phase tools (`colorPicker`, `ruler`, `codeScanner`, `displayCapture`).
 

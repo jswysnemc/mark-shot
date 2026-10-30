@@ -46,6 +46,7 @@ enum class Action {
     Settings,
     Cancel,
     Translate,
+    ToolRuler,
 };
 
 /// @brief 截图标注工具类型
@@ -64,6 +65,7 @@ enum class Tool {
     Magnifier,
     Laser,
     Marker,
+    Ruler,
 };
 
 /// @brief 打开方式使用的桌面应用信息
@@ -176,6 +178,14 @@ enum class NumberStyle {
     Chinese,
 };
 
+/// @brief 尺子标注的测量方式，已发布编号不得重排
+enum class RulerMode {
+    // 矩形测量框，标出宽、高、对角线和面积
+    Length = 0,
+    // 顶点加两条边，标出夹角度数
+    Angle,
+};
+
 /// @brief 选区与标注的拖动控制点类型
 enum class SelectionDrag {
     None,
@@ -204,6 +214,10 @@ enum class SelectionDrag {
     MagnifierSourceTopRight,
     MagnifierSourceBottomLeft,
     MagnifierSourceBottomRight,
+    // 角度尺的顶点和两条边的端点
+    AngleVertex,
+    AngleFirstArm,
+    AngleSecondArm,
 };
 
 /// @brief 以图像像素坐标保存的标注数据
@@ -232,6 +246,7 @@ struct Annotation {
     RectangleStyle rectangleStyle = RectangleStyle::Stroke;
     MarkerShape markerShape = MarkerShape::Triangle;
     MosaicStyle mosaicStyle = MosaicStyle::Pixelate;
+    RulerMode rulerMode = RulerMode::Length;
 };
 
 /// @brief 标注撤销与重做使用的数据快照

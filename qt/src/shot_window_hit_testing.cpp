@@ -1,4 +1,7 @@
 #include "shot_window_module.h"
+#include "shot_window_ruler_tool.h"
+
+#include "ruler/ruler_geometry.h"
 
 namespace cfg = markshot::config;
 namespace shortcuts = markshot::shortcut;
@@ -11,7 +14,8 @@ bool ShotWindow::propertyComboPopupVisible() const
         || (m_controls.m_propertyArrowStyleCombo && m_controls.m_propertyArrowStyleCombo->view()->isVisible())
         || (m_controls.m_propertyArrowLineStyleCombo && m_controls.m_propertyArrowLineStyleCombo->view()->isVisible())
         || (m_controls.m_propertyHighlighterStyleCombo && m_controls.m_propertyHighlighterStyleCombo->view()->isVisible())
-        || (m_controls.m_propertyNumberStyleCombo && m_controls.m_propertyNumberStyleCombo->view()->isVisible());
+        || (m_controls.m_propertyNumberStyleCombo && m_controls.m_propertyNumberStyleCombo->view()->isVisible())
+        || (m_controls.m_propertyRulerModeCombo && m_controls.m_propertyRulerModeCombo->view()->isVisible());
 }
 
 bool ShotWindow::mouseOverUiWidget(QPointF widgetPoint) const
@@ -117,6 +121,7 @@ bool ShotWindow::annotationSupportsRotation(const Annotation &annotation) const
     case Tool::Move:
     case Tool::Select:
     case Tool::Laser:
+    case Tool::Ruler:
         return false;
     case Tool::Pen:
     case Tool::Line:
@@ -330,6 +335,9 @@ QRectF ShotWindow::annotationUnrotatedBounds(const Annotation &annotation) const
     case Tool::Marker:
     case Tool::Mosaic:
         bounds = annotation.rect.normalized();
+        break;
+    case Tool::Ruler:
+        bounds = markshot::ruler::rulerBounds(annotation);
         break;
     case Tool::Magnifier:
         bounds = annotation.rect.normalized().united(magnifierSourceRect(annotation));
@@ -553,6 +561,9 @@ ShotWindow::SelectionDrag ShotWindow::annotationDragAt(QPointF imagePoint, int a
         return SelectionDrag::None;
     }
 
+    if (annotation->tool == Tool::Ruler) {
+        return ShotWindowRulerTool::dragAt(*this, *annotation, imagePoint);
+    }
     const qreal imageTolerance = 8.0 * m_frozenFrame.width() / std::max<qreal>(1.0, m_frozenImageRect.width());
     if (annotationSupportsRotation(*annotation)) {
         const QPointF rotationHandle = annotationRotationHandlePoint(*annotation, false);
@@ -610,6 +621,12 @@ std::optional<int> ShotWindow::annotationAt(QPointF imagePoint) const
     const qreal imageTolerance = 8.0 * m_frozenFrame.width() / std::max<qreal>(1.0, m_frozenImageRect.width());
     for (int i = m_annotations.size() - 1; i >= 0; --i) {
         const Annotation &annotation = m_annotations.at(i);
+        if (annotation.tool == Tool::Ruler) {
+            if (markshot::ruler::rulerDragAt(annotation, imagePoint, imageTolerance, true) != SelectionDrag::None) {
+                return annotation.id;
+            }
+            continue;
+        }
         QPointF localPoint = imagePoint;
         if (annotationSupportsRotation(annotation)) {
             const QRectF localBounds = annotationUnrotatedBounds(annotation);
