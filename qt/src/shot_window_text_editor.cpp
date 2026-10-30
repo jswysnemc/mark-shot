@@ -449,7 +449,16 @@ bool ShotWindow::applySnowTextEditorGeometryIfEnabled()
     boxRect.moveLeft(std::clamp(boxRect.left(), 8, maxLeft));
     boxRect.moveTop(std::clamp(boxRect.top(), 8, maxTop));
     if (m_textEditor->geometry() != boxRect) {
+        // 7. 选择工具的选中框跟随输入框，控制点和删除按钮在编辑器外侧，新旧位置都要重画
+        const bool selectionFrameShown = m_tool != Tool::Text && !selectedAnnotationIds().isEmpty();
+        auto selectionFrameArea = [this] {
+            return imageRectToWidget(selectedAnnotationsBounds()).adjusted(-48.0, -48.0, 48.0, 48.0).toAlignedRect();
+        };
+        const QRect frameBefore = selectionFrameShown ? selectionFrameArea() : QRect();
         m_textEditor->setGeometry(boxRect);
+        if (selectionFrameShown) {
+            update(frameBefore.united(selectionFrameArea()));
+        }
     }
     m_updatingSnowTextEditorGeometry = false;
     return true;

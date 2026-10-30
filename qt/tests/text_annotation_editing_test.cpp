@@ -364,6 +364,52 @@ private slots:
         QVERIFY(std::abs(editor->width() - editingBox.width()) <= 1);
     }
 
+    /** 提供屏幕与图像同尺寸、HiDPI 半尺寸两种缩放，无参数和返回值。 */
+    void selectionFrameFollowsEditor_data()
+    {
+        QTest::addColumn<int>("imageScale");
+        QTest::newRow("1x") << 1;
+        QTest::newRow("hidpi") << 2;
+    }
+
+    /** 验证选择工具编辑已有文字时，选中框和删除按钮随输入框逐字变大，无参数和返回值。 */
+    void selectionFrameFollowsEditor()
+    {
+        QFETCH(int, imageScale);
+        auto window = createTextWindow(imageScale);
+        QVERIFY(window);
+        clickAt(*window, QPoint(150, 150));
+        QTextEdit *editor = window->m_textEditor;
+        editor->insertPlainText(QStringLiteral("Hello"));
+        window->commitTextEditor();
+        QCOMPARE(window->m_annotations.size(), 1);
+
+        // 1. 选择工具选中文字后进入编辑
+        window->setTool(ShotWindow::Tool::Select);
+        window->setSelectedAnnotations({window->m_annotations.first().id});
+        window->beginEditingSelectedTextAnnotation();
+        QVERIFY(editor->isVisible());
+
+        // 2. 每输入一个字符，选中框与输入框重合，删除按钮跟着右移
+        qreal previousDeleteX = window->selectedAnnotationDeleteButtonRect().left();
+        for (const QChar character : QStringLiteral(" world测试")) {
+            editor->insertPlainText(QString(character));
+            const QRectF frame = window->imageRectToWidget(window->selectedAnnotationsBounds());
+            const QRectF box(editor->geometry());
+            const QString detail = QStringLiteral("%1: frame %2,%3 %4x%5 box %6,%7 %8x%9")
+                                       .arg(editor->toPlainText())
+                                       .arg(frame.x()).arg(frame.y()).arg(frame.width()).arg(frame.height())
+                                       .arg(box.x()).arg(box.y()).arg(box.width()).arg(box.height());
+            QVERIFY2(std::abs(frame.left() - box.left()) <= 1.0, qPrintable(detail));
+            QVERIFY2(std::abs(frame.top() - box.top()) <= 1.0, qPrintable(detail));
+            QVERIFY2(std::abs(frame.right() - box.right()) <= 1.0, qPrintable(detail));
+            QVERIFY2(std::abs(frame.bottom() - box.bottom()) <= 1.0, qPrintable(detail));
+            const qreal deleteX = window->selectedAnnotationDeleteButtonRect().left();
+            QVERIFY2(deleteX > previousDeleteX, qPrintable(detail));
+            previousDeleteX = deleteX;
+        }
+    }
+
     /** 验证按在输入框内边距上只移动光标，输入框保持打开且不提交，无参数和返回值。 */
     void paddingClickKeepsEditorOpen()
     {

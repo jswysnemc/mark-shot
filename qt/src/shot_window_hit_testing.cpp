@@ -336,7 +336,13 @@ QRectF ShotWindow::annotationUnrotatedBounds(const Annotation &annotation) const
         bounds.adjust(-annotation.width, -annotation.width, annotation.width, annotation.width);
         break;
     case Tool::Text:
-        bounds = textContentRect(annotation, false);
+        // 正在输入的文字以输入框为准，选中框、控制点和删除按钮随输入实时变大
+        if (m_textEditor && m_textEditor->isVisible() && m_editingTextAnnotationId == annotation.id) {
+            const QRectF editorBox(m_textEditor->geometry());
+            bounds = QRectF(widgetToImage(editorBox.topLeft()), widgetToImage(editorBox.bottomRight()));
+        } else {
+            bounds = textContentRect(annotation, false);
+        }
         break;
     case Tool::Number: {
         if (annotation.points.isEmpty()) {
