@@ -16,10 +16,12 @@ namespace markshot::ruler {
 namespace {
 
 // 以下尺寸均为默认粗细下的屏幕像素，绘制时乘以缩放倍数
-// 顶点处圆弧半径的上下限，以及占较短一条边的比例
+// 顶点处圆弧半径的上下限，以及默认粗细下占较短一条边的比例
 constexpr qreal kAngleArcMinRadius = 14.0;
 constexpr qreal kAngleArcMaxRadius = 44.0;
 constexpr qreal kAngleArcEdgeRatio = 0.4;
+// 圆弧放大后最多占到较短一条边的比例，边的末端仍露在圆弧外
+constexpr qreal kAngleArcEdgeLimit = 0.8;
 // 角度说明与圆弧的距离，以及与边界的间距
 constexpr qreal kAngleLabelGap = 10.0;
 constexpr qreal kAngleFloatingGap = 8.0;
@@ -28,7 +30,7 @@ constexpr qreal kAngleVertexRadius = 4.0;
 constexpr qreal kAngleEndRadius = 3.0;
 
 /**
- * 计算顶点处圆弧的半径，随较短一条边变短，但不超出上下限。
+ * 计算顶点处圆弧的半径：随较短一条边变短、随粗细放大，但不超出上下限，也不越过边长的限定比例。
  * @param angle 三点齐全的角度尺。
  * @return 圆弧半径，绘制坐标。
  */
@@ -36,7 +38,10 @@ qreal angleArcRadius(const AngleGeometry &angle)
 {
     const qreal shorter = std::min(QLineF(angle.paintPoints.at(0), angle.paintPoints.at(1)).length(),
                                    QLineF(angle.paintPoints.at(0), angle.paintPoints.at(2)).length());
-    return std::clamp(shorter * kAngleArcEdgeRatio, kAngleArcMinRadius * angle.unit, kAngleArcMaxRadius * angle.unit);
+    const qreal radius = std::clamp(shorter * kAngleArcEdgeRatio * angle.sizeScale,
+                                    kAngleArcMinRadius * angle.unit,
+                                    kAngleArcMaxRadius * angle.unit);
+    return std::min(radius, shorter * kAngleArcEdgeLimit);
 }
 
 /**

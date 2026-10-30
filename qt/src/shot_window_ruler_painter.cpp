@@ -93,6 +93,26 @@ markshot::ruler::RulerGeometry ShotWindowRulerPainter::lengthGeometry(const Anno
             labelBounds(widgetCoordinates)};
 }
 
+/**
+ * 汇总一把角度尺的绘制参数：三个定点、缩放倍数、按粗细放大的倍数和颜色。
+ * @param annotation 角度尺。
+ * @param widgetCoordinates true 表示画到窗口。
+ * @return 绘制参数。
+ */
+markshot::ruler::AngleGeometry ShotWindowRulerPainter::angleGeometry(const Annotation &annotation,
+                                                                     bool widgetCoordinates) const
+{
+    markshot::ruler::AngleGeometry angle{annotation.points,
+                                         {},
+                                         unitFor(annotation, widgetCoordinates),
+                                         markshot::ruler::rulerUnitForWidth(annotation.width),
+                                         annotation.color};
+    for (const QPointF &point : annotation.points) {
+        angle.paintPoints.append(mapPoint(point, widgetCoordinates));
+    }
+    return angle;
+}
+
 /** 把图像坐标 imagePoint 换算到绘制坐标，widgetCoordinates 为 false 时原样返回。 */
 QPointF ShotWindowRulerPainter::mapPoint(QPointF imagePoint, bool widgetCoordinates) const
 {
@@ -107,13 +127,8 @@ QRectF ShotWindowRulerPainter::mapRect(const QRectF &imageRect, bool widgetCoord
 
 void ShotWindowRulerPainter::drawBody(QPainter &painter, const Annotation &annotation, bool widgetCoordinates) const
 {
-    const qreal unit = unitFor(annotation, widgetCoordinates);
     if (annotation.rulerMode == RulerMode::Angle) {
-        markshot::ruler::AngleGeometry angle{annotation.points, {}, unit, annotation.color};
-        for (const QPointF &point : annotation.points) {
-            angle.paintPoints.append(mapPoint(point, widgetCoordinates));
-        }
-        markshot::ruler::drawAngleBody(painter, angle);
+        markshot::ruler::drawAngleBody(painter, angleGeometry(annotation, widgetCoordinates));
         return;
     }
     // 1. 刚按下还没拉开的长度尺先不画
@@ -151,11 +166,8 @@ void ShotWindowRulerPainter::drawLabels(QPainter &painter, bool widgetCoordinate
             if (annotation->points.size() < 3) {
                 continue;
             }
-            markshot::ruler::AngleGeometry angle{annotation->points, {}, unit, annotation->color};
-            for (const QPointF &point : annotation->points) {
-                angle.paintPoints.append(mapPoint(point, widgetCoordinates));
-            }
-            const QRectF rect = markshot::ruler::angleInfoLabelRect(angle, bounds);
+            const QRectF rect = markshot::ruler::angleInfoLabelRect(angleGeometry(*annotation, widgetCoordinates),
+                                                                    bounds);
             const qreal degrees = markshot::ruler::angleDegrees(annotation->points.at(0),
                                                                 annotation->points.at(1),
                                                                 annotation->points.at(2));

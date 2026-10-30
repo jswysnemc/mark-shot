@@ -8,6 +8,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QTemporaryDir>
+#include <QWheelEvent>
 #include <QtTest>
 
 #include <memory>
@@ -72,6 +73,30 @@ void pressKey(ShotWindow &window, Qt::Key key)
 {
     QKeyEvent press(QEvent::KeyPress, key, Qt::NoModifier);
     QCoreApplication::sendEvent(&window, &press);
+}
+
+/**
+ * 向截图窗口发送一次向上的滚轮事件。
+ * @param window 截图窗口。
+ * @param position 窗口坐标。
+ * @param notches 滚动的格数。
+ * @return 无返回值。
+ */
+void wheelUp(ShotWindow &window, QPoint position, int notches)
+{
+    QWheelEvent event(QPointF(position), QPointF(window.mapToGlobal(position)), {}, QPoint(0, 120 * notches),
+                      Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(&window, &event);
+}
+
+/**
+ * 计算颜色与白色在三个通道上的差值之和。
+ * @param color 待比较的颜色。
+ * @return 差值之和，白色为 0。
+ */
+int distanceFromWhite(const QColor &color)
+{
+    return (255 - color.red()) + (255 - color.green()) + (255 - color.blue());
 }
 
 }  // namespace
@@ -259,6 +284,30 @@ private slots:
         QCOMPARE(window->selectedAnnotationIds(), QVector<int>{id});
         drag(*window, QPoint(390, 260), QPoint(370, 250));
         QCOMPARE(rulers(*window).first().points, (QVector<QPointF>{{310, 310}, {410, 310}, {310, 210}}));
+    }
+
+    /** 验证选中角度尺后滚轮加粗，顶点处的圆弧和扇形跟着放大，不只是文字变大，无参数和返回值。 */
+    void wheelScalesWholeAngleMarker()
+    {
+        auto window = createRulerWindow();
+        QVERIFY(window);
+        pressKey(*window, Qt::Key_U);
+        drag(*window, QPoint(300, 300), QPoint(400, 300));
+        sendMouse(*window, QEvent::MouseMove, QPoint(300, 200), Qt::NoButton);
+        click(*window, QPoint(300, 200));
+        click(*window, QPoint(350, 300));
+        QCOMPARE(window->selectedAnnotationIds().size(), 1);
+        sendMouse(*window, QEvent::MouseMove, QPoint(700, 550), Qt::NoButton);
+
+        // 1. 默认粗细下圆弧半径 40，距顶点 55、偏离第一条边 20 度的位置在扇形外
+        const QPoint probe(352, 281);
+        QVERIFY(distanceFromWhite(window->grab().toImage().pixelColor(probe)) < 6);
+
+        // 2. 滚轮把粗细从 3 加到 12，圆弧半径放大到 80，同一位置落进扇形
+        wheelUp(*window, QPoint(700, 550), 9);
+        QCOMPARE(rulers(*window).first().width, 12.0);
+        const int tint = distanceFromWhite(window->grab().toImage().pixelColor(probe));
+        QVERIFY2(tint > 12, qPrintable(QString::number(tint)));
     }
 
     /** 验证只单击也能逐点放下角度尺的三个点，无参数和返回值。 */

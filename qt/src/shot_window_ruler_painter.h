@@ -9,6 +9,7 @@ class QPainter;
 class ShotWindow;
 
 namespace markshot::ruler {
+struct AngleGeometry;
 struct RulerGeometry;
 }
 
@@ -63,6 +64,7 @@ private:
     qreal unitFor(const Annotation &annotation, bool widgetCoordinates) const;
     QRectF labelBounds(bool widgetCoordinates) const;
     markshot::ruler::RulerGeometry lengthGeometry(const Annotation &annotation, bool widgetCoordinates) const;
+    markshot::ruler::AngleGeometry angleGeometry(const Annotation &annotation, bool widgetCoordinates) const;
     QPointF mapPoint(QPointF imagePoint, bool widgetCoordinates) const;
     QRectF mapRect(const QRectF &imageRect, bool widgetCoordinates) const;
 

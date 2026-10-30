@@ -18,6 +18,8 @@ struct AngleGeometry {
     QVector<QPointF> paintPoints;
     // 线宽、圆点和字号的缩放倍数
     qreal unit = 1.0;
+    // 只由粗细决定的放大倍数，不含截图和窗口缩放；圆弧占边长的比例随它放大
+    qreal sizeScale = 1.0;
     // 边、圆弧和端点的颜色
     QColor color = QColor(45, 212, 191);
 };
