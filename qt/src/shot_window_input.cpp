@@ -2,6 +2,7 @@
 
 #include "selection_cursor_nudge.h"
 #include "selection_loupe.h"
+#include "startup_ruler/ruler_set.h"
 
 namespace cfg = markshot::config;
 namespace shortcuts = markshot::shortcut;
@@ -65,8 +66,8 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
         if (m_frozenImageRect.contains(event->position()) || m_startupRulerDragging) {
             m_startupHoverImagePoint = clampImagePoint(imagePoint);
             m_startupHoverValid = true;
-            if (m_startupTool == StartupTool::Ruler && m_startupRulerDragging) {
-                m_startupRulerEnd = m_startupHoverImagePoint;
+            if (m_startupTool == StartupTool::Ruler && m_startupRulerDragging && !m_startupRulers.isEmpty()) {
+                m_startupRulers.last().setP2(m_startupHoverImagePoint);
             }
         } else {
             m_startupHoverValid = false;
@@ -346,11 +347,13 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
         && event->button() == Qt::LeftButton
         && m_startupRulerDragging) {
         m_startupRulerDragging = false;
-        if (m_frozenImageRect.contains(event->position())) {
-            m_startupRulerEnd = clampImagePoint(widgetToImage(event->position()));
-            m_startupHoverImagePoint = m_startupRulerEnd;
+        if (m_frozenImageRect.contains(event->position()) && !m_startupRulers.isEmpty()) {
+            m_startupRulers.last().setP2(clampImagePoint(widgetToImage(event->position())));
+            m_startupHoverImagePoint = m_startupRulers.last().p2();
             m_startupHoverValid = true;
         }
+        // 只单击没有拖开时不留下尺子，已量好的尺子不受影响
+        markshot::startup_ruler::dropUnmeasuredLastRuler(m_startupRulers);
         update();
         event->accept();
         return;

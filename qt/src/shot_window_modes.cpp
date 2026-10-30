@@ -604,7 +604,7 @@ void ShotWindow::setStartupTool(StartupTool tool)
     hideDisplayCapturePicker();
     m_startupHoverValid = false;
     m_startupRulerDragging = false;
-    m_startupRulerHasMeasure = false;
+    m_startupRulers.clear();
     m_startupHintAnchor = markshot::startup_hint::PanelAnchor::BottomLeft;
     if (m_controls.m_startupColorPanel) {
         m_controls.m_startupColorPanel->hide();
@@ -623,7 +623,7 @@ void ShotWindow::leaveStartupTool()
     hideDisplayCapturePicker();
     m_startupHoverValid = false;
     m_startupRulerDragging = false;
-    m_startupRulerHasMeasure = false;
+    m_startupRulers.clear();
     m_dragging = false;
     m_startupHintAnchor = markshot::startup_hint::PanelAnchor::BottomLeft;
     if (m_controls.m_startupColorPanel) {

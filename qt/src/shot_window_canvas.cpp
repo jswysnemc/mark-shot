@@ -280,10 +280,9 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
             return;
         }
         if (m_startupTool == StartupTool::Ruler) {
+            // 每次按下都新拖一把尺子，之前量好的尺子保留在画面上
             m_startupRulerDragging = true;
-            m_startupRulerHasMeasure = true;
-            m_startupRulerStart = imagePoint;
-            m_startupRulerEnd = imagePoint;
+            m_startupRulers.append(QLineF(imagePoint, imagePoint));
             update();
             event->accept();
             return;

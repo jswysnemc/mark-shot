@@ -5,6 +5,7 @@
 #include <QFont>
 #include <QImage>
 #include <QKeySequence>
+#include <QLineF>
 #include <QPointer>
 #include <QPoint>
 #include <QPointF>
@@ -60,6 +61,7 @@ class ShotWindow final : public QWidget {
     friend class SelectionHistoryRestoreTest;
     friend class TextAnnotationEditingTest;
     friend class ToolbarDockWindowTest;
+    friend class StartupRulerTest;
 
 public:
     using Action = markshot::shot::types::Action;
@@ -561,15 +563,14 @@ private:
     StartupTool m_startupTool = StartupTool::None;
     bool m_startupHoverValid = false;
     bool m_startupRulerDragging = false;
-    bool m_startupRulerHasMeasure = false;
     qreal m_startupColorLoupeSize = 112.0;
     QPointF m_startupHoverImagePoint;
     bool m_selectionLoupeEnabled = false;
     bool m_selectionPointerDetached = false;
     bool m_selectionKeyboardAdjusting = false;
     QPoint m_selectionPointerHardwareAnchor;
-    QPointF m_startupRulerStart;
-    QPointF m_startupRulerEnd;
+    // 尺子工具已拖出的尺子，起点和终点为图像坐标，拖动中的尺子在最后
+    QVector<QLineF> m_startupRulers;
     QImage m_sharpViewportCache;
     QRectF m_sharpViewportCacheSourceRect;
     QSize m_sharpViewportCacheTargetSize;

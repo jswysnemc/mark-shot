@@ -1,4 +1,5 @@
 #include "shot_window.h"
+#include "startup_ruler/ruler_set.h"
 
 #include <QApplication>
 #include <QEnterEvent>
@@ -90,6 +91,9 @@ void ShotWindow::cancelPointerInteraction()
     m_dragging = false;
     m_imagePanning = false;
     m_toolbarDragging = false;
+    if (m_startupRulerDragging) {
+        markshot::startup_ruler::dropUnmeasuredLastRuler(m_startupRulers);
+    }
     m_startupRulerDragging = false;
     m_selectionDrag = SelectionDrag::None;
     m_annotationDrag = SelectionDrag::None;

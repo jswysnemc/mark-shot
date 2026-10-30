@@ -1,6 +1,7 @@
 #include "shot_window_module.h"
 
 #include "selection_loupe.h"
+#include "startup_ruler/ruler_painter.h"
 
 using namespace markshot::shot;
 
@@ -129,35 +130,22 @@ void ShotWindow::drawStartupShortcutHint(QPainter &painter) const
     markshot::startup_hint::drawPanel(painter, items, layout);
 }
 
-/// @brief 绘制启动阶段的尺寸测量辅助层
+/// @brief 绘制启动阶段的尺寸测量辅助层，悬停十字线之外逐把绘制已拖出的尺子
 /// @param painter 当前绘制器
 /// @return 无返回值
 void ShotWindow::drawStartupRuler(QPainter &painter) const
 {
-    if (!m_startupHoverValid && !m_startupRulerHasMeasure && !m_startupRulerDragging) {
+    if (!m_startupHoverValid && m_startupRulers.isEmpty()) {
         return;
     }
 
     painter.save();
     painter.setFont(markshot::theme::uiFont(10, QFont::DemiBold));
     painter.setPen(QPen(QColor(45, 212, 191, 150), 1.0, Qt::DashLine));
-    auto clampFloatingRect = [this](QRectF rect) {
-        if (rect.right() > width() - 8.0) {
-            rect.moveRight(width() - 8.0);
-        }
-        if (rect.left() < 8.0) {
-            rect.moveLeft(8.0);
-        }
-        if (rect.bottom() > height() - 8.0) {
-            rect.moveBottom(height() - 8.0);
-        }
-        if (rect.top() < 8.0) {
-            rect.moveTop(8.0);
-        }
-        return rect;
-    };
+    const QSizeF windowSize(size());
 
-    std::optional<QRectF> hoverLabelRect;
+    // 1. 悬停十字线和坐标取色标签，标签位置登记后尺寸说明会避开它
+    QVector<QRectF> occupiedAreas;
     if (m_startupHoverValid) {
         const QPointF hover = imageToWidget(m_startupHoverImagePoint);
         painter.drawLine(QPointF(m_frozenImageRect.left(), hover.y()), QPointF(m_frozenImageRect.right(), hover.y()));
@@ -179,129 +167,29 @@ void ShotWindow::drawStartupRuler(QPainter &painter) const
         if (hoverLabel.bottom() > height() - 8.0) {
             hoverLabel.moveBottom(hover.y() - 14.0);
         }
-        hoverLabel = clampFloatingRect(hoverLabel);
-        hoverLabelRect = hoverLabel;
+        hoverLabel = markshot::startup_ruler::clampRulerFloatingRect(hoverLabel, windowSize);
+        occupiedAreas.append(hoverLabel);
         drawRoundedLabel(painter, hoverLabel, hoverText, QColor(8, 13, 19, 225));
     }
 
-    if (!m_startupRulerHasMeasure && !m_startupRulerDragging) {
-        painter.restore();
-        return;
+    // 2. 按拖出的先后换算每把尺子，刚按下还没拖开的尺子先不画
+    QVector<markshot::startup_ruler::RulerGeometry> rulers;
+    for (const QLineF &line : m_startupRulers) {
+        const QRectF imageRect = normalizedRect(line.p1(), line.p2());
+        if (imageRect.width() < 1.0 && imageRect.height() < 1.0) {
+            continue;
+        }
+        rulers.append({imageRect, imageRectToWidget(imageRect)});
     }
 
-    const QRectF imageRect = normalizedRect(m_startupRulerStart, m_startupRulerEnd);
-    if (imageRect.width() < 1.0 && imageRect.height() < 1.0) {
-        painter.restore();
-        return;
+    // 3. 先画全部测量框和刻度，再画尺寸说明，说明避开每把尺子的刻度且不会被后画的尺子压住
+    for (const markshot::startup_ruler::RulerGeometry &ruler : std::as_const(rulers)) {
+        markshot::startup_ruler::drawRulerScale(painter, ruler);
     }
-
-    const QRectF widgetRect = imageRectToWidget(imageRect);
-    painter.setPen(QPen(QColor(45, 212, 191), 2.0));
-    painter.setBrush(QColor(45, 212, 191, 26));
-    painter.drawRoundedRect(widgetRect, 3.0, 3.0);
-
-    const int widthPx = qRound(imageRect.width());
-    const int heightPx = qRound(imageRect.height());
-    const qreal diagonal = std::hypot(imageRect.width(), imageRect.height());
-    const QString info = QStringLiteral("%1 x %2 px   diag %3 px   area %4 px")
-                             .arg(widthPx)
-                             .arg(heightPx)
-                             .arg(qRound(diagonal))
-                             .arg(widthPx * heightPx);
-    const QFontMetrics metrics(painter.font());
-    const QSizeF infoSize(metrics.horizontalAdvance(info) + 20.0, metrics.height() + 10.0);
-    constexpr qreal kRulerFloatingGap = 8.0;
-    constexpr qreal kRulerMajorTickLength = 13.0;
-    constexpr qreal kRulerMinorTickLength = 6.0;
-    constexpr qreal kRulerTopLabelOffset = 30.0;
-    constexpr qreal kRulerTopLabelWidth = 68.0;
-    constexpr qreal kRulerTickLabelHeight = 16.0;
-    constexpr qreal kRulerLeftLabelOffset = 62.0;
-    constexpr qreal kRulerLeftLabelWidth = 48.0;
-    constexpr qreal kRulerTopScaleGap = kRulerTopLabelOffset + kRulerFloatingGap;
-    constexpr qreal kRulerBottomScaleGap = kRulerMajorTickLength + kRulerFloatingGap;
-    constexpr qreal kRulerRightScaleGap = kRulerMajorTickLength + kRulerFloatingGap;
-    constexpr qreal kRulerLeftScaleGap = kRulerLeftLabelOffset + kRulerFloatingGap;
-    const QVector<QRectF> infoCandidates = {
-        QRectF(QPointF(widgetRect.left(), widgetRect.bottom() + kRulerBottomScaleGap), infoSize),
-        QRectF(QPointF(widgetRect.left(), widgetRect.top() - infoSize.height() - kRulerTopScaleGap), infoSize),
-        QRectF(QPointF(widgetRect.right() + kRulerRightScaleGap, widgetRect.top()), infoSize),
-        QRectF(QPointF(widgetRect.left() - infoSize.width() - kRulerLeftScaleGap, widgetRect.top()), infoSize),
-    };
-    const QRectF rulerScaleArea = widgetRect.adjusted(-kRulerLeftScaleGap,
-                                                      -kRulerTopScaleGap,
-                                                      kRulerRightScaleGap,
-                                                      kRulerBottomScaleGap);
-    auto overlapsInfoObstacle = [&](const QRectF &rect) {
-        if (rect.intersects(rulerScaleArea)) {
-            return true;
-        }
-        if (!hoverLabelRect.has_value()) {
-            return false;
-        }
-        return rect.intersects(hoverLabelRect->adjusted(-kRulerFloatingGap,
-                                                        -kRulerFloatingGap,
-                                                        kRulerFloatingGap,
-                                                        kRulerFloatingGap));
-    };
-
-    QRectF infoRect = clampFloatingRect(infoCandidates.first());
-    for (const QRectF &candidate : infoCandidates) {
-        const QRectF clamped = clampFloatingRect(candidate);
-        if (!overlapsInfoObstacle(clamped)) {
-            infoRect = clamped;
-            break;
-        }
-    }
-    drawRoundedLabel(painter, infoRect, info);
-
-    const int stepX = rulerTickStep(imageRect.width());
-    const int stepY = rulerTickStep(imageRect.height());
-    const int minorX = std::max(1, stepX / 5);
-    const int minorY = std::max(1, stepY / 5);
-    painter.setPen(QPen(QColor(204, 251, 241, 230), 1.0));
-    auto drawXTick = [&](int tick, bool major) {
-        if (imageRect.width() <= 0.0) {
-            return;
-        }
-        const qreal x = widgetRect.left() + tick * widgetRect.width() / imageRect.width();
-        const qreal length = major ? kRulerMajorTickLength : kRulerMinorTickLength;
-        painter.drawLine(QPointF(x, widgetRect.top()), QPointF(x, widgetRect.top() - length));
-        painter.drawLine(QPointF(x, widgetRect.bottom()), QPointF(x, widgetRect.bottom() + length));
-        if (major) {
-            const QString text = QString::number(tick);
-            painter.drawText(QRectF(x - kRulerTopLabelWidth / 2.0,
-                                    widgetRect.top() - kRulerTopLabelOffset,
-                                    kRulerTopLabelWidth,
-                                    kRulerTickLabelHeight),
-                             Qt::AlignCenter,
-                             text);
-        }
-    };
-    auto drawYTick = [&](int tick, bool major) {
-        if (imageRect.height() <= 0.0) {
-            return;
-        }
-        const qreal y = widgetRect.top() + tick * widgetRect.height() / imageRect.height();
-        const qreal length = major ? kRulerMajorTickLength : kRulerMinorTickLength;
-        painter.drawLine(QPointF(widgetRect.left(), y), QPointF(widgetRect.left() - length, y));
-        painter.drawLine(QPointF(widgetRect.right(), y), QPointF(widgetRect.right() + length, y));
-        if (major) {
-            const QString text = QString::number(tick);
-            painter.drawText(QRectF(widgetRect.left() - kRulerLeftLabelOffset,
-                                    y - kRulerTickLabelHeight / 2.0,
-                                    kRulerLeftLabelWidth,
-                                    kRulerTickLabelHeight),
-                             Qt::AlignRight | Qt::AlignVCenter,
-                             text);
-        }
-    };
-
-    for (int x = 0; x <= widthPx; x += minorX) {
-        drawXTick(x, x % stepX == 0);
-    }
-    for (int y = 0; y <= heightPx; y += minorY) {
-        drawYTick(y, y % stepY == 0);
+    const QVector<QRectF> infoLabels = markshot::startup_ruler::layoutRulerInfoLabels(
+        rulers, QFontMetricsF(painter.font()), windowSize, occupiedAreas);
+    for (int i = 0; i < rulers.size(); ++i) {
+        drawRoundedLabel(painter, infoLabels.at(i), markshot::startup_ruler::rulerInfoText(rulers.at(i).imageRect));
     }
 
     painter.restore();

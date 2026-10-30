@@ -242,6 +242,19 @@ void ShotWindow::keyPressEvent(QKeyEvent *event)
         return;
     }
 
+    // 【截图】【尺子】Backspace/Delete 撤掉最后拖出的一把尺子，其余尺子保留
+    if (m_mode == Mode::Selecting
+        && m_startupTool == StartupTool::Ruler
+        && !m_startupRulerDragging
+        && (event->key() == Qt::Key_Backspace || event->key() == Qt::Key_Delete)) {
+        if (!m_startupRulers.isEmpty()) {
+            m_startupRulers.removeLast();
+            update();
+        }
+        event->accept();
+        return;
+    }
+
     if (m_mode == Mode::Selecting) {
         if (event->isAutoRepeat()
             && (eventMatchesDisplayCaptureShortcut(event)
