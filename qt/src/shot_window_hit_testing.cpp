@@ -1,4 +1,5 @@
 #include "shot_window_module.h"
+#include "shot_window_ruler_painter.h"
 #include "shot_window_ruler_tool.h"
 
 #include "ruler/ruler_geometry.h"
@@ -121,8 +122,10 @@ bool ShotWindow::annotationSupportsRotation(const Annotation &annotation) const
     case Tool::Move:
     case Tool::Select:
     case Tool::Laser:
-    case Tool::Ruler:
         return false;
+    case Tool::Ruler:
+        // 长度尺随测量框旋转；角度尺旋转时直接改写三个定点，说明位置随之更新
+        return annotation.rulerMode == markshot::shot::types::RulerMode::Length;
     case Tool::Pen:
     case Tool::Line:
     case Tool::Highlighter:
@@ -337,8 +340,8 @@ QRectF ShotWindow::annotationUnrotatedBounds(const Annotation &annotation) const
         bounds = annotation.rect.normalized();
         break;
     case Tool::Ruler:
-        bounds = markshot::ruler::rulerBounds(annotation);
-        break;
+        // 旋转后的测量框可以伸出截图，范围不裁剪，旋转轴心始终是测量框中心
+        return markshot::ruler::rulerBounds(annotation);
     case Tool::Magnifier:
         bounds = annotation.rect.normalized().united(magnifierSourceRect(annotation));
         bounds.adjust(-annotation.width, -annotation.width, annotation.width, annotation.width);
@@ -402,9 +405,12 @@ QPointF ShotWindow::annotationRotationHandlePoint(const Annotation &annotation, 
     } else {
         direction /= length;
     }
+    // 尺子的把手放在上边刻度数字之外，不压住数字
+    const qreal widgetGap =
+        annotation.tool == Tool::Ruler ? ShotWindowRulerPainter(*this).rotationHandleGap(annotation) : 26.0;
     const qreal handleGap = widgetCoordinates
-        ? 26.0
-        : 26.0 / std::max<qreal>(0.001, annotationSizeScale(true));
+        ? widgetGap
+        : widgetGap / std::max<qreal>(0.001, annotationSizeScale(true));
     return topCenter + direction * handleGap;
 }
 

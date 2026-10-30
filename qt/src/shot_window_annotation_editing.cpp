@@ -1,6 +1,7 @@
 #include "shot_window_module.h"
 #include "shot_window_ruler_tool.h"
 
+#include "annotation/rotation_drag.h"
 #include "text_annotation_layout.h"
 
 namespace cfg = markshot::config;
@@ -129,7 +130,7 @@ void ShotWindow::beginAnnotationDrag(int annotationId, SelectionDrag drag, QPoin
     update();
 }
 
-void ShotWindow::updateAnnotationDrag(QPointF imagePoint, bool keepAspectRatio)
+void ShotWindow::updateAnnotationDrag(QPointF imagePoint, bool keepAspectRatio, bool snapRotation)
 {
     const QVector<int> selectedIds = selectedAnnotationIds();
     if (selectedIds.isEmpty() || m_annotationDrag == SelectionDrag::None) {
@@ -146,29 +147,34 @@ void ShotWindow::updateAnnotationDrag(QPointF imagePoint, bool keepAspectRatio)
         }
     }
 
-    if (m_annotationDrag == SelectionDrag::Rotate) {
+    if (ShotWindowRulerTool(*this).updateDrag(imagePoint, snapRotation)) {
+        // 尺子的控制点和角度尺的旋转按尺子自身规则处理,逻辑见 shot_window_ruler_drag.cpp
+    } else if (m_annotationDrag == SelectionDrag::Rotate) {
         const QPointF center = selectedIds.size() == 1
             ? annotationRotationCenter(m_annotationBeforeDrag, false)
             : m_annotationBoundsBeforeDrag.center();
-        const QPointF startVector = m_dragStart - center;
-        const QPointF currentVector = clampImagePoint(imagePoint) - center;
-        if (QLineF(QPointF(0, 0), startVector).length() <= 0.1
-            || QLineF(QPointF(0, 0), currentVector).length() <= 0.1) {
+        const std::optional<qreal> rotation =
+            markshot::annotation::rotationDragDegrees(center, m_dragStart, clampImagePoint(imagePoint));
+        if (!rotation) {
             return;
         }
-        const qreal startAngle = std::atan2(startVector.y(), startVector.x());
-        const qreal currentAngle = std::atan2(currentVector.y(), currentVector.x());
-        const qreal deltaDegrees = (currentAngle - startAngle) * 180.0 / M_PI;
         if (selectedIds.size() == 1) {
             Annotation *annotation = annotationById(selectedIds.first());
             if (!annotation || !annotationSupportsRotation(m_annotationBeforeDrag)) {
                 return;
             }
-            annotation->rotationDegrees =
-                normalizedRotationDegrees(m_annotationBeforeDrag.rotationDegrees + deltaDegrees);
+            // 按住 Shift 时旋转角度吸附到 0、45、90 等 45 度倍数
+            const qreal degrees = m_annotationBeforeDrag.rotationDegrees + *rotation;
+            annotation->rotationDegrees = snapRotation ? markshot::annotation::snappedRotationDegrees(degrees)
+                                                       : normalizedRotationDegrees(degrees);
         } else {
+            // 多选没有统一的旋转角度,按住 Shift 时让整组转过的角度吸附到 45 度倍数
+            const qreal deltaDegrees = snapRotation ? markshot::annotation::snappedRotationDegrees(*rotation) : *rotation;
             for (const Annotation &before : m_annotationsBeforeDrag) {
                 Annotation *annotation = annotationById(before.id);
+                if (annotation && ShotWindowRulerTool(*this).rotateInGroup(*annotation, before, center, deltaDegrees)) {
+                    continue;
+                }
                 if (!annotation || !annotationSupportsRotation(before)) {
                     continue;
                 }
@@ -187,7 +193,6 @@ void ShotWindow::updateAnnotationDrag(QPointF imagePoint, bool keepAspectRatio)
         // 放大镜的小框/大框 resize 与平移交互独立处理,逻辑见 shot_window_magnifier_drag.cpp
         updateMagnifierDrag(imagePoint);
     } else if (updateLineAnchorDrag(imagePoint)) {
-    } else if (ShotWindowRulerTool(*this).updateDrag(imagePoint)) {
     } else if (selectedIds.size() == 1
         && (m_annotationDrag == SelectionDrag::NumberTip
             || m_annotationDrag == SelectionDrag::NumberBubble)) {

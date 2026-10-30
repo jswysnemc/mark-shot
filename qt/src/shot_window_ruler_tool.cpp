@@ -41,7 +41,24 @@ qreal ShotWindowRulerTool::minimumAngleArm() const
 }
 
 /**
- * 查找尺子工具下命中的已有尺子：已选中的尺子优先，其后从上到下，内部不算命中。
+ * 计算角度尺草稿下一点的位置：按住 Shift 时从顶点出发的边吸附到 45 度倍数。
+ * @param points 草稿点列表，为空时表示正要放下顶点。
+ * @param imagePoint 指针位置，图像像素坐标。
+ * @param modifiers 按住的修饰键。
+ * @return 限制在截图范围内的位置，图像像素坐标。
+ */
+QPointF ShotWindowRulerTool::anglePoint(const QVector<QPointF> &points, QPointF imagePoint,
+                                        Qt::KeyboardModifiers modifiers) const
+{
+    const QPointF point = m_window.clampImagePoint(imagePoint);
+    if (points.isEmpty() || !modifiers.testFlag(Qt::ShiftModifier)) {
+        return point;
+    }
+    return m_window.clampImagePoint(constrainedLineEnd(points.first(), point));
+}
+
+/**
+ * 查找尺子工具下命中的已有尺子：选中尺子的旋转把手最先，其次是选中的尺子，再从上到下，内部不算命中。
  * @param imagePoint 指针位置，图像像素坐标。
  * @return 命中的尺子编号和调整方式，未命中时为空。
  */
@@ -51,6 +68,11 @@ std::optional<std::pair<int, ShotWindowRulerTool::SelectionDrag>> ShotWindowRule
     QVector<int> order;
     const QVector<int> selected = m_window.selectedAnnotationIds();
     if (selected.size() == 1) {
+        // 1. 旋转把手只画在选中的尺子上，也只在选中时命中
+        const Annotation *annotation = m_window.annotationById(selected.first());
+        if (annotation && annotation->tool == Tool::Ruler && rotationHandleHit(m_window, *annotation, imagePoint)) {
+            return std::make_pair(annotation->id, SelectionDrag::Rotate);
+        }
         order.append(selected.first());
     }
     for (int i = m_window.m_annotations.size() - 1; i >= 0; --i) {
@@ -69,7 +91,7 @@ std::optional<std::pair<int, ShotWindowRulerTool::SelectionDrag>> ShotWindowRule
     return std::nullopt;
 }
 
-bool ShotWindowRulerTool::press(QPointF widgetPoint, QPointF imagePoint)
+bool ShotWindowRulerTool::press(QPointF widgetPoint, QPointF imagePoint, Qt::KeyboardModifiers modifiers)
 {
     if (!active()) {
         return false;
@@ -79,7 +101,7 @@ bool ShotWindowRulerTool::press(QPointF widgetPoint, QPointF imagePoint)
 
     // 1. 角度尺等待定点时，按下即放下跟随点，按住拖动可继续微调
     if (anglePending()) {
-        AngleDraft::press(window.m_draft->points, point);
+        AngleDraft::press(window.m_draft->points, anglePoint(window.m_draft->points, imagePoint, modifiers));
         window.m_dragging = true;
         window.update();
         return true;
@@ -94,7 +116,7 @@ bool ShotWindowRulerTool::press(QPointF widgetPoint, QPointF imagePoint)
         return true;
     }
 
-    // 3. 命中已有尺子的控制点或边框时调整这把尺子
+    // 3. 命中选中尺子的旋转把手，或已有尺子的控制点、边框时调整这把尺子
     if (const auto hit = hitAt(point)) {
         window.beginAnnotationDrag(hit->first, hit->second, point);
         return true;
@@ -120,7 +142,7 @@ bool ShotWindowRulerTool::press(QPointF widgetPoint, QPointF imagePoint)
     return true;
 }
 
-bool ShotWindowRulerTool::move(QPointF widgetPoint, QPointF imagePoint)
+bool ShotWindowRulerTool::move(QPointF widgetPoint, QPointF imagePoint, Qt::KeyboardModifiers modifiers)
 {
     if (!active()) {
         return false;
@@ -135,9 +157,9 @@ bool ShotWindowRulerTool::move(QPointF widgetPoint, QPointF imagePoint)
         window.m_ruler.hoverImagePoint = point;
     }
 
-    // 2. 拖动已有尺子的控制点或整把尺子
+    // 2. 拖动已有尺子的控制点、旋转把手或整把尺子
     if (window.m_dragging && window.m_annotationDrag != SelectionDrag::None) {
-        window.updateAnnotationDrag(imagePoint, false);
+        window.updateAnnotationDrag(imagePoint, false, modifiers.testFlag(Qt::ShiftModifier));
         window.updateAnnotationPropertyPanelGeometry();
         window.update();
         return true;
@@ -146,7 +168,7 @@ bool ShotWindowRulerTool::move(QPointF widgetPoint, QPointF imagePoint)
     // 3. 草稿跟随指针：长度尺拉开测量框，角度尺移动跟随点
     if (window.m_draft.has_value() && window.m_draft->tool == Tool::Ruler && (window.m_dragging || anglePending())) {
         if (window.m_draft->rulerMode == RulerMode::Angle) {
-            AngleDraft::follow(window.m_draft->points, point);
+            AngleDraft::follow(window.m_draft->points, anglePoint(window.m_draft->points, imagePoint, modifiers));
         } else {
             window.m_draft->rect = normalizedRect(window.m_dragStart, point);
         }
@@ -155,7 +177,7 @@ bool ShotWindowRulerTool::move(QPointF widgetPoint, QPointF imagePoint)
     return true;
 }
 
-bool ShotWindowRulerTool::release(QPointF imagePoint)
+bool ShotWindowRulerTool::release(QPointF imagePoint, Qt::KeyboardModifiers modifiers)
 {
     if (!active()) {
         return false;
@@ -177,7 +199,8 @@ bool ShotWindowRulerTool::release(QPointF imagePoint)
     // 2. 角度尺定下一点后继续定点，三点齐全才提交；长度尺松开即提交
     const QPointF point = window.clampImagePoint(imagePoint);
     if (window.m_draft->rulerMode == RulerMode::Angle) {
-        if (AngleDraft::release(window.m_draft->points, point, minimumAngleArm()) == AngleDraftStep::Continue) {
+        const QPointF anglePosition = anglePoint(window.m_draft->points, imagePoint, modifiers);
+        if (AngleDraft::release(window.m_draft->points, anglePosition, minimumAngleArm()) == AngleDraftStep::Continue) {
             window.update();
             return true;
         }
@@ -209,38 +232,6 @@ bool ShotWindowRulerTool::cancelDraft()
     }
     m_window.cancelPointerInteraction();
     return true;
-}
-
-bool ShotWindowRulerTool::updateDrag(QPointF imagePoint)
-{
-    ShotWindow &window = m_window;
-    if (window.m_annotationBeforeDrag.tool != Tool::Ruler
-        || !markshot::ruler::isRulerHandleDrag(window.m_annotationDrag)
-        || window.selectedAnnotationIds().size() != 1) {
-        return false;
-    }
-    if (Annotation *annotation = window.annotationById(window.m_annotationBeforeDrag.id)) {
-        *annotation = markshot::ruler::draggedRuler(window.m_annotationBeforeDrag,
-                                                    window.m_annotationDrag,
-                                                    window.clampImagePoint(imagePoint));
-    }
-    return true;
-}
-
-ShotWindowRulerTool::SelectionDrag ShotWindowRulerTool::dragAt(const ShotWindow &window,
-                                                              const Annotation &annotation,
-                                                              QPointF imagePoint)
-{
-    return markshot::ruler::rulerDragAt(annotation, imagePoint, imageTolerance(window), window.m_tool != Tool::Ruler);
-}
-
-ShotWindowRulerTool::SelectionDrag ShotWindowRulerTool::hoverDragAt(QPointF imagePoint) const
-{
-    if (anglePending()) {
-        return SelectionDrag::None;
-    }
-    const auto hit = hitAt(imagePoint);
-    return hit ? hit->second : SelectionDrag::None;
 }
 
 void ShotWindowRulerTool::clearHover()

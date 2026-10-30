@@ -62,6 +62,7 @@ class ShotWindow final : public QWidget {
     friend class TextAnnotationEditingTest;
     friend class ToolbarDockWindowTest;
     friend class RulerAnnotationTest;
+    friend class RulerRotationTest;
     friend class ShotWindowRulerTool;
     friend class ShotWindowRulerPainter;
 
@@ -291,7 +292,7 @@ private:
     void moveAnnotation(Annotation &annotation, QPointF delta) const;
     void transformAnnotation(Annotation &annotation, QRectF oldBounds, QRectF newBounds) const;
     void beginAnnotationDrag(int annotationId, SelectionDrag drag, QPointF imagePoint);
-    void updateAnnotationDrag(QPointF imagePoint, bool keepAspectRatio);
+    void updateAnnotationDrag(QPointF imagePoint, bool keepAspectRatio, bool snapRotation);
     bool updateLineAnchorDrag(QPointF imagePoint);
     bool insertLineSkeletonPointAt(int annotationId, QPointF imagePoint);
     bool removeSelectedLineSkeletonPoint();

@@ -171,9 +171,12 @@ void ShotWindow::updatePointerCursor(QPointF widgetPoint)
     }
     // 5. 【截图】【尺子】命中尺子控制点或边框时显示调整光标，其余位置用十字开始新的测量
     if (m_tool == Tool::Ruler) {
-        const SelectionDrag drag = m_dragging ? m_annotationDrag : ShotWindowRulerTool(*this).hoverDragAt(imagePoint);
+        qreal rotation =
+            annotationSupportsRotation(m_annotationBeforeDrag) ? m_annotationBeforeDrag.rotationDegrees : 0.0;
+        const SelectionDrag drag =
+            m_dragging ? m_annotationDrag : ShotWindowRulerTool(*this).hoverDragAt(imagePoint, &rotation);
         setCursor(drag == SelectionDrag::None ? captureCrossCursor(devicePixelRatioF())
-                                              : cursorForSelectionDrag(drag, m_dragging));
+                                              : cursorForSelectionDrag(drag, m_dragging, rotation));
         return;
     }
 

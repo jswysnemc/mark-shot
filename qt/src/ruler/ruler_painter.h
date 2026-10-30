@@ -22,6 +22,10 @@ struct RulerGeometry {
     qreal unit = 1.0;
     // 测量框、刻度和刻度数字的颜色
     QColor color = QColor(45, 212, 191);
+    // 绕测量框中心的旋转角度，屏幕上顺时针为正
+    qreal rotationDegrees = 0.0;
+    // 刻度数字允许出现的范围，绘制坐标；默认一侧超出时换到对侧，为空时固定在上方和左侧
+    QRectF bounds;
 };
 
 /**
@@ -48,15 +52,22 @@ QFont rulerFont(qreal unit);
 QRectF clampRulerFloatingRect(QRectF rect, const QRectF &bounds, qreal gap);
 
 /**
- * 计算一把尺子的测量框连同四边刻度和刻度数字占用的范围。
- * @param paintRect 测量范围，绘制坐标。
- * @param unit 缩放倍数。
- * @return 占用范围，绘制坐标。
+ * 计算一把尺子的测量框连同四边刻度和刻度数字占用的范围，刻度数字按 bounds 换侧后的位置计算。
+ * @param ruler 尺子范围、缩放倍数、旋转角度和允许范围。
+ * @return 占用范围，旋转后的外接矩形，绘制坐标。
  */
-QRectF rulerScaleBounds(const QRectF &paintRect, qreal unit);
+QRectF rulerScaleBounds(const RulerGeometry &ruler);
+
+/**
+ * 计算测量框上边向外伸出的刻度和刻度数字有多远，旋转把手放在这段距离之外，不压住刻度数字。
+ * @param ruler 尺子范围、缩放倍数和刻度数字允许范围。
+ * @return 伸出距离，绘制坐标，未旋转时沿上边向上量。
+ */
+qreal rulerTopReach(const RulerGeometry &ruler);
 
 /**
  * 为尺寸说明选位置：依次尝试尺子下、上、右、左，避开自身刻度和已占用的范围，都被占用时放在下方。
+ * 旋转的尺子按测量框和刻度旋转后的外接矩形选位置，说明本身不旋转。
  * @param ruler 尺子范围及缩放倍数。
  * @param labelSize 尺寸说明标签大小。
  * @param bounds 标签允许放置的范围。
@@ -106,9 +117,10 @@ QVector<QRectF> layoutRulerInfoLabels(const QVector<RulerGeometry> &rulers,
 void drawRulerLabel(QPainter &painter, const QRectF &rect, const QString &text, qreal unit);
 
 /**
- * 绘制一把尺子的测量框和四边刻度。
- * @param painter 当前绘制器，调用前后状态不变。
- * @param ruler 尺子范围及样式。
+ * 绘制一把尺子的测量框和四边刻度。刻度数字默认在上方和左侧，超出 bounds 时换到下方或右侧；
+ * 两侧都放不下且尺子未旋转时，数字移进 bounds 内，靠近屏幕边缘时也看得见。
+ * @param painter 当前绘制器，调用前后状态不变；尺子旋转时调用方已按 rotationDegrees 旋转绘制器。
+ * @param ruler 尺子范围、样式和刻度数字允许范围。
  * @return 无返回值。
  */
 void drawRulerScale(QPainter &painter, const RulerGeometry &ruler);

@@ -1,6 +1,7 @@
 #include "ruler/ruler_geometry.h"
 
 #include <QLineF>
+#include <QtMath>
 
 #include <algorithm>
 #include <cmath>
@@ -51,6 +52,35 @@ qreal distanceToSegment(QPointF point, QPointF start, QPointF end)
     return QLineF(point, start + segment * t).length();
 }
 
+/**
+ * 把点绕轴心旋转，与 QPainter::rotate 同向，屏幕上顺时针为正。
+ * @param point 待旋转的点。
+ * @param center 旋转轴心。
+ * @param degrees 旋转角度。
+ * @return 旋转后的点。
+ */
+QPointF rotatedAround(QPointF point, QPointF center, qreal degrees)
+{
+    if (qFuzzyIsNull(degrees)) {
+        return point;
+    }
+    const qreal radians = qDegreesToRadians(degrees);
+    const qreal c = std::cos(radians);
+    const qreal s = std::sin(radians);
+    const QPointF delta = point - center;
+    return center + QPointF(delta.x() * c - delta.y() * s, delta.x() * s + delta.y() * c);
+}
+
+/**
+ * 计算尺子的旋转角度，只有长度尺随测量框旋转，角度尺的旋转已写进三个定点。
+ * @param annotation 尺子标注。
+ * @return 旋转角度。
+ */
+qreal rulerRotation(const Annotation &annotation)
+{
+    return annotation.rulerMode == RulerMode::Angle ? 0.0 : annotation.rotationDegrees;
+}
+
 }  // namespace
 
 bool rulerMeasures(const Annotation &annotation)
@@ -99,6 +129,8 @@ QVector<RulerHandle> rulerHandles(const Annotation &annotation, qreal tolerance)
 
     // 1. 四角始终可拖，平直的尺子靠角点拉成矩形
     const QRectF rect = annotation.rect.normalized();
+    const QPointF center = rulerBounds(annotation).center();
+    const qreal rotation = rulerRotation(annotation);
     handles = {
         {rect.topLeft(), SelectionDrag::TopLeft},
         {rect.topRight(), SelectionDrag::TopRight},
@@ -114,7 +146,31 @@ QVector<RulerHandle> rulerHandles(const Annotation &annotation, qreal tolerance)
         handles.append({QPointF(rect.left(), rect.center().y()), SelectionDrag::Left});
         handles.append({QPointF(rect.right(), rect.center().y()), SelectionDrag::Right});
     }
+
+    // 3. 控制点随测量框一起旋转
+    for (RulerHandle &handle : handles) {
+        handle.point = rotatedAround(handle.point, center, rotation);
+    }
     return handles;
+}
+
+void rotateAnglePoints(Annotation &annotation, QPointF center, qreal degrees)
+{
+    for (QPointF &point : annotation.points) {
+        point = rotatedAround(point, center, degrees);
+    }
+}
+
+qreal angleFirstArmDegrees(const Annotation &annotation)
+{
+    if (annotation.points.size() < 2) {
+        return 0.0;
+    }
+    const QPointF arm = annotation.points.at(1) - annotation.points.at(0);
+    if (qFuzzyIsNull(arm.x()) && qFuzzyIsNull(arm.y())) {
+        return 0.0;
+    }
+    return qRadiansToDegrees(std::atan2(arm.y(), arm.x()));
 }
 
 SelectionDrag rulerDragAt(const Annotation &annotation, QPointF point, qreal tolerance, bool interiorMoves)
@@ -142,7 +198,9 @@ SelectionDrag rulerDragAt(const Annotation &annotation, QPointF point, qreal tol
         }
         return SelectionDrag::None;
     }
+    // 3. 旋转的长度尺把指针换算回测量框未旋转时的位置
     const QRectF bounds = rulerBounds(annotation);
+    point = rotatedAround(point, bounds.center(), -rulerRotation(annotation));
     if (!bounds.adjusted(-tolerance, -tolerance, tolerance, tolerance).contains(point)) {
         return SelectionDrag::None;
     }
@@ -184,10 +242,12 @@ Annotation draggedRuler(const Annotation &before, SelectionDrag drag, QPointF po
         return after;
     }
 
-    // 2. 长度尺拖角时对角不动，拖边时对边不动，越过对侧时自然翻转
+    // 2. 长度尺拖角时对角不动，拖边时对边不动，越过对侧时自然翻转；旋转时在测量框未旋转的坐标中计算
     const QRectF rect = before.rect.normalized();
+    const QPointF center = rulerBounds(before).center();
+    const qreal rotation = rulerRotation(before);
     QPointF anchor;
-    QPointF moved = point;
+    QPointF moved = rotatedAround(point, center, -rotation);
     switch (drag) {
     case SelectionDrag::TopLeft: anchor = rect.bottomRight(); break;
     case SelectionDrag::TopRight: anchor = rect.bottomLeft(); break;
@@ -200,6 +260,14 @@ Annotation draggedRuler(const Annotation &before, SelectionDrag drag, QPointF po
     default: return after;
     }
     after.rect = QRectF(anchor, moved).normalized();
+    if (qFuzzyIsNull(rotation)) {
+        return after;
+    }
+
+    // 3. 新测量框绕自身中心旋转，中心取屏幕上不动的点与指针的中点，不动的角或边才留在原处
+    const QPointF visualCenter =
+        (rotatedAround(anchor, center, rotation) + rotatedAround(moved, center, rotation)) / 2.0;
+    after.rect.moveCenter(visualCenter);
     return after;
 }
 

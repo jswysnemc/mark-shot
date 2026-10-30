@@ -334,7 +334,7 @@ private slots:
         // 2. 逐段检查说明与其他尺子的刻度、与其他说明都不相交
         for (int i = 0; i < labels.size(); ++i) {
             for (int j = 0; j < geometries.size(); ++j) {
-                const QRectF scale = markshot::ruler::rulerScaleBounds(geometries.at(j).paintRect, 1.0);
+                const QRectF scale = markshot::ruler::rulerScaleBounds(geometries.at(j));
                 QVERIFY2(!labels.at(i).intersects(scale), qPrintable(QStringLiteral("label %1 ruler %2").arg(i).arg(j)));
                 if (j != i) {
                     QVERIFY2(!labels.at(i).intersects(labels.at(j)), qPrintable(QStringLiteral("label %1 label %2").arg(i).arg(j)));

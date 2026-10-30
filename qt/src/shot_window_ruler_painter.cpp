@@ -12,9 +12,35 @@ using markshot::shot::types::Mode;
 using markshot::shot::types::RulerMode;
 using markshot::shot::types::Tool;
 
+namespace {
+
+// 角度尺选中框向外留出的距离，窗口像素，虚线不压住两条边
+constexpr qreal kAngleFramePadding = 6.0;
+// 旋转把手连线的长度，窗口像素，从刻度数字或选中框外侧量起
+constexpr qreal kRotationStemLength = 20.0;
+
+}  // namespace
+
 ShotWindowRulerPainter::ShotWindowRulerPainter(const ShotWindow &window)
     : m_window(window)
 {
+}
+
+/**
+ * 计算旋转把手连线起点到尺子范围上边的距离。
+ * @param annotation 尺子标注。
+ * @return 距离，窗口像素。
+ */
+qreal ShotWindowRulerPainter::handleClearance(const Annotation &annotation) const
+{
+    return annotation.rulerMode == RulerMode::Angle
+        ? kAngleFramePadding
+        : markshot::ruler::rulerTopReach(lengthGeometry(annotation, true));
+}
+
+qreal ShotWindowRulerPainter::rotationHandleGap(const Annotation &annotation) const
+{
+    return handleClearance(annotation) + kRotationStemLength;
 }
 
 /**
@@ -32,6 +58,39 @@ qreal ShotWindowRulerPainter::unitFor(const Annotation &annotation, bool widgetC
         : 1.0;
     return markshot::ruler::rulerUnitForWidth(annotation.width) * captureScale
         * m_window.annotationSizeScale(widgetCoordinates);
+}
+
+/**
+ * 计算尺子说明和刻度数字允许出现的范围：导出图片取选区，窗口中再与窗口求交，缩放平移后也留在屏幕上。
+ * @param widgetCoordinates true 表示画到窗口。
+ * @return 允许范围，绘制坐标。
+ */
+QRectF ShotWindowRulerPainter::labelBounds(bool widgetCoordinates) const
+{
+    const QRectF selection = mapRect(m_window.normalizedSelection(), widgetCoordinates);
+    if (!widgetCoordinates) {
+        return selection;
+    }
+    const QRectF visible = selection.intersected(QRectF(m_window.rect()));
+    return visible.isEmpty() ? selection : visible;
+}
+
+/**
+ * 汇总一把长度尺的绘制参数：测量范围、缩放倍数、旋转角度和刻度数字允许范围。
+ * @param annotation 长度尺。
+ * @param widgetCoordinates true 表示画到窗口。
+ * @return 绘制参数。
+ */
+markshot::ruler::RulerGeometry ShotWindowRulerPainter::lengthGeometry(const Annotation &annotation,
+                                                                      bool widgetCoordinates) const
+{
+    const QRectF imageRect = annotation.rect.normalized();
+    return {imageRect,
+            mapRect(imageRect, widgetCoordinates),
+            unitFor(annotation, widgetCoordinates),
+            annotation.color,
+            annotation.rotationDegrees,
+            labelBounds(widgetCoordinates)};
 }
 
 /** 把图像坐标 imagePoint 换算到绘制坐标，widgetCoordinates 为 false 时原样返回。 */
@@ -61,8 +120,7 @@ void ShotWindowRulerPainter::drawBody(QPainter &painter, const Annotation &annot
     if (!markshot::ruler::rulerMeasures(annotation)) {
         return;
     }
-    const QRectF imageRect = annotation.rect.normalized();
-    markshot::ruler::drawRulerScale(painter, {imageRect, mapRect(imageRect, widgetCoordinates), unit, annotation.color});
+    markshot::ruler::drawRulerScale(painter, lengthGeometry(annotation, widgetCoordinates));
 }
 
 void ShotWindowRulerPainter::drawLabels(QPainter &painter, bool widgetCoordinates) const
@@ -80,7 +138,7 @@ void ShotWindowRulerPainter::drawLabels(QPainter &painter, bool widgetCoordinate
     if (rulers.isEmpty()) {
         return;
     }
-    const QRectF bounds = mapRect(m_window.normalizedSelection(), widgetCoordinates);
+    const QRectF bounds = labelBounds(widgetCoordinates);
 
     // 2. 角度说明固定在角平分线方向，先登记为占用，长度说明再避开它们
     QVector<QRectF> occupied;
@@ -105,8 +163,7 @@ void ShotWindowRulerPainter::drawLabels(QPainter &painter, bool widgetCoordinate
             labels.append({rect, markshot::ruler::angleInfoText(degrees)});
             labelUnits.append(unit);
         } else if (markshot::ruler::rulerMeasures(*annotation)) {
-            const QRectF imageRect = annotation->rect.normalized();
-            lengthRulers.append({imageRect, mapRect(imageRect, widgetCoordinates), unit, annotation->color});
+            lengthRulers.append(lengthGeometry(*annotation, widgetCoordinates));
         }
     }
     const QVector<QRectF> lengthLabels = markshot::ruler::layoutRulerInfoLabels(lengthRulers, bounds, occupied);
@@ -158,22 +215,46 @@ void ShotWindowRulerPainter::drawHover(QPainter &painter) const
 
 void ShotWindowRulerPainter::drawSelectedFrame(QPainter &painter, const Annotation &annotation) const
 {
+    const ShotWindow &window = m_window;
+    const QRectF bounds = markshot::ruler::rulerBounds(annotation);
+    if (bounds.isEmpty()) {
+        return;
+    }
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing, true);
 
-    // 1. 长度尺画出测量范围，角度尺只画三个控制点
-    if (annotation.rulerMode != RulerMode::Angle) {
-        painter.setPen(QPen(QColor(251, 146, 60), 2.0, Qt::DashLine));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawRect(m_window.imageRectToWidget(markshot::ruler::rulerBounds(annotation)));
+    // 1. 虚线范围：长度尺沿旋转后的测量框，角度尺取三点的外接矩形并向外留出间距，不压住两条边
+    const QPointF center = bounds.center();
+    const qreal rotation = window.annotationSupportsRotation(annotation) ? annotation.rotationDegrees : 0.0;
+    QPolygonF frame;
+    if (annotation.rulerMode == RulerMode::Angle) {
+        frame = QPolygonF(window.imageRectToWidget(bounds).adjusted(-kAngleFramePadding, -kAngleFramePadding,
+                                                                    kAngleFramePadding, kAngleFramePadding));
+    } else {
+        for (const QPointF &corner : {bounds.topLeft(), bounds.topRight(), bounds.bottomRight(), bounds.bottomLeft()}) {
+            frame.append(window.imageToWidget(window.rotatedPoint(corner, center, rotation)));
+        }
     }
+    painter.setPen(QPen(QColor(251, 146, 60), 2.0, Qt::DashLine));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawPolygon(frame);
 
-    // 2. 控制点与其他标注一致：橙色实心，白色描边便于在深色背景上分辨
-    painter.setPen(QPen(QColor(255, 255, 255), 1.5));
+    // 2. 旋转把手在范围上边中点外侧，连线从刻度数字或选中框外侧开始，样式与其他标注一致
+    const QPointF topCenter =
+        window.imageToWidget(window.rotatedPoint(QPointF(center.x(), bounds.top()), center, rotation));
+    const QPointF rotateHandle = window.annotationRotationHandlePoint(annotation, true);
+    const QLineF stem(topCenter, rotateHandle);
+    const QPointF stemStart = stem.length() > 0.0 ? stem.pointAt(handleClearance(annotation) / stem.length()) : topCenter;
+    painter.setPen(QPen(QColor(251, 146, 60), 1.8, Qt::SolidLine, Qt::RoundCap));
+    painter.drawLine(stemStart, rotateHandle);
     painter.setBrush(QColor(251, 146, 60));
-    const qreal tolerance = ShotWindowRulerTool::imageTolerance(m_window);
+    painter.setPen(QPen(QColor(255, 255, 255), 1.5));
+    painter.drawEllipse(rotateHandle, 6.0, 6.0);
+
+    // 3. 控制点与其他标注一致：橙色实心，白色描边便于在深色背景上分辨
+    const qreal tolerance = ShotWindowRulerTool::imageTolerance(window);
     for (const markshot::ruler::RulerHandle &handle : markshot::ruler::rulerHandles(annotation, tolerance)) {
-        const QPointF point = m_window.imageToWidget(handle.point);
+        const QPointF point = window.imageToWidget(handle.point);
         if (annotation.rulerMode == RulerMode::Angle) {
             painter.drawEllipse(point, 6.0, 6.0);
         } else {

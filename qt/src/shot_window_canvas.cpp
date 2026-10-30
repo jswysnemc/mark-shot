@@ -379,7 +379,7 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
         deleteSelectedAnnotation();
         return;
     }
-    if (ShotWindowRulerTool(*this).press(event->position(), imagePoint)) {
+    if (ShotWindowRulerTool(*this).press(event->position(), imagePoint, event->modifiers())) {
         return;
     }
 

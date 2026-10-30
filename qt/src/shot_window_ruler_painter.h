@@ -8,6 +8,10 @@
 class QPainter;
 class ShotWindow;
 
+namespace markshot::ruler {
+struct RulerGeometry;
+}
+
 /// 绘制截图窗口中的尺子：测量框和角度、说明标签、悬停十字线和选中控制点
 class ShotWindowRulerPainter {
 public:
@@ -25,7 +29,7 @@ public:
     void drawBody(QPainter &painter, const Annotation &annotation, bool widgetCoordinates) const;
 
     /**
-     * 统一排版并绘制全部尺子的说明标签，标签互不重叠且留在选区内。
+     * 统一排版并绘制全部尺子的说明标签，标签互不重叠且留在选区内，画到窗口时还留在窗口内。
      * @param painter 当前绘制器，调用前后状态不变。
      * @param widgetCoordinates true 表示画到窗口并包含草稿，false 表示画到导出图片。
      * @return 无返回值。
@@ -40,15 +44,25 @@ public:
     void drawHover(QPainter &painter) const;
 
     /**
-     * 绘制选中尺子的范围和控制点。
+     * 绘制选中尺子的虚线范围、控制点和旋转把手，长度尺的范围随测量框旋转，角度尺取三点的外接矩形。
      * @param painter 当前绘制器，调用前后状态不变。
      * @param annotation 选中的尺子。
      * @return 无返回值。
      */
     void drawSelectedFrame(QPainter &painter, const Annotation &annotation) const;
 
+    /**
+     * 计算旋转把手到尺子范围上边的距离：长度尺越过上边的刻度数字，角度尺越过外扩的选中框。
+     * @param annotation 尺子标注。
+     * @return 距离，窗口像素。
+     */
+    qreal rotationHandleGap(const Annotation &annotation) const;
+
 private:
+    qreal handleClearance(const Annotation &annotation) const;
     qreal unitFor(const Annotation &annotation, bool widgetCoordinates) const;
+    QRectF labelBounds(bool widgetCoordinates) const;
+    markshot::ruler::RulerGeometry lengthGeometry(const Annotation &annotation, bool widgetCoordinates) const;
     QPointF mapPoint(QPointF imagePoint, bool widgetCoordinates) const;
     QRectF mapRect(const QRectF &imageRect, bool widgetCoordinates) const;
 

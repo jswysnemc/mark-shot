@@ -27,6 +27,8 @@ set(MARK_SHOT_WINDOW_SOURCES
     src/annotation/arrow_rendering.cpp
     src/annotation/arrow_rendering.h
     src/annotation/arrow_style.h
+    src/annotation/rotation_drag.cpp
+    src/annotation/rotation_drag.h
     src/shot_window_arrow_properties.cpp
     src/shot_window_canvas.cpp
     src/shot_window_code_scan.cpp

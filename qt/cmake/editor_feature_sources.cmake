@@ -29,6 +29,7 @@ set(MARK_SHOT_EDITOR_FEATURE_SOURCES
     src/ruler/ruler_painter.cpp
     src/ruler/ruler_painter.h
     src/ruler/ruler_tool_state.h
+    src/shot_window_ruler_drag.cpp
     src/shot_window_ruler_painter.cpp
     src/shot_window_ruler_painter.h
     src/shot_window_ruler_session.cpp

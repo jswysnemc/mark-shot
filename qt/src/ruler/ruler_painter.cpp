@@ -6,6 +6,7 @@
 #include <QFontMetricsF>
 #include <QPainter>
 #include <QPen>
+#include <QTransform>
 
 #include <algorithm>
 #include <array>
@@ -21,13 +22,9 @@ constexpr qreal kRulerFloatingGap = 8.0;
 // 主刻度与次刻度的长度
 constexpr qreal kRulerMajorTickLength = 13.0;
 constexpr qreal kRulerMinorTickLength = 6.0;
-// 上边刻度数字的位置和尺寸
-constexpr qreal kRulerTopLabelOffset = 30.0;
-constexpr qreal kRulerTopLabelWidth = 68.0;
+// 刻度数字靠近测量框的一端与测量框的距离，以及横向刻度数字的行高
+constexpr qreal kRulerNumberGap = 14.0;
 constexpr qreal kRulerTickLabelHeight = 16.0;
-// 左边刻度数字的位置和尺寸
-constexpr qreal kRulerLeftLabelOffset = 62.0;
-constexpr qreal kRulerLeftLabelWidth = 48.0;
 // 说明标签的字号、内边距和圆角
 constexpr qreal kRulerFontPixelSize = 13.0;
 constexpr qreal kRulerLabelPaddingX = 20.0;
@@ -91,6 +88,154 @@ int majorTickStep(qreal imageLength, qreal paintLength, qreal minimumGap)
     return step;
 }
 
+/// 一把尺子的刻度数字放在测量框哪一侧，以及两行数字所在的条带
+struct RulerTickLayout {
+    // 横向刻度数字在测量框下方时为 true，默认在上方
+    bool numbersBelow = false;
+    // 纵向刻度数字在测量框右侧时为 true，默认在左侧
+    bool numbersRight = false;
+    // 横向、纵向刻度数字所在的条带，绘制坐标，未旋转
+    QRectF horizontalBand;
+    QRectF verticalBand;
+};
+
+/**
+ * 计算横向刻度数字所在的条带：一行数字的高度，左右各伸出半个最长数字。
+ * @param ruler 尺子范围及缩放倍数。
+ * @param metrics 刻度数字字体度量。
+ * @param below true 表示放在测量框下方。
+ * @return 条带，绘制坐标，未旋转。
+ */
+QRectF horizontalNumberBand(const RulerGeometry &ruler, const QFontMetricsF &metrics, bool below)
+{
+    const QRectF &rect = ruler.paintRect;
+    const qreal unit = ruler.unit;
+    const qreal height = kRulerTickLabelHeight * unit;
+    const qreal overhang = metrics.horizontalAdvance(QString::number(qRound(ruler.imageRect.width()))) / 2.0;
+    const qreal top = below ? rect.bottom() + kRulerNumberGap * unit : rect.top() - kRulerNumberGap * unit - height;
+    return QRectF(rect.left() - overhang, top, rect.width() + overhang * 2.0, height);
+}
+
+/**
+ * 计算纵向刻度数字所在的条带：宽度为最长数字，贴着测量框一侧。
+ * @param ruler 尺子范围及缩放倍数。
+ * @param metrics 刻度数字字体度量。
+ * @param right true 表示放在测量框右侧。
+ * @return 条带，绘制坐标，未旋转。
+ */
+QRectF verticalNumberBand(const RulerGeometry &ruler, const QFontMetricsF &metrics, bool right)
+{
+    const QRectF &rect = ruler.paintRect;
+    const qreal unit = ruler.unit;
+    const qreal width = std::ceil(metrics.horizontalAdvance(QString::number(qRound(ruler.imageRect.height()))));
+    const qreal halfHeight = kRulerTickLabelHeight * unit / 2.0;
+    const qreal left = right ? rect.right() + kRulerNumberGap * unit : rect.left() - kRulerNumberGap * unit - width;
+    return QRectF(left, rect.top() - halfHeight, width, rect.height() + halfHeight * 2.0);
+}
+
+/**
+ * 计算一段条带绕测量框中心旋转后的外接矩形。
+ * @param ruler 尺子范围及旋转角度。
+ * @param localRect 未旋转的条带，绘制坐标。
+ * @return 旋转后的外接矩形，绘制坐标。
+ */
+QRectF rotatedAroundRuler(const RulerGeometry &ruler, const QRectF &localRect)
+{
+    if (qFuzzyIsNull(ruler.rotationDegrees)) {
+        return localRect;
+    }
+    const QPointF center = ruler.paintRect.center();
+    QTransform transform;
+    transform.translate(center.x(), center.y());
+    transform.rotate(ruler.rotationDegrees);
+    transform.translate(-center.x(), -center.y());
+    return transform.mapRect(localRect);
+}
+
+/**
+ * 判断一段刻度数字条带是否完整落在允许范围内。未旋转时只看与测量框垂直的方向，
+ * 沿测量框方向超出的数字逐个移回范围内；旋转后按外接矩形整体判断。
+ * @param ruler 尺子范围、旋转角度和允许范围。
+ * @param band 未旋转的条带，绘制坐标。
+ * @param horizontal true 表示横向刻度数字，条带沿测量框上下边。
+ * @return 落在范围内时返回 true。
+ */
+bool numberBandFits(const RulerGeometry &ruler, const QRectF &band, bool horizontal)
+{
+    const QRectF &bounds = ruler.bounds;
+    if (!qFuzzyIsNull(ruler.rotationDegrees)) {
+        return bounds.contains(rotatedAroundRuler(ruler, band));
+    }
+    return horizontal ? band.top() >= bounds.top() && band.bottom() <= bounds.bottom()
+                      : band.left() >= bounds.left() && band.right() <= bounds.right();
+}
+
+/**
+ * 把一段区域沿一个方向移回允许范围内，另一个方向保持不变。
+ * @param rect 原始区域。
+ * @param bounds 允许范围。
+ * @param horizontal true 表示左右移动，false 表示上下移动。
+ * @return 移回范围内的区域。
+ */
+QRectF clampedAlong(QRectF rect, const QRectF &bounds, bool horizontal)
+{
+    if (horizontal) {
+        rect.moveLeft(std::clamp(rect.left(), bounds.left(), std::max(bounds.left(), bounds.right() - rect.width())));
+    } else {
+        rect.moveTop(std::clamp(rect.top(), bounds.top(), std::max(bounds.top(), bounds.bottom() - rect.height())));
+    }
+    return rect;
+}
+
+/**
+ * 判断尺子未旋转、有允许范围且与范围相交，此时刻度数字可以逐个移回范围内。
+ * @param ruler 尺子范围、旋转角度和允许范围。
+ * @return 可以移回时返回 true。
+ */
+bool numbersClampToBounds(const RulerGeometry &ruler)
+{
+    const QRectF &rect = ruler.paintRect;
+    const QRectF &bounds = ruler.bounds;
+    return qFuzzyIsNull(ruler.rotationDegrees) && !bounds.isEmpty() && rect.right() >= bounds.left()
+        && rect.left() <= bounds.right() && rect.bottom() >= bounds.top() && rect.top() <= bounds.bottom();
+}
+
+/**
+ * 决定刻度数字放在哪一侧：默认在上方和左侧，超出允许范围时换到对侧；两侧都放不下时，
+ * 未旋转的尺子把数字条带移进范围内，旋转的尺子保持默认位置。
+ * @param ruler 尺子范围、缩放倍数、旋转角度和允许范围。
+ * @return 刻度数字的位置。
+ */
+RulerTickLayout rulerTickLayout(const RulerGeometry &ruler)
+{
+    const QFontMetricsF metrics(rulerFont(ruler.unit));
+    RulerTickLayout layout;
+    layout.horizontalBand = horizontalNumberBand(ruler, metrics, false);
+    layout.verticalBand = verticalNumberBand(ruler, metrics, false);
+    if (ruler.bounds.isEmpty()) {
+        return layout;
+    }
+
+    // 1. 默认一侧超出范围而对侧放得下时换到对侧
+    const QRectF below = horizontalNumberBand(ruler, metrics, true);
+    if (!numberBandFits(ruler, layout.horizontalBand, true) && numberBandFits(ruler, below, true)) {
+        layout.numbersBelow = true;
+        layout.horizontalBand = below;
+    }
+    const QRectF right = verticalNumberBand(ruler, metrics, true);
+    if (!numberBandFits(ruler, layout.verticalBand, false) && numberBandFits(ruler, right, false)) {
+        layout.numbersRight = true;
+        layout.verticalBand = right;
+    }
+
+    // 2. 两侧都放不下时把条带移进范围内，数字压在测量框上也比看不见好
+    if (numbersClampToBounds(ruler)) {
+        layout.horizontalBand = clampedAlong(layout.horizontalBand, ruler.bounds, false);
+        layout.verticalBand = clampedAlong(layout.verticalBand, ruler.bounds, true);
+    }
+    return layout;
+}
+
 }  // namespace
 
 qreal rulerUnitForWidth(qreal width)
@@ -134,12 +279,22 @@ QRectF clampRulerFloatingRect(QRectF rect, const QRectF &bounds, qreal gap)
     return rect;
 }
 
-QRectF rulerScaleBounds(const QRectF &paintRect, qreal unit)
+QRectF rulerScaleBounds(const RulerGeometry &ruler)
 {
-    return paintRect.adjusted(-kRulerLeftLabelOffset * unit,
-                              -kRulerTopLabelOffset * unit,
-                              kRulerMajorTickLength * unit,
-                              kRulerMajorTickLength * unit);
+    // 1. 测量框连同四边刻度，再并上两行刻度数字，最后按旋转取外接矩形
+    const RulerTickLayout layout = rulerTickLayout(ruler);
+    const qreal tick = kRulerMajorTickLength * ruler.unit;
+    const QRectF local = ruler.paintRect.adjusted(-tick, -tick, tick, tick)
+                             .united(layout.horizontalBand)
+                             .united(layout.verticalBand);
+    return rotatedAroundRuler(ruler, local);
+}
+
+qreal rulerTopReach(const RulerGeometry &ruler)
+{
+    // 1. 数字换到下方或移进测量框时，上边只剩刻度线
+    const qreal tick = kRulerMajorTickLength * ruler.unit;
+    return std::max(tick, ruler.paintRect.top() - rulerTickLayout(ruler).horizontalBand.top());
 }
 
 QSizeF rulerLabelSize(const QFontMetricsF &metrics, const QString &text, qreal unit)
@@ -153,18 +308,17 @@ QRectF placeRulerInfoLabel(const RulerGeometry &ruler,
                            const QRectF &bounds,
                            const QVector<QRectF> &occupied)
 {
-    const QRectF &rect = ruler.paintRect;
     const qreal gap = kRulerFloatingGap * ruler.unit;
-    // 1. 候选位置依次是下、上、右、左，都放在刻度区域之外
+    // 1. 候选位置依次是下、上、右、左，都放在刻度区域之外，与旋转后的测量框左边或上边对齐
+    const QRectF body = rotatedAroundRuler(ruler, ruler.paintRect);
+    const QRectF scale = rulerScaleBounds(ruler);
     const QVector<QRectF> candidates = {
-        QRectF(QPointF(rect.left(), rect.bottom() + kRulerMajorTickLength * ruler.unit + gap), labelSize),
-        QRectF(QPointF(rect.left(), rect.top() - labelSize.height() - kRulerTopLabelOffset * ruler.unit - gap),
-               labelSize),
-        QRectF(QPointF(rect.right() + kRulerMajorTickLength * ruler.unit + gap, rect.top()), labelSize),
-        QRectF(QPointF(rect.left() - labelSize.width() - kRulerLeftLabelOffset * ruler.unit - gap, rect.top()),
-               labelSize),
+        QRectF(QPointF(body.left(), scale.bottom() + gap), labelSize),
+        QRectF(QPointF(body.left(), scale.top() - labelSize.height() - gap), labelSize),
+        QRectF(QPointF(scale.right() + gap, body.top()), labelSize),
+        QRectF(QPointF(scale.left() - labelSize.width() - gap, body.top()), labelSize),
     };
-    const QRectF scaleArea = rulerScaleBounds(rect, ruler.unit).adjusted(-gap, -gap, gap, gap);
+    const QRectF scaleArea = scale.adjusted(-gap, -gap, gap, gap);
 
     // 2. 移回边界后仍不压住自身刻度和已占用范围的第一个位置胜出
     auto overlaps = [&](const QRectF &candidate) {
@@ -190,7 +344,7 @@ QVector<QRectF> layoutRulerInfoLabels(const QVector<RulerGeometry> &rulers,
 {
     // 1. 每把尺子的测量框和刻度都登记为占用，说明不会压住别的尺子
     for (const RulerGeometry &ruler : rulers) {
-        occupied.append(rulerScaleBounds(ruler.paintRect, ruler.unit));
+        occupied.append(rulerScaleBounds(ruler));
     }
 
     // 2. 按绘制先后放说明，放好的说明也登记为占用
@@ -233,7 +387,9 @@ void drawRulerScale(QPainter &painter, const RulerGeometry &ruler)
     painter.setBrush(fill);
     painter.drawRoundedRect(paintRect, 3.0 * unit, 3.0 * unit);
 
-    // 2. 上下两边画横向刻度，主刻度在上方标数字；尺子较短时放大主刻度间隔，数字不挤在一起
+    // 2. 上下两边画横向刻度，主刻度默认在上方标数字，靠近边缘时换到下方；尺子较短时放大主刻度间隔
+    const RulerTickLayout layout = rulerTickLayout(ruler);
+    const bool clampNumbers = numbersClampToBounds(ruler);
     const int widthPx = qRound(imageRect.width());
     const int heightPx = qRound(imageRect.height());
     const QFontMetricsF metrics(painter.font());
@@ -253,17 +409,20 @@ void drawRulerScale(QPainter &painter, const RulerGeometry &ruler)
             painter.drawLine(QPointF(x, paintRect.top()), QPointF(x, paintRect.top() - length));
             painter.drawLine(QPointF(x, paintRect.bottom()), QPointF(x, paintRect.bottom() + length));
             if (major) {
-                drawHaloText(painter,
-                             QRectF(x - kRulerTopLabelWidth * unit / 2.0,
-                                    paintRect.top() - kRulerTopLabelOffset * unit,
-                                    kRulerTopLabelWidth * unit,
-                                    kRulerTickLabelHeight * unit),
-                             Qt::AlignCenter, QString::number(tick), ruler.color, unit);
+                // 数字贴着刻度居中，刻度在范围内时整段数字移回范围内，不被屏幕边缘截掉
+                const QString text = QString::number(tick);
+                const qreal textWidth = metrics.horizontalAdvance(text);
+                QRectF label(x - textWidth / 2.0, layout.horizontalBand.top(), textWidth,
+                             layout.horizontalBand.height());
+                if (clampNumbers && x >= ruler.bounds.left() && x <= ruler.bounds.right()) {
+                    label = clampedAlong(label, ruler.bounds, true);
+                }
+                drawHaloText(painter, label, Qt::AlignCenter | Qt::TextDontClip, text, ruler.color, unit);
             }
         }
     }
 
-    // 3. 左右两边画纵向刻度，主刻度在左侧标数字
+    // 3. 左右两边画纵向刻度，主刻度默认在左侧标数字，靠近边缘时换到右侧
     if (imageRect.height() > 0.0) {
         for (int tick = 0; tick <= heightPx; tick += minorY) {
             const bool major = tick % stepY == 0;
@@ -273,12 +432,14 @@ void drawRulerScale(QPainter &painter, const RulerGeometry &ruler)
             painter.drawLine(QPointF(paintRect.left(), y), QPointF(paintRect.left() - length, y));
             painter.drawLine(QPointF(paintRect.right(), y), QPointF(paintRect.right() + length, y));
             if (major) {
-                drawHaloText(painter,
-                             QRectF(paintRect.left() - kRulerLeftLabelOffset * unit,
-                                    y - kRulerTickLabelHeight * unit / 2.0,
-                                    kRulerLeftLabelWidth * unit,
-                                    kRulerTickLabelHeight * unit),
-                             Qt::AlignRight | Qt::AlignVCenter, QString::number(tick), ruler.color, unit);
+                // 数字贴着测量框一侧对齐，刻度在范围内时整段数字移回范围内
+                QRectF label(layout.verticalBand.left(), y - kRulerTickLabelHeight * unit / 2.0,
+                             layout.verticalBand.width(), kRulerTickLabelHeight * unit);
+                if (clampNumbers && y >= ruler.bounds.top() && y <= ruler.bounds.bottom()) {
+                    label = clampedAlong(label, ruler.bounds, false);
+                }
+                const int align = (layout.numbersRight ? Qt::AlignLeft : Qt::AlignRight) | Qt::AlignVCenter;
+                drawHaloText(painter, label, align | Qt::TextDontClip, QString::number(tick), ruler.color, unit);
             }
         }
     }

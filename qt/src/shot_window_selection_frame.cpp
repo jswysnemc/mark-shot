@@ -78,7 +78,7 @@ void ShotWindow::drawSelectedAnnotationFrame(QPainter &painter) const
         }
     }
     if (singleSelectedAnnotation && singleSelectedAnnotation->tool == Tool::Ruler) {
-        // 尺子不旋转，控制点按测量方式画在角点或三个定点上
+        // 尺子的控制点按测量方式画在角点或三个定点上，旋转把手与其他标注一致
         ShotWindowRulerPainter(*this).drawSelectedFrame(painter, *singleSelectedAnnotation);
     } else if (rotatedSingleSelection) {
         const QRectF localBounds = imageRectToWidget(annotationUnrotatedBounds(*singleSelectedAnnotation));

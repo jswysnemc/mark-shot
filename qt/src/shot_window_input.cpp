@@ -128,7 +128,9 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
     }
 
     if (m_mode == Mode::Editing && m_tool == Tool::Select && m_dragging && m_annotationDrag != SelectionDrag::None) {
-        updateAnnotationDrag(imagePoint, event->modifiers().testFlag(Qt::ControlModifier));
+        updateAnnotationDrag(imagePoint,
+                             event->modifiers().testFlag(Qt::ControlModifier),
+                             event->modifiers().testFlag(Qt::ShiftModifier));
         updateAnnotationPropertyPanelGeometry();
         return;
     }
@@ -138,7 +140,7 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
         return;
     }
 
-    if (ShotWindowRulerTool(*this).move(event->position(), imagePoint)) {
+    if (ShotWindowRulerTool(*this).move(event->position(), imagePoint, event->modifiers())) {
         return;
     }
 
@@ -376,7 +378,8 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
         return;
     }
 
-    if (m_mode == Mode::Editing && ShotWindowRulerTool(*this).release(widgetToImage(event->position()))) {
+    if (m_mode == Mode::Editing
+        && ShotWindowRulerTool(*this).release(widgetToImage(event->position()), event->modifiers())) {
         updatePointerCursor(event->position());
         return;
     }

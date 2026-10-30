@@ -216,7 +216,7 @@ the annotation toolbar. Tools are switched with the number keys or the toolbar:
 | `N` | Number | sequential numbered markers (Arabic, alpha, roman, Chinese, …) |
 | `M` | Mosaic | switch between `Pixelate` / `Blur` / `Grayscale` / `Invert` / `Brighten` in the property panel; the wheel sets strength |
 | `G` | Laser | temporary strokes that dissolve automatically |
-| `U` | Ruler | `Length` drags a box labelled with width, height, diagonal and area; `Angle` places the vertex, drags the first arm, then clicks the second arm end. Press `U` again or use the property panel to switch. Drag corners, edges or points to adjust, drag the frame or an arm to move, `Delete` removes the selected ruler; the hover crosshair shows coordinates and color. Rulers are included in copied and saved images |
+| `U` | Ruler | `Length` drags a box labelled with width, height, diagonal and area; `Angle` places the vertex, drags the first arm, then clicks the second arm end. Press `U` again or use the property panel to switch. Drag corners, edges or points to adjust, drag the frame or an arm to move, drag the round handle above a selected ruler to rotate it, `Delete` removes the selected ruler. Hold `Shift` while placing or dragging an angle arm to snap it to 45° steps from the vertex. Tick numbers move to the other side of the ruler near the screen edge. The hover crosshair shows coordinates and color. Rulers are included in copied and saved images |
 
 Drawing tips:
 
@@ -242,7 +242,7 @@ Switch to **Select** (`S`). Click an annotation to show its handles:
 
 - drag inside to move;
 - drag corner / edge handles to resize;
-- drag the round handle above the top edge to rotate;
+- drag the round handle above the top edge to rotate; hold `Shift` to snap to 0°, 45°, 90° and so on;
 - press `Delete` / `Backspace` to remove;
 - double-click text to edit it in place.
 
