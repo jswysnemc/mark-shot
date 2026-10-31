@@ -419,7 +419,9 @@ bool ShotWindow::applySnowTextEditorGeometryIfEnabled()
         boxTopLeft = textContentRect(*editingAnnotation, true).topLeft().toPoint();
     } else {
         // 最小框高度取文档首行实际高度，整数字体高度可能少 1px，框底会越过选区
-        const QSize minimumBox(fontHeight * 2 + insetWidth, textEditorLineHeight(*document, fontHeight) + insetHeight);
+        // 最小框宽度多留第 3 步扣掉的取整 1px，两个字宽的文字回移后不会换行
+        const QSize minimumBox(fontHeight * 2 + insetWidth + 1,
+                               textEditorLineHeight(*document, fontHeight) + insetHeight);
         boxTopLeft = newTextEditorBoxTopLeft(imageToWidget(m_textEditorImagePoint).toPoint(),
                                              selection.toRect(), minimumBox);
     }

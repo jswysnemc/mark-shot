@@ -568,8 +568,10 @@ private slots:
         QVERIFY(window);
         window->setSelectedTextBold(false);
         clickAt(*window, QPoint(150, 150));
-        window->m_textEditor->insertPlainText(QStringLiteral("Single line label"));
+        // 文字要短到在任何字体下都放得进选区，前提是加粗前确实是单行
+        window->m_textEditor->insertPlainText(QStringLiteral("Label"));
         window->commitTextEditor();
+        QVERIFY(!markshot::shot::textAnnotationWraps(window->m_annotations.first()));
         const qreal heightBefore = window->m_annotations.first().rect.height();
 
         window->setSelectedAnnotations({window->m_annotations.first().id});
