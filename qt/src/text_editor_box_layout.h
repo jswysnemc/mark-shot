@@ -4,6 +4,8 @@
 #include <QRect>
 #include <QSize>
 
+class QTextDocument;
+
 namespace markshot::shot {
 
 /// 文字输入框四边到文字的距离，单位为窗口像素
@@ -30,5 +32,13 @@ TextEditorBoxInsets textEditorBoxInsets(qreal scale, int cursorWidth);
  * @return 输入框左上角，窗口坐标。
  */
 QPoint newTextEditorBoxTopLeft(QPoint click, const QRect &selection, const QSize &minimumBox);
+
+/**
+ * 计算输入框单行文字的实际高度：文档按浮点字体度量排版，可能比整数字体高度多出 1px。
+ * @param document 输入框文档。
+ * @param fontHeight 编辑器字体的整数高度，文档尚未排版时作为下限。
+ * @return 首行排版高度加上下文档边距，取整后不小于字体高度。
+ */
+int textEditorLineHeight(const QTextDocument &document, int fontHeight);
 
 }  // namespace markshot::shot

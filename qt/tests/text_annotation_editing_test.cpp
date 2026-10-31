@@ -460,6 +460,18 @@ private slots:
         editor->insertPlainText(QStringLiteral("Hi"));
         QVERIFY(editor->geometry().right() < kSelection.x() + kSelection.width());
         QVERIFY(editor->geometry().bottom() < kSelection.y() + kSelection.height());
+
+        // 3. 多个字号逐一检查：文档按浮点度量排版，整数字体高度常比实际行高少 1px
+        for (int textSize = 1; textSize <= 40; ++textSize) {
+            window->m_textSize = textSize;
+            window->beginTextAnnotation(QPointF(490, 390));
+            editor->insertPlainText(QStringLiteral("Hi"));
+            const QRect box = editor->geometry();
+            QVERIFY2(box.bottom() < kSelection.y() + kSelection.height(),
+                     qPrintable(QStringLiteral("size %1 box %2,%3 %4x%5")
+                                    .arg(textSize).arg(box.x()).arg(box.y()).arg(box.width()).arg(box.height())));
+            QVERIFY2(box.right() < kSelection.x() + kSelection.width(), qPrintable(QString::number(textSize)));
+        }
     }
 
     /** 验证输入法预编辑文字同样撑开编辑器，预编辑光标留在框内，无参数和返回值。 */

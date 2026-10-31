@@ -2,6 +2,12 @@
 
 #include "shot_window_internal.h"
 
+#include <QAbstractTextDocumentLayout>
+#include <QTextBlock>
+#include <QTextDocument>
+#include <QTextLayout>
+#include <QtMath>
+
 #include <algorithm>
 
 namespace markshot::shot {
@@ -33,6 +39,21 @@ QPoint newTextEditorBoxTopLeft(QPoint click, const QRect &selection, const QSize
     const int x = std::max(selection.left(), std::min(click.x(), right - minimumBox.width()));
     const int y = std::max(selection.top(), std::min(click.y(), bottom - minimumBox.height()));
     return QPoint(x, y);
+}
+
+int textEditorLineHeight(const QTextDocument &document, int fontHeight)
+{
+    // 1. 读取文档尺寸以完成排版，首行高度与输入框实际高度来自同一套浮点度量
+    if (QAbstractTextDocumentLayout *layout = document.documentLayout()) {
+        layout->documentSize();
+    }
+    const QTextLayout *firstLine = document.begin().layout();
+    if (!firstLine || firstLine->lineCount() == 0) {
+        return fontHeight;
+    }
+    // 2. 加上上下文档边距后向上取整，与 QTextDocument::size() 的取整方式一致
+    const qreal height = firstLine->lineAt(0).height() + document.documentMargin() * 2.0;
+    return std::max(fontHeight, qCeil(height));
 }
 
 }  // namespace markshot::shot
