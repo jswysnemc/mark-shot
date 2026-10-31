@@ -6,6 +6,7 @@
 
 #include <QCursor>
 #include <QGuiApplication>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
@@ -42,6 +43,42 @@ QString niriFocusedOutputName()
 #endif
 }
 
+/// @brief Retrieves the name of the currently focused output in the Umbriel compositor.
+/// @return The name of the focused output, or an empty string if not running on Umbriel or on error.
+QString umbrielFocusedOutputName()
+{
+#if defined(Q_OS_WIN)
+    return {};
+#else
+    if (!qEnvironmentVariableIsSet("UMBRIEL_SOCKET")) {
+        return {};
+    }
+    // `subscribe` emits the current state as its first JSON line and then keeps
+    // streaming, so read one line and stop the process.
+    QProcess umbriel;
+    umbriel.setProgram(QStringLiteral("umbriel"));
+    umbriel.setArguments({QStringLiteral("subscribe"), QStringLiteral("outputs")});
+    umbriel.start(QIODevice::ReadOnly);
+    if (!umbriel.waitForStarted(1000) || !umbriel.waitForReadyRead(1000)) {
+        umbriel.kill();
+        return {};
+    }
+    const QByteArray line = umbriel.readLine();
+    umbriel.kill();
+    umbriel.waitForFinished(1000);
+
+    const QJsonDocument document = QJsonDocument::fromJson(line);
+    const QJsonArray outputs = document.object().value(QStringLiteral("data")).toArray();
+    for (const QJsonValue &value : outputs) {
+        const QJsonObject output = value.toObject();
+        if (output.value(QStringLiteral("focused")).toBool()) {
+            return output.value(QStringLiteral("name")).toString();
+        }
+    }
+    return {};
+#endif
+}
+
 /// @brief Finds a QScreen object by its name.
 /// @param name The name of the screen to find.
 /// @return A pointer to the QScreen if found, or nullptr if not found or if the name is empty.
@@ -75,6 +112,10 @@ QScreen *focusedScreen()
         if (QScreen *screen = screenByName(niriFocusedOutputName())) {
             return screen;
         }
+    }
+    // 2.1 【截图会话】【屏幕选择】Umbriel 会话询问聚焦输出
+    if (QScreen *screen = screenByName(umbrielFocusedOutputName())) {
+        return screen;
     }
     // 3. 【截图会话】【屏幕选择】保留 X11 和已收到客户端指针事件时的 Qt 回退
     if (QScreen *screen = QGuiApplication::screenAt(QCursor::pos())) {
