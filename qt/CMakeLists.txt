@@ -296,6 +296,10 @@ qt_add_executable(mark-shot
     src/ui/compact_toolbar.h
     src/ui/toolbar_grip.cpp
     src/ui/toolbar_grip.h
+    src/ui/toolbar_palette.cpp
+    src/ui/toolbar_palette.h
+    src/ui/toolbar_panel_style.cpp
+    src/ui/toolbar_panel_style.h
     src/ui/icons.cpp
     src/ui/action_names.cpp
     src/ui/icons.h

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/toolbar_palette.h"
+
 #include <QColor>
 #include <QIcon>
 #include <QSet>
@@ -36,7 +38,7 @@ struct ToolbarButtonSpec {
     bool enabled = true;
     /// @brief 图标资源名，用于选中悬停时按主题色重绘前景
     QString iconName;
-    /// @brief 常态前景色，无效时不随悬停切换
+    /// @brief 常态前景色，无效时不随悬停切换；悬停前景取自工具栏配色
     QColor iconInk;
 };
 
@@ -116,6 +118,11 @@ public:
     /// @return 无返回值
     void setDynamicIconCallback(DynamicIconCallback callback);
 
+    /// @brief 设置面板底板、边框、分隔线、握柄与悬停前景使用的配色
+    /// @param palette 工具栏配色令牌
+    /// @return 无返回值
+    void setToolbarPalette(const ToolbarPalette &palette);
+
 protected:
     /// @brief 绘制圆角半透明背景与细边框
     /// @param event 绘制事件
@@ -137,7 +144,7 @@ private:
     /// @brief 根据相邻分组的可见按钮决定分隔线显示
     /// @return 无返回值
     void refreshSeparators();
-    /// @brief 悬停时把普通工具前景换成常态色的反色
+    /// @brief 悬停时把普通工具前景换成配色中的悬停前景
     /// @param button 工具栏按钮
     /// @param hovered 指针是否在按钮上
     /// @return 无返回值
@@ -155,6 +162,7 @@ private:
     QVector<Group> m_groups;
     bool m_refreshingSeparators = false;
     DynamicIconCallback m_dynamicIconCallback;
+    ToolbarPalette m_toolbarPalette;
 };
 
 }

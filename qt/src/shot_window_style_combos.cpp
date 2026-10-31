@@ -114,4 +114,9 @@ void ShotWindow::initializePropertyStyleCombos(QHBoxLayout *propertyLayout)
     propertyLayout->addWidget(m_controls.m_propertyNumberStyleCombo);
     // 6. 尺子测量方式
     ShotWindowRulerTool(*this).initializePanel(propertyLayout);
+    // 7. 属性栏下拉框统一跟随工具栏配色
+    const auto combos = m_controls.m_annotationPropertyPanel->findChildren<markshot::ui::CompactComboBox *>();
+    for (markshot::ui::CompactComboBox *combo : combos) {
+        combo->setToolbarPalette(m_toolbarAppearance.palette);
+    }
 }

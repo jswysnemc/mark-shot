@@ -24,6 +24,7 @@ ToolbarGrip::ToolbarGrip(QWidget *parent)
     setCursor(Qt::OpenHandCursor);
     setAttribute(Qt::WA_Hover, true);
     setOrientation(Qt::Horizontal);
+    setToolbarPalette(ToolbarPalette{});
 }
 
 void ToolbarGrip::setOrientation(Qt::Orientation orientation)
@@ -45,6 +46,15 @@ void ToolbarGrip::setOrientation(Qt::Orientation orientation)
     update();
 }
 
+void ToolbarGrip::setToolbarPalette(const ToolbarPalette &palette)
+{
+    m_dotColor = palette.gripDot;
+    m_hoverDotColor = palette.gripDotHover;
+    m_disabledDotColor = palette.gripDotDisabled;
+    m_hoverFill = palette.gripHoverFill;
+    update();
+}
+
 void ToolbarGrip::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event)
@@ -55,16 +65,14 @@ void ToolbarGrip::paintEvent(QPaintEvent *event)
     // 1. 悬停时绘制同色系圆角底板，提示可拖动区域
     if (hovered) {
         painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor(148, 163, 184, 40));
+        painter.setBrush(m_hoverFill);
         painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 1.5, -0.5, -1.5), 3.0, 3.0);
     }
 
     // 2. 按排列方向绘制 2x3 点阵，纵向工具栏旋转为 3x2
     const int rows = m_orientation == Qt::Horizontal ? kDotRows : kDotColumns;
     const int columns = m_orientation == Qt::Horizontal ? kDotColumns : kDotRows;
-    const QColor dotColor = !isEnabled() ? QColor(148, 163, 184, 60)
-        : hovered                       ? QColor(203, 213, 225, 220)
-                                        : QColor(148, 163, 184, 150);
+    const QColor dotColor = !isEnabled() ? m_disabledDotColor : hovered ? m_hoverDotColor : m_dotColor;
     painter.setPen(Qt::NoPen);
     painter.setBrush(dotColor);
     const QPointF origin(width() / 2.0 - (columns - 1) * kDotGap / 2.0,

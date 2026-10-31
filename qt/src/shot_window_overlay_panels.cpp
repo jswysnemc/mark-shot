@@ -177,7 +177,7 @@ void ShotWindow::refreshShapeMarkerToolbarButton()
     }
     rememberShapeMarkerToolbarIconIfEnabled();
     m_controls.m_shapeMarkerToolbarButton->setIcon(
-        markshot::ui::makeMarkerShapeIcon(m_markerShape, QColor(), m_markerFilled));
+        markshot::ui::makeMarkerShapeIcon(m_markerShape, m_toolbarAppearance.palette.text, m_markerFilled));
     m_controls.m_shapeMarkerToolbarButton->setToolTip(
         QStringLiteral("%1 (%2)").arg(
             markshot::i18n::translate(markshot::marker::shapeLabel(m_markerShape)),
@@ -194,8 +194,8 @@ void ShotWindow::refreshShapeMarkerToolbarButton()
         const QVariant fillProperty = button->property("markerFillMode");
         if (shapeProperty.isValid()) {
             selected = shapeProperty.toInt() == static_cast<int>(m_markerShape);
-            button->setIcon(markshot::ui::makeMarkerShapeIcon(
-                static_cast<MarkerShape>(shapeProperty.toInt()), QColor(), m_markerFilled));
+            button->setIcon(markshot::ui::makeMarkerShapeIcon(static_cast<MarkerShape>(shapeProperty.toInt()),
+                                                              m_toolbarAppearance.palette.text, m_markerFilled));
         } else if (fillProperty.isValid()) {
             selected = fillProperty.toBool() == m_markerFilled;
         }

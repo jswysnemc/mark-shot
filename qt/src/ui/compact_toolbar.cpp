@@ -12,10 +12,6 @@
 namespace markshot::ui {
 namespace {
 
-// 与主题工具栏外观一致的面板色板
-const QColor kPanelFill(15, 17, 23, 230);
-const QColor kPanelBorder(255, 255, 255, 28);
-const QColor kSeparatorColor(148, 163, 184, 70);
 constexpr qreal kPanelRadius = 11.0;
 constexpr int kSeparatorLength = 16;
 // 分隔线两侧留白只依赖布局间距，避免分组后工具栏总长超过未分组版本，进而撑大全屏窗口最小宽度
@@ -41,21 +37,13 @@ QString roleName(ToolbarButtonRole role)
     return {};
 }
 
-/// @brief 判断悬停时是否把前景换成常态色的反色
+/// @brief 判断悬停时是否切换为强调色底上的前景
 /// @param button 工具栏按钮
 /// @return 普通工具按钮返回 true
-bool invertForegroundOnHover(const QPushButton *button)
+bool usesHoverForeground(const QPushButton *button)
 {
     const QString role = button->property("role").toString();
     return role.isEmpty() || role == QStringLiteral("secondary");
-}
-
-/// @brief 计算图标前景的反色
-/// @param color 常态前景色
-/// @return 通道取反后的颜色
-QColor invertedInk(QColor color)
-{
-    return QColor(255 - color.red(), 255 - color.green(), 255 - color.blue(), color.alpha());
 }
 
 }
@@ -70,6 +58,15 @@ public:
     {
         setAttribute(Qt::WA_TransparentForMouseEvents, true);
         setOrientation(Qt::Horizontal);
+    }
+
+    /// @brief 设置分隔线颜色
+    /// @param color 分隔线颜色
+    /// @return 无返回值
+    void setColor(const QColor &color)
+    {
+        m_color = color;
+        update();
     }
 
     /// @brief 按工具栏方向设置分隔线尺寸
@@ -95,7 +92,7 @@ protected:
         Q_UNUSED(event)
         QPainter painter(this);
         painter.setPen(Qt::NoPen);
-        painter.setBrush(kSeparatorColor);
+        painter.setBrush(m_color);
         if (m_orientation == Qt::Horizontal) {
             painter.drawRect(QRect(width() / 2, 0, 1, height()));
         } else {
@@ -105,6 +102,7 @@ protected:
 
 private:
     Qt::Orientation m_orientation = Qt::Horizontal;
+    QColor m_color = ToolbarPalette{}.separator;
 };
 
 CompactToolbar::CompactToolbar(const QString &objectName,
@@ -168,6 +166,7 @@ int CompactToolbar::addGroup()
     if (!m_groups.isEmpty()) {
         group.separator = new ToolbarSeparator(this);
         group.separator->setOrientation(m_orientation);
+        group.separator->setColor(m_toolbarPalette.separator);
         m_layout->addWidget(group.separator, 0, Qt::AlignCenter);
     }
     m_groups.append(group);
@@ -287,8 +286,8 @@ void CompactToolbar::paintEvent(QPaintEvent *event)
     Q_UNUSED(event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QPen(kPanelBorder, 1.0));
-    painter.setBrush(kPanelFill);
+    painter.setPen(QPen(m_toolbarPalette.panelBorder, 1.0));
+    painter.setBrush(m_toolbarPalette.panelFill);
     painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), kPanelRadius, kPanelRadius);
 }
 
@@ -320,9 +319,9 @@ void CompactToolbar::syncSelectedHoverIcon(QPushButton *button, bool hovered)
     if (iconName.isEmpty() || !normalInk.isValid()) {
         return;
     }
-    // 1. 悬停使用更亮背景上的反色前景，离开后恢复常态前景
-    const bool hoverInk = button->isEnabled() && hovered && invertForegroundOnHover(button);
-    const QColor ink = hoverInk ? invertedInk(normalInk) : normalInk;
+    // 1. 悬停使用强调色底上的配色前景，离开后恢复常态前景
+    const bool hoverInk = button->isEnabled() && hovered && usesHoverForeground(button);
+    const QColor ink = hoverInk ? m_toolbarPalette.hoverIcon : normalInk;
     if (paintDynamicIconIfEnabled(button, ink)) {
         return;
     }
@@ -333,6 +332,19 @@ void CompactToolbar::setDynamicIconCallback(DynamicIconCallback callback)
 {
     // 1. 【工具栏】【动态图标】记录外部注入的图标绘制委托
     m_dynamicIconCallback = std::move(callback);
+}
+
+void CompactToolbar::setToolbarPalette(const ToolbarPalette &palette)
+{
+    // 1. 记录配色并同步握柄与已有分隔线，底板在下次绘制时生效
+    m_toolbarPalette = palette;
+    m_grip->setToolbarPalette(palette);
+    for (const Group &group : std::as_const(m_groups)) {
+        if (group.separator) {
+            group.separator->setColor(palette.separator);
+        }
+    }
+    update();
 }
 
 void CompactToolbar::refreshSeparators()

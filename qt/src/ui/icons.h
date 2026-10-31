@@ -52,9 +52,10 @@ QIcon makePropertyIcon(PropertyIcon icon, QColor ink = QColor());
 /**
  * 创建填充开关图标，图形本身表达填充状态
  * @param filled 是否为填充状态
+ * @param ink 图标颜色，无效时使用默认面板配色
  * @return 由统一 SVG 资源按需渲染的图标
  */
-QIcon makeFillIcon(bool filled);
+QIcon makeFillIcon(bool filled, QColor ink = QColor());
 
 // 形状标记工具/弹层图标。
 QIcon makeMarkerShapeIcon(ShotWindow::MarkerShape shape, QColor ink = QColor(), bool filled = true);

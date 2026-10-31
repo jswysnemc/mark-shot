@@ -1,4 +1,5 @@
 #include "shot_window_module.h"
+#include "ui/toolbar_panel_style.h"
 
 namespace {
 

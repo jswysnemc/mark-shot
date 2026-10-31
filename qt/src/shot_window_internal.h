@@ -110,7 +110,7 @@ std::optional<bool> envFlagValue(const QProcessEnvironment &env, const QStringLi
 std::optional<QColor> colorFromConfigValue(const QJsonValue &value);
 std::optional<qreal> realFromConfigValue(const QJsonValue &value);
 bool sendDesktopNotification(const QString &summary, const QString &body, int timeoutMs = 2500);
-QColor propertyIconInkForFill(const QColor &fillColor);
+QColor propertyIconInkForFill(const QColor &fillColor, const QColor &fallbackInk = QColor(229, 231, 235));
 QString colorHexRgb(QColor color);
 QString colorHexRgba(QColor color);
 QString alphaText(QColor color);

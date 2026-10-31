@@ -183,7 +183,7 @@ Mark Shot 在 Linux 上从 `~/.config/mark-shot/config.json` 读取应用配置�
 | :--- | :---: | :---: | :--- |
 | `env` | 对象 | `{}` | 在创建 `QApplication` 之前应用到进程的环境变量（例如设置 `"QT_FONT_DPI": 96` 来规避高 DPI 缩放带来的截图边界偏移）。别名：`environment`。 |
 | `ui.language` | 字符串 | `"system"` | 界面语言。支持 `system`（跟随系统语言）、`english`、`chinese`，也接受 `en`/`zh`/`zh_cn`/`cn` 等变体。取代旧版最外层 `language` 字段。可在设置通用页配置。 |
-| `ui.theme` | 字符串 | `"system"` | 界面主题。支持 `system`（跟随 Qt 或桌面色彩方案）、`dark` 和 `light`。可在设置通用页配置，设置窗口会立即应用该主题。取代旧版最外层 `theme` 字段。 |
+| `ui.theme` | 字符串 | `"system"` | 界面主题。支持 `system`（跟随 Qt 或桌面色彩方案）、`dark` 和 `light`。可在设置通用页配置，设置窗口会立即应用该主题；截图工具栏、属性栏及其下拉面板从下一次截图起使用对应的浅色或深色配色。取代旧版最外层 `theme` 字段。 |
 | `capture.freezeScope` | 字符串 | `"all-screens"` | 普通区域截图模式下的显示器冻结范围。当为多显示器环境且没有显式指定捕获全部输出时生效。支持的值包括：`all-screens`（冻结所有显示器）、`cursor-screen`（仅冻结鼠标指针当前所在的显示器）。别名：`freezeScope`、`freezeDisplayScope` 等。 |
 | `capture.hideOwnWindows` | 布尔值 | `true` | 控制截图后端是否从冻结画面中排除 Mark Shot 自身窗口。截图设置页的开关会在下一次截图时立即生效，不需要重启应用。别名：`screenshot.hideOwnWindowsDuringCapture`。 |
 | `capture.wayland.kde.kwinScreenshot.enabled` | 布尔值 | `true` | 是否在 KDE Wayland 环境下启用 KWin 的 `org.kde.KWin.ScreenShot2` 限制级别 DBus 接口截屏功能。如果关闭，将自动回退到常规 Portal 截屏。 |

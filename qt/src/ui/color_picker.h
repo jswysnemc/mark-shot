@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/toolbar_palette.h"
+
 #include <QColor>
 #include <QVector>
 #include <QWidget>
@@ -122,6 +124,13 @@ public:
 
     QColor color() const { return m_color; }
     void setColor(const QColor &color);
+
+    /**
+     * 按宿主面板配色设置十六进制输入框样式。
+     * @param palette 工具栏配色令牌。
+     * @return 无返回值。
+     */
+    void setToolbarPalette(const ToolbarPalette &palette);
 
 signals:
     void colorChanged(const QColor &color);

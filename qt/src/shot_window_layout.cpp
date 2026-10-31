@@ -334,7 +334,7 @@ void ShotWindow::updateAnnotationPropertyPanel()
         m_controls.m_propertyFillButton->setVisible(supportsFill);
         const QSignalBlocker blocker(m_controls.m_propertyFillButton);
         m_controls.m_propertyFillButton->setChecked(panelFilled);
-        m_controls.m_propertyFillButton->setIcon(markshot::ui::makeFillIcon(panelFilled));
+        m_controls.m_propertyFillButton->setIcon(markshot::ui::makeFillIcon(panelFilled, m_toolbarAppearance.palette.text));
     }
     // 圆角对描边与聚光灯两种矩形风格生效
     const bool supportsRadius = !groupSelection
@@ -471,7 +471,7 @@ void ShotWindow::updateAnnotationPropertyPanel()
     if (m_controls.m_propertyColorButton) {
         m_controls.m_propertyColorButton->setStyleSheet(markshot::theme::propertyColorButtonStyleSheet(panelColor));
         m_controls.m_propertyColorButton->setIcon(markshot::ui::makePropertyIcon(
-            markshot::ui::PropertyIcon::Color, propertyIconInkForFill(panelColor)));
+            markshot::ui::PropertyIcon::Color, propertyIconInkForFill(panelColor, m_toolbarAppearance.palette.text)));
         m_controls.m_propertyColorButton->setVisible(panelTool != Tool::Mosaic);
         if (panelTool == Tool::Mosaic && m_controls.m_propertyColorDialogPanel) {
             m_controls.m_propertyColorDialogPanel->hide();
@@ -482,7 +482,8 @@ void ShotWindow::updateAnnotationPropertyPanel()
         m_controls.m_propertyTextBackgroundButton->setVisible(supportsTextBackground);
         m_controls.m_propertyTextBackgroundButton->setStyleSheet(markshot::theme::propertyColorButtonStyleSheet(panelTextBackgroundColor));
         m_controls.m_propertyTextBackgroundButton->setIcon(markshot::ui::makePropertyIcon(
-            markshot::ui::PropertyIcon::TextBackground, propertyIconInkForFill(panelTextBackgroundColor)));
+            markshot::ui::PropertyIcon::TextBackground,
+            propertyIconInkForFill(panelTextBackgroundColor, m_toolbarAppearance.palette.text)));
         if (!supportsTextBackground && m_controls.m_propertyColorDialogPanel && m_controls.m_propertyColorEditingTextBackground) {
             m_controls.m_propertyColorDialogPanel->hide();
         }

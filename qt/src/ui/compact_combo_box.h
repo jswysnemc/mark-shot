@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/toolbar_palette.h"
+
 #include <QComboBox>
 #include <QPointer>
 
@@ -8,7 +10,7 @@ namespace markshot::ui {
 class ContextMenu;
 
 /**
- * 截图属性栏使用的紧凑下拉框：保留 QComboBox 数据接口，按钮与弹出列表均为自绘暗色样式。
+ * 截图属性栏使用的紧凑下拉框：保留 QComboBox 数据接口，按钮与弹出列表均为自绘样式，配色跟随工具栏。
  */
 class CompactComboBox final : public QComboBox {
     Q_OBJECT
@@ -44,6 +46,13 @@ public:
      */
     QSize minimumSizeHint() const override;
 
+    /**
+     * 设置按钮与弹出菜单使用的工具栏配色。
+     * @param palette 工具栏配色令牌。
+     * @return 无返回值。
+     */
+    void setToolbarPalette(const ToolbarPalette &palette);
+
 protected:
     /**
      * 绘制圆角按钮、当前文本与下拉箭头。
@@ -68,6 +77,7 @@ protected:
 
 private:
     QPointer<ContextMenu> m_menu;
+    ToolbarPalette m_toolbarPalette;
     bool m_hovered = false;
 };
 

@@ -5,6 +5,7 @@
 // ===== 新增 import =====
 #include "text_annotation_layout.h"
 #include "ui/recent_font_store.h"
+#include "ui/toolbar_panel_style.h"
 
 #include <QColor>
 #include <QFontDatabase>
@@ -48,7 +49,7 @@ void ShotWindow::initializePropertyFontPanel()
     m_controls.m_propertyFontPanel = new QWidget(this);
     m_controls.m_propertyFontPanel->setObjectName(QStringLiteral("propertyFontPanel"));
     m_controls.m_propertyFontPanel->setCursor(Qt::ArrowCursor);
-    m_controls.m_propertyFontPanel->setStyleSheet(markshot::theme::openWithPanelStyleSheet());
+    m_controls.m_propertyFontPanel->setStyleSheet(markshot::theme::openWithPanelStyleSheet(m_toolbarAppearance.palette));
     auto *fontPanelLayout = new QVBoxLayout(m_controls.m_propertyFontPanel);
     fontPanelLayout->setContentsMargins(6, 6, 6, 6);
     // 列表与底部控件行之间保留固定间距，高度由 updatePropertyFontPanelGeometry 统一分配
@@ -335,15 +336,16 @@ QIcon fontListBlankIcon()
 
 /**
  * 生成当前字体的勾选标记。
+ * @param ink 勾选标记颜色，与字体面板前景一致。
  * @return 勾选图标。
  */
-QIcon fontListCheckIcon()
+QIcon fontListCheckIcon(const QColor &ink)
 {
     QPixmap pixmap(14, 14);
     pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QPen(QColor(229, 231, 235), 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setPen(QPen(ink, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     painter.drawLine(QPointF(2.2, 7.2), QPointF(5.4, 10.6));
     painter.drawLine(QPointF(5.4, 10.6), QPointF(11.6, 3.2));
     return QIcon(pixmap);
@@ -407,7 +409,7 @@ void ShotWindow::refreshRecentTextFontsIfEnabled()
         item->setData(kRecentFontRowRole, static_cast<int>(RecentFontRowKind::RecentFont));
         item->setToolTip(family);
         item->setFont(QFont(family, 13));
-        item->setIcon(family == currentFamily ? fontListCheckIcon() : fontListBlankIcon());
+        item->setIcon(family == currentFamily ? fontListCheckIcon(m_toolbarAppearance.palette.text) : fontListBlankIcon());
         currentInRecent = currentInRecent || family == currentFamily;
         m_controls.m_propertyFontList->insertItem(0, item);
     }
@@ -422,7 +424,8 @@ void ShotWindow::refreshRecentTextFontsIfEnabled()
         m_controls.m_propertyFontList->insertItem(recent.size(), header);
         auto *label = new QLabel(MS_TR("All system fonts"), m_controls.m_propertyFontList);
         label->setStyleSheet(QStringLiteral(
-            "QLabel { color: #9CA3AF; background: transparent; font-size: 11px; font-weight: 600; padding: 8px 8px 2px 8px; }"));
+            "QLabel { color: %1; background: transparent; font-size: 11px; font-weight: 600; padding: 8px 8px 2px 8px; }")
+                .arg(markshot::ui::cssColor(m_toolbarAppearance.palette.mutedText)));
         label->setAttribute(Qt::WA_TransparentForMouseEvents, true);
         m_controls.m_propertyFontList->setIndexWidget(
             m_controls.m_propertyFontList->model()->index(recent.size(), 0), label);
@@ -437,7 +440,7 @@ void ShotWindow::refreshRecentTextFontsIfEnabled()
         const QString family = item->data(Qt::UserRole).toString();
         item->setFont(QFont(family, 13));
         const bool checked = !currentInRecent && family == currentFamily;
-        item->setIcon(checked ? fontListCheckIcon() : fontListBlankIcon());
+        item->setIcon(checked ? fontListCheckIcon(m_toolbarAppearance.palette.text) : fontListBlankIcon());
         if (checked) {
             currentInRecent = true;
         }

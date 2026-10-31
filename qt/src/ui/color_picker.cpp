@@ -379,21 +379,7 @@ ColorPicker::ColorPicker(QWidget *parent) : QWidget(parent)
     m_hex->setFixedHeight(kSwatchSize);
     QRegularExpression re(QStringLiteral("^#?[0-9a-fA-F]{0,8}$"));
     m_hex->setValidator(new QRegularExpressionValidator(re, this));
-    m_hex->setStyleSheet(QStringLiteral(
-        "QLineEdit {"
-        " color: #E5E7EB;"
-        " background: rgba(255,255,255,16);"
-        " border: 1px solid rgba(255,255,255,28);"
-        " border-radius: 6px;"
-        " padding: 4px 8px;"
-        " font-family: %1;"
-        " font-size: 12px;"
-        " font-weight: 600;"
-        " selection-background-color: #2DD4BF;"
-        " selection-color: #042F2E;"
-        "}"
-        "QLineEdit:focus { border-color: rgba(45,212,191,180); }")
-            .arg(markshot::theme::uiFontFamilyCss()));
+    setToolbarPalette(ToolbarPalette{});
     bottom->addWidget(m_hex, 1);
     layout->addLayout(bottom);
 
@@ -437,6 +423,27 @@ ColorPicker::ColorPicker(QWidget *parent) : QWidget(parent)
     connect(m_hex, &QLineEdit::editingFinished, this, [this] { onHexEdited(); });
 
     setColor(QColor(255, 0, 0, 255));
+}
+
+void ColorPicker::setToolbarPalette(const ToolbarPalette &palette)
+{
+    m_hex->setStyleSheet(QStringLiteral(
+        "QLineEdit {"
+        " color: %1;"
+        " background: %2;"
+        " border: 1px solid %3;"
+        " border-radius: 6px;"
+        " padding: 4px 8px;"
+        " font-family: %4;"
+        " font-size: 12px;"
+        " font-weight: 600;"
+        " selection-background-color: %5;"
+        " selection-color: %6;"
+        "}"
+        "QLineEdit:focus { border-color: %7; }")
+            .arg(cssColor(palette.text), cssColor(palette.controlFill), cssColor(palette.controlBorder),
+                 markshot::theme::uiFontFamilyCss(), cssColor(palette.hoverFill), cssColor(palette.hoverText),
+                 cssColor(palette.focusBorder)));
 }
 
 void ColorPicker::setColor(const QColor &color)

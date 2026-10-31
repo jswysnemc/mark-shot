@@ -1,5 +1,6 @@
 
 #include "scroll/scroll_session_window_internal.h"
+#include "ui/toolbar_panel_style.h"
 
 #include <QCursor>
 

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "ui/toolbar_palette.h"
+
+#include <QColor>
 #include <QWidget>
 
 namespace markshot::ui {
@@ -16,6 +19,11 @@ public:
     /// @return 无返回值
     void setOrientation(Qt::Orientation orientation);
 
+    /// @brief 按工具栏配色设置点阵与悬停底板颜色
+    /// @param palette 工具栏配色令牌
+    /// @return 无返回值
+    void setToolbarPalette(const ToolbarPalette &palette);
+
 protected:
     /// @brief 根据悬停状态绘制点阵
     /// @param event 绘制事件
@@ -28,6 +36,10 @@ protected:
 
 private:
     Qt::Orientation m_orientation = Qt::Horizontal;
+    QColor m_dotColor;
+    QColor m_hoverDotColor;
+    QColor m_disabledDotColor;
+    QColor m_hoverFill;
 };
 
 }

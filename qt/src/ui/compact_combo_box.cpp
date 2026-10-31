@@ -12,17 +12,11 @@
 namespace markshot::ui {
 namespace {
 
-// 按钮尺寸与暗色面板令牌
+// 按钮尺寸令牌，颜色取自工具栏配色
 constexpr int kHorizontalPadding = 8;
 constexpr int kChevronSize = 12;
 constexpr int kChevronGap = 6;
 constexpr qreal kRadius = 6.0;
-const QColor kBackground(255, 255, 255, 16);
-const QColor kHoverBackground(255, 255, 255, 26);
-const QColor kBorder(255, 255, 255, 26);
-const QColor kActiveBorder(45, 212, 191, 150);
-const QColor kText(229, 231, 235);
-const QColor kSecondaryText(148, 163, 184);
 
 }  // namespace
 
@@ -47,7 +41,8 @@ void CompactComboBox::showPopup()
     // 1. 每次打开时按当前数据重建，选项变化与选中状态始终一致
     if (!m_menu) {
         m_menu = new ContextMenu(this);
-        m_menu->setColorScheme(ContextMenu::ColorScheme::Dark);
+        m_menu->setColorScheme(m_toolbarPalette.dark ? ContextMenu::ColorScheme::Dark
+                                                     : ContextMenu::ColorScheme::Light);
         connect(m_menu, &ContextMenu::popupFinished, this, [this] { update(); });
     }
     m_menu->clear();
@@ -94,6 +89,16 @@ QSize CompactComboBox::minimumSizeHint() const
     return sizeHint();
 }
 
+void CompactComboBox::setToolbarPalette(const ToolbarPalette &palette)
+{
+    // 1. 记录配色；已创建的菜单同步明暗主题，按钮在下次绘制时生效
+    m_toolbarPalette = palette;
+    if (m_menu) {
+        m_menu->setColorScheme(palette.dark ? ContextMenu::ColorScheme::Dark : ContextMenu::ColorScheme::Light);
+    }
+    update();
+}
+
 void CompactComboBox::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event);
@@ -104,8 +109,9 @@ void CompactComboBox::paintEvent(QPaintEvent *event)
 
     // 1. 圆角底板：悬停加亮，展开时使用强调色细边
     const QRectF frame = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
-    painter.setPen(QPen(open ? kActiveBorder : kBorder, 1));
-    painter.setBrush(m_hovered && enabled ? kHoverBackground : kBackground);
+    const ToolbarPalette &colors = m_toolbarPalette;
+    painter.setPen(QPen(open ? colors.focusBorder : colors.controlBorder, 1));
+    painter.setBrush(m_hovered && enabled ? colors.controlHoverFill : colors.controlFill);
     painter.drawRoundedRect(frame, kRadius, kRadius);
 
     // 2. 当前选项文本，空间不足时省略尾部
@@ -113,12 +119,12 @@ void CompactComboBox::paintEvent(QPaintEvent *event)
                             kChevronSize);
     const QRect textRect(kHorizontalPadding, 0, chevronRect.left() - kChevronGap - kHorizontalPadding, height());
     painter.setFont(font());
-    painter.setPen(enabled ? kText : kSecondaryText);
+    painter.setPen(enabled ? colors.text : colors.mutedText);
     painter.drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft,
                      QFontMetrics(font()).elidedText(currentText(), Qt::ElideRight, textRect.width()));
 
     // 3. 统一 SVG 下拉箭头
-    const QPixmap chevron = renderSvgIcon(QStringLiteral("chevron-down"), open ? kActiveBorder : kSecondaryText,
+    const QPixmap chevron = renderSvgIcon(QStringLiteral("chevron-down"), open ? colors.focusBorder : colors.mutedText,
                                           chevronRect.size(), devicePixelRatioF());
     painter.drawPixmap(chevronRect, chevron);
 }

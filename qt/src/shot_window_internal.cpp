@@ -85,10 +85,10 @@ bool sendDesktopNotification(const QString &summary, const QString &body, int ti
 
 
 
-QColor propertyIconInkForFill(const QColor &fillColor)
+QColor propertyIconInkForFill(const QColor &fillColor, const QColor &fallbackInk)
 {
     if (!fillColor.isValid() || fillColor.alpha() < 48) {
-        return QColor(229, 231, 235);
+        return fallbackInk;
     }
     const int luma =
         (fillColor.red() * 299 + fillColor.green() * 587 + fillColor.blue() * 114) / 1000;

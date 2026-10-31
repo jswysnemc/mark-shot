@@ -38,9 +38,10 @@ QIcon makePropertyIcon(PropertyIcon icon, QColor ink)
     return makeSvgIcon(propertyIconName(icon), ink.isValid() ? ink : kOverlayInk);
 }
 
-QIcon makeFillIcon(bool filled)
+QIcon makeFillIcon(bool filled, QColor ink)
 {
-    return makeSvgIcon(filled ? QStringLiteral("fill-on") : QStringLiteral("fill-off"), kOverlayInk);
+    return makeSvgIcon(filled ? QStringLiteral("fill-on") : QStringLiteral("fill-off"),
+                       ink.isValid() ? ink : kOverlayInk);
 }
 
 QIcon makeMarkerShapeIcon(ShotWindow::MarkerShape shape, QColor ink, bool filled)

@@ -175,9 +175,10 @@ QPushButton *ShotWindow::addToolbarButton(Action action, const QString &shortcut
     markshot::ui::CompactToolbar *toolbar = mainToolbarButton ? m_controls.m_toolbarPanel : m_controls.m_actionToolbarPanel;
     markshot::ui::ToolbarButtonSpec spec;
     spec.actionKey = markshot::ui::actionName(action);
-    spec.icon = markshot::ui::makeToolIcon(action);
+    // 主动作位于强调色渐变底上，前景固定取主动作前景色，其余按钮跟随工具栏配色
+    spec.iconInk = action == Action::Save ? m_toolbarAppearance.palette.primaryText : m_toolbarAppearance.palette.text;
+    spec.icon = markshot::ui::makeToolIcon(action, spec.iconInk);
     spec.iconName = markshot::ui::toolIconName(action);
-    spec.iconInk = action == Action::Save ? QColor(255, 255, 255) : QColor(229, 231, 235);
     spec.tooltip = QStringLiteral("%1 (%2)").arg(markshot::i18n::translate(spec.actionKey), shortcutText);
     if (action == Action::ScrollCapture && isGnomeWaylandSession() && !hasGnomeScrollHelper()) {
         spec.enabled = false;

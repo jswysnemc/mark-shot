@@ -4,6 +4,7 @@
 #include "selection_loupe_config.h"
 #include "ui/canvas_scrollbar_style.h"
 #include "ui/compact_toolbar.h"
+#include "ui/toolbar_panel_style.h"
 
 namespace cfg = markshot::config;
 namespace shortcuts = markshot::shortcut;
@@ -195,6 +196,10 @@ ShotWindow::ShotWindow(QImage frozenFrame,
         m_controls.m_toolbarPosition = markshot::captureToolbarPositionFromConfigRoot(appConfigRoot);
         m_selectionLoupeEnabled = markshot::selectionLoupeEnabledFromConfigRoot(appConfigRoot);
     }
+    // 【截图工具栏】【主题】按设置中的界面主题解析工具栏配色，跟随系统时读取当前系统明暗
+    m_toolbarAppearance.palette = markshot::ui::toolbarPalette(markshot::ui::effectiveUiThemeMode(
+        appConfigOk ? markshot::ui::uiThemeModeFromConfigRoot(appConfigRoot) : markshot::ui::UiThemeMode::System));
+    const QColor panelInk = m_toolbarAppearance.palette.text;
     // 在初始化 UI 之前先加载上次会话的工具默认值,使后续 toolbar/属性面板按
     // 持久化的状态显示;loadAnnotationStateFromDisk 仅修改 m_* 默认值字段,
     // 不会触碰任何尚未构造完成的控件
@@ -270,12 +275,13 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     auto *propertyLayout = new QHBoxLayout(m_controls.m_annotationPropertyPanel);
     propertyLayout->setContentsMargins(propertyMarginX, propertyMarginY, propertyMarginX, propertyMarginY);
     propertyLayout->setSpacing(propertySpacing);
-    auto addPropertyGlyph = [this, propertyLayout, propertyGlyphSize](markshot::ui::PropertyIcon icon,
-                                                                     const QString &tooltip) {
+    auto addPropertyGlyph = [this, propertyLayout, propertyGlyphSize, panelInk](markshot::ui::PropertyIcon icon,
+                                                                               const QString &tooltip) {
         auto *label = new QLabel(m_controls.m_annotationPropertyPanel);
         label->setObjectName(QStringLiteral("propertyGlyph"));
         label->setAlignment(Qt::AlignCenter);
-        label->setPixmap(markshot::ui::makePropertyIcon(icon).pixmap(QSize(propertyGlyphSize, propertyGlyphSize)));
+        label->setPixmap(
+            markshot::ui::makePropertyIcon(icon, panelInk).pixmap(QSize(propertyGlyphSize, propertyGlyphSize)));
         label->setToolTip(tooltip);
         propertyLayout->addWidget(label);
         return label;
@@ -322,7 +328,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     propertyLayout->addSpacing(propertyMinorSpacing);
     m_controls.m_propertyColorButton = new QPushButton(m_controls.m_annotationPropertyPanel);
     m_controls.m_propertyColorButton->setFocusPolicy(Qt::NoFocus);
-    m_controls.m_propertyColorButton->setIcon(markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::Color));
+    m_controls.m_propertyColorButton->setIcon(markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::Color, panelInk));
     m_controls.m_propertyColorButton->setIconSize(QSize(propertyButtonIconSize, propertyButtonIconSize));
     m_controls.m_propertyColorButton->setToolTip(MS_TR("Change selected object color"));
     m_controls.m_propertyColorButton->setAccessibleName(MS_TR("Change selected object color"));
@@ -330,7 +336,8 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     propertyLayout->addWidget(m_controls.m_propertyColorButton);
     m_controls.m_propertyTextBackgroundButton = new QPushButton(m_controls.m_annotationPropertyPanel);
     m_controls.m_propertyTextBackgroundButton->setFocusPolicy(Qt::NoFocus);
-    m_controls.m_propertyTextBackgroundButton->setIcon(markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::TextBackground));
+    m_controls.m_propertyTextBackgroundButton->setIcon(
+        markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::TextBackground, panelInk));
     m_controls.m_propertyTextBackgroundButton->setIconSize(QSize(propertyButtonIconSize, propertyButtonIconSize));
     m_controls.m_propertyTextBackgroundButton->setToolTip(MS_TR("Text background color"));
     m_controls.m_propertyTextBackgroundButton->setAccessibleName(MS_TR("Text background color"));
@@ -339,12 +346,12 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     m_controls.m_propertyFillButton = new QPushButton(m_controls.m_annotationPropertyPanel);
     m_controls.m_propertyFillButton->setCheckable(true);
     m_controls.m_propertyFillButton->setFocusPolicy(Qt::NoFocus);
-    m_controls.m_propertyFillButton->setIcon(markshot::ui::makeFillIcon(false));
+    m_controls.m_propertyFillButton->setIcon(markshot::ui::makeFillIcon(false, panelInk));
     m_controls.m_propertyFillButton->setIconSize(QSize(propertyButtonIconSize, propertyButtonIconSize));
     m_controls.m_propertyFillButton->setToolTip(MS_TR("Toggle shape fill"));
     m_controls.m_propertyFillButton->setAccessibleName(MS_TR("Toggle shape fill"));
-    connect(m_controls.m_propertyFillButton, &QPushButton::toggled, this, [this](bool checked) {
-        m_controls.m_propertyFillButton->setIcon(markshot::ui::makeFillIcon(checked));
+    connect(m_controls.m_propertyFillButton, &QPushButton::toggled, this, [this, panelInk](bool checked) {
+        m_controls.m_propertyFillButton->setIcon(markshot::ui::makeFillIcon(checked, panelInk));
         setSelectedAnnotationFilled(checked);
     });
     propertyLayout->addWidget(m_controls.m_propertyFillButton);
@@ -362,7 +369,8 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     initializePropertyStyleCombos(propertyLayout);
     m_controls.m_propertyResetNumberButton = new QPushButton(m_controls.m_annotationPropertyPanel);
     m_controls.m_propertyResetNumberButton->setFocusPolicy(Qt::NoFocus);
-    m_controls.m_propertyResetNumberButton->setIcon(markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::ResetNumber));
+    m_controls.m_propertyResetNumberButton->setIcon(
+        markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::ResetNumber, panelInk));
     m_controls.m_propertyResetNumberButton->setIconSize(QSize(propertyButtonIconSize, propertyButtonIconSize));
     m_controls.m_propertyResetNumberButton->setToolTip(MS_TR("Reset number sequence"));
     m_controls.m_propertyResetNumberButton->setAccessibleName(MS_TR("Reset number sequence"));
@@ -385,7 +393,8 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     propertyLayout->addWidget(m_controls.m_propertyMagnifierScaleLabel);
     m_controls.m_propertyMagnifierShapeButton = new QPushButton(m_controls.m_annotationPropertyPanel);
     m_controls.m_propertyMagnifierShapeButton->setFocusPolicy(Qt::NoFocus);
-    m_controls.m_propertyMagnifierShapeButton->setIcon(markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::MagnifierShape));
+    m_controls.m_propertyMagnifierShapeButton->setIcon(
+        markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::MagnifierShape, panelInk));
     m_controls.m_propertyMagnifierShapeButton->setIconSize(QSize(propertyButtonIconSize, propertyButtonIconSize));
     m_controls.m_propertyMagnifierShapeButton->setToolTip(MS_TR("Toggle magnifier shape (circle/rectangle)"));
     m_controls.m_propertyMagnifierShapeButton->setAccessibleName(MS_TR("Toggle magnifier shape"));
@@ -394,7 +403,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     propertyLayout->addWidget(m_controls.m_propertyMagnifierShapeButton);
     m_controls.m_propertyFontButton = new QPushButton(m_controls.m_annotationPropertyPanel);
     m_controls.m_propertyFontButton->setFocusPolicy(Qt::NoFocus);
-    m_controls.m_propertyFontButton->setIcon(markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::Font));
+    m_controls.m_propertyFontButton->setIcon(markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::Font, panelInk));
     m_controls.m_propertyFontButton->setIconSize(QSize(propertyButtonIconSize, propertyButtonIconSize));
     m_controls.m_propertyFontButton->setToolTip(MS_TR("Text font"));
     m_controls.m_propertyFontButton->setAccessibleName(MS_TR("Text font"));
@@ -402,7 +411,8 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     propertyLayout->addWidget(m_controls.m_propertyFontButton);
     m_controls.m_propertyEditTextButton = new QPushButton(m_controls.m_annotationPropertyPanel);
     m_controls.m_propertyEditTextButton->setFocusPolicy(Qt::NoFocus);
-    m_controls.m_propertyEditTextButton->setIcon(markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::EditText));
+    m_controls.m_propertyEditTextButton->setIcon(
+        markshot::ui::makePropertyIcon(markshot::ui::PropertyIcon::EditText, panelInk));
     m_controls.m_propertyEditTextButton->setIconSize(QSize(propertyButtonIconSize, propertyButtonIconSize));
     m_controls.m_propertyEditTextButton->setToolTip(MS_TR("Edit selected text"));
     m_controls.m_propertyEditTextButton->setAccessibleName(MS_TR("Edit selected text"));
@@ -413,11 +423,13 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     m_controls.m_propertyColorDialogPanel = new QWidget(this);
     m_controls.m_propertyColorDialogPanel->setObjectName(QStringLiteral("propertyColorDialogPanel"));
     m_controls.m_propertyColorDialogPanel->setCursor(Qt::ArrowCursor);
-    m_controls.m_propertyColorDialogPanel->setStyleSheet(markshot::theme::propertyColorDialogPanelStyleSheet());
+    m_controls.m_propertyColorDialogPanel->setStyleSheet(
+        markshot::theme::propertyColorDialogPanelStyleSheet(m_toolbarAppearance.palette));
     auto *propertyColorLayout = new QVBoxLayout(m_controls.m_propertyColorDialogPanel);
     propertyColorLayout->setContentsMargins(8, 8, 8, 8);
     propertyColorLayout->setSpacing(0);
     m_controls.m_propertyColorPicker = new markshot::ui::ColorPicker(m_controls.m_propertyColorDialogPanel);
+    m_controls.m_propertyColorPicker->setToolbarPalette(m_toolbarAppearance.palette);
     m_controls.m_propertyColorPicker->setColor(m_currentColor);
     connect(m_controls.m_propertyColorPicker, &markshot::ui::ColorPicker::colorChanged, this,
             [this](const QColor &color) { applyPropertyColor(color); });
@@ -447,6 +459,7 @@ void ShotWindow::initializeToolbar()
         {m_toolbarAppearance.toolbarIconSize, 6, 2}, this);
     m_controls.m_toolbarPanel = panel;
     m_controls.m_toolbar = panel;
+    panel->setToolbarPalette(m_toolbarAppearance.palette);
     panel->setDynamicIconCallback([this](QPushButton *button, const QColor &ink) -> QIcon {
         // 1. 【截图工具栏】【动态图标】为形状标记按钮根据当前形状与悬停前景色生成图标
         if (!button || !button->property("dynamicIcon").toBool()) {
@@ -454,8 +467,8 @@ void ShotWindow::initializeToolbar()
         }
         return markshot::ui::makeMarkerShapeIcon(m_markerShape, ink, m_markerFilled);
     });
-    panel->setStyleSheet(
-        markshot::theme::panelStyleSheet(m_toolbarAppearance.toolbarButtonSize, m_toolbarAppearance.fontSize));
+    panel->setStyleSheet(markshot::theme::panelStyleSheet(
+        m_toolbarAppearance.palette, m_toolbarAppearance.toolbarButtonSize, m_toolbarAppearance.fontSize));
     // 工具栏点击需要清除滚轮预览，握柄事件进入窗口的拖拽与吸附逻辑
     panel->installEventFilter(this);
     panel->grip()->installEventFilter(this);
@@ -515,6 +528,7 @@ void ShotWindow::initializeActionToolbar()
         {m_toolbarAppearance.actionToolbarIconSize, 4, 2}, this);
     m_controls.m_actionToolbarPanel = panel;
     m_controls.m_actionToolbar = panel;
+    panel->setToolbarPalette(m_toolbarAppearance.palette);
     panel->setStyleSheet(m_controls.m_toolbar->styleSheet()
         + QStringLiteral(
               "QWidget#actionToolbar QPushButton {"
@@ -546,7 +560,7 @@ void ShotWindow::initializeTransientPanels()
     m_controls.m_openWithPanel = new QWidget(this);
     m_controls.m_openWithPanel->setObjectName(QStringLiteral("openWithPanel"));
     m_controls.m_openWithPanel->setCursor(Qt::ArrowCursor);
-    m_controls.m_openWithPanel->setStyleSheet(markshot::theme::openWithPanelStyleSheet());
+    m_controls.m_openWithPanel->setStyleSheet(markshot::theme::openWithPanelStyleSheet(m_toolbarAppearance.palette));
     auto *openLayout = new QVBoxLayout(m_controls.m_openWithPanel);
     openLayout->setContentsMargins(8, 8, 8, 8);
     openLayout->setSpacing(4);
@@ -555,7 +569,7 @@ void ShotWindow::initializeTransientPanels()
     m_controls.m_extensionPanel = new QWidget(this);
     m_controls.m_extensionPanel->setObjectName(QStringLiteral("extensionPanel"));
     m_controls.m_extensionPanel->setCursor(Qt::ArrowCursor);
-    m_controls.m_extensionPanel->setStyleSheet(markshot::theme::openWithPanelStyleSheet());
+    m_controls.m_extensionPanel->setStyleSheet(markshot::theme::openWithPanelStyleSheet(m_toolbarAppearance.palette));
     auto *extensionLayout = new QVBoxLayout(m_controls.m_extensionPanel);
     extensionLayout->setContentsMargins(8, 8, 8, 8);
     extensionLayout->setSpacing(4);
@@ -590,7 +604,7 @@ void ShotWindow::initializeTransientPanels()
         auto *button = new QPushButton(m_controls.m_shapeMarkerPopup);
         button->setFocusPolicy(Qt::NoFocus);
         button->setCursor(Qt::ArrowCursor);
-        button->setIcon(markshot::ui::makeMarkerShapeIcon(shape));
+        button->setIcon(markshot::ui::makeMarkerShapeIcon(shape, m_toolbarAppearance.palette.text));
         button->setIconSize(QSize(m_toolbarAppearance.toolbarIconSize, m_toolbarAppearance.toolbarIconSize));
         button->setToolTip(markshot::i18n::translate(markshot::marker::shapeLabel(shape)));
         button->setProperty("markerShape", static_cast<int>(shape));
@@ -611,7 +625,7 @@ void ShotWindow::initializeTransientPanels()
         button->setFocusPolicy(Qt::NoFocus);
         button->setCursor(Qt::ArrowCursor);
         button->setIcon(markshot::ui::makeMarkerShapeIcon(ShotWindow::MarkerShape::Circle,
-                                                          QColor(),
+                                                          m_toolbarAppearance.palette.text,
                                                           filled));
         button->setIconSize(QSize(m_toolbarAppearance.toolbarIconSize, m_toolbarAppearance.toolbarIconSize));
         button->setToolTip(markshot::i18n::translate(filled ? QStringLiteral("Filled")

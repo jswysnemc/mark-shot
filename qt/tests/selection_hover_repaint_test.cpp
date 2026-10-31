@@ -1,6 +1,6 @@
 #include "shot_window.h"
 #include "support/isolated_config.h"
-#include "ui/theme.h"
+#include "ui/toolbar_panel_style.h"
 
 #include <QApplication>
 #include <QMouseEvent>
