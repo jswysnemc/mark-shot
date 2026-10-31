@@ -45,12 +45,20 @@ public:
     void drawHover(QPainter &painter) const;
 
     /**
-     * 绘制选中尺子的虚线范围、控制点和旋转把手，长度尺的范围随测量框旋转，角度尺取三点的外接矩形。
+     * 绘制选中尺子的虚线范围、控制点和旋转把手，长度尺的范围随测量框旋转；
+     * 角度尺的范围是 angleFrame，另画四角和四边中点的缩放控制点。
      * @param painter 当前绘制器，调用前后状态不变。
      * @param annotation 选中的尺子。
      * @return 无返回值。
      */
     void drawSelectedFrame(QPainter &painter, const Annotation &annotation) const;
+
+    /**
+     * 计算角度尺选中框：三点外接矩形向外留出固定的窗口像素，选中框的绘制、拖动命中和删除按钮共用。
+     * @param annotation 角度尺。
+     * @return 选中框，图像像素坐标；没有定点时为空。
+     */
+    QRectF angleFrame(const Annotation &annotation) const;
 
     /**
      * 计算旋转把手到尺子范围上边的距离：长度尺越过上边的刻度数字，角度尺越过外扩的选中框。

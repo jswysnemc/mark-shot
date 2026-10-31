@@ -147,7 +147,7 @@ void ShotWindow::updateAnnotationDrag(QPointF imagePoint, bool keepAspectRatio, 
         }
     }
 
-    if (ShotWindowRulerTool(*this).updateDrag(imagePoint, snapRotation)) {
+    if (ShotWindowRulerTool(*this).updateDrag(imagePoint, keepAspectRatio, snapRotation)) {
         // 尺子的控制点和角度尺的旋转按尺子自身规则处理,逻辑见 shot_window_ruler_drag.cpp
     } else if (m_annotationDrag == SelectionDrag::Rotate) {
         const QPointF center = selectedIds.size() == 1

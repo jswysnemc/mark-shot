@@ -11,6 +11,7 @@
 #include <QWheelEvent>
 #include <QtTest>
 
+#include <cmath>
 #include <memory>
 
 namespace {
@@ -26,13 +27,14 @@ using markshot::shot::types::Tool;
  * @param type 事件类型。
  * @param position 窗口坐标。
  * @param buttons 事件发生后仍按住的按键。
+ * @param modifiers 按住的修饰键。
  * @return 无返回值。
  */
-void sendMouse(ShotWindow &window, QEvent::Type type, QPoint position, Qt::MouseButtons buttons)
+void sendMouse(ShotWindow &window, QEvent::Type type, QPoint position, Qt::MouseButtons buttons,
+               Qt::KeyboardModifiers modifiers = Qt::NoModifier)
 {
     const Qt::MouseButton button = type == QEvent::MouseMove ? Qt::NoButton : Qt::LeftButton;
-    QMouseEvent event(type, QPointF(position), QPointF(window.mapToGlobal(position)), button, buttons,
-                      Qt::NoModifier);
+    QMouseEvent event(type, QPointF(position), QPointF(window.mapToGlobal(position)), button, buttons, modifiers);
     QCoreApplication::sendEvent(&window, &event);
 }
 
@@ -41,14 +43,15 @@ void sendMouse(ShotWindow &window, QEvent::Type type, QPoint position, Qt::Mouse
  * @param window 截图窗口。
  * @param from 按下位置，窗口坐标。
  * @param to 松开位置，窗口坐标。
+ * @param modifiers 全程按住的修饰键。
  * @return 无返回值。
  */
-void drag(ShotWindow &window, QPoint from, QPoint to)
+void drag(ShotWindow &window, QPoint from, QPoint to, Qt::KeyboardModifiers modifiers = Qt::NoModifier)
 {
-    sendMouse(window, QEvent::MouseButtonPress, from, Qt::LeftButton);
-    sendMouse(window, QEvent::MouseMove, (from + to) / 2, Qt::LeftButton);
-    sendMouse(window, QEvent::MouseMove, to, Qt::LeftButton);
-    sendMouse(window, QEvent::MouseButtonRelease, to, Qt::NoButton);
+    sendMouse(window, QEvent::MouseButtonPress, from, Qt::LeftButton, modifiers);
+    sendMouse(window, QEvent::MouseMove, (from + to) / 2, Qt::LeftButton, modifiers);
+    sendMouse(window, QEvent::MouseMove, to, Qt::LeftButton, modifiers);
+    sendMouse(window, QEvent::MouseButtonRelease, to, Qt::NoButton, modifiers);
 }
 
 /**
@@ -284,6 +287,62 @@ private slots:
         QCOMPARE(window->selectedAnnotationIds(), QVector<int>{id});
         drag(*window, QPoint(390, 260), QPoint(370, 250));
         QCOMPARE(rulers(*window).first().points, (QVector<QPointF>{{310, 310}, {410, 310}, {310, 210}}));
+    }
+
+    /** 验证拖动角度尺选中框的角和边缩放三个定点，按住 Ctrl 等比缩放夹角不变，无参数和返回值。 */
+    void angleFrameHandlesScaleRuler()
+    {
+        auto window = createRulerWindow();
+        QVERIFY(window);
+        pressKey(*window, Qt::Key_U);
+        drag(*window, QPoint(300, 300), QPoint(400, 300));
+        sendMouse(*window, QEvent::MouseMove, QPoint(350, 200), Qt::NoButton);
+        click(*window, QPoint(350, 200));
+        click(*window, QPoint(330, 300));
+        const int id = rulers(*window).first().id;
+        QCOMPARE(window->selectedAnnotationIds(), QVector<int>{id});
+
+        // 1. 外接矩形 (300,200)-(400,300) 外扩 14 像素，右下角拖到 (464,314)，外接矩形右边跟到 450，宽度放大 1.5 倍
+        drag(*window, QPoint(414, 314), QPoint(464, 314));
+        QCOMPARE(rulers(*window).first().points, (QVector<QPointF>{{300, 300}, {450, 300}, {375, 200}}));
+
+        // 2. 按住 Ctrl 再拖右下角，宽高等比放大 2 倍，夹角不变
+        const QVector<QPointF> before = rulers(*window).first().points;
+        const qreal degrees = markshot::ruler::angleDegrees(before.at(0), before.at(1), before.at(2));
+        drag(*window, QPoint(464, 314), QPoint(614, 364), Qt::ControlModifier);
+        const QVector<QPointF> after = rulers(*window).first().points;
+        QCOMPARE(after, (QVector<QPointF>{{300, 400}, {600, 400}, {450, 200}}));
+        QVERIFY(std::abs(markshot::ruler::angleDegrees(after.at(0), after.at(1), after.at(2)) - degrees) < 0.01);
+
+        // 3. 选择工具下拖左边，外接矩形左边跟到 250，右边不动
+        window->setTool(Tool::Select);
+        click(*window, QPoint(450, 400));
+        QCOMPARE(window->selectedAnnotationIds(), QVector<int>{id});
+        drag(*window, QPoint(286, 300), QPoint(236, 300));
+        QCOMPARE(rulers(*window).first().points, (QVector<QPointF>{{250, 400}, {600, 400}, {425, 200}}));
+    }
+
+    /** 验证三点共线的角度尺拖选中框时，没有尺寸的方向保持不变，另一方向照常缩放，无参数和返回值。 */
+    void flatAngleFrameKeepsFlatAxis()
+    {
+        auto window = createRulerWindow();
+        QVERIFY(window);
+        pressKey(*window, Qt::Key_U);
+        drag(*window, QPoint(300, 300), QPoint(400, 300));
+        sendMouse(*window, QEvent::MouseMove, QPoint(200, 300), Qt::NoButton);
+        click(*window, QPoint(200, 300));
+        click(*window, QPoint(350, 300));
+        QCOMPARE(window->selectedAnnotationIds().size(), 1);
+        const QVector<QPointF> flat{{300, 300}, {400, 300}, {200, 300}};
+        QCOMPARE(rulers(*window).first().points, flat);
+
+        // 1. 拖上边时高度方向没有尺寸可缩放，三个点不动
+        drag(*window, QPoint(250, 286), QPoint(250, 236));
+        QCOMPARE(rulers(*window).first().points, flat);
+
+        // 2. 拖右下角只在宽度方向缩放，三个点仍在 y=300
+        drag(*window, QPoint(414, 314), QPoint(464, 364));
+        QCOMPARE(rulers(*window).first().points, (QVector<QPointF>{{325, 300}, {450, 300}, {200, 300}}));
     }
 
     /** 验证选中角度尺后滚轮加粗，顶点处的圆弧和扇形跟着放大，不只是文字变大，无参数和返回值。 */

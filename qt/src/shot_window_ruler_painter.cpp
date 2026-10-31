@@ -14,8 +14,8 @@ using markshot::shot::types::Tool;
 
 namespace {
 
-// 角度尺选中框向外留出的距离，窗口像素，虚线不压住两条边
-constexpr qreal kAngleFramePadding = 6.0;
+// 角度尺选中框向外留出的距离，窗口像素，选中框的缩放控制点与落在外接矩形角上的定点分得开
+constexpr qreal kAngleFramePadding = 14.0;
 // 旋转把手连线的长度，窗口像素，从刻度数字或选中框外侧量起
 constexpr qreal kRotationStemLength = 20.0;
 
@@ -240,8 +240,7 @@ void ShotWindowRulerPainter::drawSelectedFrame(QPainter &painter, const Annotati
     const qreal rotation = window.annotationSupportsRotation(annotation) ? annotation.rotationDegrees : 0.0;
     QPolygonF frame;
     if (annotation.rulerMode == RulerMode::Angle) {
-        frame = QPolygonF(window.imageRectToWidget(bounds).adjusted(-kAngleFramePadding, -kAngleFramePadding,
-                                                                    kAngleFramePadding, kAngleFramePadding));
+        frame = QPolygonF(window.imageRectToWidget(angleFrame(annotation)));
     } else {
         for (const QPointF &corner : {bounds.topLeft(), bounds.topRight(), bounds.bottomRight(), bounds.bottomLeft()}) {
             frame.append(window.imageToWidget(window.rotatedPoint(corner, center, rotation)));
@@ -263,15 +262,34 @@ void ShotWindowRulerPainter::drawSelectedFrame(QPainter &painter, const Annotati
     painter.setPen(QPen(QColor(255, 255, 255), 1.5));
     painter.drawEllipse(rotateHandle, 6.0, 6.0);
 
-    // 3. 控制点与其他标注一致：橙色实心，白色描边便于在深色背景上分辨
+    // 3. 控制点与其他标注一致：橙色实心，白色描边便于在深色背景上分辨；角度尺选中框另有四角和四边中点的缩放点
+    auto drawSquare = [&painter](QPointF point) {
+        painter.drawRoundedRect(QRectF(point.x() - 5.0, point.y() - 5.0, 10.0, 10.0), 2.0, 2.0);
+    };
+    if (annotation.rulerMode == RulerMode::Angle) {
+        for (const QPointF &point : window.selectionHandlePoints(window.imageRectToWidget(angleFrame(annotation)))) {
+            drawSquare(point);
+        }
+    }
     const qreal tolerance = ShotWindowRulerTool::imageTolerance(window);
     for (const markshot::ruler::RulerHandle &handle : markshot::ruler::rulerHandles(annotation, tolerance)) {
         const QPointF point = window.imageToWidget(handle.point);
         if (annotation.rulerMode == RulerMode::Angle) {
             painter.drawEllipse(point, 6.0, 6.0);
         } else {
-            painter.drawRoundedRect(QRectF(point.x() - 5.0, point.y() - 5.0, 10.0, 10.0), 2.0, 2.0);
+            drawSquare(point);
         }
     }
     painter.restore();
+}
+
+QRectF ShotWindowRulerPainter::angleFrame(const Annotation &annotation) const
+{
+    const QRectF bounds = markshot::ruler::rulerBounds(annotation);
+    if (bounds.isEmpty()) {
+        return {};
+    }
+    // 1. 留白按窗口像素给定，换算到图像像素，缩放画布时选中框与定点的距离不变
+    const qreal padding = kAngleFramePadding / std::max<qreal>(0.001, m_window.annotationSizeScale(true));
+    return bounds.adjusted(-padding, -padding, padding, padding);
 }

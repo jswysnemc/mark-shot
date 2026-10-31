@@ -276,7 +276,7 @@ private slots:
         QVERIFY(samePoint(annotation(*window, first).rect.center(), QPointF(400, 130)));
     }
 
-    /** 验证选中的角度尺画出三点外接矩形的虚线选中框，无参数和返回值。 */
+    /** 验证选中的角度尺画出外扩的虚线选中框和缩放控制点，删除按钮不压住控制点，无参数和返回值。 */
     void angleRulerHasSelectionFrame()
     {
         auto window = createRulerWindow();
@@ -289,14 +289,24 @@ private slots:
         QCOMPARE(window->selectedAnnotationIds().size(), 1);
         sendMouse(*window, QEvent::MouseMove, QPoint(700, 550), Qt::NoButton);
 
-        // 1. 外接矩形上边 y=200 外扩 6 像素后，x=320 到 x=380 之间是橙色虚线，选中框的线段占一部分像素
+        // 1. 外接矩形上边 y=200 外扩 14 像素后，x=320 到 x=380 之间是橙色虚线，选中框的线段占一部分像素
         const QImage frame = window->grab().toImage();
+        auto orange = [](const QColor &color) {
+            return color.red() > 200 && color.green() > 110 && color.green() < 180 && color.blue() < 110;
+        };
         int framePixels = 0;
         for (int x = 320; x <= 380; ++x) {
-            const QColor color = frame.pixelColor(x, 194);
-            framePixels += color.red() > 200 && color.green() > 110 && color.green() < 180 && color.blue() < 110 ? 1 : 0;
+            framePixels += orange(frame.pixelColor(x, 186)) ? 1 : 0;
         }
         QVERIFY2(framePixels > 15, qPrintable(QString::number(framePixels)));
+
+        // 2. 选中框 (286,186)-(414,314) 的角和边中点画出缩放控制点
+        QVERIFY(orange(frame.pixelColor(286, 186)));
+        QVERIFY(orange(frame.pixelColor(286, 250)));
+        QVERIFY(orange(frame.pixelColor(414, 314)));
+
+        // 3. 删除按钮放在选中框外，不压住右上角的控制点
+        QVERIFY(!window->selectedAnnotationDeleteButtonRect().intersects(QRectF(409, 181, 10, 10)));
     }
 
     /** 验证拖动角度尺的旋转把手时三个定点绕外接矩形中心转动，夹角不变，无参数和返回值。 */
@@ -311,9 +321,9 @@ private slots:
         click(*window, QPoint(350, 300));
         const int id = window->selectedAnnotationIds().first();
 
-        // 1. 外接矩形中心 (350, 250)，把手在 (350, 174)，拖到中心右侧转过 90 度
+        // 1. 外接矩形中心 (350, 250)，把手在选中框上边 y=186 外 20 像素的 (350, 166)，拖到中心右侧转过 90 度
         const QPointF handle = window->annotationRotationHandlePoint(annotation(*window, id), false);
-        QVERIFY(samePoint(handle, QPointF(350, 174)));
+        QVERIFY(samePoint(handle, QPointF(350, 166)));
         drag(*window, handle, QPointF(450, 250));
         const QVector<QPointF> points = annotation(*window, id).points;
         QCOMPARE(points.size(), 3);

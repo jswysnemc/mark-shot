@@ -379,7 +379,12 @@ QRectF ShotWindow::selectedAnnotationDeleteButtonRect() const
         }
     }
 
-    const QRectF bounds = imageRectToWidget(selectedAnnotationsBounds());
+    // 角度尺的选中框比外接矩形大一圈，删除按钮放在选中框外，不压住右上角的缩放控制点
+    const Annotation *single = selectedIds.size() == 1 ? annotationById(selectedIds.first()) : nullptr;
+    const bool angleRuler =
+        single && single->tool == Tool::Ruler && single->rulerMode == markshot::shot::types::RulerMode::Angle;
+    const QRectF bounds = imageRectToWidget(angleRuler ? ShotWindowRulerPainter(*this).angleFrame(*single)
+                                                       : selectedAnnotationsBounds());
     if (bounds.isEmpty()) {
         return {};
     }

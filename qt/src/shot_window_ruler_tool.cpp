@@ -159,7 +159,8 @@ bool ShotWindowRulerTool::move(QPointF widgetPoint, QPointF imagePoint, Qt::Keyb
 
     // 2. 拖动已有尺子的控制点、旋转把手或整把尺子
     if (window.m_dragging && window.m_annotationDrag != SelectionDrag::None) {
-        window.updateAnnotationDrag(imagePoint, false, modifiers.testFlag(Qt::ShiftModifier));
+        window.updateAnnotationDrag(imagePoint, modifiers.testFlag(Qt::ControlModifier),
+                                    modifiers.testFlag(Qt::ShiftModifier));
         window.updateAnnotationPropertyPanelGeometry();
         window.update();
         return true;

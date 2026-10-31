@@ -66,13 +66,14 @@ public:
     bool cancelDraft();
 
     /**
-     * 拖动单把尺子的控制点或旋转角度尺时按尺子自身规则更新，供通用标注拖动调用；
+     * 拖动单把尺子的控制点、角度尺选中框或旋转角度尺时按尺子自身规则更新，供通用标注拖动调用；
      * 长度尺的旋转与其他标注一致，交给通用旋转处理。
      * @param imagePoint 指针位置，图像像素坐标。
+     * @param keepAspectRatio 按住 Ctrl 时为 true：拖动角度尺选中框时等比缩放，夹角不变。
      * @param snap 按住 Shift 时为 true：角度尺的边和旋转吸附到 45 度倍数。
      * @return 当前拖动已在这里处理时返回 true。
      */
-    bool updateDrag(QPointF imagePoint, bool snap);
+    bool updateDrag(QPointF imagePoint, bool keepAspectRatio, bool snap);
 
     /**
      * 多选旋转时让角度尺的三个定点绕组中心转动。
@@ -86,7 +87,8 @@ public:
 
     /**
      * 判断指针在选中的尺子上命中的调整方式：先看旋转把手，再看控制点和边框；
-     * 选择工具下长度尺内部也可拖动，尺子工具下内部留给新的测量；角度尺在选中框内任意位置都可拖动。
+     * 选择工具下长度尺内部也可拖动，尺子工具下内部留给新的测量；
+     * 角度尺最后看选中框，框的四角和四边缩放，框内任意位置整体拖动。
      * @param window 截图窗口。
      * @param annotation 尺子标注。
      * @param imagePoint 指针位置，图像像素坐标。
@@ -154,6 +156,7 @@ private:
     std::optional<std::pair<int, SelectionDrag>> hitAt(QPointF imagePoint) const;
     static bool rotationHandleHit(const ShotWindow &window, const Annotation &annotation, QPointF imagePoint);
     void rotateAngle(Annotation &annotation, QPointF imagePoint, bool snap) const;
+    void resizeAngle(Annotation &annotation, QPointF imagePoint, bool keepAspectRatio) const;
 
     ShotWindow &m_window;
 };
