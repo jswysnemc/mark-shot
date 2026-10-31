@@ -35,6 +35,7 @@ class WindowsPackagingTest(unittest.TestCase):
                         MINGW_PREFIX=str(self.prefix))
         self.env.pop("MARK_SHOT_FFMPEG_PREFIX", None)
         self.env.pop("MARK_SHOT_RUNTIME_EXTRA_PREFIX", None)
+        self.env.pop("MARK_SHOT_QT_EXTRA_PLUGINS", None)
 
     def tool(self, name: str, body: str) -> None:
         """创建名称为 name、内容为 body 的测试工具，无返回值。"""
@@ -131,6 +132,20 @@ class WindowsPackagingTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.app / "libonnx.dll").is_file())
         self.assertTrue((self.app / "libprotobuf.dll").is_file())
+
+    def test_test_runtime_requests_offscreen_platform(self) -> None:
+        """【Windows测试】【平台插件】测试部署显式包含离屏插件，普通发行包不增加该插件，无返回值。"""
+        arguments = self.root / "deploy-arguments"
+        self.tool("windeployqt", '#!/usr/bin/env bash\nprintf "%s\\n" "$@" > "$DEPLOY_ARGUMENTS"\n')
+        self.env["DEPLOY_ARGUMENTS"] = str(arguments)
+        self.env["MARK_SHOT_QT_EXTRA_PLUGINS"] = "qoffscreen,qminimal"
+        result = self.deploy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--include-plugins\nqoffscreen,qminimal\n", arguments.read_text())
+        self.env.pop("MARK_SHOT_QT_EXTRA_PLUGINS")
+        result = self.deploy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("--include-plugins", arguments.read_text())
 
     def test_closure_includes_lazy_backend(self) -> None:
         """主程序没有媒体导入时，仍部署按需后端的间接依赖，无返回值。"""

@@ -181,6 +181,8 @@ jobs:
         run: cmake --build build --parallel
 
       - name: Deploy test runtime libraries
+        env:
+          MARK_SHOT_QT_EXTRA_PLUGINS: qoffscreen,qminimal
         run: |
           # OCR 测试从临时目录加载插件，入口旁须有完整依赖，不能只复制 ONNX Runtime 本体
           bash qt/scripts/windows-deploy-runtime.sh "$PWD/build/qt" "$PWD/build/mark-shot.exe"
@@ -193,7 +195,9 @@ jobs:
         run: |
           cmake -DMODEL_DIRECTORY="$PWD/build/ocr-test-models" -P qt/scripts/download-ocr-test-models.cmake
           export MARK_SHOT_OCR_MODEL_DIR="$(cygpath -m "$PWD/build/ocr-test-models")"
-          ctest --test-dir build --output-on-failure
+          # 【Windows测试】【插件路径】测试入口分布在 build 和 build/qt，统一使用已部署的 Qt 插件
+          export QT_PLUGIN_PATH="$(cygpath -m "$PWD/build/qt")"
+          ctest --test-dir build --output-on-failure --timeout 180
 
       - name: Install into artifact tree
         run: |

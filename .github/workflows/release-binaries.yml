@@ -345,12 +345,17 @@ jobs:
         run: cmake --build build --parallel
 
       - name: Deploy test runtime libraries
+        env:
+          MARK_SHOT_QT_EXTRA_PLUGINS: qoffscreen,qminimal
         run: bash qt/scripts/windows-deploy-runtime.sh "$PWD/build/qt" "$PWD/build/mark-shot.exe"
 
       - name: Test
         env:
           QT_FORCE_STDERR_LOGGING: '1'
-        run: ctest --test-dir build --output-on-failure
+        run: |
+          # 【Windows测试】【插件路径】测试入口分布在 build 和 build/qt，统一使用已部署的 Qt 插件
+          export QT_PLUGIN_PATH="$(cygpath -m "$PWD/build/qt")"
+          ctest --test-dir build --output-on-failure --timeout 180
 
       - name: Package install tree
         run: |

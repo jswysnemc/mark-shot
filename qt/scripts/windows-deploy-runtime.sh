@@ -6,6 +6,7 @@
 #                            directory is searched before $MINGW_PREFIX/bin so the
 #                            trimmed FFmpeg DLLs win over the full MSYS2 package.
 #   MARK_SHOT_RUNTIME_EXTRA_PREFIX  Private side-by-side ABI compatibility DLLs.
+#   MARK_SHOT_QT_EXTRA_PLUGINS  Comma-separated Qt plugins needed by test runners.
 set -euo pipefail
 
 app_bin="${1:-$PWD/app/bin}"
@@ -159,6 +160,10 @@ fi
 
 # 2. 有 Schannel 时才排除 OpenSSL，缺少系统 TLS 插件的 Qt 构建仍须能访问 HTTPS
 tls_options=()
+extra_plugin_options=()
+if [[ -n "${MARK_SHOT_QT_EXTRA_PLUGINS:-}" ]]; then
+  extra_plugin_options+=(--include-plugins "$MARK_SHOT_QT_EXTRA_PLUGINS")
+fi
 schannel="$(find "${MINGW_PREFIX:-/ucrt64}" -type f -iname qschannelbackend.dll -print -quit)"
 if [[ -n "$schannel" ]]; then
   tls_options+=(--exclude-plugins "qopensslbackend,qcertonlybackend")
@@ -170,6 +175,7 @@ fi
   --no-quick-import \
   --skip-plugin-types generic,networkinformation,qmltooling \
   "${tls_options[@]}" \
+  "${extra_plugin_options[@]}" \
   --dir "$app_bin" "$exe"
 if [[ -n "$schannel" && ! -f "$app_bin/tls/qschannelbackend.dll" ]]; then
   echo "Schannel TLS backend was not deployed; refusing to package without HTTPS support" >&2
