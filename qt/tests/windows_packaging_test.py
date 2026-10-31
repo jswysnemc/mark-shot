@@ -34,6 +34,7 @@ class WindowsPackagingTest(unittest.TestCase):
         self.env = dict(os.environ, PATH=f"{self.tools}:{os.environ['PATH']}",
                         MINGW_PREFIX=str(self.prefix))
         self.env.pop("MARK_SHOT_FFMPEG_PREFIX", None)
+        self.env.pop("MARK_SHOT_RUNTIME_EXTRA_PREFIX", None)
 
     def tool(self, name: str, body: str) -> None:
         """创建名称为 name、内容为 body 的测试工具，无返回值。"""
@@ -76,6 +77,25 @@ class WindowsPackagingTest(unittest.TestCase):
         self.assertEqual((self.app / "onnxruntime.dll").read_text(encoding="utf-8"),
                          "DLL Name: KERNEL32.dll\n")
         self.assertFalse((self.app / "VCRUNTIME140.dll").exists())
+
+    def test_private_compatibility_runtime_keeps_both_abis(self) -> None:
+        """【Windows测试】【并存依赖】旧 ABI 从独立目录补齐，新 ABI 仍使用工具链版本。"""
+        compatibility = self.root / "compatibility"
+        (compatibility / "bin").mkdir(parents=True)
+        old_name = "libabsl_hash-2605.0.0.dll"
+        new_name = "libabsl_hash-2608.0.0.dll"
+        self.exe.write_text(f"DLL Name: {old_name}\nDLL Name: {new_name}\n", encoding="utf-8")
+        (compatibility / "bin" / old_name).write_text("DLL Name: KERNEL32.dll\n", encoding="utf-8")
+        (self.prefix / "bin" / new_name).write_text("DLL Name: USER32.dll\n", encoding="utf-8")
+        missing = self.deploy()
+        self.assertNotEqual(missing.returncode, 0)
+        self.assertIn(old_name, missing.stderr)
+        self.env["MARK_SHOT_RUNTIME_EXTRA_PREFIX"] = str(compatibility)
+        result = self.deploy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.app / old_name).is_file())
+        self.assertTrue((self.app / new_name).is_file())
+        self.assertFalse((self.prefix / "bin" / old_name).exists())
 
     def test_mismatched_minimal_ffmpeg_does_not_fall_back(self) -> None:
         """后端 ABI 与裁剪库不一致时禁止悄悄使用完整 FFmpeg，无返回值。"""

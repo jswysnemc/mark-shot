@@ -160,6 +160,12 @@ jobs:
             mingw-w64-ucrt-x86_64-rust
             mingw-w64-ucrt-x86_64-zxing-cpp
 
+      - name: Prepare compatible OCR runtime
+        run: |
+          compat="$PWD/build/runtime-compat"
+          bash qt/scripts/windows-prepare-runtime-compat.sh "$compat"
+          echo "MARK_SHOT_RUNTIME_EXTRA_PREFIX=$compat" >> "$GITHUB_ENV"
+
       # MSYS2 GCC 16.2 在 LTO 链接阶段触发内部编译器错误，Windows 构建暂时关闭 LTO
       - name: Configure
         run: |

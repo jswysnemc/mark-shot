@@ -5,6 +5,7 @@
 #   MARK_SHOT_FFMPEG_PREFIX  Prefix produced by build-minimal-ffmpeg.sh. Its bin/
 #                            directory is searched before $MINGW_PREFIX/bin so the
 #                            trimmed FFmpeg DLLs win over the full MSYS2 package.
+#   MARK_SHOT_RUNTIME_EXTRA_PREFIX  Private side-by-side ABI compatibility DLLs.
 set -euo pipefail
 
 app_bin="${1:-$PWD/app/bin}"
@@ -23,6 +24,9 @@ if [ -n "${MARK_SHOT_FFMPEG_PREFIX:-}" ]; then
   search_dirs+=("$MARK_SHOT_FFMPEG_PREFIX/bin")
 fi
 search_dirs+=("$mingw_bin")
+if [ -n "${MARK_SHOT_RUNTIME_EXTRA_PREFIX:-}" ]; then
+  search_dirs+=("$MARK_SHOT_RUNTIME_EXTRA_PREFIX/bin")
+fi
 
 # 【打包】【依赖解析】Windows 导入名不区分大小写，按优先级建立一次索引
 declare -A dependency_paths=()
@@ -134,7 +138,10 @@ copy_dependency_closure() {
       if is_system_dependency "$dep_name"; then
         continue
       fi
-      dep_path="$(resolve_dependency "$dep_name")"
+      if ! dep_path="$(resolve_dependency "$dep_name")"; then
+        echo "Required by: $current" >&2
+        return 1
+      fi
       dest="$app_bin/$(basename "$dep_path")"
       if [ ! -f "$dest" ]; then
         cp "$dep_path" "$dest"
