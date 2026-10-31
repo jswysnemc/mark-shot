@@ -68,7 +68,8 @@ bool prefersGrim()
         // Prefer compositor sockets even when desktop strings are empty/custom.
         if (!env.value(QStringLiteral("NIRI_SOCKET")).isEmpty()
             || !env.value(QStringLiteral("HYPRLAND_INSTANCE_SIGNATURE")).isEmpty()
-            || !env.value(QStringLiteral("SWAYSOCK")).isEmpty()) {
+            || !env.value(QStringLiteral("SWAYSOCK")).isEmpty()
+            || !env.value(QStringLiteral("UMBRIEL_SOCKET")).isEmpty()) {
             return true;
         }
 
@@ -79,6 +80,7 @@ bool prefersGrim()
             || desktop.contains(QStringLiteral("river"))
             || desktop.contains(QStringLiteral("wayfire"))
             || desktop.contains(QStringLiteral("labwc"))
+            || desktop.contains(QStringLiteral("umbriel"))
             || desktop.contains(QStringLiteral("wlroots"));
     }();
     return grimPreferred;
