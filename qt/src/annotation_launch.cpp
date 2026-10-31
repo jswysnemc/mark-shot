@@ -79,6 +79,38 @@ QString umbrielFocusedOutputName()
 #endif
 }
 
+/// @brief Retrieves the name of the currently focused output in the scroll compositor.
+/// scroll (https://github.com/dawsers/scroll) is a fork of sway: `scrollmsg` speaks the
+/// sway/i3 IPC and `get_outputs` reports a `focused` flag per output.
+/// @return The name of the focused output, or an empty string if not running on scroll or on error.
+QString scrollFocusedOutputName()
+{
+#if defined(Q_OS_WIN)
+    return {};
+#else
+    if (!qEnvironmentVariableIsSet("SCROLLSOCK")) {
+        return {};
+    }
+    QProcess scroll;
+    scroll.setProgram(QStringLiteral("scrollmsg"));
+    scroll.setArguments({QStringLiteral("-t"), QStringLiteral("get_outputs")});
+    scroll.start(QIODevice::ReadOnly);
+    if (!scroll.waitForStarted(1000) || !scroll.waitForFinished(1000)
+        || scroll.exitStatus() != QProcess::NormalExit || scroll.exitCode() != 0) {
+        scroll.kill();
+        return {};
+    }
+    const QJsonArray outputs = QJsonDocument::fromJson(scroll.readAllStandardOutput()).array();
+    for (const QJsonValue &value : outputs) {
+        const QJsonObject output = value.toObject();
+        if (output.value(QStringLiteral("focused")).toBool()) {
+            return output.value(QStringLiteral("name")).toString();
+        }
+    }
+    return {};
+#endif
+}
+
 /// @brief Finds a QScreen object by its name.
 /// @param name The name of the screen to find.
 /// @return A pointer to the QScreen if found, or nullptr if not found or if the name is empty.
@@ -115,6 +147,10 @@ QScreen *focusedScreen()
     }
     // 2.1 【截图会话】【屏幕选择】Umbriel 会话询问聚焦输出
     if (QScreen *screen = screenByName(umbrielFocusedOutputName())) {
+        return screen;
+    }
+    // 2.2 【截图会话】【屏幕选择】scroll（sway 分支）会话询问聚焦输出
+    if (QScreen *screen = screenByName(scrollFocusedOutputName())) {
         return screen;
     }
     // 3. 【截图会话】【屏幕选择】保留 X11 和已收到客户端指针事件时的 Qt 回退
