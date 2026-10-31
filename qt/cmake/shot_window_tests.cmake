@@ -207,6 +207,7 @@ set_tests_properties(canvas-appearance PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=o
 
 qt_add_executable(mark-shot-ocr-scroll-window-style-test
     tests/ocr_scroll_window_style_test.cpp
+    src/ui/toolbar_palette.cpp
     src/ocr_result_window/ocr_result_window_style.cpp
     src/ui/icons.cpp
     src/ui/icon_manifest.cpp

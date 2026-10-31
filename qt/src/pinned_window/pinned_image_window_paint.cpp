@@ -19,14 +19,12 @@ namespace {
  * @param path 要填充的路径。
  * @param color 不透明时的颜色，透明度由 alpha 统一控制。
  * @param alpha 整层透明度，0 到 255。
- * @param clearPath 需要从色块中挖掉的路径，可为空。
  * @return 无返回值。
  */
 void paintSolidWash(QPainter &painter,
                     const QPainterPath &path,
                     const QColor &color,
-                    int alpha,
-                    const QPainterPath *clearPath)
+                    int alpha)
 {
     if (path.isEmpty() || alpha <= 0) {
         return;
@@ -48,11 +46,6 @@ void paintSolidWash(QPainter &painter,
     layerPainter.setPen(Qt::NoPen);
     layerPainter.setBrush(QColor(color.red(), color.green(), color.blue()));
     layerPainter.drawPath(path);
-    if (clearPath && !clearPath->isEmpty()) {
-        layerPainter.setCompositionMode(QPainter::CompositionMode_Clear);
-        layerPainter.setBrush(Qt::black);
-        layerPainter.drawPath(*clearPath);
-    }
     layerPainter.end();
 
     // 2. 整层只乘一次透明度
@@ -94,7 +87,6 @@ void PinnedImageWindow::paintImageContents(QPainter &painter, QRectF viewport)
     const QRectF imageRect = displayedImageRect();
     paintPinnedShadowIfEnabled(painter, imageRect);
     painter.drawPixmap(imageRect, m_pixmap, QRectF(QPointF(0.0, 0.0), QSizeF(m_pixmap.size())));
-    paintOcrRecognitionPlatesIfEnabled(painter);
     if (m_translationActive) {
         drawTranslationOverlay(painter);
     }
@@ -120,57 +112,8 @@ void PinnedImageWindow::paintImageContents(QPainter &painter, QRectF viewport)
         return;
     }
 
-    paintSolidWash(painter, textSelectionWidgetPath(viewport), QColor(72, 132, 245), 96, nullptr);
+    paintSolidWash(painter, textSelectionWidgetPath(viewport), QColor(72, 132, 245), 96);
     drawBorder();
-}
-
-void PinnedImageWindow::paintOcrRecognitionPlatesIfEnabled(QPainter &painter) const
-{
-    // 识别结果只托一层轻背景，原文像素继续显示，不再把识别文字画回去
-    if (m_translationActive || m_ocrTokens.isEmpty()) {
-        return;
-    }
-
-    QPainterPath plates;
-    plates.setFillRule(Qt::WindingFill);
-    QRectF band;
-    int bandLine = -1;
-    const auto flush = [this, &plates, &band] {
-        if (band.isNull()) {
-            return;
-        }
-        // 1. 内边距用窗口像素，避免图片缩放后背景框相对字形漂移
-        const QRectF plate = imageToWidget(band).adjusted(-4.0, -2.0, 4.0, 2.0);
-        plates.addRoundedRect(plate, 5.0, 5.0);
-        band = QRectF();
-    };
-    for (const OcrToken &token : m_ocrTokens) {
-        if (token.imageRect.isEmpty() || token.text.trimmed().isEmpty()) {
-            continue;
-        }
-        if (band.isNull()) {
-            band = token.imageRect;
-            bandLine = token.line;
-            continue;
-        }
-        const qreal gap = token.imageRect.left() - band.right();
-        const qreal limit = std::max<qreal>(8.0, std::min(band.height(), token.imageRect.height()) * 0.65);
-        const bool sameLine = token.line == bandLine
-            && token.imageRect.top() < band.bottom()
-            && token.imageRect.bottom() > band.top();
-        if (sameLine && gap <= limit) {
-            band = band.united(token.imageRect);
-        } else {
-            flush();
-            band = token.imageRect;
-            bandLine = token.line;
-        }
-    }
-    flush();
-
-    // 2. 选区单独着色，先从浅底里挖掉，两种颜色不再叠在一起
-    const QPainterPath selection = textSelectionWidgetPath(QRectF(rect()));
-    paintSolidWash(painter, plates, QColor(248, 250, 252), 72, selection.isEmpty() ? nullptr : &selection);
 }
 
 QPainterPath PinnedImageWindow::textSelectionWidgetPath(QRectF viewport) const

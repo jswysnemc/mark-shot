@@ -2,12 +2,15 @@
 #include "support/isolated_config.h"
 #include "capture_history/history_window.h"
 #include "settings/settings_design_tokens.h"
+#include "ui/i18n.h"
 #include "window_detection.h"
 
 #include <QApplication>
 #include <QDir>
 #include <QFile>
 #include <QJsonObject>
+#include <QLabel>
+#include <QListWidget>
 #include <QPainter>
 #include <QPushButton>
 #include <QTemporaryDir>
@@ -38,10 +41,13 @@ private slots:
     {
         QTest::addColumn<QString>("theme");
         QTest::addColumn<QSize>("size");
-        QTest::newRow("light") << QStringLiteral("light") << QSize(800, 520);
-        QTest::newRow("dark") << QStringLiteral("dark") << QSize(800, 520);
-        QTest::newRow("light-compact") << QStringLiteral("light") << QSize(440, 320);
-        QTest::newRow("dark-compact") << QStringLiteral("dark") << QSize(440, 320);
+        QTest::addColumn<bool>("chinese");
+        QTest::newRow("light") << QStringLiteral("light") << QSize(800, 520) << false;
+        QTest::newRow("dark") << QStringLiteral("dark") << QSize(800, 520) << false;
+        QTest::newRow("light-compact") << QStringLiteral("light") << QSize(440, 320) << false;
+        QTest::newRow("dark-compact") << QStringLiteral("dark") << QSize(440, 320) << false;
+        QTest::newRow("light-compact-zh") << QStringLiteral("light") << QSize(440, 320) << true;
+        QTest::newRow("dark-compact-zh") << QStringLiteral("dark") << QSize(440, 320) << true;
     }
 
     /**
@@ -52,6 +58,8 @@ private slots:
     {
         QFETCH(QString, theme);
         QFETCH(QSize, size);
+        QFETCH(bool, chinese);
+        markshot::i18n::setLanguage(chinese ? markshot::i18n::Language::Chinese : markshot::i18n::Language::English);
         QVERIFY(markshot::writeAppConfigRoot({{QStringLiteral("ui"),
             QJsonObject{{QStringLiteral("theme"), theme}}}}));
         markshot::history::HistoryWindow window;
@@ -67,6 +75,34 @@ private slots:
         for (QPushButton *button : window.findChildren<QPushButton *>()) {
             QVERIFY(window.rect().contains(QRect(button->mapTo(&window, QPoint()), button->size())));
         }
+        // 1. 【历史测试】【紧凑布局】图片操作始终位于一行，窄窗口保留可读的预览区域
+        auto *list = window.findChild<QListWidget *>(QStringLiteral("historyList"));
+        auto *preview = window.findChild<QLabel *>(QStringLiteral("historyPreview"));
+        QVERIFY(list);
+        QVERIFY(preview);
+        QCOMPARE(list->iconSize(), QSize(56, 38));
+        QVERIFY(preview->height() >= 160);
+        int actionTop = -1;
+        int actionCount = 0;
+        for (QPushButton *button : window.findChildren<QPushButton *>()) {
+            if (button->property("role").toString() == QStringLiteral("quiet")) {
+                continue;
+            }
+            const int top = button->mapTo(&window, QPoint()).y();
+            if (actionTop < 0) {
+                actionTop = top;
+            }
+            QCOMPARE(top, actionTop);
+            QVERIFY(button->height() <= 32);
+            QVERIFY(!button->accessibleName().isEmpty());
+            QVERIFY(top < list->mapTo(&window, QPoint()).y());
+            ++actionCount;
+        }
+        QCOMPARE(actionCount, 5);
+        list->setCurrentRow(1);
+        const QString selected = list->currentItem()->data(Qt::UserRole).toString();
+        window.refresh();
+        QCOMPARE(list->currentItem()->data(Qt::UserRole).toString(), selected);
         const QString screenshotDirectory = qEnvironmentVariable("MARK_SHOT_TEST_SCREENSHOT_DIR");
         if (!screenshotDirectory.isEmpty()) {
             QVERIFY(QDir().mkpath(screenshotDirectory));

@@ -5,6 +5,18 @@ namespace markshot::i18n {
 const QHash<QString, QString> &taskWindowChineseTable()
 {
     static const QHash<QString, QString> table = {
+        {QStringLiteral("Pinned Mark Shot"), QStringLiteral("钉住的截图")},
+        {QStringLiteral("Rotate Left"), QStringLiteral("向左旋转")},
+        {QStringLiteral("Rotate Right"), QStringLiteral("向右旋转")},
+        {QStringLiteral("Always on Top"), QStringLiteral("始终置顶")},
+        {QStringLiteral("Copy Image Text"), QStringLiteral("复制图片文字")},
+        {QStringLiteral("Copy Selected Text"), QStringLiteral("复制选中的文字")},
+        {QStringLiteral("Text Selection Copy"), QStringLiteral("拖选复制文字")},
+        {QStringLiteral("Pin Clipboard"), QStringLiteral("剪贴板贴图")},
+        {QStringLiteral("Clipboard has no image or text to pin."), QStringLiteral("剪贴板中没有可贴图的图片或文字。")},
+        {QStringLiteral("Clipboard content is too large to pin."), QStringLiteral("剪贴板内容过大，无法贴图。")},
+        {QStringLiteral("Save Pinned Image"), QStringLiteral("保存钉住的图片")},
+        {QStringLiteral("Pinned Image"), QStringLiteral("置顶图片")},
         {QStringLiteral("%1 update downloaded. Quit all Mark Shot instances and restart to apply it."),
          QStringLiteral("%1 更新已下载。请退出所有 Mark Shot 进程，重新启动后生效。")},
         {QStringLiteral("Text Recognition"), QStringLiteral("文字识别")},

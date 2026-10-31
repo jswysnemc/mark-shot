@@ -231,9 +231,10 @@ void ShotWindow::showTextEditorContextMenu(const QPoint &globalPosition)
         return;
     }
 
-    // 截图浮层固定为暗色玻璃风格，菜单与之保持一致
+    // 1. 【截图编辑】【右键菜单】菜单明暗主题与当前截图工具栏保持一致
     markshot::ui::ContextMenu menu(this);
-    menu.setColorScheme(markshot::ui::ContextMenu::ColorScheme::Dark);
+    menu.setColorScheme(m_toolbarAppearance.palette.dark
+        ? markshot::ui::ContextMenu::ColorScheme::Dark : markshot::ui::ContextMenu::ColorScheme::Light);
     const QTextCursor cursor = m_textEditor->textCursor();
     const bool hasSelection = cursor.hasSelection();
     const bool hasDocumentText = !m_textEditor->document()->isEmpty();

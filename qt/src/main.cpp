@@ -10,6 +10,7 @@
 #include "capture_delay/capture_delay_scheduler.h"
 #include "cli/recording_cli.h"
 #include "clipboard_image.h"
+#include "clipboard_paste/clipboard_pin_launch.h"
 #include "debug_log.h"
 #include "screen_capture_portal_guard.h"
 #include "ipc/single_instance_ipc.h"
@@ -109,6 +110,8 @@ int main(int argc, char *argv[])
     QCommandLineOption pinImageOption(QStringLiteral("pin-image"),
                                       QStringLiteral("Open an image file directly as a pinned sticker."),
                                       QStringLiteral("path"));
+    QCommandLineOption pinClipboardOption(QStringLiteral("pin-clipboard"),
+        QStringLiteral("Pin clipboard text or image without taking a screenshot."));
     QCommandLineOption recordingStatusOption(QStringLiteral("recording-status"),
                                              QStringLiteral("Print the current recording status as JSON."));
     QCommandLineOption stopRecordingOption(QStringLiteral("stop-recording"),
@@ -148,6 +151,7 @@ int main(int argc, char *argv[])
     parser.addOption(trayOption);
     parser.addOption(captureOption);
     parser.addOption(pinImageOption);
+    parser.addOption(pinClipboardOption);
     parser.addOption(recordingStatusOption);
     parser.addOption(stopRecordingOption);
     parser.addOption(pauseRecordingOption);
@@ -162,6 +166,22 @@ int main(int argc, char *argv[])
     parser.addOption(delayOption);
     markshot::cli::addHeadlessCaptureOptions(&parser);
     parser.process(app);
+
+    // 1. 【剪贴板】【命令入口】剪贴板贴图独立运行，不接受截图或录制操作混用
+    if (parser.isSet(pinClipboardOption)) {
+        for (const QString &option : {QStringLiteral("pin-image"), QStringLiteral("history"),
+                QStringLiteral("capture"), QStringLiteral("tray"), QStringLiteral("all-outputs"),
+                QStringLiteral("fullscreen"), QStringLiteral("xdg-window"), QStringLiteral("delay"),
+                QStringLiteral("recording-status"), QStringLiteral("stop-recording"),
+                QStringLiteral("pause-recording"), QStringLiteral("capture-to"), QStringLiteral("list-displays")}) {
+            if (parser.isSet(option)) {
+                parser.showHelp(1);
+            }
+        }
+        if (!parser.positionalArguments().isEmpty()) {
+            parser.showHelp(1);
+        }
+    }
 
     // 1. 【应用】【截图历史】历史入口独立运行，拒绝与截图或录制控制参数混用
     if (parser.isSet(historyOption)) {
@@ -321,6 +341,14 @@ int main(int argc, char *argv[])
     }
 
     const QString imagePath = positionalArguments.isEmpty() ? QString() : positionalArguments.first();
+    if (parser.isSet(pinClipboardOption)) {
+        QString error;
+        if (!markshot::clipboard::pinContent(&error)) {
+            fprintf(stderr, "%s\n", error.toLocal8Bit().constData());
+            return 1;
+        }
+        return QApplication::exec();
+    }
     if (parser.isSet(pinImageOption)) {
         if (!positionalArguments.isEmpty()) {
             QMessageBox::critical(nullptr,

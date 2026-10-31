@@ -5,7 +5,7 @@
 #include <QWidget>
 
 class QCheckBox;
-class QGridLayout;
+class QHBoxLayout;
 class QLabel;
 class QListWidget;
 class QPushButton;
@@ -45,7 +45,10 @@ private:
     /// @brief 根据设置页主题刷新窗口配色与操作图标
     /// @return 无返回值
     void applyTheme();
-    /// @brief 窄窗口使用两列操作按钮，保证按钮文字完整显示
+    /// @brief 创建紧凑工具栏、历史列表、预览与底部设置
+    /// @return 无返回值
+    void buildLayout();
+    /// @brief 窄窗口隐藏操作文字，保留图标、提示与无障碍名称
     /// @return 无返回值
     void updateActionLayout();
     /// @brief 获取当前选择的历史标识
@@ -92,8 +95,7 @@ private:
     QLabel *m_status = nullptr;
     QCheckBox *m_enabled = nullptr;
     QPushButton *m_clear = nullptr;
-    QGridLayout *m_actions = nullptr;
-    int m_actionColumns = 3;
+    QHBoxLayout *m_actions = nullptr;
     QVector<QPushButton *> m_imageActions;
 };
 

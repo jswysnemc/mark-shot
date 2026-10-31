@@ -50,30 +50,36 @@ private slots:
                 != translate.pixmap(18, 18, QIcon::Normal, QIcon::On).toImage());
     }
 
-    /// @brief 验证深灰背景、细边框及青点白字状态行，无整行青色填充
+    /// @brief 覆盖滚动预览的深浅主题，无参数和返回值
+    void paintsCompactScrollStatus_data() { preservesTheme_data(); }
+
+    /// @brief 验证主题背景及紧凑状态行，无整行强调色填充
     /// @return 无返回值
     void paintsCompactScrollStatus()
     {
+        QFETCH(bool, light);
+        const auto palette = markshot::ui::toolbarPalette(light
+            ? markshot::ui::UiThemeMode::Light : markshot::ui::UiThemeMode::Dark);
         QImage image(240, 80, QImage::Format_ARGB32_Premultiplied);
         image.fill(Qt::transparent);
         {
             QPainter painter(&image);
-            markshot::scroll::drawScrollPreviewSurface(painter, image.rect());
+            markshot::scroll::drawScrollPreviewSurface(painter, image.rect(), false, palette);
             markshot::scroll::drawScrollPreviewStatus(painter, QRect(12, 10, 216, 22),
-                                                      QStringLiteral("Capturing"));
+                                                      QStringLiteral("Capturing"), {}, palette);
         }
-        QCOMPARE(image.pixelColor(120, 60), QColor("#1E1E1E"));
-        QCOMPARE(image.pixelColor(0, 40), QColor("#3A3A3A"));
-        QCOMPARE(image.pixelColor(16, 20), QColor("#2DD4BF"));
+        QCOMPARE(image.pixelColor(120, 60), palette.listFill);
+        QVERIFY(image.pixelColor(0, 40) != palette.listFill);
+        QCOMPARE(image.pixelColor(16, 20), palette.sliderEnd);
         int tealPixels = 0;
         int whitePixels = 0;
         for (int y = 10; y < 32; ++y) {
             for (int x = 12; x < 228; ++x) {
                 const QColor pixel = image.pixelColor(x, y);
-                if (pixel.green() > 170 && pixel.red() < 100) {
+                if (pixel.green() > pixel.red() + 50 && pixel.green() > pixel.blue()) {
                     ++tealPixels;
                 }
-                if (pixel.red() > 200 && pixel.green() > 200 && pixel.blue() > 200) {
+                if (light ? pixel.lightness() < 100 : pixel.lightness() > 200) {
                     ++whitePixels;
                 }
             }
@@ -81,7 +87,7 @@ private slots:
         QVERIFY(tealPixels > 10);
         QVERIFY(tealPixels < 50);
         QVERIFY(whitePixels > 10);
-        QCOMPARE(image.pixelColor(210, 20), QColor("#1E1E1E"));
+        QCOMPARE(image.pixelColor(210, 20), palette.listFill);
     }
 
     /// @brief 验证拼接长度绘制在状态行右侧，不覆盖左侧状态文字
@@ -100,7 +106,7 @@ private slots:
         int rightWhite = 0;
         for (int x = 180; x < 226; ++x) {
             const QColor pixel = image.pixelColor(x, 21);
-            if (pixel.red() > 180 && pixel.green() > 180 && pixel.blue() > 180) {
+            if (pixel.lightness() > 120) {
                 ++rightWhite;
             }
         }

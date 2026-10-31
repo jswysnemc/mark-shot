@@ -1,3 +1,5 @@
+import {PinnedWindowKeeper} from './pinned-window-keeper.js';
+import {previewPalette, previewPanelStyle, previewButtonStyle} from './scroll-preview-theme.js';
 import { DBUS_XML } from './dbus-interface.js';
 import { isFullyOccluded } from './window-occlusion.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -10,7 +12,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { ScrollPreviewOverlay } from './scroll-preview-overlay.js';
 const IFACE = 'org.gnome.Shell.Extensions.MarkShotScrollHelper';
 const OBJECT_PATH = '/org/gnome/Shell/Extensions/MarkShotScrollHelper';
-const API_VERSION = '6';
+const API_VERSION = '7';
 
 const PANEL_WIDTH = 340;
 const DEFAULT_PREVIEW_GAP = 5;
@@ -80,50 +82,6 @@ function windowVisibleOnCurrentWorkspace(metaWindow, actor) {
     return true;
 }
 
-function windowTitleMatches(metaWindow, title) {
-    if (typeof title !== 'string' || title.trim() === '') {
-        return false;
-    }
-    return metaWindow?.get_title?.() === title;
-}
-
-function textMatchesMarkShot(text) {
-    if (typeof text !== 'string') {
-        return false;
-    }
-    const normalized = text.trim().toLowerCase();
-    return normalized === 'mark-shot'
-        || normalized === 'mark shot'
-        || normalized === 'markshot'
-        || normalized.includes('mark shot')
-        || normalized.includes('mark-shot');
-}
-
-function windowMatchesPinnedRequest(metaWindow, title) {
-    if (windowTitleMatches(metaWindow, title)) {
-        return true;
-    }
-
-    return textMatchesMarkShot(metaWindow?.get_title?.())
-        || textMatchesMarkShot(metaWindow?.get_wm_class?.())
-        || textMatchesMarkShot(metaWindow?.get_wm_class_instance?.());
-}
-
-function setWindowAbove(metaWindow, above) {
-    if (!metaWindow) {
-        return false;
-    }
-    if (above && typeof metaWindow.make_above === 'function') {
-        metaWindow.make_above();
-        return true;
-    }
-    if (!above && typeof metaWindow.unmake_above === 'function') {
-        metaWindow.unmake_above();
-        return true;
-    }
-    return false;
-}
-
 function finishScreenshotArea(source, result, stream, filename, invocation) {
     try {
         const finishResult = source.screenshot_area_finish(result);
@@ -150,7 +108,10 @@ export default class MarkShotScrollHelper extends Extension {
     enable() {
         const interfaceInfo = Gio.DBusNodeInfo.new_for_xml(DBUS_XML).interfaces[0];
         this._screenshot = new Shell.Screenshot();
+        this._pinnedKeeper = new PinnedWindowKeeper(global.display,
+            () => (global.get_window_actors?.() ?? []).map(actor => actor.meta_window).filter(Boolean));
         this._previewSessionId = '';
+        this._previewPalette = previewPalette(true);
         this._previewRoot = null;
         this._previewStatus = null;
         this._previewImageBin = null;
@@ -176,6 +137,8 @@ export default class MarkShotScrollHelper extends Extension {
     }
 
     disable() {
+        this._pinnedKeeper?.destroy();
+        this._pinnedKeeper = null;
         this._destroyPreview();
         if (this._dbusId) {
             Gio.DBus.session.unregister_object(this._dbusId);
@@ -211,6 +174,18 @@ export default class MarkShotScrollHelper extends Extension {
                 return;
             }
 
+            if (methodName === 'SetScrollPreviewTheme') {
+                const [dark] = parameters.deepUnpack();
+                const palette = previewPalette(dark);
+                if (palette.panel !== this._previewPalette.panel) {
+                    this._destroyPreview();
+                    this._previewPalette = palette;
+                }
+                this._scrollOverlay?.setTheme(dark);
+                invocation.return_value(null);
+                return;
+            }
+
             if (methodName === 'ShowScrollPreview') {
                 this._handleShowScrollPreview(parameters);
                 invocation.return_value(null);
@@ -237,7 +212,7 @@ export default class MarkShotScrollHelper extends Extension {
             if (methodName === 'SetWindowsAbove') {
                 const [title, above] = parameters.deepUnpack();
                 invocation.return_value(new GLib.Variant('(i)', [
-                    this._setWindowsAbove(title, above),
+                    this._pinnedKeeper.setAbove(title, above),
                 ]));
                 return;
             }
@@ -346,23 +321,6 @@ export default class MarkShotScrollHelper extends Extension {
         return windows;
     }
 
-    _setWindowsAbove(title, above) {
-        let changed = 0;
-        const actors = global.get_window_actors?.() ?? [];
-
-        for (const actor of actors) {
-            const metaWindow = actor?.meta_window;
-            if (!windowMatchesPinnedRequest(metaWindow, title) || !allowedWindowType(metaWindow)) {
-                continue;
-            }
-            if (setWindowAbove(metaWindow, above)) {
-                changed += 1;
-            }
-        }
-
-        return changed;
-    }
-
     _handleShowScrollPreview(parameters) {
         const [
             sessionId,
@@ -404,27 +362,20 @@ export default class MarkShotScrollHelper extends Extension {
         this._previewRoot = new St.BoxLayout({
             vertical: true,
             reactive: true,
-            style: [
-                'background-color: rgba(15, 17, 23, 242);',
-                'border: 1px solid rgba(255, 255, 255, 28);',
-                'border-radius: 12px;',
-                `padding: ${PANEL_PADDING}px;`,
-                'spacing: 10px;',
-            ].join(' '),
+            style: previewPanelStyle(this._previewPalette, PANEL_PADDING),
         });
 
         this._previewStatus = new St.Label({
             text: 'Scroll down to capture',
             style: [
-                'color: rgb(204, 251, 241);',
-                'font-weight: 700;',
-                'font-size: 10pt;',
+                `color: ${this._previewPalette.text};`,
+                'font-size: 9pt;',
             ].join(' '),
         });
         this._previewRoot.add_child(this._previewStatus);
 
         this._previewImageBin = new St.Bin({
-            style: 'background-color: rgba(8, 13, 19, 220);',
+            style: `background-color: ${this._previewPalette.image};`,
             x_expand: true,
             y_expand: true,
         });
@@ -454,33 +405,16 @@ export default class MarkShotScrollHelper extends Extension {
     }
 
     _makeButton(action, iconName, label) {
-        const roleStyle = action === 'save'
-            ? 'background-color: rgba(45, 212, 191, 92); border-color: rgba(94, 234, 212, 150);'
-            : action === 'cancel'
-                ? 'background-color: rgba(255, 255, 255, 16); border-color: rgba(248, 113, 113, 70);'
-                : 'background-color: rgba(255, 255, 255, 16); border-color: rgba(255, 255, 255, 24);';
-
         const button = new St.Button({
             reactive: true,
             can_focus: true,
             accessible_name: label,
-            style: [
-                'color: rgb(229, 231, 235);',
-                roleStyle,
-                'border-width: 1px;',
-                'border-style: solid;',
-                'border-radius: 10px;',
-                'min-width: 40px;',
-                'max-width: 40px;',
-                'min-height: 36px;',
-                'max-height: 36px;',
-                'padding: 0;',
-            ].join(' '),
+            style: previewButtonStyle(this._previewPalette, action === 'save'),
         });
         button.set_child(new St.Icon({
             icon_name: iconName,
             icon_size: ICON_SIZE,
-            style: 'color: rgb(229, 231, 235);',
+            style: `color: ${this._previewPalette.text};`,
         }));
         button.connect('clicked', () => {
             this._emitPreviewAction(action);
@@ -633,7 +567,7 @@ export default class MarkShotScrollHelper extends Extension {
         button.set_child(new St.Icon({
             icon_name: iconName,
             icon_size: ICON_SIZE,
-            style: 'color: rgb(229, 231, 235);',
+            style: `color: ${this._previewPalette.text};`,
         }));
     }
 

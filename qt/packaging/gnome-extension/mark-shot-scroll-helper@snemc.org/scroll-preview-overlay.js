@@ -1,3 +1,4 @@
+import {previewPalette, previewButtonStyle} from './scroll-preview-theme.js';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -36,9 +37,21 @@ function fallbackMonitor() {
 export class ScrollPreviewOverlay {
     constructor(emitAction) {
         this._emitAction = emitAction;
+        this._palette = previewPalette(true);
         this._frameParts = [];
         this._handle = null;
         this._handleAxis = '';
+    }
+
+    /**
+     * 【滚动截图】【握柄主题】同步方向握柄配色，不改变捕获边框颜色
+     * @param {boolean} dark 是否使用深色主题
+     * @returns {void}
+     */
+    setTheme(dark) {
+        this._palette = previewPalette(dark);
+        this._handle?.set_style(previewButtonStyle(this._palette));
+        this._handle?.get_child()?.set_style(`color: ${this._palette.text};`);
     }
 
     _ensureActors() {
@@ -61,12 +74,7 @@ export class ScrollPreviewOverlay {
                 reactive: true,
                 can_focus: true,
                 accessible_name: 'Direction handle',
-                style: [
-                    'background-color: rgba(15, 17, 23, 242);',
-                    'border: 1px solid rgba(94, 234, 212, 150);',
-                    'border-radius: 10px;',
-                    'padding: 0;',
-                ].join(' '),
+                style: previewButtonStyle(this._palette),
             });
             this._handle.connect('clicked', () => {
                 this._emitAction?.('axis');
@@ -135,7 +143,7 @@ export class ScrollPreviewOverlay {
             this._handle.set_child(new St.Icon({
                 icon_name: axis === 'horizontal' ? ACTION_ICONS.axisHorizontal : ACTION_ICONS.axisVertical,
                 icon_size: ICON_SIZE,
-                style: 'color: rgb(229, 231, 235);',
+                style: `color: ${this._palette.text};`,
             }));
         }
         this._handle.show();

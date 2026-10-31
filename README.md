@@ -61,12 +61,12 @@ It captures screen frames instantly and opens an interactive fullscreen overlay,
 
 ### Pinned Window Stickers
 - Pins any cropped region or annotated screenshot as an independent, frameless, and top-level floating window.
-- Supports direct selection of OCR-recognized text in the pinned window, with `Ctrl + C` and context-menu copying.
+- Pins clipboard images or plain text. OCR runs in the background; dragging from recognized text selects it, while dragging elsewhere moves the sticker. `Ctrl + C` copies selected text. See [pinned images and clipboard](docs/pinned-images.md).
 - Translates OCR text through OpenAI-compatible, Google Gemini, and Anthropic Claude endpoints, or the Tencent, Baidu, and Youdao machine translation APIs, rendering translated text back onto the image at the original layout positions. See the [translation provider guide](docs/translation-providers.md) for credentials and provider selection.
 - **Interactive Gestures**:
-  - Drag with left click to reposition.
+  - Start a left-drag on recognized text to select it, or elsewhere to reposition.
   - Scroll mouse wheel to scale.
-  - Double left-click or press `Esc` to close.
+  - Double-click text to select its line; double-click elsewhere or press `Esc` to close.
   - Right-click to open a context menu with options to rotate, copy image text, translate, save, copy, or close.
 
 ### Scrolling Screenshot Capture
@@ -229,6 +229,7 @@ argument.
 | `--tray` | Keeps Mark Shot running in the system tray and registers global capture hotkeys when supported. |
 | `--capture` | Forces one-shot capture when tray autostart is enabled in the config. |
 | `--pin-image <path>` | Opens an existing local image directly as a pinned sticker window, skipping capture and region selection. |
+| `--pin-clipboard` | Pins the clipboard image or plain text without starting a capture. |
 | `--recording-status` | Prints the current recording status as JSON through the running instance. |
 | `--stop-recording` | Requests the running instance to stop the active recording. |
 | `--pause-recording` | Toggles pause for the active recording in the running instance. |

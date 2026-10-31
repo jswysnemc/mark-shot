@@ -33,10 +33,11 @@ QString historyWindowStyleSheet(markshot::ui::UiThemeMode mode)
     return markshot::settings::tokens::settingsStyleSheet(mode) + QStringLiteral(
         "QWidget#historyWindow, QDialog#historyConfirmDialog { background: %1; color: %2; }"
         "QListWidget#historyList { background: transparent; border: 0; outline: 0; }"
-        "QListWidget#historyList::item { color: %2; padding: 6px; border-radius: 6px; }"
+        "QListWidget#historyList::item { color: %2; padding: 4px; border-radius: 6px; }"
         "QListWidget#historyList::item:hover { background: %3; }"
         "QListWidget#historyList::item:selected { background: %4; color: %2; }"
         "QLabel#historyPreview { background: %5; border: 1px solid %6; border-radius: 6px; padding: 6px; }"
+        "QWidget#historyWindow QPushButton { min-height: 28px; padding: 0 8px; border-radius: 6px; }"
         "QPushButton#historyCloseButton { min-height: 0; padding: 0; }"
         "QSplitter::handle { background: transparent; width: 6px; }"
         "QSplitter::handle:hover { background: %6; border-radius: 3px; }")
@@ -58,9 +59,11 @@ void HistoryWindow::applyTheme()
         const QVariant action = button->property("historyAction");
         if (action.isValid()) {
             button->setIcon(historyIcon(static_cast<ShotWindow::Action>(action.toInt()),
-                                       colors.color(QPalette::ButtonText)));
+                colors.color(button->property("role").toString() == QStringLiteral("primary")
+                    ? QPalette::HighlightedText : QPalette::ButtonText)));
         }
     }
+    updateActionLayout();
 }
 
 void HistoryWindow::paintEvent(QPaintEvent *event)

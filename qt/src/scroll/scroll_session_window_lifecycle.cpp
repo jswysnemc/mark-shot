@@ -122,7 +122,7 @@ void ScrollSessionWindow::buildControlBar()
 {
     m_controlBar = new QWidget(this);
     m_controlBar->setObjectName(QStringLiteral("shotToolbar"));
-    m_controlBar->setStyleSheet(markshot::theme::panelStyleSheet());
+    m_controlBar->setStyleSheet(markshot::theme::panelStyleSheet(m_uiConfig.palette, 30, 11));
 
     auto *row = new QHBoxLayout(m_controlBar);
     row->setContentsMargins(7, 7, 7, 7);
@@ -132,12 +132,12 @@ void ScrollSessionWindow::buildControlBar()
         auto *button = new QPushButton(m_controlBar);
         button->setProperty("role", role.isEmpty() ? QStringLiteral("secondary") : role);
         configureIconButton(button, icon, label);
-        applyControlButtonChrome(button);
+        applyControlButtonChrome(button, m_uiConfig.palette);
         row->addWidget(button, 0, Qt::AlignCenter);
         return button;
     };
 
-    m_axisButton = makeButton(makeControlIcon(ControlIcon::AxisVertical), MS_TR("Dir: Vertical"));
+    m_axisButton = makeButton(makeControlIcon(ControlIcon::AxisVertical, m_uiConfig.palette), MS_TR("Dir: Vertical"));
     m_axisButton->setProperty("dragHandle", true);
     m_axisButton->setCursor(Qt::OpenHandCursor);
     m_axisButton->installEventFilter(this);
@@ -147,18 +147,18 @@ void ScrollSessionWindow::buildControlBar()
     m_floatingAxisButton->setCursor(Qt::OpenHandCursor);
     m_floatingAxisButton->setProperty("role", QStringLiteral("secondary"));
     configureIconButton(m_floatingAxisButton,
-                        makeControlIcon(ControlIcon::AxisVertical),
+                        makeControlIcon(ControlIcon::AxisVertical, m_uiConfig.palette),
                         MS_TR("Dir: Vertical"));
-    applyControlButtonChrome(m_floatingAxisButton);
+    applyControlButtonChrome(m_floatingAxisButton, m_uiConfig.palette);
     m_floatingAxisButton->installEventFilter(this);
     m_floatingAxisButton->hide();
 
     row->addSpacing(4);
-    m_pauseButton = makeButton(makeControlIcon(ControlIcon::Pause), MS_TR("Pause"));
-    m_annotateButton = makeButton(makeControlIcon(ControlIcon::Annotate), MS_TR("Annotate"));
-    m_saveButton = makeButton(makeControlIcon(ControlIcon::Save), MS_TR("Save"), QStringLiteral("primary"));
-    m_copyButton = makeButton(makeControlIcon(ControlIcon::Copy), MS_TR("Copy"));
-    m_cancelButton = makeButton(makeControlIcon(ControlIcon::Cancel), MS_TR("Cancel"), QStringLiteral("danger"));
+    m_pauseButton = makeButton(makeControlIcon(ControlIcon::Pause, m_uiConfig.palette), MS_TR("Pause"));
+    m_annotateButton = makeButton(makeControlIcon(ControlIcon::Annotate, m_uiConfig.palette), MS_TR("Annotate"));
+    m_saveButton = makeButton(makeControlIcon(ControlIcon::Save, m_uiConfig.palette), MS_TR("Save"), QStringLiteral("primary"));
+    m_copyButton = makeButton(makeControlIcon(ControlIcon::Copy, m_uiConfig.palette), MS_TR("Copy"));
+    m_cancelButton = makeButton(makeControlIcon(ControlIcon::Cancel, m_uiConfig.palette), MS_TR("Cancel"), QStringLiteral("danger"));
 
     connect(m_axisButton, &QPushButton::clicked, this, [this] { toggleAxis(); });
     connect(m_floatingAxisButton, &QPushButton::clicked, this, [this] { toggleAxis(); });
@@ -409,13 +409,13 @@ void ScrollSessionWindow::drawFloatingDragHandle(QPainter &painter) const
 
     QPainterPath path;
     path.addRoundedRect(handle, 10, 10);
-    painter.fillPath(path, QColor(15, 17, 23, 242));
-    painter.setPen(QPen(QColor(94, 234, 212, 150), 1));
+    painter.fillPath(path, m_uiConfig.palette.popupFill);
+    painter.setPen(QPen(m_uiConfig.palette.activeBorder, 1));
     painter.drawPath(path);
 
     const bool horizontal = m_stitcher.axis() == ScrollAxis::Horizontal;
     const QIcon icon = makeControlIcon(horizontal ? ControlIcon::AxisHorizontal
-                                                  : ControlIcon::AxisVertical);
+                                                  : ControlIcon::AxisVertical, m_uiConfig.palette);
     icon.paint(&painter, handle.adjusted(9, 7, -9, -7), Qt::AlignCenter);
 }
 

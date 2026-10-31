@@ -243,7 +243,7 @@ QImage ScrollSessionWindow::renderGnomePreviewImage(const QSize &size) const
     }
 
     QImage preview(size, QImage::Format_ARGB32_Premultiplied);
-    preview.fill(QColor(QStringLiteral("#1E1E1E")));
+    preview.fill(m_uiConfig.palette.listFill);
 
     QPainter painter(&preview);
     painter.setRenderHint(QPainter::Antialiasing, true);
@@ -305,6 +305,13 @@ void ScrollSessionWindow::updateGnomeShellPreview(bool force)
     if (!metric.isEmpty()) {
         status += QStringLiteral("    ") + metric;
     }
+
+    // 1. 【滚动截图】【GNOME主题】新增可选方法不改变旧扩展的预览接口，旧版仍可显示
+    QDBusMessage themeMessage = QDBusMessage::createMethodCall(
+        QString::fromLatin1(kGnomeShellService), QString::fromLatin1(kGnomeHelperPath),
+        QString::fromLatin1(kGnomeHelperInterface), QStringLiteral("SetScrollPreviewTheme"));
+    themeMessage << m_uiConfig.palette.dark;
+    QDBusConnection::sessionBus().call(themeMessage, QDBus::NoBlock);
 
     QDBusMessage message = QDBusMessage::createMethodCall(
         QString::fromLatin1(kGnomeShellService),

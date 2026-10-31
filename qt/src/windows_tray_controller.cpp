@@ -1,6 +1,7 @@
 #include "windows_tray_controller.h"
 
 #include "debug_log.h"
+#include "clipboard_paste/clipboard_pin_launch.h"
 #if !defined(Q_OS_WIN)
 #include "shortcuts/global_shortcut_manager.h"
 #endif
@@ -279,6 +280,7 @@ bool WindowsTrayController::start()
     });
     m_menu->addAction(MS_TR("Capture"), this, [this] { triggerCapture(); });
     m_menu->addAction(MS_TR("Fullscreen Capture"), this, [this] { triggerFullscreenCapture(); });
+    m_menu->addAction(MS_TR("Pin Clipboard"), this, [] { clipboard::pinContentOrNotify(); });
     if (m_delayedCaptureCallbacks.schedule) {
         m_menu->addMenu(capture_delay::createDelayedCaptureMenu(m_delayedCaptureCallbacks, m_menu));
     }

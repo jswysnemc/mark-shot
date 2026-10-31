@@ -1,6 +1,7 @@
 #pragma once
 
 #include "scroll/stitcher.h"
+#include "ui/toolbar_palette.h"
 
 #include <QImage>
 #include <QPoint>
@@ -27,6 +28,7 @@ class QWheelEvent;
 namespace markshot::scroll {
 
 struct ScrollSessionUiConfig {
+    ui::ToolbarPalette palette;
     bool frameEnabled = true;
     bool hidePreviewDuringCapture = false;
     int frameGap = 5;

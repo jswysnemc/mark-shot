@@ -13,7 +13,7 @@ void ScrollSessionWindow::drawPreviewContent(QPainter &painter, const QRect &are
         return;
     }
 
-    drawScrollPreviewSurface(painter, area);
+    drawScrollPreviewSurface(painter, area, false, m_uiConfig.palette);
 
     const PreviewLayout layout = computePreviewLayout(area);
     if (!layout.valid) {
@@ -77,7 +77,7 @@ void ScrollSessionWindow::drawPreviewContent(QPainter &painter, const QRect &are
         detailTarget = QRect(detailRect.left(), detailRect.top(), detailRect.width(), targetH);
     }
     painter.drawImage(detailTarget, result, srcRect);
-    painter.setPen(QPen(QColor(255, 255, 255, 40), 1));
+    painter.setPen(QPen(m_uiConfig.palette.separator, 1));
     painter.setBrush(Qt::NoBrush);
     painter.drawRect(detailTarget);
 
@@ -90,7 +90,7 @@ void ScrollSessionWindow::drawPreviewContent(QPainter &painter, const QRect &are
         return;
     }
     painter.drawImage(overviewTarget, result);
-    painter.setPen(QPen(QColor(255, 255, 255, 40), 1));
+    painter.setPen(QPen(m_uiConfig.palette.separator, 1));
     painter.setBrush(Qt::NoBrush);
     painter.drawRect(overviewTarget);
 
@@ -273,12 +273,12 @@ void ScrollSessionWindow::refreshControlLabels()
             ? MS_TR("Continue Capture")
             : (m_paused ? MS_TR("Resume") : MS_TR("Pause"));
         configureIconButton(m_pauseButton,
-                            makeControlIcon(m_paused ? ControlIcon::Resume : ControlIcon::Pause),
+                            makeControlIcon(m_paused ? ControlIcon::Resume : ControlIcon::Pause, m_uiConfig.palette),
                             pauseLabel);
     }
     const bool horizontal = m_stitcher.axis() == ScrollAxis::Horizontal;
     const QIcon axisIcon = makeControlIcon(horizontal ? ControlIcon::AxisHorizontal
-                                                     : ControlIcon::AxisVertical);
+                                                     : ControlIcon::AxisVertical, m_uiConfig.palette);
     const QString axisLabel = horizontal ? MS_TR("Dir: Horizontal") : MS_TR("Dir: Vertical");
     const QString dragLabel = horizontal ? MS_TR("Drag region horizontally")
                                          : MS_TR("Drag region vertically");
@@ -417,16 +417,16 @@ void ScrollSessionWindow::paintEvent(QPaintEvent *)
 
     if (m_previewPanelVisible) {
         const QRect panel = previewPanelRect();
-        drawScrollPreviewSurface(painter, panel, true);
+        drawScrollPreviewSurface(painter, panel, true, m_uiConfig.palette);
 
-        // 1. 【滚动截图】【预览状态】保持深色紧凑状态行，仅绘制静态青点和白色文字
+        // 1. 【滚动截图】【预览状态】状态行与工具栏共用配色，仅绘制静态状态点和文字
         const QRect statusRect(panel.left() + kPanelPadding,
                                panel.top() + kPanelPadding,
                                panel.width() - kPanelPadding * 2,
                                kStatusHeight);
         drawScrollPreviewStatus(painter, statusRect,
             m_statusText.isEmpty() ? MS_TR("Scroll down to capture") : m_statusText,
-            stitchedLengthLabel());
+            stitchedLengthLabel(), m_uiConfig.palette);
 
         // Preview image area: between the status row and the control bar.
         const QRect imageArea = imageAreaRect();
@@ -671,8 +671,8 @@ void ScrollSessionWindow::drawHandleAvoidanceChromeIfEnabled(QPainter &painter) 
     if (!guide.isEmpty()) {
         QPainterPath path;
         path.addRoundedRect(QRectF(guide), 8.0, 8.0);
-        painter.setPen(QPen(QColor(94, 234, 212, 150), 1.0));
-        painter.setBrush(QColor(15, 17, 23, 236));
+        painter.setPen(QPen(m_uiConfig.palette.activeBorder, 1.0));
+        painter.setBrush(m_uiConfig.palette.popupFill);
         painter.drawPath(path);
 
         painter.setPen(QPen(QColor(94, 234, 212), 1.6, Qt::SolidLine, Qt::RoundCap));
@@ -682,7 +682,7 @@ void ScrollSessionWindow::drawHandleAvoidanceChromeIfEnabled(QPainter &painter) 
         painter.drawLine(gripLeft, gripTop, gripLeft, gripBottom);
         painter.drawLine(gripLeft + 5, gripTop, gripLeft + 5, gripBottom);
 
-        painter.setPen(QColor(229, 231, 235));
+        painter.setPen(m_uiConfig.palette.text);
         painter.setFont(avoidanceGuideFont());
         painter.drawText(guide.adjusted(28, 0, -8, 0), Qt::AlignVCenter | Qt::AlignLeft,
                          MS_TR("Drag the button"));

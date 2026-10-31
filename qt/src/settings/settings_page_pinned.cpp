@@ -30,7 +30,7 @@ SettingsPagePinned::SettingsPagePinned(QWidget *parent)
                                  MS_TR("Keep pinned images above normal windows when the platform supports it."));
     m_textSelectionCopy = addSwitchRow(windowForm,
                                        MS_TR("Text Selection Copy"),
-                                       MS_TR("Allow selecting OCR or translated text with the mouse."));
+                                       MS_TR("Recognize text in the background for selection; drag elsewhere to move."));
     m_borderEnabled = addSwitchRow(windowForm,
                                    MS_TR("Pinned Border"),
                                    MS_TR("Draw a border around pinned images."));
@@ -57,7 +57,7 @@ SettingsPagePinned::SettingsPagePinned(QWidget *parent)
                                          this);
     QFormLayout *ocrForm = settingsCardForm(ocrCard);
     m_ocrEnabled = addSwitchRow(ocrForm, MS_TR("OCR Enabled"), MS_TR("Enable OCR actions for pinned images."));
-    m_autoOcr = addSwitchRow(ocrForm, MS_TR("Auto OCR"), MS_TR("Recognize text automatically after pinning."));
+    m_autoOcr = addSwitchRow(ocrForm, MS_TR("Auto OCR"), MS_TR("Recognize automatically even when text selection is off."));
     QFrame *advanced = createAdvancedSettingsCard(MS_TR("Recognition and translation options"), {}, this);
     QFormLayout *advancedForm = settingsCardForm(advanced);
     m_ocrBackend = addTextRow(advancedForm, MS_TR("OCR Backend"), QStringLiteral("rapidocr"));

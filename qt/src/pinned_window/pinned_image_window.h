@@ -31,6 +31,7 @@ class QMouseEvent;
 class QPaintEvent;
 class QWheelEvent;
 class SelectionTranslateTest;
+class PinnedTextSelectionTest;
 
 namespace markshot::translation_layout {
 struct TranslationSeed;
@@ -49,6 +50,7 @@ class PinnedLayerShellDragPreview;
 /// @brief 提供置顶图片显示、文本识别、文本选择、翻译和边界缩放的窗口。
 class PinnedImageWindow final : public QWidget {
     friend class ::SelectionTranslateTest;
+    friend class ::PinnedTextSelectionTest;
 
 public:
     /// @brief 表示单个 OCR 文字块的边界和文本。
@@ -125,26 +127,6 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
 
 private:
-    /// @brief 保存首次识别期间的真实拖选手势
-    struct DeferredTextSelection {
-        QPointF anchor;
-        QPointF focus;
-        QPoint globalAnchor;
-        QPoint windowTopLeft;
-        bool released = false;
-        bool copyWhenReady = false;
-    };
-
-    /// @brief 在尚无 OCR 结果时保留手势并按需启动识别
-    /// @param widgetPoint 按下时的窗口内坐标
-    /// @param globalPoint 按下事件携带的全局坐标
-    /// @return 当前手势需要等待识别时返回 true
-    bool deferTextSelection(QPointF widgetPoint, QPoint globalPoint);
-
-    /// @brief 识别结束后把保留手势解析为文字选区或图片移动
-    /// @return 无返回值
-    void finishDeferredTextSelection();
-
     /// @brief 绘制完整图片及覆盖层，供原窗口和拖动预览共同使用
     /// @param painter 目标窗口的绘制器
     /// @param viewport 目标窗口内的可见绘制区域
@@ -278,9 +260,14 @@ private:
     /// @param geometry 新窗口几何。
     void applyResizeGeometry(QRect geometry);
 
-    /// @brief 启动 OCR 子进程。
-    /// @return 无返回值。
-    void startOcr();
+    /// @brief 在贴图可见时后台准备识别结果，已有结果或任务时不重复启动
+    /// @return 无返回值
+    void scheduleBackgroundOcr();
+
+    /// @brief 异步启动 OCR 任务，不阻塞鼠标交互
+    /// @param textSelectionOnly 是否仅为拖选准备结果，不自动翻译或弹出后端缺失通知
+    /// @return 无返回值
+    void startOcr(bool textSelectionOnly = false);
 
     /// @brief 返回默认 OCR 辅助程序路径。
     /// @return OCR 辅助程序路径。
@@ -463,7 +450,7 @@ private:
     int m_selectionFocus = -1;
     bool m_selectingText = false;
     bool m_textSelectionOcrAttempted = false;
-    std::optional<DeferredTextSelection> m_deferredTextSelection;
+    bool m_ocrForTextSelection = false;
     bool m_moving = false;
     bool m_translationActive = false;
     bool m_translateAfterOcr = false;
@@ -489,12 +476,8 @@ private:
     /// @return 已接管边框绘制时返回 true。
     bool paintPinnedNonWindowChromeIfEnabled(QPainter &painter, const QRectF &imageRect);
 
-    // --- 新增：OCR 原文轻背景与逐字拖选 ---
+    // OCR 原文仅保存文字坐标，用于逐字拖选
     QVector<OcrToken> m_ocrSelectionTokens;
-    /// @brief 在原图文字上绘制轻背景，不重绘识别文字。
-    /// @param painter 当前画笔。
-    /// @return 无返回值。
-    void paintOcrRecognitionPlatesIfEnabled(QPainter &painter) const;
     /// @brief 选中同一行的全部可拖选文字。
     /// @param tokenIndex 命中的文字下标。
     /// @return 无返回值。

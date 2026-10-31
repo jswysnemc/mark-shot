@@ -2,71 +2,12 @@
 
 #include "clipboard_image.h"
 #include "ocr_result.h"
-#include "pinned_window_top.h"
 
-#include <QApplication>
-#include <QCursor>
-#include <QWindow>
 
 #include <algorithm>
 #include <limits>
 
 namespace markshot::shot {
-
-bool PinnedImageWindow::deferTextSelection(QPointF widgetPoint, QPoint globalPoint)
-{
-    if (!m_config.textSelectionCopyEnabled || !m_config.ocrEnabled || !activeTokens().isEmpty()
-        || (m_textSelectionOcrAttempted && !m_ocrTask)) {
-        return false;
-    }
-    // 1. 【贴图】【按需拖选】缓存首次手势，复用已进行的 OCR，避免重复启动任务
-    m_deferredTextSelection = DeferredTextSelection{widgetPoint, widgetPoint, globalPoint, pinnedTopLeft()};
-    setCursor(Qt::BusyCursor);
-    if (!m_ocrTask) {
-        startOcr();
-    }
-    if (!m_ocrTask) {
-        finishDeferredTextSelection();
-    }
-    return true;
-}
-
-void PinnedImageWindow::finishDeferredTextSelection()
-{
-    if (!m_deferredTextSelection) {
-        return;
-    }
-    const DeferredTextSelection gesture = *m_deferredTextSelection;
-    m_deferredTextSelection.reset();
-    // 1. 【贴图】【按需拖选】使用原始按下位置判断文字，不把拖入文字区域的移动改为选区
-    const auto anchor = tokenAt(widgetToImage(gesture.anchor));
-    if (anchor) {
-        m_selectionAnchor = *anchor;
-        m_selectionFocus = closestToken(widgetToImage(gesture.focus)).value_or(*anchor);
-        m_selectingText = !gesture.released;
-        if (gesture.copyWhenReady) {
-            copySelectedText();
-        }
-        update();
-    } else {
-        // 2. 【贴图】【按需拖选】起点没有文字时恢复原本的图片移动手势
-        m_moving = !gesture.released;
-        m_dragOffset = gesture.globalAnchor - gesture.windowTopLeft;
-        const bool layerShell = pinnedWindowHasLayerShellTop(this);
-        // 3. 【贴图】【按需拖选】先固定输入 surface，再追上识别期间的指针位移
-        if (m_moving && layerShell) {
-            beginLayerShellDragPreview();
-        }
-        const bool systemMove = m_moving && !layerShell && windowHandle()
-            && windowHandle()->startSystemMove();
-        const QPoint delta = (gesture.focus - gesture.anchor).toPoint();
-        if (!systemMove && delta.manhattanLength() >= QApplication::startDragDistance()) {
-            setPinnedGeometry(QRect(gesture.windowTopLeft + delta, logicalPinnedSize()),
-                              !layerShell);
-        }
-    }
-    updateCursorForPosition(gesture.focus);
-}
 
 QPointF PinnedImageWindow::widgetToImage(QPointF point) const
 {
@@ -145,10 +86,6 @@ std::optional<int> PinnedImageWindow::closestToken(QPointF imagePoint) const
 
 void PinnedImageWindow::updateCursorForPosition(QPointF widgetPoint)
 {
-    if (m_deferredTextSelection) {
-        setCursor(Qt::BusyCursor);
-        return;
-    }
     // 1. 【置顶图片】【光标状态】活动操作保持自己的光标，不受后台翻译完成事件覆盖
     if (isPinnedResizeDirection(m_resizeDrag.direction)) {
         setCursor(cursorForPinnedResizeDirection(m_resizeDrag.direction));

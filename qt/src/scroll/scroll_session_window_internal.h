@@ -151,8 +151,16 @@ PreviewPanelPlacement choosePreviewPanelPlacement(const QRect &anchor,
                                                   int previewGap);
 QSize controlButtonSize();
 QRect chooseFloatingDragHandleRect(const QRect &anchor, const QRect &bounds);
-QIcon makeControlIcon(ControlIcon icon);
+/// @brief 按截图会话配色绘制控制图标
+/// @param icon 控制动作
+/// @param palette 当前主题配色
+/// @return 动作图标
+QIcon makeControlIcon(ControlIcon icon, const ui::ToolbarPalette &palette);
 void configureIconButton(QPushButton *button, const QIcon &icon, const QString &label);
-void applyControlButtonChrome(QPushButton *button);
+/// @brief 按截图会话配色设置紧凑控制按钮
+/// @param button 目标按钮
+/// @param palette 当前主题配色
+/// @return 无返回值
+void applyControlButtonChrome(QPushButton *button, const ui::ToolbarPalette &palette);
 
 }  // namespace markshot::scroll

@@ -33,6 +33,9 @@ export const DBUS_XML = `
       <arg type="b" name="axis_locked" direction="in"/>
       <arg type="i" name="preview_gap" direction="in"/>
     </method>
+    <method name="SetScrollPreviewTheme">
+      <arg type="b" name="dark" direction="in"/>
+    </method>
     <method name="HideScrollPreview">
       <arg type="s" name="session_id" direction="in"/>
     </method>

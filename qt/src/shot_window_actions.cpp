@@ -108,7 +108,8 @@ void ShotWindow::startScrollCapture()
     }
 
     const QString outputName = m_outputName;
-    const markshot::scroll::ScrollSessionUiConfig uiConfig = scrollSessionUiConfig();
+    markshot::scroll::ScrollSessionUiConfig uiConfig = scrollSessionUiConfig();
+    uiConfig.palette = m_toolbarAppearance.palette;
     QScreen *targetScreen = screen();
     QPointer<ShotWindow> self(this);
 
@@ -286,10 +287,11 @@ void ShotWindow::showToast(const QString &text, int durationMs)
     label->setAlignment(Qt::AlignCenter);
     label->setFont(markshot::theme::uiFont(12, QFont::DemiBold));
     label->setStyleSheet(QStringLiteral(
-        "background: rgba(8, 13, 19, 220);"
-        "color: rgba(204, 251, 241, 238);"
-        "border-radius: 14px;"
-        "padding: 8px 22px;"));
+        "background: %1; color: %2; border: 1px solid %3;"
+        "border-radius: 8px; padding: 6px 14px;")
+        .arg(markshot::ui::cssColor(m_toolbarAppearance.palette.popupFill),
+             markshot::ui::cssColor(m_toolbarAppearance.palette.strongText),
+             markshot::ui::cssColor(m_toolbarAppearance.palette.panelBorder)));
     label->adjustSize();
     label->move((width() - label->width()) / 2, height() - label->height() - 80);
     label->show();

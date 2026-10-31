@@ -487,11 +487,12 @@ QRect chooseFloatingDragHandleRect(const QRect &anchor, const QRect &bounds)
     return QRect(QPoint(left, std::clamp(cornerTop, minTop, maxTop)), handleSize);
 }
 
-QIcon makeControlIcon(ControlIcon icon)
+QIcon makeControlIcon(ControlIcon icon, const ui::ToolbarPalette &palette)
 {
     constexpr int size = 32;
-    const QColor ink(229, 231, 235);
-    const QColor soft(229, 231, 235, 130);
+    const QColor ink = palette.text;
+    QColor soft = ink;
+    soft.setAlpha(130);
     QPixmap pixmap(size, size);
     pixmap.fill(Qt::transparent);
 
@@ -528,7 +529,7 @@ QIcon makeControlIcon(ControlIcon icon)
         play.lineTo(11, 24);
         play.closeSubpath();
         p.setPen(iconPen(ink, 1.4));
-        p.setBrush(QColor(229, 231, 235, 70));
+        p.setBrush(palette.controlHoverFill);
         p.drawPath(play);
         break;
     }
@@ -582,28 +583,25 @@ void configureIconButton(QPushButton *button, const QIcon &icon, const QString &
     button->setAccessibleName(label);
 }
 
-void applyControlButtonChrome(QPushButton *button)
+void applyControlButtonChrome(QPushButton *button, const ui::ToolbarPalette &palette)
 {
     button->setFixedSize(controlButtonSize());
     button->setFocusPolicy(Qt::NoFocus);
     button->setCursor(Qt::PointingHandCursor);
     button->setStyleSheet(QStringLiteral(
-        "QPushButton {"
-        " color: #E5E7EB; background: rgba(255,255,255,16);"
-        " border: 1px solid rgba(255,255,255,24); border-radius: 10px;"
-        " padding: 0; min-width: 40px; max-width: 40px;"
-        " min-height: 36px; max-height: 36px; }"
-        "QPushButton:hover { background: rgba(45,212,191,30);"
-        " border-color: rgba(45,212,191,90); }"
-        "QPushButton[role=\"primary\"] { background: rgba(45,212,191,92);"
-        " border-color: rgba(94,234,212,150); }"
-        "QPushButton[role=\"primary\"]:hover { background: rgba(45,212,191,126);"
-        " border-color: rgba(153,246,228,190); }"
-        "QPushButton[role=\"danger\"]:hover { background: rgba(248,113,113,42);"
-        " border-color: rgba(248,113,113,105); }"
-        "QPushButton:focus { border-color: rgba(94,234,212,180); }"
-        "QPushButton:disabled { color: rgba(229,231,235,90);"
-        " background: rgba(255,255,255,8); border-color: rgba(255,255,255,14); }"));
+        "QPushButton { color: %1; background: %2; border: 1px solid %3; border-radius: 8px;"
+        " padding: 0; min-width: 40px; max-width: 40px; min-height: 36px; max-height: 36px; }"
+        "QPushButton:hover { background: %4; border-color: %5; }"
+        "QPushButton[role=\"primary\"] { background: %6; border-color: %7; }"
+        "QPushButton[role=\"primary\"]:hover { background: %4; border-color: %7; }"
+        "QPushButton[role=\"danger\"]:hover { background: %8; border-color: %9; }"
+        "QPushButton:disabled { color: %10; background: transparent; }")
+        .arg(ui::cssColor(palette.text), ui::cssColor(palette.controlFill),
+             ui::cssColor(palette.controlBorder), ui::cssColor(palette.softHoverFill),
+             ui::cssColor(palette.softHoverBorder), ui::cssColor(palette.activeFill),
+             ui::cssColor(palette.activeBorder), ui::cssColor(palette.dangerHoverFill),
+             ui::cssColor(palette.dangerHoverBorder))
+        .arg(ui::cssColor(palette.mutedText)));
 }
 
 }  // namespace markshot::scroll

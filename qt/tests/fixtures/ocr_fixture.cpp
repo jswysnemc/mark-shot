@@ -5,6 +5,14 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTextStream>
+#include <QTimer>
+
+/// @brief 输出固定文字检测框，供普通识别与受控异步识别复用
+/// @return 无返回值
+void writeFixtureOcr()
+{
+    QTextStream(stdout) << R"({"tokens":[{"text":"Hello","box":[40,40,60,40],"line":0,"index":0},{"text":"world","box":[120,40,60,40],"line":0,"index":1}]})";
+}
 
 /**
  * 【翻译测试】【固定结果】把输入 JSON 中每段文字加上目标语言前缀后原样输出，框不变
@@ -54,9 +62,24 @@ int main(int argc, char **argv)
         QTextStream(stdout) << "[]";
         return 0;
     }
+    if (args.at(1) == QStringLiteral("--ocr-gated-fixture")) {
+        // 1. 【OCR测试】【结果时序】由测试创建信号文件放行结果，不依赖机器运行速度
+        const QString readyPath = args.at(2) + QStringLiteral(".ready");
+        QTimer timer;
+        QObject::connect(&timer, &QTimer::timeout, &app, [&app, readyPath] {
+            if (QFile::exists(readyPath)) {
+                QFile::remove(readyPath);
+                writeFixtureOcr();
+                app.quit();
+            }
+        });
+        timer.start(10);
+        QTimer::singleShot(10000, &app, [&app] { app.exit(3); });
+        return app.exec();
+    }
     if (args.at(1) != QStringLiteral("--ocr-fixture")) {
         return 2;
     }
-    QTextStream(stdout) << R"({"tokens":[{"text":"Hello","box":[40,40,60,40],"line":0,"index":0},{"text":"world","box":[120,40,60,40],"line":0,"index":1}]})";
+    writeFixtureOcr();
     return 0;
 }

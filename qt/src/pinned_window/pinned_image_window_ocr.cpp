@@ -12,10 +12,23 @@
 #include <QFile>
 #include <QStandardPaths>
 #include <QTemporaryFile>
+#include <QTimer>
 
 namespace markshot::shot {
 
-void PinnedImageWindow::startOcr()
+void PinnedImageWindow::scheduleBackgroundOcr()
+{
+    // 1. 【贴图】【后台识别】先交付窗口显示和已有识别结果，再启动独立异步任务
+    QTimer::singleShot(0, this, [this] {
+        if (!isVisible() || !m_config.ocrEnabled || (!m_config.autoOcr && !m_config.textSelectionCopyEnabled)
+            || m_ocrTask || m_textSelectionOcrAttempted || !m_ocrTokens.isEmpty()) {
+            return;
+        }
+        startOcr(!m_config.autoOcr);
+    });
+}
+
+void PinnedImageWindow::startOcr(bool textSelectionOnly)
 {
     cancelOcr();
     if (!m_config.ocrEnabled) {
@@ -24,6 +37,7 @@ void PinnedImageWindow::startOcr()
         return;
     }
     m_textSelectionOcrAttempted = true;
+    m_ocrForTextSelection = textSelectionOnly;
 
     QTemporaryFile tempFile(QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation).isEmpty()
                                 ? QDir::tempPath()
@@ -88,6 +102,7 @@ void PinnedImageWindow::cancelOcr()
         m_ocrTask->deleteLater();
         m_ocrTask = nullptr;
     }
+    m_ocrForTextSelection = false;
     if (!m_ocrTempPath.isEmpty()) {
         QFile::remove(m_ocrTempPath);
         m_ocrTempPath.clear();
@@ -118,7 +133,7 @@ void PinnedImageWindow::finishOcr(markshot::providers::ProviderTask *task,
         m_copyTextAfterOcr = false;
     }
     m_ocrTask = nullptr;
-    finishDeferredTextSelection();
+    m_ocrForTextSelection = false;
     if (!m_ocrTempPath.isEmpty()) {
         QFile::remove(m_ocrTempPath);
         m_ocrTempPath.clear();
@@ -154,7 +169,7 @@ void PinnedImageWindow::applyOcrOutput(const QByteArray &output, const QByteArra
     }
     if (translateAfterOcr) {
         startTranslation(true);
-    } else if (m_config.autoTranslateAfterOcr) {
+    } else if (m_config.autoTranslateAfterOcr && !m_ocrForTextSelection) {
         // 后台自动翻译不显示忙碌光标，但完成后仍需激活译文显示（issue #80）。
         startTranslation(true, false);
     } else {
@@ -164,6 +179,10 @@ void PinnedImageWindow::applyOcrOutput(const QByteArray &output, const QByteArra
 
 void PinnedImageWindow::notifyMissingOcrBackend()
 {
+    // 1. 【贴图】【后台识别】预识别失败不打断移动，用户显式请求时再提示安装后端
+    if (m_ocrForTextSelection && !m_copyTextAfterOcr && !m_translateAfterOcr) {
+        return;
+    }
     if (m_ocrBackendWarningShown) {
         return;
     }

@@ -109,6 +109,12 @@ qt_add_executable(mark-shot
     src/main.cpp
     src/clipboard_image.cpp
     src/clipboard_image.h
+    src/clipboard_paste/clipboard_content.cpp
+    src/clipboard_paste/clipboard_content.h
+    src/clipboard_paste/clipboard_reader.cpp
+    src/clipboard_paste/clipboard_reader.h
+    src/clipboard_paste/clipboard_pin_launch.cpp
+    src/clipboard_paste/clipboard_pin_launch.h
     src/clipboard_image_config.cpp
     src/clipboard_image_config.h
     src/clipboard_image_mime_data.cpp

@@ -55,18 +55,11 @@ const QHash<QString, QString> &chineseTable()
     static const QHash<QString, QString> table = {
         // Window titles.
         {QStringLiteral("Mark Shot"), QStringLiteral("Mark Shot")},
-        {QStringLiteral("Pinned Mark Shot"), QStringLiteral("钉住的截图")},
 
         // Pinned-window context menu.
-        {QStringLiteral("Rotate Left"), QStringLiteral("向左旋转")},
-        {QStringLiteral("Rotate Right"), QStringLiteral("向右旋转")},
         {QStringLiteral("Zoom In"), QStringLiteral("放大")},
         {QStringLiteral("Zoom Out"), QStringLiteral("缩小")},
         {QStringLiteral("Reset Size"), QStringLiteral("重置大小")},
-        {QStringLiteral("Always on Top"), QStringLiteral("始终置顶")},
-        {QStringLiteral("Copy Image Text"), QStringLiteral("复制图片文字")},
-        {QStringLiteral("Copy Selected Text"), QStringLiteral("复制选中的文字")},
-        {QStringLiteral("Text Selection Copy"), QStringLiteral("拖选复制文字")},
         {QStringLiteral("Translate"), QStringLiteral("翻译")},
         {QStringLiteral("Show Original Text"), QStringLiteral("显示原文")},
         {QStringLiteral("Show Translated Text"), QStringLiteral("显示译文")},
@@ -74,7 +67,6 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Close"), QStringLiteral("关闭")},
 
         // Save dialogs.
-        {QStringLiteral("Save Pinned Image"), QStringLiteral("保存钉住的图片")},
         {QStringLiteral("Save Screenshot"), QStringLiteral("保存截图")},
         {QStringLiteral("PNG Images (*.png)"), QStringLiteral("PNG 图片 (*.png)")},
         {QStringLiteral("Screenshot saved"), QStringLiteral("截图已保存")},
@@ -400,13 +392,12 @@ const QHash<QString, QString> &chineseTable()
          QStringLiteral("调整截图窗口中紧凑工具栏的尺寸。")},
         {QStringLiteral("Icon Size"), QStringLiteral("图标大小")},
         {QStringLiteral("Font Size"), QStringLiteral("字体大小")},
-        {QStringLiteral("Pinned Image"), QStringLiteral("置顶图片")},
         {QStringLiteral("Control pinned image window behavior."),
          QStringLiteral("控制置顶图片窗口行为。")},
         {QStringLiteral("Keep pinned images above normal windows when the platform supports it."),
          QStringLiteral("平台支持时让置顶图片保持在普通窗口上方。")},
-        {QStringLiteral("Allow selecting OCR or translated text with the mouse."),
-         QStringLiteral("允许用鼠标拖选 OCR 或翻译文本。")},
+        {QStringLiteral("Recognize text in the background for selection; drag elsewhere to move."),
+         QStringLiteral("后台识别文字供拖选，拖动其他位置可移动图片。")},
         {QStringLiteral("Pinned Border"), QStringLiteral("置顶图片边框")},
         {QStringLiteral("Draw a border around pinned images."),
          QStringLiteral("在置顶图片周围绘制边框。")},
@@ -422,8 +413,8 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Enable OCR actions for pinned images."),
          QStringLiteral("启用置顶图片 OCR 操作。")},
         {QStringLiteral("Auto OCR"), QStringLiteral("自动 OCR")},
-        {QStringLiteral("Recognize text automatically after pinning."),
-         QStringLiteral("钉住图片后自动识别文字。")},
+        {QStringLiteral("Recognize automatically even when text selection is off."),
+         QStringLiteral("即使关闭文字拖选，也在贴图后自动识别。")},
         {QStringLiteral("OCR Backend"), QStringLiteral("OCR 后端")},
         {QStringLiteral("OCR Command"), QStringLiteral("OCR 命令")},
         {QStringLiteral("OCR Timeout"), QStringLiteral("OCR 超时")},
