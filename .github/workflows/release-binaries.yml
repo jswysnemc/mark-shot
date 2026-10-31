@@ -338,7 +338,12 @@ jobs:
       - name: Build
         run: cmake --build build --parallel
 
+      - name: Deploy test runtime libraries
+        run: bash qt/scripts/windows-deploy-runtime.sh "$PWD/build/qt" "$PWD/build/mark-shot.exe"
+
       - name: Test
+        env:
+          QT_FORCE_STDERR_LOGGING: '1'
         run: ctest --test-dir build --output-on-failure
 
       - name: Package install tree

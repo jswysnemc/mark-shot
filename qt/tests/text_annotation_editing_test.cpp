@@ -286,6 +286,7 @@ private slots:
     {
         QTest::addColumn<QString>("text");
         QTest::newRow("latin") << QStringLiteral("Hello world");
+        QTest::newRow("narrow") << QStringLiteral("ill!ji");
         QTest::newRow("cjk") << QStringLiteral("输入文字测试");
     }
 

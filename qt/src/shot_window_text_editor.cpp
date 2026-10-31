@@ -409,7 +409,8 @@ bool ShotWindow::applySnowTextEditorGeometryIfEnabled()
     const int insetWidth = insets.left + insets.right;
     const int insetHeight = insets.top + insets.bottom;
     const int fontHeight = m_textEditor->fontMetrics().height();
-    const int minTextWidth = std::max(1, fontHeight / 2);
+    // 空框只容纳光标，不用行高预留半个字宽，否则窄字形或回退字形的首字符不会撑开输入框
+    const int minTextWidth = std::max(1, m_textEditor->cursorWidth());
     const QRectF selection = imageRectToWidget(normalizedSelection());
 
     // 2. 已有文字从原背景框左上角开始，新文字从点击处开始，放不下最小输入框时向选区内回移

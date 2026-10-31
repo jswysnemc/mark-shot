@@ -89,6 +89,29 @@ class WindowsPackagingTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("avcodec-62.dll", result.stderr)
 
+    def test_ocr_test_runtime_includes_transitive_dependencies(self) -> None:
+        """【Windows测试】【依赖部署】把插件间接依赖放到测试入口旁，无参数和返回值。"""
+        build = self.root / "build"
+        self.app = build / "qt"
+        self.app.mkdir(parents=True)
+        self.exe = build / "mark-shot.exe"
+        self.exe.write_text("DLL Name: KERNEL32.dll\n", encoding="utf-8")
+        self.exe.chmod(0o755)
+        plugin_dir = build / "qt/plugins/ocr-rapid"
+        plugin_dir.mkdir(parents=True)
+        (plugin_dir / "mark-shot-ocr-rapid.dll").write_text(
+            "DLL Name: onnxruntime.dll\n", encoding="utf-8")
+        imports = "DLL Name: libonnx.dll\nDLL Name: KERNEL32.dll\n"
+        # 1. 【Windows测试】【已有运行时】模拟 CMake 已经复制 ONNX 本体，但没有递归部署依赖
+        (self.app / "onnxruntime.dll").write_text(imports, encoding="utf-8")
+        (self.prefix / "bin/onnxruntime.dll").write_text(imports, encoding="utf-8")
+        (self.prefix / "bin/libonnx.dll").write_text("DLL Name: libprotobuf.dll\n", encoding="utf-8")
+        (self.prefix / "bin/libprotobuf.dll").write_text("DLL Name: KERNEL32.dll\n", encoding="utf-8")
+        result = self.deploy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.app / "libonnx.dll").is_file())
+        self.assertTrue((self.app / "libprotobuf.dll").is_file())
+
     def test_closure_includes_lazy_backend(self) -> None:
         """主程序没有媒体导入时，仍部署按需后端的间接依赖，无返回值。"""
         backend = self.app / "recording"

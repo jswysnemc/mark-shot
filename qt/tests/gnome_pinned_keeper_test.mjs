@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict';
-import {PinnedWindowKeeper} from '../packaging/gnome-extension/mark-shot-scroll-helper@snemc.org/pinned-window-keeper.js';
-import {previewPalette, previewPanelStyle, previewButtonStyle} from '../packaging/gnome-extension/mark-shot-scroll-helper@snemc.org/scroll-preview-theme.js';
+import {readFile} from 'node:fs/promises';
+
+/**
+ * 【扩展测试】【模块加载】显式按 ESM 加载纯逻辑模块，不依赖新版 Node 的语法自动检测
+ * @param {string} name 扩展模块文件名
+ * @returns {Promise<object>} 模块导出对象
+ */
+async function loadExtensionModule(name) {
+    const source = await readFile(new URL(
+        `../packaging/gnome-extension/mark-shot-scroll-helper@snemc.org/${name}`, import.meta.url));
+    return import(`data:text/javascript;base64,${source.toString('base64')}`);
+}
+
+const {PinnedWindowKeeper} = await loadExtensionModule('pinned-window-keeper.js');
+const {previewPalette, previewPanelStyle, previewButtonStyle} = await loadExtensionModule('scroll-preview-theme.js');
 
 /** 【贴图测试】【信号】提供可控的 Mutter 信号替身 */
 class Signals {

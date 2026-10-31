@@ -174,6 +174,11 @@ jobs:
       - name: Build
         run: cmake --build build --parallel
 
+      - name: Deploy test runtime libraries
+        run: |
+          # OCR 测试从临时目录加载插件，入口旁须有完整依赖，不能只复制 ONNX Runtime 本体
+          bash qt/scripts/windows-deploy-runtime.sh "$PWD/build/qt" "$PWD/build/mark-shot.exe"
+
       - name: Test
         env:
           MARK_SHOT_TEST_REQUIRE_OCR_MODELS: '1'
