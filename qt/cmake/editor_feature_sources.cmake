@@ -37,7 +37,7 @@ set(MARK_SHOT_EDITOR_FEATURE_SOURCES
     src/shot_window_ruler_tool.h
     src/selection_translate/selection_translate_placement.cpp
     src/selection_translate/selection_translate_placement.h
-    src/selection_translate/selection_translate_result.h
+    src/selection_translate/selection_translate_session.h
     src/selection_translate/translate_language_popup.cpp
     src/selection_translate/translate_language_popup.h
     src/selection_translate/translate_result_bar.cpp

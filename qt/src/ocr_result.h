@@ -31,6 +31,7 @@ std::optional<QRectF> tokenRect(const QJsonObject &object);
 ParsedOutput parseOutput(const QByteArray &output, QSize imageSize = {});
 QVector<Token> tokensFromJsonOutput(const QByteArray &output, QSize imageSize = {});
 bool isNoLeadingSpacePunctuation(QChar ch);
+bool isCjkCodePoint(uint codePoint);
 bool shouldInsertSpace(const QString &previousText,
                        const QString &currentText,
                        QRectF previousRect,

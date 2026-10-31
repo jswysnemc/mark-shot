@@ -26,6 +26,10 @@ class QPainter;
 class QWheelEvent;
 class QWidget;
 
+namespace markshot::translation_layout {
+struct TranslationSeed;
+}
+
 namespace markshot::shot {
 
 inline constexpr qreal kMinSelectionSize = 8.0;
@@ -175,6 +179,12 @@ QWidget *createCodeScanResultWindow(QString text);
 /// @param screen 选区所在屏幕，为空时使用光标所在屏幕。
 /// @return 无返回值。
 void placeCodeScanResultWindow(QWidget *window, QScreen *screen);
-QWidget *createPinnedImageWindow(QImage image, std::optional<QPoint> initialTopLeft = std::nullopt);
+/// @brief 创建贴图窗口。
+/// @param image 贴图图片。
+/// @param initialTopLeft 初始全局左上角位置，未提供时居中显示。
+/// @param translationSeed 截图窗口翻译模式交出的识别结果与译文，为空或没有识别结果时贴图自行识别。
+/// @return 贴图窗口。
+QWidget *createPinnedImageWindow(QImage image, std::optional<QPoint> initialTopLeft = std::nullopt,
+                                 const markshot::translation_layout::TranslationSeed *translationSeed = nullptr);
 
 }  // namespace markshot::shot

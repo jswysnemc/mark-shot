@@ -5,22 +5,23 @@
 #include "providers/provider_task.h"
 #include "providers/translate/translate_provider_factory.h"
 #include "shell_command.h"
+#include "translation_layout/block_layout.h"
+#include "translation_layout/block_painter.h"
+#include "translation_layout/translation_exchange.h"
+#include "translation_layout/translation_seed.h"
+#include "ui/theme.h"
 
-#include <QAbstractTextDocumentLayout>
 #include <QDir>
 #include <QFile>
-#include <QFont>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QPainter>
 #include <QStandardPaths>
 #include <QTemporaryFile>
-#include <QTextDocument>
-#include <QTextOption>
 
 #include <algorithm>
 
 namespace markshot::shot {
+
+namespace layout = markshot::translation_layout;
 
 void PinnedImageWindow::startTranslation(bool activateWhenFinished, bool showBusyCursor)
 {
@@ -29,6 +30,11 @@ void PinnedImageWindow::startTranslation(bool activateWhenFinished, bool showBus
     }
     cancelTranslation();
     clearTextSelection();
+    // 1. 【置顶图片】【段落翻译】相邻行合并成段落后整句翻译，译文按段排回原文位置
+    m_translationSourceBlocks = layout::groupParagraphs(sharedOcrTokens(m_ocrTokens));
+    if (m_translationSourceBlocks.isEmpty()) {
+        return;
+    }
     m_activateTranslationWhenFinished = activateWhenFinished;
 
     QTemporaryFile inputFile(QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation).isEmpty()
@@ -41,11 +47,12 @@ void PinnedImageWindow::startTranslation(bool activateWhenFinished, bool showBus
         return;
     }
     m_translationInputPath = inputFile.fileName();
-    const QByteArray inputJson = translationInputJson();
+    const QByteArray inputJson =
+        layout::translationInputJson(m_translationSourceBlocks, m_config.translationTargetLanguage);
     inputFile.write(inputJson);
     inputFile.close();
 
-    // 1. 组装翻译请求，provider 优先链由工厂解析
+    // 2. 组装翻译请求，provider 优先链由工厂解析
     markshot::providers::TranslateTaskRequest request;
     request.inputJson = inputJson;
     request.inputPath = m_translationInputPath;
@@ -68,7 +75,7 @@ void PinnedImageWindow::startTranslation(bool activateWhenFinished, bool showBus
         request.helperProgram = defaultTranslationHelperProgram();
     }
 
-    // 2. 异步启动任务，超时由任务内部处理
+    // 3. 异步启动任务，超时由任务内部处理
     markshot::providers::ProviderTask *task = markshot::providers::createTranslateTask(request, this);
     m_translationTask = task;
     connect(task,
@@ -82,29 +89,6 @@ void PinnedImageWindow::startTranslation(bool activateWhenFinished, bool showBus
     }
     task->start(m_config.translationTimeoutMs);
     update();
-}
-
-QByteArray PinnedImageWindow::translationInputJson() const
-{
-    QJsonArray tokens;
-    for (const OcrToken &token : m_ocrTokens) {
-        QJsonObject object;
-        object.insert(QStringLiteral("text"), token.text);
-        object.insert(QStringLiteral("box"), rectToJson(token.imageRect));
-        object.insert(QStringLiteral("line"), token.line);
-        object.insert(QStringLiteral("index"), token.index);
-        object.insert(QStringLiteral("confidence"), token.confidence);
-        tokens.append(object);
-    }
-    QJsonObject root;
-    root.insert(QStringLiteral("targetLanguage"), m_config.translationTargetLanguage);
-    root.insert(QStringLiteral("tokens"), tokens);
-    return QJsonDocument(root).toJson(QJsonDocument::Compact);
-}
-
-QJsonArray PinnedImageWindow::rectToJson(QRectF rect) const
-{
-    return markshot::ocr::rectToJson(rect);
 }
 
 QString PinnedImageWindow::defaultTranslationHelperProgram() const
@@ -133,11 +117,13 @@ void PinnedImageWindow::finishTranslation(markshot::providers::ProviderTask *tas
     if (task != m_translationTask) {
         return;
     }
-    if (!output.isEmpty()) {
-        const QVector<OcrToken> tokens = tokensFromJsonOutput(output);
-        if (!tokens.isEmpty()) {
-            m_translationOverlayTokens = tokens;
-            m_translatedTokens = selectableTranslationTokens(tokens);
+    const QVector<QString> texts =
+        output.isEmpty() ? QVector<QString>() : layout::translatedBlockTexts(output, m_translationSourceBlocks, m_imageSize);
+    if (std::any_of(texts.cbegin(), texts.cend(), [](const QString &text) { return !text.trimmed().isEmpty(); })) {
+        // 1. 【置顶图片】【译文排版】在原图上取色并按段落排版，覆盖层随贴图缩放
+        setTranslationBlocks(layout::layoutTranslatedBlocks(m_pixmap.toImage(), m_translationSourceBlocks, texts,
+                                                            markshot::theme::uiFont()));
+        if (!m_translationBlocks.isEmpty()) {
             m_translationActive = m_activateTranslationWhenFinished;
             clearTextSelection();
             updateCursorForPosition(mapFromGlobal(QCursor::pos()));
@@ -164,7 +150,7 @@ void PinnedImageWindow::requestTranslation()
     if (!canRequestTranslation()) {
         return;
     }
-    if (!m_translationOverlayTokens.isEmpty()) {
+    if (!m_translationBlocks.isEmpty()) {
         setTranslationActive(true);
         return;
     }
@@ -181,7 +167,7 @@ void PinnedImageWindow::requestTranslation()
 
 void PinnedImageWindow::setTranslationActive(bool active)
 {
-    if (active && m_translationOverlayTokens.isEmpty()) {
+    if (active && m_translationBlocks.isEmpty()) {
         return;
     }
     m_translationActive = active;
@@ -245,41 +231,53 @@ QVector<PinnedImageWindow::OcrToken> PinnedImageWindow::splitTokenForSelection(c
     return splitTokens;
 }
 
+void PinnedImageWindow::setTranslationBlocks(QVector<layout::TranslatedBlock> blocks)
+{
+    m_translationBlocks = std::move(blocks);
+    QVector<OcrToken> lineTokens;
+    for (const markshot::ocr::Token &token : layout::translatedLineTokens(m_translationBlocks)) {
+        lineTokens.append({token.text, token.imageRect, token.line, token.index, token.confidence});
+    }
+    m_translatedTokens = selectableTranslationTokens(lineTokens);
+}
+
+void PinnedImageWindow::applyTranslationSeed(const layout::TranslationSeed &seed)
+{
+    if (seed.sourceTokens.isEmpty()) {
+        return;
+    }
+    // 1. 【置顶图片】【译文交接】直接使用截图窗口的识别结果，自动识别不再启动
+    cancelOcr();
+    cancelTranslation();
+    m_textSelectionOcrAttempted = true;
+    m_ocrTokens.clear();
+    for (const markshot::ocr::Token &token : seed.sourceTokens) {
+        m_ocrTokens.append({token.text, token.imageRect, token.line, token.index, token.confidence});
+    }
+    m_ocrSelectionTokens = selectableTranslationTokens(m_ocrTokens);
+
+    // 2. 已排好的译文作为覆盖层，原文与译文之间沿用右键菜单切换
+    setTranslationBlocks(seed.blocks);
+    m_translationActive = seed.showTranslation && !m_translationBlocks.isEmpty();
+    clearTextSelection();
+    if (m_translationBlocks.isEmpty() && m_config.autoTranslateAfterOcr) {
+        startTranslation(true, false);
+    }
+    update();
+}
+
 void PinnedImageWindow::drawTranslationOverlay(QPainter &painter) const
 {
-    painter.save();
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setRenderHint(QPainter::TextAntialiasing, true);
-    for (const OcrToken &token : m_translationOverlayTokens) {
-        const QRectF textRect = imageToWidget(token.imageRect).adjusted(-3.0, -2.0, 3.0, 2.0);
-        if (textRect.isEmpty()) {
-            continue;
-        }
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor(255, 255, 255, 232));
-        painter.drawRoundedRect(textRect, 2.0, 2.0);
-        QFont font = painter.font();
-        const int pixelSize = std::clamp(qRound(textRect.height() * 0.62), 8, 28);
-        font.setPixelSize(pixelSize);
-        QTextDocument document;
-        document.setDefaultFont(font);
-        document.setDocumentMargin(1.0);
-        document.setTextWidth(textRect.width());
-        QTextOption option;
-        option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
-        document.setDefaultTextOption(option);
-        document.setPlainText(token.text);
-        painter.save();
-        painter.setClipRect(textRect);
-        painter.translate(textRect.topLeft());
-        // 背景固定为浅色，文字颜色必须显式指定深色；否则 Dark Theme 的全局
-        // palette 会把文字渲染成接近白色，导致译文不可见（issue #81）。
-        QAbstractTextDocumentLayout::PaintContext context;
-        context.palette.setColor(QPalette::Text, QColor(17, 24, 39));
-        context.clip = QRectF(QPointF(0.0, 0.0), textRect.size());
-        document.documentLayout()->draw(&painter, context);
-        painter.restore();
+    if (m_translationBlocks.isEmpty() || m_imageSize.isEmpty()) {
+        return;
     }
+    // 1. 画笔换到图片像素坐标，译文随贴图缩放；底板和文字颜色取自原图，不受全局深色主题影响（issue #81）
+    const QRectF displayRect = displayedImageRect();
+    painter.save();
+    painter.setClipRect(displayRect, Qt::IntersectClip);
+    painter.translate(displayRect.topLeft());
+    painter.scale(displayRect.width() / m_imageSize.width(), displayRect.height() / m_imageSize.height());
+    layout::paintTranslatedBlocks(painter, m_translationBlocks);
     painter.restore();
 }
 

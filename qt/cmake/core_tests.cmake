@@ -54,6 +54,7 @@ include(cmake/debug_tests.cmake)
 include(cmake/provider_tests.cmake)
 include(cmake/marketplace_tests.cmake)
 include(cmake/memory_tests.cmake)
+include(cmake/translation_layout_tests.cmake)
 include(cmake/settings_tests.cmake)
 
 qt_add_executable(mark-shot-startup-default-color-test

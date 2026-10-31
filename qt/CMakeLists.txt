@@ -89,6 +89,7 @@ include(cmake/settings_sources.cmake)
 include(cmake/shot_window_sources.cmake)
 include(cmake/capture_history_sources.cmake)
 include(cmake/memory_sources.cmake)
+include(cmake/translation_layout_sources.cmake)
 mark_shot_optimize_cold_sources(${MARK_SHOT_SETTINGS_SOURCES} ${MARK_SHOT_MARKETPLACE_SOURCES}
     src/main.cpp src/ui/i18n.cpp src/ui/i18n_task_windows.cpp src/ui/i18n_annotation_tools.cpp)
 
@@ -214,6 +215,7 @@ qt_add_executable(mark-shot
     src/shell_command.h
     src/ocr_result.cpp
     src/ocr_result.h
+    ${MARK_SHOT_TRANSLATION_LAYOUT_SOURCES}
     src/save_path_config.cpp
     src/save_path_config.h
     src/selection_history.cpp

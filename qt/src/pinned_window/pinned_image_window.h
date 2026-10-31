@@ -2,6 +2,8 @@
 
 #include "pinned_window/pinned_resize_controller.h"
 #include "shot_window_internal.h"
+#include "translation_layout/paragraph_blocks.h"
+#include "translation_layout/translated_block.h"
 
 #include <QByteArray>
 #include <QImage>
@@ -28,9 +30,10 @@ class QKeyEvent;
 class QMouseEvent;
 class QPaintEvent;
 class QWheelEvent;
+class SelectionTranslateTest;
 
-namespace markshot::ocr {
-struct Token;
+namespace markshot::translation_layout {
+struct TranslationSeed;
 }
 
 namespace markshot::providers {
@@ -45,6 +48,8 @@ class PinnedLayerShellDragPreview;
 
 /// @brief 提供置顶图片显示、文本识别、文本选择、翻译和边界缩放的窗口。
 class PinnedImageWindow final : public QWidget {
+    friend class ::SelectionTranslateTest;
+
 public:
     /// @brief 表示单个 OCR 文字块的边界和文本。
     struct OcrToken {
@@ -71,6 +76,11 @@ public:
     /// @brief 使用当前显示方向的图片打开图片编辑视图，贴图窗口保持不变。
     /// @return 新建的图片编辑窗口，图片为空时返回空指针。
     ShotWindow *openImageEditor();
+
+    /// @brief 使用截图窗口翻译模式交出的识别结果与译文，不再重新识别；没有识别结果时不做任何事
+    /// @param seed 坐标相对贴图图片的识别结果、译文和当前是否显示译文
+    /// @return 无返回值
+    void applyTranslationSeed(const markshot::translation_layout::TranslationSeed &seed);
 
 protected:
     /// @brief 处理窗口激活状态并在需要时重新置顶。
@@ -300,19 +310,10 @@ private:
     /// @return 解析得到的 token 列表。
     QVector<OcrToken> tokensFromJsonOutput(const QByteArray &output) const;
 
-    /// @brief 启动翻译子进程。
+    /// @brief 把识别结果合并成段落后启动翻译子进程。
     /// @param activateWhenFinished 翻译完成后是否直接显示译文。
     /// @param showBusyCursor 是否显示忙碌光标。
     void startTranslation(bool activateWhenFinished = true, bool showBusyCursor = true);
-
-    /// @brief 构建翻译子进程输入 JSON。
-    /// @return 翻译输入 JSON。
-    QByteArray translationInputJson() const;
-
-    /// @brief 将矩形转换为 OCR JSON 数组。
-    /// @param rect 图片坐标系矩形。
-    /// @return JSON 数组。
-    QJsonArray rectToJson(QRectF rect) const;
 
     /// @brief 返回默认翻译辅助程序路径。
     /// @return 翻译辅助程序路径。
@@ -415,10 +416,15 @@ private:
     /// @param active 是否显示忙碌光标。
     void setTranslationBusyCursor(bool active);
 
-    /// @brief 将翻译 token 拆分成可选择 token。
-    /// @param tokens 翻译覆盖层 token。
+    /// @brief 将 OCR 或译文行 token 按字符拆分成可选择 token。
+    /// @param tokens OCR 或译文行 token。
     /// @return 可选择 token 列表。
     QVector<OcrToken> selectableTranslationTokens(const QVector<OcrToken> &tokens) const;
+
+    /// @brief 使用排好的译文段落作为翻译覆盖层，并生成可拖选的译文 token。
+    /// @param blocks 排好的译文段落，图片像素坐标。
+    /// @return 无返回值。
+    void setTranslationBlocks(QVector<markshot::translation_layout::TranslatedBlock> blocks);
 
     /// @brief 将单个翻译 token 按字符拆分。
     /// @param token 翻译 token。
@@ -446,7 +452,9 @@ private:
     PinnedWindowConfig m_config;
     QVector<OcrToken> m_ocrTokens;
     QVector<OcrToken> m_translatedTokens;
-    QVector<OcrToken> m_translationOverlayTokens;
+    // 翻译覆盖层：排好的译文段落，以及本次送去翻译的原文段落
+    QVector<markshot::translation_layout::TranslatedBlock> m_translationBlocks;
+    QVector<markshot::translation_layout::SourceBlock> m_translationSourceBlocks;
     markshot::providers::ProviderTask *m_ocrTask = nullptr;
     markshot::providers::ProviderTask *m_translationTask = nullptr;
     QString m_ocrTempPath;

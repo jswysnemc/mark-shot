@@ -35,6 +35,7 @@ set(MARK_SHOT_WINDOW_SOURCES
     src/shot_window_code_scan_result_window.cpp
     src/shot_window_startup_tool_routing.cpp
     src/shot_window_selection_translate.cpp
+    src/shot_window_selection_translate_tasks.cpp
     src/shot_window_config.cpp
     src/shot_window_display_capture.cpp
     src/shot_window_double_click_action.cpp

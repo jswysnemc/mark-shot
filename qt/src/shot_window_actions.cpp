@@ -1,5 +1,7 @@
 #include "shot_window_module.h"
 #include "shot_window_ruler_painter.h"
+#include "shot_window_selection_translate.h"
+#include "translation_layout/translation_seed.h"
 
 #include <QScopedValueRollback>
 #include <QScopeGuard>
@@ -142,7 +144,9 @@ void ShotWindow::pinSelection()
         return;
     }
 
-    QImage output = renderedSelection();
+    // 1. 【截图】【转贴图】翻译模式下贴原图，识别结果与译文交给贴图窗口的原文译文切换
+    markshot::translation_layout::TranslationSeed translationSeed;
+    QImage output = ShotWindowSelectionTranslate(*this).renderSelectionForPin(&translationSeed);
     if (output.isNull()) {
         return;
     }
@@ -157,7 +161,7 @@ void ShotWindow::pinSelection()
     const std::optional<QPoint> pinnedTopLeft = logicalSelection.isEmpty()
         ? std::nullopt
         : std::optional<QPoint>(logicalSelection.topLeft());
-    auto *window = createPinnedImageWindow(output, pinnedTopLeft);
+    auto *window = createPinnedImageWindow(output, pinnedTopLeft, &translationSeed);
     markshot::history::rememberScreenshot(output);
     presentPinnedImage(window);
     close();

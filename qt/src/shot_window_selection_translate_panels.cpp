@@ -3,7 +3,6 @@
 #include "shot_window_module.h"
 
 #include "selection_translate/selection_translate_placement.h"
-#include "selection_translate/selection_translate_result.h"
 #include "selection_translate/translate_language_popup.h"
 #include "selection_translate/translate_result_bar.h"
 #include "translation_language_options.h"
@@ -12,10 +11,31 @@
 using namespace markshot::shot;
 namespace translate = markshot::selection_translate;
 
-void ShotWindowSelectionTranslate::openLanguagePopup()
+namespace {
+
+/**
+ * 查找目标语言的界面名称。
+ * @param value 实际传给翻译器的语言名称。
+ * @return 内置语言返回当前界面语言的名称，自定义语言原样返回。
+ */
+QString languageLabel(const QString &value)
+{
+    for (const markshot::TranslationLanguageOption &option : markshot::translationLanguageOptions()) {
+        if (option.value == value) {
+            return option.label;
+        }
+    }
+    return value;
+}
+
+}  // namespace
+
+void ShotWindowSelectionTranslate::openLanguagePopup(bool anchorToResultBar)
 {
     m_window.commitTextEditor();
-    if (!m_window.hasUsableSelection() || m_window.m_mode != ShotWindow::Mode::Editing) {
+    const std::optional<translate::SelectionTranslateSession> &session =
+        m_window.m_controls.m_selectionTranslateSession;
+    if (m_window.m_mode != ShotWindow::Mode::Editing || (!session && !m_window.hasUsableSelection())) {
         return;
     }
     translate::TranslateLanguagePopup *popup = languagePopup();
@@ -38,9 +58,17 @@ void ShotWindowSelectionTranslate::openLanguagePopup()
         }
     }
 
-    // 3. 当前目标语言打勾，弹层贴着翻译按钮；按钮不可见时退回侧边面板位置
-    popup->setLanguages(markshot::translationLanguageOptions(), config.translationTargetLanguage);
+    // 3. 当前目标语言打勾：翻译模式内取正在显示的语言，否则取配置
+    popup->setLanguages(markshot::translationLanguageOptions(),
+                        session ? session->language : config.translationTargetLanguage);
     const QSize popupSize = popup->sizeHint();
+
+    // 4. 从译文浮条打开时贴着浮条上下弹出；否则贴着翻译按钮，按钮不可见时退回侧边面板位置
+    const translate::TranslateResultBar *bar = m_window.m_controls.m_translateResultBar;
+    if (anchorToResultBar && bar && bar->isVisible()) {
+        popup->popup(translate::languagePopupGeometry(bar->geometry(), false, popupSize, m_window.rect()));
+        return;
+    }
     bool verticalToolbar = true;
     const QRect anchor = translateButtonRect(&verticalToolbar);
     const QRect geometry = anchor.isEmpty()
@@ -51,19 +79,22 @@ void ShotWindowSelectionTranslate::openLanguagePopup()
 
 void ShotWindowSelectionTranslate::copyTranslation()
 {
-    const std::optional<translate::SelectionTranslateResult> &result = m_window.m_controls.m_selectionTranslation;
-    if (!result) {
+    const std::optional<translate::SelectionTranslateSession> &session =
+        m_window.m_controls.m_selectionTranslateSession;
+    const translate::SelectionTranslation *translation = session ? session->current() : nullptr;
+    if (!translation) {
         return;
     }
-    m_window.showToast(markshot::copyTextToClipboard(result->translatedText) ? MS_TR("Translation copied")
-                                                                            : MS_TR("Copy failed"));
+    m_window.showToast(markshot::copyTextToClipboard(translation->text) ? MS_TR("Translation copied")
+                                                                       : MS_TR("Copy failed"));
 }
 
 void ShotWindowSelectionTranslate::updateResultBar()
 {
-    const std::optional<translate::SelectionTranslateResult> &result = m_window.m_controls.m_selectionTranslation;
-    const bool visible = result && m_window.m_mode == ShotWindow::Mode::Editing && m_window.hasUsableSelection()
-        && m_window.normalizedSelection().intersects(QRectF(result->imageRect));
+    const std::optional<translate::SelectionTranslateSession> &session =
+        m_window.m_controls.m_selectionTranslateSession;
+    const bool visible = session && m_window.m_mode == ShotWindow::Mode::Editing && m_window.hasUsableSelection()
+        && m_window.normalizedSelection().intersects(QRectF(session->imageRect));
     if (!visible) {
         if (m_window.m_controls.m_translateResultBar) {
             m_window.m_controls.m_translateResultBar->hide();
@@ -73,7 +104,8 @@ void ShotWindowSelectionTranslate::updateResultBar()
 
     // 1. 【框选翻译】【译文浮条】浮条贴在译文区域旁边，避开工具栏、属性栏和选区尺寸提示
     translate::TranslateResultBar *bar = resultBar();
-    bar->setLanguageLabel(result->languageLabel);
+    bar->setLanguageLabel(languageLabel(session->language));
+    bar->setShowingTranslation(session->showingTranslation && session->current());
     QVector<QRect> obstacles;
     for (const QWidget *panel : {m_window.m_controls.m_toolbar, m_window.m_controls.m_actionToolbar,
                                  m_window.m_controls.m_annotationPropertyPanel, m_window.m_selectionSizePanel}) {
@@ -81,7 +113,7 @@ void ShotWindowSelectionTranslate::updateResultBar()
             obstacles.append(panel->geometry());
         }
     }
-    const QRect region = m_window.imageRectToWidget(QRectF(result->imageRect)).toAlignedRect();
+    const QRect region = m_window.imageRectToWidget(QRectF(session->imageRect)).toAlignedRect();
     bar->setGeometry(translate::resultBarGeometry(region, bar->sizeHint(), m_window.rect(), obstacles));
     bar->show();
     bar->raise();
@@ -120,10 +152,16 @@ translate::TranslateResultBar *ShotWindowSelectionTranslate::resultBar() const
     if (!bar) {
         ShotWindow *window = &m_window;
         bar = new translate::TranslateResultBar(window->m_toolbarAppearance.palette, window);
+        // 1. 浮条上的语言、原文译文切换、复制和退出分别交给翻译模式处理
+        QObject::connect(bar, &translate::TranslateResultBar::languageRequested, window,
+                         [window] { ShotWindowSelectionTranslate(*window).openLanguagePopup(true); });
+        QObject::connect(bar, &translate::TranslateResultBar::viewChanged, window, [window](bool showTranslation) {
+            ShotWindowSelectionTranslate(*window).setShowingTranslation(showTranslation);
+        });
         QObject::connect(bar, &translate::TranslateResultBar::copyRequested, window,
                          [window] { ShotWindowSelectionTranslate(*window).copyTranslation(); });
-        QObject::connect(bar, &translate::TranslateResultBar::restoreRequested, window,
-                         [window] { ShotWindowSelectionTranslate(*window).restoreOriginal(); });
+        QObject::connect(bar, &translate::TranslateResultBar::exitRequested, window,
+                         [window] { ShotWindowSelectionTranslate(*window).exitTranslation(); });
     }
     return bar;
 }

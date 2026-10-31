@@ -140,13 +140,16 @@ void ShotWindow::updateToolbarState()
         return;
     }
 
-    // 1. 汇总当前工具、截图范围与排列方向对应的选中动作
+    // 1. 汇总当前工具、截图范围、排列方向与翻译模式对应的选中动作
     QSet<QString> activeActions{currentToolName()};
     if (m_fullscreenAnnotation) {
         activeActions.insert(markshot::ui::actionName(Action::ToggleCaptureScope));
     }
     if (m_controls.m_toolbarVerticalLayout) {
         activeActions.insert(markshot::ui::actionName(Action::ToggleToolbarLayout));
+    }
+    if (m_controls.m_selectionTranslateSession) {
+        activeActions.insert(markshot::ui::actionName(Action::Translate));
     }
     // 2. 主副工具栏统一应用，组件只重绘状态变化的按钮
     m_controls.m_toolbarPanel->setActiveActions(activeActions);

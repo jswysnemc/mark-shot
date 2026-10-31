@@ -122,7 +122,12 @@ PinnedImageWindow::PinnedImageWindow(QImage image, std::optional<QPoint> initial
         setPinnedGeometry(m_logicalGeometry, false);
     }
     if (m_config.autoOcr) {
-        QTimer::singleShot(0, this, [this] { startOcr(); });
+        // 截图窗口已交出识别结果时不再重复识别
+        QTimer::singleShot(0, this, [this] {
+            if (m_ocrTokens.isEmpty()) {
+                startOcr();
+            }
+        });
     }
     applyPinnedNonWindowChromeIfEnabled();
     applyPinnedShadowLayoutIfEnabled();
@@ -448,7 +453,7 @@ void PinnedImageWindow::contextMenuEvent(QContextMenuEvent *event)
         m_translationActive ? MS_TR("Show Original Text") : MS_TR("Show Translated Text"),
         this,
         [this] { setTranslationActive(!m_translationActive); });
-    toggleTranslationAction->setEnabled(!m_translationOverlayTokens.isEmpty() && !m_translationTask);
+    toggleTranslationAction->setEnabled(!m_translationBlocks.isEmpty() && !m_translationTask);
     menu.addAction(MS_TR("Save As"), this, [this] { saveImageAs(); });
     menu.addSeparator();
     QAction *closeAction = menu.addAction(MS_TR("Close"), this, &QWidget::close);
@@ -490,7 +495,7 @@ void PinnedImageWindow::rotateImage(qreal degrees)
     m_ocrTokens.clear();
     m_ocrSelectionTokens.clear();
     m_translatedTokens.clear();
-    m_translationOverlayTokens.clear();
+    m_translationBlocks.clear();
     m_translationActive = false;
     m_translateAfterOcr = false;
     m_copyTextAfterOcr = false;
@@ -614,7 +619,7 @@ void PinnedImageWindow::setTranslationTargetLanguage(QString targetLanguage)
 
     // 目标语言变化后旧译文不再可信,清空缓存并等待用户再次请求翻译
     cancelTranslation();
-    m_translationOverlayTokens.clear();
+    m_translationBlocks.clear();
     m_translatedTokens.clear();
     m_translationActive = false;
     update();
