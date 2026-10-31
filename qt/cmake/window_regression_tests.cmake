@@ -12,7 +12,7 @@ add_dependencies(mark-shot-shell-command-test mark-shot-ocr-fixture)
 add_test(NAME shell-command COMMAND mark-shot-shell-command-test -o -,txt)
 
 # 2. 【窗口测试】【真实入口】复用应用对象，按功能分别检查实际窗口行为
-foreach(window_test IN ITEMS pinned-text-selection capture-history-window settings-idle-repaint settings-card-pages arrow-properties selection-hover-repaint selection-history-restore text-annotation-editing ruler-annotation ruler-rotation toolbar-dock-window toolbar-theme capture-memory canvas-image-memory)
+foreach(window_test IN ITEMS pinned-text-selection capture-history-window settings-idle-repaint settings-card-pages arrow-properties selection-hover-repaint selection-history-restore text-annotation-editing ruler-annotation ruler-rotation toolbar-dock-window toolbar-theme selection-translate capture-memory canvas-image-memory)
     string(REPLACE "-" "_" source_name "${window_test}")
     qt_add_executable(mark-shot-${window_test}-test
         tests/${source_name}_test.cpp
@@ -40,6 +40,8 @@ add_test(NAME canvas-image-memory-hidpi COMMAND mark-shot-canvas-image-memory-te
 set_tests_properties(canvas-image-memory-hidpi PROPERTIES TIMEOUT 30
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_STYLE_OVERRIDE=Fusion;QT_SCALE_FACTOR=2")
 
-target_compile_definitions(mark-shot-pinned-text-selection-test PRIVATE
-    MARK_SHOT_TEST_OCR_FIXTURE_PATH="$<TARGET_FILE:mark-shot-ocr-fixture>")
-add_dependencies(mark-shot-pinned-text-selection-test mark-shot-ocr-fixture)
+foreach(fixture_test IN ITEMS pinned-text-selection selection-translate)
+    target_compile_definitions(mark-shot-${fixture_test}-test PRIVATE
+        MARK_SHOT_TEST_OCR_FIXTURE_PATH="$<TARGET_FILE:mark-shot-ocr-fixture>")
+    add_dependencies(mark-shot-${fixture_test}-test mark-shot-ocr-fixture)
+endforeach()

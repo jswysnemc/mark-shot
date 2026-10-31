@@ -2,6 +2,7 @@
 #include "shot_window_qt_fwd.h"
 #include "capture_toolbar_position.h"
 #include "display_capture/display_capture_target.h"
+#include "selection_translate/selection_translate_result.h"
 #include <QPoint>
 #include <QRect>
 #include <QRectF>
@@ -10,6 +11,7 @@
 class QWidget;
 namespace markshot::ui { class ColorPicker; class CompactToolbar; }
 namespace markshot::display_capture { class DisplayCapturePicker; }
+namespace markshot::selection_translate { class TranslateLanguagePopup; class TranslateResultBar; }
 /// @brief 【Qt界面】【控件组合】管理截图窗口控件；所有权仍归 Qt 父子对象树
 struct ShotWindowControls {
     // Persistent widgets owned by the annotation window. Their geometry is
@@ -60,6 +62,10 @@ struct ShotWindowControls {
     bool m_propertyColorEditingTextBackground = false;
     QWidget *m_openWithPanel = nullptr;
     QWidget *m_extensionPanel = nullptr;
+    // 框选翻译的目标语言弹层、译文浮条和已写回的译文，首次翻译时创建
+    markshot::selection_translate::TranslateLanguagePopup *m_translateLanguagePopup = nullptr;
+    markshot::selection_translate::TranslateResultBar *m_translateResultBar = nullptr;
+    std::optional<markshot::selection_translate::SelectionTranslateResult> m_selectionTranslation;
     QWidget *m_startupColorPanel = nullptr;
     markshot::display_capture::DisplayCapturePicker *m_displayCapturePicker = nullptr;
     QVector<markshot::display_capture::Target> m_displayCaptureTargets;

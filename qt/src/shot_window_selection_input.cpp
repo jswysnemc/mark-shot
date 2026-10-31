@@ -1,6 +1,7 @@
 #include "shot_window_module.h"
 
 #include "selection_adjustment.h"
+#include "shot_window_selection_translate.h"
 #include "selection_cursor_nudge.h"
 
 using namespace markshot::shot;
@@ -101,6 +102,7 @@ void ShotWindow::beginSelection(QPointF imagePoint)
     m_selectionStart = imagePoint;
     m_selection = QRectF(imagePoint, imagePoint);
     // 2. 【截图】【选区创建】隐藏旧选区相关的编辑控件
+    ShotWindowSelectionTranslate(*this).hidePanels();
     if (m_textEditor) {
         m_textEditor->hide();
         m_textEditor->clear();

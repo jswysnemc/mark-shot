@@ -1,7 +1,10 @@
 #include "shot_window_module.h"
 
+#include "shot_window_selection_translate.h"
 #include "toolbar_dock_layout.h"
 #include "ui/compact_toolbar.h"
+
+#include <QScopeGuard>
 
 using namespace markshot::shot;
 
@@ -164,6 +167,8 @@ void ShotWindow::updateToolbarGeometry()
 /// @return 无返回值
 void ShotWindow::updateActionToolbarGeometry()
 {
+    // 【框选翻译】【译文浮条】浮条避让两条工具栏，副工具栏摆好后再刷新
+    const auto updateTranslateResultBar = qScopeGuard([this] { ShotWindowSelectionTranslate(*this).updateResultBar(); });
     if (!m_controls.m_actionToolbar || !hasUsableSelection() || m_fullscreenAnnotation) {
         return;
     }

@@ -559,7 +559,6 @@ const QHash<QString, QString> &chineseTable()
          QStringLiteral("OCR 模型已就绪：%1。若本次会话已使用过 OCR，请重启 Mark Shot。")},
         {QStringLiteral("Translation"), QStringLiteral("翻译")},
         {QStringLiteral("Translation timed out"), QStringLiteral("翻译超时")},
-        {QStringLiteral("Translation applied"), QStringLiteral("已写入译文")},
         {QStringLiteral("Debug"), QStringLiteral("调试")},
         {QStringLiteral("Configure diagnostic logging for troubleshooting."),
          QStringLiteral("配置用于排障的诊断日志。")},

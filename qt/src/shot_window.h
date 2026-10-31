@@ -65,6 +65,8 @@ class ShotWindow final : public QWidget {
     friend class RulerRotationTest;
     friend class ShotWindowRulerTool;
     friend class ShotWindowRulerPainter;
+    friend class ShotWindowSelectionTranslate;
+    friend class SelectionTranslateTest;
 
 public:
     using Action = markshot::shot::types::Action;
