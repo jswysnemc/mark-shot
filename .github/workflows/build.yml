@@ -177,6 +177,8 @@ jobs:
       - name: Test
         env:
           MARK_SHOT_TEST_REQUIRE_OCR_MODELS: '1'
+          # QtTest 在没有控制台窗口时把输出写到 OutputDebugString，CI 日志里看不到失败断言
+          QT_FORCE_STDERR_LOGGING: '1'
         run: |
           cmake -DMODEL_DIRECTORY="$PWD/build/ocr-test-models" -P qt/scripts/download-ocr-test-models.cmake
           export MARK_SHOT_OCR_MODEL_DIR="$(cygpath -m "$PWD/build/ocr-test-models")"
