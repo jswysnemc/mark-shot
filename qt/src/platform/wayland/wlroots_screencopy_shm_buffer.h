@@ -76,6 +76,18 @@ public:
      */
     void reset();
 
+    /**
+     * 【录制】【映射寿命】在 Wayland 连接关闭前解除协议对象，保留仍被帧引用的像素映射。
+     * 必须在采集线程调用，后续只允许读取已发布的像素；无参数和返回值。
+     */
+    void releaseWaylandBuffer();
+
+    /** 返回当前像素映射字节数，不包含协议对象或内核开销，无参数。 */
+    qsizetype byteSize() const { return m_size; }
+
+    /** 检查 format、width、height、stride 是否与当前有效缓冲一致，返回是否可直接复用。 */
+    bool matches(std::uint32_t format, int width, int height, int stride) const;
+
 private:
     wl_buffer *m_buffer = nullptr;
     void *m_data = nullptr;

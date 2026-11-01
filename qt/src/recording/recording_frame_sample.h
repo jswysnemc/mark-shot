@@ -12,6 +12,7 @@ struct RecordingFrameSample {
     QImage image;
     RecordingRawBgraFrame bgra;
     qint64 timestampMs = 0;
+    // 【录制】【帧标识】正序号在同一会话标识不可变画面，心跳沿用原值；零表示未知
     qint64 sequence = 0;
 
     /**

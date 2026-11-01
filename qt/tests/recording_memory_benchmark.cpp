@@ -36,7 +36,13 @@ bool waitUntil(const std::function<bool()> &ready, int timeoutMs)
 /** 用 pool 生成尺寸为 size、编号为 index、帧率为 fps 的固定图案帧，返回共享 BGRA 载荷。 */
 RecordingFrameSample createFrame(RecordingBgraBufferPool &pool, QSize size, int index, int fps)
 {
-    QByteArray &buffer = pool.acquire(static_cast<qsizetype>(size.width()) * size.height() * 4);
+    QByteArray *slot = nullptr;
+    if (!waitUntil([&] {
+            return slot || (slot = pool.tryAcquire(recordingBgraFrameBytes(size))) != nullptr;
+        }, 30000)) {
+        return {};
+    }
+    QByteArray &buffer = *slot;
     auto *pixels = reinterpret_cast<QRgb *>(buffer.data());
     for (int y = 0; y < size.height(); ++y) {
         for (int x = 0; x < size.width(); ++x) {

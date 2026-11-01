@@ -161,10 +161,16 @@ bool VideoRecordingWriter::writeSampleWithPacing(const RecordingFrameSample &sam
         return false;
     }
 
-    const int duplicates = m_pacer.duplicatesBefore(sample.timestampMs);
+    const auto decision = m_pacer.plan(sample.timestampMs);
+    if (decision.frameIndex < 0) {
+        if (error) {
+            error->clear();
+        }
+        return true;
+    }
     if (m_writtenFrames > 0) {
         // 补帧复用编码器内上一帧已转换像素，避免重复执行 sws_scale 放大写线程负载
-        for (int i = 0; i < duplicates; ++i) {
+        for (int i = 0; i < decision.repeatCount; ++i) {
             if (!m_libavProcess.writeRepeatFrame(error)) {
                 return false;
             }
@@ -172,7 +178,7 @@ bool VideoRecordingWriter::writeSampleWithPacing(const RecordingFrameSample &sam
         }
     }
 
-    if (!m_libavProcess.writeFrame(sample, error)) {
+    if (!m_libavProcess.writeFrame(sample, error, decision.frameIndex)) {
         return false;
     }
     ++m_writtenFrames;

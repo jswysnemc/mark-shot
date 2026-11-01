@@ -1,5 +1,7 @@
 #include "platform/wayland/wlroots_screencopy_capture_stream.h"
 
+#include "recording/recording_frame_handoff.h"
+
 #include <QProcessEnvironment>
 
 #include <memory>
@@ -53,19 +55,24 @@ public:
         if (m_thread.isRunning()) {
             return true;
         }
+        m_handoff = std::make_unique<RecordingFrameHandoff>(this);
+        connect(m_handoff.get(), &RecordingFrameHandoff::frameReady,
+                this, &RecordingCaptureStream::frameReady);
+        connect(m_handoff.get(), &RecordingFrameHandoff::failed,
+                this, &RecordingCaptureStream::failed);
         m_worker = new WlrootsScreencopyWorker(m_options);
         m_worker->moveToThread(&m_thread);
         connect(&m_thread, &QThread::finished, m_worker, &QObject::deleteLater);
         connect(m_worker,
                 &WlrootsScreencopyWorker::frameReady,
-                this,
-                &RecordingCaptureStream::frameReady,
-                Qt::QueuedConnection);
+                m_handoff.get(),
+                [publish = m_handoff->publisher()](const RecordingFrameSample &sample) { publish(sample); },
+                Qt::DirectConnection);
         connect(m_worker,
                 &WlrootsScreencopyWorker::failed,
-                this,
-                &RecordingCaptureStream::failed,
-                Qt::QueuedConnection);
+                m_handoff.get(),
+                [fail = m_handoff->errorPublisher()](const QString &error) { fail(error); },
+                Qt::DirectConnection);
         m_thread.start();
 
         QString workerError;
@@ -92,6 +99,10 @@ public:
      */
     void stop() override
     {
+        // 1. 【录制】【帧交接】先归还尚未交付的映射帧，再等待采集线程释放 Wayland 对象
+        if (m_handoff) {
+            m_handoff->close();
+        }
         if (m_thread.isRunning() && m_worker) {
             QMetaObject::invokeMethod(m_worker,
                                       [this] { m_worker->stop(); },
@@ -111,6 +122,9 @@ public:
      */
     void setBackpressureActive(bool active) override
     {
+        if (m_handoff) {
+            m_handoff->setEnabled(!active);
+        }
         if (!m_thread.isRunning() || !m_worker) {
             return;
         }
@@ -128,6 +142,7 @@ private:
     RecordingOptions m_options;
     QThread m_thread;
     WlrootsScreencopyWorker *m_worker = nullptr;
+    std::unique_ptr<RecordingFrameHandoff> m_handoff;
 };
 
 #endif

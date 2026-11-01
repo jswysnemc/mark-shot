@@ -76,9 +76,10 @@ public:
      * 写入一帧录制样本。
      * @param sample 录制帧样本。
      * @param error 输出错误信息。
+     * @param frameIndex 固定帧率时间格序号，-1 表示顺序写入。
      * @return 写入成功时返回 true。
      */
-    bool writeFrame(const RecordingFrameSample &sample, QString *error);
+    bool writeFrame(const RecordingFrameSample &sample, QString *error, qint64 frameIndex);
 
     /**
      * 复用上一帧已转换数据补写一帧，跳过像素转换。
@@ -306,13 +307,15 @@ bool LibavRecordingProcessPrivate::openVideo(const RecordingVideoEncoderOptions 
 #endif
 }
 
-bool LibavRecordingProcessPrivate::writeFrame(const RecordingFrameSample &sample, QString *error)
+bool LibavRecordingProcessPrivate::writeFrame(const RecordingFrameSample &sample, QString *error,
+                                              qint64 frameIndex)
 {
     if (error) {
         error->clear();
     }
 #ifndef HAVE_LIBAV_RECORDING
     Q_UNUSED(sample)
+    Q_UNUSED(frameIndex)
     return failWith(error, QStringLiteral("FFmpeg libraries are not linked"));
 #else
     if (!m_started) {
@@ -320,6 +323,9 @@ bool LibavRecordingProcessPrivate::writeFrame(const RecordingFrameSample &sample
     }
     if (m_audioFailed) {
         return failWith(error, QStringLiteral("libav audio capture or encoding failed"));
+    }
+    if (frameIndex >= 0 && frameIndex < m_nextPts) {
+        return failWith(error, QStringLiteral("libav video timestamp must be monotonic"));
     }
     startAudioCaptureIfNeeded();
 
@@ -330,6 +336,8 @@ bool LibavRecordingProcessPrivate::writeFrame(const RecordingFrameSample &sample
     if (!fillVideoFrame(bytes, error)) {
         return false;
     }
+    // 1. 【录制】【视频时间轴】显式序号保留大间隔，避免追帧上限把视频缩短
+    m_nextPts = frameIndex >= 0 ? frameIndex : m_nextPts;
     m_frame->pts = m_nextPts++;
 
     // 硬件编码需要把系统内存帧上传到显存后再送入编码器
@@ -544,6 +552,10 @@ bool LibavRecordingProcessPrivate::encodeFrame(AVFrame *frame, QString *error)
                             QStringLiteral("Failed to receive packet from libav encoder: %1")
                                 .arg(libavErrorText(result)));
         }
+        // 1. 【录制】【视频时间轴】部分编码器不填写包时长，MP4 末帧必须至少占一个时间格
+        if (m_packet->duration <= 0) {
+            m_packet->duration = 1;
+        }
         av_packet_rescale_ts(m_packet, m_codecContext->time_base, m_stream->time_base);
         m_packet->stream_index = m_stream->index;
         const bool written = m_muxer.writePacket(m_packet, error);
@@ -602,9 +614,10 @@ bool LibavRecordingProcess::start(const RecordingOptions &options,
     return m_impl->start(options, encoder, frameSize, fps, error);
 }
 
-bool LibavRecordingProcess::writeFrame(const RecordingFrameSample &sample, QString *error)
+bool LibavRecordingProcess::writeFrame(const RecordingFrameSample &sample, QString *error,
+                                       qint64 frameIndex)
 {
-    return m_impl->writeFrame(sample, error);
+    return m_impl->writeFrame(sample, error, frameIndex);
 }
 
 bool LibavRecordingProcess::writeRepeatFrame(QString *error)

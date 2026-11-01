@@ -1,46 +1,82 @@
 #include "recording/recording_bgra_buffer_pool.h"
 
+#include <algorithm>
+#include <limits>
+
 namespace markshot::recording {
 
-QByteArray &RecordingBgraBufferPool::acquire(qsizetype byteCount)
+RecordingBgraBufferPool::RecordingBgraBufferPool(quint64 budgetBytes)
+    : m_budgetBytes(budgetBytes)
 {
-    // 1. 【录制】【帧缓冲】优先复用最近使用且未共享的槽位，使多余槽位能够持续闲置
-    int selected = -1;
-    for (int offset = 0; offset < kSlotCount; ++offset) {
-        const int index = (m_cursor + offset) % kSlotCount;
-        if (m_slots[index].isDetached()) {
-            selected = index;
-            break;
-        }
-    }
-
-    // 2. 【录制】【帧缓冲】全部被共享时只解除池的引用，不复制或覆写下游仍持有的数据
-    if (selected < 0) {
-        selected = (m_cursor + 1) % kSlotCount;
-        m_slots[selected] = QByteArray();
-    }
-    m_cursor = selected;
-    QByteArray &buffer = m_slots[selected];
-    // 3. 【录制】【帧缓冲】分辨率显著降低时重新分配，避免 resize 保留原来大帧的容量
-    if (byteCount < buffer.capacity() / 2) buffer = QByteArray();
-    buffer.resize(byteCount);
-    reclaimIdleSlots(selected);
-    return buffer;
 }
 
-void RecordingBgraBufferPool::reclaimIdleSlots(int activeSlot)
+QByteArray *RecordingBgraBufferPool::tryAcquire(qsizetype byteCount, qint64 nowMs)
 {
-    for (int index = 0; index < kSlotCount; ++index) {
-        if (index == activeSlot || !m_slots[index].isDetached()) {
-            m_idleAcquisitions[index] = 0;
-            continue;
-        }
-        // 【录制】【帧缓冲】跨过一段连续闲置期才回收，短时抖动仍能复用已有分配
-        if (++m_idleAcquisitions[index] >= kIdleRetentionAcquisitions) {
-            m_slots[index] = QByteArray();
-            m_idleAcquisitions[index] = 0;
+    if (byteCount <= 0 || byteCount > std::numeric_limits<int>::max()
+        || byteCount > std::numeric_limits<qsizetype>::max() / kSlotCount) {
+        return nullptr;
+    }
+    reclaimIdle(nowMs);
+    // 1. 【录制】【帧缓冲】只复用未被共享的存储，不解除借出槽位来绕过预算
+    for (int offset = 0; offset < kSlotCount; ++offset) {
+        const int index = (m_cursor + offset) % kSlotCount;
+        if (m_slots[index].isDetached() && m_slots[index].size() == byteCount) {
+            m_cursor = index;
+            m_idleSince[index] = -1;
+            return &m_slots[index];
         }
     }
+
+    // 2. 【录制】【帧缓冲】尺寸改变时立即清除空闲旧布局，借出的旧分辨率帧继续占用预算
+    int selected = -1;
+    quint64 heldBytes = 0;
+    quint64 largestHeld = 0;
+    for (int index = 0; index < kSlotCount; ++index) {
+        auto &slot = m_slots[index];
+        if (slot.isEmpty() || slot.isDetached()) {
+            slot = {};
+            if (selected < 0) selected = index;
+        } else {
+            heldBytes += static_cast<quint64>(slot.capacity());
+            largestHeld = std::max(largestHeld, static_cast<quint64>(slot.capacity()));
+        }
+    }
+    const quint64 budget = recordingEffectiveCaptureBudget(byteCount, largestHeld, m_budgetBytes);
+    if (selected < 0 || heldBytes > budget || static_cast<quint64>(byteCount) > budget - heldBytes) {
+        return nullptr;
+    }
+
+    // 3. 【录制】【帧缓冲】按请求尺寸分配，不使用 resize 的几何增长策略
+    QByteArray buffer(byteCount, Qt::Uninitialized);
+    if (static_cast<quint64>(buffer.capacity()) > budget - heldBytes) {
+        return nullptr;
+    }
+    m_slots[selected] = std::move(buffer);
+    m_cursor = selected;
+    m_idleSince[selected] = -1;
+    return &m_slots[selected];
+}
+
+void RecordingBgraBufferPool::reclaimIdle(qint64 nowMs)
+{
+    for (int index = 0; index < kSlotCount; ++index) {
+        if (m_slots[index].isEmpty() || !m_slots[index].isDetached()) {
+            m_idleSince[index] = -1;
+            continue;
+        }
+        if (m_idleSince[index] < 0) {
+            m_idleSince[index] = nowMs;
+        } else if (nowMs - m_idleSince[index] >= kRecordingCaptureIdleMs) {
+            m_slots[index] = {};
+            m_idleSince[index] = -1;
+        }
+    }
+}
+
+void RecordingBgraBufferPool::reset()
+{
+    m_slots = {};
+    m_idleSince.fill(-1);
 }
 
 qsizetype RecordingBgraBufferPool::retainedCapacity() const

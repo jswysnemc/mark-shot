@@ -171,7 +171,17 @@ void WlrootsScreencopyWorker::requestFrame()
         return;
     }
 
-    // 1. 【录制】【wlroots采集】根据录制区域决定请求整个输出或输出内局部区域
+    // 1. 【录制】【wlroots采集】请求前按绝对时间格等待，避免按合成器刷新率不断复制 SHM
+    const qint64 nowMs = m_clock.elapsed();
+    const qint64 delayMs = m_capturePacer.delayBeforeNext(nowMs);
+    if (delayMs > 0) {
+        m_captureTimer->start(static_cast<int>(delayMs));
+        return;
+    }
+    m_captureTimer->stop();
+    m_capturePacer.plan(nowMs);
+
+    // 2. 【录制】【wlroots采集】根据录制区域决定请求整个输出或输出内局部区域
     const QRect outputGeometry = m_selectedOutput->geometry;
     const QRect requested = m_options.captureGeometry.normalized();
     const bool useRegion = requested.isValid() && !requested.isEmpty()
@@ -201,7 +211,7 @@ void WlrootsScreencopyWorker::requestFrame()
         emit failed(QStringLiteral("failed to create wlroots screencopy frame"));
         return;
     }
-    // 2. 【录制】【wlroots采集】注册 frame 回调并交给 compositor 异步复制
+    // 3. 【录制】【wlroots采集】注册 frame 回调并交给 compositor 异步复制
     m_capturePending = true;
     m_yInvert = false;
     m_hasPendingBuffer = false;
@@ -237,8 +247,8 @@ void WlrootsScreencopyWorker::copyPendingFrame()
         emit failed(error);
         return;
     }
-    // 2. 【录制】【wlroots采集】优先使用带 damage 的复制接口，旧协议回退普通 copy
-    if (m_screencopyVersion >= 2) {
+    // 2. 【录制】【wlroots采集】首帧必须立即复制，静止桌面重启会话不能等待新的 damage
+    if (m_screencopyVersion >= 2 && m_sequence > 0) {
         zwlr_screencopy_frame_v1_copy_with_damage(m_frame, m_currentBuffer->buffer());
     } else {
         zwlr_screencopy_frame_v1_copy(m_frame, m_currentBuffer->buffer());

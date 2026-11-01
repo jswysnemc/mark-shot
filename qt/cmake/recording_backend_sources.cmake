@@ -15,6 +15,8 @@ set(MARK_SHOT_LIBAV_BACKEND_SOURCES
     src/recording/audio/wasapi_audio_capture_reader.h
     src/recording/gif_recording_writer.cpp
     src/recording/gif_recording_writer.h
+    src/recording/libav/libav_gif_frame_cache.cpp
+    src/recording/libav/libav_gif_frame_cache.h
     src/recording/libav/libav_gif_palette_filter.cpp
     src/recording/libav/libav_gif_palette_filter.h
     src/recording/libav/libav_hw_encoder_context.cpp

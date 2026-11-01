@@ -269,6 +269,8 @@ void PortalPipeWireScreencast::stop()
     m_nodeId = 0;
     m_targetObject.clear();
     m_cursorIncluded = false;
+    m_rawBufferPool.reset();
+    m_rawReclaimPending = false;
     m_frameCount = 0;
     m_frameErrorCount = 0;
     m_droppedFrameCount = 0;
@@ -277,6 +279,20 @@ void PortalPipeWireScreencast::stop()
     m_latestFrameTimeMs = 0;
     m_streamGeometry = {};
     m_negotiatedStreamGeometry = {};
+}
+
+void PortalPipeWireScreencast::reclaimRawBuffers()
+{
+    if (!m_loop || m_rawReclaimPending.exchange(true)) return;
+    // 1. 【录制】【空闲回收】回收在采集循环执行，主线程不等待 GPU；最多保留一个维护请求
+    const int result = pw_loop_invoke(pw_thread_loop_get_loop(m_loop),
+        [](spa_loop *, bool, uint32_t, const void *, size_t, void *data) {
+            auto *self = static_cast<PortalPipeWireScreencast *>(data);
+            self->m_rawBufferPool.reclaimIdle();
+            self->m_rawReclaimPending = false;
+            return 0;
+        }, SPA_ID_INVALID, nullptr, 0, false, this);
+    if (result < 0) m_rawReclaimPending = false;
 }
 
 bool PortalPipeWireScreencast::start(const CaptureRequest &request, QString *error)

@@ -1,4 +1,6 @@
 set(MARK_SHOT_RECORDING_SOURCES
+    src/recording/recording_capture_memory_policy.cpp
+    src/recording/recording_capture_memory_policy.h
     src/recording/recording_memory_policy.cpp
     src/recording/recording_memory_policy.h
     src/recording/audio/audio_input_device_list.cpp
@@ -29,6 +31,8 @@ set(MARK_SHOT_RECORDING_SOURCES
     src/recording/recording_frame_converter.h
     src/recording/recording_frame_payload.cpp
     src/recording/recording_frame_payload.h
+    src/recording/recording_frame_handoff.cpp
+    src/recording/recording_frame_handoff.h
     src/recording/recording_frame_heartbeat.cpp
     src/recording/recording_frame_heartbeat.h
     src/recording/recording_frame_pacer.cpp

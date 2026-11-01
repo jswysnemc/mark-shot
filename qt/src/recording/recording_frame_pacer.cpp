@@ -1,6 +1,7 @@
 #include "recording/recording_frame_pacer.h"
 
 #include <algorithm>
+#include <limits>
 
 namespace markshot::recording {
 
@@ -11,33 +12,51 @@ RecordingFramePacer::RecordingFramePacer(int fps)
 
 void RecordingFramePacer::reset(int fps)
 {
-    const int safeFps = std::max(1, fps);
-    m_intervalUs = std::max<qint64>(1, 1000000 / safeFps);
-    m_maxCatchUpFrames = std::max(1, safeFps * 10);
-    m_nextFrameUs = 0;
+    m_fps = std::max(1, fps);
+    m_originMs = 0;
+    m_nextFrame = 0;
     m_started = false;
 }
 
-int RecordingFramePacer::duplicatesBefore(qint64 timestampMs)
+RecordingFramePacer::Decision RecordingFramePacer::plan(qint64 timestampMs)
 {
-    const qint64 timestampUs = std::max<qint64>(0, timestampMs) * 1000;
+    const qint64 timestamp = std::max<qint64>(0, timestampMs);
     if (!m_started) {
         m_started = true;
-        m_nextFrameUs = timestampUs + m_intervalUs;
+        m_originMs = timestamp;
+        m_nextFrame = 1;
+        return {0, 0};
+    }
+    if (timestamp < m_originMs) {
+        return {};
+    }
+
+    // 1. 【录制】【帧率对齐】使用绝对有理数时间格，兼容采集端向下取整的毫秒时间戳
+    const qint64 elapsed = timestamp - m_originMs;
+    const qint64 seconds = elapsed / 1000;
+    if (seconds >= std::numeric_limits<qint64>::max() / m_fps - 1) {
+        return {};
+    }
+    const qint64 frame = seconds * m_fps + ((elapsed % 1000 + 1) * m_fps - 1) / 1000;
+    if (frame < m_nextFrame) {
+        return {};
+    }
+
+    // 2. 【录制】【帧率对齐】限制追帧工作量，但保留真实序号，长时间断流不再压缩时间轴
+    const auto repeats = std::min({frame - m_nextFrame, m_fps * 10,
+                                  static_cast<qint64>(std::numeric_limits<int>::max())});
+    m_nextFrame = frame + 1;
+    return {frame, static_cast<int>(repeats)};
+}
+
+qint64 RecordingFramePacer::delayBeforeNext(qint64 timestampMs) const
+{
+    if (!m_started) {
         return 0;
     }
-
-    int duplicates = 0;
-    const qint64 halfIntervalUs = m_intervalUs / 2;
-    while (m_nextFrameUs + halfIntervalUs < timestampUs
-           && duplicates < m_maxCatchUpFrames) {
-        ++duplicates;
-        m_nextFrameUs += m_intervalUs;
-    }
-
-    m_nextFrameUs = std::max(m_nextFrameUs + m_intervalUs,
-                             timestampUs + m_intervalUs);
-    return duplicates;
+    const qint64 nextMs = m_nextFrame / m_fps * 1000 + m_nextFrame % m_fps * 1000 / m_fps;
+    const qint64 elapsed = std::max<qint64>(0, timestampMs) - m_originMs;
+    return std::max<qint64>(0, nextMs - elapsed);
 }
 
 }  // namespace markshot::recording

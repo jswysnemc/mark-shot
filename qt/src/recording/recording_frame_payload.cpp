@@ -1,4 +1,5 @@
 #include "recording/recording_frame_payload.h"
+#include "recording/recording_capture_memory_policy.h"
 
 #include <cstdlib>
 
@@ -10,10 +11,10 @@ namespace markshot::recording {
  */
 bool RecordingRawBgraFrame::isValid() const
 {
-    if (size.isEmpty() || std::abs(stride) < size.width() * 4) {
+    const qsizetype minimumBytes = stride == 0 ? 0 : recordingBgraFrameBytes(size, stride);
+    if (minimumBytes == 0) {
         return false;
     }
-    const qsizetype minimumBytes = static_cast<qsizetype>(std::abs(stride)) * size.height();
     if (mappedData && mappedSize >= minimumBytes) {
         return true;
     }

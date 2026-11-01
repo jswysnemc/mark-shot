@@ -20,6 +20,8 @@ if(MARK_SHOT_LINUX AND PipeWire_FOUND)
     qt_add_executable(mark-shot-screencast-authorization-test
         tests/screencast_authorization_test.cpp
         src/screen_capture_pipewire_screencast.cpp
+        src/recording/recording_bgra_buffer_pool.cpp
+        src/recording/recording_capture_memory_policy.cpp
         src/screen_capture_portal_guard.cpp
         src/portal/screencast_persistence.cpp
         src/portal/screencast_restore_store.cpp

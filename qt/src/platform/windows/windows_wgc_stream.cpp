@@ -3,8 +3,10 @@
 #include "debug_log.h"
 #include "platform/windows/windows_wgc_support.h"
 #include "recording/recording_bgra_buffer_pool.h"
+#include "recording/recording_frame_pacer.h"
 
 #include <QElapsedTimer>
+#include <QTimer>
 
 #include <atomic>
 #include <cstring>
@@ -35,6 +37,7 @@ struct StreamState {
     std::mutex frameMutex;
     winrt::com_ptr<ID3D11Texture2D> staging;
     markshot::recording::RecordingBgraBufferPool bgraPool;
+    markshot::recording::RecordingFramePacer capturePacer;
     UINT stagingWidth = 0;
     UINT stagingHeight = 0;
     DXGI_FORMAT stagingFormat = DXGI_FORMAT_UNKNOWN;
@@ -104,11 +107,13 @@ bool ensureStagingTexture(const std::shared_ptr<StreamState> &state,
  * 【录制】【Windows采集】把 WGC 帧复制为连续 BGRA 数据。
  * @param state 采集状态。
  * @param frame WGC 帧。
+ * @param timestampMs 复制前的采集时间，避免读回耗时改变时间轴。
  * @param error 输出错误信息。
  * @return 成功时返回 BGRA 帧。
  */
 std::optional<WindowsWgcFrame> readFrameToBgra(const std::shared_ptr<StreamState> &state,
                                                const Capture::Direct3D11CaptureFrame &frame,
+                                               qint64 timestampMs,
                                                QString *error)
 {
     const Direct3D11::IDirect3DSurface surface = frame.Surface();
@@ -141,7 +146,19 @@ std::optional<WindowsWgcFrame> readFrameToBgra(const std::shared_ptr<StreamState
         return std::nullopt;
     }
 
-    std::lock_guard<std::mutex> lock(state->frameMutex);
+    const QSize frameSize(static_cast<int>(desc.Width), static_cast<int>(desc.Height));
+    const QRect sourceCrop = state->cropPixels.intersected(QRect(QPoint(0, 0), frameSize));
+    const QRect crop = sourceCrop.isEmpty() ? QRect(QPoint(0, 0), frameSize) : sourceCrop;
+    const qsizetype byteCount = markshot::recording::recordingBgraFrameBytes(crop.size());
+    if (!byteCount) {
+        if (error) *error = QStringLiteral("Windows Graphics Capture returned invalid frame dimensions");
+        return std::nullopt;
+    }
+    // 1. 【录制】【采集预算】预算耗尽时不创建 staging 纹理，也不执行 GPU 读回
+    QByteArray *bgra = state->bgraPool.tryAcquire(byteCount);
+    if (!bgra) return std::nullopt;
+    const int rowBytes = crop.width() * 4;
+
     if (!ensureStagingTexture(state, desc, error)) {
         return std::nullopt;
     }
@@ -157,17 +174,11 @@ std::optional<WindowsWgcFrame> readFrameToBgra(const std::shared_ptr<StreamState
         return std::nullopt;
     }
 
-    const QSize frameSize(static_cast<int>(desc.Width), static_cast<int>(desc.Height));
-    const QRect sourceCrop = state->cropPixels.intersected(QRect(QPoint(0, 0), frameSize));
-    const QRect crop = sourceCrop.isEmpty() ? QRect(QPoint(0, 0), frameSize) : sourceCrop;
-    const int rowBytes = crop.width() * 4;
-    // 复用池化缓冲承接 staging 纹理数据，避免每帧新分配整帧内存
-    QByteArray &bgra = state->bgraPool.acquire(static_cast<qsizetype>(rowBytes) * crop.height());
     for (int y = 0; y < crop.height(); ++y) {
         const auto *source = static_cast<const uchar *>(mapped.pData)
             + mapped.RowPitch * (crop.y() + y)
             + crop.x() * 4;
-        std::memcpy(bgra.data() + static_cast<qsizetype>(rowBytes) * y,
+        std::memcpy(bgra->data() + static_cast<qsizetype>(rowBytes) * y,
                     source,
                     static_cast<std::size_t>(rowBytes));
     }
@@ -175,10 +186,10 @@ std::optional<WindowsWgcFrame> readFrameToBgra(const std::shared_ptr<StreamState
     state->bundle.context->Unmap(state->staging.get(), 0);
 
     WindowsWgcFrame output;
-    output.bgra = bgra;
+    output.bgra = *bgra;
     output.size = crop.size();
     output.stride = rowBytes;
-    output.timestampMs = state->elapsed.isValid() ? state->elapsed.elapsed() : 0;
+    output.timestampMs = timestampMs;
     return output;
 }
 
@@ -202,18 +213,22 @@ void handleFrameArrived(const std::weak_ptr<StreamState> &weakState,
             reportStreamError(state, QStringLiteral("Windows Graphics Capture frame was empty"));
             return;
         }
-        // 写出队列繁忙时在纹理读回前丢弃帧，避免为将被丢弃的帧支付拷贝成本
+        // 1. 【录制】【Windows采集】串行保护节奏器和纹理，在 GPU 读回前丢弃背压及超额帧
+        std::lock_guard<std::mutex> lock(state->frameMutex);
         if (state->backpressure.load(std::memory_order_relaxed)) {
+            return;
+        }
+        const qint64 timestampMs = state->elapsed.elapsed();
+        if (state->capturePacer.plan(timestampMs).frameIndex < 0) {
             return;
         }
 
         QString error;
-        std::optional<WindowsWgcFrame> bgra = readFrameToBgra(state, frame, &error);
+        std::optional<WindowsWgcFrame> bgra = readFrameToBgra(state, frame, timestampMs, &error);
         if (!bgra) {
-            reportStreamError(state,
-                              error.isEmpty()
-                                  ? QStringLiteral("Windows Graphics Capture frame read failed")
-                                  : error);
+            if (!error.isEmpty()) {
+                reportStreamError(state, error);
+            }
             return;
         }
 
@@ -232,6 +247,17 @@ void handleFrameArrived(const std::weak_ptr<StreamState> &weakState,
 
 class WindowsWgcStream::Private {
 public:
+    /** 在拥有采集会话的线程安排空闲回收，不依赖 FrameArrived 继续到达。 */
+    Private()
+    {
+        m_reclaimTimer.setInterval(1000);
+        QObject::connect(&m_reclaimTimer, &QTimer::timeout, &m_reclaimTimer, [this] {
+            if (!m_state) return;
+            std::unique_lock lock(m_state->frameMutex, std::try_to_lock);
+            if (lock.owns_lock()) m_state->bgraPool.reclaimIdle();
+        });
+    }
+
     /**
      * 【录制】【Windows采集】启动 WGC 长生命周期采集。
      * @param request 捕获请求。
@@ -298,6 +324,7 @@ public:
             m_state->onError = std::move(onError);
             m_state->cropPixels = crop;
             m_state->outputSize = crop.size();
+            m_state->capturePacer.reset(request.targetFps);
             m_state->elapsed.start();
             m_state->running = true;
 
@@ -328,6 +355,7 @@ public:
                 });
             m_hasFrameToken = true;
             m_session.StartCapture();
+            m_reclaimTimer.start();
 
             markshot::debugLog("recording",
                                "【录制】【Windows采集】started mode=wgc-stream geometry=%d,%d %dx%d frame=%dx%d crop=%d,%d %dx%d",
@@ -357,6 +385,7 @@ public:
      */
     void stop()
     {
+        m_reclaimTimer.stop();
         if (m_state) {
             m_state->running = false;
         }
@@ -399,6 +428,7 @@ public:
 
 private:
     std::shared_ptr<StreamState> m_state;
+    QTimer m_reclaimTimer;
     Capture::GraphicsCaptureItem m_item{nullptr};
     Capture::Direct3D11CaptureFramePool m_framePool{nullptr};
     Capture::GraphicsCaptureSession m_session{nullptr};

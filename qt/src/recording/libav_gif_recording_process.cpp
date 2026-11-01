@@ -8,6 +8,7 @@
 #include <algorithm>
 
 #ifdef HAVE_LIBAV_RECORDING
+#include "recording/libav/libav_gif_frame_cache.h"
 #include "recording/libav/libav_muxer.h"
 #include "recording/libav/libav_video_scaler.h"
 
@@ -119,10 +120,11 @@ private:
 
     /**
      * 把已填充的输入帧送去量化并编码。
+     * @param sequence 输入样本的采集序号，用于心跳帧复用。
      * @param error 输出错误信息。
      * @return 处理成功时返回 true。
      */
-    bool quantizeAndEncode(QString *error);
+    bool quantizeAndEncode(qint64 sequence, QString *error);
 
     /**
      * 计算帧在 GIF 时间基上的 pts。
@@ -141,6 +143,7 @@ private:
 #ifdef HAVE_LIBAV_RECORDING
     LibavMuxer m_muxer;
     LibavVideoScaler m_scaler;
+    LibavGifFrameCache m_frameCache;
     AVCodecContext *m_codecContext = nullptr;
     AVStream *m_stream = nullptr;
     AVFrame *m_frame = nullptr;
@@ -276,7 +279,7 @@ int64_t LibavGifRecordingProcess::Private::nextPtsFor(qint64 timestampMs)
     return pts;
 }
 
-bool LibavGifRecordingProcess::Private::quantizeAndEncode(QString *error)
+bool LibavGifRecordingProcess::Private::quantizeAndEncode(qint64 sequence, QString *error)
 {
 #ifdef HAVE_LIBAVFILTER
     // 逐帧生成局部调色板后再编码
@@ -294,8 +297,15 @@ bool LibavGifRecordingProcess::Private::quantizeAndEncode(QString *error)
         if (!encodeFrame(quantized, error)) {
             return false;
         }
+        // 1. 【录制】【GIF复用】编码后才共享引用，避免提前改变编码器的可写性判断
+        // 2. 【录制】【GIF复用】仅缓存本次输入的输出，滤镜延迟结果不能冒用新序号
+        if (quantized->pts == m_frame->pts) {
+            m_frameCache.remember(quantized, sequence);
+        }
     }
 #else
+    // 1. 【录制】【GIF复用】固定调色板转换的逐帧结果未通过一致性验证，保留原路径
+    Q_UNUSED(sequence)
     return encodeFrame(m_frame, error);
 #endif
 }
@@ -342,6 +352,15 @@ bool LibavGifRecordingProcess::Private::writeFrame(const RecordingFrameSample &s
     if (!m_started) {
         return failWith(error, QStringLiteral("GIF writer is not started"));
     }
+    if (!sample.hasFrameData()) {
+        return failWith(error, QStringLiteral("Cannot write an empty GIF frame"));
+    }
+    // 1. 【录制】【GIF复用】心跳沿用采集序号，仅更新时间戳，不再转换和量化像素
+    if (AVFrame *cached = m_frameCache.find(sample.sequence)) {
+        cached->pts = nextPtsFor(sample.timestampMs);
+        return encodeFrame(cached, error);
+    }
+    m_frameCache.clear();
 
     const RecordingBgraFrame bytes = bgraBytesForSample(sample, error);
     if (!bytes.data || bytes.size <= 0) {
@@ -359,7 +378,7 @@ bool LibavGifRecordingProcess::Private::writeFrame(const RecordingFrameSample &s
         return false;
     }
     m_frame->pts = nextPtsFor(sample.timestampMs);
-    return quantizeAndEncode(error);
+    return quantizeAndEncode(sample.sequence, error);
 #endif
 }
 
@@ -437,6 +456,7 @@ void LibavGifRecordingProcess::Private::cleanup()
     m_paletteFilter.close();
 #endif
 #ifdef HAVE_LIBAV_RECORDING
+    m_frameCache.clear();
     m_scaler.reset();
     if (m_frame) {
         av_frame_free(&m_frame);

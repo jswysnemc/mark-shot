@@ -1,3 +1,24 @@
+include(cmake/recording_wayland_tests.cmake)
+
+qt_add_executable(mark-shot-recording-frame-handoff-test
+    tests/recording_frame_handoff_test.cpp
+    src/recording/recording_frame_handoff.cpp
+    src/recording/recording_frame_handoff.h
+    src/recording/recording_frame_payload.cpp
+)
+target_include_directories(mark-shot-recording-frame-handoff-test PRIVATE src)
+target_link_libraries(mark-shot-recording-frame-handoff-test PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
+add_test(NAME recording-frame-handoff COMMAND mark-shot-recording-frame-handoff-test)
+
+qt_add_executable(mark-shot-recording-frame-pacer-test
+    tests/recording_frame_pacer_test.cpp
+    src/recording/recording_frame_pacer.cpp
+    src/recording/recording_frame_pacer.h
+)
+target_include_directories(mark-shot-recording-frame-pacer-test PRIVATE src)
+target_link_libraries(mark-shot-recording-frame-pacer-test PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME recording-frame-pacer COMMAND mark-shot-recording-frame-pacer-test)
+
 qt_add_executable(mark-shot-recording-portal-reentry-test
     tests/recording_portal_reentry_test.cpp
     src/recording/recording_display_source.h
@@ -84,6 +105,7 @@ add_test(NAME recording-video-encoder-options COMMAND mark-shot-recording-video-
 
 qt_add_executable(mark-shot-recording-bgra-buffer-pool-test
     tests/recording_bgra_buffer_pool_test.cpp
+    src/recording/recording_capture_memory_policy.cpp
     src/recording/recording_bgra_buffer_pool.cpp
     src/recording/recording_bgra_buffer_pool.h
 )
@@ -187,6 +209,8 @@ if(FFmpegLibav_FOUND)
         src/recording/libav_error.h
         src/recording/libav/libav_gif_palette_filter.cpp
         src/recording/libav/libav_gif_palette_filter.h
+        src/recording/libav/libav_gif_frame_cache.cpp
+        src/recording/libav/libav_gif_frame_cache.h
         src/recording/libav/libav_hw_encoder_context.cpp
         src/recording/libav/libav_hw_encoder_context.h
         src/recording/libav/libav_muxer.cpp
@@ -303,3 +327,5 @@ target_link_libraries(mark-shot-pipewire-dmabuf-policy-test
         Qt6::Test
 )
 add_test(NAME pipewire-dmabuf-policy COMMAND mark-shot-pipewire-dmabuf-policy-test)
+
+include(cmake/recording_gif_tests.cmake)

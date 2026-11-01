@@ -3,6 +3,7 @@
 #include "debug_log.h"
 
 #include <QSocketNotifier>
+#include <QTimer>
 
 #include <utility>
 
@@ -17,6 +18,13 @@ namespace markshot::recording {
 WlrootsScreencopyWorker::WlrootsScreencopyWorker(RecordingOptions options)
     : m_options(std::move(options))
 {
+    m_captureTimer = new QTimer(this);
+    m_captureTimer->setSingleShot(true);
+    m_captureTimer->setTimerType(Qt::PreciseTimer);
+    connect(m_captureTimer, &QTimer::timeout, this, &WlrootsScreencopyWorker::requestFrame);
+    m_reclaimTimer = new QTimer(this);
+    m_reclaimTimer->setInterval(1000);
+    connect(m_reclaimTimer, &QTimer::timeout, this, [this] { m_buffers.reclaimIdle(); });
 }
 
 /**
@@ -97,7 +105,13 @@ bool WlrootsScreencopyWorker::start(QString *error)
     m_notifier = new QSocketNotifier(wl_display_get_fd(m_display), QSocketNotifier::Read, this);
     connect(m_notifier, &QSocketNotifier::activated, this, &WlrootsScreencopyWorker::dispatchEvents);
     m_running = true;
+    m_sequence = 0;
+    m_basePresentationUs = -1;
+    m_failedFrames = 0;
+    m_backpressureActive = false;
+    m_capturePacer.reset(m_options.fps);
     m_clock.start();
+    m_reclaimTimer->start();
     requestFrame();
     markshot::debugLog("recording",
                        "【录制】【wlroots采集】started output=%s geometry=%d,%d %dx%d",
@@ -127,6 +141,9 @@ void WlrootsScreencopyWorker::stop()
 void WlrootsScreencopyWorker::setBackpressureActive(bool active)
 {
     m_backpressureActive = active;
+    if (m_backpressureActive) {
+        m_captureTimer->stop();
+    }
     if (!m_backpressureActive) {
         requestFrame();
     }
@@ -155,6 +172,8 @@ void WlrootsScreencopyWorker::dispatchEvents()
  */
 void WlrootsScreencopyWorker::cleanup()
 {
+    m_captureTimer->stop();
+    m_reclaimTimer->stop();
     // 1. 【录制】【wlroots采集】先停止 Qt 事件源，避免清理期间继续分发 Wayland 事件
     if (m_notifier) {
         m_notifier->setEnabled(false);
@@ -164,10 +183,7 @@ void WlrootsScreencopyWorker::cleanup()
     // 2. 【录制】【wlroots采集】按依赖顺序释放 frame、buffer、output 和全局对象
     destroyCurrentFrame();
     m_currentBuffer.reset();
-    if (!m_buffers.waitUntilIdle(2000)) {
-        markshot::debugLog("recording",
-                           "【录制】【wlroots缓冲池】等待缓冲归还超时");
-    }
+    // 3. 【录制】【映射寿命】像素映射可被下游继续持有，协议对象必须在连接关闭前清理
     m_buffers.reset();
     for (std::unique_ptr<WlrootsOutput> &output : m_outputs) {
         if (output->output) {

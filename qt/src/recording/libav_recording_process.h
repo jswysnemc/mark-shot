@@ -37,9 +37,10 @@ public:
      * 写入一帧录制样本。
      * @param sample 录制帧样本。
      * @param error 输出错误信息。
+     * @param frameIndex 固定帧率时间格序号，-1 表示紧接上一帧；跳号保留断流期间的真实时间。
      * @return 写入成功时返回 true。
      */
-    bool writeFrame(const RecordingFrameSample &sample, QString *error);
+    bool writeFrame(const RecordingFrameSample &sample, QString *error, qint64 frameIndex = -1);
 
     /**
      * 复用上一帧已转换数据补写一帧，跳过像素转换。

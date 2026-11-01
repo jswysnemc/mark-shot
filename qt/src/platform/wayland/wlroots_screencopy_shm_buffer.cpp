@@ -1,4 +1,5 @@
 #include "platform/wayland/wlroots_screencopy_shm_buffer.h"
+#include "recording/recording_capture_memory_policy.h"
 
 #ifdef HAVE_WLROOTS_SCREENCOPY
 #include <wayland-client.h>
@@ -89,7 +90,8 @@ bool WlrootsScreencopyShmBuffer::ensure(wl_shm *shm,
     }
     return false;
 #else
-    if (!shm || width <= 0 || height <= 0 || stride < width * 4) {
+    const qsizetype size = stride <= 0 ? 0 : recordingBgraFrameBytes(QSize(width, height), stride);
+    if (!shm || size == 0) {
         if (error) {
             *error = QStringLiteral("invalid wl_shm buffer parameters");
         }
@@ -101,7 +103,6 @@ bool WlrootsScreencopyShmBuffer::ensure(wl_shm *shm,
         }
         return false;
     }
-    const qsizetype size = static_cast<qsizetype>(stride) * height;
     if (m_buffer && m_format == format && m_width == width
         && m_height == height && m_stride == stride && m_size == size) {
         return true;
@@ -154,6 +155,11 @@ bool WlrootsScreencopyShmBuffer::ensure(wl_shm *shm,
 wl_buffer *WlrootsScreencopyShmBuffer::buffer() const
 {
     return m_buffer;
+}
+
+bool WlrootsScreencopyShmBuffer::matches(std::uint32_t format, int width, int height, int stride) const
+{
+    return m_buffer && m_format == format && m_width == width && m_height == height && m_stride == stride;
 }
 
 QImage WlrootsScreencopyShmBuffer::toImage(bool yInvert, QString *error) const
@@ -300,11 +306,8 @@ RecordingRawBgraFrame WlrootsScreencopyShmBuffer::mappedBgraFrame(std::shared_pt
 
 void WlrootsScreencopyShmBuffer::reset()
 {
+    releaseWaylandBuffer();
 #ifdef HAVE_WLROOTS_SCREENCOPY
-    if (m_buffer) {
-        wl_buffer_destroy(m_buffer);
-        m_buffer = nullptr;
-    }
     if (m_data && m_size > 0) {
         ::munmap(m_data, m_size);
     }
@@ -315,6 +318,16 @@ void WlrootsScreencopyShmBuffer::reset()
     m_width = 0;
     m_height = 0;
     m_stride = 0;
+}
+
+void WlrootsScreencopyShmBuffer::releaseWaylandBuffer()
+{
+#ifdef HAVE_WLROOTS_SCREENCOPY
+    if (m_buffer) {
+        wl_buffer_destroy(m_buffer);
+        m_buffer = nullptr;
+    }
+#endif
 }
 
 }  // namespace markshot::recording

@@ -1,9 +1,10 @@
 #include "recording/recording_pipewire_capture_stream.h"
 
 #include "debug_log.h"
+#include "recording/recording_frame_handoff.h"
 #include "screen_capture.h"
 
-#include <QMetaObject>
+#include <QTimer>
 
 #include <algorithm>
 #include <atomic>
@@ -30,6 +31,15 @@ public:
         , m_options(std::move(options))
     {
         qRegisterMetaType<RecordingFrameSample>("markshot::recording::RecordingFrameSample");
+        m_reclaimTimer.setParent(this);
+        m_reclaimTimer.setInterval(1000);
+        connect(&m_reclaimTimer, &QTimer::timeout, this, [this] { m_screencast.reclaimRawBuffers(); });
+    }
+
+    /** 停止采集后再销毁会话，后台发布句柄不引用适配器。 */
+    ~RecordingPipeWireCaptureStream() override
+    {
+        stop();
     }
 
     /**
@@ -49,8 +59,13 @@ public:
             return false;
         }
 
-        m_sequence = 0;
-        m_running = true;
+        stop();
+        m_backpressureActive = false;
+        m_handoff = std::make_unique<RecordingFrameHandoff>(this);
+        connect(m_handoff.get(), &RecordingFrameHandoff::frameReady,
+                this, &RecordingCaptureStream::frameReady);
+        connect(m_handoff.get(), &RecordingFrameHandoff::failed,
+                this, &RecordingCaptureStream::failed);
 
         CaptureRequest request;
         request.sourceGeometry = m_options.captureGeometry;
@@ -65,12 +80,19 @@ public:
         QString streamError;
         if (!m_screencast.startRawStream(
                 request,
-                [this](PipeWireScreencastRawFrame frame) {
-                    handleRawFrame(std::move(frame));
+                [publish = m_handoff->publisher(), sequence = std::make_shared<std::atomic<qint64>>(0)]
+                (PipeWireScreencastRawFrame frame) {
+                    // 1. 【录制】【帧交接】回调仅持有发布句柄和序号，不访问适配器生命周期
+                    RecordingFrameSample sample;
+                    sample.bgra.bytes = std::move(frame.bgra);
+                    sample.bgra.size = frame.size;
+                    sample.bgra.stride = frame.stride;
+                    sample.bgra.yInverted = frame.yInverted;
+                    sample.timestampMs = frame.timestampMs;
+                    sample.sequence = sequence->fetch_add(1, std::memory_order_relaxed) + 1;
+                    publish(std::move(sample));
                 },
-                [this](QString errorText) {
-                    handleRawError(std::move(errorText));
-                },
+                m_handoff->errorPublisher(),
                 &streamError)) {
             stop();
             if (error) {
@@ -79,6 +101,7 @@ public:
             return false;
         }
 
+        m_reclaimTimer.start();
         markshot::debugLog("recording",
                            "【录制】【PipeWire采集】started mode=stream-callback geometry=%d,%d %dx%d fps=%d",
                            m_options.captureGeometry.x(),
@@ -95,7 +118,10 @@ public:
      */
     void stop() override
     {
-        m_running = false;
+        m_reclaimTimer.stop();
+        if (m_handoff) {
+            m_handoff->close();
+        }
         m_screencast.stop();
     }
 
@@ -110,64 +136,19 @@ public:
             return;
         }
         m_backpressureActive = active;
+        if (m_handoff) {
+            m_handoff->setEnabled(!active);
+        }
         // 背压状态下沉到 PipeWire 回调层，让丢帧发生在拷贝之前
         m_screencast.setRawBackpressure(active);
     }
 
 private:
-    /**
-     * 处理 PipeWire stream 回调送来的 raw BGRA 帧。
-     * @param frame raw BGRA 帧。
-     * @return 无返回值。
-     */
-    void handleRawFrame(PipeWireScreencastRawFrame frame)
-    {
-        if (!m_running || m_backpressureActive || frame.bgra.isEmpty() || frame.size.isEmpty()) {
-            return;
-        }
-
-        RecordingFrameSample sample;
-        sample.bgra.bytes = std::move(frame.bgra);
-        sample.bgra.size = frame.size;
-        sample.bgra.stride = frame.stride;
-        sample.bgra.yInverted = frame.yInverted;
-        sample.timestampMs = frame.timestampMs;
-        sample.sequence = ++m_sequence;
-        QMetaObject::invokeMethod(
-            this,
-            [this, sample = std::move(sample)] {
-                if (m_running) {
-                    emit frameReady(sample);
-                }
-            },
-            Qt::QueuedConnection);
-    }
-
-    /**
-     * 处理 PipeWire stream 回调错误。
-     * @param errorText 错误文本。
-     * @return 无返回值。
-     */
-    void handleRawError(QString errorText)
-    {
-        if (!m_running || errorText.isEmpty()) {
-            return;
-        }
-        QMetaObject::invokeMethod(
-            this,
-            [this, errorText = std::move(errorText)] {
-                if (m_running) {
-                    emit failed(errorText);
-                }
-            },
-            Qt::QueuedConnection);
-    }
-
     RecordingOptions m_options;
     PortalPipeWireScreencast m_screencast;
-    qint64 m_sequence = 0;
-    std::atomic_bool m_running{false};
-    std::atomic_bool m_backpressureActive{false};
+    std::unique_ptr<RecordingFrameHandoff> m_handoff;
+    bool m_backpressureActive = false;
+    QTimer m_reclaimTimer;
 };
 
 #endif

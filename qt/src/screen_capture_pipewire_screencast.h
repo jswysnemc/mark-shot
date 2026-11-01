@@ -66,6 +66,9 @@ public:
      */
     void setRawBackpressure(bool active);
 
+    /** 在拥有会话的线程调用，合并并异步投递空闲回收，不等待 GPU 读回，无参数和返回值。 */
+    void reclaimRawBuffers();
+
 private:
     /**
      * 启动可用的 Portal 截屏会话。
@@ -215,6 +218,7 @@ private:
     ErrorCallback m_rawErrorCallback;
     std::atomic_bool m_rawBackpressure{false};
     markshot::recording::RecordingBgraBufferPool m_rawBufferPool;
+    std::atomic_bool m_rawReclaimPending{false};
     bool m_rawDmaBufDirectReadBroken = false;
     pw_thread_loop *m_loop = nullptr;
     pw_context *m_context = nullptr;

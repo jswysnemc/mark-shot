@@ -2,6 +2,7 @@
 
 #include "platform/wayland/wlroots_screencopy_buffer_pool.h"
 #include "recording/recording_frame_sample.h"
+#include "recording/recording_frame_pacer.h"
 #include "recording/recording_options.h"
 
 #include <QElapsedTimer>
@@ -18,6 +19,7 @@
 #endif
 
 class QSocketNotifier;
+class QTimer;
 
 namespace markshot::recording {
 
@@ -184,6 +186,9 @@ private:
 
     RecordingOptions m_options;
     QSocketNotifier *m_notifier = nullptr;
+    QTimer *m_captureTimer = nullptr;
+    QTimer *m_reclaimTimer = nullptr;
+    RecordingFramePacer m_capturePacer;
     QElapsedTimer m_clock;
     wl_display *m_display = nullptr;
     wl_registry *m_registry = nullptr;

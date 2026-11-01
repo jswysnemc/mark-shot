@@ -25,4 +25,19 @@ if(TARGET mark-shot-recording-libav)
     add_dependencies(mark-shot-recording-backend-test mark-shot-recording-libav mark-shot-recording-bad-abi)
     add_test(NAME recording-backend COMMAND mark-shot-recording-backend-test)
     set_tests_properties(recording-backend PROPERTIES TIMEOUT 30)
+
+    qt_add_executable(mark-shot-recording-video-timeline-test
+        tests/recording_video_timeline_test.cpp
+        src/recording/recording_frame_handoff.cpp
+        src/recording/recording_frame_handoff.h
+        src/recording/recording_frame_payload.cpp
+        ${MARK_SHOT_BACKEND_LOADER_SOURCES}
+        src/debug_log.cpp)
+    target_include_directories(mark-shot-recording-video-timeline-test PRIVATE src)
+    target_link_libraries(mark-shot-recording-video-timeline-test PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
+    set_target_properties(mark-shot-recording-video-timeline-test PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${MARK_SHOT_RUNTIME_DIR}")
+    add_dependencies(mark-shot-recording-video-timeline-test mark-shot-recording-libav)
+    add_test(NAME recording-video-timeline COMMAND mark-shot-recording-video-timeline-test)
+    set_tests_properties(recording-video-timeline PROPERTIES TIMEOUT 60)
 endif()

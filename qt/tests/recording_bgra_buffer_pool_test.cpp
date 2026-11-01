@@ -2,120 +2,111 @@
 
 #include <QtTest/QtTest>
 
-#include <cstring>
+#include <array>
+#include <limits>
+
+using namespace markshot::recording;
 
 class RecordingBgraBufferPoolTest : public QObject {
     Q_OBJECT
 
 private slots:
-    /**
-     * 验证缓冲池返回指定大小的可写缓冲。
-     * @return 无返回值。
-     */
-    void acquiresRequestedSize()
+    /** 借出全部槽位后拒绝继续扩容，归还一个槽位后原地复用，无参数和返回值。 */
+    void refusesAllocationWhileEverySlotIsHeld()
     {
-        markshot::recording::RecordingBgraBufferPool pool;
-        QByteArray &buffer = pool.acquire(64);
-        QCOMPARE(buffer.size(), qsizetype(64));
-        std::memset(buffer.data(), 0x5a, 64);
-        QCOMPARE(buffer.at(63), char(0x5a));
-    }
-
-    /**
-     * 验证下游释放引用后槽位内存被复用。
-     * @return 无返回值。
-     */
-    void reusesReleasedSlot()
-    {
-        markshot::recording::RecordingBgraBufferPool pool;
-        const char *firstData = nullptr;
-        {
-            QByteArray &buffer = pool.acquire(128);
-            firstData = buffer.constData();
-        }
-        // 未被下游持有的槽位应在后续 acquire 中复用同一块内存
-        bool reused = false;
-        for (int i = 0; i < 4; ++i) {
-            QByteArray &buffer = pool.acquire(128);
-            if (buffer.constData() == firstData) {
-                reused = true;
-                break;
-            }
-        }
-        QVERIFY(reused);
-    }
-
-    /**
-     * 验证被下游持有的缓冲不会被后续 acquire 覆写。
-     * @return 无返回值。
-     */
-    void doesNotOverwriteHeldBuffers()
-    {
-        markshot::recording::RecordingBgraBufferPool pool;
-        QByteArray &slot = pool.acquire(16);
-        std::memset(slot.data(), 0x11, 16);
-        const QByteArray held = slot;
-
-        // 连续获取超过槽位数量的缓冲并写入不同内容
-        for (int i = 0; i < 8; ++i) {
-            QByteArray &buffer = pool.acquire(16);
-            std::memset(buffer.data(), 0x22 + i, 16);
-        }
-        QCOMPARE(held.at(0), char(0x11));
-        QCOMPARE(held.at(15), char(0x11));
-    }
-
-    /** 突发积压消退后回收长期闲置槽位，避免一直保留峰值容量，无参数和返回值。 */
-    void releasesIdleSlotsAfterBurst()
-    {
-        markshot::recording::RecordingBgraBufferPool pool;
+        RecordingBgraBufferPool pool;
         std::array<QByteArray, 4> held;
-        for (QByteArray &frame : held) frame = pool.acquire(4096);
-        QVERIFY(pool.retainedCapacity() >= 4 * 4096);
+        for (int index = 0; index < 4; ++index) {
+            auto *slot = pool.tryAcquire(4096, 0);
+            QVERIFY(slot);
+            slot->fill(char(index + 1));
+            held[index] = *slot;
+        }
+        const auto capacity = pool.retainedCapacity();
+        QVERIFY(!pool.tryAcquire(4096, 10000));
+        QCOMPARE(pool.retainedCapacity(), capacity);
+        for (int index = 0; index < 4; ++index) {
+            QCOMPARE(held[index], QByteArray(4096, char(index + 1)));
+        }
+        const char *released = held[2].constData();
+        held[2] = {};
+        auto *slot = pool.tryAcquire(4096, 10001);
+        QVERIFY(slot);
+        QVERIFY(slot->constData() == released);
+    }
+
+    /** 按实际字节而非固定四槽计数准入，预算内仍允许两帧前进，无参数和返回值。 */
+    void enforcesByteBudget()
+    {
+        RecordingBgraBufferPool pool(3 * 4096);
+        std::array<QByteArray, 3> held;
+        for (auto &frame : held) {
+            auto *slot = pool.tryAcquire(4096, 0);
+            QVERIFY(slot);
+            frame = *slot;
+        }
+        QCOMPARE(pool.retainedCapacity(), qsizetype(3 * 4096));
+        QVERIFY(!pool.tryAcquire(4096, 0));
+        RecordingBgraBufferPool smallBudget(1);
+        const QByteArray first = *smallBudget.tryAcquire(4096, 0);
+        const QByteArray second = *smallBudget.tryAcquire(4096, 0);
+        QVERIFY(!smallBudget.tryAcquire(4096, 0));
+        QCOMPARE(smallBudget.retainedCapacity(), qsizetype(8192));
+    }
+
+    /** 不依赖后续帧到达也能回收空闲槽位，但不会释放仍被借出的内存，无参数和返回值。 */
+    void reclaimsOnlyContinuouslyIdleBuffers()
+    {
+        RecordingBgraBufferPool pool;
+        std::array<QByteArray, 4> held;
+        for (auto &frame : held) frame = *pool.tryAcquire(4096, 0);
+        held[0] = {};
+        held[1] = {};
+        pool.reclaimIdle(100);
+        pool.reclaimIdle(100 + kRecordingCaptureIdleMs - 1);
+        QCOMPARE(pool.retainedCapacity(), qsizetype(4 * 4096));
+        pool.reclaimIdle(100 + kRecordingCaptureIdleMs);
+        QCOMPARE(pool.retainedCapacity(), qsizetype(2 * 4096));
         held = {};
-
-        qsizetype activeCapacity = 0;
-        for (int i = 0; i < 128; ++i) activeCapacity = pool.acquire(4096).capacity();
-        QCOMPARE(pool.retainedCapacity(), activeCapacity);
+        pool.reclaimIdle(100000);
+        QCOMPARE(pool.retainedCapacity(), qsizetype(2 * 4096));
+        pool.reclaimIdle(100000 + kRecordingCaptureIdleMs);
+        QCOMPARE(pool.retainedCapacity(), qsizetype(0));
     }
 
-    /** 短时间负载波动保留缓冲，避免每帧反复分配大块内存，无参数和返回值。 */
-    void retainsSlotsAcrossShortReusePeriods()
+    /** 大帧尚未全部归还时先等待，归还一帧后允许缩小分辨率且不覆盖旧快照，无参数和返回值。 */
+    void resolutionChangesDoNotOverwriteOrDeadlock()
     {
-        markshot::recording::RecordingBgraBufferPool pool;
-        std::array<QByteArray, 4> held;
-        for (QByteArray &frame : held) frame = pool.acquire(4096);
-        const qsizetype retained = pool.retainedCapacity();
-        held = {};
-
-        for (int i = 0; i < 63; ++i) pool.acquire(4096);
-        QCOMPARE(pool.retainedCapacity(), retained);
-        const qsizetype activeCapacity = pool.acquire(4096).capacity();
-        QCOMPARE(pool.retainedCapacity(), activeCapacity);
+        RecordingBgraBufferPool pool(4096);
+        QByteArray largeA = *pool.tryAcquire(8192, 0);
+        QByteArray largeB = *pool.tryAcquire(8192, 0);
+        QVERIFY(!pool.tryAcquire(1024, 1));
+        largeA = {};
+        auto *small = pool.tryAcquire(1024, 2);
+        QVERIFY(small);
+        QCOMPARE(small->size(), qsizetype(1024));
+        QCOMPARE(pool.retainedCapacity(), qsizetype(8192 + 1024));
+        const QByteArray smallHeld = *small;
+        largeB = {};
+        auto *next = pool.tryAcquire(1024, 3);
+        QVERIFY(next);
+        QCOMPARE(pool.retainedCapacity(), qsizetype(2048));
     }
 
-    /** 超过池容量时仍保留外部快照内容，回收不能覆盖在途帧，无参数和返回值。 */
-    void preservesEveryHeldSlotDuringReclamation()
+    /** 拒绝非法尺寸，停止后释放池引用而不使外部 QByteArray 失效，无参数和返回值。 */
+    void validatesSizeAndResetPreservesSnapshots()
     {
-        markshot::recording::RecordingBgraBufferPool pool;
-        std::array<QByteArray, 4> held;
-        for (int i = 0; i < 4; ++i) {
-            QByteArray &buffer = pool.acquire(4096);
-            buffer.fill(char(i + 1));
-            held[i] = buffer;
-        }
-        for (int i = 0; i < 128; ++i) pool.acquire(4096).fill(char(0x7f));
-        for (int i = 0; i < 4; ++i) QCOMPARE(held[i], QByteArray(4096, char(i + 1)));
-    }
-
-    /** 分辨率显著降低时不保留旧帧的大容量分配，无参数和返回值。 */
-    void shrinksAfterResolutionChange()
-    {
-        markshot::recording::RecordingBgraBufferPool pool;
-        const qsizetype largeCapacity = pool.acquire(1024 * 1024).capacity();
-        const QByteArray &small = pool.acquire(1024);
-        QCOMPARE(small.size(), qsizetype(1024));
-        QVERIFY(small.capacity() < largeCapacity / 2);
+        RecordingBgraBufferPool pool;
+        QVERIFY(!pool.tryAcquire(0));
+        QVERIFY(!pool.tryAcquire(-1));
+        QVERIFY(!pool.tryAcquire(std::numeric_limits<qsizetype>::max()));
+        auto *slot = pool.tryAcquire(64);
+        QVERIFY(slot);
+        slot->fill('x');
+        const QByteArray held = *slot;
+        pool.reset();
+        QCOMPARE(pool.retainedCapacity(), qsizetype(0));
+        QCOMPARE(held, QByteArray(64, 'x'));
     }
 };
 
