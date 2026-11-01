@@ -46,8 +46,11 @@ QByteArray readWayland(const QString &program, const QStringList &arguments, qsi
 std::unique_ptr<QMimeData> readContent()
 {
     auto result = std::make_unique<QMimeData>();
-    // 1. 【剪贴板】【读取】先复制 Qt 已收到的数据，不保留剪贴板所有者的对象指针
-    const QMimeData *source = QGuiApplication::clipboard()->mimeData();
+    // 1. 【剪贴板】【读取】Wayland 失去焦点后可能保留旧选择，格式和缓存内容都不能代表当前剪贴板
+    QClipboard *clipboard = QGuiApplication::clipboard();
+    const bool wayland = QGuiApplication::platformName().startsWith(QStringLiteral("wayland"));
+    const bool canReadQt = !wayland || QGuiApplication::focusWindow() || clipboard->ownsClipboard();
+    const QMimeData *source = canReadQt ? clipboard->mimeData() : nullptr;
     if (source) {
         if (source->hasImage()) {
             result->setImageData(source->imageData());
@@ -62,11 +65,10 @@ std::unique_ptr<QMimeData> readContent()
             result->setText(source->text());
         }
     }
-    if (!result->formats().isEmpty()
-        || !QGuiApplication::platformName().startsWith(QStringLiteral("wayland"))) {
+    if (!result->formats().isEmpty() || !wayland) {
         return result;
     }
-    // 2. 【剪贴板】【Wayland读取】独立快捷键进程未获得键盘焦点时使用 data-control 工具
+    // 2. 【剪贴板】【Wayland读取】托盘和独立快捷键不保证获取焦点，使用 data-control 读取最新选择
     const QString program = QStandardPaths::findExecutable(QStringLiteral("wl-paste"));
     if (program.isEmpty()) {
         return result;

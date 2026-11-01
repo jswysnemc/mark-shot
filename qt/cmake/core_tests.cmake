@@ -357,5 +357,6 @@ target_link_libraries(mark-shot-global-shortcut-keymap-test
 add_test(NAME global-shortcut-keymap COMMAND mark-shot-global-shortcut-keymap-test)
 
 include(cmake/gui_memory_tests.cmake)
+include(cmake/clipboard_reader_tests.cmake)
 include(cmake/tests.cmake)
 include(cmake/release_tests.cmake)

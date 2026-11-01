@@ -23,7 +23,7 @@ The **Text Selection Copy** option enables background recognition for selection 
 
 ## Linux Desktop Support
 
-On niri and other supported layer-shell compositors, pinned images use the existing overlay path. They do not require a tray process and remain alive after the editor closes. An unfocused command-line process can use `wl-paste` as a clipboard fallback; install `wl-clipboard` for this path.
+On niri and other supported layer-shell compositors, pinned images use the existing overlay path. They do not require a tray process and remain alive after the editor closes. The desktop host displays the tray menu, so activating a tray action does not guarantee keyboard focus for Mark Shot. Unfocused tray and command-line processes bypass Qt's stale selection cache unless they own the clipboard, using `wl-paste` to read the current clipboard instead; install `wl-clipboard` for this path.
 
 GNOME does not expose layer-shell to ordinary clients. Its pinned images remain regular windows, with the bundled `mark-shot-scroll-helper@snemc.org` extension maintaining the above state. Unique titles distinguish individual stickers; the extension tracks late window creation and changes to the above state without affecting unrelated application windows.
 
