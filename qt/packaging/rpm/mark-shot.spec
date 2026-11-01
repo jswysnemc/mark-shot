@@ -1,5 +1,5 @@
 Name:           mark-shot
-Version:        0.1.61
+Version:        0.1.62
 Release:        1%{?dist}
 Summary:        Qt 6 screenshot selection and annotation tool
 
@@ -93,6 +93,9 @@ sed -i '1s|^#!/usr/bin/env python3$|#!/usr/bin/python3|' \
 %{_datadir}/gnome-shell/extensions/mark-shot-scroll-helper@snemc.org/
 
 %changelog
+* Sun Nov 01 2026 jswysnemc <snemc@qq.com> - 0.1.62-1
+- Add paragraph-based translation, ruler angle mode, flexible toolbar positions, and inline text editing sizing
+
 * Sun Oct 25 2026 jswysnemc <snemc@qq.com> - 0.1.61-1
 - Fix KWin mixed-scale captures, add region detection switch, route startup tools to cursor screen, and bundle detection scripts
 

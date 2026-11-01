@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.62 - 2026-11-01
+
+### Features & Enhancements
+
+- **Paragraph-Based Translation & Language Picker**: Typeset translations by paragraph block to retain source formatting. Added language selection dropdown with quick one-click translation copy and revert toggles, alongside refreshed translation and capture scope toolbar icons.
+- **Ruler Tool Angle Mode & Rotational Snapping**: Promoted the ruler into a first-class annotation tool featuring an angle mode. Supports freeform rotation, Shift-key angle snapping, on-screen tick visibility clamping, scale handles on angle frames, and mouse wheel scaling.
+- **Customizable Toolbar Positions**: Added fixed toolbar positions for region editing and screen-top docking options, with toolbar theme colors dynamically tracking application dark/light palettes.
+- **Capture History & Pinned Image Interactions**: Restoring past capture sessions resumes editing directly without intermediate modal states, with refined pinned image layering and interaction.
+
+### Bug Fixes
+
+- **Text Annotation Inline Editor Sizing**: Dynamic text box adapts to content dimensions character-by-character, preserves cursor advance, allows in-place mouse wheel font size scaling during editing, and resolves narrow-glyph wrapping issues.
+- **Umbriel & Wayland Focused Output Routing**: Accurately queries focused monitor outputs during scrolling captures and on the Umbriel compositor, preferring grim for native Wayland pipelines.
+- **Multi-Screen Recording & X11 Spanning**: Screen recording restricts frames to the display hosting the selected bounding box, and multi-monitor overlays on X11 bypass window manager decorations.
+- **Windows Packaging & Dependency Closure**: Deploys compatibility runtimes for Windows OCR dependencies and ensures offscreen test platform plugins are bundled correctly.
+
 ## 0.1.61 - 2026-10-25
 
 ### Features & Enhancements

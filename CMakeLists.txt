@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(mark-shot VERSION 0.1.61 LANGUAGES C CXX)
+project(mark-shot VERSION 0.1.62 LANGUAGES C CXX)
 include(CTest)
 option(MARK_SHOT_BUILD_QT "Build the Qt desktop application" ON)
 include(cmake/release_optimization.cmake)

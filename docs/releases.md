@@ -1,5 +1,13 @@
 # Release Notes
 
+### 0.1.62
+
+- **Paragraph Translation & Language Picker**: Typeset translations by paragraph to preserve text formatting; added rapid target language switching and translation copy/revert options; refreshed translate and capture scope icons.
+- **Ruler Tool Angle Mode & Snapping**: Promoted the ruler to a regular annotation tool with angle measurement, freeform rotation, Shift angle snapping, auto-clamped tick labels, and wheel scaling.
+- **Flexible Toolbar Positions**: Added screen-top docking and fixed toolbar region placements, adapting colors to the active desktop theme.
+- **Capture History Restoration & Text Editing**: Restoring previous captures resumes editing in-place; text boxes dynamically size with caret reservations, support wheel resizing while editing, and fix narrow glyph wrapping.
+- **Wayland Focused Output & Recording Fixes**: Enhanced focused monitor routing for Umbriel and scroll captures, constrained multi-screen recordings to the target display, and bypassed window manager decorations for spanning X11 overlays.
+
 ### 0.1.61
 
 - **KWin Mixed-Scale Capture Resolution**: KWin ScreenShot2 routes whole-output captures through `CaptureScreen` rather than `CaptureArea`, respecting individual monitor scales and avoiding stretched or squished captures on mixed-scale setups.

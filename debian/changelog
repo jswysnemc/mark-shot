@@ -1,3 +1,12 @@
+mark-shot (0.1.62-0ppa1~resolute1) resolute; urgency=medium
+
+  * Add paragraph-based translation layout, language picker, and restored icons.
+  * Promote ruler to regular annotation tool with angle mode and rotation snapping.
+  * Provide screen-top and fixed toolbar docking positions following theme colors.
+  * Refine text annotation sizing, capture history restoring, and Wayland focused output routing.
+
+ -- Mark Shot maintainers <snemc@qq.com>  Sun, 01 Nov 2026 12:00:00 +0900
+
 mark-shot (0.1.61-0ppa1~resolute1) resolute; urgency=medium
 
   * Use CaptureScreen for KWin whole-output captures to preserve mixed-scale resolution.
