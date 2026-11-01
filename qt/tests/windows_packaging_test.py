@@ -133,6 +133,38 @@ class WindowsPackagingTest(unittest.TestCase):
         self.assertTrue((self.app / "libonnx.dll").is_file())
         self.assertTrue((self.app / "libprotobuf.dll").is_file())
 
+    def test_dynamic_ocr_runtime_is_explicitly_bundled(self) -> None:
+        """【Windows测试】【动态运行库】插件不导入 ORT 时仍部署本体及间接依赖，无返回值。"""
+        plugins = self.app.parent / "lib/mark-shot/plugins"
+        plugins.mkdir(parents=True)
+        (plugins / "mark-shot-ocr-rapid.dll").write_text("DLL Name: KERNEL32.dll\n")
+        imports = "DLL Name: libprotobuf.dll\n"
+        (self.prefix / "bin/onnxruntime.dll").write_text(imports)
+        (self.prefix / "bin/libprotobuf.dll").write_text("DLL Name: KERNEL32.dll\n")
+        result = self.deploy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.app / "onnxruntime.dll").is_file())
+        self.assertTrue((self.app / "libprotobuf.dll").is_file())
+
+    def test_missing_dynamic_ocr_runtime_rejects_package(self) -> None:
+        """【Windows测试】【缺失运行库】含 OCR 插件却缺少构建运行库时必须阻止发布，无返回值。"""
+        plugins = self.app / "plugins"
+        plugins.mkdir()
+        (plugins / "mark-shot-ocr-rapid.dll").write_text("DLL Name: KERNEL32.dll\n")
+        result = self.deploy()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ONNX Runtime", result.stderr)
+
+    def test_dynamic_ocr_replaces_stale_staged_runtime(self) -> None:
+        """【Windows测试】【运行库版本】已部署的旧 ORT 必须由构建所用版本替换，无返回值。"""
+        (self.app / "mark-shot-ocr-rapid.dll").write_text("DLL Name: KERNEL32.dll\n")
+        (self.app / "onnxruntime.dll").write_text("obsolete runtime\n")
+        expected = "DLL Name: KERNEL32.dll\n"
+        (self.prefix / "bin/onnxruntime.dll").write_text(expected)
+        result = self.deploy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.app / "onnxruntime.dll").read_text(), expected)
+
     def test_test_runtime_requests_offscreen_platform(self) -> None:
         """【Windows测试】【平台插件】测试部署显式包含离屏插件，普通发行包不增加该插件，无返回值。"""
         arguments = self.root / "deploy-arguments"

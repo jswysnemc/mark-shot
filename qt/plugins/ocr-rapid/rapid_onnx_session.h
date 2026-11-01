@@ -7,6 +7,8 @@
 #include <memory>
 #include <vector>
 
+struct OrtApi;
+
 namespace markshot::ocr_rapid {
 
 struct TensorShape {
@@ -20,7 +22,8 @@ struct TensorShape {
  */
 class RapidOnnxSession final {
 public:
-    RapidOnnxSession();
+    /** 【OCR】【会话寿命】借用 api 创建会话；会话必须在其运行库释放前销毁。 */
+    explicit RapidOnnxSession(const OrtApi &api);
     ~RapidOnnxSession();
 
     /**

@@ -112,7 +112,23 @@ copy_dependency_closure() {
   declare -A seen=()
   mapfile -t queue < <(find "$app_root" -type f \( -iname "*.exe" -o -iname "*.dll" \))
 
-  # 1. 【打包】【媒体裁剪】替换部署工具可能预先复制的完整 FFmpeg，再计算闭包
+  # 1. 【打包】【OCR运行库】动态加载不出现在 PE 导入表中，显式部署构建前缀提供的运行库并递归计算依赖
+  for current in "${queue[@]}"; do
+    name="$(basename "$current")"
+    if [[ "${name,,}" == "mark-shot-ocr-rapid.dll" || "${name,,}" == "libmark-shot-ocr-rapid.dll" ]]; then
+      dep_path="${dependency_paths[onnxruntime.dll]:-${dependency_paths[libonnxruntime.dll]:-}}"
+      if [[ -z "$dep_path" ]]; then
+        echo "ONNX Runtime is missing from the build prefixes; refusing to package the OCR plugin" >&2
+        return 1
+      fi
+      dest="$app_bin/$(basename "$dep_path")"
+      cmp -s "$dep_path" "$dest" || cp "$dep_path" "$dest"
+      queue+=("$dest")
+      break
+    fi
+  done
+
+  # 2. 【打包】【媒体裁剪】替换部署工具可能预先复制的完整 FFmpeg，再计算闭包
   if [[ -n "${MARK_SHOT_FFMPEG_PREFIX:-}" ]]; then
     for current in "${queue[@]}"; do
       name="$(basename "$current")"
@@ -132,7 +148,7 @@ copy_dependency_closure() {
     fi
     seen["$current_key"]=1
 
-    # 2. 【打包】【完整性】解析失败必须终止，不能生成缺依赖的压缩包
+    # 3. 【打包】【完整性】解析失败必须终止，不能生成缺依赖的压缩包
     imports="$(objdump -p "$current")"
     while IFS= read -r dep_name; do
       [[ -n "$dep_name" ]] || continue

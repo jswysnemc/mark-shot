@@ -43,6 +43,7 @@ Depends:
  qt6-svg-plugins,
  qt6-wayland,
  ${misc:Depends},
+ ${markshot:OcrDepends},
  ${shlibs:Depends},
 Recommends:
  grim,

@@ -42,5 +42,9 @@ build() {
 
 package() {
     DESTDIR="${pkgdir}" cmake --install build
+    # 【打包】【OCR依赖】仅在包含原生 OCR 插件时声明动态运行库，不依赖 ELF 导入扫描
+    if [[ -n "$(find "${pkgdir}/usr" -type f -name 'libmark-shot-ocr-rapid.so' -print -quit)" ]]; then
+        depends+=('onnxruntime')
+    fi
     install -Dm644 "${pkgname}-${pkgver}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 }

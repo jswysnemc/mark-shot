@@ -185,6 +185,89 @@ private slots:
         QVERIFY2(combined.contains(QStringLiteral("你好")),
                  qPrintable(QStringLiteral("recognized: %1").arg(combined)));
     }
+
+    /** 【OCR测试】【运行库回收】保留插件实例并完成识别后不得继续映射 ONNX，无参数和返回值。 */
+    void releasesRuntimeAfterRecognition()
+    {
+#ifdef Q_OS_LINUX
+        if (!locateRapidModels().isComplete()) {
+            QSKIP("PP-OCR models are not available on this machine");
+        }
+        QString error;
+        QVector<markshot::plugin::OcrToken> tokens;
+        QVERIFY2(m_plugin->recognize(renderTextImage(QStringLiteral("HELLO 123")), &tokens, &error),
+                 qPrintable(error));
+        QVERIFY(!tokens.isEmpty());
+        QFile maps(QStringLiteral("/proc/self/maps"));
+        QVERIFY(maps.open(QIODevice::ReadOnly));
+        QVERIFY2(!maps.readAll().contains("libonnxruntime.so"),
+                 "Completed OCR still retains the ONNX Runtime mapping");
+        QVERIFY(m_loader.isLoaded());
+#else
+        QSKIP("This regression checks Linux mappings; other platforms use lifetime tests");
+#endif
+    }
+
+    /** 【OCR测试】【损坏资源】覆盖检测、识别及字典加载失败，无参数和返回值。 */
+    void recoversFromDamagedResources_data()
+    {
+        QTest::addColumn<QByteArray>("variable");
+        QTest::newRow("detector") << QByteArray("MARK_SHOT_RAPID_DET_MODEL");
+        QTest::newRow("recognizer") << QByteArray("MARK_SHOT_RAPID_REC_MODEL");
+        QTest::newRow("dictionary") << QByteArray("MARK_SHOT_RAPID_REC_DICT");
+    }
+
+    /** 【OCR测试】【损坏资源】失败后的原生资源释放不能阻断同一插件下一次正常识别，无参数和返回值。 */
+    void recoversFromDamagedResources()
+    {
+        QFETCH(QByteArray, variable);
+        if (!locateRapidModels().isComplete()) QSKIP("PP-OCR models are not available on this machine");
+        const QByteArray previous = qgetenv(variable.constData());
+        const auto restore = [&] {
+            if (previous.isNull()) qunsetenv(variable.constData());
+            else qputenv(variable.constData(), previous);
+        };
+        const auto guard = qScopeGuard(restore);
+        QTemporaryDir damaged;
+        QVERIFY(damaged.isValid());
+        const QString path = damaged.filePath(QStringLiteral("empty-model"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.close();
+        qputenv(variable.constData(), path.toUtf8());
+        QString error;
+        QVector<markshot::plugin::OcrToken> tokens;
+        QVERIFY(!m_plugin->recognize(renderTextImage(QStringLiteral("HELLO 123")), &tokens, &error));
+        QVERIFY(!error.isEmpty());
+        QVERIFY(tokens.isEmpty());
+        restore();
+        QVERIFY2(m_plugin->recognize(renderTextImage(QStringLiteral("HELLO 123")), &tokens, &error),
+                 qPrintable(error));
+        QVERIFY(!tokens.isEmpty());
+    }
+
+    /** 【OCR测试】【运行库恢复】缺失显式运行库时不可用，恢复配置后同一插件正常识别，无参数和返回值。 */
+    void recoversAfterRuntimeBecomesAvailable()
+    {
+        if (!locateRapidModels().isComplete()) QSKIP("PP-OCR models are not available on this machine");
+        const QByteArray previous = qgetenv("MARK_SHOT_RAPID_ONNX_RUNTIME");
+        const auto restore = [&] {
+            if (previous.isNull()) qunsetenv("MARK_SHOT_RAPID_ONNX_RUNTIME");
+            else qputenv("MARK_SHOT_RAPID_ONNX_RUNTIME", previous);
+        };
+        const auto guard = qScopeGuard(restore);
+        qputenv("MARK_SHOT_RAPID_ONNX_RUNTIME", m_pluginDirectory.filePath(QStringLiteral("missing-runtime")).toUtf8());
+        QString error;
+        QVERIFY(!m_plugin->isAvailable(&error));
+        QVERIFY(!error.isEmpty());
+        QVector<markshot::plugin::OcrToken> tokens;
+        QVERIFY(!m_plugin->recognize(renderTextImage(QStringLiteral("HELLO 123")), &tokens, &error));
+        restore();
+        QVERIFY2(m_plugin->isAvailable(&error), qPrintable(error));
+        QVERIFY2(m_plugin->recognize(renderTextImage(QStringLiteral("HELLO 123")), &tokens, &error),
+                 qPrintable(error));
+        QVERIFY(!tokens.isEmpty());
+    }
 };
 
 QTEST_MAIN(OcrRapidPluginTest)

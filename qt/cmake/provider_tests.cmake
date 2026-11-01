@@ -1,3 +1,5 @@
+include(cmake/ocr_memory_tests.cmake)
+
 qt_add_executable(mark-shot-translate-segments-test
     tests/translate_segments_test.cpp
     src/providers/translate/translate_segments.cpp
@@ -22,6 +24,8 @@ qt_add_executable(mark-shot-ocr-provider-factory-test
     src/debug_log.h
     src/providers/ocr/ocr_plugin_task.cpp
     src/providers/ocr/ocr_plugin_task.h
+    src/providers/ocr/ocr_task_executor.cpp
+    src/providers/ocr/ocr_task_executor.h
     src/memory/process_memory_trim.cpp
     src/memory/process_memory_trim.h
     src/providers/ocr/ocr_provider_factory.cpp

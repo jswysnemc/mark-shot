@@ -46,4 +46,8 @@ package() {
         --exclude='.PKGINFO' \
         --exclude='.MTREE' \
         --exclude='.BUILDINFO'
+    # 【打包】【OCR依赖】重新打包时恢复源归档中动态 OCR 的运行依赖
+    if [[ -n "$(find "${pkgdir}/usr" -type f -name 'libmark-shot-ocr-rapid.so' -print -quit)" ]]; then
+        depends+=('onnxruntime')
+    fi
 }

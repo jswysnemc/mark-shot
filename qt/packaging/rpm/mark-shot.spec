@@ -41,6 +41,8 @@ Requires:       qt6-qtwayland
 # qt6-qtsvg 提供 qsvg 图像插件与 qsvgicon 图标引擎，Qt 运行时按需加载，
 # 自动依赖生成器扫不出来；缺失时设置界面的 SVG 图标无法渲染
 Requires:       qt6-qtsvg
+# 【打包】【OCR依赖】运行库按任务加载，自动 ELF 依赖扫描无法发现此依赖
+Requires:       onnxruntime
 Requires:       grim
 Requires:       wl-clipboard
 Recommends:     xclip

@@ -1,8 +1,6 @@
 #pragma once
 
 #include "markshot/ocr_provider_plugin.h"
-#include "rapid_det_model.h"
-#include "rapid_rec_model.h"
 
 #include <QMutex>
 #include <QObject>
@@ -29,23 +27,7 @@ public:
                    QString *error) override;
 
 private:
-    /**
-     * 首次识别时加载模型，线程安全。
-     * @param error 输出错误信息。
-     * @return 模型就绪时返回 true。
-     */
-    bool ensureLoaded(QString *error);
-
-    /**
-     * 释放已加载的检测与识别会话。调用方须已持有 m_mutex。
-     * @return 无返回值。
-     */
-    void releaseModels();
-
     QMutex m_mutex;
-    RapidDetModel m_detModel;
-    RapidRecModel m_recModel;
-    bool m_loaded = false;
 };
 
 }  // namespace markshot::ocr_rapid

@@ -39,3 +39,8 @@ override_dh_clean:
 
 override_dh_installchangelogs:
 	dh_installchangelogs CHANGELOG.md
+
+# 【打包】【OCR依赖】显式声明动态加载的运行库，失败时不得生成缺少依赖的包
+override_dh_gencontrol:
+	dependency="$$(python3 qt/scripts/debian-ocr-runtime-dependency.py)" && \
+		dh_gencontrol -- -Vmarkshot:OcrDepends="$$dependency"

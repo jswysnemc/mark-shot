@@ -30,6 +30,9 @@ struct RapidRecResult {
  */
 class RapidRecModel final {
 public:
+    /** 【OCR】【识别模型】将模型会话绑定到本次运行库 api，不持有跨任务的原生状态。 */
+    explicit RapidRecModel(const OrtApi &api) : m_session(api) {}
+
     /**
      * 加载识别模型与字符字典。
      * @param modelPath 模型文件路径。

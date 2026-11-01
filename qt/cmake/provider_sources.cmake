@@ -17,6 +17,8 @@ set(MARK_SHOT_PROVIDER_SOURCES
     src/providers/code_scan/code_scan_tasks.h
     src/providers/ocr/ocr_plugin_task.cpp
     src/providers/ocr/ocr_plugin_task.h
+    src/providers/ocr/ocr_task_executor.cpp
+    src/providers/ocr/ocr_task_executor.h
     src/providers/ocr/ocr_provider_factory.cpp
     src/providers/ocr/ocr_provider_factory.h
     src/providers/ocr/ocr_tesseract_task.cpp

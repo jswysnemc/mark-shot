@@ -218,7 +218,10 @@ void ProviderPluginRegistry::discoverOnce()
             // 1. 【插件】【元数据扫描】只读取插件元数据，不映射动态库及其依赖
             ProviderPluginCandidate candidate;
             candidate.path = entry.absoluteFilePath();
-            candidate.loader = new QPluginLoader(candidate.path, QCoreApplication::instance());
+            // 2. 【插件】【元数据扫描】先清除默认驻留标记再关联路径，避免污染同目录非插件运行库的共享句柄
+            candidate.loader = new QPluginLoader(QCoreApplication::instance());
+            candidate.loader->setLoadHints({});
+            candidate.loader->setFileName(candidate.path);
             candidate.declaredCapabilities = declaredCapabilities(*candidate.loader);
             m_candidates.append(std::move(candidate));
         }
@@ -271,6 +274,10 @@ void ProviderPluginRegistry::loadCandidate(ProviderPluginCandidate *candidate)
 
     // 2. 加载候选动态库并检查是否实现任一 provider 接口
     const ProviderPluginInfo baseInfo = basePluginInfo(candidate->path, *loader);
+    // 3. 【插件】【实例寿命】仅真正的 Qt 插件保持驻留，保证借用接口和静态字符串的原有寿命
+    if (!loader->metaData().isEmpty()) {
+        loader->setLoadHints(loader->loadHints() | QLibrary::PreventUnloadHint);
+    }
     QObject *instance = loadProviderPluginWithRuntimeFallback(loader);
     if (!instance) {
         ProviderPluginInfo info = baseInfo;

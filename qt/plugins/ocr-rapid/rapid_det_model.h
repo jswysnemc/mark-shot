@@ -16,6 +16,9 @@ namespace markshot::ocr_rapid {
  */
 class RapidDetModel final {
 public:
+    /** 【OCR】【检测模型】将模型会话绑定到本次运行库 api，不持有跨任务的原生状态。 */
+    explicit RapidDetModel(const OrtApi &api) : m_session(api) {}
+
     /**
      * 加载检测模型。
      * @param modelPath 模型文件路径。

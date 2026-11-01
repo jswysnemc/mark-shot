@@ -180,6 +180,17 @@ jobs:
             MODULE_DIRS+=(--deploy-deps-only "$directory")
           done < <(find "$APPDIR/usr/lib" -type d \( -path '*/mark-shot/recording' -o -path '*/mark-shot/plugins' \) -print0)
 
+          # 【打包】【OCR依赖】动态运行库不再由插件的 DT_NEEDED 引入，显式加入打包根
+          if [ -n "$(find "$APPDIR/usr/lib" -type f -name 'libmark-shot-ocr-rapid.so' -print -quit)" ]; then
+            ORT_LIBDIR="$(pkg-config --variable=libdir libonnxruntime)"
+            test -n "$ORT_LIBDIR" && test -f "$ORT_LIBDIR/libonnxruntime.so.1" || {
+              echo "ONNX Runtime was not found for the bundled OCR plugin" >&2
+              exit 1
+            }
+            install -Dm644 "$ORT_LIBDIR/libonnxruntime.so.1" "$APPDIR/usr/lib/libonnxruntime.so.1"
+            MODULE_DIRS+=(--deploy-deps-only "$APPDIR/usr/lib")
+          fi
+
           ./linuxdeploy-x86_64.AppImage \
             --appdir "$APPDIR" \
             --executable "$APPDIR/usr/bin/mark-shot" \

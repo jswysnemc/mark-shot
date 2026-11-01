@@ -14,3 +14,8 @@ if(dynamic_section MATCHES "\\(NEEDED\\)[^\n]*\\[lib(protobuf|absl_|utf8_)")
     message(FATAL_ERROR
         "OCR plugin directly links an ONNX Runtime implementation dependency: ${CMAKE_MATCH_0}")
 endif()
+
+# 3. 【OCR】【运行库寿命】插件常驻不能继续通过直接链接固定推理运行库
+if(dynamic_section MATCHES "\\(NEEDED\\)[^\n]*\\[libonnxruntime")
+    message(FATAL_ERROR "OCR plugin retains ONNX Runtime through a direct dependency")
+endif()

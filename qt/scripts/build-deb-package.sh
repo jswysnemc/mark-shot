@@ -112,6 +112,9 @@ if [[ -e "$PACKAGE_DIR/usr/lib/mark-shot/libmark-shot-layer-shell.so" ]]; then
 fi
 if [[ -e "$PACKAGE_DIR/usr/lib/mark-shot/plugins/libmark-shot-ocr-rapid.so" ]]; then
     PLUGIN_NOTES+=("includes ocr-rapid plugin")
+    # 【打包】【OCR依赖】动态运行库不出现在 DT_NEEDED 中，从开发包关系确定实际 ABI 包名
+    OCR_RUNTIME_DEP="$(python3 qt/scripts/debian-ocr-runtime-dependency.py)"
+    MANUAL_DEPS="${MANUAL_DEPS}, ${OCR_RUNTIME_DEP}"
 fi
 if [[ -e "$PACKAGE_DIR/usr/lib/mark-shot/plugins/libmark-shot-code-scan-zxing.so" ]]; then
     PLUGIN_NOTES+=("includes code-scan-zxing plugin")

@@ -224,6 +224,12 @@ jobs:
           echo "Detected FFmpeg soname dependencies:"
           printf '%s\n' "$FFMPEG_DEP"
 
+          # 【打包】【OCR依赖】动态 ONNX 不出现在导入表中，按实际安装的插件补充运行包
+          OCR_DEP=""
+          if [ -n "$(find "$STAGE/usr" -type f -name 'libmark-shot-ocr-rapid.so' -print -quit)" ]; then
+              OCR_DEP="depend = onnxruntime"
+          fi
+
           cat > "$STAGE/.PKGINFO" <<EOF
           pkgname = mark-shot-bin
           pkgver = ${VERSION}-${PKGREL}
@@ -239,6 +245,7 @@ jobs:
           depend = qt6-wayland
           ${LAYER_SHELL_DEP}
           ${FFMPEG_DEP}
+          ${OCR_DEP}
           depend = pipewire
           depend = grim
           depend = wl-clipboard

@@ -32,6 +32,7 @@ class QPaintEvent;
 class QWheelEvent;
 class SelectionTranslateTest;
 class PinnedTextSelectionTest;
+class PinnedOcrMemoryTest;
 
 namespace markshot::translation_layout {
 struct TranslationSeed;
@@ -51,6 +52,7 @@ class PinnedLayerShellDragPreview;
 class PinnedImageWindow final : public QWidget {
     friend class ::SelectionTranslateTest;
     friend class ::PinnedTextSelectionTest;
+    friend class ::PinnedOcrMemoryTest;
 
 public:
     /// @brief 表示单个 OCR 文字块的边界和文本。
