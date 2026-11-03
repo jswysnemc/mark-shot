@@ -118,7 +118,27 @@ void RapidOnnxSession::release()
 bool RapidOnnxSession::run(const QVector<float> &input, const TensorShape &inputShape,
                            QVector<float> *output, TensorShape *outputShape, QString *error)
 {
+    if (!output || !outputShape) {
+        if (error) *error = QStringLiteral("onnx output destination is missing");
+        return false;
+    }
+    return visitOutput(input, inputShape,
+        [&](const float *values, qsizetype count, const TensorShape &shape, QString *) {
+            *outputShape = shape;
+            output->resize(count);
+            if (count) std::copy(values, values + count, output->data());
+            return true;
+        }, error);
+}
+
+bool RapidOnnxSession::visitOutput(const QVector<float> &input, const TensorShape &inputShape,
+                                   const OutputConsumer &consume, QString *error)
+{
     if (error) error->clear();
+    if (!consume) {
+        if (error) *error = QStringLiteral("onnx output consumer is missing");
+        return false;
+    }
     if (!m_impl->session.get()) {
         if (error) *error = QStringLiteral("onnx session is not loaded");
         return false;
@@ -159,7 +179,7 @@ bool RapidOnnxSession::run(const QVector<float> &input, const TensorShape &input
         return false;
     }
 
-    // 2. 【OCR】【输出张量】核对类型和容量后复制输出，原生数据不离开本次运行库作用域
+    // 2. 【OCR】【输出张量】核对类型和容量后借用输出，回调结束或抛异常时均释放原生数据
     size_t rank = 0, count = 0;
     ONNXTensorElementDataType type = ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
     if (!m_impl->check(api.GetTensorTypeAndShape(outputTensor.get(), info.put()), error)
@@ -173,20 +193,16 @@ bool RapidOnnxSession::run(const QVector<float> &input, const TensorShape &input
         if (error) *error = QStringLiteral("unsupported onnx output tensor type or size");
         return false;
     }
-    outputShape->dims.resize(rank);
-    if (!m_impl->check(api.GetDimensions(info.get(), outputShape->dims.data(), rank), error)) return false;
+    TensorShape outputShape;
+    outputShape.dims.resize(rank);
+    if (!m_impl->check(api.GetDimensions(info.get(), outputShape.dims.data(), rank), error)) return false;
     void *data = nullptr;
     if (!m_impl->check(api.GetTensorMutableData(outputTensor.get(), &data), error)) return false;
-    output->resize(static_cast<qsizetype>(count));
-    if (count) {
-        if (!data) {
-            if (error) *error = QStringLiteral("onnx output tensor data is missing");
-            return false;
-        }
-        const auto *values = static_cast<const float *>(data);
-        std::copy(values, values + count, output->data());
+    if (count && !data) {
+        if (error) *error = QStringLiteral("onnx output tensor data is missing");
+        return false;
     }
-    return true;
+    return consume(static_cast<const float *>(data), static_cast<qsizetype>(count), outputShape, error);
 }
 
 }  // namespace markshot::ocr_rapid

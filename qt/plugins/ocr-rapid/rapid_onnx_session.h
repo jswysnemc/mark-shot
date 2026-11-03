@@ -4,6 +4,7 @@
 #include <QVector>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -54,6 +55,20 @@ public:
              QVector<float> *output,
              TensorShape *outputShape,
              QString *error);
+
+    /** 【OCR】【借用输出】在推理张量释放前调用回调；数据只在回调期间有效，禁止保存指针。 */
+    using OutputConsumer = std::function<bool(const float *, qsizetype, const TensorShape &, QString *)>;
+
+    /**
+     * 【OCR】【作用域输出】执行 input/inputShape，交给 consume(data,count,shape,error) 同步处理。
+     * @param input NCHW 输入数据，在调用期间借用。
+     * @param inputShape 输入维度。
+     * @param consume 输出处理函数，原生浮点数据不得逃逸，count 为元素数。
+     * @param error 失败原因，可为空。
+     * @return 推理和回调均成功时为 true，所有路径均释放输出张量。
+     */
+    bool visitOutput(const QVector<float> &input, const TensorShape &inputShape,
+                     const OutputConsumer &consume, QString *error);
 
 private:
     class Impl;

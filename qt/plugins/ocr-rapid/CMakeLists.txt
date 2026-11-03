@@ -49,6 +49,9 @@ target_sources(mark-shot-ocr-rapid PRIVATE
     rapid_onnx_session.h
     rapid_rec_model.cpp
     rapid_rec_model.h
+    rapid_rec_result.h
+    rapid_rec_decoder.cpp
+    rapid_rec_decoder.h
 )
 
 target_include_directories(mark-shot-ocr-rapid PRIVATE

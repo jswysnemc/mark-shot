@@ -29,6 +29,18 @@ add_dependencies(mark-shot-rapid-onnx-runtime-test
 add_test(NAME rapid-onnx-runtime COMMAND mark-shot-rapid-onnx-runtime-test)
 set_tests_properties(rapid-onnx-runtime PROPERTIES TIMEOUT 30)
 
+qt_add_executable(mark-shot-rapid-onnx-output-test
+    tests/rapid_onnx_output_test.cpp
+    plugins/ocr-rapid/rapid_model_paths.cpp
+    plugins/ocr-rapid/rapid_onnx_runtime.cpp
+    plugins/ocr-rapid/rapid_runtime_paths.cpp
+    plugins/ocr-rapid/rapid_onnx_session.cpp)
+target_include_directories(mark-shot-rapid-onnx-output-test PRIVATE plugins/ocr-rapid plugin-sdk)
+target_link_libraries(mark-shot-rapid-onnx-output-test PRIVATE
+    Qt6::Core Qt6::Test mark-shot-onnx-headers ${CMAKE_DL_LIBS})
+add_test(NAME rapid-onnx-output COMMAND mark-shot-rapid-onnx-output-test)
+set_tests_properties(rapid-onnx-output PROPERTIES TIMEOUT 30)
+
 qt_add_executable(mark-shot-pinned-ocr-memory-test
     tests/pinned_ocr_memory_test.cpp
     plugins/ocr-rapid/rapid_model_paths.cpp

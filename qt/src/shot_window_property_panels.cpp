@@ -545,9 +545,11 @@ void ShotWindow::openSelectedTextBackgroundColorPalette()
 
 void ShotWindow::toggleSelectedTextFontPanel()
 {
-    if (!m_controls.m_propertyFontPanel || !m_controls.m_propertyFontList || !m_controls.m_propertyFontButton) {
+    if (!m_controls.m_propertyFontButton) {
         return;
     }
+    // 1. 【界面内存】【字体弹层】普通截图和文字输入不枚举字体，打开选择面板时才创建
+    initializePropertyFontPanel();
 
     if (m_controls.m_propertyFontPanel->isVisible()) {
         m_controls.m_propertyFontPanel->hide();
@@ -569,6 +571,10 @@ void ShotWindow::toggleSelectedTextFontPanel()
     if (m_controls.m_propertyFontSearch) {
         m_controls.m_propertyFontSearch->clear();
         m_controls.m_propertyFontSearch->setFocus(Qt::OtherFocusReason);
+    }
+    // 2. 【界面内存】【字体定位】尺寸与筛选确定后再居中，避免首次打开和重开显示不同字体并重复加载
+    if (auto *current = m_controls.m_propertyFontList->currentItem()) {
+        m_controls.m_propertyFontList->scrollToItem(current, QAbstractItemView::PositionAtCenter);
     }
 }
 

@@ -23,3 +23,10 @@ qt_add_executable(mark-shot-region-image-memory-test
 target_include_directories(mark-shot-region-image-memory-test PRIVATE src)
 target_link_libraries(mark-shot-region-image-memory-test PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
 add_test(NAME region-image-memory COMMAND mark-shot-region-image-memory-test)
+
+qt_add_executable(mark-shot-canvas-image-input-test
+    tests/canvas_image_input_test.cpp
+    src/canvas/canvas_image_input.cpp)
+target_include_directories(mark-shot-canvas-image-input-test PRIVATE src)
+target_link_libraries(mark-shot-canvas-image-input-test PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
+add_test(NAME canvas-image-input COMMAND mark-shot-canvas-image-input-test)

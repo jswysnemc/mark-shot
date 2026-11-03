@@ -1,5 +1,6 @@
 #include "shot_window.h"
 #include "annotation_launch.h"
+#include "pinned_window/pinned_image_window.h"
 #include "support/isolated_config.h"
 
 #include <QApplication>
@@ -154,6 +155,26 @@ private slots:
         QCOMPARE(input.devicePixelRatio(), 2.0);
         QCOMPARE(window.m_frozenFrame.devicePixelRatio(), 1.0);
         QCOMPARE(window.m_frozenFrame.pixel(0, 0), input.pixel(0, 0));
+        QCOMPARE(window.m_frozenFrame.constBits(), input.constBits());
+    }
+
+    /** 【画布测试】【贴图编辑】真实高分屏贴图入口共享原像素，关闭贴图后编辑器仍可使用，无参数和返回值。 */
+    void pinnedHighDpiEditorKeepsSharedPixelsAlive()
+    {
+        QImage input(128, 96, QImage::Format_RGB32);
+        input.fill(QColor(35, 65, 95));
+        input.setDevicePixelRatio(2.0);
+        const auto *pixels = input.constBits();
+        QScopedPointer<markshot::shot::PinnedImageWindow> pinned(
+            new markshot::shot::PinnedImageWindow(std::move(input)));
+        QScopedPointer<ShotWindow> editor(pinned->openImageEditor());
+        QVERIFY(editor);
+        QTRY_VERIFY(editor->m_fullscreenAnnotation);
+        QCOMPARE(editor->m_frozenFrame.constBits(), pixels);
+        QCOMPARE(editor->m_frozenFrame.devicePixelRatio(), 1.0);
+        pinned.reset();
+        QCOMPARE(editor->m_frozenFrame.constBits(), pixels);
+        QCOMPARE(editor->m_frozenFrame.pixelColor(0, 0), QColor(35, 65, 95));
     }
 
     /** 就地转换仍保留色彩空间、分辨率及文本元数据，无参数和返回值。 */

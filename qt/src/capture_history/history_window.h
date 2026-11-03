@@ -1,7 +1,9 @@
 #pragma once
 
 #include "capture_history/history_store.h"
+#include "capture_history/history_preview_cache.h"
 
+#include <QTimer>
 #include <QWidget>
 
 class QCheckBox;
@@ -9,6 +11,7 @@ class QHBoxLayout;
 class QLabel;
 class QListWidget;
 class QPushButton;
+class CaptureHistoryWindowTest;
 
 namespace markshot::history {
 
@@ -42,6 +45,7 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
 
 private:
+    friend class ::CaptureHistoryWindowTest;
     /// @brief 根据设置页主题刷新窗口配色与操作图标
     /// @return 无返回值
     void applyTheme();
@@ -60,6 +64,10 @@ private:
     /// @brief 按可用空间绘制当前图片预览
     /// @return 无返回值
     void updatePreview();
+    /** 【截图历史】【预览调度】合并连续尺寸变化，只在短暂稳定后更新预览，无参数和返回值。 */
+    void schedulePreview();
+    /** 【截图历史】【原图操作】读取当前选择的原图，失败显示统一状态，返回原图或空图。 */
+    QImage selectedOriginal();
     /// @brief 显示操作结果
     /// @param text 提示文字
     /// @return 无返回值
@@ -88,6 +96,10 @@ private:
     void setRecordingEnabled(bool enabled);
 
     HistoryStore m_store;
+    HistoryPreviewCache m_previews;
+    QTimer m_previewTimer;
+    QString m_selectedRevision;
+    // 【截图历史】【图像寿命】仅持有当前显示尺寸的预览，操作时的原图由局部变量持有
     QImage m_currentImage;
     QListWidget *m_list = nullptr;
     QLabel *m_preview = nullptr;

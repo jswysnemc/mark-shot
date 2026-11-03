@@ -1,6 +1,7 @@
 #include "shot_window_module.h"
 
 #include "app_config_store.h"
+#include "canvas/canvas_image_input.h"
 #include "selection_loupe_config.h"
 #include "ui/canvas_scrollbar_style.h"
 #include "ui/compact_toolbar.h"
@@ -239,15 +240,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     setAttribute(Qt::WA_DeleteOnClose);
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
     markshot::windows::setExcludedFromCapture(this);
-    if (m_frozenFrame.format() != QImage::Format_ARGB32_Premultiplied
-        && m_frozenFrame.format() != QImage::Format_RGB32) {
-        // 1. 【画布】【图像内存】RGB32 无需预乘，可与贴图共享；其他格式优先就地转换
-        m_frozenFrame = std::move(m_frozenFrame).convertToFormat(QImage::Format_ARGB32_Premultiplied);
-    }
-    // Annotation and selection geometry are stored in image pixels. Clear any
-    // high-DPI metadata from screen grabs so Qt painting does not apply a second
-    // device-pixel-ratio scale on top of our explicit image-to-widget mapping.
-    m_frozenFrame.setDevicePixelRatio(1.0);
+    m_frozenFrame = markshot::canvas::canvasImageInput(std::move(m_frozenFrame));
 
     initializeToolbar();
     initializeImageScrollBars();
@@ -435,8 +428,6 @@ ShotWindow::ShotWindow(QImage frozenFrame,
             [this](const QColor &color) { applyPropertyColor(color); });
     propertyColorLayout->addWidget(m_controls.m_propertyColorPicker);
     m_controls.m_propertyColorDialogPanel->hide();
-
-    initializePropertyFontPanel();
 
     initializeTransientPanels();
     initializeTextEditor();

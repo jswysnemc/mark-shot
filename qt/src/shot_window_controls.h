@@ -4,6 +4,8 @@
 #include "display_capture/display_capture_target.h"
 #include "selection_translate/selection_translate_session.h"
 #include <QPoint>
+#include <QColor>
+#include <QIcon>
 #include <QRect>
 #include <QRectF>
 #include <QVector>
@@ -24,6 +26,10 @@ struct ShotWindowControls {
     QWidget *m_actionToolbar = nullptr;
     markshot::ui::CompactToolbar *m_actionToolbarPanel = nullptr;
     QWidget *m_annotationPropertyPanel = nullptr;
+    // 【界面内存】【字体图标】由窗口持有，跨次打开复用，避免让整份列表因图标缓存键变化重新布局
+    QIcon m_propertyFontBlankIcon;
+    QIcon m_propertyFontCheckIcon;
+    QColor m_propertyFontCheckInk;
     QLabel *m_annotationPropertyTitle = nullptr;
     QLabel *m_propertyWidthLabel = nullptr;
     QSlider *m_propertyWidthSlider = nullptr;

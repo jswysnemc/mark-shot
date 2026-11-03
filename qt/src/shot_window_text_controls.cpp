@@ -1,8 +1,7 @@
 #include "shot_window_module.h"
 
-#include <QLineEdit>
+#include "annotation/text_size_limits.h"
 
-// ===== 新增 import =====
 #include "text_annotation_layout.h"
 #include "ui/recent_font_store.h"
 #include "ui/toolbar_panel_style.h"
@@ -14,13 +13,9 @@
 #include <QPainter>
 #include <QPixmap>
 
-namespace {
+using namespace markshot::shot::text_size;
 
-constexpr int kMinTextPointSize = 8;
-constexpr int kMaxTextPointSize = 300;
-constexpr int kTextPointSizeOffset = 19;
-// 字体弹层底部字号输入框与 B/I 按钮的统一高度
-constexpr int kFontPanelControlHeight = 26;
+namespace {
 
 /**
  * 修改文字样式，并让修改前的单行文字保持单行。
@@ -39,109 +34,6 @@ void applyTextStyleKeepingLines(markshot::shot::types::Annotation &annotation, A
 }
 
 }  // namespace
-
-/**
- * 创建文字字体面板，并连接字体、字号、粗体和斜体控件。
- * @return 无返回值。
- */
-void ShotWindow::initializePropertyFontPanel()
-{
-    m_controls.m_propertyFontPanel = new QWidget(this);
-    m_controls.m_propertyFontPanel->setObjectName(QStringLiteral("propertyFontPanel"));
-    m_controls.m_propertyFontPanel->setCursor(Qt::ArrowCursor);
-    m_controls.m_propertyFontPanel->setStyleSheet(markshot::theme::openWithPanelStyleSheet(m_toolbarAppearance.palette));
-    auto *fontPanelLayout = new QVBoxLayout(m_controls.m_propertyFontPanel);
-    fontPanelLayout->setContentsMargins(6, 6, 6, 6);
-    // 列表与底部控件行之间保留固定间距，高度由 updatePropertyFontPanelGeometry 统一分配
-    fontPanelLayout->setSpacing(6);
-
-    // 1. 搜索框按名称过滤，避免在整份字体列表里滚动查找
-    m_controls.m_propertyFontSearch = new QLineEdit(m_controls.m_propertyFontPanel);
-    m_controls.m_propertyFontSearch->setFixedHeight(kFontPanelControlHeight);
-    m_controls.m_propertyFontSearch->setClearButtonEnabled(true);
-    m_controls.m_propertyFontSearch->setPlaceholderText(MS_TR("Search fonts"));
-    m_controls.m_propertyFontSearch->setAccessibleName(MS_TR("Search fonts"));
-    fontPanelLayout->addWidget(m_controls.m_propertyFontSearch);
-
-    // 2. 创建字体系列列表
-    m_controls.m_propertyFontList = new QListWidget(m_controls.m_propertyFontPanel);
-    m_controls.m_propertyFontList->setFocusPolicy(Qt::NoFocus);
-    m_controls.m_propertyFontList->setUniformItemSizes(true);
-    m_controls.m_propertyFontList->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    m_controls.m_propertyFontList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    m_controls.m_propertyFontList->setTextElideMode(Qt::ElideRight);
-    m_controls.m_propertyFontList->setIconSize(QSize(14, 14));
-    for (const QString &family : QFontDatabase::families()) {
-        auto *item = new QListWidgetItem(family, m_controls.m_propertyFontList);
-        item->setData(Qt::UserRole, family);
-        item->setToolTip(family);
-        item->setFont(QFont(family, 13));
-    }
-    refreshRecentTextFontsIfEnabled();
-    connect(m_controls.m_propertyFontSearch, &QLineEdit::textChanged, this, [this](const QString &query) {
-        const QString needle = query.trimmed();
-        for (int index = 0; index < m_controls.m_propertyFontList->count(); ++index) {
-            QListWidgetItem *item = m_controls.m_propertyFontList->item(index);
-            const QString family = item->data(Qt::UserRole).toString();
-            item->setHidden(!needle.isEmpty() && !family.contains(needle, Qt::CaseInsensitive));
-        }
-    });
-    connect(m_controls.m_propertyFontList, &QListWidget::itemClicked, this, [this](QListWidgetItem *item) {
-        if (!item || ignoreRecentFontHeaderClickIfEnabled(item)) {
-            return;
-        }
-        setSelectedTextFontFamily(item->data(Qt::UserRole).toString());
-        m_controls.m_propertyFontPanel->hide();
-    });
-    fontPanelLayout->addWidget(m_controls.m_propertyFontList, 1);
-
-    // 3. 底部控件行：字号输入框与 B/I 按钮同排，固定高度，不参与列表伸缩
-    auto *fontStyleLayout = new QHBoxLayout;
-    fontStyleLayout->setContentsMargins(0, 0, 0, 0);
-    fontStyleLayout->setSpacing(4);
-    m_controls.m_propertyFontSizeSpin = new QSpinBox(m_controls.m_propertyFontPanel);
-    m_controls.m_propertyFontSizeSpin->setFixedHeight(kFontPanelControlHeight);
-    m_controls.m_propertyFontSizeSpin->setRange(kMinTextPointSize, kMaxTextPointSize);
-    m_controls.m_propertyFontSizeSpin->setSingleStep(1);
-    m_controls.m_propertyFontSizeSpin->setSuffix(QStringLiteral(" pt"));
-    m_controls.m_propertyFontSizeSpin->setFocusPolicy(Qt::StrongFocus);
-    m_controls.m_propertyFontSizeSpin->setToolTip(MS_TR("Text font size in points"));
-    connect(m_controls.m_propertyFontSizeSpin, &QSpinBox::valueChanged, this, [this](int value) {
-        setSelectedTextFontSize(value);
-    });
-    fontStyleLayout->addWidget(m_controls.m_propertyFontSizeSpin, 1);
-
-    // 4. 创建粗体和斜体切换控件
-    m_controls.m_propertyFontBoldButton = new QToolButton(m_controls.m_propertyFontPanel);
-    m_controls.m_propertyFontBoldButton->setFixedSize(kFontPanelControlHeight, kFontPanelControlHeight);
-    m_controls.m_propertyFontBoldButton->setCheckable(true);
-    m_controls.m_propertyFontBoldButton->setText(QStringLiteral("B"));
-    m_controls.m_propertyFontBoldButton->setToolTip(MS_TR("Bold"));
-    m_controls.m_propertyFontBoldButton->setFocusPolicy(Qt::NoFocus);
-    QFont boldButtonFont = m_controls.m_propertyFontBoldButton->font();
-    boldButtonFont.setBold(true);
-    m_controls.m_propertyFontBoldButton->setFont(boldButtonFont);
-    connect(m_controls.m_propertyFontBoldButton, &QToolButton::toggled, this, [this](bool checked) {
-        setSelectedTextBold(checked);
-    });
-    fontStyleLayout->addWidget(m_controls.m_propertyFontBoldButton);
-
-    m_controls.m_propertyFontItalicButton = new QToolButton(m_controls.m_propertyFontPanel);
-    m_controls.m_propertyFontItalicButton->setFixedSize(kFontPanelControlHeight, kFontPanelControlHeight);
-    m_controls.m_propertyFontItalicButton->setCheckable(true);
-    m_controls.m_propertyFontItalicButton->setText(QStringLiteral("I"));
-    m_controls.m_propertyFontItalicButton->setToolTip(MS_TR("Italic"));
-    m_controls.m_propertyFontItalicButton->setFocusPolicy(Qt::NoFocus);
-    QFont italicButtonFont = m_controls.m_propertyFontItalicButton->font();
-    italicButtonFont.setItalic(true);
-    m_controls.m_propertyFontItalicButton->setFont(italicButtonFont);
-    connect(m_controls.m_propertyFontItalicButton, &QToolButton::toggled, this, [this](bool checked) {
-        setSelectedTextItalic(checked);
-    });
-    fontStyleLayout->addWidget(m_controls.m_propertyFontItalicButton);
-    fontPanelLayout->addLayout(fontStyleLayout, 0);
-    m_controls.m_propertyFontPanel->hide();
-}
 
 /**
  * 设置选中文字标注或文字工具默认使用的字体系列。
@@ -367,7 +259,7 @@ void ShotWindow::rememberRecentTextFontIfEnabled(const QString &fontFamily)
 }
 
 /**
- * 在字体列表顶部刷新最近使用分区。开关关闭时直接返回。
+ * 【字体弹层】【最近字体】在列表顶部刷新最近使用分区。开关关闭时直接返回。
  * @return 无返回值。
  */
 void ShotWindow::refreshRecentTextFontsIfEnabled()
@@ -378,8 +270,17 @@ void ShotWindow::refreshRecentTextFontsIfEnabled()
     if (!m_controls.m_propertyFontList) {
         return;
     }
+    // 1. 【界面内存】【字体图标】整份列表共用两个图标，不为每个字体重复分配像素和图标对象
+    if (m_controls.m_propertyFontBlankIcon.isNull()) m_controls.m_propertyFontBlankIcon = fontListBlankIcon();
+    if (m_controls.m_propertyFontCheckIcon.isNull()
+        || m_controls.m_propertyFontCheckInk != m_toolbarAppearance.palette.text) {
+        m_controls.m_propertyFontCheckInk = m_toolbarAppearance.palette.text;
+        m_controls.m_propertyFontCheckIcon = fontListCheckIcon(m_controls.m_propertyFontCheckInk);
+    }
+    const QIcon &blankIcon = m_controls.m_propertyFontBlankIcon;
+    const QIcon &checkIcon = m_controls.m_propertyFontCheckIcon;
 
-    // 1. 移除上一次插入的最近使用分区，完整字体列表保持原顺序
+    // 2. 【字体弹层】【最近字体】移除上一次插入的分区，完整字体列表保持原顺序
     for (int index = m_controls.m_propertyFontList->count() - 1; index >= 0; --index) {
         QListWidgetItem *item = m_controls.m_propertyFontList->item(index);
         if (item->data(kRecentFontRowRole).toInt() == 0) {
@@ -388,7 +289,7 @@ void ShotWindow::refreshRecentTextFontsIfEnabled()
         delete m_controls.m_propertyFontList->takeItem(index);
     }
 
-    // 2. 最近使用放在顶部，每项用该字体绘制名称
+    // 3. 【字体弹层】【最近字体】最近使用放在顶部，每项用该字体绘制名称
     QString currentFamily = m_textFontFamily;
     if (m_selectedAnnotationId.has_value()) {
         if (const Annotation *annotation = annotationById(*m_selectedAnnotationId);
@@ -409,12 +310,12 @@ void ShotWindow::refreshRecentTextFontsIfEnabled()
         item->setData(kRecentFontRowRole, static_cast<int>(RecentFontRowKind::RecentFont));
         item->setToolTip(family);
         item->setFont(QFont(family, 13));
-        item->setIcon(family == currentFamily ? fontListCheckIcon(m_toolbarAppearance.palette.text) : fontListBlankIcon());
+        item->setIcon(family == currentFamily ? checkIcon : blankIcon);
         currentInRecent = currentInRecent || family == currentFamily;
         m_controls.m_propertyFontList->insertItem(0, item);
     }
 
-    // 3. 有最近使用时，用「所有系统字体」把完整列表隔开
+    // 4. 【字体弹层】【分区标题】有最近使用时，用「所有系统字体」把完整列表隔开
     if (!recent.isEmpty()) {
         const int rowHeight = std::max(28, m_controls.m_propertyFontList->sizeHintForRow(0));
         auto *header = new QListWidgetItem;
@@ -431,7 +332,7 @@ void ShotWindow::refreshRecentTextFontsIfEnabled()
             m_controls.m_propertyFontList->model()->index(recent.size(), 0), label);
     }
 
-    // 4. 系统字体与最近使用左对齐；当前字体只在最近使用里打勾
+    // 5. 【字体弹层】【当前字体】系统字体与最近使用左对齐，当前字体只在最近使用里打勾
     for (int index = recent.size(); index < m_controls.m_propertyFontList->count(); ++index) {
         QListWidgetItem *item = m_controls.m_propertyFontList->item(index);
         if (item->data(kRecentFontRowRole).toInt() != 0) {
@@ -440,7 +341,7 @@ void ShotWindow::refreshRecentTextFontsIfEnabled()
         const QString family = item->data(Qt::UserRole).toString();
         item->setFont(QFont(family, 13));
         const bool checked = !currentInRecent && family == currentFamily;
-        item->setIcon(checked ? fontListCheckIcon(m_toolbarAppearance.palette.text) : fontListBlankIcon());
+        item->setIcon(checked ? checkIcon : blankIcon);
         if (checked) {
             currentInRecent = true;
         }

@@ -22,3 +22,10 @@ target_link_libraries(mark-shot-rapid-image-input-test PRIVATE Qt6::Core Qt6::Gu
 add_test(NAME rapid-image-input COMMAND mark-shot-rapid-image-input-test)
 
 include(cmake/ocr_runtime_tests.cmake)
+
+qt_add_executable(mark-shot-rapid-rec-decoder-test
+    tests/rapid_rec_decoder_test.cpp
+    plugins/ocr-rapid/rapid_rec_decoder.cpp)
+target_include_directories(mark-shot-rapid-rec-decoder-test PRIVATE plugins/ocr-rapid)
+target_link_libraries(mark-shot-rapid-rec-decoder-test PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME rapid-rec-decoder COMMAND mark-shot-rapid-rec-decoder-test)

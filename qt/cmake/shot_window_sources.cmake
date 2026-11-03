@@ -3,6 +3,8 @@ include(cmake/editor_feature_sources.cmake)
 include(cmake/region_detection_sources.cmake)
 
 set(MARK_SHOT_WINDOW_SOURCES
+    src/canvas/canvas_image_input.cpp
+    src/canvas/canvas_image_input.h
     bridge/editor_history.cpp
     bridge/editor_history.h
     bridge/annotation_snapshot_codec.cpp
@@ -82,6 +84,8 @@ set(MARK_SHOT_WINDOW_SOURCES
     src/shot_window_startup_color_dialog.cpp
     src/shot_window_state.cpp
     src/shot_window_text_controls.cpp
+    src/shot_window_font_panel.cpp
+    src/annotation/text_size_limits.h
     src/shot_window_text_editor.cpp
     src/shot_window_text_layout.cpp
     src/shot_window_text_tool_input.cpp

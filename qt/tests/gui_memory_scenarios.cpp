@@ -4,6 +4,7 @@
 #include "region_detection/region_detection_scheduler.h"
 #include "settings/settings_dialog.h"
 #include "shot_window.h"
+#include "ui/i18n.h"
 
 #include <QApplication>
 #include <QElapsedTimer>
@@ -143,6 +144,33 @@ bool captureScenario(const QString &scenario, QSize frameSize, QSize viewport, i
     window->show();
     if (!settle(window, error)) return false;
     checkpoint(QStringLiteral("shown"));
+    if (scenario == QStringLiteral("font-panel")) {
+        if (!chooseTool(window, "Text")) {
+            *error = QStringLiteral("Text tool is unavailable");
+            return false;
+        }
+        if (!settle(window, error)) return false;
+        checkpoint(QStringLiteral("text_tool"));
+        QPushButton *fontButton = nullptr;
+        for (auto *button : window->findChildren<QPushButton *>()) {
+            if (button->accessibleName() == MS_TR("Text font")) fontButton = button;
+        }
+        if (!fontButton) {
+            *error = QStringLiteral("Font button is unavailable");
+            return false;
+        }
+        for (const QString &phase : {QStringLiteral("font_opened"), QStringLiteral("font_hidden"),
+                                     QStringLiteral("font_reopened")}) {
+            fontButton->click();
+            if (!settle(window, error)) return false;
+            const auto *panel = window->findChild<QWidget *>(QStringLiteral("propertyFontPanel"));
+            if (!panel || panel->isVisible() != (phase != QStringLiteral("font_hidden"))) {
+                *error = QStringLiteral("Font panel visibility did not change");
+                return false;
+            }
+            checkpoint(phase);
+        }
+    }
     if (scenario == QStringLiteral("annotate")) {
         if (!annotate(window, strokes, error)) return false;
         checkpoint(QStringLiteral("annotated"));
@@ -175,11 +203,13 @@ bool captureScenario(const QString &scenario, QSize frameSize, QSize viewport, i
     return true;
 }
 
-/** 测量 frameSize 图像的贴图及可选编辑流程，viewport 指定显示尺寸，checkpoint 采样，失败写入 error。 */
-bool pinScenario(QSize frameSize, QSize viewport, bool edit,
+/** 测量 frameSize 图像的贴图及可选编辑流程；viewport/sourceDpr 指定尺寸和原图比例，checkpoint 采样，失败写入 error，返回是否成功。 */
+bool pinScenario(QSize frameSize, QSize viewport, bool edit, qreal sourceDpr,
                   const GuiMemoryCheckpoint &checkpoint, QString *error)
 {
-    QPointer<shot::PinnedImageWindow> window = new shot::PinnedImageWindow(testImage(frameSize));
+    QImage image = testImage(frameSize);
+    image.setDevicePixelRatio(sourceDpr);
+    QPointer<shot::PinnedImageWindow> window = new shot::PinnedImageWindow(std::move(image));
     window->show();
     if (!settle(window, error)) return false;
     // 1. 【GUI测量】【贴图缩放】通过实际滚轮调整显示比例，不更改窗口内部缩放状态
@@ -235,8 +265,10 @@ bool runGuiMemoryScenario(const QString &scenario, QSize frameSize, QSize viewpo
                           const GuiMemoryCheckpoint &checkpoint, QString *error)
 {
     if (scenario == QStringLiteral("settings")) return settingsScenario(checkpoint, error);
-    if (scenario == QStringLiteral("pin") || scenario == QStringLiteral("pin-edit")) {
-        return pinScenario(frameSize, viewport, scenario == QStringLiteral("pin-edit"), checkpoint, error);
+    if (scenario == QStringLiteral("pin") || scenario == QStringLiteral("pin-edit")
+        || scenario == QStringLiteral("pin-edit-hidpi")) {
+        return pinScenario(frameSize, viewport, scenario != QStringLiteral("pin"),
+                           scenario == QStringLiteral("pin-edit-hidpi") ? 2.0 : 1.0, checkpoint, error);
     }
     return captureScenario(scenario, frameSize, viewport, strokes, zoomPasses, checkpoint, error);
 }

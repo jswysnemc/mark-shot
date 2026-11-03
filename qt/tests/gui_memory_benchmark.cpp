@@ -41,7 +41,7 @@ int main(int argc, char **argv)
     parser.setApplicationDescription(QStringLiteral("Measure real GUI workflows without desktop capture or working-set trimming"));
     parser.addHelpOption();
     parser.addOptions({
-        {{QStringLiteral("scenario")}, QStringLiteral("capture, annotate, edit, pin, pin-edit, settings or cycle"), QStringLiteral("name"), QStringLiteral("capture")},
+        {{QStringLiteral("scenario")}, QStringLiteral("capture, annotate, edit, font-panel, pin, pin-edit, pin-edit-hidpi, settings or cycle"), QStringLiteral("name"), QStringLiteral("capture")},
         {{QStringLiteral("width")}, QStringLiteral("Source image width"), QStringLiteral("pixels"), QStringLiteral("3840")},
         {{QStringLiteral("height")}, QStringLiteral("Source image height"), QStringLiteral("pixels"), QStringLiteral("2160")},
         {{QStringLiteral("strokes")}, QStringLiteral("Number of annotation strokes"), QStringLiteral("count"), QStringLiteral("20")},
@@ -55,8 +55,9 @@ int main(int argc, char **argv)
     const int zoomPasses = parser.value(QStringLiteral("zoom-passes")).toInt();
     const int iterations = parser.value(QStringLiteral("iterations")).toInt();
     const QString scenario = parser.value(QStringLiteral("scenario"));
-    const QStringList scenarios{QStringLiteral("capture"), QStringLiteral("annotate"), QStringLiteral("edit"),
-                                QStringLiteral("pin"), QStringLiteral("pin-edit"), QStringLiteral("settings")};
+    const QStringList scenarios{QStringLiteral("capture"), QStringLiteral("annotate"), QStringLiteral("edit"), QStringLiteral("font-panel"),
+                                QStringLiteral("pin"), QStringLiteral("pin-edit"), QStringLiteral("pin-edit-hidpi"),
+                                QStringLiteral("settings")};
     if (size.width() < 320 || size.height() < 240 || size.width() > 8192 || size.height() > 8192
         || strokes < 1 || strokes > 200 || zoomPasses < 1 || zoomPasses > 20 || iterations < 1 || iterations > 20
         || (!scenarios.contains(scenario) && scenario != QStringLiteral("cycle"))) parser.showHelp(2);

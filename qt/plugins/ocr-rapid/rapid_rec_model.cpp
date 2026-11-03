@@ -1,5 +1,7 @@
 #include "rapid_rec_model.h"
 
+#include "rapid_rec_decoder.h"
+
 #include <QFile>
 #include <QTextStream>
 
@@ -109,91 +111,11 @@ bool RapidRecModel::recognize(const QImage &lineImage, RapidRecResult *result, Q
     QVector<float> input;
     fillRecInput(scaled, &input);
 
-    // 2. 推理得到 [1, T, C] 概率序列
-    QVector<float> output;
-    TensorShape outputShape;
-    if (!m_session.run(input,
-                       {{1, 3, kRecInputHeight, inputWidth}},
-                       &output,
-                       &outputShape,
-                       error)) {
-        return false;
-    }
-    if (outputShape.dims.size() != 3) {
-        if (error) {
-            *error = QStringLiteral("unexpected recognition output shape");
-        }
-        return false;
-    }
-    const int steps = static_cast<int>(outputShape.dims.at(1));
-    const int classes = static_cast<int>(outputShape.dims.at(2));
-    if (steps <= 0 || classes <= 1
-        || static_cast<qsizetype>(steps) * classes > output.size()) {
-        if (error) {
-            *error = QStringLiteral("recognition output size mismatch");
-        }
-        return false;
-    }
-    result->stepCount = steps;
-
-    // 3. 逐时间步取 argmax，先保留类别与置信度
-    QVector<int> bestIndexes(steps);
-    QVector<float> bestScores(steps);
-    for (int step = 0; step < steps; ++step) {
-        const float *probabilities = output.constData() + static_cast<qsizetype>(step) * classes;
-        int best = 0;
-        float bestScore = probabilities[0];
-        for (int c = 1; c < classes; ++c) {
-            if (probabilities[c] > bestScore) {
-                bestScore = probabilities[c];
-                best = c;
-            }
-        }
-        bestIndexes[step] = best;
-        bestScores[step] = bestScore;
-    }
-
-    // 4. CTC 解码：按连续 run 折叠重复并跳过 blank(0)，同时保留字符跨度
-    QString text;
-    QVector<RapidRecCharacter> characters;
-    double confidenceSum = 0.0;
-    int keptSteps = 0;
-    int previousIndex = 0;
-    int step = 0;
-    while (step < steps) {
-        const int currentIndex = bestIndexes.at(step);
-        const int startStep = step;
-        double runConfidenceSum = 0.0;
-        int runStepCount = 0;
-        while (step < steps && bestIndexes.at(step) == currentIndex) {
-            runConfidenceSum += bestScores.at(step);
-            ++runStepCount;
-            ++step;
-        }
-
-        if (currentIndex != 0 && currentIndex != previousIndex) {
-            // 类别布局：0=blank，1..dictSize=字典字符，dictSize+1=空格
-            const QString characterText =
-                currentIndex <= m_characters.size()
-                ? m_characters.at(currentIndex - 1)
-                : QStringLiteral(" ");
-            RapidRecCharacter character;
-            character.text = characterText;
-            character.startStep = startStep;
-            character.endStep = step - 1;
-            character.confidence = runStepCount > 0 ? runConfidenceSum / runStepCount : 0.0;
-            characters.append(character);
-            text += characterText;
-            confidenceSum += character.confidence;
-            ++keptSteps;
-        }
-        previousIndex = currentIndex;
-    }
-
-    result->text = text.trimmed();
-    result->confidence = keptSteps > 0 ? confidenceSum / keptSteps : 0.0;
-    result->characters = characters;
-    return true;
+    // 2. 【OCR】【字符解码】在原生输出仍有效时直接解码，不复制完整的 [1,T,C] 概率矩阵
+    return m_session.visitOutput(input, {{1, 3, kRecInputHeight, inputWidth}},
+        [&](const float *output, qsizetype count, const TensorShape &shape, QString *failure) {
+            return decodeRapidRecognition(output, count, shape, m_characters, result, failure);
+        }, error);
 }
 
 }  // namespace markshot::ocr_rapid

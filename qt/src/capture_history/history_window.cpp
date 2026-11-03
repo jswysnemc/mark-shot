@@ -27,6 +27,9 @@ HistoryWindow::HistoryWindow()
     setMinimumSize(QSize(440, 320).boundedTo(available));
     resize(QSize(800, 520).boundedTo(available));
 
+    m_previewTimer.setSingleShot(true);
+    connect(&m_previewTimer, &QTimer::timeout, this, [this] { updatePreview(); });
+
     buildLayout();
     applyTheme();
     refresh();
@@ -43,22 +46,41 @@ void HistoryWindow::refresh()
     const QString selected = selectedFileName();
     const auto entries = m_store.entries();
     const QSignalBlocker blocker(m_list);
-    m_list->clear();
+    QSet<QString> names;
+    for (const HistoryEntry &entry : entries) names.insert(entry.fileName);
+    m_previews.retain(names);
+    for (int row = m_list->count() - 1; row >= 0; --row) {
+        if (!names.contains(m_list->item(row)->data(Qt::UserRole).toString())) delete m_list->takeItem(row);
+    }
+    QHash<QString, QListWidgetItem *> items;
+    for (int row = 0; row < m_list->count(); ++row) {
+        auto *item = m_list->item(row);
+        items.insert(item->data(Qt::UserRole).toString(), item);
+    }
     int selectedRow = 0;
-    for (const HistoryEntry &entry : entries) {
-        QImage thumbnail = m_store.image(entry.fileName, QSize(56, 38));
-        thumbnail.setDevicePixelRatio(1.0);
-        const QString label = entry.createdAt.toLocalTime().toString(QStringLiteral("MM-dd HH:mm:ss"))
-            + QStringLiteral("\n%1 × %2").arg(entry.imageSize.width()).arg(entry.imageSize.height());
-        const QPixmap pixmap = QPixmap::fromImage(thumbnail);
-        QIcon thumbnailIcon(pixmap);
-        thumbnailIcon.addPixmap(pixmap, QIcon::Selected);
-        auto *item = new QListWidgetItem(thumbnailIcon, label, m_list);
-        item->setData(Qt::UserRole, entry.fileName);
-        item->setToolTip(entry.createdAt.toLocalTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
-        if (entry.fileName == selected) {
-            selectedRow = m_list->count() - 1;
+    for (int row = 0; row < entries.size(); ++row) {
+        const HistoryEntry &entry = entries.at(row);
+        auto *item = items.value(entry.fileName);
+        if (!item) {
+            item = new QListWidgetItem;
+            item->setData(Qt::UserRole, entry.fileName);
+            m_list->insertItem(row, item);
+        } else if (m_list->row(item) != row) {
+            m_list->insertItem(row, m_list->takeItem(m_list->row(item)));
         }
+        // 2. 【截图历史】【增量刷新】未变化条目不替换图标或模型索引，保留选择和滚动位置
+        const QString version = HistoryPreviewCache::revision(m_store, entry.fileName);
+        if (item->data(Qt::UserRole + 1).toString() != version) {
+            const QPixmap pixmap = QPixmap::fromImage(m_previews.image(m_store, entry.fileName, QSize(56, 38)));
+            QIcon icon(pixmap);
+            icon.addPixmap(pixmap, QIcon::Selected);
+            item->setIcon(icon);
+            item->setText(entry.createdAt.toLocalTime().toString(QStringLiteral("MM-dd HH:mm:ss"))
+                          + QStringLiteral("\n%1 × %2").arg(entry.imageSize.width()).arg(entry.imageSize.height()));
+            item->setToolTip(entry.createdAt.toLocalTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
+            item->setData(Qt::UserRole + 1, version);
+        }
+        if (entry.fileName == selected) selectedRow = row;
     }
 
     // 2. 【截图历史】【刷新】同步预览、数量和自动记录开关
@@ -73,26 +95,35 @@ void HistoryWindow::refresh()
 void HistoryWindow::updateSelection()
 {
     showStatus({});
-    m_currentImage = m_store.image(selectedFileName());
-    for (QPushButton *button : m_imageActions) {
-        button->setEnabled(!m_currentImage.isNull());
-    }
-    updatePreview();
+    const QString version = HistoryPreviewCache::revision(m_store, selectedFileName());
+    if (version == m_selectedRevision && !m_currentImage.isNull()) return;
+    m_selectedRevision = version;
+    m_currentImage = {};
+    m_preview->clear();
+    for (QPushButton *button : m_imageActions) button->setEnabled(false);
+    if (version.isEmpty()) updatePreview();
+    else schedulePreview();
+}
+
+void HistoryWindow::schedulePreview()
+{
+    m_previewTimer.start(30);
 }
 
 void HistoryWindow::updatePreview()
 {
+    m_previewTimer.stop();
+    const qreal dpr = devicePixelRatioF();
+    const QSize target = (m_preview->contentsRect().size() - QSize(12, 12)) * dpr;
+    if (target.isEmpty()) return;
+    m_currentImage = m_previews.image(m_store, selectedFileName(), target);
+    for (QPushButton *button : m_imageActions) button->setEnabled(!m_currentImage.isNull());
     if (m_currentImage.isNull()) {
         m_preview->setPixmap(QPixmap());
         m_preview->setText(m_list->count() == 0 ? MS_TR("No screenshots in history") : MS_TR("Screenshot is no longer available"));
         return;
     }
-    const qreal dpr = devicePixelRatioF();
-    const QSize target = (m_preview->contentsRect().size() - QSize(12, 12)) * dpr;
-    if (target.isEmpty()) {
-        return;
-    }
-    QPixmap preview = QPixmap::fromImage(m_currentImage.scaled(target, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    QPixmap preview = QPixmap::fromImage(m_currentImage);
     preview.setDevicePixelRatio(dpr);
     m_preview->setPixmap(preview);
 }
@@ -120,7 +151,7 @@ void HistoryWindow::resizeEvent(QResizeEvent *event)
     QWidget::resizeEvent(event);
     updateActionLayout();
     if (m_preview) {
-        updatePreview();
+        schedulePreview();
     }
 }
 

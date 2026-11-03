@@ -19,32 +19,43 @@
 
 namespace markshot::history {
 
+QImage HistoryWindow::selectedOriginal()
+{
+    const QImage image = m_store.image(selectedFileName());
+    if (image.isNull()) showStatus(MS_TR("Screenshot is no longer available"));
+    return image;
+}
+
 void HistoryWindow::copySelected()
 {
-    if (!m_currentImage.isNull()) {
-        showStatus(markshot::copyImageToClipboard(m_currentImage) ? MS_TR("Copied") : MS_TR("Copy failed"));
+    const QImage image = selectedOriginal();
+    if (!image.isNull()) {
+        showStatus(markshot::copyImageToClipboard(image) ? MS_TR("Copied") : MS_TR("Copy failed"));
     }
 }
 
 void HistoryWindow::editSelected()
 {
-    if (!m_currentImage.isNull()) {
-        markshot::openImageForAnnotation(m_currentImage, MS_TR("Screenshot History"));
+    const QImage image = selectedOriginal();
+    if (!image.isNull()) {
+        markshot::openImageForAnnotation(image, MS_TR("Screenshot History"));
     }
 }
 
 void HistoryWindow::pinSelected()
 {
-    if (m_currentImage.isNull()) {
+    const QImage image = selectedOriginal();
+    if (image.isNull()) {
         return;
     }
-    auto *window = new markshot::shot::PinnedImageWindow(m_currentImage);
+    auto *window = new markshot::shot::PinnedImageWindow(image);
     markshot::shot::presentPinnedImage(window);
 }
 
 void HistoryWindow::saveSelected()
 {
-    if (m_currentImage.isNull()) {
+    const QImage image = selectedOriginal();
+    if (image.isNull()) {
         return;
     }
     // 1. 【截图历史】【另存为】使用应用样式的文件对话框选择输出文件
@@ -56,7 +67,6 @@ void HistoryWindow::saveSelected()
     dialog->setDefaultSuffix(QStringLiteral("png"));
     dialog->setNameFilter(MS_TR("PNG Images (*.png)"));
     dialog->selectFile(selectedFileName());
-    const QImage image = m_currentImage;
 
     // 2. 【截图历史】【另存为】保存选择时的图像快照，不创建重复历史
     connect(dialog, &QFileDialog::accepted, this, [this, dialog, image] {

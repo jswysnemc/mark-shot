@@ -6,13 +6,18 @@
 #include "window_detection.h"
 
 #include <QApplication>
+#include <QClipboard>
 #include <QDir>
 #include <QFile>
+#include <QFileDialog>
 #include <QJsonObject>
 #include <QLabel>
 #include <QListWidget>
 #include <QPainter>
+#include <QMimeData>
 #include <QPushButton>
+#include <QPersistentModelIndex>
+#include <QScopeGuard>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -67,6 +72,7 @@ private slots:
         window.resize(size);
         window.show();
         QVERIFY(QTest::qWaitForWindowExposed(&window));
+        QTRY_VERIFY(!window.m_currentImage.isNull());
         const auto expected = markshot::settings::tokens::settingsPalette(markshot::ui::uiThemeModeFromString(theme));
         QCOMPARE(window.palette().color(QPalette::Window), expected.color(QPalette::Window));
         QCOMPARE(window.size(), size);
@@ -136,6 +142,86 @@ private slots:
         QTest::mouseClick(close, Qt::LeftButton);
         QVERIFY(!window.isVisible());
     }
+
+    /** 【历史测试】【无变化刷新】刷新不销毁已有列表项和选择，无参数和返回值。 */
+    void preservesItemsWhenHistoryIsUnchanged()
+    {
+        markshot::history::HistoryWindow window;
+        window.setAttribute(Qt::WA_DeleteOnClose, false);
+        auto *list = window.findChild<QListWidget *>(QStringLiteral("historyList"));
+        QVERIFY(list);
+        list->setCurrentRow(1);
+        const QPersistentModelIndex selected(list->currentIndex());
+        window.refresh();
+        QVERIFY2(selected.isValid(), "Unchanged history rebuilds the entire item model");
+        QCOMPARE(list->currentIndex(), QModelIndex(selected));
+    }
+
+    /** 【历史测试】【预览上限】小窗口只持有显示尺寸的预览，不长期持有完整 4K 像素，无参数和返回值。 */
+    void keepsOnlyDisplaySizedPreview()
+    {
+        markshot::history::HistoryStore store;
+        QImage original(3840, 2160, QImage::Format_RGB32);
+        original.fill(QColor(30, 80, 120));
+        original.setDevicePixelRatio(2.0);
+        QVERIFY(store.append(original));
+        const QString name = store.entries().first().fileName;
+        const auto cleanup = qScopeGuard([&] { store.remove(name); });
+        markshot::history::HistoryWindow window;
+        window.setAttribute(Qt::WA_DeleteOnClose, false);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+        QTRY_VERIFY(!window.m_currentImage.isNull());
+        const QSize target = window.m_preview->contentsRect().size() * window.devicePixelRatioF();
+        QVERIFY2(window.m_currentImage.width() <= target.width()
+                     && window.m_currentImage.height() <= target.height(),
+                 "Small preview retains a full-resolution history image");
+        const QImage loaded = window.selectedOriginal();
+        QCOMPARE(loaded.size(), original.size());
+        QCOMPARE(loaded.devicePixelRatio(), original.devicePixelRatio());
+        QCOMPARE(loaded.pixelColor(1500, 1500), original.pixelColor(1500, 1500));
+        QVERIFY(window.m_currentImage.width() <= target.width());
+    }
+
+    /** 【历史测试】【原图导出】复制和保存读取原图，保存对话框期间切换选择不改变图像快照，无参数和返回值。 */
+    void exportsOriginalRatherThanPreview()
+    {
+        QTemporaryDir output;
+        QVERIFY(output.isValid());
+        markshot::history::HistoryStore store;
+        QImage original(2560, 1440, QImage::Format_ARGB32);
+        original.fill(QColor(150, 40, 60, 170));
+        QVERIFY(store.append(original));
+        const QString name = store.entries().first().fileName;
+        const auto cleanup = qScopeGuard([&] { store.remove(name); QApplication::clipboard()->clear(); });
+        markshot::history::HistoryWindow window;
+        window.setAttribute(Qt::WA_DeleteOnClose, false);
+        window.show();
+        QTRY_VERIFY(!window.m_currentImage.isNull());
+        window.copySelected();
+        const auto *mime = QApplication::clipboard()->mimeData();
+        QVERIFY(mime);
+        const QImage copied = mime->hasFormat(QStringLiteral("image/png"))
+            ? QImage::fromData(mime->data(QStringLiteral("image/png"))) : QApplication::clipboard()->image();
+        QCOMPARE(copied.size(), original.size());
+        QCOMPARE(copied.pixelColor(1000, 1000), original.pixelColor(1000, 1000));
+        QCOMPARE(store.entries().first().fileName, name);
+        window.saveSelected();
+        auto *dialog = window.findChild<QFileDialog *>();
+        QVERIFY(dialog);
+        window.m_list->setCurrentRow(1);
+        const QString path = output.filePath(QStringLiteral("saved.png"));
+        dialog->selectFile(path);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "accept", Qt::DirectConnection));
+        QTRY_VERIFY(QFile::exists(path));
+        const QImage saved(path);
+        QCOMPARE(saved.size(), original.size());
+        QCOMPARE(saved.pixelColor(1000, 1000), original.pixelColor(1000, 1000));
+        QVERIFY(store.remove(window.selectedFileName()));
+        QVERIFY(window.selectedOriginal().isNull());
+        window.refresh();
+        QTRY_VERIFY(!window.m_currentImage.isNull());
+    }
 };
 
 /**
@@ -149,6 +235,12 @@ int main(int argc, char **argv)
     QTemporaryDir isolated;
     if (!markshot::test::isolateConfig(isolated)) {
         return 1;
+    }
+    // 1. 【历史测试】【剪贴板隔离】离屏测试不启动真实桌面的剪贴板所有者或会话服务
+    if (qEnvironmentVariable("QT_QPA_PLATFORM").startsWith(QStringLiteral("offscreen"))) {
+        qputenv("XDG_SESSION_TYPE", "offscreen");
+        qputenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent-mark-shot-test-bus");
+        for (const char *key : {"DISPLAY", "WAYLAND_DISPLAY", "WAYLAND_SOCKET", "NIRI_SOCKET", "SWAYSOCK"}) qunsetenv(key);
     }
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("mark-shot-history-test"));

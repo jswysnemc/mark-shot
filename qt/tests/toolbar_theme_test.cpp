@@ -5,6 +5,7 @@
 #include "ui/compact_toolbar.h"
 #include "ui/context_menu.h"
 #include "ui/icons.h"
+#include "ui/i18n.h"
 #include "ui/interface_theme_config.h"
 #include "ui/toolbar_palette.h"
 #include "ui/toolbar_panel_style.h"
@@ -131,6 +132,18 @@ private slots:
         auto *propertyPanel = window.findChild<QWidget *>(QStringLiteral("annotationPropertyPanel"));
         QVERIFY(propertyPanel);
         QCOMPARE(propertyPanel->styleSheet(), toolbar->styleSheet());
+        // 4.1 【主题测试】【延迟面板】通过文字工具的真实入口创建字体弹层，再检查浅色、深色和系统主题
+        QVERIFY(!window.findChild<QWidget *>(QStringLiteral("propertyFontPanel")));
+        window.startFullscreenAnnotation();
+        auto *text = toolbar->button(markshot::ui::actionName(ShotWindow::Action::ToolText));
+        QVERIFY(text);
+        text->click();
+        QPushButton *font = nullptr;
+        for (auto *button : propertyPanel->findChildren<QPushButton *>()) {
+            if (button->accessibleName() == MS_TR("Text font")) font = button;
+        }
+        QVERIFY(font);
+        font->click();
         const QString popupFill = markshot::ui::cssColor(expected.popupFill);
         for (const char *name : {"openWithPanel", "extensionPanel", "propertyFontPanel", "propertyColorDialogPanel"}) {
             auto *panel = window.findChild<QWidget *>(QString::fromLatin1(name));

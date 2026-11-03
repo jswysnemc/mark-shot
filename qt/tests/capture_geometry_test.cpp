@@ -82,6 +82,42 @@ private slots:
 
         QCOMPARE(cropped.size(), QSize(400, 200));
         QCOMPARE(cropped.devicePixelRatio(), 1.0);
+        QCOMPARE(cropped.constBits(), image.constBits());
+    }
+
+    /** 【截图测试】【整帧共享】覆盖整个输出的请求复用像素并保持写入隔离，无参数和返回值。 */
+    void fullFrameCropSharesUntilWritten()
+    {
+        QImage frame(80, 40, QImage::Format_RGB32);
+        frame.fill(Qt::red);
+        frame.setDevicePixelRatio(2.0);
+        const QRect geometry(-40, 20, 40, 20);
+        QImage cropped = markshot::capture::cropFrameToRequest(frame, geometry,
+                                                               geometry.adjusted(-5, -5, 5, 5));
+        QCOMPARE(cropped.constBits(), frame.constBits());
+        QCOMPARE(cropped.devicePixelRatio(), 2.0);
+        cropped.setPixelColor(0, 0, Qt::blue);
+        QCOMPARE(frame.pixelColor(0, 0), QColor(Qt::red));
+        QCOMPARE(cropped.pixelColor(0, 0), QColor(Qt::blue));
+
+        cropped = markshot::capture::cropFrameToRequest(frame, {}, frame.rect());
+        const auto *pixels = frame.constBits();
+        frame = {};
+        QCOMPARE(cropped.constBits(), pixels);
+        QCOMPARE(cropped.pixelColor(0, 0), QColor(Qt::red));
+    }
+
+    /** 【截图测试】【局部裁剪】小选区不保留整张原图，未命中的请求返回空图，无参数和返回值。 */
+    void partialCropOwnsOnlyRequestedPixels()
+    {
+        QImage frame(80, 40, QImage::Format_RGB32);
+        frame.fill(Qt::green);
+        const QImage cropped = markshot::capture::cropFrameToRequest(frame, frame.rect(), QRect(5, 10, 8, 6));
+        QVERIFY(cropped.constBits() != frame.constBits());
+        QCOMPARE(cropped.sizeInBytes(), qsizetype(8 * 6 * 4));
+        frame.fill(Qt::blue);
+        QCOMPARE(cropped.pixelColor(0, 0), QColor(Qt::green));
+        QVERIFY(markshot::capture::cropFrameToRequest(frame, frame.rect(), QRect(90, 0, 5, 5)).isNull());
     }
 
     void resizeFrameToGeometrySizeMatchesLogicalBounds()

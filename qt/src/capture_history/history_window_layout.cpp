@@ -82,7 +82,7 @@ void HistoryWindow::buildLayout()
     splitter->setStretchFactor(1, 1);
     splitter->setSizes({210, 566});
     layout->addWidget(splitter, 1);
-    connect(splitter, &QSplitter::splitterMoved, this, [this] { updatePreview(); });
+    connect(splitter, &QSplitter::splitterMoved, this, [this] { schedulePreview(); });
     connect(m_list, &QListWidget::currentItemChanged, this, [this] { updateSelection(); });
     connect(m_list, &QListWidget::itemDoubleClicked, this, [this] { editSelected(); });
 
