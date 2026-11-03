@@ -17,6 +17,8 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  CARGO_PROFILE_TEST_DEBUG: '0'
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -37,7 +39,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential clang libclang-dev pkg-config \
             libwayland-dev libxkbcommon-dev libpipewire-0.3-dev \
-            libssl-dev fontconfig
+            libssl-dev libfontconfig-dev fontconfig
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -46,9 +48,14 @@ jobs:
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          cache-directories: /home/runner/.cache/ort.pyke.io
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
+        with:
+          cache-dependency-glob: .github/workflows/native-build.yml
 
       - name: Prepare private test directories
         run: mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
@@ -76,15 +83,48 @@ jobs:
           ./target/release/mark-shot --help > target/native-help.txt
           ldd target/release/mark-shot > target/native-linkage.txt
           cat target/native-linkage.txt
-          if grep -Ei 'not found|libQt|libgtk|webkit|webview' target/native-linkage.txt; then
+          if grep -Ei 'not found|libQt|libgtk|webkit|webview|webgpu_dawn' target/native-linkage.txt; then
             exit 1
           fi
 
+      - name: Collect dependency licenses
+        run: |
+          curl -fsSLo target/cargo-about.tar.gz https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.3/cargo-about-0.9.3-x86_64-unknown-linux-musl.tar.gz
+          printf '%s  %s\n' '3ad1e94ea1e63d69d1961f4fb15ccbbe9575d906111f96d2cb4dce6df48f71b4' 'target/cargo-about.tar.gz' | sha256sum --check
+          mkdir -p target/cargo-about
+          tar -xzf target/cargo-about.tar.gz --strip-components=1 -C target/cargo-about
+          target/cargo-about/cargo-about generate --locked --workspace --target x86_64-unknown-linux-gnu --fail --config release/about.toml --output-file target/native-license-notices.txt release/license-notices.hbs
+
+      - name: Collect native runtime notices
+        run: |
+          cargo metadata --locked --format-version 1 > target/native-metadata.json
+          python3 - <<'PY'
+          import csv
+          import json
+          from pathlib import Path
+          packages = json.loads(Path("target/native-metadata.json").read_text())["packages"]
+          manifest = Path(next(item["manifest_path"] for item in packages if item["name"] == "ort-sys"))
+          table = manifest.parent / "build/download/dist.tsv"
+          with table.open() as source:
+              rows = [row for row in csv.DictReader(source, delimiter="\t") if row["target"] == "x86_64-unknown-linux-gnu" and row["feature_set"] == "none"]
+          assert len(rows) == 1, "ambiguous native runtime distribution"
+          assert rows[0]["url"] == "https://cdn.pyke.io/0/pyke:ort-rs/ms@1.28.0/x86_64-unknown-linux-gnu.tar.lzma2", "runtime version changed"
+          assert rows[0]["sha256_hash"] == "e454f710f8a49f53aa5b4ff51e3454ae1835777e431c6c35c5255ce6f205fd68", "runtime distribution changed"
+          PY
+          mkdir -p target/native-runtime-notices
+          curl -fsSLo target/native-runtime-notices/LICENSE-ONNXRUNTIME.txt https://raw.githubusercontent.com/microsoft/onnxruntime/da9b5e364c465de65c49d91e696cd6485270757f/LICENSE
+          curl -fsSLo target/native-runtime-notices/NOTICES-ONNXRUNTIME.txt https://raw.githubusercontent.com/microsoft/onnxruntime/da9b5e364c465de65c49d91e696cd6485270757f/ThirdPartyNotices.txt
+          printf '%s  %s\n' '2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c' 'target/native-runtime-notices/LICENSE-ONNXRUNTIME.txt' '0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2' 'target/native-runtime-notices/NOTICES-ONNXRUNTIME.txt' | sha256sum --check
+
       - name: Package native build
         run: |
-          mkdir -p target/native-dist/mark-shot-native/docs
+          mkdir -p target/native-dist/mark-shot-native/docs target/native-dist/mark-shot-native/licenses
           install -m 755 target/release/mark-shot target/native-dist/mark-shot-native/mark-shot
           cp LICENSE-MIT LICENSE-APACHE README.md target/native-dist/mark-shot-native/
+          cp assets/fonts/LICENSE-OFL.txt assets/fonts/LICENSE-NUMERALS.txt target/native-dist/mark-shot-native/licenses/
+          cp assets/icons/mark-shot/LICENSE target/native-dist/mark-shot-native/licenses/LICENSE-ICONS.txt
+          cp target/native-license-notices.txt target/native-dist/mark-shot-native/licenses/DEPENDENCIES.txt
+          cp target/native-runtime-notices/*.txt target/native-dist/mark-shot-native/licenses/
           cp docs/*.md target/native-dist/mark-shot-native/docs/
           cp target/native-help.txt target/native-linkage.txt target/native-dist/mark-shot-native/
           printf '%s\n' "$GITHUB_SHA" > target/native-dist/mark-shot-native/SOURCE-COMMIT

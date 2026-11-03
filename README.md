@@ -29,7 +29,7 @@ sudo pacman -S --needed rust pkgconf wayland libxkbcommon pipewire fontconfig
 Debian / Ubuntu 构建依赖：
 
 ```sh
-sudo apt install cargo rustc pkg-config libwayland-dev libxkbcommon-dev libpipewire-0.3-dev libssl-dev fontconfig
+sudo apt install cargo rustc pkg-config libwayland-dev libxkbcommon-dev libpipewire-0.3-dev libssl-dev libfontconfig-dev fontconfig
 ```
 
 发行版自带 Rust 版本不足时，应使用 rustup 提供的稳定工具链。

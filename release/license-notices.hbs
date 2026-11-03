@@ -1,0 +1,23 @@
+Mark Shot Native Third-Party Licenses
+
+This file lists dependency versions, source archives and license text.
+Bundled fonts, icons and native runtime notices are supplied separately.
+Local workspace modules belong to the project source archive at SOURCE-COMMIT.
+
+{{#each licenses}}
+========================================================================
+License: {{name}}
+
+Used by:
+{{#each used_by}}
+- {{crate.name}} {{crate.version}}
+{{#if crate.source}}
+  Source: https://crates.io/api/v1/crates/{{crate.name}}/{{crate.version}}/download
+{{else}}
+  Source: project source archive identified by SOURCE-COMMIT
+{{/if}}
+{{/each}}
+
+{{{text}}}
+
+{{/each}}
