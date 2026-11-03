@@ -1,4 +1,6 @@
 set(MARK_SHOT_SETTINGS_SOURCES
+    src/settings/application_theme.cpp
+    src/settings/application_theme.h
     src/settings/cloud_translate_settings.cpp
     src/settings/cloud_translate_settings.h
     src/settings/provider_preference_config.cpp

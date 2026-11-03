@@ -1,6 +1,7 @@
 #include "settings/settings_dialog.h"
 
 #include "app_config_store.h"
+#include "settings/application_theme.h"
 #include "settings/settings_design_tokens.h"
 #include "settings/settings_field_texts.h"
 #include "settings/settings_inline_icons.h"
@@ -180,8 +181,7 @@ void SettingsDialog::saveConfig()
 void SettingsDialog::applyTheme(markshot::ui::UiThemeMode mode)
 {
     const markshot::ui::UiThemeMode effectiveMode = markshot::ui::effectiveUiThemeMode(mode);
-    const QPalette palette = tokens::settingsPalette(effectiveMode);
-    qApp->setPalette(palette);
+    const QPalette palette = applyApplicationTheme(effectiveMode);
     setStyleSheet(tokens::settingsStyleSheet(effectiveMode));
     rememberSettingsWindowBorderColorIfEnabled(effectiveMode);
     // 1. 【设置】【撤销入口】恢复图标跟随主题文本色，禁用态由图标自动降低透明度

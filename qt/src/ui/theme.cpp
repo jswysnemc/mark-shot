@@ -147,15 +147,22 @@ void synchronizeToolTipPalette(const QPalette &palette)
 
     const QColor background = palette.color(QPalette::Active, QPalette::ToolTipBase);
     const QColor foreground = palette.color(QPalette::Active, QPalette::ToolTipText);
-    qApp->setStyleSheet(QStringLiteral(
+    // 1. 边框取文字色的低透明度，浅色工具提示上同样能看清边界
+    const bool darkTip = background.lightness() < foreground.lightness();
+    const QString border = darkTip ? QStringLiteral("rgba(255, 255, 255, 42)") : QStringLiteral("rgba(15, 23, 42, 40)");
+    const QString styleSheet = QStringLiteral(
         "QToolTip {"
         " color: %1;"
         " background-color: %2;"
-        " border: 1px solid rgba(255, 255, 255, 42);"
+        " border: 1px solid %3;"
         " border-radius: 6px;"
         " padding: 4px 6px;"
         "}")
-        .arg(foreground.name(QColor::HexRgb), background.name(QColor::HexRgb)));
+        .arg(foreground.name(QColor::HexRgb), background.name(QColor::HexRgb), border);
+    // 2. 样式未变化时不重设，避免全局重新应用样式
+    if (qApp->styleSheet() != styleSheet) {
+        qApp->setStyleSheet(styleSheet);
+    }
 }
 
 QString ocrPanelButtonStyleSheet()

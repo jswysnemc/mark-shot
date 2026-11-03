@@ -26,6 +26,7 @@
 #include "ui/icons.h"
 #include "ui/i18n.h"
 #include "ui/interaction_cursor.h"
+#include "settings/application_theme.h"
 #include "ui/theme.h"
 #include "window_detection.h"
 #include "windows_tray_controller.h"
@@ -89,7 +90,8 @@ int main(int argc, char *argv[])
     QFont applicationFont = app.font();
     applicationFont.setFamily(markshot::theme::uiFontFamily());
     app.setFont(applicationFont);
-    markshot::theme::synchronizeToolTipPalette(app.palette());
+    // 【界面主题】【启动应用】消息框、文件对话框与工具提示从启动起就跟随配置主题
+    markshot::settings::applyConfiguredApplicationTheme();
 
     markshot::i18n::initialize();
 
