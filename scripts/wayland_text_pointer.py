@@ -5,7 +5,6 @@ from contextvars import ContextVar
 import json
 import os
 from pathlib import Path
-import sys
 import time
 import subprocess
 
@@ -13,9 +12,7 @@ import wayland_text_format_session as session
 from wayland_test_keyboard import focused_environment
 from wayland_pin_pointer import GlobalPointer
 
-sys.path.insert(0, str(Path.home() / ".claude/skills/niri-use/src"))
-from niri_pointer import VirtualPointer, BTN_LEFT, BTN_RIGHT, BTN_MIDDLE  # noqa: E402
-from niri_commands import _transform_for_pointer  # noqa: E402
+from wayland_virtual_pointer import VirtualPointer, BTN_LEFT, BTN_RIGHT, BTN_MIDDLE, transform_for_pointer
 
 
 CURRENT = ContextVar("private_text_pointer", default=None)
@@ -65,7 +62,7 @@ def click(point, button="left"):
     if button not in BUTTONS:
         raise ValueError(f"unsupported pointer button: {button}")
     pointer, logical, right_hold, x11 = active
-    coordinates = _transform_for_pointer(point[0] - logical["x"], point[1] - logical["y"], logical["width"], logical["height"], logical.get("pointer_transform", logical["transform"]))
+    coordinates = transform_for_pointer(point[0] - logical["x"], point[1] - logical["y"], logical["width"], logical["height"], logical.get("pointer_transform", logical["transform"]))
     hold = right_hold if button == "right" else 0.04
     if x11 is not None:
         environment, mode = x11

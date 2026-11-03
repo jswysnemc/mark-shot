@@ -1,25 +1,16 @@
-"""【贴图回归】【全局指针】复用 niri-use 协议客户端，虚拟指针不绑定单一输出"""
+"""【贴图回归】【全局指针】复用仓库协议客户端，虚拟指针不绑定单一输出"""
 
 from contextlib import contextmanager
 import os
-from pathlib import Path
-import struct
-import sys
-
-sys.path.insert(0, str(Path.home() / ".claude/skills/niri-use/src"))
-from niri_pointer import VirtualPointer, VP_DESTROY  # noqa: E402
+from wayland_virtual_pointer import VirtualPointer
 
 
 class GlobalPointer(VirtualPointer):
     """【贴图回归】【跨输出设备】使用私有合成器全局逻辑坐标，不做单输出变换"""
 
-    def _setup(self):
-        """【贴图回归】【设备绑定】先发现座席，再创建无输出绑定的指针；继承协议客户端的往返校验"""
-        super()._setup()
-        self._send(self.vp, VP_DESTROY)
-        self.vp = self._nid()
-        self._send(self.mgr, 0, struct.pack("=II", self.seat, self.vp))
-        self._roundtrip()
+    def __init__(self):
+        """【贴图回归】【设备绑定】创建不绑定单一输出的协议指针，无参数、无返回值"""
+        super().__init__(bind_output=False)
 
     def move(self, point):
         """【贴图回归】【全局移动】将 point 发往已校验的 1760×720 私有输出布局，无返回值"""
