@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="fgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#CBA6F7"/>
+      <stop offset="1" stop-color="#89B4FA"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="256" height="256" rx="56" fill="#11111B"/>
+  <path d="M 96.00,56.00 L 56.00,56.00 L 56.00,96.00" fill="none" stroke="url(#fgGrad)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 160.00,56.00 L 200.00,56.00 L 200.00,96.00" fill="none" stroke="url(#fgGrad)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 96.00,200.00 L 56.00,200.00 L 56.00,160.00" fill="none" stroke="url(#fgGrad)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 160.00,200.00 L 200.00,200.00 L 200.00,160.00" fill="none" stroke="url(#fgGrad)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 128.00,98.00 L 135.78,120.22 L 158.00,128.00 L 135.78,135.78 L 128.00,158.00 L 120.22,135.78 L 98.00,128.00 L 120.22,120.22 Z" fill="url(#fgGrad)"/>
+</svg>

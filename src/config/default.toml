@@ -1,0 +1,578 @@
+# mark-shot config.
+
+# Commented or empty color follows the [theme] role written next to it
+# Uncomment to deliberately set a specific color separate from theme
+
+# Deleting a line or the whole file will rollback to default.
+# A line with a mistake is skipped with a warning in ~/.local/state/mark-shot/mark-shot.log,
+# the rest of the file still applies.
+
+# The config file may be excessive, yet I decided to make the absolute majority of constants in the
+# project configurable. Some of the customized options aren't guaranteed to even apply correctly. F
+
+# First come  traditionally customizable sections that will work perfectly, and then stuff you can
+# tinker with if you want but it's not really recommended and can result in breaking the application.
+# Useful, important options will be moved to the GUI later on.
+
+[general]
+# What happens to every screenshot, on top of what you choose in the editor:
+# e.g. with to = "s" copying also saves the file.
+# Finishing without an explicit choice (Enter, a double click on the selection,
+# releasing the mouse in -r, -f and -w) does only this. Overridden by -t.
+#
+# The same letters as -t, in any order:
+#   c  copy to the clipboard
+#   p  pin to the screen
+#   s  save to the screenshots folder
+#   o  write the PNG to stdout
+#   r  copy the text to the primary selection (middle click), only with -r ocr
+#
+# -r ocr uses c, r and o for its text and ignores p and s.
+to = "cs"
+
+# How does the screenshot with editing gui appear :
+# window  a fullscreen window: can be sent to another desktop or minimized (Recommended)
+# layer   drawn above everything else until the capture is finished, so to check something
+#         outside the screenshot you'd have to cancel the capture.
+# auto    layer on niri, where a window would open as a new column, and on COSMIC, window everywhere else
+overlay = "auto"
+
+[save]
+directory = "screenshots"
+month_format = "%Y-%m"
+filename_format = "%Y-%m-%d_%H-%M"
+
+[pinned]
+always_on_top = true
+border_enabled = true
+border_color = "#5EEAD4"
+border_width = 2.0
+
+[history]
+# Completed captures are recorded once; browsing actions do not record duplicates
+enabled = true
+# Optional plaintext annotation index; can include cropped or covered text
+index_annotations = false
+# Retained screenshots, from 1 to 200
+limit = 50
+max_size_mib = 256
+# Empty uses ~/.local/share/mark-shot/capture-history
+directory = ""
+
+[notifications]
+enabled = true
+# show the screenshot in the notification
+preview = true
+
+# Shared by every panel, popover, toast and the magnifier label.
+[theme]
+font_size = 11.0
+small_font_size = 11.0
+# ratio of the font size
+line_height = 1.2
+background = "#0F1117E6"
+foreground = "#E5E7EB"
+muted = "#9CA3AF"
+hover = "#2DD4BF"
+# selected and active things, progress bars, titles
+accent = "#99F6E44E"
+# icons and text drawn over a hover or accent fill
+on_accent = "#1A1814"
+border = "#FFFFFF1C"
+# used instead of border when the background is light
+border_on_light = "#10161737"
+field = "#272D2F"
+# the empty part of progress bars
+track = "#3B4647"
+caret = "#F5E0DC"
+text_selection = "#89B4FA6E"
+panel_height = 42.0
+panel_padding = 6.0
+# gap between a panel and what it is attached to
+panel_margin = 5.0
+panel_radius = 11.0
+item_radius = 4.0
+border_width = 1.0
+separator_width = 2.0
+# ratio of the panel height
+separator_length = 0.5
+separator_radius = 1.0
+progress_height = 4.0
+caret_width = 1.5
+# height of the caret and the text selection in input fields, ratio of the field height
+field_text_height = 0.75
+
+[keys]
+accept = "Return"
+copy = "Ctrl+C"
+save = "Ctrl+S"
+save_as = "Ctrl+Alt+S"
+pin = "Ctrl+P"
+cancel = "Escape"
+undo = "Ctrl+Z"
+redo = ["Ctrl+Shift+Z", "Ctrl+Y"]
+select_all = "Ctrl+A"
+delete = ["Delete", "Backspace"]
+toggle_ui = "Space"
+toggle_magnifier = "Shift+M"
+scroll_capture = "Ctrl+Shift+S"
+history = "Ctrl+H"
+size_up = "]"
+size_down = "["
+tool_selection = "S"
+tool_pick = "V"
+tool_ocr = "O"
+tool_eyedropper = "I"
+tool_text = "T"
+tool_pen = "P"
+tool_highlighter = "H"
+tool_laser = "G"
+tool_marker = "K"
+tool_ruler = "U"
+tool_magnifier = "Z"
+tool_line = "D"
+tool_arrow = "A"
+tool_rectangle = "R"
+tool_circle = "C"
+tool_number = "N"
+tool_numerated_arrow = "Shift+N"
+tool_redact = ["M", "X"]
+move_left = "Left"
+move_right = "Right"
+move_up = "Up"
+move_down = "Down"
+move_left_fast = "Shift+Left"
+move_right_fast = "Shift+Right"
+move_up_fast = "Shift+Up"
+move_down_fast = "Shift+Down"
+resize_left = "Alt+Left"
+resize_right = "Alt+Right"
+resize_up = "Alt+Up"
+resize_down = "Alt+Down"
+resize_left_fast = "Alt+Shift+Left"
+resize_right_fast = "Alt+Shift+Right"
+resize_up_fast = "Alt+Shift+Up"
+resize_down_fast = "Alt+Shift+Down"
+
+[toolbar]
+button_size = 30.0
+button_gap = 2.0
+separator_slot = 1.0
+# height of the hover and selected fill, ratio of the toolbar height
+highlight_height = 0.8
+# highlight pin, copy, and save icons when their finishing action is pre-set (general.to, -t)
+# (icon_to color)
+highlight_to = false
+# background = "#1E2124FA"      # theme.background
+# icon = "#E5EDEF"              # theme.foreground
+# icon_hovered = "#1E2124"      # theme.on_accent
+# icon_selected = "#1E2124"     # theme.on_accent
+# icon_to = "#4BBF9B"           # theme.accent
+# button_hovered = "#B4BEFE"    # theme.hover
+# button_selected = "#4DBE9D"   # theme.accent
+# separator = "#E5EDEF"         # theme.foreground
+
+# icon size of every toolbar button
+[toolbar.icons]
+selection = 31.0
+pick = 26.0
+ocr = 29.5
+eyedropper = 28.0
+text = 22.0
+pen = 20.0
+highlighter = 27.0
+laser = 25.0
+marker = 26.0
+ruler = 26.0
+magnifier = 26.0
+line = 28.0
+arrow = 24.0
+rectangle = 31.0
+circle = 25.0
+numerated_arrow = 25.0
+number = 26.0
+redact = 26.0
+scroll = 26.0
+pin = 21.0
+copy = 20.0
+save = 20.0
+
+# The panel with the current tool's settings.
+[settings_panel]
+item_gap = 8.0
+# ratio of the panel height
+item_height = 0.7
+separator_slot = 16.0
+# rough width of one character, used to size labels
+char_width = 7.0
+label_padding = 8.0
+swatch_size = 28.0
+# radius of the color dot, ratio of the swatch
+swatch_dot = 0.35
+icon_button_size = 28.0
+icon_size = 16.0
+copy_icon_size = 15.0
+stepper_width = 84.0
+stepper_bold = true
+stepper_arrow_zone = 30.0
+stepper_arrow_width = 15.0
+stepper_arrow_height = 6.0
+stepper_arrow_gap = 9.0
+stepper_arrow_stroke = 1.6
+hex_width = 84.0
+rgb_width = 120.0
+download_width = 196.0
+download_label_width = 96.0
+download_percent_width = 38.0
+checkbox_size = 18.0
+checkbox_gap = 6.0
+checkbox_radius = 3.0
+checkmark_width = 2.0
+# background = "#1E2124FA"      # theme.background
+# text = "#E5EDEF"              # theme.foreground
+# icon = "#E5EDEF"              # theme.foreground
+# icon_hovered = "#B4BEFE"      # theme.hover
+# icon_active = "#4DBE9D"       # theme.accent
+# separator = "#E5EDEF"         # theme.foreground
+
+[color_picker]
+max_recent = 6
+# fills the recent colors until there is a history
+palette = ["#000000", "#FFFFFF", "#F38BA8", "#FAB387", "#F9E2AF", "#A6E3A1"]
+# Doesn't implement recent colors, i suppose outlines needs a fixed set of most used colors
+outline_palette = ["#000000", "#FFFFFF", "#F38BA8", "#F9E2AF", "#89B4FA", "#A6E3A1"]
+padding = 15.0
+sv_size = 170.0
+sv_radius = 10.0
+hue_gap = 12.0
+hue_width = 17.0
+hue_radius = 5.0
+marker_radius = 10.0
+marker_stroke = 2.0
+marker_outline = 0.1
+border_width = 2.0
+label_gap = 10.0
+label_height = 14.0
+label_font_size = 13.0
+swatch_row_gap = 6.0
+swatch_size = 22.0
+swatch_gap = 8.0
+swatch_hover_grow = 3.0
+eyedropper_icon_size = 13.0
+row_gap = 10.0
+field_height = 24.0
+field_gap = 6.0
+field_radius = 4.0
+field_text_inset = 6.0
+hex_label_width = 28.0
+rgba_label_width = 14.0
+marker_outline_color = "#000000A0"
+# background = "#1E2124FA"      # theme.background
+# text = "#E5EDEF"              # theme.foreground
+# label = "#A2B1B4"             # theme.muted
+# marker = "#E5EDEF"            # theme.foreground
+
+# The OCR language list.
+[model_picker]
+width = 320.0
+padding = 8.0
+title_height = 44.0
+title_gap = 4.0
+row_height = 44.0
+row_padding = 10.0
+name_top = 5.0
+name_height = 20.0
+note_top = 24.0
+note_height = 15.0
+bar_top = 30.0
+status_width = 62.0
+button_size = 26.0
+icon_size = 14.0
+# background = "#1E2124FA"      # theme.background
+
+[choice_picker]
+columns = 6
+cell_size = 40.0
+padding = 8.0
+gap = 4.0
+title_height = 26.0
+label_height = 20.0
+
+[magnifier]
+zoom = 10.0
+# pixels across, must be odd
+cells = 21
+# distance from the pointer
+offset = 24.0
+outline_width = 2.0
+grid_width = 1.0
+label_height = 26.0
+label_gap = 6.0
+swatch_size = 14.0
+swatch_gap = 8.0
+swatch_radius = 3.0
+grid = "#E5EDEF28"
+crosshair = "#9399B250"
+# outline = "#E5EDEF"           # theme.foreground
+# label_background = "#1E2124FA" # theme.background
+# label_text = "#E5EDEF"        # theme.foreground
+
+# The captured region on the screen.
+[selection]
+# over everything outside the selection
+dim = "#0000008c"
+border_width = 2.0
+border_radius = 8.0
+# arrow keys move and resize it by this much, Shift by the fast one
+nudge = 1.0
+nudge_fast = 10.0
+# border = "#E5EDEF"            # theme.foreground
+
+[annotations.shadow]
+color = "#10161782"
+offset = [0.0, 3.0]
+layers = 2
+spread = 1.5
+# how fast each next layer fades
+falloff = 1.2
+# the pen gets a halo instead of a drop shadow, this much wider than the stroke
+pen_halo = 3.0
+
+# The frame around a selected annotation.
+[annotations.handles]
+width = 3.0
+radius = 4.0
+min_length = 8.0
+# ratio of the side
+corner_length = 0.2
+middle_length = 0.32
+# color = "#E5EDEF"             # theme.foreground
+
+[annotations.arrow]
+# head length, ratio of the stroke width
+head_length = 4.0
+head_min = 12.0
+# the head takes at most this ratio of the arrow
+head_max = 0.6
+# half the head width, ratio of its length
+head_width = 0.55
+
+[annotations.numbered]
+# circle radius, ratio of the stroke width
+circle = 3.0
+# ratio of the circle radius
+tail_width = 0.48
+# digit size for 1, 2, 3 and 4+ digits, ratio of the circle radius
+digit_sizes = [1.1, 0.85, 0.65, 0.5]
+bold = true
+dark_digits = "#000000"
+light_digits = "#FFFFFF"
+# circles brighter than this get dark digits
+digits_flip = 0.55
+
+[annotations.text]
+line_height = 1.2
+min_width = 10.0
+# font size limits while resizing a text box with the mouse
+resize_min = 6.0
+resize_max = 300.0
+# fraction of the font size
+outline_width = 0.04
+# selected_text = "#E5EDEF"     # theme.foreground
+
+# What a new annotation starts with. The last used values are remembered in
+# ~/.local/state/mark-shot/tools.toml and overrides these.
+[tools]
+# 【标注】【默认颜色】沿用原版红色，序号白色文字保持可见；已有保存颜色仍优先
+color = "#FF4D4D"
+fill = false
+
+[tools.stroke]
+width = 12.0
+min = 1.0
+max = 40.0
+step = 1.0
+
+[tools.font]
+size = 20.0
+min = 8.0
+max = 300.0
+step = 1.0
+bold = true
+italic = false
+outline = false
+outline_color = "#000000"
+
+[tools.redact]
+# Original image strength, from 4 to 48; the default effect is pixelation
+strength = 14.0
+step = 1.0
+# mode = "pixelate" # pixelate, blur, grayscale, invert, brighten
+
+[tools.pen]
+# 0 draws the raw pointer path, closer to 1 is smoother (and lags more)
+smoothing = 0.7
+min_distance = 1.0
+
+[tools.highlighter]
+# 0 draws the raw pointer path, closer to 1 is smoother (and lags more)
+smoothing = 0.7
+min_distance = 1.0
+# multiplied by the color's own alpha
+opacity = 0.4
+
+[tools.laser]
+# 激光笔宽独立保存，不修改持久画笔；笔迹在松开后自动消散
+width = 10.0
+
+[tools.marker]
+width = 3.0
+shape = "triangle"
+filled = true
+
+[tools.ruler]
+width = 3.0
+mode = "length"
+
+[tools.magnifier]
+width = 3.0
+zoom = 2.75
+shape = "circle"
+
+[tools.number]
+width = 3.0
+style = "arabic"
+
+[tools.arrow]
+width = 3.0
+style = "fletched"
+line_style = "solid"
+
+[tools.line]
+width = 3.0
+style = "solid"
+
+[toasts]
+height = 38.0
+padding = 18.0
+margin = 8.0
+# seconds
+lifetime = 4.0
+short_lifetime = 3.0
+copied_lifetime = 1.4
+# background = "#1E2124FA"      # theme.background
+# text = "#E5EDEF"              # theme.foreground
+
+[input]
+double_click_ms = 400
+double_click_distance = 6.0
+# how far from a selection or annotation edge it still grabs
+handle_hit_width = 20.0
+# size of the corner grab zones, ratio of the side, between corner_min and corner_max
+corner_ratio = 0.3
+corner_min = 8.0
+corner_max = 40.0
+scroll_sensitivity = 4.0
+scroll_step_pixels = 10.0
+# holding a stepper arrow
+hold_delay_ms = 400
+hold_repeat_ms = 120
+hold_fast_after = 8
+hold_fast_repeat_ms = 40
+# when using Shift on few tools, it snaps to horizontal or venrtical line within this many degrees
+snap_angle = 3.0
+
+[animation]
+# multiplies every animation below; 0.1 at least
+speed = 1.0
+# one animation tick (100fps)
+frame_ms = 10
+# opacity per second
+popover_fade = 8.0
+toolbar_fade = 5.0
+# share of the remaining distance per second
+toolbar_slide = 12.0
+# the toolbar never slides in from further than this
+toolbar_slide_distance = 340.0
+# seconds
+toast_fade_in = 0.18
+toast_fade_out = 0.14
+
+[ocr]
+threads = 4
+# 【文字识别】【结果窗口】主 OCR 命令识别后打开可编辑窗口；关闭后保留截图内逐字选择
+result_panel = true
+# on-demand  build the engine when OCR is used, inside this process
+# at-launch  build it at every launch, inside this process
+# daemon     keep a ready engine in a background process, reused by later launches
+mode = "on-demand"
+# only the daemon uses this: auto | cpu | gpu
+device = "auto"
+# seconds the daemon may sit unused before it exits, 0 keeps it forever
+daemon_idle_secs = 900
+# how far from a line the pointer still selects it
+hit_slack = 3.0
+vertical_slack = 10.0
+# a smaller drag counts as a click, not a new region
+min_region = 16.0
+# handle visually identical Cyrillic/Greek letters in Latin words
+# not sure why would it be disabled, aside from testing of course
+lookalikes = true
+
+[ocr.look]
+region_shade = "#10161760"
+plate = "#E5EDEF30"
+plate_pad_x = 4.0
+plate_pad_y = 2.0
+plate_radius = 5.0
+selection_radius = 2.0
+badge_size = 62.0
+badge_radius = 17.0
+badge_icon_size = 30.0
+# sweeps per second
+scan_rate = 1.15
+scan_width = 2.5
+# badge_background = "#1E2124FA" # theme.background
+# badge_icon = "#E5EDEF"        # theme.foreground
+# scan = "#4DBE9D"              # theme.accent
+
+# How recognized lines are grouped, in median line heights. The daemon reads
+# [ocr.layout], [ocr.detect] and [ocr.filter] when it starts:
+# run `mark-shot --ocr-daemon stop` to apply changes to a running one.
+[ocr.layout]
+block_gap = 0.4
+block_gap_max = 0.7
+block_overlap = 0.5
+block_align = 0.35
+row_tolerance = 0.6
+row_split_gap = 4.0
+column_gutter = 6.0
+
+[ocr.detect]
+# larger screenshots are scaled down to this before detection
+max_side = 1920
+# padding in small selections so text at the edge isn't ignored; 0 = off
+# left here mostly only for testing
+pad = 16
+score_threshold = 0.3
+box_threshold = 0.6
+unclip_ratio = 1.5
+max_candidates = 1000
+
+# Recognized text dropped as noise.
+[ocr.filter]
+min_confidence = 0.55
+single_char_confidence = 0.6
+single_char_height = 0.6
+glyph_height = 1.8
+glyph_aspect = 1.2
+speck_size = 0.5
+# table rules between cells
+rule_contrast = 32
+rule_coverage = 0.9
+rule_reach = 0.5
+
+[log]
+# off | error | info; unset keeps each process's own default
+# level = "info"
+max_file_size_mb = 1

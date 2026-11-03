@@ -1,0 +1,79 @@
+[workspace]
+members = ["crates/shot-image", "crates/shot-stitch"]
+resolver = "3"
+
+[package]
+name = "mark-shot"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.95"
+description = "Native Rust screenshot and annotation tool for Linux Wayland"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+
+[dependencies]
+async-trait = "0.1"
+tokio = { version = "1.50.0", features = ["rt", "rt-multi-thread", "macros", "sync", "time", "net", "process", "io-util"] }
+zbus = { version = "5.14.0", features = ["tokio"] }
+futures = "0.3"
+ashpd = { version = "0.13.9", features = ["screencast", "pipewire"] }
+pipewire = "0.9.2"
+smithay-client-toolkit = "0.21"
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["staging", "unstable", "wayland-client"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+wl-clipboard-rs = "0.9.3"
+dirs = "7.0"
+nix = { version = "0.31.2", features = ["fs", "process", "poll", "feature", "socket", "signal"] }
+rustix = { version = "1.1.4", features = ["event"] }
+cosmic-text = "0.19.0"
+unicode-segmentation = "1.13"
+sys-locale = "0.3.2"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp", "bmp", "gif", "tiff", "pnm", "ico"] }
+png = "0.18.1"
+crc32fast = "1.5"
+resvg = "0.48.1"
+tiny-skia = "0.12.0"
+usvg = "0.48.1"
+oar-ocr = "0.9"
+ort = { version = "=2.0.0-rc.13", features = ["webgpu"], optional = true }
+lzma-rust2 = { version = "0.21", default-features = false, features = ["std", "optimization"], optional = true }
+hmac-sha256 = "1.1"
+ureq = { version = "3.4", default-features = false, features = ["native-tls", "json"] }
+chrono = { version = "0.4", features = ["clock"] }
+log = "0.4"
+strum = { version = "0.28", features = ["derive"] }
+rayon = "1.11"
+pico-args = { version = "0.5", features = ["combined-flags"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1.1"
+toml_edit = "0.25"
+tempfile = "3.27"
+shot-image = { path = "crates/shot-image" }
+shot-stitch = { path = "crates/shot-stitch" }
+i_overlay = { version = "=4.2.2", default-features = false }
+kurbo = "=0.13.1"
+
+[features]
+default = []
+ocr-gpu = ["dep:ort", "dep:lzma-rust2", "oar-ocr/webgpu"]
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+too_many_arguments = "allow"
+field_reassign_with_default = "allow"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+[profile.dist]
+inherits = "release"
+lto = true

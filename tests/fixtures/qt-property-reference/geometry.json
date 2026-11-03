@@ -1,0 +1,354 @@
+{
+  "properties": {
+    "size": [
+      438,
+      44
+    ],
+    "controls": [
+      {
+        "class": "QLabel",
+        "geometry": [
+          10,
+          8,
+          19,
+          28
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QLabel",
+        "geometry": [
+          129,
+          6,
+          34,
+          32
+        ],
+        "text": "1",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QSlider",
+        "geometry": [
+          35,
+          14,
+          88,
+          15
+        ],
+        "text": "",
+        "groove": [
+          0,
+          5,
+          88,
+          4
+        ],
+        "handle": [
+          3,
+          1,
+          14,
+          12
+        ]
+      },
+      {
+        "class": "QLabel",
+        "geometry": [
+          171,
+          8,
+          19,
+          28
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QLabel",
+        "geometry": [
+          278,
+          6,
+          36,
+          32
+        ],
+        "text": "100%",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QSlider",
+        "geometry": [
+          196,
+          14,
+          76,
+          15
+        ],
+        "text": "",
+        "groove": [
+          0,
+          5,
+          76,
+          4
+        ],
+        "handle": [
+          62,
+          1,
+          14,
+          12
+        ]
+      },
+      {
+        "class": "QPushButton",
+        "geometry": [
+          322,
+          6,
+          32,
+          32
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QPushButton",
+        "geometry": [
+          360,
+          6,
+          32,
+          32
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QPushButton",
+        "geometry": [
+          398,
+          6,
+          32,
+          32
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      }
+    ]
+  },
+  "selected-properties": {
+    "size": [
+      476,
+      44
+    ],
+    "controls": [
+      {
+        "class": "QLabel",
+        "geometry": [
+          10,
+          8,
+          19,
+          28
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QLabel",
+        "geometry": [
+          129,
+          6,
+          34,
+          32
+        ],
+        "text": "1",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QSlider",
+        "geometry": [
+          35,
+          14,
+          88,
+          15
+        ],
+        "text": "",
+        "groove": [
+          0,
+          5,
+          88,
+          4
+        ],
+        "handle": [
+          3,
+          1,
+          14,
+          12
+        ]
+      },
+      {
+        "class": "QLabel",
+        "geometry": [
+          171,
+          8,
+          19,
+          28
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QLabel",
+        "geometry": [
+          278,
+          6,
+          36,
+          32
+        ],
+        "text": "100%",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QSlider",
+        "geometry": [
+          196,
+          14,
+          76,
+          15
+        ],
+        "text": "",
+        "groove": [
+          0,
+          5,
+          76,
+          4
+        ],
+        "handle": [
+          62,
+          1,
+          14,
+          12
+        ]
+      },
+      {
+        "class": "QPushButton",
+        "geometry": [
+          322,
+          6,
+          32,
+          32
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QPushButton",
+        "geometry": [
+          360,
+          6,
+          32,
+          32
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QPushButton",
+        "geometry": [
+          398,
+          6,
+          32,
+          32
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QPushButton",
+        "geometry": [
+          436,
+          6,
+          32,
+          32
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      }
+    ]
+  },
+  "font": {
+    "size": [
+      360,
+      360
+    ],
+    "controls": [
+      {
+        "class": "QLineEdit",
+        "geometry": [
+          6,
+          7,
+          348,
+          28
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QListWidget",
+        "geometry": [
+          6,
+          40,
+          348,
+          280
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QSpinBox",
+        "geometry": [
+          6,
+          326,
+          288,
+          26
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QToolButton",
+        "geometry": [
+          298,
+          326,
+          26,
+          26
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      },
+      {
+        "class": "QToolButton",
+        "geometry": [
+          328,
+          326,
+          26,
+          26
+        ],
+        "text": "",
+        "groove": null,
+        "handle": null
+      }
+    ]
+  }
+}

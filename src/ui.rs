@@ -1,0 +1,23 @@
+// panels, popovers, toasts, magnifier, etc. Every component has its own folder
+// with its state.rs, and draw.rs files.
+pub mod choice_popover;
+pub mod color_popover;
+pub mod context_menu;
+pub mod controls;
+pub mod file_picker;
+pub mod filter_properties;
+pub mod font_panel;
+pub mod fonts;
+pub mod icons;
+pub mod line_properties;
+pub mod magnifier;
+pub mod model_popover;
+pub mod panel;
+pub mod radial_palette;
+pub mod settings_panel;
+pub mod single_line;
+pub mod text_editor;
+pub mod text_field;
+pub mod text_properties;
+pub mod toast;
+pub mod toolbar;

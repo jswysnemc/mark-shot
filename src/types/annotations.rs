@@ -1,0 +1,127 @@
+//! 【标注】【数据类型】持久标注、形状和拖动快照，不承担编辑事务
+
+mod bounds;
+mod transform;
+pub use bounds::arrow_head;
+
+use crate::types::{MarkerShape, SelectionHandle};
+use tiny_skia::{Color, Rect};
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum AnnotationShape {
+    Number {
+        mark: crate::features::number::NumberMark,
+    },
+    NumeratedArrow {
+        start: (f32, f32),
+        end: (f32, f32),
+        number: u32,
+    },
+    Arrow {
+        line: crate::features::line::LineSkeleton,
+        style: crate::features::arrow::ArrowStyle,
+        line_style: crate::features::line::LineStyle,
+    },
+    Rectangle {
+        start: (f32, f32),
+        end: (f32, f32),
+        filled: bool,
+    },
+    Marker {
+        start: (f32, f32),
+        end: (f32, f32),
+        kind: MarkerShape,
+        filled: bool,
+    },
+    Ruler {
+        measurement: crate::features::ruler::Measurement,
+    },
+    Magnifier {
+        magnifier: crate::features::magnifier::Magnifier,
+    },
+    Circle {
+        start: (f32, f32),
+        end: (f32, f32),
+        filled: bool,
+    },
+    Line {
+        line: crate::features::line::LineSkeleton,
+        style: crate::features::line::LineStyle,
+    },
+    Redact {
+        filter: crate::features::filter::RegionFilter,
+    },
+    Pen {
+        points: Vec<(f32, f32)>,
+    },
+    Highlighter {
+        points: Vec<(f32, f32)>,
+        flat_ends: [bool; 2],
+    },
+    Text {
+        appearance: crate::features::text::TextAppearance,
+        start: (f32, f32),
+        content: String,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        outline: Option<Color>,
+    },
+}
+
+pub struct AnnDragState {
+    pub handle: SelectionHandle,
+    pub start_global: (f64, f64),
+    pub prev_global: (f64, f64),
+    /// 开始拖动时的标注快照
+    pub orig: Annotation,
+    pub orig_index: usize,
+}
+
+impl AnnotationShape {
+    /// 【标注】【起点读取】返回形状的首个逻辑坐标；空笔迹返回原点
+    pub fn start_point(&self) -> (f32, f32) {
+        match self {
+            AnnotationShape::Number { mark } => mark.bubble,
+            AnnotationShape::NumeratedArrow { start, .. } => *start,
+            AnnotationShape::Arrow { line, .. } => line.start,
+            AnnotationShape::Rectangle { start, .. } => *start,
+            AnnotationShape::Marker { start, .. } => *start,
+            AnnotationShape::Ruler { measurement } => measurement.start(),
+            AnnotationShape::Magnifier { magnifier } => magnifier.source,
+            AnnotationShape::Circle { start, .. } => *start,
+            AnnotationShape::Line { line, .. } => line.start,
+            AnnotationShape::Redact { filter } => filter.start,
+            AnnotationShape::Pen { points } | AnnotationShape::Highlighter { points, .. } => {
+                points.first().copied().unwrap_or((0.0, 0.0))
+            }
+            AnnotationShape::Text { start, .. } => *start,
+        }
+    }
+
+    /// 【标注】【线条骨架】返回直线或箭头共用骨架；其他形状返回空值
+    pub fn line(&self) -> Option<&crate::features::line::LineSkeleton> {
+        match self {
+            Self::Arrow { line, .. } | Self::Line { line, .. } => Some(line),
+            _ => None,
+        }
+    }
+
+    /// 【标注】【线条编辑】返回可修改的直线或箭头骨架；调用方负责边界和历史事务
+    pub fn line_mut(&mut self) -> Option<&mut crate::features::line::LineSkeleton> {
+        match self {
+            Self::Arrow { line, .. } | Self::Line { line, .. } => Some(line),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Annotation {
+    pub id: u64,
+    pub shape: AnnotationShape,
+    pub color: Color,
+    pub shadow_color: Color,
+    pub stroke_width: f32,
+    pub bbox: Rect,
+}
