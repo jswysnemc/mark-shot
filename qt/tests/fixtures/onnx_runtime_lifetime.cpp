@@ -12,7 +12,8 @@ struct ThreadState {
     {
         const char *path = std::getenv("MARK_SHOT_TEST_ORT_THREAD_TRACE");
         if (!path) return;
-        if (FILE *file = std::fopen(path, "a")) {
+        // 1. 以二进制模式追加，避免 Windows 文本模式把换行写成 CRLF
+        if (FILE *file = std::fopen(path, "ab")) {
             std::fputs("thread-ended\n", file);
             std::fclose(file);
         }
