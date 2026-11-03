@@ -6,6 +6,7 @@
 #include <QString>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -48,7 +49,7 @@ public:
 
     /**
      * 【录制】【映射寿命】关闭所有协议缓冲并归还池引用，借出的像素映射由最后一个帧释放。
-     * 必须在采集线程且 Wayland 连接仍有效时调用。
+     * 必须在采集线程且 Wayland 连接仍有效时调用；之后任何线程释放帧都不会再访问 Wayland。
      * @return 无返回值。
      */
     void reset();
@@ -58,6 +59,15 @@ private:
         std::shared_ptr<WlrootsScreencopyShmBuffer> buffer;
         qint64 idleSince = -1;
     };
+
+    /**
+     * 【录制】【映射寿命】在采集线程关闭待移除槽位的 wl_buffer，再把槽位移出缓冲池。
+     * 缓冲析构不发送 Wayland 请求，所有移除路径都必须经过这里显式释放协议对象。
+     * @param shouldDrop 对每个槽位只调用一次，返回 true 表示移除。
+     * @return 无返回值。
+     */
+    void dropEntries(const std::function<bool(const Entry &)> &shouldDrop);
+
     static constexpr int kMaxBuffers = 16;
     quint64 m_budgetBytes;
     std::vector<Entry> m_buffers;

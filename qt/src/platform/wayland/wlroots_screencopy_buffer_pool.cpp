@@ -37,9 +37,7 @@ std::shared_ptr<WlrootsScreencopyShmBuffer> WlrootsScreencopyBufferPool::acquire
     }
 
     // 2. 【录制】【wlroots缓冲池】新布局优先释放空闲旧帧，借出的旧像素保留并继续计入容量
-    m_buffers.erase(std::remove_if(m_buffers.begin(), m_buffers.end(), [](const Entry &entry) {
-        return entry.buffer.use_count() == 1;
-    }), m_buffers.end());
+    dropEntries([](const Entry &entry) { return entry.buffer.use_count() == 1; });
     quint64 largestHeld = 0;
     for (const auto &entry : m_buffers) {
         largestHeld = std::max(largestHeld, static_cast<quint64>(entry.buffer->byteSize()));
@@ -67,10 +65,11 @@ void WlrootsScreencopyBufferPool::reclaimIdle(qint64 nowMs)
             entry.idleSince = nowMs;
         }
     }
-    m_buffers.erase(std::remove_if(m_buffers.begin(), m_buffers.end(), [nowMs](const Entry &entry) {
+    // 2. 【录制】【空闲回收】只移除池内唯一持有且空闲超时的槽位
+    dropEntries([nowMs](const Entry &entry) {
         return entry.buffer.use_count() == 1 && entry.idleSince >= 0
             && nowMs - entry.idleSince >= kRecordingCaptureIdleMs;
-    }), m_buffers.end());
+    });
 }
 
 quint64 WlrootsScreencopyBufferPool::retainedBytes() const
@@ -82,11 +81,25 @@ quint64 WlrootsScreencopyBufferPool::retainedBytes() const
 
 void WlrootsScreencopyBufferPool::reset()
 {
-    // 1. 【录制】【映射寿命】先销毁仍属于当前连接的 wl_buffer，避免借出的帧晚于连接释放协议对象
-    for (const auto &entry : m_buffers) {
-        entry.buffer->releaseWaylandBuffer();
+    // 1. 【录制】【映射寿命】先销毁仍属于当前连接的 wl_buffer，借出的帧此后只持有像素映射
+    dropEntries([](const Entry &) { return true; });
+}
+
+/**
+ * 【录制】【映射寿命】在采集线程关闭待移除槽位的 wl_buffer，再把槽位移出缓冲池。
+ * @param shouldDrop 对每个槽位只调用一次，返回 true 表示移除。
+ * @return 无返回值。
+ */
+void WlrootsScreencopyBufferPool::dropEntries(const std::function<bool(const Entry &)> &shouldDrop)
+{
+    // 1. 【录制】【映射寿命】稳定分区保留槽位顺序，待移除槽位集中到尾部且仍持有有效缓冲
+    const auto dropped = std::stable_partition(m_buffers.begin(), m_buffers.end(),
+                                               [&shouldDrop](const Entry &entry) { return !shouldDrop(entry); });
+    // 2. 【录制】【映射寿命】借出的帧可能最后在任意线程析构，协议对象必须趁连接有效时在这里关闭
+    for (auto it = dropped; it != m_buffers.end(); ++it) {
+        it->buffer->releaseWaylandBuffer();
     }
-    m_buffers.clear();
+    m_buffers.erase(dropped, m_buffers.end());
 }
 
 }  // namespace markshot::recording
