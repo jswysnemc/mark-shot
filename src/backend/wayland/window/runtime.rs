@@ -37,6 +37,8 @@ use wayland_protocols::{
 };
 
 use super::{WindowAction, WindowContent, WindowEvent, WindowSpec};
+use crate::backend::wayland::text_input::TextInput;
+use crate::features::text::input_method::focus::Target;
 use crate::{AppResult, keys::Mods};
 
 pub(super) struct NativeWindow {
@@ -49,6 +51,8 @@ pub(super) struct NativeWindow {
     pub keyboard: Option<wl_keyboard::WlKeyboard>,
     pub pointer_seat: Option<wl_seat::WlSeat>,
     pub keyboard_seat: Option<wl_seat::WlSeat>,
+    pub text_input: TextInput,
+    pub input_target: Target,
     pub enter_serial: u32,
     pub modifiers: Mods,
     pub shm: Shm,
@@ -88,6 +92,7 @@ impl NativeWindow {
                 }
             }
         }
+        self.reconcile_text_input();
     }
 
     /// 【原生窗口】【帧提交】按当前大小绘制一帧并请求帧回调；缓冲未释放时等待后续事件
@@ -189,6 +194,10 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         fractional_manager.map(|manager| manager.get_fractional_scale(window.wl_surface(), &qh, ()))
     });
     window.commit();
+    let mut text_input = TextInput::default();
+    text_input.manager = globals
+        .bind::<wayland_protocols::wp::text_input::zv3::client::zwp_text_input_manager_v3::ZwpTextInputManagerV3, _, _>(&qh, 1..=1, ())
+        .ok();
 
     let mut state = NativeWindow {
         registry: RegistryState::new(&globals),
@@ -200,6 +209,8 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         keyboard: None,
         pointer_seat: None,
         keyboard_seat: None,
+        text_input,
+        input_target: Target::default(),
         enter_serial: 0,
         modifiers: Mods::default(),
         shm,
@@ -223,6 +234,8 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         if state.configured && state.dirty && !state.frame_pending {
             state.render(&qh)?;
         }
+        state.sync_text_input();
+        connection.flush()?;
         event_loop.dispatch(None, &mut state)?;
     }
     // 1. 【原生窗口】【关闭交接】嵌套窗口不会退出进程，先析构表面再发送销毁请求

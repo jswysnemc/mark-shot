@@ -52,13 +52,13 @@ class FakeGitHub:
         """【原生发布测试】【命令模拟】根据 arguments 下载样本或上传资产，无外部命令，返回空字节串"""
         self.calls.append(("command", arguments, None))
         if arguments[:2] == ["release", "upload"]:
-            self.release["assets"] = [{"name": name, "id": index} for index, name in enumerate((ARCHIVE_NAME, ARCHIVE_NAME + ".sha256", self.verification.name), 1)]
+            self.release["assets"] = [{"name": Path(name).name, "id": index} for index, name in enumerate(arguments[5:], 1)]
         else:
             destination = Path(arguments[arguments.index("--dir") + 1])
             for name in (ARCHIVE_NAME, ARCHIVE_NAME + ".sha256"):
                 shutil.copyfile(self.root / name, destination / name)
             if arguments[0] == "release":
-                shutil.copyfile(self.verification, destination / self.verification.name)
+                shutil.copyfile(self.verification, destination / "native-preview-verification.json")
         return b""
 
 
@@ -93,6 +93,17 @@ class PublishTests(unittest.TestCase):
             self.assertFalse(any(method == "POST" for method, _, _ in github.calls))
             self.assertTrue(any(method == "DELETE" for method, _, _ in github.calls))
             self.assertFalse(github.release["draft"])
+
+    def test_versioned_verification_keeps_public_asset_name(self):
+        """【原生发布测试】【版本归档】仓库使用版本化证据文件时公开资产仍采用固定名称，无参数、无返回值"""
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, ENVIRONMENT, clear=True):
+            root = Path(directory)
+            _, verification, notes, manifest = fixture(root)
+            versioned = verification.with_name("native-preview-2-verification.json")
+            verification.rename(versioned)
+            github = FakeGitHub(root, manifest, notes, versioned)
+            publish(github, manifest, notes, versioned, root / "versioned", "b" * 40)
+            self.assertEqual({asset["name"] for asset in github.release["assets"]}, {ARCHIVE_NAME, ARCHIVE_NAME + ".sha256", "native-preview-verification.json"})
 
     def test_corrupt_download_does_not_create_release(self):
         """【原生发布测试】【损坏产物】下载文件摘要错误时禁止创建草稿，无参数、无返回值"""

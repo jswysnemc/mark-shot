@@ -1,12 +1,13 @@
 //! 【输入法】【原生绑定】按键盘 seat 创建可选 text-input-v3，主表面焦点与正文目标分别核验
 
 mod events;
+pub(crate) mod message;
 mod state;
 #[cfg(test)]
 mod tests;
 
 use wayland_client::{
-    QueueHandle,
+    Dispatch, QueueHandle,
     protocol::{wl_seat::WlSeat, wl_surface::WlSurface},
 };
 use wayland_protocols::wp::text_input::zv3::client::{
@@ -16,13 +17,7 @@ use wayland_protocols::wp::text_input::zv3::client::{
     },
 };
 
-use crate::{
-    backend::wayland::overlay::state::OverlayState,
-    types::{
-        OverlayEvent,
-        text_input::{Focus, Snapshot, Update},
-    },
-};
+use crate::types::text_input::{Focus, Snapshot, Update};
 use state::{Request, State};
 
 #[derive(Default)]
@@ -41,7 +36,10 @@ struct Device {
 
 impl TextInput {
     /// 【输入法】【键盘绑定】用 seat 与 qh 创建唯一协议对象，无返回值；合成器不提供协议时保持普通键盘输入
-    pub fn bind(&mut self, seat: &WlSeat, qh: &QueueHandle<OverlayState>) {
+    pub fn bind<D>(&mut self, seat: &WlSeat, qh: &QueueHandle<D>)
+    where
+        D: Dispatch<ZwpTextInputV3, ()> + 'static,
+    {
         if self.devices.iter().any(|device| &device.seat == seat) {
             return;
         }
@@ -58,16 +56,14 @@ impl TextInput {
     }
 
     /// 【输入法】【设备移除】销毁 seat 的协议对象并返回原生焦点离开事件，供键盘能力或设备移除边界调用
-    pub fn remove(&mut self, seat: &WlSeat) -> Option<OverlayEvent> {
+    pub fn remove(&mut self, seat: &WlSeat) -> Option<Focus> {
         let index = self
             .devices
             .iter()
             .position(|device| &device.seat == seat)?;
         let device = self.devices.remove(index);
         device.proxy.destroy();
-        device
-            .focus
-            .map(|focus| OverlayEvent::TextInputLeave { focus_id: focus.id })
+        device.focus
     }
 
     /// 【输入法】【协议同步】将 snapshot 发给匹配的原生焦点，空值停用所有对象，无返回值；只更新实际变化的协议状态

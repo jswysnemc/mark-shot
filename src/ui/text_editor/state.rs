@@ -11,11 +11,20 @@ const HISTORY_LIMIT: usize = 128;
 const HISTORY_BYTES: usize = 4 * 1024 * 1024;
 pub(super) const TEXT_LIMIT: usize = 8 * 1024 * 1024;
 
-struct HistoryEntry {
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum HistoryKind {
+    Other,
+    Insert,
+    InputMethod,
+    SelectionDelete,
+}
+
+pub(super) struct HistoryEntry {
     change: Change,
     before: (Cursor, Selection),
     after: (Cursor, Selection),
     bytes: usize,
+    kind: HistoryKind,
 }
 
 pub struct TextEditor {
@@ -24,11 +33,13 @@ pub struct TextEditor {
     redo: Vec<HistoryEntry>,
     history_bytes: usize,
     size: (f32, f32),
+    pub(super) input: super::input_method::InputState,
 }
 
 impl TextEditor {
     /// 【界面控件】【单行模式】禁止软换行，fonts 用于重新排版；原有文字和编辑历史保持不变
     pub fn single_line(&mut self, fonts: &mut FontSystem) {
+        self.input.single_line = true;
         self.editor
             .with_buffer_mut(|buffer| buffer.set_wrap(cosmic_text::Wrap::None));
         self.editor.shape_as_needed(fonts, false);
@@ -49,7 +60,18 @@ impl TextEditor {
             redo: Vec::new(),
             history_bytes: 0,
             size: (640.0, 360.0),
+            input: super::input_method::InputState::default(),
         }
+    }
+
+    /// 【界面控件】【单行初始化】用 text 和 fonts 创建 Qt 单行语义编辑器，限制三万二千七百六十七个 UTF-16 单元，返回编辑器
+    pub fn new_single_line(text: &str, fonts: &mut FontSystem) -> Self {
+        let mut value = Self::new(
+            super::input_method::composition::clipped(text, 32767),
+            fonts,
+        );
+        value.single_line(fonts);
+        value
     }
 
     /// 【界面控件】【完整文字】返回当前全部文字，按原有行结束符连接
@@ -77,6 +99,7 @@ impl TextEditor {
             self.editor
                 .with_buffer_mut(|buffer| buffer.set_size(Some(size.0), Some(size.1)));
             self.editor.shape_as_needed(fonts, false);
+            self.resize_presentation(fonts, size.0, size.1);
         }
     }
 
@@ -92,7 +115,27 @@ impl TextEditor {
         fonts: &mut FontSystem,
         operation: impl FnOnce(&mut Editor<'static>, &mut FontSystem),
     ) -> bool {
-        let before = (self.editor.cursor(), self.editor.selection());
+        self.interrupt_input();
+        let before = (!self.input.single_line).then(|| {
+            (
+                self.editor
+                    .selection_bounds()
+                    .map_or(self.editor.cursor(), |(_, end)| end),
+                Selection::None,
+            )
+        });
+        self.mutate_kind(fonts, HistoryKind::Other, before, operation)
+    }
+
+    /// 【界面控件】【历史分组】用 fonts 执行 operation，kind 和 before 控制 Qt 分组及撤销光标，返回是否改变正文
+    pub(super) fn mutate_kind(
+        &mut self,
+        fonts: &mut FontSystem,
+        kind: HistoryKind,
+        before: Option<(Cursor, Selection)>,
+        operation: impl FnOnce(&mut Editor<'static>, &mut FontSystem),
+    ) -> bool {
+        let before = before.unwrap_or_else(|| (self.editor.cursor(), self.editor.selection()));
         self.editor.start_change();
         operation(&mut self.editor, fonts);
         let change = self.editor.finish_change();
@@ -102,12 +145,32 @@ impl TextEditor {
         };
         let bytes = change.items.iter().map(|item| item.text.len()).sum();
         let after = (self.editor.cursor(), self.editor.selection());
-        self.undo.push_back(HistoryEntry {
-            change,
-            before,
-            after,
-            bytes,
-        });
+        let merge = !self.input.separator
+            && self.undo.back().is_some_and(|previous| {
+                previous.after == before
+                    && before.1 == Selection::None
+                    && ((previous.kind == kind && kind == HistoryKind::Insert)
+                        || (self.input.single_line
+                            && previous.kind == HistoryKind::SelectionDelete
+                            && kind == HistoryKind::Insert))
+            });
+        if merge {
+            let previous = self.undo.back_mut().unwrap();
+            previous.change.items.extend(change.items);
+            previous.after = after;
+            previous.bytes += bytes;
+            previous.kind = kind;
+        } else {
+            self.undo.push_back(HistoryEntry {
+                change,
+                before,
+                after,
+                bytes,
+                kind,
+            });
+        }
+        self.input.separator = kind == HistoryKind::Other;
+        self.input.revision = self.input.revision.wrapping_add(1);
         self.redo.clear();
         self.history_bytes += bytes;
         while self.undo.len() > 1
@@ -118,6 +181,50 @@ impl TextEditor {
             }
         }
         true
+    }
+
+    /// 【界面控件】【连续键入】用 fonts 插入 text 并按 Qt 连续文字分组，返回是否改变内容
+    pub(super) fn type_text(&mut self, fonts: &mut FontSystem, text: &str) -> bool {
+        let available = if self.input.single_line {
+            32767usize.saturating_sub(
+                self.text().encode_utf16().count().saturating_sub(
+                    self.selected_text()
+                        .map_or(0, |text| text.encode_utf16().count()),
+                ),
+            )
+        } else {
+            usize::MAX
+        };
+        let text = super::input_method::composition::clipped(text, available);
+        if text.is_empty() {
+            return false;
+        }
+        let length = self
+            .text()
+            .len()
+            .saturating_sub(self.selected_text().map_or(0, |value| value.len()));
+        if length.saturating_add(text.len()) > TEXT_LIMIT {
+            return false;
+        }
+        let before = (!self.input.single_line).then(|| {
+            (
+                self.editor
+                    .selection_bounds()
+                    .map_or(self.editor.cursor(), |(_, end)| end),
+                Selection::None,
+            )
+        });
+        self.mutate_kind(fonts, HistoryKind::Insert, before, |editor, _| {
+            editor.insert_string(text, None)
+        })
+    }
+
+    /// 【界面控件】【历史光标】保存 position 为上一动作的重做位置，并分隔下一动作；用于单行选区删除后相对替换，无返回值
+    pub(super) fn history_position(&mut self, position: (Cursor, Selection)) {
+        if let Some(previous) = self.undo.back_mut() {
+            previous.after = position;
+        }
+        self.input.separator = true;
     }
 
     /// 【界面控件】【动作执行】执行 action 并记录可撤销修改；返回文字是否发生变化
@@ -139,7 +246,11 @@ impl TextEditor {
 
     /// 【界面控件】【文字插入】将 text 插入当前位置或替换选区；规范换行并拒绝超过容量上限的输入
     pub fn insert(&mut self, fonts: &mut FontSystem, text: &str) -> bool {
-        let text = text.replace("\r\n", "\n").replace('\r', "\n");
+        let text = if self.input.single_line {
+            text.to_owned()
+        } else {
+            text.replace("\r\n", "\n").replace('\r', "\n")
+        };
         let length = self.editor.with_buffer(|buffer| {
             buffer
                 .lines
@@ -148,12 +259,23 @@ impl TextEditor {
                 .sum::<usize>()
         });
         let selected = self.selected_text().map_or(0, |text| text.len());
+        let text = if self.input.single_line {
+            let available = 32767usize.saturating_sub(
+                self.text().encode_utf16().count().saturating_sub(
+                    self.selected_text()
+                        .map_or(0, |value| value.encode_utf16().count()),
+                ),
+            );
+            super::input_method::composition::clipped(&text, available)
+        } else {
+            &text
+        };
         if text.is_empty()
             || length.saturating_sub(selected).saturating_add(text.len()) > TEXT_LIMIT
         {
             return false;
         }
-        self.mutate(fonts, |editor, _| editor.insert_string(&text, None))
+        self.mutate(fonts, |editor, _| editor.insert_string(text, None))
     }
 
     /// 【界面控件】【选区删除】删除当前选择并记录撤销；返回是否删除文字
@@ -183,6 +305,7 @@ impl TextEditor {
 
     /// 【界面控件】【全部选择】选择全部文字并将视区移动到末尾；不修改内容
     pub fn select_all(&mut self, fonts: &mut FontSystem) {
+        self.interrupt_input();
         self.editor
             .set_selection(Selection::Normal(Cursor::new(0, 0)));
         self.editor
@@ -195,8 +318,14 @@ impl TextEditor {
         !self.undo.is_empty()
     }
 
+    /// 【界面控件】【重做可用】返回当前是否存在重做记录，不修改候选、正文或历史，无参数
+    pub fn can_redo(&self) -> bool {
+        !self.redo.is_empty()
+    }
+
     /// 【界面控件】【撤销】反向应用最近修改并恢复光标、选择；返回是否成功
     pub fn undo(&mut self, fonts: &mut FontSystem) -> bool {
+        self.interrupt_input();
         let Some(mut entry) = self.undo.pop_back() else {
             return false;
         };
@@ -210,11 +339,13 @@ impl TextEditor {
         self.editor.set_selection(entry.before.1);
         self.editor.shape_as_needed(fonts, false);
         self.redo.push(entry);
+        self.input.revision = self.input.revision.wrapping_add(1);
         true
     }
 
     /// 【界面控件】【重做】重新应用最近撤销的修改并恢复光标、选择；返回是否成功
     pub fn redo(&mut self, fonts: &mut FontSystem) -> bool {
+        self.interrupt_input();
         let Some(mut entry) = self.redo.pop() else {
             return false;
         };
@@ -228,6 +359,7 @@ impl TextEditor {
         self.editor.shape_as_needed(fonts, false);
         self.history_bytes += entry.bytes;
         self.undo.push_back(entry);
+        self.input.revision = self.input.revision.wrapping_add(1);
         true
     }
 }

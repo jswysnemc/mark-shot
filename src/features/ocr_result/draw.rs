@@ -117,7 +117,7 @@ pub(super) fn draw(state: &mut ResultWindow, canvas: &mut Pixmap, scale: f32) {
             canvas,
             state.layout.editor,
             scale,
-            state.focused,
+            state.focused && !state.menu && state.control_focus.is_none(),
         ),
         View::Table => {
             if let Some(table) = &mut state.table {
@@ -127,7 +127,7 @@ pub(super) fn draw(state: &mut ResultWindow, canvas: &mut Pixmap, scale: f32) {
                     canvas,
                     state.layout.body,
                     scale,
-                    state.focused,
+                    state.focused && !state.menu && state.control_focus.is_none(),
                 );
             }
         }

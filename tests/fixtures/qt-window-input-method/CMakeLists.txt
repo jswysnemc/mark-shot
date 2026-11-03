@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.22)
+project(window_input_method_reference LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Test)
+add_executable(window-input-method-reference probe.cpp scenarios.cpp table_probe.cpp)
+target_link_libraries(window-input-method-reference PRIVATE Qt6::Widgets Qt6::Test)

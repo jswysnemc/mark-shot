@@ -13,6 +13,9 @@ AppImage、Flatpak 等原版发布渠道。
 `release/native-preview.json` 固定源提交、任务编号、产物编号、归档和二进制摘要。
 `release/native-preview-verification.json` 记录同一指纹的界面场景，以及仍未完成的范围。
 发布清单同时固定验证记录和发布说明摘要，拒绝缺项、未知字段和不同构建的证据。
+第二版使用 `release/native-preview-2.json`、`release/native-preview-2-verification.json`
+及 `release/native-preview-2-notes.md`，保留第一版文件不变。第二版还要求 niri、Sway
+两组独立窗口原生输入法证据。公开证据资产仍统一命名为 `native-preview-verification.json`。
 
 ## 发布隔离
 

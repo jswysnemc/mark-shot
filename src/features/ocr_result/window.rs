@@ -7,7 +7,7 @@ use tiny_skia::Pixmap;
 
 use super::{
     document::OcrDocument,
-    export::{self, Format},
+    export,
     layout::{Control, Layout, contains},
     table,
     table_view::TableView,
@@ -22,7 +22,7 @@ use crate::{
     ui::text_editor::{EditEvent, TextEditor},
 };
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum View {
     Text,
     Image,
@@ -52,6 +52,7 @@ pub(super) struct ResultWindow {
     pub hovered: Option<Control>,
     pub menu: bool,
     pub focused: bool,
+    pub control_focus: Option<Control>,
     pub status: Option<String>,
     pub copied: bool,
     dragging: bool,
@@ -61,7 +62,7 @@ pub(super) struct ResultWindow {
 
 impl ResultWindow {
     /// 【文字识别】【结果初始化】将 document 转为编辑器、原图和可选表格；仅非 ASCII 原文加载系统字体
-    fn new(document: OcrDocument) -> AppResult<Self> {
+    pub(super) fn new(document: OcrDocument) -> AppResult<Self> {
         let image = document.image()?;
         let mut fonts = crate::fonts::bundled();
         let system_fonts = !document.text.is_ascii();
@@ -83,6 +84,7 @@ impl ResultWindow {
             hovered: None,
             menu: false,
             focused: true,
+            control_focus: None,
             status: None,
             copied: false,
             dragging: false,
@@ -92,7 +94,7 @@ impl ResultWindow {
     }
 
     /// 【文字识别】【字体补充】text 首次包含非 ASCII 字符时补充系统字体；不重复扫描字体目录
-    fn ensure_fonts(&mut self, text: &str) {
+    pub(super) fn ensure_fonts(&mut self, text: &str) {
         if !self.system_fonts && !text.is_ascii() {
             crate::fonts::add_system(&mut self.fonts, crate::fonts::system());
             self.system_fonts = true;
@@ -127,11 +129,10 @@ impl ResultWindow {
                 if self.copy_text(&text) {
                     if self.view == View::Text {
                         self.source.delete_selection(&mut self.fonts);
-                    } else if let Some(table) = &mut self.table {
-                        if let Some(editor) = &mut table.editor {
-                            editor.delete_selection(&mut self.fonts);
-                        }
-                        table.sync();
+                    } else if let Some(table) = &mut self.table
+                        && let Some(editor) = &mut table.editor
+                    {
+                        editor.delete_selection(&mut self.fonts);
                     }
                 }
             }
@@ -141,12 +142,10 @@ impl ResultWindow {
                     let changed = if self.view == View::Text {
                         self.source.insert(&mut self.fonts, &text)
                     } else if let Some(table) = &mut self.table {
-                        let changed = table
+                        table
                             .editor
                             .as_mut()
-                            .is_some_and(|editor| editor.insert(&mut self.fonts, &text));
-                        table.sync();
-                        changed
+                            .is_some_and(|editor| editor.insert(&mut self.fonts, &text))
                     } else {
                         false
                     };
@@ -167,20 +166,40 @@ impl ResultWindow {
 
     /// 【文字识别】【结果快捷键】处理 input 的关闭、全文复制与编辑动作；原图页不接收文字编辑
     fn key(&mut self, input: KeyInput) -> WindowAction {
+        if !self.focused {
+            return WindowAction::None;
+        }
         if input.key == Some(Key::Escape) {
             if self.menu {
                 self.menu = false;
                 return WindowAction::Redraw;
             }
+            if self.view == View::Table
+                && self.table.as_mut().is_some_and(|table| table.finish(false))
+            {
+                return WindowAction::Redraw;
+            }
             return WindowAction::Close;
         }
+        if let Some(control) = self.control_focus {
+            if input.key == Some(Key::Tab) && !input.mods.ctrl && !input.mods.alt {
+                self.control_focus = None;
+                return WindowAction::Redraw;
+            }
+            if matches!(input.key, Some(Key::Enter | Key::Char(' ')))
+                && !input.mods.ctrl
+                && !input.mods.alt
+            {
+                return self.control(control);
+            }
+            if !(input.mods.ctrl && input.mods.shift && input.key == Some(Key::Char('c'))) {
+                return WindowAction::None;
+            }
+        }
         self.ensure_fonts(&input.text);
-        if self.view == View::Table
-            && input.mods.ctrl
-            && input.mods.shift
-            && input.key == Some(Key::Char('c'))
-        {
-            return self.control(Control::Format(Format::Tsv));
+        if input.mods.ctrl && input.mods.shift && input.key == Some(Key::Char('c')) {
+            self.copy_text(&self.source.text());
+            return WindowAction::Redraw;
         }
         let event = match self.view {
             View::Text => self.source.key(&mut self.fonts, &input),
@@ -215,7 +234,24 @@ impl ResultWindow {
         match control {
             Control::Close => return WindowAction::Close,
             Control::View(view) => {
+                if self.view != view {
+                    super::input_method::cancel(self);
+                }
+                self.control_focus = None;
+                if self.view == View::Table
+                    && view != View::Table
+                    && let Some(table) = &mut self.table
+                {
+                    table.finish(true);
+                }
                 self.view = view;
+                if view == View::Table
+                    && let Some(table) = &mut self.table
+                    && table.active.is_none()
+                    && !table.table.rows.is_empty()
+                {
+                    table.active = Some((0, 0));
+                }
                 self.menu = false;
                 self.copied = false;
                 self.status = None;
@@ -223,11 +259,10 @@ impl ResultWindow {
             Control::Undo => {
                 if self.view == View::Text {
                     self.source.undo(&mut self.fonts);
-                } else if let Some(table) = &mut self.table {
-                    if let Some(editor) = &mut table.editor {
-                        editor.undo(&mut self.fonts);
-                    }
-                    table.sync();
+                } else if let Some(table) = &mut self.table
+                    && let Some(editor) = &mut table.editor
+                {
+                    editor.undo(&mut self.fonts);
                 }
                 self.copied = false;
                 self.status = None;
@@ -237,7 +272,12 @@ impl ResultWindow {
                     let text = self.source.text();
                     self.copy_text(&text);
                 }
-                View::Table => self.menu = !self.menu,
+                View::Table => {
+                    if let Some(table) = &mut self.table {
+                        table.finish(true);
+                    }
+                    self.menu = !self.menu;
+                }
                 View::Image => {
                     match crate::backend::initialize_clipboard().copy_image_to_clipboard(&self.png)
                     {
@@ -255,7 +295,7 @@ impl ResultWindow {
             },
             Control::Format(format) => {
                 if let Some(table) = &mut self.table {
-                    table.sync();
+                    table.finish(true);
                     let text = export::text(&table.table, format);
                     self.copy_text(&text);
                 }
@@ -308,6 +348,10 @@ impl ResultWindow {
     /// 【文字识别】【鼠标按下】按 position 处理控件、标题移动、尺寸调整或正文编辑；返回窗口动作
     fn press(&mut self, position: (f64, f64)) -> WindowAction {
         if let Some(control) = self.layout.control(position, self.menu) {
+            if matches!(control, Control::Copy | Control::Undo) {
+                super::input_method::cancel(self);
+                self.control_focus = Some(control);
+            }
             return self.control(control);
         }
         if self.menu {
@@ -321,6 +365,7 @@ impl ResultWindow {
             return WindowAction::Move;
         }
         if contains(self.layout.body, position) {
+            self.control_focus = None;
             self.dragging = self.view != View::Image;
             let clicks = self.clicks(position);
             self.select(position, false, clicks);
@@ -331,6 +376,26 @@ impl ResultWindow {
 }
 
 impl WindowContent for ResultWindow {
+    /// 【文字识别】【输入拥有者】返回当前真正编辑的原文或单元格身份，无参数
+    fn text_input_target(&self) -> Option<u64> {
+        super::input_method::identity(self)
+    }
+
+    /// 【文字识别】【协议快照】按 focus、target_id、previous、cause 返回变化后的输入快照，不复制静止正文
+    fn text_input_snapshot(
+        &mut self,
+        focus: crate::types::text_input::Focus,
+        target_id: u64,
+        previous: Option<&crate::types::text_input::Snapshot>,
+        cause: crate::types::text_input::ChangeCause,
+    ) -> Option<crate::types::text_input::Snapshot> {
+        super::input_method::snapshot(self, focus, target_id, previous, cause)
+    }
+
+    /// 【文字识别】【候选取消】清除全部显示候选并返回是否需要重绘，无参数；不修改确认正文
+    fn cancel_text_input(&mut self) -> bool {
+        super::input_method::cancel(self)
+    }
     /// 【文字识别】【窗口就绪】首帧提交后向父进程确认就绪；父进程此后可以关闭截图覆盖层
     fn mapped(&mut self) {
         use std::io::Write;
@@ -354,8 +419,15 @@ impl WindowContent for ResultWindow {
             WindowEvent::Focused(focused) => {
                 self.focused = focused;
                 self.dragging = false;
+                if !focused {
+                    super::input_method::cancel(self);
+                    if let Some(table) = &mut self.table {
+                        table.finish(true);
+                    }
+                }
                 WindowAction::Redraw
             }
+            WindowEvent::TextInput(edit) => super::input_method::apply(self, edit),
             WindowEvent::Key(input) => self.key(input),
             WindowEvent::PointerButton {
                 position,

@@ -7,6 +7,8 @@ tiny-skia 和 cosmic-text 绘制，不依赖 Qt、GTK、浏览器或 WebView。
 实现为依据。截图、编辑、贴图、OCR 和滚动截图基础工作流已实现，完整界面一致性仍在补齐。
 二维码扫描和录像不在本次范围内。
 完整功能对照与当前验证状态见 `docs/rewrite-status.md`。
+OCR 原文和已开启编辑的表格单元格支持原生 Wayland 输入法，候选与复制、历史及表格
+数据隔离。Qt 状态对照、已验证范围与剩余差异见 `docs/window-input-method-compatibility.md`。
 
 ## 构建
 

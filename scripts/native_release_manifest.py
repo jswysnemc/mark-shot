@@ -19,6 +19,7 @@ GUI_GROUPS = {
     "niri-caret": 1,
     "sway-caret": 1,
 }
+WINDOW_GROUPS = {"niri-window-ime", "sway-window-ime"}
 
 
 def require(condition, message):
@@ -82,4 +83,11 @@ class ReleaseManifest:
             require(group.get("scenario_count") == GUI_GROUPS[group["name"]], "GUI scenario count mismatch")
         require(report.get("user_configuration_modified") is False, "GUI verification modified user configuration")
         require(report.get("original_qt_sources_modified") is False, "GUI verification modified original Qt sources")
+        if int(self.tag.rsplit(".", 1)[1]) >= 2:
+            windows = report.get("window_gui_groups", [])
+            require(len(windows) == len(WINDOW_GROUPS) and {item.get("name") for item in windows} == WINDOW_GROUPS, "incomplete window input method verification")
+            for window in windows:
+                require(window.get("passed") is True and window.get("scenario_count") == 2, "failed window input method verification")
+                require(window.get("binary_sha256") == self.binary_sha256, "window input method uses another binary")
+                require(window.get("native_protocol") is True and window.get("no_ocr") is True and window.get("no_idle_surface_requests") is True, "missing native window isolation evidence")
         return report

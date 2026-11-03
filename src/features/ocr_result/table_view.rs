@@ -5,14 +5,9 @@ use tiny_skia::{Pixmap, Rect};
 
 use super::{layout::contains, table::Table, table_geometry::RowGeometry};
 use crate::{
-    backend::wayland::window::KeyInput,
-    keys::Key,
     renderer::{Painter, text::TextStyle},
     theme::{color, font},
-    ui::{
-        controls,
-        text_editor::{EditEvent, TextEditor},
-    },
+    ui::{controls, text_editor::TextEditor},
 };
 
 const GUTTER: f32 = 32.0;
@@ -22,6 +17,7 @@ pub(super) struct TableView {
     pub table: Table,
     pub active: Option<(usize, usize)>,
     pub editor: Option<TextEditor>,
+    pub editor_offset: f32,
     pub scroll: (f32, f32),
     rows: RowGeometry,
     raster: Option<Pixmap>,
@@ -49,6 +45,7 @@ impl TableView {
             rows,
             active: None,
             editor: None,
+            editor_offset: 0.0,
             scroll: (0.0, 0.0),
             raster: None,
         }
@@ -74,7 +71,7 @@ impl TableView {
     }
 
     /// 【文字识别】【单元格区域】返回 row、column 在 body 本地坐标中的文字区域
-    fn text_rect(&self, body: Rect, row: usize, column: usize) -> Rect {
+    pub(super) fn text_rect(&self, body: Rect, row: usize, column: usize) -> Rect {
         let width = self.column_width(body);
         Rect::from_xywh(
             GUTTER + column as f32 * width - self.scroll.0 + 6.0,
@@ -83,16 +80,6 @@ impl TableView {
             self.rows.height(row) - 10.0,
         )
         .unwrap()
-    }
-
-    /// 【文字识别】【激活单元格】激活 row、column 并初始化编辑器；fonts 用于文字选择与排版
-    fn activate(&mut self, fonts: &mut FontSystem, row: usize, column: usize) {
-        if self.active == Some((row, column)) {
-            return;
-        }
-        self.sync();
-        self.active = Some((row, column));
-        self.editor = Some(TextEditor::new(&self.table.rows[row][column], fonts));
     }
 
     /// 【文字识别】【单元格同步】将活动编辑器内容写回表格；无活动单元格时不修改
@@ -105,77 +92,6 @@ impl TableView {
         }
     }
 
-    /// 【文字识别】【表格鼠标】在 body 内按 position 定位和编辑单元格；drag、clicks 控制文字选择
-    pub fn pointer(
-        &mut self,
-        fonts: &mut FontSystem,
-        body: Rect,
-        position: (f64, f64),
-        drag: bool,
-        clicks: u8,
-    ) {
-        let cell = if drag {
-            self.active
-        } else {
-            self.cell_at(body, position)
-        };
-        let Some((row, column)) = cell else {
-            return;
-        };
-        self.activate(fonts, row, column);
-        let rect = self.text_rect(body, row, column);
-        if let Some(editor) = &mut self.editor {
-            editor.resize(fonts, rect.width(), rect.height());
-            editor.pointer(
-                fonts,
-                (
-                    position.0 - f64::from(body.x() + rect.x()),
-                    position.1 - f64::from(body.y() + rect.y()),
-                ),
-                drag,
-                clicks,
-            );
-        }
-    }
-
-    /// 【文字识别】【表格按键】编辑活动单元格；Tab 和 Enter 移动到相邻单元格，返回剪贴板或重绘请求
-    pub fn key(&mut self, fonts: &mut FontSystem, body: Rect, input: &KeyInput) -> EditEvent {
-        if !input.mods.ctrl
-            && matches!(input.key, Some(Key::Tab | Key::Enter))
-            && !(input.key == Some(Key::Enter) && input.mods.shift)
-        {
-            let Some((row, column)) = self.active else {
-                return EditEvent::None;
-            };
-            let index = row * self.table.columns() + column;
-            let next = if input.key == Some(Key::Tab) {
-                if input.mods.shift {
-                    index.saturating_sub(1)
-                } else {
-                    (index + 1).min(self.table.rows.len() * self.table.columns() - 1)
-                }
-            } else {
-                ((row + 1).min(self.table.rows.len() - 1)) * self.table.columns() + column
-            };
-            self.activate(
-                fonts,
-                next / self.table.columns(),
-                next % self.table.columns(),
-            );
-            self.ensure_visible(body);
-            if let Some(editor) = &mut self.editor {
-                editor.select_all(fonts);
-            }
-            return EditEvent::Redraw;
-        }
-        let event = self
-            .editor
-            .as_mut()
-            .map_or(EditEvent::None, |editor| editor.key(fonts, input));
-        self.sync();
-        event
-    }
-
     /// 【文字识别】【表格滚动】按 delta 移动表格视区；根据 body 大小限制两个方向的滚动范围
     pub fn scroll(&mut self, body: Rect, delta: (f64, f64)) {
         let max_x = (self.column_width(body) * self.table.columns() as f32 + GUTTER - body.width())
@@ -186,7 +102,7 @@ impl TableView {
     }
 
     /// 【文字识别】【单元格可见】根据 body 大小滚动到活动单元格；保留已在视区内的位置
-    fn ensure_visible(&mut self, body: Rect) {
+    pub(super) fn ensure_visible(&mut self, body: Rect) {
         let Some((row, column)) = self.active else {
             return;
         };
@@ -250,7 +166,7 @@ impl TableView {
                     if self.active == Some((row, column)) {
                         painter.fill_rounded(rect, 3.0, color::active().with_alpha(42));
                     }
-                    if self.active != Some((row, column)) {
+                    if self.active != Some((row, column)) || self.editor.is_none() {
                         let text = &self.table.rows[row][column];
                         let label = controls::fit_label(
                             &mut painter,
@@ -285,7 +201,15 @@ impl TableView {
                 self.rows.height(row) - 10.0,
             )
             .unwrap();
-            editor.draw(fonts, cache, raster, rect, scale, focused);
+            editor.draw_single_line(
+                fonts,
+                cache,
+                raster,
+                rect,
+                scale,
+                focused,
+                &mut self.editor_offset,
+            );
         }
         {
             let mut painter = Painter::new(raster)

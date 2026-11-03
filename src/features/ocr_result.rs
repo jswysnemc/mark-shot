@@ -3,9 +3,11 @@
 pub mod document;
 mod draw;
 pub mod export;
+mod input_method;
 mod layout;
 pub mod table;
 mod table_geometry;
+mod table_input;
 mod table_view;
 pub mod transport;
 mod window;

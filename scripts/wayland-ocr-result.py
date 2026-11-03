@@ -56,9 +56,17 @@ def expected_csv(rows):
     return output.getvalue().removesuffix("\r\n")
 
 
+def copy_table(env, window, expected):
+    """【结果测试】【表格菜单】在 window 选择 TSV 菜单并核对 expected，env 为私有会话；不借用原文复制快捷键"""
+    session.click(window, window["size"][0] - 44, 56)
+    session.click(window, window["size"][0] - 98, 92)
+    session.wait_clipboard(env, expected)
+
+
 def table_formats(env, window, artifacts):
     """【结果测试】【表格操作】修改 window 中单元格并验证四种导出；env 为隔离环境，artifacts 保存结果"""
     session.click(window, 160, 56)
+    session.click(window, 82, 155)
     session.click(window, 82, 155)
     session.key("ctrl+a")
     edited = 'A|B, "quoted"\n新值'
@@ -66,7 +74,7 @@ def table_formats(env, window, artifacts):
     rows = [row.copy() for row in ROWS]
     rows[1][0] = edited
     tsv = '\n'.join('\t'.join('"' + value.replace('"', '""') + '"' if any(char in value for char in '\t\r\n"') else value for value in row) for row in rows)
-    session.copy_all(env, tsv)
+    copy_table(env, window, tsv)
     (artifacts / "table.tsv").write_text(tsv)
     for index, suffix in [(2, "csv"), (1, "md"), (3, "html")]:
         session.control("copy", "clipboard sentinel")
@@ -129,7 +137,7 @@ def editable_result(binary, env, artifacts):
         session.click(window, 98, 56)
         session.click(window, window["size"][0] - 118, 56)
         session.click(window, 160, 56)
-        session.copy_all(env, tsv)
+        copy_table(env, window, tsv)
         session.key("Escape")
         if process.wait(timeout=3) != 0:
             raise RuntimeError("the native result window exited with an error")
@@ -198,7 +206,8 @@ def actual_ocr(binary, models, base_env, artifacts, first_use=False, table_resul
             (artifacts / "recognized.txt").write_text(text)
             if table_result:
                 session.click(window, 160, 56)
-                text = session.copy_all(env, SOURCE)
+                copy_table(env, window, SOURCE)
+                text = session.read_clipboard(env)
                 (artifacts / "table.tsv").write_text(text)
             session.screenshot(artifacts / "recognized.png")
             session.key("Escape")

@@ -76,7 +76,7 @@ impl TextEditor {
         offset: &mut f32,
     ) {
         self.resize(fonts, rect.width(), rect.height());
-        if focused && let Some((x, _)) = self.editor.cursor_position() {
+        if focused && let Some((x, _)) = self.display_editor(fonts).cursor_position() {
             if x as f32 <= *offset {
                 *offset = x.max(0) as f32;
             }
@@ -109,13 +109,16 @@ impl TextEditor {
             (rect.right() * scale).ceil() as i32,
             (rect.bottom() * scale).ceil() as i32,
         ];
-        let cursor = if focused {
+        let visible = self
+            .preedit()
+            .is_none_or(|preedit| preedit.cursor.is_some());
+        let cursor = if focused && visible {
             color::caret().cosmic()
         } else {
             cosmic_text::Color::rgba(0, 0, 0, 0)
         };
         crate::renderer::editor_text::draw_editor(
-            &mut self.editor,
+            self.display_editor(fonts),
             fonts,
             cache,
             scale,

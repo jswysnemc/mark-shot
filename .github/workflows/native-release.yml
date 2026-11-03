@@ -1,6 +1,7 @@
 name: Native Preview Release
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - rewrite/native-wayland
@@ -39,7 +40,11 @@ jobs:
       - name: Check whether a preview is requested
         id: manifest
         run: |
-          if [ -f release/native-preview.json ]; then
+          if [ -f release/native-preview-2.json ]; then
+            echo 'prefix=release/native-preview-2' >> "$GITHUB_OUTPUT"
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          elif [ -f release/native-preview.json ]; then
+            echo 'prefix=release/native-preview' >> "$GITHUB_OUTPUT"
             echo 'present=true' >> "$GITHUB_OUTPUT"
           else
             echo 'present=false' >> "$GITHUB_OUTPUT"
@@ -49,4 +54,9 @@ jobs:
         if: steps.manifest.outputs.present == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/native_release.py
+          PREVIEW_PREFIX: ${{ steps.manifest.outputs.prefix }}
+        run: |
+          python3 scripts/native_release.py \
+            --manifest "$PREVIEW_PREFIX.json" \
+            --notes "$PREVIEW_PREFIX-notes.md" \
+            --verification "$PREVIEW_PREFIX-verification.json"

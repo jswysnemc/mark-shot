@@ -4,11 +4,13 @@ mod input;
 mod protocol;
 mod runtime;
 mod shell;
+mod text_input;
 mod wake;
 
 use tiny_skia::Pixmap;
 
 use crate::keys::{Key, Mods};
+use crate::types::text_input::{ChangeCause, Edit, Focus, Snapshot};
 
 pub use runtime::run;
 pub use wake::WindowWake;
@@ -37,6 +39,7 @@ pub enum WindowEvent {
     },
     Focused(bool),
     Key(KeyInput),
+    TextInput(Edit),
     PointerMove {
         position: (f64, f64),
     },
@@ -71,6 +74,27 @@ pub enum WindowCursor {
 }
 
 pub trait WindowContent {
+    /// 【原生窗口】【输入目标】返回当前可编辑字段的稳定身份，菜单、原图或只读内容返回空值，无参数
+    fn text_input_target(&self) -> Option<u64> {
+        None
+    }
+
+    /// 【原生窗口】【输入快照】用 focus、target_id、previous 和 cause 返回变化后的有界快照；空值表示没有变化，不分配静止帧文字
+    fn text_input_snapshot(
+        &mut self,
+        _focus: Focus,
+        _target_id: u64,
+        _previous: Option<&Snapshot>,
+        _cause: ChangeCause,
+    ) -> Option<Snapshot> {
+        None
+    }
+
+    /// 【原生窗口】【候选取消】取消显示候选但不回退已确认正文，返回是否需要重绘，无参数
+    fn cancel_text_input(&mut self) -> bool {
+        false
+    }
+
     /// 【原生窗口】【唤醒接入】接收 wake 以通知后台任务完成；默认不启动后台工作
     fn connected(&mut self, _wake: WindowWake) {}
 

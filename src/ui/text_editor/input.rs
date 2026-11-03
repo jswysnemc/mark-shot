@@ -57,6 +57,25 @@ fn motion(key: Key, ctrl: bool) -> Option<Motion> {
 impl TextEditor {
     /// 【界面控件】【键盘编辑】处理 input 并使用 fonts 排版；返回修改、重绘或剪贴板请求
     pub fn key(&mut self, fonts: &mut FontSystem, input: &KeyInput) -> EditEvent {
+        let cancelled = if self.preedit().is_some() {
+            self.interrupt_input()
+        } else {
+            false
+        };
+        let result = self.key_committed(fonts, input);
+        if cancelled && result == EditEvent::None {
+            EditEvent::Redraw
+        } else {
+            result
+        }
+    }
+
+    /// 【界面控件】【已确认按键】处理 input 的正文编辑，fonts 用于排版；候选由外层键盘入口取消，返回编辑事件
+    fn key_committed(&mut self, fonts: &mut FontSystem, input: &KeyInput) -> EditEvent {
+        if self.input.single_line && matches!(input.key, Some(Key::Enter | Key::Tab)) {
+            self.input.separator = true;
+            return EditEvent::None;
+        }
         let ctrl = input.mods.ctrl && !input.mods.alt;
         let shift = input.mods.shift;
         if ctrl {
@@ -109,6 +128,7 @@ impl TextEditor {
         if let Some(key) = input.key
             && let Some(motion) = motion(key, ctrl)
         {
+            self.input.separator = true;
             if shift {
                 if self.editor.selection() == Selection::None {
                     self.editor
@@ -139,7 +159,7 @@ impl TextEditor {
             self.action(fonts, action)
         } else {
             let text: String = input.text.chars().filter(|ch| !ch.is_control()).collect();
-            self.insert(fonts, &text)
+            self.type_text(fonts, &text)
         };
         if changed {
             EditEvent::Changed
@@ -156,6 +176,7 @@ impl TextEditor {
         drag: bool,
         clicks: u8,
     ) {
+        self.interrupt_input();
         let (x, y) = (position.0.round() as i32, position.1.round() as i32);
         let action = if drag {
             Action::Drag { x, y }

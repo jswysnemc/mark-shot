@@ -228,6 +228,7 @@ impl SeatHandler for NativeWindow {
                     self.loop_handle.clone(),
                     Box::new(|state, _, event| state.key_event(event)),
                 ) {
+                    self.text_input.bind(&seat, qh);
                     self.keyboard = Some(keyboard);
                     self.keyboard_seat = Some(seat);
                 }
@@ -260,6 +261,9 @@ impl SeatHandler for NativeWindow {
                 self.pointer_seat = None;
             }
             Capability::Keyboard if self.keyboard_seat.as_ref() == Some(&seat) => {
+                if let Some(focus) = self.text_input.remove(&seat) {
+                    self.leave_text_input(focus.id);
+                }
                 if let Some(keyboard) = self.keyboard.take()
                     && keyboard.version() >= 3
                 {

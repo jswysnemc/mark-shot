@@ -2,7 +2,10 @@
 
 mod draw;
 mod input;
+mod input_method;
 mod state;
 
 pub use input::EditEvent;
+pub use input_method::composition::Update as InputMethodUpdate;
+pub use input_method::context::InputArea;
 pub use state::TextEditor;

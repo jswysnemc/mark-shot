@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 
 from native_release_artifact import verify_archive
@@ -97,11 +98,14 @@ def publish(github, manifest, notes, verification, directory, publication_commit
     artifacts.mkdir(parents=True, exist_ok=False)
     github.command(["run", "download", str(manifest.run_id), "--repo", REPOSITORY, "--name", ARTIFACT_NAME, "--dir", str(artifacts)])
     verify_archive(artifacts / ARCHIVE_NAME, manifest)
+    verification_asset = artifacts / "native-preview-verification.json"
+    shutil.copyfile(verification, verification_asset)
+    require(sha256_file(verification_asset) == manifest.verification_sha256, "staged verification digest mismatch")
     if release is None:
         release = github.api(f"{base}/releases", method="POST", payload={"tag_name": manifest.tag, "target_commitish": manifest.source_commit, "name": f"Mark Shot {manifest.tag}", "body": notes_text, "draft": True, "prerelease": True, "make_latest": "false"})
     for asset in release.get("assets", []):
         github.api(f"{base}/releases/assets/{asset['id']}", method="DELETE")
-    github.command(["release", "upload", manifest.tag, "--repo", REPOSITORY, str(artifacts / ARCHIVE_NAME), str(artifacts / (ARCHIVE_NAME + ".sha256")), str(verification)])
+    github.command(["release", "upload", manifest.tag, "--repo", REPOSITORY, str(artifacts / ARCHIVE_NAME), str(artifacts / (ARCHIVE_NAME + ".sha256")), str(verification_asset)])
     release = github.api(f"{base}/releases/{release['id']}")
     verify_published_assets(github, manifest, release, directory / "draft-check")
 
