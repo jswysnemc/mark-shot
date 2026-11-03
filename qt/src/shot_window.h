@@ -16,6 +16,7 @@
 #include <QWidget>
 
 #include "capture_double_click_action.h"
+#include "capture_middle_click_gesture.h"
 #include "editor_history.h"
 #include "display_capture/display_capture_target.h"
 #include "recording/recording_options.h"
@@ -66,6 +67,7 @@ class ShotWindow final : public QWidget {
     friend class ShotWindowRulerTool;
     friend class ShotWindowRulerPainter;
     friend class ShotWindowSelectionTranslate;
+    friend class ShotWindowClickAction;
     friend class SelectionTranslateTest;
 
 public:
@@ -603,9 +605,9 @@ private:
     Tool m_tool = Tool::Pen;
     Tool m_defaultTool = Tool::Pen;
     Tool m_fullscreenDefaultTool = Tool::Pen;
-    // 选区内双击手势执行的动作，会话启动时从应用配置读入一次（issue #85）。
-    markshot::CaptureDoubleClickAction m_doubleClickAction =
-        markshot::CaptureDoubleClickAction::Copy;
+    // 选区内双击动作与中键单击手势，动作在会话启动时从应用配置读入一次（issue #85、#141）。
+    markshot::CaptureDoubleClickAction m_doubleClickAction = markshot::CaptureDoubleClickAction::Copy;
+    markshot::CaptureMiddleClickGesture m_middleClick;
     std::array<QKeySequence, static_cast<int>(Action::ToolRuler) + 1> m_actionShortcuts;
     std::array<QKeySequence, static_cast<int>(Tool::Ruler) + 1> m_toolShortcuts;
     QKeySequence m_startupColorPickerShortcut;

@@ -6,6 +6,7 @@
     },
     "capture": {
         "doubleClickAction": "copy",
+        "middleClickAction": "default",
         "selectionLoupe": {
             "enabled": false
         },

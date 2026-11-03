@@ -162,6 +162,8 @@ add_test(NAME capture-freeze-scope COMMAND mark-shot-capture-freeze-scope-test)
 
 qt_add_executable(mark-shot-capture-double-click-action-test
     tests/capture_double_click_action_test.cpp
+    src/capture_click_action.cpp
+    src/capture_click_action.h
     src/capture_double_click_action.cpp
     src/capture_double_click_action.h
     src/config_value.cpp
@@ -175,6 +177,44 @@ target_link_libraries(mark-shot-capture-double-click-action-test
         Qt6::Test
 )
 add_test(NAME capture-double-click-action COMMAND mark-shot-capture-double-click-action-test)
+
+qt_add_executable(mark-shot-capture-middle-click-action-test
+    tests/capture_middle_click_action_test.cpp
+    src/capture_click_action.cpp
+    src/capture_click_action.h
+    src/capture_middle_click_action.cpp
+    src/capture_middle_click_action.h
+    src/config_value.cpp
+    src/config_value.h
+)
+target_include_directories(mark-shot-capture-middle-click-action-test PRIVATE src)
+target_link_libraries(mark-shot-capture-middle-click-action-test
+    PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Test
+)
+add_test(NAME capture-middle-click-action COMMAND mark-shot-capture-middle-click-action-test)
+
+qt_add_executable(mark-shot-capture-middle-click-gesture-test
+    tests/capture_middle_click_gesture_test.cpp
+    src/capture_click_action.cpp
+    src/capture_click_action.h
+    src/capture_middle_click_action.cpp
+    src/capture_middle_click_action.h
+    src/capture_middle_click_gesture.cpp
+    src/capture_middle_click_gesture.h
+    src/config_value.cpp
+    src/config_value.h
+)
+target_include_directories(mark-shot-capture-middle-click-gesture-test PRIVATE src)
+target_link_libraries(mark-shot-capture-middle-click-gesture-test
+    PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Test
+)
+add_test(NAME capture-middle-click-gesture COMMAND mark-shot-capture-middle-click-gesture-test)
 
 qt_add_executable(mark-shot-capture-toolbar-position-test
     tests/capture_toolbar_position_test.cpp

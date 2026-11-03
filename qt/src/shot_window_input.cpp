@@ -2,6 +2,7 @@
 
 #include "selection_cursor_nudge.h"
 #include "selection_loupe.h"
+#include "shot_window_click_action.h"
 #include "shot_window_ruler_tool.h"
 
 namespace cfg = markshot::config;
@@ -17,7 +18,10 @@ void ShotWindow::mouseMoveEvent(QMouseEvent *event)
         updateImageScrollBars();
     }
     if (m_imagePanning) {
-        panImageTo(event->position());
+        // 【截图】【中键单击】未超过拖动阈值前保持画面不动，超过后按完整位移平移
+        if (!m_middleClick.track(event->position())) {
+            panImageTo(event->position());
+        }
         event->accept();
         return;
     }
@@ -356,6 +360,8 @@ void ShotWindow::mouseReleaseEvent(QMouseEvent *event)
         if (event->button() == Qt::MiddleButton) {
             m_imagePanning = false;
             updatePointerCursor(event->position());
+            // 【截图】【中键单击】未拖动的中键单击执行配置动作，拖动只结束平移
+            ShotWindowClickAction(*this).finishMiddleClick(event->position());
         }
         event->accept();
         return;

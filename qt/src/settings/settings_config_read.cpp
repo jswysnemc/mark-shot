@@ -562,6 +562,7 @@ SettingsConfig readSettingsConfig(QString *error)
     settings.capture.kdeKwinScreenshotEnabled = kdeKWinScreenshotEnabledFromConfigRoot(root);
     settings.capture.hideOwnWindows = hideOwnWindowsDuringCaptureFromConfigRoot(root);
     settings.capture.doubleClickAction = captureDoubleClickActionFromConfigRoot(root);
+    settings.capture.middleClickAction = captureMiddleClickActionFromConfigRoot(root);
     settings.capture.toolbarPosition = captureToolbarPositionFromConfigRoot(root);
     settings.capture.selectionLoupeEnabled = selectionLoupeEnabledFromConfigRoot(root);
     settings.capture.regionDetectionEnabled = region_detection::regionDetectionEnabledFromConfigRoot(root);
