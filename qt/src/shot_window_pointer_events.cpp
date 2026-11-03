@@ -81,14 +81,18 @@ bool ShotWindow::event(QEvent *event)
     return handled;
 }
 
+/// @brief 结束中断的指针操作，撤去未提交草稿并恢复抓取控件状态
+/// @return 无返回值
 void ShotWindow::cancelPointerInteraction()
 {
+    // 1. 【截图】【中键单击】中断的中键按下不再算作单击，释放丢失时也不会补发动作
+    m_middleClick.cancel();
     if (!m_dragging && !m_imagePanning && !m_toolbarDragging
         && !m_annotationSelectionBoxActive && !m_draft.has_value() && !m_laserDraft.has_value()) {
         return;
     }
 
-    // 1. 【标注】【交互取消】已完成的标注保持原状，撤去未提交草稿及临时选择框
+    // 2. 【标注】【交互取消】已完成的标注保持原状，撤去未提交草稿及临时选择框
     m_dragging = false;
     m_imagePanning = false;
     m_toolbarDragging = false;
@@ -104,7 +108,7 @@ void ShotWindow::cancelPointerInteraction()
     m_selectionPointerDetached = false;
     flushInitialSelectionRepaint();
 
-    // 2. 【标注】【交互取消】握柄可持有独立光标，和画布一起恢复
+    // 3. 【标注】【交互取消】握柄可持有独立光标，和画布一起恢复
     for (QWidget *widget : findChildren<QWidget *>()) {
         if (widget->property("dragHandle").toBool()) {
             widget->setCursor(widget->isEnabled() ? Qt::OpenHandCursor : Qt::ArrowCursor);

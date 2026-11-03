@@ -365,6 +365,11 @@ const QHash<QString, QString> &chineseTable()
         {QStringLiteral("Save To Default Folder"), QStringLiteral("保存到默认目录")},
         {QStringLiteral("Pin To Screen"), QStringLiteral("钉到屏幕")},
         {QStringLiteral("Cancel Capture"), QStringLiteral("取消截图")},
+        {QStringLiteral("Middle Click Action"), QStringLiteral("中键单击动作")},
+        {QStringLiteral("Action performed when clicking the middle button inside the selection without dragging. "
+                        "Dragging with the middle button still pans the canvas."),
+         QStringLiteral("在选区内单击中键且不拖动时执行的动作。按住中键拖动仍然平移画布。")},
+        {QStringLiteral("Default (Pan Canvas)"), QStringLiteral("默认（平移画布）")},
         {QStringLiteral("Tool Shortcuts"), QStringLiteral("工具快捷键")},
         {QStringLiteral("Configure shortcuts used while editing a selected screenshot."),
          QStringLiteral("配置选中截图后的标注工具快捷键。")},

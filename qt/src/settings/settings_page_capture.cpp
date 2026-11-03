@@ -11,6 +11,32 @@
 
 namespace markshot::settings {
 
+namespace {
+
+/// @brief 向下拉框追加双击与中键单击共用的选区快捷动作。
+/// @param combo 目标下拉框。
+/// @return 无返回值。
+void addCaptureClickActionItems(QComboBox *combo)
+{
+    combo->addItem(MS_TR("Copy And Close"), static_cast<int>(CaptureClickAction::Copy));
+    combo->addItem(MS_TR("Save To Default Folder"), static_cast<int>(CaptureClickAction::Save));
+    combo->addItem(MS_TR("Save As"), static_cast<int>(CaptureClickAction::SaveAs));
+    combo->addItem(MS_TR("Pin To Screen"), static_cast<int>(CaptureClickAction::Pin));
+    combo->addItem(MS_TR("Cancel Capture"), static_cast<int>(CaptureClickAction::Cancel));
+}
+
+/// @brief 选中下拉框中与动作对应的项，找不到时选中第一项。
+/// @param combo 目标下拉框。
+/// @param action 需要显示的动作。
+/// @return 无返回值。
+void selectCaptureClickAction(QComboBox *combo, CaptureClickAction action)
+{
+    const int index = combo->findData(static_cast<int>(action));
+    combo->setCurrentIndex(index >= 0 ? index : 0);
+}
+
+}  // namespace
+
 SettingsPageCapture::SettingsPageCapture(QWidget *parent)
     : QWidget(parent)
 {
@@ -42,16 +68,15 @@ SettingsPageCapture::SettingsPageCapture(QWidget *parent)
         MS_TR("Action performed when double clicking an empty area inside the selection."));
     m_doubleClickAction->addItem(MS_TR("Do Nothing"),
                                  static_cast<int>(CaptureDoubleClickAction::None));
-    m_doubleClickAction->addItem(MS_TR("Copy And Close"),
-                                 static_cast<int>(CaptureDoubleClickAction::Copy));
-    m_doubleClickAction->addItem(MS_TR("Save To Default Folder"),
-                                 static_cast<int>(CaptureDoubleClickAction::Save));
-    m_doubleClickAction->addItem(MS_TR("Save As"),
-                                 static_cast<int>(CaptureDoubleClickAction::SaveAs));
-    m_doubleClickAction->addItem(MS_TR("Pin To Screen"),
-                                 static_cast<int>(CaptureDoubleClickAction::Pin));
-    m_doubleClickAction->addItem(MS_TR("Cancel Capture"),
-                                 static_cast<int>(CaptureDoubleClickAction::Cancel));
+    addCaptureClickActionItems(m_doubleClickAction);
+    // 框选完成后在选区内单击中键执行的快捷动作，中键拖动仍平移画布（issue #141）
+    m_middleClickAction = addComboRow(form, MS_TR("Middle Click Action"),
+        MS_TR("Action performed when clicking the middle button inside the selection without dragging. "
+              "Dragging with the middle button still pans the canvas."));
+    m_middleClickAction->setObjectName(QStringLiteral("captureMiddleClickAction"));
+    m_middleClickAction->addItem(MS_TR("Default (Pan Canvas)"),
+                                 static_cast<int>(CaptureClickAction::None));
+    addCaptureClickActionItems(m_middleClickAction);
     // 两条工具栏停靠屏幕边缘时位置固定，免去每次截图后寻找菜单（issue #146）
     m_toolbarPosition = addComboRow(form, MS_TR("Toolbar Position"),
         MS_TR("Where the toolbars appear after selecting a region."));
@@ -78,9 +103,8 @@ void SettingsPageCapture::setConfig(const SettingsConfig &config)
     m_freezeScope->setCurrentIndex(index >= 0 ? index : 0);
     m_kdeKwinScreenshot->setChecked(config.capture.kdeKwinScreenshotEnabled);
     m_hideOwnWindows->setChecked(config.capture.hideOwnWindows);
-    const int doubleClickIndex =
-        m_doubleClickAction->findData(static_cast<int>(config.capture.doubleClickAction));
-    m_doubleClickAction->setCurrentIndex(doubleClickIndex >= 0 ? doubleClickIndex : 0);
+    selectCaptureClickAction(m_doubleClickAction, config.capture.doubleClickAction);
+    selectCaptureClickAction(m_middleClickAction, config.capture.middleClickAction);
     const int toolbarPositionIndex =
         m_toolbarPosition->findData(static_cast<int>(config.capture.toolbarPosition));
     m_toolbarPosition->setCurrentIndex(toolbarPositionIndex >= 0 ? toolbarPositionIndex : 0);
@@ -101,6 +125,8 @@ void SettingsPageCapture::updateConfig(SettingsConfig *config) const
     config->capture.hideOwnWindows = m_hideOwnWindows->isChecked();
     config->capture.doubleClickAction =
         static_cast<CaptureDoubleClickAction>(m_doubleClickAction->currentData().toInt());
+    config->capture.middleClickAction =
+        static_cast<CaptureClickAction>(m_middleClickAction->currentData().toInt());
     config->capture.toolbarPosition =
         static_cast<CaptureToolbarPosition>(m_toolbarPosition->currentData().toInt());
     config->capture.selectionLoupeEnabled = m_selectionLoupe->isChecked();

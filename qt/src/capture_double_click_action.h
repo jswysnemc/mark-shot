@@ -1,5 +1,7 @@
 #pragma once
 
+#include "capture_click_action.h"
+
 #include <QJsonObject>
 #include <QString>
 
@@ -7,15 +9,8 @@
 
 namespace markshot {
 
-// 选区内双击触发的动作。数值同时作为设置界面下拉项的稳定标识。
-enum class CaptureDoubleClickAction {
-    None,
-    Copy,
-    Save,
-    SaveAs,
-    Pin,
-    Cancel,
-};
+// 选区内双击触发的动作，与中键单击共用同一动作集合；None 表示双击不执行动作。
+using CaptureDoubleClickAction = CaptureClickAction;
 
 /// @brief 返回选区双击动作的内置默认值。
 /// @return 默认双击动作。

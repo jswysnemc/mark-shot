@@ -194,6 +194,7 @@ ShotWindow::ShotWindow(QImage frozenFrame,
     if (appConfigOk) {
         m_toolbarAppearance = markshot::toolbarAppearanceFromConfigRoot(appConfigRoot);
         m_doubleClickAction = markshot::captureDoubleClickActionFromConfigRoot(appConfigRoot);
+        m_middleClick.setAction(markshot::captureMiddleClickActionFromConfigRoot(appConfigRoot));
         m_controls.m_toolbarPosition = markshot::captureToolbarPositionFromConfigRoot(appConfigRoot);
         m_selectionLoupeEnabled = markshot::selectionLoupeEnabledFromConfigRoot(appConfigRoot);
     }

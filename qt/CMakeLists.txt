@@ -158,9 +158,15 @@ qt_add_executable(mark-shot
     src/display_capture/display_capture_snapshot.h
     src/display_capture/display_capture_target.h
     src/capture_cursor_policy_config.cpp
+    src/capture_click_action.cpp
+    src/capture_click_action.h
     src/capture_double_click_action.cpp
     src/capture_double_click_action.h
     src/capture_double_click_action_config.cpp
+    src/capture_middle_click_action.cpp
+    src/capture_middle_click_action.h
+    src/capture_middle_click_gesture.cpp
+    src/capture_middle_click_gesture.h
     src/capture_toolbar_position.cpp
     src/capture_toolbar_position.h
     src/selection_loupe_config.cpp

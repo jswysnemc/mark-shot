@@ -1,4 +1,5 @@
 #include "shot_window_module.h"
+#include "shot_window_click_action.h"
 #include "shot_window_ruler_painter.h"
 #include "shot_window_ruler_tool.h"
 
@@ -231,8 +232,9 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
 {
     clearWheelPreview();
 
-    // 1. 【标注】【图像平移】中键抓取期间只维护平移，其他按键不创建并行草稿
+    // 1. 【标注】【图像平移】中键抓取期间只维护平移，其他按键不创建并行草稿，也让本次中键不再算作单击
     if (m_imagePanning) {
+        m_middleClick.cancel();
         event->accept();
         return;
     }
@@ -303,6 +305,8 @@ void ShotWindow::mousePressEvent(QMouseEvent *event)
             m_imagePanStartCenter = m_imageCenterInitialized
                 ? m_imageCenter
                 : QPointF(m_frozenFrame.width() / 2.0, m_frozenFrame.height() / 2.0);
+            // 2. 【截图】【中键单击】框选完成后在选区内按下中键时登记单击候选，释放时再区分单击和平移
+            ShotWindowClickAction(*this).beginMiddleClick(event->position(), event->buttons());
             updateCursor();
             event->accept();
             return;

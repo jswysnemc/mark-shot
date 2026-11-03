@@ -1,5 +1,7 @@
 #include "shot_window_module.h"
 
+#include "shot_window_click_action.h"
+
 using namespace markshot::shot;
 
 /**
@@ -63,28 +65,6 @@ bool ShotWindow::runConfiguredDoubleClickAction()
     discardDraftForDoubleClick();
     update();
 
-    // 2. 按配置分发到既有动作入口，各入口自行处理关闭窗口
-    switch (m_doubleClickAction) {
-    case markshot::CaptureDoubleClickAction::None:
-        return false;
-    case markshot::CaptureDoubleClickAction::Copy:
-        copySelection();
-        return true;
-    case markshot::CaptureDoubleClickAction::Save:
-        saveSelection();
-        return true;
-    case markshot::CaptureDoubleClickAction::SaveAs:
-        saveSelectionAs();
-        return true;
-    case markshot::CaptureDoubleClickAction::Pin:
-        pinSelection();
-        return true;
-    case markshot::CaptureDoubleClickAction::Cancel:
-        commitTextEditor();
-        emit sessionCancelRequested();
-        close();
-        return true;
-    }
-
-    return false;
+    // 2. 按配置分发到与中键单击共用的动作入口，各入口自行处理关闭窗口
+    return ShotWindowClickAction(*this).run(m_doubleClickAction);
 }
