@@ -1,0 +1,167 @@
+{
+  "schema": 1,
+  "date": "2026-11-04",
+  "source_commit": "14b9d2f761025f606487f89d4a2431fbd00988ca",
+  "repository": "jswysnemc/mark-shot",
+  "branch": "rewrite/native-wayland",
+  "run_id": 41708747790,
+  "run_url": "https://github.com/jswysnemc/mark-shot/actions/runs/41708747790",
+  "binary": {
+    "sha256": "b65e3731b17bd10eebe8a6db4155d32a38c46fcbcdc836ef4e95f54ae92aa8f9",
+    "bytes": 43223448
+  },
+  "build_platform": "Ubuntu 24.04 x86_64",
+  "minimum_glibc": "2.39",
+  "rust_tests": {
+    "passed": 753,
+    "failed": 0,
+    "ignored": 10
+  },
+  "python_tests": {
+    "passed": 141,
+    "failed": 0
+  },
+  "checks": {
+    "rustfmt": true,
+    "workspace_clippy_all_targets_all_features": true,
+    "python_ruff_imports": true,
+    "archive_checksum": true,
+    "packaged_source_commit": true,
+    "help_smoke": true,
+    "native_runtime_licenses": true,
+    "no_qt_gtk_webview_linkage": true
+  },
+  "gui_groups": [
+    {
+      "name": "niri-layer",
+      "passed": true,
+      "binary_sha256": "b65e3731b17bd10eebe8a6db4155d32a38c46fcbcdc836ef4e95f54ae92aa8f9",
+      "scenario_count": 5,
+      "evidence_sha256": "77369f9049fb6401c5259674b6334cfd9ebf196561bd1e489bf6438010044ec7",
+      "native_protocol": true,
+      "no_ocr": true,
+      "exact_candidate_free_exports": true,
+      "field_routing": true,
+      "filtered_pixels_unchanged_during_preedit": true,
+      "invalid_numeric_batch_rejected": true,
+      "hex_confirmation_and_local_undo": true,
+      "stationary_field_no_redraw": true,
+      "stationary_field_threads": 1,
+      "stationary_field_cpu_ticks_delta": 0
+    },
+    {
+      "name": "niri-window",
+      "passed": true,
+      "binary_sha256": "b65e3731b17bd10eebe8a6db4155d32a38c46fcbcdc836ef4e95f54ae92aa8f9",
+      "scenario_count": 5,
+      "evidence_sha256": "1e0c7436ae97157e35df116185e3812463fd1fae1722cd88b6abe56faaaae141",
+      "native_protocol": true,
+      "no_ocr": true,
+      "exact_candidate_free_exports": true,
+      "field_routing": true,
+      "filtered_pixels_unchanged_during_preedit": true,
+      "invalid_numeric_batch_rejected": true,
+      "hex_confirmation_and_local_undo": true,
+      "stationary_field_no_redraw": true,
+      "stationary_field_threads": 1,
+      "stationary_field_cpu_ticks_delta": 0
+    },
+    {
+      "name": "sway-layer",
+      "passed": true,
+      "binary_sha256": "b65e3731b17bd10eebe8a6db4155d32a38c46fcbcdc836ef4e95f54ae92aa8f9",
+      "scenario_count": 5,
+      "evidence_sha256": "7b420d55c77f819c9e8b1b2aae00046388a7b21402ffad542401c1f923905532",
+      "native_protocol": true,
+      "no_ocr": true,
+      "exact_candidate_free_exports": true,
+      "field_routing": true,
+      "filtered_pixels_unchanged_during_preedit": true,
+      "invalid_numeric_batch_rejected": true,
+      "hex_confirmation_and_local_undo": true,
+      "stationary_field_no_redraw": true,
+      "stationary_field_threads": 1,
+      "stationary_field_cpu_ticks_delta": 0
+    },
+    {
+      "name": "sway-window",
+      "passed": true,
+      "binary_sha256": "b65e3731b17bd10eebe8a6db4155d32a38c46fcbcdc836ef4e95f54ae92aa8f9",
+      "scenario_count": 6,
+      "evidence_sha256": "ed8dc17b91169cb4a1e669695f0bbc5474dc9536a5a6293f97b4ec23636a618c",
+      "native_protocol": true,
+      "no_ocr": true,
+      "exact_candidate_free_exports": true,
+      "field_routing": true,
+      "filtered_pixels_unchanged_during_preedit": true,
+      "invalid_numeric_batch_rejected": true,
+      "hex_confirmation_and_local_undo": true,
+      "stationary_field_no_redraw": true,
+      "stationary_field_threads": 1,
+      "stationary_field_cpu_ticks_delta": 0
+    },
+    {
+      "name": "niri-caret",
+      "passed": true,
+      "binary_sha256": "b65e3731b17bd10eebe8a6db4155d32a38c46fcbcdc836ef4e95f54ae92aa8f9",
+      "scenario_count": 1,
+      "evidence_sha256": "62a7089361cc8116a10232e121daba02c1e8012399fbef56e1daf32c0fdbd766",
+      "no_ocr": true,
+      "no_commit_redraw": true,
+      "typing_caret_phases": 2,
+      "selection_caret_phases": 2,
+      "narrow_damage_frames": 22
+    },
+    {
+      "name": "sway-caret",
+      "passed": true,
+      "binary_sha256": "b65e3731b17bd10eebe8a6db4155d32a38c46fcbcdc836ef4e95f54ae92aa8f9",
+      "scenario_count": 1,
+      "evidence_sha256": "aefa31f6a90139cd85f2a79af98d2b9d416a58b5e56cd25f01a9e5e76711b55c",
+      "no_ocr": true,
+      "no_commit_redraw": true,
+      "typing_caret_phases": 2,
+      "selection_caret_phases": 2,
+      "narrow_damage_frames": 24
+    }
+  ],
+  "user_configuration_modified": false,
+  "original_qt_sources_modified": false,
+  "original_goal_complete": false,
+  "known_boundary": {
+    "origin": [
+      662,
+      347
+    ],
+    "target": [
+      341,
+      500
+    ],
+    "last_motion": [
+      672.6289,
+      359.5352
+    ],
+    "overlay": "layer",
+    "dismissal": "action",
+    "pointer_backend": "virtual",
+    "passed": false,
+    "binary_sha256": "b65e3731b17bd10eebe8a6db4155d32a38c46fcbcdc836ef4e95f54ae92aa8f9",
+    "pointer_resent": false,
+    "expected_regression_failure": true
+  },
+  "qt_reference": {
+    "fixture": "tests/fixtures/qt-line-edit-input-method.json",
+    "scenarios": 43,
+    "states": 192,
+    "all_signal_counts_compared": false,
+    "exact_qt_pixels_proven": false
+  },
+  "remaining": [
+    "independent window native input methods",
+    "field caret blinking and complete mouse selection",
+    "complete Unicode and text resize/wrapping/cursor remapping",
+    "light theme, settings, translation, uploads, extensions, tray and configuration migration",
+    "Fcitx/IBus and complete compositor/output matrix",
+    "exact Qt pixels and all signal comparisons"
+  ]
+}
