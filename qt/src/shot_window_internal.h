@@ -2,6 +2,7 @@
 
 #include "capture_cross_cursor.h"
 #include "ocr_result.h"
+#include "pinned_window/pinned_focus_chrome.h"
 #include "shot_window.h"
 #include "scroll/scroll_session_window.h"
 
@@ -83,6 +84,8 @@ struct PinnedWindowConfig {
     bool borderEnabled = true;
     QColor borderColor = markshot::theme::kAccent;
     qreal borderWidth = 2.0;
+    // 失焦贴图边框相对 borderColor 的不透明度
+    double inactiveBorderOpacity = kPinnedInactiveBorderOpacityDefault;
     bool shadowEnabled = false;
 };
 

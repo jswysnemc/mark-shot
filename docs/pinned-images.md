@@ -21,6 +21,15 @@ Images take precedence when the clipboard also contains text. Text preserves lin
 
 The **Text Selection Copy** option enables background recognition for selection when OCR is enabled. This preparation neither triggers automatic translation nor displays missing-backend notifications. Explicit **Auto OCR** and **Auto Translate** settings retain their processing behavior. Disabling OCR prevents background recognition. Unselected recognition regions have no overlay background; only selected text is highlighted.
 
+## Focus Appearance
+
+A focused pinned image draws its border in the configured **Border Color**. An unfocused one draws the same color at **Unfocused Border Opacity** (`pinnedWindow.inactiveBorderOpacity`, default `0.4`); `0` hides the border while the image is unfocused, `1` keeps it unchanged. Border width does not change with focus. With **Pinned Shadow** enabled, the shadow is deeper while focused and lighter while unfocused.
+
+Mark Shot does not request activation when it shows a pinned image, so a new image normally starts unfocused until you click it. Whether a new window gets focus anyway is decided by the window manager.
+
+- X11, Windows, GNOME, and KDE Plasma: the focused appearance follows the window manager's active window.
+- niri and other layer-shell compositors: keyboard focus is on demand and granted by the compositor, usually on click. The image also shows the focused appearance while the pointer is over it, so it does not stay unfocused on compositors that never hand over focus.
+
 ## Linux Desktop Support
 
 On niri and other supported layer-shell compositors, pinned images use the existing overlay path. They do not require a tray process and remain alive after the editor closes. The desktop host displays the tray menu, so activating a tray action does not guarantee keyboard focus for Mark Shot. Unfocused tray and command-line processes bypass Qt's stale selection cache unless they own the clipboard, using `wl-paste` to read the current clipboard instead; install `wl-clipboard` for this path.

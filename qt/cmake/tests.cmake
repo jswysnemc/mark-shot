@@ -213,6 +213,20 @@ target_link_libraries(mark-shot-pinned-text-selection-metrics-test
 )
 add_test(NAME pinned-text-selection-metrics COMMAND mark-shot-pinned-text-selection-metrics-test)
 
+qt_add_executable(mark-shot-pinned-focus-chrome-test
+    tests/pinned_focus_chrome_test.cpp
+    src/pinned_window/pinned_focus_chrome.cpp
+    src/pinned_window/pinned_focus_chrome.h
+)
+target_include_directories(mark-shot-pinned-focus-chrome-test PRIVATE src)
+target_link_libraries(mark-shot-pinned-focus-chrome-test
+    PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Test
+)
+add_test(NAME pinned-focus-chrome COMMAND mark-shot-pinned-focus-chrome-test)
+
 qt_add_executable(mark-shot-pinned-layer-shell-geometry-test
     tests/pinned_layer_shell_geometry_test.cpp
     src/pinned_window/pinned_layer_shell_geometry.cpp

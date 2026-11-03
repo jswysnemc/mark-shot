@@ -7,6 +7,7 @@
 #include <QProcessEnvironment>
 
 #include <algorithm>
+#include <cmath>
 
 namespace cfg = markshot::config;
 
@@ -97,7 +98,7 @@ void applyPinnedTextSelectionConfig(const QJsonObject &pinned, PinnedWindowConfi
 }
 
 /**
- * 从置顶图片配置读取边框配置。
+ * 从置顶图片配置读取边框、失焦边框不透明度和阴影配置。
  * @param pinned 置顶图片配置对象。
  * @param config 需要更新的置顶图片配置。
  * @return 无返回值。
@@ -132,6 +133,12 @@ void applyPinnedBorderConfig(const QJsonObject &pinned, PinnedWindowConfig *conf
     if (const std::optional<qreal> width =
             realFromConfigValue(pinned.value(QStringLiteral("borderWidth")))) {
         config->borderWidth = std::clamp(*width, 1.0, 12.0);
+    }
+    // 【贴图】【焦点外观】失焦边框不透明度，非有限数值保留默认值
+    if (const std::optional<qreal> opacity =
+            realFromConfigValue(pinned.value(QStringLiteral("inactiveBorderOpacity")));
+        opacity.has_value() && std::isfinite(*opacity)) {
+        config->inactiveBorderOpacity = std::clamp(*opacity, 0.0, 1.0);
     }
     if (const std::optional<bool> shadowEnabled =
             cfg::boolValue(pinned,

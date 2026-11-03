@@ -5,6 +5,7 @@
 #include "capture_toolbar_position.h"
 #include "clipboard_image_config.h"
 #include "export_image_effect.h"
+#include "pinned_window/pinned_focus_chrome.h"
 #include "settings/cloud_translate_settings.h"
 #include "shortcut_config.h"
 #include "shot_window.h"
@@ -77,6 +78,7 @@ struct PinnedSettings {
     bool borderEnabled = true;
     QColor borderColor;
     double borderWidth = 2.0;
+    double inactiveBorderOpacity = markshot::shot::kPinnedInactiveBorderOpacityDefault;
     bool shadowEnabled = false;
 };
 
