@@ -38,7 +38,6 @@ class VirtualPointer:
         try:
             seat = self.connection.bind("wl_seat", 1)
             manager = self.connection.bind("zwlr_virtual_pointer_manager_v1", 2)
-            self.pointer = self.connection.new_id()
             if bind_output:
                 if not 0 <= output_index < len(self.connection.outputs):
                     raise ValueError("private pointer output index is unavailable")
@@ -46,8 +45,11 @@ class VirtualPointer:
                 output = self.connection.bind_name(name, "wl_output", 1)
                 if self.connection.globals["zwlr_virtual_pointer_manager_v1"][1] < 2:
                     raise RuntimeError("output-bound virtual pointer requires protocol version 2")
+                # 1. 【Wayland 测试】【对象顺序】先发送输出对象创建，后分配指针，避免客户端编号出现空缺
+                self.pointer = self.connection.new_id()
                 self.connection.send(manager, 2, struct.pack("=III", seat, output, self.pointer))
             else:
+                self.pointer = self.connection.new_id()
                 self.connection.send(manager, 0, struct.pack("=II", seat, self.pointer))
             self.connection.roundtrip()
         except BaseException:

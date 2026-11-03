@@ -1,0 +1,85 @@
+"""【原生发布】【清单校验】固定预览版来源和已经通过验证的二进制"""
+
+from dataclasses import dataclass
+import hashlib
+import json
+from pathlib import Path
+import re
+
+
+REPOSITORY = "jswysnemc/mark-shot"
+BRANCH = "rewrite/native-wayland"
+ARCHIVE_NAME = "mark-shot-native-linux-x86_64.tar.gz"
+ARTIFACT_NAME = "mark-shot-native-linux-x86_64"
+GUI_GROUPS = {
+    "niri-layer": 5,
+    "niri-window": 5,
+    "sway-layer": 5,
+    "sway-window": 6,
+    "niri-caret": 1,
+    "sway-caret": 1,
+}
+
+
+def require(condition, message):
+    """【原生发布】【约束检查】condition 为假时抛出含 message 的异常，成功不返回值"""
+    if not condition:
+        raise ValueError(message)
+
+
+def sha256_file(path):
+    """【原生发布】【摘要计算】读取 path 的文件内容，返回 SHA-256 十六进制摘要"""
+    with Path(path).open("rb") as source:
+        return hashlib.file_digest(source, "sha256").hexdigest()
+
+
+@dataclass(frozen=True)
+class ReleaseManifest:
+    """【原生发布】【不可变清单】保存发布标签、来源、产物与说明文档摘要"""
+
+    tag: str
+    source_commit: str
+    run_id: int
+    artifact_id: int
+    archive_sha256: str
+    binary_sha256: str
+    binary_bytes: int
+    verification_sha256: str
+    notes_sha256: str
+
+    @classmethod
+    def load(cls, path):
+        """【原生发布】【清单读取】解析 path 并拒绝未知字段及非法来源，返回经过验证的清单"""
+        data = json.loads(Path(path).read_text())
+        expected = set(cls.__dataclass_fields__) | {"schema", "repository", "branch"}
+        require(set(data) == expected, "release manifest fields changed")
+        require(type(data["schema"]) is int and data["schema"] == 1, "unsupported release schema")
+        require(data["repository"] == REPOSITORY, "unexpected release repository")
+        require(data["branch"] == BRANCH, "unexpected release branch")
+        require(isinstance(data["tag"], str) and re.fullmatch(r"native-v\d+\.\d+\.\d+-preview\.\d+", data["tag"]), "only native preview tags are allowed")
+        for name, length in (("source_commit", 40), ("archive_sha256", 64), ("binary_sha256", 64), ("verification_sha256", 64), ("notes_sha256", 64)):
+            require(isinstance(data[name], str) and re.fullmatch(rf"[0-9a-f]{{{length}}}", data[name]), f"invalid {name}")
+        for name in ("run_id", "artifact_id", "binary_bytes"):
+            require(type(data[name]) is int and data[name] > 0, f"invalid {name}")
+        require(data["binary_bytes"] <= 128 * 1024 * 1024, "binary size exceeds release limit")
+        return cls(**{name: data[name] for name in cls.__dataclass_fields__})
+
+    def verify_documents(self, verification, notes):
+        """【原生发布】【证据校验】校验 verification 和 notes 对应本构建，返回界面验证报告"""
+        require(sha256_file(verification) == self.verification_sha256, "verification document digest mismatch")
+        require(sha256_file(notes) == self.notes_sha256, "release notes digest mismatch")
+        report = json.loads(Path(verification).read_text())
+        require(report.get("source_commit") == self.source_commit, "verification source mismatch")
+        require(report.get("run_id") == self.run_id, "verification run mismatch")
+        require(report.get("binary") == {"sha256": self.binary_sha256, "bytes": self.binary_bytes}, "verification binary mismatch")
+        require(report.get("original_goal_complete") is False, "preview must not claim a complete rewrite")
+        groups = report.get("gui_groups", [])
+        require(len(groups) == len(GUI_GROUPS), "incomplete GUI verification")
+        require({item.get("name") for item in groups} == set(GUI_GROUPS), "unexpected GUI verification groups")
+        for group in groups:
+            require(group.get("passed") is True, "failed GUI verification group")
+            require(group.get("binary_sha256") == self.binary_sha256, "GUI group uses another binary")
+            require(group.get("scenario_count") == GUI_GROUPS[group["name"]], "GUI scenario count mismatch")
+        require(report.get("user_configuration_modified") is False, "GUI verification modified user configuration")
+        require(report.get("original_qt_sources_modified") is False, "GUI verification modified original Qt sources")
+        return report

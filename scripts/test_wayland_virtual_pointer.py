@@ -2,7 +2,7 @@
 
 import struct
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from wayland_test_connection import TestConnection, wire_string
 from wayland_virtual_pointer import BTN_RIGHT, VirtualPointer, transform_for_pointer
@@ -29,6 +29,7 @@ class PointerTests(unittest.TestCase):
                 with patch("wayland_virtual_pointer.TestConnection", return_value=connection):
                     pointer = VirtualPointer(output_index=1, bind_output=bound)
                 if bound:
+                    self.assertLess(connection.mock_calls.index(call.bind_name(8, "wl_output", 1)), connection.mock_calls.index(call.new_id()))
                     connection.bind_name.assert_called_once_with(8, "wl_output", 1)
                     connection.send.assert_called_once_with(11, 2, struct.pack("=III", 10, 12, 13))
                 else:

@@ -1,0 +1,52 @@
+name: Native Preview Release
+
+on:
+  push:
+    branches:
+      - rewrite/native-wayland
+    paths:
+      - '.github/workflows/native-release.yml'
+      - 'release/native-preview*'
+      - 'scripts/native_release*.py'
+      - 'scripts/test_native_release*.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-preview-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  publish:
+    name: Publish verified native preview
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Checkout publication instructions
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Test publication validation
+        run: python3 -m unittest discover -s scripts -p 'test_native_release*.py'
+
+      - name: Check whether a preview is requested
+        id: manifest
+        run: |
+          if [ -f release/native-preview.json ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish immutable verified artifact
+        if: steps.manifest.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/native_release.py
