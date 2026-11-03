@@ -1,4 +1,19 @@
 if(MARK_SHOT_LINUX AND WaylandClient_FOUND AND WAYLAND_SCANNER_EXECUTABLE)
+    # 【录制测试】【映射寿命】socketpair 冒充 compositor，不依赖真实桌面，验证 wl_buffer 销毁线程与时机
+    qt_add_executable(mark-shot-recording-wlroots-buffer-lifetime-test
+        tests/recording_wlroots_buffer_lifetime_test.cpp
+        src/platform/wayland/wlroots_screencopy_buffer_pool.cpp
+        src/platform/wayland/wlroots_screencopy_shm_buffer.cpp
+        src/recording/recording_capture_memory_policy.cpp
+        src/recording/recording_frame_payload.cpp
+        src/debug_log.cpp)
+    target_include_directories(mark-shot-recording-wlroots-buffer-lifetime-test PRIVATE src)
+    target_compile_definitions(mark-shot-recording-wlroots-buffer-lifetime-test PRIVATE HAVE_WLROOTS_SCREENCOPY)
+    target_link_libraries(mark-shot-recording-wlroots-buffer-lifetime-test PRIVATE
+        Qt6::Gui Qt6::Test PkgConfig::WaylandClient)
+    add_test(NAME recording-wlroots-buffer-lifetime COMMAND mark-shot-recording-wlroots-buffer-lifetime-test)
+    set_tests_properties(recording-wlroots-buffer-lifetime PROPERTIES TIMEOUT 30 LABELS "wayland;unit")
+
     find_package(Python3 QUIET COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
         qt_add_executable(mark-shot-recording-wlroots-buffer-pool-test
@@ -6,7 +21,8 @@ if(MARK_SHOT_LINUX AND WaylandClient_FOUND AND WAYLAND_SCANNER_EXECUTABLE)
             src/platform/wayland/wlroots_screencopy_buffer_pool.cpp
             src/platform/wayland/wlroots_screencopy_shm_buffer.cpp
             src/recording/recording_capture_memory_policy.cpp
-            src/recording/recording_frame_payload.cpp)
+            src/recording/recording_frame_payload.cpp
+            src/debug_log.cpp)
         target_include_directories(mark-shot-recording-wlroots-buffer-pool-test PRIVATE src)
         target_compile_definitions(mark-shot-recording-wlroots-buffer-pool-test PRIVATE HAVE_WLROOTS_SCREENCOPY)
         target_link_libraries(mark-shot-recording-wlroots-buffer-pool-test PRIVATE

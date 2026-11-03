@@ -1,4 +1,5 @@
 #include "platform/wayland/wlroots_screencopy_shm_buffer.h"
+#include "debug_log.h"
 #include "recording/recording_capture_memory_policy.h"
 
 #ifdef HAVE_WLROOTS_SCREENCOPY
@@ -64,9 +65,18 @@ bool isSupportedFormat(std::uint32_t format)
 
 }  // namespace
 
+/**
+ * 【录制】【映射寿命】销毁共享内存缓冲，只解除像素映射，永不发送 Wayland 请求。
+ * 最后一个帧引用可能在任意线程、连接关闭之后释放，此时 wl_buffer 所属的 wl_display 可能已经失效。
+ */
 WlrootsScreencopyShmBuffer::~WlrootsScreencopyShmBuffer()
 {
-    reset();
+    // 1. 【录制】【映射寿命】协议对象应已由采集线程释放，残留句柄说明所有者违反约定，只能放弃
+    if (m_buffer) {
+        abandonWaylandBuffer("destroyed before the capture thread released it");
+    }
+    // 2. 【录制】【映射寿命】像素映射与 Wayland 连接无关，任意线程都可以解除
+    unmapPixels();
 }
 
 bool WlrootsScreencopyShmBuffer::ensure(wl_shm *shm,
@@ -142,6 +152,8 @@ bool WlrootsScreencopyShmBuffer::ensure(wl_shm *shm,
         return false;
     }
 
+    // 【录制】【映射寿命】记录分发该连接事件的采集线程，之后只有它可以销毁 wl_buffer
+    m_ownerThread = std::this_thread::get_id();
     m_data = data;
     m_size = size;
     m_format = format;
@@ -304,9 +316,56 @@ RecordingRawBgraFrame WlrootsScreencopyShmBuffer::mappedBgraFrame(std::shared_pt
 #endif
 }
 
+/**
+ * 【录制】【映射寿命】释放协议缓冲并解除像素映射，必须在创建线程且连接有效时调用。
+ * @return 无返回值。
+ */
 void WlrootsScreencopyShmBuffer::reset()
 {
     releaseWaylandBuffer();
+    unmapPixels();
+}
+
+/**
+ * 【录制】【映射寿命】在创建线程销毁 wl_buffer，其他线程只放弃句柄，保证不跨线程编组请求。
+ * @return 无返回值。
+ */
+void WlrootsScreencopyShmBuffer::releaseWaylandBuffer()
+{
+    if (!m_buffer) {
+        return;
+    }
+    // 1. 【录制】【映射寿命】其他线程无法确认所属连接和事件队列仍然有效，不能编组 destroy 请求
+    if (std::this_thread::get_id() != m_ownerThread) {
+        abandonWaylandBuffer("released outside the capture thread");
+        return;
+    }
+#ifdef HAVE_WLROOTS_SCREENCOPY
+    // 2. 【录制】【映射寿命】采集线程在 wl_display 断开之前销毁协议对象
+    wl_buffer_destroy(m_buffer);
+#endif
+    m_buffer = nullptr;
+}
+
+/**
+ * 【录制】【映射寿命】放弃无法安全销毁的 wl_buffer 句柄，不访问所属连接。
+ * @param reason 放弃原因，写入错误日志。
+ * @return 无返回值。
+ */
+void WlrootsScreencopyShmBuffer::abandonWaylandBuffer(const char *reason)
+{
+    markshot::debugLog("recording",
+                       "【录制】【映射寿命】abandon wl_buffer without protocol request error=%s",
+                       reason);
+    m_buffer = nullptr;
+}
+
+/**
+ * 【录制】【映射寿命】解除像素映射并清空布局参数，不涉及任何 Wayland 对象。
+ * @return 无返回值。
+ */
+void WlrootsScreencopyShmBuffer::unmapPixels()
+{
 #ifdef HAVE_WLROOTS_SCREENCOPY
     if (m_data && m_size > 0) {
         ::munmap(m_data, m_size);
@@ -318,16 +377,6 @@ void WlrootsScreencopyShmBuffer::reset()
     m_width = 0;
     m_height = 0;
     m_stride = 0;
-}
-
-void WlrootsScreencopyShmBuffer::releaseWaylandBuffer()
-{
-#ifdef HAVE_WLROOTS_SCREENCOPY
-    if (m_buffer) {
-        wl_buffer_destroy(m_buffer);
-        m_buffer = nullptr;
-    }
-#endif
 }
 
 }  // namespace markshot::recording
