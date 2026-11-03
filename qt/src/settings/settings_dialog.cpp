@@ -5,6 +5,7 @@
 #include "settings/settings_field_texts.h"
 #include "settings/settings_inline_icons.h"
 #include "settings/settings_navigation.h"
+#include "settings/settings_saved_notifier.h"
 #include "settings/settings_wheel_guard.h"
 #include "ui/i18n.h"
 #include "ui/application_icon.h"
@@ -170,6 +171,8 @@ void SettingsDialog::saveConfig()
     // 1. 【设置】【保存基线】撤销修改恢复到刚保存的值
     applyConfigToPages(nextConfig);
     applyTheme(m_config.general.uiThemeMode);
+    // 2. 【设置】【保存通知】通知常驻组件重新读取配置，例如托盘全局快捷键
+    SettingsSavedNotifier::instance().notifySaved();
     setStatus(MS_TR("Changes saved"));
     m_statusLabel->setToolTip(MS_TR("Some changes take effect after restarting Mark Shot."));
 }

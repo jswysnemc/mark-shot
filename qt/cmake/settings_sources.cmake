@@ -16,6 +16,8 @@ set(MARK_SHOT_SETTINGS_SOURCES
     src/settings/settings_dialog_pages.cpp
     src/settings/settings_navigation.cpp
     src/settings/settings_navigation.h
+    src/settings/settings_saved_notifier.cpp
+    src/settings/settings_saved_notifier.h
     src/settings/settings_page_about.cpp
     src/settings/settings_page_about.h
     src/settings/settings_page_advanced.cpp

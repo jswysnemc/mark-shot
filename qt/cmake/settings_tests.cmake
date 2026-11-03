@@ -82,3 +82,13 @@ add_dependencies(mark-shot-settings-field-widgets-test mark-shot)
 add_test(NAME settings-field-widgets COMMAND mark-shot-settings-field-widgets-test -o -,txt)
 set_tests_properties(settings-field-widgets PROPERTIES TIMEOUT 30
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_STYLE_OVERRIDE=Fusion;QT_SCALE_FACTOR=1")
+
+# 【托盘测试】【全局快捷键】设置保存后只在快捷键变化时重新注册
+qt_add_executable(mark-shot-windows-tray-hotkey-diff-test
+    tests/windows_tray_hotkey_diff_test.cpp
+    src/windows_tray_hotkey_diff.cpp
+    src/windows_tray_hotkey_diff.h
+)
+target_include_directories(mark-shot-windows-tray-hotkey-diff-test PRIVATE src)
+target_link_libraries(mark-shot-windows-tray-hotkey-diff-test PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
+add_test(NAME windows-tray-hotkey-diff COMMAND mark-shot-windows-tray-hotkey-diff-test)

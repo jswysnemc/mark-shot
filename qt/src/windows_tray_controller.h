@@ -91,6 +91,12 @@ private:
     void registerHotkeys();
     void unregisterHotkeys();
 
+    /**
+     * 【托盘】【全局快捷键】设置保存后重新读取配置，快捷键变化时注销旧组合并注册新组合。
+     * @return 无返回值。
+     */
+    void reloadHotkeys();
+
     QApplication *m_application = nullptr;
     Config m_config;
     Callback m_captureCallback;

@@ -199,6 +199,9 @@ qt_add_executable(mark-shot
     src/windows_tray_config.cpp
     src/windows_tray_controller.cpp
     src/windows_tray_controller.h
+    src/windows_tray_hotkey_diff.cpp
+    src/windows_tray_hotkey_diff.h
+    src/windows_tray_hotkey_reload.cpp
     src/screen_capture.cpp
     src/screen_capture.h
     src/screen_capture_api.cpp

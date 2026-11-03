@@ -10,6 +10,7 @@
 #include "recording/ui/recording_countdown.h"
 #include "recording/recording_status.h"
 #include "settings/settings_dialog.h"
+#include "settings/settings_saved_notifier.h"
 #include "capture_history/history_window.h"
 #include "shot_window.h"
 #include "ui/application_icon.h"
@@ -347,6 +348,9 @@ bool WindowsTrayController::start()
     if (m_config.hotkeysEnabled) {
         registerHotkeys();
     }
+    // 3. 【托盘】【全局快捷键】设置保存后立即应用新的快捷键，无需重启
+    connect(&settings::SettingsSavedNotifier::instance(), &settings::SettingsSavedNotifier::saved,
+            this, &WindowsTrayController::reloadHotkeys);
     return true;
 }
 
