@@ -427,6 +427,37 @@ private slots:
         QVERIFY(!popup->isVisible());
         QVERIFY(ratioSpy.isEmpty());
     }
+
+    /**
+     * 验证尺寸 HUD 跟随工具栏亮色配色：底板为浅色、文字为深色，暗色仍保持原有深色底板。
+     * @return 无返回值。
+     */
+    void hudFollowsLightToolbarPalette()
+    {
+        const auto backgroundLightness = [](const markshot::ui::ToolbarPalette *palette) {
+            QWidget host;
+            host.resize(400, 120);
+            aspect::SelectionSizePanel panel(&host);
+            if (palette) {
+                panel.setToolbarPalette(*palette);
+            }
+            panel.setValues(QSize(200, 100), QSize(1000, 800), 0.0);
+            panel.resize(panel.sizeHint());
+            const QImage image = panel.grab().toImage();
+            // 1. 取 HUD 中部偏左的空白底板像素，避开文字与图标
+            return image.pixelColor(3, image.height() / 2).lightness();
+        };
+        const markshot::ui::ToolbarPalette light = markshot::ui::toolbarPalette(markshot::ui::UiThemeMode::Light);
+        QVERIFY(backgroundLightness(nullptr) < 80);
+        QVERIFY(backgroundLightness(&light) > 200);
+
+        const aspect::hud_style::HudColors lightColors = aspect::hud_style::hudColors(light);
+        QVERIFY(lightColors.text.lightness() < 128);
+        QVERIFY(lightColors.panelFill.lightness() > 200);
+        const aspect::hud_style::HudColors darkColors = aspect::hud_style::hudColors();
+        QCOMPARE(darkColors.panelFill, QColor(8, 13, 19, 228));
+        QCOMPARE(darkColors.text, QColor(229, 231, 235));
+    }
 };
 
 QTEST_MAIN(SelectionToolbarTest)

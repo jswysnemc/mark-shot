@@ -1,6 +1,7 @@
 #pragma once
 
 #include "shot_window_types.h"
+#include "ui/toolbar_palette.h"
 
 #include <QColor>
 #include <QPointF>
@@ -25,8 +26,10 @@ struct AnnotationSizePreview {
 /// @param position 光标热点的窗口坐标
 /// @param viewport 可用于显示提示的窗口区域
 /// @param obstacles 提示需要避开的可见控件区域
+/// @param palette 截图会话的工具栏配色，数值提示跟随明暗主题
 /// @return 无返回值
 void drawAnnotationSizePreview(QPainter &painter, const AnnotationSizePreview &preview,
-                               QPointF position, QRectF viewport, const QVector<QRect> &obstacles);
+                               QPointF position, QRectF viewport, const QVector<QRect> &obstacles,
+                               const ui::ToolbarPalette &palette = {});
 
 }  // namespace markshot::shot

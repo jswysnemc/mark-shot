@@ -4,7 +4,6 @@
 #include "selection_aspect/selection_ratio_popup.h"
 #include "selection_aspect/selection_size_field.h"
 #include "ui/i18n.h"
-#include "ui/theme.h"
 
 #include <QEvent>
 #include <QFontMetrics>
@@ -92,6 +91,18 @@ void SelectionSizePanel::watchObstacle(QWidget *widget)
     }
 }
 
+void SelectionSizePanel::setToolbarPalette(const ui::ToolbarPalette &palette)
+{
+    // 1. 输入框、比例弹层与 HUD 本身使用同一组颜色
+    m_colors = hud_style::hudColors(palette);
+    m_widthField->setHudColors(m_colors);
+    m_heightField->setHudColors(m_colors);
+    if (m_ratioPopup) {
+        m_ratioPopup->setHudColors(m_colors);
+    }
+    update();
+}
+
 QSize SelectionSizePanel::sizeHint() const
 {
     return m_contentSize;
@@ -102,20 +113,20 @@ void SelectionSizePanel::paintEvent(QPaintEvent *event)
     Q_UNUSED(event);
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    paintPanelBackground(painter, QRectF(rect()));
+    paintPanelBackground(painter, QRectF(rect()), m_colors);
     painter.setFont(font());
 
     // 1. 乘号、单位与分隔线
-    painter.setPen(mutedColor());
+    painter.setPen(m_colors.muted);
     painter.drawText(m_timesRect, Qt::AlignCenter, kTimesText);
     painter.drawText(m_unitRect, Qt::AlignCenter, kUnitText);
     painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(255, 255, 255, 36));
+    painter.setBrush(m_colors.separator);
     painter.drawRect(m_separatorRect);
 
     // 2. 悬停或弹层打开时绘制可点击区域的浅色底
     const bool popupOpen = m_ratioPopup && m_ratioPopup->isVisible();
-    painter.setBrush(hoverColor());
+    painter.setBrush(m_colors.hover);
     if (m_hoverZone == HotZone::Lock) {
         painter.drawRoundedRect(QRectF(m_lockRect), 5.0, 5.0);
     }
@@ -125,13 +136,13 @@ void SelectionSizePanel::paintEvent(QPaintEvent *event)
 
     // 3. 锁形图标，锁定时使用强调色
     const bool locked = m_ratio > 0.0;
-    const QColor lockInk = locked ? markshot::theme::kAccent : mutedColor();
+    const QColor lockInk = locked ? m_colors.accent : m_colors.muted;
     const QRectF lockBox(m_lockRect.center().x() - kGlyphSize / 2.0 + 0.5, m_lockRect.center().y() - kGlyphSize / 2.0 + 0.5,
                          kGlyphSize, kGlyphSize);
     paintLockGlyph(painter, lockBox, locked, lockInk);
 
     // 4. 比例示意图、名称与下拉箭头
-    const QColor ratioInk = locked ? markshot::theme::kAccent : textColor();
+    const QColor ratioInk = locked ? m_colors.accent : m_colors.text;
     const qreal glyphTop = m_ratioRect.center().y() - kGlyphSize / 2.0 + 0.5;
     paintRatioGlyph(painter, QRectF(m_ratioRect.left() + kRatioInnerGap, glyphTop, kGlyphSize, kGlyphSize), m_ratio,
                     ratioInk);
@@ -142,7 +153,7 @@ void SelectionSizePanel::paintEvent(QPaintEvent *event)
     painter.drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft, ratioLabel());
     const QRectF chevronBox(m_ratioRect.right() - kChevronWidth - kRatioInnerGap + 1, glyphTop, kChevronWidth,
                             kGlyphSize);
-    paintChevronGlyph(painter, chevronBox, mutedColor());
+    paintChevronGlyph(painter, chevronBox, m_colors.muted);
 }
 
 void SelectionSizePanel::mousePressEvent(QMouseEvent *event)
@@ -319,6 +330,7 @@ void SelectionSizePanel::toggleRatioPopup()
     if (!m_ratioPopup) {
         QWidget *host = parentWidget() ? parentWidget() : this;
         m_ratioPopup = new SelectionRatioPopup(host);
+        m_ratioPopup->setHudColors(m_colors);
         connect(m_ratioPopup, &SelectionRatioPopup::ratioSelected, this, &SelectionSizePanel::aspectRatioChanged);
         connect(m_ratioPopup, &SelectionRatioPopup::closed, this, [this] {
             update();

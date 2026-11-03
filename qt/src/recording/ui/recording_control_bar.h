@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/toolbar_palette.h"
+
 #include <QWidget>
 
 class QLabel;
@@ -61,6 +63,8 @@ private:
     QToolButton *m_pause = nullptr;
     QToolButton *m_stop = nullptr;
     bool m_paused = false;
+    // 创建时按界面主题读取的控制条配色
+    markshot::ui::ToolbarPalette m_palette;
 };
 
 }  // namespace markshot::recording::ui

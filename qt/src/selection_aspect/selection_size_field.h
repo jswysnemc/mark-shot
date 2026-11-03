@@ -1,5 +1,7 @@
 #pragma once
 
+#include "selection_aspect/selection_hud_colors.h"
+
 #include <QWidget>
 
 class QLineEdit;
@@ -27,6 +29,13 @@ public:
      * @return 无返回值。
      */
     void setValue(int value, int maximum);
+
+    /**
+     * 【选区尺寸】【主题】应用截图会话的 HUD 颜色并重绘。
+     * @param colors HUD 颜色。
+     * @return 无返回值。
+     */
+    void setHudColors(const hud_style::HudColors &colors);
 
     /**
      * 当前显示值。
@@ -153,6 +162,7 @@ private:
     void stepEditing(int delta);
 
     QLineEdit *m_editor = nullptr;
+    hud_style::HudColors m_colors = hud_style::hudColors();
     int m_value = 1;
     int m_maximum = 1;
     bool m_hovered = false;

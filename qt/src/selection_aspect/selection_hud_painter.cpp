@@ -15,27 +15,12 @@ QFont hudFont()
     return markshot::theme::uiFont(10, QFont::DemiBold);
 }
 
-QColor textColor()
-{
-    return QColor(229, 231, 235);
-}
-
-QColor mutedColor()
-{
-    return QColor(156, 163, 175);
-}
-
-QColor hoverColor()
-{
-    return QColor(255, 255, 255, 26);
-}
-
-void paintPanelBackground(QPainter &painter, const QRectF &rect)
+void paintPanelBackground(QPainter &painter, const QRectF &rect, const HudColors &colors)
 {
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QPen(QColor(255, 255, 255, 30), 1.0));
-    painter.setBrush(QColor(8, 13, 19, 228));
+    painter.setPen(QPen(colors.panelBorder, 1.0));
+    painter.setBrush(colors.panelFill);
     painter.drawRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5), kHudRadius, kHudRadius);
     painter.restore();
 }

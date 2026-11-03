@@ -14,6 +14,8 @@ set(MARK_SHOT_EDITOR_FEATURE_SOURCES
     src/selection_aspect/selection_size_panel.h
     src/selection_aspect/selection_hud_layout.cpp
     src/selection_aspect/selection_hud_layout.h
+    src/selection_aspect/selection_hud_colors.cpp
+    src/selection_aspect/selection_hud_colors.h
     src/selection_aspect/selection_hud_painter.cpp
     src/selection_aspect/selection_hud_painter.h
     src/selection_aspect/selection_ratio_popup.cpp

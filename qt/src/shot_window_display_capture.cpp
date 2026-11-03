@@ -81,7 +81,8 @@ void ShotWindow::ensureDisplayCapturePicker()
         return;
     }
 
-    m_controls.m_displayCapturePicker = new markshot::display_capture::DisplayCapturePicker(this);
+    m_controls.m_displayCapturePicker =
+        new markshot::display_capture::DisplayCapturePicker(m_toolbarAppearance.palette, this);
     connect(m_controls.m_displayCapturePicker,
             &markshot::display_capture::DisplayCapturePicker::copyRequested,
             this,

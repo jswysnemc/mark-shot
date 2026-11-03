@@ -1,6 +1,7 @@
 #include "annotation_size_preview.h"
 
 #include "capture_cross_cursor.h"
+#include "ui/overlay_chip_colors.h"
 #include "ui/theme.h"
 
 #include <QFontMetricsF>
@@ -84,7 +85,8 @@ QPainterPath sizeSamplePath(const AnnotationSizePreview &preview, QRectF slot)
 }  // namespace
 
 void drawAnnotationSizePreview(QPainter &painter, const AnnotationSizePreview &preview,
-                               QPointF position, QRectF viewport, const QVector<QRect> &obstacles)
+                               QPointF position, QRectF viewport, const QVector<QRect> &obstacles,
+                               const ui::ToolbarPalette &palette)
 {
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing, true);
@@ -121,14 +123,17 @@ void drawAnnotationSizePreview(QPainter &painter, const AnnotationSizePreview &p
                            std::max(26.0, std::ceil(metrics.height()) + 10));
     const QRectF badge = sizeBadgeRect(position, badgeSize, showFootprint ? extent / 2 : 0,
                                       viewport, obstacles);
-    painter.setPen(QPen(QColor(148, 163, 184, 90), 1));
-    painter.setBrush(QColor(17, 24, 39, 242));
+    const ui::OverlayChipColors chip = ui::overlayChipColors(
+        palette, {QColor(17, 24, 39, 242), QColor(148, 163, 184, 90), QColor(243, 244, 246),
+                  QColor(226, 232, 240, 150), {}});
+    painter.setPen(QPen(chip.border, 1));
+    painter.setBrush(chip.fill);
     painter.drawRoundedRect(badge, 6, 6);
     const QRectF sample(badge.left() + 9, badge.center().y() - 8, 16, 16);
-    painter.setPen(QPen(QColor(226, 232, 240, 150), 0.75));
+    painter.setPen(QPen(chip.mutedText, 0.75));
     painter.setBrush(preview.color);
     painter.drawPath(sizeSamplePath(preview, sample));
-    painter.setPen(QColor(243, 244, 246));
+    painter.setPen(chip.text);
     painter.drawText(badge.adjusted(33, 0, -10, 0), Qt::AlignVCenter | Qt::AlignLeft, label);
     painter.restore();
 }

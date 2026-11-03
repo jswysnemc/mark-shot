@@ -2,6 +2,7 @@
 
 #include "recording/recording_session_manager.h"
 #include "recording/recording_status.h"
+#include "ui/overlay_chip_colors.h"
 
 using namespace markshot::shot;
 
@@ -147,18 +148,23 @@ void ShotWindow::drawActiveRecordingStatus(QPainter &painter)
     const QRectF button = stopButtonRect(panel);
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(3, 7, 18, 224));
+    // 1. 【录制】【状态面板】面板与文字跟随截图会话主题，停止按钮保持红色警示
+    const markshot::ui::OverlayChipColors chip = markshot::ui::overlayChipColors(
+        m_toolbarAppearance.palette,
+        {QColor(3, 7, 18, 224), QColor(0, 0, 0, 0), QColor(248, 250, 252), QColor(203, 213, 225),
+         QColor(125, 211, 252)});
+    painter.setPen(chip.border.alpha() > 0 ? QPen(chip.border, 1.0) : QPen(Qt::NoPen));
+    painter.setBrush(chip.fill);
     painter.drawRoundedRect(panel, 18.0, 18.0);
 
     painter.setFont(markshot::theme::uiFont(15, QFont::DemiBold));
-    painter.setPen(QColor(248, 250, 252));
+    painter.setPen(chip.text);
     painter.drawText(panel.adjusted(24.0, 20.0, -24.0, 0.0),
                      Qt::AlignTop | Qt::AlignHCenter,
                      MS_TR("Recording in Progress"));
 
     painter.setFont(markshot::theme::uiFont(11, QFont::DemiBold));
-    painter.setPen(QColor(125, 211, 252));
+    painter.setPen(chip.accentText);
     const QString statusText = MS_TR("%1 recording  %2  %3 fps")
         .arg(modeLabel(status.mode), formatElapsed(status.elapsedMs))
         .arg(status.fps);
@@ -167,7 +173,7 @@ void ShotWindow::drawActiveRecordingStatus(QPainter &painter)
                      statusText);
 
     painter.setFont(markshot::theme::uiFont(10));
-    painter.setPen(QColor(203, 213, 225));
+    painter.setPen(chip.mutedText);
     const QString outputText = status.outputPath.isEmpty()
         ? QString()
         : MS_TR("Output: %1").arg(status.outputPath);
@@ -175,7 +181,7 @@ void ShotWindow::drawActiveRecordingStatus(QPainter &painter)
                      Qt::AlignTop | Qt::AlignHCenter,
                      painter.fontMetrics().elidedText(outputText, Qt::ElideMiddle, qRound(panel.width() - 56.0)));
 
-    painter.setPen(QColor(226, 232, 240));
+    painter.setPen(m_toolbarAppearance.palette.dark ? QColor(226, 232, 240) : chip.text);
     painter.drawText(panel.adjusted(28.0, 111.0, -28.0, 0.0),
                      Qt::AlignTop | Qt::AlignHCenter,
                      MS_TR("Hold S to stop recording, or continue selecting a screenshot region."));

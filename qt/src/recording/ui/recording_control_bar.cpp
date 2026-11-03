@@ -1,12 +1,14 @@
 #include "recording/ui/recording_control_bar.h"
 
 #include "recording/ui/recording_control_icons.h"
+#include "ui/configured_toolbar_palette.h"
 #include "ui/i18n.h"
 #include "ui/theme.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPainter>
+#include <QPen>
 #include <QPaintEvent>
 #include <QToolButton>
 
@@ -59,20 +61,25 @@ QString indicatorStyleSheet(bool paused)
 
 /**
  * 生成控制条按钮样式。
+ * @param palette 控制条配色，暗色保持原有白色半透明悬停底。
  * @return 样式表文本。
  */
-QString buttonStyleSheet()
+QString buttonStyleSheet(const markshot::ui::ToolbarPalette &palette)
 {
+    const QString hover = palette.dark ? QStringLiteral("rgba(255, 255, 255, 30)") : markshot::ui::cssColor(palette.controlHoverFill);
+    const QString pressed = palette.dark ? QStringLiteral("rgba(255, 255, 255, 52)") : markshot::ui::cssColor(palette.controlBorder);
     return QStringLiteral(
                "QToolButton { border: none; border-radius: 7px; background-color: transparent; }"
-               "QToolButton:hover { background-color: rgba(255, 255, 255, 30); }"
-               "QToolButton:pressed { background-color: rgba(255, 255, 255, 52); }");
+               "QToolButton:hover { background-color: %1; }"
+               "QToolButton:pressed { background-color: %2; }")
+        .arg(hover, pressed);
 }
 
 }  // namespace
 
 RecordingControlBar::RecordingControlBar(QWidget *parent)
     : QWidget(parent)
+    , m_palette(markshot::ui::configuredToolbarPalette())
 {
     setAttribute(Qt::WA_TranslucentBackground, true);
     setObjectName(QStringLiteral("recordingControlBar"));
@@ -96,14 +103,17 @@ void RecordingControlBar::buildLayout()
     m_elapsed = new QLabel(formatElapsed(0), this);
     m_elapsed->setObjectName(QStringLiteral("recordingElapsed"));
     m_elapsed->setFont(markshot::theme::monospaceFont(11, QFont::DemiBold));
-    m_elapsed->setStyleSheet(QStringLiteral("color: #f8fafc;"));
+    // 1. 【录制】【控制条】文字跟随界面主题，暗色保持原有浅色文字
+    m_elapsed->setStyleSheet(QStringLiteral("color: %1;").arg(
+        m_palette.dark ? QStringLiteral("#f8fafc") : markshot::ui::cssColor(m_palette.strongText)));
     m_elapsed->setMinimumWidth(52);
     row->addWidget(m_elapsed);
 
     m_state = new QLabel(MS_TR("Recording"), this);
     m_state->setObjectName(QStringLiteral("recordingState"));
     m_state->setFont(markshot::theme::uiFont(9));
-    m_state->setStyleSheet(QStringLiteral("color: #CBD5E1;"));
+    m_state->setStyleSheet(QStringLiteral("color: %1;").arg(
+        m_palette.dark ? QStringLiteral("#CBD5E1") : markshot::ui::cssColor(m_palette.mutedText)));
     row->addWidget(m_state);
 
     row->addSpacing(2);
@@ -111,7 +121,7 @@ void RecordingControlBar::buildLayout()
     m_pause = new QToolButton(this);
     m_pause->setObjectName(QStringLiteral("recordingPause"));
     m_pause->setFixedSize(kButtonSize, kButtonSize);
-    m_pause->setStyleSheet(buttonStyleSheet());
+    m_pause->setStyleSheet(buttonStyleSheet(m_palette));
     m_pause->setCursor(Qt::PointingHandCursor);
     connect(m_pause, &QToolButton::clicked, this, &RecordingControlBar::pauseToggleRequested);
     row->addWidget(m_pause);
@@ -123,9 +133,11 @@ void RecordingControlBar::buildLayout()
     m_stop->setText(MS_TR("Stop"));
     m_stop->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     m_stop->setAccessibleName(MS_TR("Stop Recording"));
-    m_stop->setStyleSheet(buttonStyleSheet() + QStringLiteral("QToolButton { color: #F8FAFC; padding: 0 6px; }"));
+    m_stop->setStyleSheet(buttonStyleSheet(m_palette) + QStringLiteral("QToolButton { color: %1; padding: 0 6px; }").arg(
+        m_palette.dark ? QStringLiteral("#F8FAFC") : markshot::ui::cssColor(m_palette.strongText)));
     m_stop->setCursor(Qt::PointingHandCursor);
-    m_stop->setIcon(makeRecordingStopIcon(QColor(248, 113, 113)));
+    // 2. 停止图标保持红色警示，亮色底上改用更深的红色
+    m_stop->setIcon(makeRecordingStopIcon(m_palette.dark ? QColor(248, 113, 113) : QColor(220, 38, 38)));
     m_stop->setToolTip(MS_TR("Stop Recording"));
     connect(m_stop, &QToolButton::clicked, this, &RecordingControlBar::stopRequested);
     row->addWidget(m_stop);
@@ -152,7 +164,7 @@ void RecordingControlBar::refreshPauseButton()
     if (!m_pause) {
         return;
     }
-    const QColor ink(226, 232, 240);
+    const QColor ink = m_palette.dark ? QColor(226, 232, 240) : m_palette.text;
     m_pause->setIcon(m_paused ? makeRecordingResumeIcon(ink) : makeRecordingPauseIcon(ink));
     m_pause->setToolTip(m_paused ? MS_TR("Resume Recording") : MS_TR("Pause Recording"));
     m_pause->setAccessibleName(m_pause->toolTip());
@@ -163,9 +175,16 @@ void RecordingControlBar::paintEvent(QPaintEvent *event)
     Q_UNUSED(event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(15, 18, 26, 235));
-    painter.drawRoundedRect(rect(), kCornerRadius, kCornerRadius);
+    // 1. 亮色底板加一条细边，压在浅色桌面上保持边界
+    if (m_palette.dark) {
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(15, 18, 26, 235));
+        painter.drawRoundedRect(rect(), kCornerRadius, kCornerRadius);
+        return;
+    }
+    painter.setPen(QPen(m_palette.panelBorder, 1.0));
+    painter.setBrush(m_palette.panelFill);
+    painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), kCornerRadius, kCornerRadius);
 }
 
 }  // namespace markshot::recording::ui

@@ -4,17 +4,55 @@
 namespace {
 
 /**
+ * 【扫码】【主题】生成扫码结果窗口的输入框与按钮样式，暗色与原 OCR 按钮配色一致。
+ * @param palette 截图会话的工具栏配色。
+ * @return 追加在面板样式之后的样式表文本。
+ */
+QString codeScanResultStyleSheet(const markshot::ui::ToolbarPalette &palette)
+{
+    using markshot::ui::cssColor;
+    return QStringLiteral(
+               "QTextEdit {"
+               " color: %1;"
+               " background: %2;"
+               " border: 1px solid %3;"
+               " border-radius: 8px;"
+               " padding: 6px 8px;"
+               " selection-background-color: %4;"
+               "}"
+               "QTextEdit:focus { border-color: %5; }"
+               "QPushButton#ocrPanelButton {"
+               " color: %6;"
+               " text-align: center;"
+               " background: transparent;"
+               " border: 1px solid transparent;"
+               " border-radius: 8px;"
+               " padding: 8px 10px;"
+               " min-height: 22px;"
+               "}"
+               "QPushButton#ocrPanelButton:hover { background: %7; border-color: %8; }")
+        .arg(cssColor(palette.strongText), cssColor(palette.controlFill), cssColor(palette.controlBorder),
+             cssColor(palette.selectionFill), cssColor(palette.focusBorder), cssColor(palette.text),
+             cssColor(palette.softHoverFill), cssColor(palette.softHoverBorder));
+}
+
+/**
  * 显示二维码和条形码识别结果的窗口。
  */
 class CodeScanResultWindow final : public QWidget {
 public:
-    explicit CodeScanResultWindow(QString text)
+    /**
+     * 创建扫码结果窗口。
+     * @param text 识别结果文本。
+     * @param palette 截图会话的工具栏配色，窗口外框、输入框与按钮跟随同一主题。
+     */
+    CodeScanResultWindow(QString text, const markshot::ui::ToolbarPalette &palette)
     {
         setWindowTitle(MS_TR("Code Scan Result"));
         setAttribute(Qt::WA_DeleteOnClose);
         setWindowFlags(Qt::Window | Qt::WindowStaysOnTopHint);
         setObjectName(QStringLiteral("extensionPanel"));
-        setStyleSheet(markshot::theme::openWithPanelStyleSheet());
+        setStyleSheet(markshot::theme::openWithPanelStyleSheet(palette) + codeScanResultStyleSheet(palette));
 
         auto *layout = new QVBoxLayout(this);
         layout->setContentsMargins(12, 12, 12, 12);
@@ -41,7 +79,6 @@ public:
         auto *closeButton = new QPushButton(MS_TR("Close"), this);
         for (QPushButton *button : {copyButton, closeButton}) {
             button->setObjectName(QStringLiteral("ocrPanelButton"));
-            button->setStyleSheet(markshot::theme::ocrPanelButtonStyleSheet());
         }
         connect(copyButton, &QPushButton::clicked, this, [this] {
             markshot::copyTextToClipboard(m_editor->toPlainText());
@@ -86,11 +123,12 @@ namespace markshot::shot {
 /**
  * 创建扫码结果窗口。
  * @param text 要展示的识别结果文本。
+ * @param palette 截图会话的工具栏配色。
  * @return 新建的扫码结果窗口。
  */
-QWidget *createCodeScanResultWindow(QString text)
+QWidget *createCodeScanResultWindow(QString text, const markshot::ui::ToolbarPalette &palette)
 {
-    return new CodeScanResultWindow(std::move(text));
+    return new CodeScanResultWindow(std::move(text), palette);
 }
 
 void placeCodeScanResultWindow(QWidget *window, QScreen *screen)

@@ -153,11 +153,17 @@ int rulerTickStep(qreal pixels)
 
 void drawRoundedLabel(QPainter &painter, QRectF rect, const QString &text, QColor fill)
 {
+    drawRoundedLabel(painter, rect, text, {fill, QColor(0, 0, 0, 0), QColor(229, 231, 235), {}, {}});
+}
+
+void drawRoundedLabel(QPainter &painter, QRectF rect, const QString &text,
+                      const markshot::ui::OverlayChipColors &colors)
+{
     painter.save();
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(fill);
+    painter.setPen(colors.border.alpha() > 0 ? QPen(colors.border, 1.0) : QPen(Qt::NoPen));
+    painter.setBrush(colors.fill);
     painter.drawRoundedRect(rect, 9.0, 9.0);
-    painter.setPen(QColor(229, 231, 235));
+    painter.setPen(colors.text);
     painter.drawText(rect, Qt::AlignCenter, text);
     painter.restore();
 }

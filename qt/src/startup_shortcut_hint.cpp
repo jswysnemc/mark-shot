@@ -214,7 +214,8 @@ PanelAnchor preferredAnchor(QPointF pointer, const QVector<ShortcutHintItem> &it
     return PanelAnchor::BottomLeft;
 }
 
-void drawPanel(QPainter &painter, const QVector<ShortcutHintItem> &items, const PanelLayout &layout)
+void drawPanel(QPainter &painter, const QVector<ShortcutHintItem> &items, const PanelLayout &layout,
+               const markshot::ui::ToolbarPalette &palette)
 {
     if (items.isEmpty() || layout.panelRect.isEmpty()) {
         return;
@@ -225,15 +226,16 @@ void drawPanel(QPainter &painter, const QVector<ShortcutHintItem> &items, const 
 
     QPainterPath shadowPath;
     shadowPath.addRoundedRect(layout.panelRect.adjusted(0.0, 2.0, 0.0, 2.0), kPanelRadius, kPanelRadius);
-    painter.fillPath(shadowPath, QColor(0, 0, 0, 92));
+    painter.fillPath(shadowPath, palette.dark ? QColor(0, 0, 0, 92) : QColor(15, 23, 42, 36));
 
+    // 1. 【启动提示】【主题】暗色保持原有黑色渐变，亮色取工具栏白色面板
     QLinearGradient background(layout.panelRect.topLeft(), layout.panelRect.bottomRight());
-    background.setColorAt(0.0, QColor(4, 9, 12, 226));
-    background.setColorAt(1.0, QColor(0, 0, 0, 206));
+    background.setColorAt(0.0, palette.dark ? QColor(4, 9, 12, 226) : palette.popupFill);
+    background.setColorAt(1.0, palette.dark ? QColor(0, 0, 0, 206) : palette.panelFill);
     QPainterPath panelPath;
     panelPath.addRoundedRect(layout.panelRect, kPanelRadius, kPanelRadius);
     painter.fillPath(panelPath, background);
-    painter.setPen(QPen(QColor(255, 255, 255, 22), 1.0));
+    painter.setPen(QPen(palette.dark ? QColor(255, 255, 255, 22) : palette.panelBorder, 1.0));
     painter.drawPath(panelPath);
 
     painter.setFont(keyFont());
@@ -242,12 +244,13 @@ void drawPanel(QPainter &painter, const QVector<ShortcutHintItem> &items, const 
         const QRectF keyRect = layout.keyRects.at(i);
         const QRectF keyShadow = keyRect.translated(0.0, 1.5);
         painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor(0, 0, 0, 90));
+        painter.setBrush(palette.dark ? QColor(0, 0, 0, 90) : QColor(15, 23, 42, 40));
         painter.drawRoundedRect(keyShadow, 7.0, 7.0);
 
+        // 2. 亮色下键帽底部加深一级，避免白色键帽融进白色面板
         QLinearGradient keyFill(keyRect.topLeft(), keyRect.bottomLeft());
-        keyFill.setColorAt(0.0, QColor(255, 255, 255, 244));
-        keyFill.setColorAt(1.0, QColor(226, 232, 240, 244));
+        keyFill.setColorAt(0.0, palette.dark ? QColor(255, 255, 255, 244) : QColor(248, 250, 252));
+        keyFill.setColorAt(1.0, palette.dark ? QColor(226, 232, 240, 244) : QColor(226, 232, 240));
         painter.setBrush(keyFill);
         painter.setPen(QPen(QColor(11, 18, 32, 84), 1.0));
         painter.drawRoundedRect(keyRect, 7.0, 7.0);
@@ -266,7 +269,7 @@ void drawPanel(QPainter &painter, const QVector<ShortcutHintItem> &items, const 
     }
 
     painter.setFont(labelFont());
-    painter.setPen(QColor(232, 250, 255, 244));
+    painter.setPen(palette.dark ? QColor(232, 250, 255, 244) : palette.strongText);
     for (int i = 0; i < items.size() && i < layout.labelRects.size(); ++i) {
         painter.drawText(layout.labelRects.at(i), Qt::AlignVCenter | Qt::AlignLeft, items.at(i).label);
     }

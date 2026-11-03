@@ -221,7 +221,11 @@ void ShotWindowRulerPainter::drawHover(QPainter &painter) const
         label.moveBottom(hover.y() - 14.0);
     }
     label = markshot::ruler::clampRulerFloatingRect(label, QRectF(window.rect()), 8.0);
-    drawRoundedLabel(painter, label, text);
+    // 3. 悬停说明只画在窗口中，跟随截图会话主题；暗色保持原配色
+    drawRoundedLabel(painter, label, text,
+                     markshot::ui::overlayChipColors(
+                         window.m_toolbarAppearance.palette,
+                         {QColor(8, 13, 19, 225), QColor(0, 0, 0, 0), QColor(229, 231, 235), {}, {}}));
     painter.restore();
 }
 

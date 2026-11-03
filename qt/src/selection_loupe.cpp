@@ -1,6 +1,7 @@
 #include "selection_loupe.h"
 
 #include "capture_cross_cursor.h"
+#include "ui/overlay_chip_colors.h"
 
 #include <QColor>
 #include <QFont>
@@ -108,7 +109,8 @@ QRect selectionLoupeDirtyRect(const SelectionLoupeLayout &layout)
 void drawSelectionLoupe(QPainter &painter,
                         const QImage &frame,
                         const SelectionLoupeLayout &layout,
-                        const QString &caption)
+                        const QString &caption,
+                        const markshot::ui::ToolbarPalette &palette)
 {
     if (frame.isNull() || layout.loupe.isEmpty() || layout.sourceRect.isEmpty()) {
         return;
@@ -144,10 +146,13 @@ void drawSelectionLoupe(QPainter &painter,
                            layout.loupe.bottom() - metrics.height() - 11.0,
                            metrics.horizontalAdvance(caption) + 20.0,
                            metrics.height() + 7.0);
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor(8, 13, 19, 210));
+        // 1. 【截图】【放大镜】说明标签跟随截图会话主题，暗色保持原配色
+        const markshot::ui::OverlayChipColors chip = markshot::ui::overlayChipColors(
+            palette, {QColor(8, 13, 19, 210), QColor(0, 0, 0, 0), QColor(226, 232, 240), {}, {}});
+        painter.setPen(chip.border.alpha() > 0 ? QPen(chip.border, 1.0) : QPen(Qt::NoPen));
+        painter.setBrush(chip.fill);
         painter.drawRoundedRect(label, 8.0, 8.0);
-        painter.setPen(QColor(226, 232, 240));
+        painter.setPen(chip.text);
         painter.drawText(label, Qt::AlignCenter, caption);
     }
     painter.restore();

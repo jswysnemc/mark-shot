@@ -17,17 +17,6 @@
 namespace markshot::selection_aspect {
 namespace {
 
-// 行内输入框样式：透明底、强调色细边，与 HUD 圆角一致
-const char *kEditorStyle =
-    "QLineEdit {"
-    " color: #F9FAFB;"
-    " background: rgba(255, 255, 255, 20);"
-    " border: 1px solid rgba(94, 234, 212, 170);"
-    " border-radius: 5px;"
-    " padding: 0px 2px;"
-    " selection-background-color: rgba(94, 234, 212, 110);"
-    "}";
-
 // 字段内容高度
 constexpr int kFieldHeight = hud_style::kHudHeight - 6;
 
@@ -63,12 +52,19 @@ SelectionSizeField::SelectionSizeField(const QString &accessibleName, QWidget *p
     m_editor = new QLineEdit(this);
     m_editor->setFont(font());
     m_editor->setAlignment(Qt::AlignCenter);
-    m_editor->setStyleSheet(QString::fromLatin1(kEditorStyle));
+    m_editor->setStyleSheet(hud_style::hudEditorStyleSheet(m_colors));
     m_editor->setValidator(new QIntValidator(1, 1, m_editor));
     m_editor->setAccessibleName(accessibleName);
     m_editor->setContextMenuPolicy(Qt::NoContextMenu);
     m_editor->installEventFilter(this);
     m_editor->hide();
+}
+
+void SelectionSizeField::setHudColors(const hud_style::HudColors &colors)
+{
+    m_colors = colors;
+    m_editor->setStyleSheet(hud_style::hudEditorStyleSheet(m_colors));
+    update();
 }
 
 void SelectionSizeField::setValue(int value, int maximum)
@@ -137,11 +133,11 @@ void SelectionSizeField::paintEvent(QPaintEvent *event)
     // 1. 悬停时绘制浅色底，提示可点击编辑
     if (m_hovered) {
         painter.setPen(Qt::NoPen);
-        painter.setBrush(hud_style::hoverColor());
+        painter.setBrush(m_colors.hover);
         painter.drawRoundedRect(QRectF(rect()), 5.0, 5.0);
     }
     // 2. 居中绘制像素值
-    painter.setPen(hud_style::textColor());
+    painter.setPen(m_colors.text);
     painter.setFont(font());
     painter.drawText(rect(), Qt::AlignCenter, QString::number(m_value));
 }

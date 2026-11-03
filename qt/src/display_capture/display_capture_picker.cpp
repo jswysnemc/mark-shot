@@ -1,6 +1,7 @@
 #include "display_capture/display_capture_picker.h"
 
 #include "display_capture/display_capture_card.h"
+#include "display_capture/display_capture_picker_style.h"
 #include "ui/i18n.h"
 #include "ui/theme.h"
 
@@ -34,53 +35,16 @@ void clearLayout(QLayout *layout)
 
 /**
  * 创建显示器快速截取选择器。
+ * @param palette 截图会话的工具栏配色。
  * @param parent 父级窗口。
  */
-DisplayCapturePicker::DisplayCapturePicker(QWidget *parent)
+DisplayCapturePicker::DisplayCapturePicker(const ui::ToolbarPalette &palette, QWidget *parent)
     : QWidget(parent)
 {
     setObjectName(QStringLiteral("displayCapturePicker"));
     setFocusPolicy(Qt::StrongFocus);
-    setStyleSheet(QStringLiteral(
-        "QWidget#displayCapturePicker {"
-        " background: rgba(226, 232, 240, 235);"
-        " border: 1px solid rgba(15, 23, 42, 45);"
-        " border-radius: 18px;"
-        "}"
-        "QFrame#displayCaptureCard {"
-        " background: rgba(248, 250, 252, 210);"
-        " border: 1px solid rgba(15, 23, 42, 18);"
-        " border-radius: 12px;"
-        "}"
-        "QFrame#displayCaptureCard:hover {"
-        " background: rgba(255, 255, 255, 238);"
-        " border-color: rgba(20, 184, 166, 130);"
-        "}"
-        "QFrame#displayCaptureActionBar {"
-        " background: rgba(8, 13, 19, 210);"
-        " border: 1px solid rgba(255, 255, 255, 34);"
-        " border-radius: 12px;"
-        "}"
-        "QPushButton#displayCaptureActionButton {"
-        " background: rgba(248, 250, 252, 232);"
-        " border: none;"
-        " border-radius: 8px;"
-        " color: #0F172A;"
-        " font-weight: 800;"
-        " padding: 4px 8px;"
-        "}"
-        "QPushButton#displayCaptureActionButton:hover {"
-        " background: rgba(204, 251, 241, 245);"
-        " color: #0F766E;"
-        "}"
-        "QLabel#displayCaptureTitle {"
-        " color: #0F172A;"
-        " font-weight: 800;"
-        "}"
-        "QLabel#displayCaptureSubtitle {"
-        " color: #334155;"
-        " font-weight: 600;"
-        "}"));
+    // 1. 【显示器截取】【主题】面板与悬停操作栏跟随截图会话主题
+    setStyleSheet(displayCapturePickerStyleSheet(palette));
 
     auto *rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(12, 12, 12, 12);
@@ -107,6 +71,7 @@ void DisplayCapturePicker::setTargets(const QVector<Target> &targets)
 
     if (targets.isEmpty()) {
         auto *empty = new QLabel(MS_TR("No displays found"), this);
+        empty->setObjectName(QStringLiteral("displayCaptureSubtitle"));
         empty->setAlignment(Qt::AlignCenter);
         empty->setFont(markshot::theme::uiFont(11, QFont::DemiBold));
         m_cardLayout->addWidget(empty);

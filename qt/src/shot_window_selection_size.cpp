@@ -53,6 +53,7 @@ aspect::SelectionSizePanel *ShotWindow::ensureSelectionSizePanel()
     // 1. 【截图】【选区尺寸】首次使用时创建 HUD 并连接修改信号
     auto *panel = new aspect::SelectionSizePanel(this);
     panel->hide();
+    panel->setToolbarPalette(m_toolbarAppearance.palette);
     connect(panel, &aspect::SelectionSizePanel::sizeApplied, this, &ShotWindow::applySelectionSize);
     connect(panel, &aspect::SelectionSizePanel::aspectRatioChanged, this, &ShotWindow::setSelectionAspectRatio);
     connect(panel, &aspect::SelectionSizePanel::focusReleaseRequested, this, [this] { setFocus(Qt::OtherFocusReason); });

@@ -152,6 +152,8 @@ qt_add_executable(mark-shot
     src/display_capture/display_capture_card.h
     src/display_capture/display_capture_picker.cpp
     src/display_capture/display_capture_picker.h
+    src/display_capture/display_capture_picker_style.cpp
+    src/display_capture/display_capture_picker_style.h
     src/display_capture/display_capture_save.cpp
     src/display_capture/display_capture_save.h
     src/display_capture/display_capture_snapshot.cpp
@@ -307,6 +309,9 @@ qt_add_executable(mark-shot
     src/ui/compact_toolbar.h
     src/ui/toolbar_grip.cpp
     src/ui/toolbar_grip.h
+    src/ui/configured_toolbar_palette.cpp
+    src/ui/configured_toolbar_palette.h
+    src/ui/overlay_chip_colors.h
     src/ui/toolbar_palette.cpp
     src/ui/toolbar_palette.h
     src/ui/toolbar_panel_style.cpp

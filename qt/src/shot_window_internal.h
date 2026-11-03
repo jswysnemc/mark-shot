@@ -4,6 +4,7 @@
 #include "ocr_result.h"
 #include "shot_window.h"
 #include "scroll/scroll_session_window.h"
+#include "ui/overlay_chip_colors.h"
 
 #include <QColor>
 #include <QCursor>
@@ -125,6 +126,19 @@ void drawRoundedLabel(QPainter &painter,
                       QRectF rect,
                       const QString &text,
                       QColor fill = QColor(8, 13, 19, 225));
+
+/**
+ * 【截图覆盖层】【提示标签】按给定颜色绘制圆角提示标签，边框透明时不描边。
+ * @param painter 当前绘制器，调用前后状态不变。
+ * @param rect 标签矩形。
+ * @param text 标签文字。
+ * @param colors 标签底板、边框与文字颜色。
+ * @return 无返回值。
+ */
+void drawRoundedLabel(QPainter &painter,
+                      QRectF rect,
+                      const QString &text,
+                      const markshot::ui::OverlayChipColors &colors);
 QRectF normalizedRect(QPointF a, QPointF b);
 bool ellipseContainsPoint(QRectF ellipse, QPointF point, qreal tolerance);
 QRect windowGeometryToImageRect(QRect windowGeometry, QRect sourceGeometry, QSize imageSize);
@@ -173,7 +187,13 @@ QWidget *createOcrResultWindow(QString text,
                                QScreen *targetScreen,
                                QImage sourceImage = {},
                                QVector<markshot::ocr::Token> tokens = {});
-QWidget *createCodeScanResultWindow(QString text);
+/**
+ * 【扫码】【结果窗口】创建扫码结果窗口。
+ * @param text 识别结果文本。
+ * @param palette 截图会话的工具栏配色。
+ * @return 扫码结果窗口。
+ */
+QWidget *createCodeScanResultWindow(QString text, const markshot::ui::ToolbarPalette &palette);
 /// @brief 把扫码结果窗口放到指定屏幕中央。
 /// @param window 扫码结果窗口。
 /// @param screen 选区所在屏幕，为空时使用光标所在屏幕。

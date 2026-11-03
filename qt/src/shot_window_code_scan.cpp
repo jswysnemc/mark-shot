@@ -84,7 +84,8 @@ void ShotWindow::scanCodeSelection()
         return;
     }
 
-    auto *window = createCodeScanResultWindow(markshot::code_scan::resultsText(parsed.results));
+    auto *window = createCodeScanResultWindow(markshot::code_scan::resultsText(parsed.results),
+                                              m_toolbarAppearance.palette);
     placeCodeScanResultWindow(window, m_captureScreen ? m_captureScreen.data() : screen());
     window->show();
     window->raise();

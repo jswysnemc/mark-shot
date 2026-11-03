@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/toolbar_palette.h"
+
 #include <QRectF>
 #include <QSize>
 #include <QString>
@@ -63,7 +65,10 @@ PanelAnchor preferredAnchor(QPointF pointer, const QVector<ShortcutHintItem> &it
  * @param painter 当前绘图对象。
  * @param items 需要展示的快捷键说明项。
  * @param layout 面板布局。
+ * @param palette 截图会话的工具栏配色，面板与文字跟随明暗主题。
+ * @return 无返回值。
  */
-void drawPanel(QPainter &painter, const QVector<ShortcutHintItem> &items, const PanelLayout &layout);
+void drawPanel(QPainter &painter, const QVector<ShortcutHintItem> &items, const PanelLayout &layout,
+               const markshot::ui::ToolbarPalette &palette = {});
 
 }  // namespace markshot::startup_hint

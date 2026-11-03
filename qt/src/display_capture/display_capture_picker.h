@@ -1,6 +1,7 @@
 #pragma once
 
 #include "display_capture/display_capture_target.h"
+#include "ui/toolbar_palette.h"
 
 #include <QString>
 #include <QVector>
@@ -15,7 +16,12 @@ class DisplayCapturePicker final : public QWidget {
     Q_OBJECT
 
 public:
-    explicit DisplayCapturePicker(QWidget *parent = nullptr);
+    /**
+     * 创建显示器快速截取选择器。
+     * @param palette 截图会话的工具栏配色。
+     * @param parent 父级窗口。
+     */
+    explicit DisplayCapturePicker(const ui::ToolbarPalette &palette, QWidget *parent = nullptr);
     void setTargets(const QVector<Target> &targets);
 
 signals:

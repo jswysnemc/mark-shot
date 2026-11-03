@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/toolbar_palette.h"
+
 #include <QImage>
 #include <QPoint>
 #include <QPointF>
@@ -48,12 +50,14 @@ QRect selectionLoupeDirtyRect(const SelectionLoupeLayout &layout);
  * @param frame 冻结截图。
  * @param layout 放大镜布局。
  * @param caption 底部说明文字，空字符串时不绘制标签。
+ * @param palette 截图会话的工具栏配色，说明标签跟随明暗主题。
  * @return 无返回值。
  */
 void drawSelectionLoupe(QPainter &painter,
                         const QImage &frame,
                         const SelectionLoupeLayout &layout,
-                        const QString &caption);
+                        const QString &caption,
+                        const markshot::ui::ToolbarPalette &palette = {});
 
 /**
  * 在逻辑光标位置绘制与系统十字光标一致的软件指针。

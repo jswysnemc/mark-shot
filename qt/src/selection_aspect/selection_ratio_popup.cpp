@@ -3,7 +3,6 @@
 #include "selection_aspect/selection_aspect_ratio.h"
 #include "selection_aspect/selection_hud_painter.h"
 #include "ui/i18n.h"
-#include "ui/theme.h"
 
 #include <QApplication>
 #include <QKeyEvent>
@@ -67,6 +66,12 @@ void SelectionRatioPopup::popup(const QRect &anchor, qreal currentRatio)
     update();
 }
 
+void SelectionRatioPopup::setHudColors(const hud_style::HudColors &colors)
+{
+    m_colors = colors;
+    update();
+}
+
 void SelectionRatioPopup::dismiss()
 {
     if (!isVisible()) {
@@ -87,7 +92,7 @@ void SelectionRatioPopup::paintEvent(QPaintEvent *event)
     Q_UNUSED(event);
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    hud_style::paintPanelBackground(painter, QRectF(rect()));
+    hud_style::paintPanelBackground(painter, QRectF(rect()), m_colors);
     painter.setFont(font());
 
     const QVector<AspectRatioPreset> presets = aspectRatioPresets();
@@ -97,11 +102,11 @@ void SelectionRatioPopup::paintEvent(QPaintEvent *event)
         // 1. 悬停或键盘选中行绘制浅色底
         if (i == m_activeIndex) {
             painter.setPen(Qt::NoPen);
-            painter.setBrush(hud_style::hoverColor());
+            painter.setBrush(m_colors.hover);
             painter.drawRoundedRect(QRectF(row), 5.0, 5.0);
         }
         // 2. 比例示意图与名称，当前比例使用强调色
-        const QColor ink = current ? markshot::theme::kAccent : hud_style::textColor();
+        const QColor ink = current ? m_colors.accent : m_colors.text;
         const int glyphTop = row.top() + (row.height() - hud_style::kGlyphSize) / 2;
         const QRectF glyphBox(row.left() + 8, glyphTop, hud_style::kGlyphSize, hud_style::kGlyphSize);
         hud_style::paintRatioGlyph(painter, glyphBox, presets.at(i).ratio, ink);
@@ -112,7 +117,7 @@ void SelectionRatioPopup::paintEvent(QPaintEvent *event)
         if (current) {
             const QRectF checkBox(row.right() - 8 - hud_style::kGlyphSize, glyphTop, hud_style::kGlyphSize,
                                   hud_style::kGlyphSize);
-            hud_style::paintCheckGlyph(painter, checkBox, markshot::theme::kAccent);
+            hud_style::paintCheckGlyph(painter, checkBox, m_colors.accent);
         }
     }
 }

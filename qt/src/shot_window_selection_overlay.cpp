@@ -27,7 +27,7 @@ void ShotWindow::drawSelectionAdjustmentOverlay(QPainter &painter) const
             m_startupColorLoupeSize, m_startupHoverImagePoint, m_frozenFrame.size(), obstacles);
         const QString caption = QStringLiteral("%1, %2")
             .arg(qRound(m_startupHoverImagePoint.x())).arg(qRound(m_startupHoverImagePoint.y()));
-        drawSelectionLoupe(painter, m_frozenFrame, layout, caption);
+        drawSelectionLoupe(painter, m_frozenFrame, layout, caption, m_toolbarAppearance.palette);
     }
 }
 
@@ -126,7 +126,7 @@ void ShotWindow::drawStartupShortcutHint(QPainter &painter) const
 
     const markshot::startup_hint::PanelLayout layout =
         markshot::startup_hint::layoutPanel(items, size(), m_startupHintAnchor);
-    markshot::startup_hint::drawPanel(painter, items, layout);
+    markshot::startup_hint::drawPanel(painter, items, layout, m_toolbarAppearance.palette);
 }
 
 /// @brief 绘制当前启动辅助工具

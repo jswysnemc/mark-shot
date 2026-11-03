@@ -1,5 +1,7 @@
 #pragma once
 
+#include "selection_aspect/selection_hud_colors.h"
+
 #include <QColor>
 #include <QFont>
 #include <QRectF>
@@ -24,30 +26,13 @@ inline constexpr int kGlyphSize = 14;
 QFont hudFont();
 
 /**
- * 主要文本颜色。
- * @return 颜色。
- */
-QColor textColor();
-
-/**
- * 次要文本颜色，用于单位与分隔符。
- * @return 颜色。
- */
-QColor mutedColor();
-
-/**
- * 可交互区域悬停时的背景颜色。
- * @return 颜色。
- */
-QColor hoverColor();
-
-/**
  * 绘制 HUD 或弹层的圆角半透明背景与细边框。
  * @param painter 已开启抗锯齿的画笔。
  * @param rect 背景矩形。
+ * @param colors 当前截图会话的 HUD 颜色。
  * @return 无返回值。
  */
-void paintPanelBackground(QPainter &painter, const QRectF &rect);
+void paintPanelBackground(QPainter &painter, const QRectF &rect, const HudColors &colors);
 
 /**
  * 绘制锁形图标。

@@ -35,6 +35,45 @@ QString stylesheetRgba(const QColor &color)
         .arg(color.alpha());
 }
 
+/// @brief 【启动取色】【主题】生成取色面板样式表，面板、格式行与按钮跟随截图会话主题。
+/// @param palette 截图会话的工具栏配色。
+/// @return 取色面板样式表文本。
+QString startupColorPanelStyleSheet(const markshot::ui::ToolbarPalette &palette)
+{
+    using markshot::ui::cssColor;
+    return QStringLiteral(
+               "QWidget#startupColorInspector {"
+               " background: %1;"
+               " border: 1px solid %2;"
+               " border-radius: 16px;"
+               "}"
+               "QLabel { color: %3; font-size: 12px; }"
+               "QLabel#formatName { font-weight: 700; color: %4; min-width: 76px; }"
+               "QLabel#formatValue {"
+               " font-family: %5;"
+               " font-weight: 700;"
+               " color: %3;"
+               "}"
+               "QFrame#formatRow {"
+               " background: %6;"
+               " border-radius: 9px;"
+               "}"
+               "QPushButton {"
+               " background: %7;"
+               " border: 0;"
+               " border-radius: 7px;"
+               " padding: 5px 9px;"
+               " color: %8;"
+               " font-weight: 700;"
+               "}"
+               "QPushButton:hover { background: %9; color: %10; }")
+        .arg(cssColor(palette.popupFill), cssColor(palette.panelBorder), cssColor(palette.strongText),
+             cssColor(palette.mutedText), markshot::theme::monospaceFontFamilyCss(),
+             cssColor(palette.controlFill), cssColor(palette.controlHoverFill), cssColor(palette.text),
+             cssColor(palette.hoverFill))
+        .arg(cssColor(palette.hoverText));
+}
+
 }  // namespace
 
 using namespace markshot::shot;
@@ -54,33 +93,8 @@ void ShotWindow::showStartupColorDialog(QColor color, QPoint anchor)
     m_controls.m_startupColorPanel = new QWidget(this);
     m_controls.m_startupColorPanel->setObjectName(QStringLiteral("startupColorInspector"));
     m_controls.m_startupColorPanel->setAttribute(Qt::WA_DeleteOnClose, true);
-    m_controls.m_startupColorPanel->setStyleSheet(QStringLiteral(
-        "QWidget#startupColorInspector {"
-        " background: rgba(229, 231, 235, 238);"
-        " border: 1px solid rgba(15, 23, 42, 55);"
-        " border-radius: 16px;"
-        "}"
-        "QLabel { color: #172033; font-size: 12px; }"
-        "QLabel#formatName { font-weight: 700; color: #475569; min-width: 76px; }"
-        "QLabel#formatValue {"
-        " font-family: %1;"
-        " font-weight: 700;"
-        " color: #172033;"
-        "}"
-        "QFrame#formatRow {"
-        " background: rgba(248, 250, 252, 228);"
-        " border-radius: 9px;"
-        "}"
-        "QPushButton {"
-        " background: rgba(148, 163, 184, 70);"
-        " border: 0;"
-        " border-radius: 7px;"
-        " padding: 5px 9px;"
-        " color: #334155;"
-        " font-weight: 700;"
-        "}"
-        "QPushButton:hover { background: rgba(45, 212, 191, 150); color: #042F2E; }")
-            .arg(markshot::theme::monospaceFontFamilyCss()));
+    const markshot::ui::ToolbarPalette &palette = m_toolbarAppearance.palette;
+    m_controls.m_startupColorPanel->setStyleSheet(startupColorPanelStyleSheet(palette));
 
     auto *layout = new QVBoxLayout(m_controls.m_startupColorPanel);
     layout->setContentsMargins(12, 12, 12, 12);
@@ -104,6 +118,12 @@ void ShotWindow::showStartupColorDialog(QColor color, QPoint anchor)
     historyRow->setContentsMargins(0, 0, 0, 0);
     historyRow->setSpacing(6);
     const QVector<QColor> swatches = startupColorSwatches(color);
+    // 1. 色块描边取前景色，暗色主题下同样能看清深色色块的边界
+    const auto swatchBorder = [&palette](int alpha) {
+        QColor border = palette.strongText;
+        border.setAlpha(alpha);
+        return border;
+    };
     for (int index = 0; index < 8; ++index) {
         const bool hasColor = index < swatches.size();
         const QColor swatchColor = hasColor ? swatches.at(index) : QColor(0, 0, 0, 0);
@@ -114,13 +134,14 @@ void ShotWindow::showStartupColorDialog(QColor color, QPoint anchor)
         button->setStyleSheet(QStringLiteral(
             "QPushButton, QPushButton:disabled {"
             " background: %1;"
-            " border: 1px solid rgba(15, 23, 42, %2);"
+            " border: 1px solid %2;"
             " border-radius: 7px;"
             " padding: 0;"
             "}"
-            "QPushButton:hover { border-color: rgba(45, 212, 191, 210); }")
-                .arg(hasColor ? stylesheetRgba(swatchColor) : QStringLiteral("rgba(15,23,42,38)"))
-                .arg(index == 0 ? 180 : 80));
+            "QPushButton:hover { border-color: %3; }")
+                .arg(hasColor ? stylesheetRgba(swatchColor) : stylesheetRgba(palette.controlFill),
+                     stylesheetRgba(swatchBorder(index == 0 ? 180 : 80)),
+                     stylesheetRgba(palette.focusBorder)));
         if (hasColor && index > 0) {
             connect(button, &QPushButton::clicked, this, [this, swatchColor, anchor] {
                 showStartupColorDialog(swatchColor, anchor);

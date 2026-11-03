@@ -5,6 +5,7 @@
 #include "selection_aspect/selection_aspect_ratio.h"
 
 #include "debug_log.h"
+#include "ui/overlay_chip_colors.h"
 #include "ui/transparency_background.h"
 #include "selection_loupe.h"
 #include "text_editor_box_chrome.h"
@@ -150,10 +151,14 @@ void ShotWindow::paintEvent(QPaintEvent *event)
                                    widgetSelection.top() + 10.0,
                                    metrics.horizontalAdvance(sizeText) + 22.0,
                                    metrics.height() + 12.0);
-            painter.setPen(Qt::NoPen);
-            painter.setBrush(QColor(8, 13, 19, 220));
+            // 【截图】【选区尺寸】标签跟随截图会话主题，暗色保持原配色
+            const markshot::ui::OverlayChipColors chip = markshot::ui::overlayChipColors(
+                m_toolbarAppearance.palette,
+                {QColor(8, 13, 19, 220), QColor(0, 0, 0, 0), QColor(204, 251, 241, 238), {}, {}});
+            painter.setPen(chip.border.alpha() > 0 ? QPen(chip.border, 1.0) : QPen(Qt::NoPen));
+            painter.setBrush(chip.fill);
             painter.drawRoundedRect(labelRect, 10.0, 10.0);
-            painter.setPen(QColor(204, 251, 241, 238));
+            painter.setPen(chip.text);
             painter.drawText(labelRect, Qt::AlignCenter, sizeText);
         } else if (m_showSelectionInfo) {
             m_showSelectionInfo = false;

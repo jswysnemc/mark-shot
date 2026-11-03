@@ -700,6 +700,10 @@ void ShotWindow::drawStartupColorLoupe(QPainter &painter, QPointF imagePoint) co
                        loupe.bottom() - metrics.height() - 11.0,
                        metrics.horizontalAdvance(hex) + 20.0,
                        metrics.height() + 7.0);
-    drawRoundedLabel(painter, label, hex, QColor(8, 13, 19, 210));
+    // 【截图】【取色值】标签跟随截图会话主题，暗色保持原配色
+    drawRoundedLabel(painter, label, hex,
+                     markshot::ui::overlayChipColors(
+                         m_toolbarAppearance.palette,
+                         {QColor(8, 13, 19, 210), QColor(0, 0, 0, 0), QColor(229, 231, 235), {}, {}}));
     painter.restore();
 }

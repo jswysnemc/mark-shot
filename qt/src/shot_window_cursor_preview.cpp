@@ -1,6 +1,7 @@
 #include "shot_window_module.h"
 
 #include "annotation_size_preview.h"
+#include "ui/overlay_chip_colors.h"
 
 using namespace markshot::shot;
 
@@ -60,10 +61,14 @@ void ShotWindow::drawWheelPreview(QPainter &painter)
                        QSizeF(textBounds.width() + 20, textBounds.height() + 10));
         bubble.moveLeft(std::clamp(bubble.left(), 8.0, std::max(8.0, width() - bubble.width() - 8.0)));
         bubble.moveTop(std::clamp(bubble.top(), 8.0, std::max(8.0, height() - bubble.height() - 8.0)));
-        painter.setPen(QPen(QColor(148, 163, 184, 80), 1));
-        painter.setBrush(QColor(17, 24, 39, 235));
+        // 【截图】【缩放比例】气泡跟随截图会话主题，暗色保持原配色
+        const markshot::ui::OverlayChipColors chip = markshot::ui::overlayChipColors(
+            m_toolbarAppearance.palette,
+            {QColor(17, 24, 39, 235), QColor(148, 163, 184, 80), QColor(229, 231, 235), {}, {}});
+        painter.setPen(QPen(chip.border, 1));
+        painter.setBrush(chip.fill);
         painter.drawRoundedRect(bubble, 6, 6);
-        painter.setPen(QColor(229, 231, 235));
+        painter.setPen(chip.text);
         painter.drawText(bubble, Qt::AlignCenter, zoomText);
     } else {
         // 1. 【标注】【粗细预览】选择工具读取实际标注，避免使用固定尺寸或默认颜色
@@ -85,7 +90,8 @@ void ShotWindow::drawWheelPreview(QPainter &painter)
                 obstacles.append(panel->geometry());
             }
         }
-        drawAnnotationSizePreview(painter, preview, m_wheelPreviewPosition, rect(), obstacles);
+        drawAnnotationSizePreview(painter, preview, m_wheelPreviewPosition, rect(), obstacles,
+                                  m_toolbarAppearance.palette);
     }
     painter.restore();
 }

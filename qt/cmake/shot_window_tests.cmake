@@ -163,6 +163,8 @@ qt_add_executable(mark-shot-selection-toolbar-test
     tests/selection_toolbar_test.cpp
     src/selection_aspect/selection_hud_layout.cpp
     src/selection_aspect/selection_hud_layout.h
+    src/selection_aspect/selection_hud_colors.cpp
+    src/selection_aspect/selection_hud_colors.h
     src/selection_aspect/selection_hud_painter.cpp
     src/selection_aspect/selection_hud_painter.h
     src/selection_aspect/selection_ratio_popup.cpp
@@ -174,6 +176,8 @@ qt_add_executable(mark-shot-selection-toolbar-test
     src/selection_aspect/selection_size_panel.cpp
     src/selection_aspect/selection_size_panel.h
     src/ui/theme.cpp
+    src/ui/toolbar_palette.cpp
+    src/ui/toolbar_palette.h
 )
 target_include_directories(mark-shot-selection-toolbar-test PRIVATE src)
 target_link_libraries(mark-shot-selection-toolbar-test PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)

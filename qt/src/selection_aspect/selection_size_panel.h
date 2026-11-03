@@ -6,6 +6,7 @@
 #include <QWidget>
 
 #include "selection_aspect/selection_aspect_ratio.h"
+#include "selection_aspect/selection_hud_colors.h"
 
 namespace markshot::selection_aspect {
 
@@ -53,6 +54,13 @@ public:
      * @return 无返回值。
      */
     void watchObstacle(QWidget *widget);
+
+    /**
+     * 【选区尺寸】【主题】按截图会话的工具栏配色设置 HUD、输入框与比例弹层颜色。
+     * @param palette 截图会话的工具栏配色。
+     * @return 无返回值。
+     */
+    void setToolbarPalette(const ui::ToolbarPalette &palette);
 
     /**
      * 按字体与内容计算的推荐尺寸。
@@ -202,6 +210,7 @@ private:
     SelectionSizeField *m_widthField = nullptr;
     SelectionSizeField *m_heightField = nullptr;
     QPointer<SelectionRatioPopup> m_ratioPopup;
+    hud_style::HudColors m_colors = hud_style::hudColors();
     QRect m_timesRect;
     QRect m_unitRect;
     QRect m_separatorRect;

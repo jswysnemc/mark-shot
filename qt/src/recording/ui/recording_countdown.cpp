@@ -1,6 +1,7 @@
 #include "recording/ui/recording_countdown.h"
 
 #include "recording/ui/recording_overlay_layout.h"
+#include "ui/configured_toolbar_palette.h"
 #include "ui/i18n.h"
 #include "ui/theme.h"
 #include "windows_integration.h"
@@ -8,6 +9,7 @@
 #include <QGuiApplication>
 #include <QLabel>
 #include <QPainter>
+#include <QPen>
 #include <QScreen>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -36,6 +38,7 @@ public:
      */
     RecordingCountdownPanel(QScreen *screen, const QRect &regionRect)
         : QWidget(nullptr)
+        , m_palette(markshot::ui::configuredToolbarPalette())
     {
         setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
                        | Qt::WindowDoesNotAcceptFocus | Qt::BypassWindowManagerHint);
@@ -52,7 +55,9 @@ public:
         m_label = new QLabel(this);
         m_label->setAlignment(Qt::AlignCenter);
         m_label->setFont(markshot::theme::uiFont(12, QFont::DemiBold));
-        m_label->setStyleSheet(QStringLiteral("color: #f8fafc;"));
+        // 1. 【录制】【倒计时】文字跟随界面主题，暗色保持原有浅色文字
+        m_label->setStyleSheet(QStringLiteral("color: %1;").arg(
+            m_palette.dark ? QStringLiteral("#f8fafc") : markshot::ui::cssColor(m_palette.strongText)));
         layout->addWidget(m_label);
 
         const QRect screenRect = screen ? screen->geometry() : QRect();
@@ -86,12 +91,21 @@ protected:
         Q_UNUSED(event)
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor(15, 18, 26, 235));
-        painter.drawRoundedRect(rect(), kCornerRadius, kCornerRadius);
+        if (m_palette.dark) {
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(15, 18, 26, 235));
+            painter.drawRoundedRect(rect(), kCornerRadius, kCornerRadius);
+            return;
+        }
+        // 1. 亮色底板加一条细边，压在浅色桌面上保持边界
+        painter.setPen(QPen(m_palette.panelBorder, 1.0));
+        painter.setBrush(m_palette.panelFill);
+        painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), kCornerRadius, kCornerRadius);
     }
 
 private:
+    // 创建时按界面主题读取的面板配色
+    markshot::ui::ToolbarPalette m_palette;
     QLabel *m_label = nullptr;
 };
 
