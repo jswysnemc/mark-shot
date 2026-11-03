@@ -1,6 +1,7 @@
-"""【截图历史测试】【真实输入】隔离窗口定位、搜索和保存对话框操作"""
+"""【截图历史测试】【真实输入】隔离窗口定位、原版操作栏、列表和保存对话框操作"""
 
 from pathlib import Path
+import json
 import time
 
 import wayland_test_session as session
@@ -26,26 +27,47 @@ def focus(item):
     return next(current for current in session.windows() if current["id"] == item["id"])
 
 
-def footer(item, action):
-    """【截图历史测试】【操作栏】点击 item 内 action 按钮；使用实际窗口尺寸，不假定桌面比例"""
-    controls = ("copy", "edit", "pin", "save", "delete", "clear")
-    width, height = item["size"]
-    button = min((width - 36) / 6, 78)
-    session.click(item, 8 + controls.index(action) * (button + 4) + button / 2, height - 48)
-    time.sleep(0.12)
-
-
-def search(item, query):
-    """【截图历史测试】【搜索输入】在 item 中真实粘贴 query；确认后把焦点交给结果列表"""
+def list_focus(item, index=0):
+    """【截图历史测试】【列表选择】在 item 的真实列表选择 index 并取得焦点，等待一次性预览结束，无返回值"""
     focus(item)
-    session.key("ctrl+f")
-    if query:
-        session.paste_text(query)
-    else:
-        session.key("BackSpace")
+    session.wait_single_thread(item["pid"], timeout=15)
+    time.sleep(0.45)
+    session.click(item, 45, 104)
+    session.key("Home")
+    for _ in range(index):
+        session.key("Down")
     time.sleep(0.12)
-    session.key("Return")
+    session.wait_single_thread(item["pid"], timeout=15)
+
+
+def focus_control(item, label):
+    """【截图历史测试】【原版焦点】按真实 Qt 样本从 item 列表移动到可用 label，Space 在释放时执行，不假设状态行位置"""
+    list_focus(item)
+    reference = json.loads((Path(__file__).resolve().parents[1] / "tests/fixtures/qt-history-window.json").read_text())
+    steps = reference["layouts"][0]["focus_sequence"].index(label)
+    for _ in range(steps):
+        session.key("Tab")
+    session.key("Space")
     time.sleep(0.12)
+
+
+def footer(item, action):
+    """【截图历史测试】【原版操作】在 item 执行 action，顶部按钮坐标来自 Qt 实测，清空采用原版焦点顺序，无返回值"""
+    if action == "clear":
+        focus_control(item, "Clear History")
+        return
+    reference = json.loads((Path(__file__).resolve().parents[1] / "tests/fixtures/qt-history-window.json").read_text())
+    layout = next(case for case in reference["layouts"] if case["size"][0] == item["size"][0])
+    labels = {"copy": "Copy", "edit": "Edit", "pin": "Pin", "save": "Save As", "delete": "Delete"}
+    x, y, width, height = next(button["rect"] for button in layout["actions"] if button["label"] == labels[action])
+    session.wait_single_thread(item["pid"], timeout=15)
+    session.click(item, x + width / 2, y + height / 2)
+    time.sleep(0.12)
+
+
+def recording(item):
+    """【截图历史测试】【记录开关】在有可用图像操作的 item 中切换原版记录复选框，无返回值"""
+    focus_control(item, "enabled")
 
 
 def field_text(environment):

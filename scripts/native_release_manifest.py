@@ -20,6 +20,7 @@ GUI_GROUPS = {
     "sway-caret": 1,
 }
 WINDOW_GROUPS = {"niri-window-ime", "sway-window-ime"}
+HISTORY_GROUPS = {"niri-history", "niri-history-edges", "niri-history-pointer"}
 
 
 def require(condition, message):
@@ -90,4 +91,11 @@ class ReleaseManifest:
                 require(window.get("passed") is True and window.get("scenario_count") == 2, "failed window input method verification")
                 require(window.get("binary_sha256") == self.binary_sha256, "window input method uses another binary")
                 require(window.get("native_protocol") is True and window.get("no_ocr") is True and window.get("no_idle_surface_requests") is True, "missing native window isolation evidence")
+        if int(self.tag.rsplit(".", 1)[1]) >= 3:
+            histories = report.get("history_gui_groups", [])
+            require(len(histories) == len(HISTORY_GROUPS) and {item.get("name") for item in histories} == HISTORY_GROUPS, "incomplete history verification")
+            for history in histories:
+                require(history.get("passed") is True, "failed history verification")
+                require(history.get("binary_sha256") == self.binary_sha256, "history verification uses another binary")
+                require(re.fullmatch(r"[0-9a-f]{64}", history.get("evidence_sha256", "")) is not None, "missing history evidence digest")
         return report

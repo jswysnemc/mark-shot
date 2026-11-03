@@ -1,56 +1,42 @@
 //! 【截图历史】【窗口动作】选择操作、保存快照和配置更改
 
-use super::{
-    jobs::Task,
-    layout::Control,
-    window::{Focus, HistoryWindow},
-};
+use super::{jobs::Task, layout::Control, window::HistoryWindow};
 use crate::{
     backend::wayland::window::WindowAction, config::history::Update, ui::file_picker::Action,
 };
 
 impl HistoryWindow {
-    /// 【截图历史】【数量提交】验证当前数量字段并请求保存；无效值恢复旧值，返回是否接受
-    pub fn commit_limit(&mut self) -> bool {
-        let limit = self
-            .limit
-            .text()
-            .parse::<usize>()
-            .ok()
-            .filter(|limit| (1..=200).contains(limit));
-        self.focus = Focus::List;
-        match limit {
-            Some(limit) if limit != self.settings.limit => {
-                self.request(Task::Settings(Update::Limit(limit)))
-            }
-            Some(_) => true,
-            None => {
-                self.limit
-                    .set(&self.settings.limit.to_string(), &mut self.fonts, false);
-                self.status = Some("Count must be between 1 and 200".into());
-                false
-            }
+    /// 【截图历史】【操作资格】返回 control 是否可用；图像操作等待真实预览，空历史不能请求清空
+    pub fn enabled(&self, control: Control) -> bool {
+        if matches!(control, Control::Close | Control::ConfirmCancel) {
+            return true;
+        }
+        if self.jobs.foreground() {
+            return false;
+        }
+        match control {
+            Control::Copy | Control::Edit | Control::Pin | Control::Save | Control::Delete => self
+                .model
+                .selected()
+                .is_some_and(|entry| self.model.preview(&entry.name).is_some()),
+            Control::Clear => !self.model.entries.is_empty(),
+            _ => true,
         }
     }
 
     /// 【截图历史】【控件动作】执行 control；当前选择捕获为任务身份，清空必须先确认
     pub fn control(&mut self, control: Control) -> WindowAction {
-        self.dragging = false;
-        if self.jobs.foreground() && !matches!(control, Control::Close | Control::ConfirmCancel) {
+        self.splitter_drag = None;
+        self.scrollbar_drag = None;
+        self.pressed = None;
+        self.keyboard_pressed = false;
+        if !self.enabled(control) {
             return WindowAction::None;
         }
         let name = self.model.selected().map(|entry| entry.name.clone());
         let task = match control {
             Control::Close => return WindowAction::Close,
             Control::Enabled => Task::Settings(Update::Enabled(!self.settings.enabled)),
-            Control::Minus => {
-                Task::Settings(Update::Limit(self.settings.limit.saturating_sub(1).max(1)))
-            }
-            Control::Plus => Task::Settings(Update::Limit((self.settings.limit + 1).min(200))),
-            Control::Refresh => {
-                self.refresh();
-                return WindowAction::Redraw;
-            }
             Control::Copy => match name {
                 Some(name) => Task::Copy(name),
                 None => return WindowAction::None,

@@ -32,7 +32,7 @@ def first_disabled(binary, artifacts):
         raise AssertionError("a first capture created a disabled history directory")
     process = app.launch(binary, environment, config, ["--history"], artifacts / "history-process.log")
     try:
-        session.size_window(actions.window(pid=process.pid), 360, 360)
+        session.size_window(actions.window(pid=process.pid), 440, 320)
         resources = checks.idle(process.pid)
         session.screenshot(artifacts / "disabled-empty-window.png")
         if history.exists():

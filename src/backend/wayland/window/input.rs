@@ -35,7 +35,9 @@ impl NativeWindow {
             let shape = match self.content.cursor(position) {
                 WindowCursor::Default => Shape::Default,
                 WindowCursor::Text => Shape::Text,
+                WindowCursor::Pointer => Shape::Pointer,
                 WindowCursor::Resize => Shape::SeResize,
+                WindowCursor::HorizontalResize => Shape::ColResize,
             };
             cursor.set_shape(self.enter_serial, shape);
         }
@@ -173,15 +175,25 @@ impl KeyboardHandler for NativeWindow {
         self.dispatch(WindowEvent::Focused(false), None);
     }
 
-    /// 【原生窗口】【按键释放】文字编辑只处理按下事件；释放不修改内容
+    /// 【原生窗口】【按键释放】把 event 的释放交给内容，文字编辑默认忽略，按钮可在释放时执行，无返回值
     fn release_key(
         &mut self,
         _: &Connection,
         _: &QueueHandle<Self>,
         _: &wl_keyboard::WlKeyboard,
         _: u32,
-        _: KeyEvent,
+        event: KeyEvent,
     ) {
+        let key =
+            keysym::chord(event.keysym, event.raw_code, self.modifiers).map(|chord| chord.key);
+        self.dispatch(
+            WindowEvent::KeyRelease(KeyInput {
+                key,
+                text: String::new(),
+                mods: self.modifiers,
+            }),
+            None,
+        );
     }
 
     /// 【原生窗口】【重复配置】重复时序由输入设备与工具包负责；不增加空闲定时器

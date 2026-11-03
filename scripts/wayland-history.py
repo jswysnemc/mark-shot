@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import time
 import tomllib
+import re
 
 from PIL import Image
 
@@ -76,7 +77,7 @@ def save_cases(item, environment, history, record, expected, artifacts):
 
 
 def index_case(binary, environment, config, history, item, source, artifacts):
-    """【截图历史测试】【附加索引】显式启用索引，真实输入中文标注后搜索并复制该完成图片"""
+    """【截图历史测试】【附加索引】显式启用索引，验证 PNG 元数据和最新记录的原图复制，不添加原版不存在的搜索界面"""
     config.write_text(config.read_text().replace("index_annotations = false", "index_annotations = true"))
     label = "history 索引验证"
     destination = artifacts / "indexed-export"
@@ -84,7 +85,7 @@ def index_case(binary, environment, config, history, item, source, artifacts):
     files = checks.wait_count(history, 2)
     indexed = next(path for path in files if Image.open(path).info.get(checks.SEARCH) == label)
     checks.equal_image(indexed, image)
-    actions.search(item, "索引验证")
+    actions.list_focus(item, 0)
     actions.footer(item, "copy")
     checks.clipboard(environment, image, artifacts / "indexed-copy.png")
     session.screenshot(artifacts / "indexed-history.png")
@@ -127,30 +128,30 @@ def reedit_and_pin(environment, history, item, expected, artifacts):
 
 
 def settings_and_clear(binary, environment, config, history, item, saved, artifacts):
-    """【截图历史测试】【设置与清空】窄窗口验证开关、数量、确认隔离与无关文件保留；返回空闲资源"""
-    item = session.size_window(item, 360, 360)
-    actions.search(item, "")
+    """【截图历史测试】【设置与清空】最小窗口验证原版开关、私有配置策略、确认隔离与文件边界，返回窗口与资源"""
+    item = session.size_window(item, 440, 320)
+    actions.list_focus(item)
     session.screenshot(artifacts / "narrow-history.png")
-    session.click(item, 64, 56)
+    actions.recording(item)
     wait_value(config, "enabled", False)
     count = len(checks.owned(history))
     headless(binary, environment, config, artifacts / "disabled-capture.png")
     if len(checks.owned(history)) != count:
         raise AssertionError("disabled history recorded a new capture")
-    session.click(item, 64, 56)
+    actions.recording(item)
     wait_value(config, "enabled", True)
 
     for limit in (1, 200):
-        session.click(item, 210, 56)
-        session.paste_text(str(limit))
-        session.key("Return")
+        config.write_text(re.sub(r"(?m)^limit = \d+$", f"limit = {limit}", config.read_text()))
+        capture_image(binary, environment, config, artifacts / "source.png", artifacts / f"policy-{limit}-export", artifacts, f"policy-{limit}")
         wait_value(config, "limit", limit)
-        checks.wait_count(history, 1)
+        checks.wait_count(history, 1 if limit == 1 else 2)
         time.sleep(0.12)
     values = tomllib.loads(config.read_text())
     if values["tools"]["marker"]["width"] != 13 or values["custom"]["preserve"] != 17 or "# preserved history preferences" not in config.read_text():
         raise AssertionError("settings overwrote unrelated configuration")
     resources = checks.idle(item["pid"])
+    retained = len(checks.owned(history))
     unrelated = history / "keep.txt"
     unrelated.write_text("keep")
     linked = history / "capture-20000101000000000-11111111111111111111111111111111.png"
@@ -159,10 +160,10 @@ def settings_and_clear(binary, environment, config, history, item, saved, artifa
     broken.write_bytes(b"broken PNG")
     actions.footer(item, "clear")
     session.key("Return")
-    checks.wait_count(history, 2)
+    checks.wait_count(history, retained + 1)
     actions.footer(item, "clear")
     actions.footer(item, "delete")
-    checks.wait_count(history, 2)
+    checks.wait_count(history, retained + 1)
     session.screenshot(artifacts / "clear-confirmation.png")
     panel_width = min(item["size"][0] - 32, 420)
     panel_x = (item["size"][0] - panel_width) / 2
@@ -198,7 +199,7 @@ def run(binary, artifacts):
     process = launch(binary, environment, config, ["--history"], artifacts / "history-process.log")
     try:
         item = session.size_window(actions.window(pid=process.pid), 760, 460)
-        actions.search(item, "1600x900")
+        actions.list_focus(item, 1)
         actions.footer(item, "copy")
         checks.clipboard(environment, original, artifacts / "history-copy.png")
         session.screenshot(artifacts / "desktop-history.png")
@@ -221,7 +222,7 @@ def run(binary, artifacts):
             raise AssertionError("ordinary history initialized OCR models")
         if hashlib.sha256(binary.read_bytes()).hexdigest() != fingerprint:
             raise AssertionError("binary changed during the history regression")
-        result = {"sha256": fingerprint, "binary_bytes": binary.stat().st_size, "headless_report": report, "initial_idle": initial_idle, "compact_idle": compact_idle, "automatic_recording": True, "default_plaintext_index_off": True, "unicode_index_search": True, "source_rgba_preserved": True, "idat_reused": True, "persistent_clipboard": True, "pin_without_duplicates": True, "reedit_records_once": True, "unicode_save_as": True, "default_overwrite_cancel": True, "explicit_overwrite": True, "save_snapshot_survives_source_deletion": True, "count_limits": [1, 200], "immediate_pruning": True, "recording_toggle": True, "clear_confirmation_isolated": True, "unrelated_files_kept": True, "custom_config_preserved": True, "ocr_not_initialized": True, "window_sizes": [[760, 460], [360, 360]]}
+        result = {"sha256": fingerprint, "binary_bytes": binary.stat().st_size, "headless_report": report, "initial_idle": initial_idle, "compact_idle": compact_idle, "automatic_recording": True, "default_plaintext_index_off": True, "unicode_index_metadata": True, "source_rgba_preserved": True, "idat_reused": True, "persistent_clipboard": True, "pin_without_duplicates": True, "reedit_records_once": True, "unicode_save_as": True, "default_overwrite_cancel": True, "explicit_overwrite": True, "save_snapshot_survives_source_deletion": True, "count_limits": [1, 200], "configured_pruning_on_capture": True, "recording_toggle": True, "clear_confirmation_isolated": True, "unrelated_files_kept": True, "custom_config_preserved": True, "ocr_not_initialized": True, "window_sizes": [[760, 460], [440, 320]]}
         (artifacts / "result.json").write_text(json.dumps(result, indent=2) + "\n")
         print(json.dumps(result))
     finally:

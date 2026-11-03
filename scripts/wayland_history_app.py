@@ -94,6 +94,8 @@ to = "c"
 overlay = "window"
 [notifications]
 enabled = false
+[pinned]
+always_on_top = false
 [history]
 enabled = true
 index_annotations = false

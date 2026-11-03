@@ -1,14 +1,18 @@
 //! 【截图历史】【入口】完成截图的私有记录与独立历史工作流
 
 mod actions;
+mod chrome;
 mod draw;
 pub mod identity;
 mod input;
 mod jobs;
 mod layout;
+mod list_draw;
 mod model;
 pub mod png_metadata;
 mod preview;
+mod scrollbar;
+mod splitter;
 pub mod transport;
 mod window;
 

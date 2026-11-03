@@ -17,6 +17,15 @@ impl UiFonts {
         }
     }
 
+    /// 【界面字库】【定向家族】创建 family 对应的轻量字库，只匹配常规和半粗体文件，返回字体状态，不扫描系统目录
+    pub fn with_system_family(family: &str) -> Self {
+        let mut value = Self::new();
+        let resolved = crate::fonts::text_faces::family(&mut value.system, family, false, false);
+        crate::fonts::text_faces::family(&mut value.system, family, true, false);
+        value.system.db_mut().set_sans_serif_family(resolved);
+        value
+    }
+
     /// 【界面字库】【Unicode 补充】text 非 ASCII 时最多加载一次系统字库；同一窗口的全部字段共享结果
     pub fn ensure_text(&mut self, text: &str) {
         if !self.loaded && !text.is_ascii() {

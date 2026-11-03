@@ -5,6 +5,7 @@ use super::{
     jobs::{Jobs, Response, Task},
     layout::{Control, Layout, contains},
     model::Model,
+    splitter::Drag,
 };
 use crate::{
     AppResult,
@@ -12,21 +13,17 @@ use crate::{
         self, WindowAction, WindowContent, WindowCursor, WindowEvent, WindowSpec, WindowWake,
     },
     config::history::History,
-    ui::{
-        file_picker::{self, Picker},
-        single_line::SingleLine,
-    },
+    ui::file_picker::{self, Picker},
 };
 use cosmic_text::SwashCache;
 use std::{io, sync::Arc};
 use tiny_skia::Pixmap;
 
-#[derive(Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(super) enum Focus {
-    Search,
-    Limit,
     #[default]
     List,
+    Control(Control),
 }
 
 pub(super) struct HistoryWindow {
@@ -36,8 +33,7 @@ pub(super) struct HistoryWindow {
     pub settings: History,
     pub store: Store,
     pub jobs: Jobs,
-    pub search: SingleLine,
-    pub limit: SingleLine,
+    pub icons: crate::renderer::Icons,
     pub layout: Layout,
     pub focus: Focus,
     pub focused: bool,
@@ -47,8 +43,14 @@ pub(super) struct HistoryWindow {
     pub confirm_clear: bool,
     pub picker: Option<Picker>,
     pub save_snapshot: Option<Arc<Vec<u8>>>,
-    pub dragging: bool,
-    pub last_click: Option<(std::time::Instant, String)>,
+    pub left_width: f32,
+    pub splitter_drag: Option<Drag>,
+    pub scrollbar_drag: Option<super::scrollbar::Drag>,
+    pub splitter_hovered: bool,
+    pub hovered_row: Option<usize>,
+    pub pressed: Option<Control>,
+    pub keyboard_pressed: bool,
+    pub last_click: Option<(std::time::Instant, String, (f64, f64))>,
     ready: bool,
 }
 
@@ -62,9 +64,7 @@ impl HistoryWindow {
     /// 【截图历史】【配置构造】用 settings 与 ready 创建独立窗口状态；不读取用户配置或创建历史目录
     fn with_settings(settings: History, ready: bool) -> io::Result<Self> {
         let store = Store::new(settings.path()?, settings.byte_limit());
-        let mut fonts = crate::ui::fonts::UiFonts::new();
-        let search = SingleLine::new("", &mut fonts, 4096);
-        let limit = SingleLine::new(&settings.limit.to_string(), &mut fonts, 3);
+        let fonts = crate::ui::fonts::UiFonts::with_system_family("Sans Serif");
         Ok(Self {
             fonts,
             cache: SwashCache::new(),
@@ -72,21 +72,51 @@ impl HistoryWindow {
             settings,
             store,
             jobs: Jobs::default(),
-            search,
-            limit,
-            layout: Layout::new((760, 460)),
-            focus: Focus::List,
+            icons: super::chrome::icons(),
+            layout: Layout::new((800, 520)),
+            focus: Focus::Control(Control::Close),
             focused: true,
             hovered: None,
-            status: Some("Loading history...".into()),
+            status: None,
             clear_confirmation: false,
             confirm_clear: false,
             picker: None,
             save_snapshot: None,
-            dragging: false,
+            left_width: 210.0,
+            splitter_drag: None,
+            scrollbar_drag: None,
+            splitter_hovered: false,
+            hovered_row: None,
+            pressed: None,
+            keyboard_pressed: false,
             last_click: None,
             ready,
         })
+    }
+
+    /// 【截图历史】【水平重排】按 size、当前左栏与状态文字重建布局，保留实际分隔宽度，无返回值
+    pub fn relayout(&mut self, size: (u32, u32)) {
+        let height = super::chrome::status_buffer(
+            &mut self.fonts,
+            self.status.as_deref(),
+            size.0 as f32 - 24.0,
+        )
+        .map_or(0.0, |buffer| buffer.layout_runs().count() as f32 * 19.0);
+        self.layout = Layout::with_options(size, self.left_width, height);
+        self.model.scroll = self
+            .model
+            .scroll
+            .min(self.model.visible.len().saturating_sub(self.layout.rows()));
+    }
+
+    /// 【截图历史】【滚动查询】返回当前列表的滚动条几何，绘制和输入共用同一范围，无参数
+    pub fn scrollbar(&self) -> Option<super::scrollbar::Geometry> {
+        super::scrollbar::geometry(
+            self.layout.list,
+            self.model.visible.len(),
+            self.layout.rows(),
+            self.model.scroll,
+        )
     }
 
     /// 【截图历史】【字体补充】text 包含非 ASCII 字符时加载系统字体；只执行一次，不初始化识别模型
@@ -99,7 +129,7 @@ impl HistoryWindow {
         self.jobs.request(self.store.clone(), task)
     }
 
-    /// 【截图历史】【列表刷新】读取最新设置与目录后请求列表；外部配置变化不覆盖未确认数量输入
+    /// 【截图历史】【列表刷新】读取最新设置与目录后请求列表，不创建原版不存在的数量编辑状态，无参数、无返回值
     pub fn refresh(&mut self) {
         let settings = crate::config::history::current();
         match settings.path() {
@@ -114,10 +144,6 @@ impl HistoryWindow {
                 self.status = Some(error.to_string());
                 return;
             }
-        }
-        if self.focus != Focus::Limit {
-            self.limit
-                .set(&settings.limit.to_string(), &mut self.fonts, false);
         }
         self.settings = settings;
         self.request(Task::List);
@@ -137,7 +163,7 @@ impl HistoryWindow {
                 .visible
                 .iter()
                 .skip(self.model.scroll)
-                .take(self.layout.rows())
+                .take((self.layout.list.height() / super::layout::ROW).ceil() as usize)
                 .map(|index| (self.model.entries[*index].name.clone(), false)),
         );
         for (name, full) in names {
@@ -172,17 +198,11 @@ impl HistoryWindow {
                     result: Ok(entries),
                     ..
                 } => {
-                    if entries.iter().any(|entry| !entry.search.is_ascii()) {
-                        self.ensure_fonts("字");
-                    }
                     self.model.refresh(entries);
                     self.model.scroll = self
                         .model
                         .scroll
                         .min(self.model.visible.len().saturating_sub(self.layout.rows()));
-                    if self.status.as_deref() == Some("Loading history...") {
-                        self.status = None;
-                    }
                     log::info!(
                         "【截图历史】【列表刷新】可用记录: {}",
                         self.model.entries.len()
@@ -237,8 +257,6 @@ impl HistoryWindow {
                 }
                 Response::Updated(Ok(settings)) => {
                     let prune = settings.limit != self.settings.limit;
-                    self.limit
-                        .set(&settings.limit.to_string(), &mut self.fonts, false);
                     self.settings = settings;
                     if prune {
                         self.request(Task::Prune(self.settings.limit));
@@ -258,8 +276,6 @@ impl HistoryWindow {
                     );
                 }
                 Response::Updated(Err(error)) => {
-                    self.limit
-                        .set(&self.settings.limit.to_string(), &mut self.fonts, false);
                     self.error("Cannot update history settings", error);
                 }
                 Response::Done {
@@ -332,6 +348,7 @@ impl WindowContent for HistoryWindow {
     }
     /// 【截图历史】【窗口绘制】按 scale 将列表和预览绘制到 canvas；无后台轮询
     fn draw(&mut self, canvas: &mut Pixmap, scale: f32) {
+        self.relayout((self.layout.size.0 as u32, self.layout.size.1 as u32));
         super::draw::draw(self, canvas, scale);
     }
     /// 【截图历史】【窗口事件】处理 event；返回重绘、关闭或窗口管理动作
@@ -339,7 +356,7 @@ impl WindowContent for HistoryWindow {
         match event {
             WindowEvent::Wake => self.completed(),
             WindowEvent::Resize { size } => {
-                self.layout = Layout::new(size);
+                self.relayout(size);
                 self.model.scroll = self
                     .model
                     .scroll
@@ -352,7 +369,10 @@ impl WindowContent for HistoryWindow {
             }
             WindowEvent::Focused(focused) => {
                 self.focused = focused;
-                self.dragging = false;
+                self.splitter_drag = None;
+                self.scrollbar_drag = None;
+                self.pressed = None;
+                self.keyboard_pressed = false;
                 if focused && self.picker.is_none() {
                     self.refresh();
                 }
@@ -374,10 +394,20 @@ impl WindowContent for HistoryWindow {
             }
         } else if self.clear_confirmation {
             WindowCursor::Default
+        } else if self.splitter_drag.is_some() {
+            WindowCursor::HorizontalResize
+        } else if self.scrollbar_drag.is_some() {
+            WindowCursor::Default
         } else if self.layout.resize_at(position) {
             WindowCursor::Resize
-        } else if contains(self.layout.search, position) || contains(self.layout.limit, position) {
-            WindowCursor::Text
+        } else if contains(self.layout.splitter, position) {
+            WindowCursor::HorizontalResize
+        } else if self
+            .layout
+            .control(position, false)
+            .is_some_and(|control| control != Control::Enabled)
+        {
+            WindowCursor::Pointer
         } else {
             WindowCursor::Default
         }
@@ -388,76 +418,15 @@ impl WindowContent for HistoryWindow {
 pub fn run(ready: bool) -> AppResult {
     window::run(
         WindowSpec {
-            title: "Mark Shot / Screenshot History".into(),
+            title: "Screenshot History".into(),
             app_id: "mark-shot-history".into(),
-            size: (760, 460),
-            minimum: (360, 360),
+            size: (800, 520),
+            minimum: (440, 320),
         },
         HistoryWindow::new(ready)?,
     )
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{
-        backend::wayland::window::{KeyInput, LEFT_BUTTON},
-        keys::{Key, Mods},
-    };
-    /// 【截图历史测试】【窗口状态】创建使用私有目录的未连接窗口；返回窗口和保留目录生命周期的句柄
-    fn state() -> (HistoryWindow, tempfile::TempDir) {
-        let directory = tempfile::tempdir().unwrap();
-        let settings = History {
-            directory: directory.path().join("history").to_string_lossy().into(),
-            ..History::default()
-        };
-        (
-            HistoryWindow::with_settings(settings, false).unwrap(),
-            directory,
-        )
-    }
-    /// 【截图历史测试】【按键构造】返回 key 与 mods 对应的窗口事件，不发送真实桌面输入
-    fn key(key: Key, mods: Mods) -> WindowEvent {
-        WindowEvent::Key(KeyInput {
-            key: Some(key),
-            mods,
-            text: String::new(),
-        })
-    }
-    /// 【截图历史测试】【清空确认】默认 Enter 取消，确认弹层不允许点击底层复制按钮
-    #[test]
-    fn clear_confirmation_defaults_to_cancel_and_blocks_click_through() {
-        let (mut state, _directory) = state();
-        state.control(Control::Clear);
-        assert!(state.clear_confirmation);
-        state.event(WindowEvent::PointerButton {
-            position: (30.0, 410.0),
-            button: LEFT_BUTTON,
-            pressed: true,
-        });
-        assert!(state.clear_confirmation);
-        state.event(key(Key::Enter, Mods::default()));
-        assert!(!state.clear_confirmation);
-        assert!(!state.store.directory().exists());
-    }
-    /// 【截图历史测试】【字段优先】搜索 Delete 只编辑字段；Escape 清空搜索后才关闭窗口
-    #[test]
-    fn search_editing_has_priority_over_image_deletion() {
-        let (mut state, _directory) = state();
-        state.focus = Focus::Search;
-        state.search.set("capture", &mut state.fonts, true);
-        state.event(key(Key::Delete, Mods::default()));
-        assert_eq!(state.search.text(), "");
-        state.search.set("capture", &mut state.fonts, false);
-        assert_eq!(
-            state.event(key(Key::Escape, Mods::default())),
-            WindowAction::Redraw
-        );
-        assert_eq!(state.search.text(), "");
-        assert_eq!(
-            state.event(key(Key::Escape, Mods::default())),
-            WindowAction::Close
-        );
-        assert!(!state.store.directory().exists());
-    }
-}
+#[path = "window_tests.rs"]
+mod tests;

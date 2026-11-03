@@ -1,0 +1,153 @@
+{
+  "qt_version": "6.12.0",
+  "initial_focus": "Close",
+  "copy_enabled": true,
+  "enabled_point_size": 9,
+  "enter_clicked": false,
+  "enter_copied": false,
+  "enter_edited": false,
+  "font_family": "Sans Serif",
+  "font_weight": 600,
+  "list_point_size": 9,
+  "preview_contents": [
+    7,
+    7,
+    553,
+    353
+  ],
+  "space_clicked_on_press": false,
+  "space_clicked_on_release": true,
+  "space_copied_on_press": false,
+  "space_copied_on_release": true,
+  "splitters": [
+    {
+      "handle": [
+        193,
+        82,
+        5,
+        392
+      ],
+      "list": [
+        12,
+        82,
+        184,
+        392
+      ],
+      "preview": [
+        195,
+        82,
+        593,
+        392
+      ],
+      "requested": 1
+    },
+    {
+      "handle": [
+        193,
+        82,
+        5,
+        392
+      ],
+      "list": [
+        12,
+        82,
+        184,
+        392
+      ],
+      "preview": [
+        195,
+        82,
+        593,
+        392
+      ],
+      "requested": 184
+    },
+    {
+      "handle": [
+        219,
+        82,
+        5,
+        392
+      ],
+      "list": [
+        12,
+        82,
+        210,
+        392
+      ],
+      "preview": [
+        221,
+        82,
+        567,
+        392
+      ],
+      "requested": 210
+    },
+    {
+      "handle": [
+        309,
+        82,
+        5,
+        392
+      ],
+      "list": [
+        12,
+        82,
+        300,
+        392
+      ],
+      "preview": [
+        311,
+        82,
+        477,
+        392
+      ],
+      "requested": 300
+    },
+    {
+      "handle": [
+        606,
+        82,
+        5,
+        392
+      ],
+      "list": [
+        12,
+        82,
+        597,
+        392
+      ],
+      "preview": [
+        608,
+        82,
+        180,
+        392
+      ],
+      "requested": 800
+    }
+  ],
+  "status": [
+    12,
+    491,
+    776,
+    19
+  ],
+  "status_clear": [
+    669,
+    455,
+    119,
+    30
+  ],
+  "status_enabled": [
+    12,
+    461,
+    163,
+    18
+  ],
+  "status_list": [
+    12,
+    82,
+    210,
+    367
+  ]
+}

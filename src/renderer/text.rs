@@ -207,6 +207,13 @@ impl Painter<'_> {
         })
     }
 
+    /// 【界面文字】【样式测量】按 style 的字号、字重与斜体测量 text，返回真实字形宽度，不使用常规字重替代
+    pub fn measure_styled(&mut self, text: &str, style: TextStyle) -> f32 {
+        self.fonts.as_mut().map_or(0.0, |fonts| {
+            shape_single_line(fonts.system, text, style.size, style.weight, style.style).1
+        })
+    }
+
     // ── common input field stuff ─────────────────────────────────────
     pub fn input_box(&mut self, rect: Rect, radius: f32) {
         self.fill_rounded(rect, radius, color::field());

@@ -5,7 +5,7 @@ import json
 import tempfile
 import unittest
 
-from native_release_manifest import ReleaseManifest, WINDOW_GROUPS, sha256_file
+from native_release_manifest import HISTORY_GROUPS, ReleaseManifest, WINDOW_GROUPS, sha256_file
 from native_release_test_support import fixture
 
 
@@ -83,6 +83,28 @@ class ManifestTests(unittest.TestCase):
             for key, value in (("binary_sha256", "b" * 64), ("passed", False), ("scenario_count", 1), ("native_protocol", False), ("no_ocr", False), ("no_idle_surface_requests", False)):
                 changed = json.loads(json.dumps(report))
                 changed["window_gui_groups"][0][key] = value
+                verification.write_text(json.dumps(changed))
+                invalid = replace(current, verification_sha256=sha256_file(verification))
+                with self.subTest(key=key), self.assertRaises(ValueError):
+                    invalid.verify_documents(verification, notes)
+
+    def test_third_preview_requires_same_binary_history_evidence(self):
+        """【原生发布测试】【历史证据】第三版不得省略历史场景或混用旧构建的鼠标证据，无参数、无返回值"""
+        with tempfile.TemporaryDirectory() as directory:
+            _, verification, notes, manifest = fixture(directory)
+            report = json.loads(verification.read_text())
+            report["window_gui_groups"] = [{"name": name, "passed": True, "scenario_count": 2, "binary_sha256": manifest.binary_sha256, "native_protocol": True, "no_ocr": True, "no_idle_surface_requests": True} for name in sorted(WINDOW_GROUPS)]
+            verification.write_text(json.dumps(report))
+            current = replace(manifest, tag="native-v0.2.0-preview.3", verification_sha256=sha256_file(verification))
+            with self.assertRaisesRegex(ValueError, "history verification"):
+                current.verify_documents(verification, notes)
+            report["history_gui_groups"] = [{"name": name, "passed": True, "binary_sha256": manifest.binary_sha256, "evidence_sha256": "c" * 64} for name in sorted(HISTORY_GROUPS)]
+            verification.write_text(json.dumps(report))
+            current = replace(current, verification_sha256=sha256_file(verification))
+            current.verify_documents(verification, notes)
+            for key, value in (("binary_sha256", "b" * 64), ("passed", False), ("name", "unverified"), ("evidence_sha256", "")):
+                changed = json.loads(json.dumps(report))
+                changed["history_gui_groups"][0][key] = value
                 verification.write_text(json.dumps(changed))
                 invalid = replace(current, verification_sha256=sha256_file(verification))
                 with self.subTest(key=key), self.assertRaises(ValueError):

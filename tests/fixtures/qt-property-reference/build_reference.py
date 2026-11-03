@@ -13,13 +13,14 @@ def flags(path, key):
     return shlex.split(line.split("=", 1)[1])
 
 
-def build(original, output):
-    """【属性对照】【探针链接】读取 original 当前对象与依赖，验证后链接到 output；返回构建证据，过期或缺失时拒绝使用旧对象"""
+def build(original, output, source=None):
+    """【属性对照】【探针链接】读取 original 当前对象与依赖，将 source 或默认探针链接到 output；返回构建证据，拒绝过期对象"""
     original, output = original.resolve(), output.resolve()
     target = original / "CMakeFiles/mark-shot.dir"
     command = shlex.split((target / "link.txt").read_text())
     objects = [(original / arg).resolve() for arg in command if arg.endswith(".o")]
     source_root = Path(__file__).resolve().parent
+    source = Path(source).resolve() if source else source_root / "main.cpp"
     output.parent.mkdir(parents=True, exist_ok=True)
 
     # 1. 【属性对照】【依赖校验】原版源文件和头文件晚于对象时停止，不把旧对象误当作当前源码的实际实现
@@ -42,7 +43,7 @@ def build(original, output):
     qt_source = next(Path(arg[2:]) for arg in compile_flags if arg.startswith("-I") and arg.endswith("/qt/src"))
     compile_flags.append("-I" + str(qt_source.parent / "tests"))
     probe = output.with_suffix(".o")
-    subprocess.run([command[0], *compile_flags, "-c", str(source_root / "main.cpp"), "-o", str(probe)], check=True)
+    subprocess.run([command[0], *compile_flags, "-c", str(source), "-o", str(probe)], check=True)
 
     # 3. 【属性对照】【输出隔离】绝对路径读取原版对象，链接器输出与依赖文件只放在本次证据目录
     linked = []
@@ -64,7 +65,7 @@ def build(original, output):
         index += 1
     subprocess.run(linked, cwd=output.parent, check=True)
     return {"original_build": str(original), "objects": len(objects), "stale_objects": 0,
-            "newest_dependency_mtime": newest, "output": str(output)}
+            "newest_dependency_mtime": newest, "output": str(output), "probe_source": str(source)}
 
 
 def main():
@@ -72,8 +73,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--original-build", type=Path, default=Path.home() / "workspace/mark-shot/build/qt")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--source", type=Path)
     options = parser.parse_args()
-    result = build(options.original_build, options.output)
+    result = build(options.original_build, options.output, options.source)
     options.output.with_suffix(".build.json").write_text(json.dumps(result, indent=2) + "\n")
 
 

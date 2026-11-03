@@ -16,6 +16,7 @@ pub use runtime::run;
 pub use wake::WindowWake;
 
 pub const LEFT_BUTTON: u32 = 0x110;
+pub const RIGHT_BUTTON: u32 = 0x111;
 
 pub struct WindowSpec {
     pub title: String,
@@ -39,6 +40,7 @@ pub enum WindowEvent {
     },
     Focused(bool),
     Key(KeyInput),
+    KeyRelease(KeyInput),
     TextInput(Edit),
     PointerMove {
         position: (f64, f64),
@@ -70,7 +72,9 @@ pub enum WindowCursor {
     #[default]
     Default,
     Text,
+    Pointer,
     Resize,
+    HorizontalResize,
 }
 
 pub trait WindowContent {

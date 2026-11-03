@@ -1,0 +1,613 @@
+{
+  "ctrl_f_changed_focus": false,
+  "layouts": [
+    {
+      "actions": [
+        {
+          "enabled": true,
+          "label": "Copy",
+          "point_size": 10,
+          "rect": [
+            12,
+            46,
+            78,
+            30
+          ],
+          "text": "Copy"
+        },
+        {
+          "enabled": true,
+          "label": "Edit",
+          "point_size": 10,
+          "rect": [
+            94,
+            46,
+            79,
+            30
+          ],
+          "text": "Edit"
+        },
+        {
+          "enabled": true,
+          "label": "Pin",
+          "point_size": 10,
+          "rect": [
+            177,
+            46,
+            78,
+            30
+          ],
+          "text": "Pin"
+        },
+        {
+          "enabled": true,
+          "label": "Save As",
+          "point_size": 10,
+          "rect": [
+            259,
+            46,
+            86,
+            30
+          ],
+          "text": "Save As"
+        },
+        {
+          "enabled": true,
+          "label": "Delete",
+          "point_size": 10,
+          "rect": [
+            349,
+            46,
+            79,
+            30
+          ],
+          "text": "Delete"
+        }
+      ],
+      "clear": [
+        309,
+        280,
+        119,
+        30
+      ],
+      "clear_text": "Clear History",
+      "close": [
+        396,
+        10,
+        32,
+        30
+      ],
+      "enabled": [
+        12,
+        286,
+        163,
+        18
+      ],
+      "enabled_text": "Keep screenshot history",
+      "focus_sequence": [
+        "list",
+        "Copy",
+        "Edit",
+        "Pin",
+        "Save As",
+        "Delete",
+        "Clear History",
+        "enabled",
+        "Close",
+        "list"
+      ],
+      "handle": [
+        219,
+        82,
+        5,
+        192
+      ],
+      "list": [
+        12,
+        82,
+        210,
+        192
+      ],
+      "minimum": [
+        440,
+        320
+      ],
+      "preview": [
+        221,
+        82,
+        207,
+        192
+      ],
+      "preview_color": "#0f172a",
+      "rows": [
+        {
+          "rect": [
+            2,
+            2,
+            206,
+            44
+          ],
+          "text": "11-04 06:56:42\n400 \u00d7 225"
+        },
+        {
+          "rect": [
+            2,
+            50,
+            206,
+            44
+          ],
+          "text": "11-04 06:56:42\n640 \u00d7 360"
+        }
+      ],
+      "size": [
+        440,
+        320
+      ],
+      "summary": "Screenshot History \u00b7 2",
+      "summary_rect": [
+        12,
+        10,
+        378,
+        30
+      ],
+      "window_color": "#0f172a"
+    },
+    {
+      "actions": [
+        {
+          "enabled": true,
+          "label": "Copy",
+          "point_size": 10,
+          "rect": [
+            12,
+            46,
+            116,
+            30
+          ],
+          "text": "Copy"
+        },
+        {
+          "enabled": true,
+          "label": "Edit",
+          "point_size": 10,
+          "rect": [
+            132,
+            46,
+            116,
+            30
+          ],
+          "text": "Edit"
+        },
+        {
+          "enabled": true,
+          "label": "Pin",
+          "point_size": 10,
+          "rect": [
+            252,
+            46,
+            116,
+            30
+          ],
+          "text": "Pin"
+        },
+        {
+          "enabled": true,
+          "label": "Save As",
+          "point_size": 10,
+          "rect": [
+            372,
+            46,
+            116,
+            30
+          ],
+          "text": "Save As"
+        },
+        {
+          "enabled": true,
+          "label": "Delete",
+          "point_size": 10,
+          "rect": [
+            492,
+            46,
+            116,
+            30
+          ],
+          "text": "Delete"
+        }
+      ],
+      "clear": [
+        489,
+        420,
+        119,
+        30
+      ],
+      "clear_text": "Clear History",
+      "close": [
+        576,
+        10,
+        32,
+        30
+      ],
+      "enabled": [
+        12,
+        426,
+        163,
+        18
+      ],
+      "enabled_text": "Keep screenshot history",
+      "focus_sequence": [
+        "list",
+        "Copy",
+        "Edit",
+        "Pin",
+        "Save As",
+        "Delete",
+        "Clear History",
+        "enabled",
+        "Close",
+        "list"
+      ],
+      "handle": [
+        219,
+        82,
+        5,
+        332
+      ],
+      "list": [
+        12,
+        82,
+        210,
+        332
+      ],
+      "minimum": [
+        440,
+        320
+      ],
+      "preview": [
+        221,
+        82,
+        387,
+        332
+      ],
+      "preview_color": "#0f172a",
+      "rows": [
+        {
+          "rect": [
+            2,
+            2,
+            206,
+            44
+          ],
+          "text": "11-04 06:56:42\n400 \u00d7 225"
+        },
+        {
+          "rect": [
+            2,
+            50,
+            206,
+            44
+          ],
+          "text": "11-04 06:56:42\n640 \u00d7 360"
+        }
+      ],
+      "size": [
+        620,
+        460
+      ],
+      "summary": "Screenshot History \u00b7 2",
+      "summary_rect": [
+        12,
+        10,
+        558,
+        30
+      ],
+      "window_color": "#0f172a"
+    },
+    {
+      "actions": [
+        {
+          "enabled": true,
+          "label": "Copy",
+          "point_size": 10,
+          "rect": [
+            12,
+            46,
+            144,
+            30
+          ],
+          "text": "Copy"
+        },
+        {
+          "enabled": true,
+          "label": "Edit",
+          "point_size": 10,
+          "rect": [
+            160,
+            46,
+            144,
+            30
+          ],
+          "text": "Edit"
+        },
+        {
+          "enabled": true,
+          "label": "Pin",
+          "point_size": 10,
+          "rect": [
+            308,
+            46,
+            144,
+            30
+          ],
+          "text": "Pin"
+        },
+        {
+          "enabled": true,
+          "label": "Save As",
+          "point_size": 10,
+          "rect": [
+            456,
+            46,
+            144,
+            30
+          ],
+          "text": "Save As"
+        },
+        {
+          "enabled": true,
+          "label": "Delete",
+          "point_size": 10,
+          "rect": [
+            604,
+            46,
+            144,
+            30
+          ],
+          "text": "Delete"
+        }
+      ],
+      "clear": [
+        629,
+        420,
+        119,
+        30
+      ],
+      "clear_text": "Clear History",
+      "close": [
+        716,
+        10,
+        32,
+        30
+      ],
+      "enabled": [
+        12,
+        426,
+        163,
+        18
+      ],
+      "enabled_text": "Keep screenshot history",
+      "focus_sequence": [
+        "list",
+        "Copy",
+        "Edit",
+        "Pin",
+        "Save As",
+        "Delete",
+        "Clear History",
+        "enabled",
+        "Close",
+        "list"
+      ],
+      "handle": [
+        219,
+        82,
+        5,
+        332
+      ],
+      "list": [
+        12,
+        82,
+        210,
+        332
+      ],
+      "minimum": [
+        440,
+        320
+      ],
+      "preview": [
+        221,
+        82,
+        527,
+        332
+      ],
+      "preview_color": "#0f172a",
+      "rows": [
+        {
+          "rect": [
+            2,
+            2,
+            206,
+            44
+          ],
+          "text": "11-04 06:56:42\n400 \u00d7 225"
+        },
+        {
+          "rect": [
+            2,
+            50,
+            206,
+            44
+          ],
+          "text": "11-04 06:56:42\n640 \u00d7 360"
+        }
+      ],
+      "size": [
+        760,
+        460
+      ],
+      "summary": "Screenshot History \u00b7 2",
+      "summary_rect": [
+        12,
+        10,
+        698,
+        30
+      ],
+      "window_color": "#0f172a"
+    },
+    {
+      "actions": [
+        {
+          "enabled": true,
+          "label": "Copy",
+          "point_size": 10,
+          "rect": [
+            12,
+            46,
+            152,
+            30
+          ],
+          "text": "Copy"
+        },
+        {
+          "enabled": true,
+          "label": "Edit",
+          "point_size": 10,
+          "rect": [
+            168,
+            46,
+            152,
+            30
+          ],
+          "text": "Edit"
+        },
+        {
+          "enabled": true,
+          "label": "Pin",
+          "point_size": 10,
+          "rect": [
+            324,
+            46,
+            152,
+            30
+          ],
+          "text": "Pin"
+        },
+        {
+          "enabled": true,
+          "label": "Save As",
+          "point_size": 10,
+          "rect": [
+            480,
+            46,
+            152,
+            30
+          ],
+          "text": "Save As"
+        },
+        {
+          "enabled": true,
+          "label": "Delete",
+          "point_size": 10,
+          "rect": [
+            636,
+            46,
+            152,
+            30
+          ],
+          "text": "Delete"
+        }
+      ],
+      "clear": [
+        669,
+        480,
+        119,
+        30
+      ],
+      "clear_text": "Clear History",
+      "close": [
+        756,
+        10,
+        32,
+        30
+      ],
+      "enabled": [
+        12,
+        486,
+        163,
+        18
+      ],
+      "enabled_text": "Keep screenshot history",
+      "focus_sequence": [
+        "list",
+        "Copy",
+        "Edit",
+        "Pin",
+        "Save As",
+        "Delete",
+        "Clear History",
+        "enabled",
+        "Close",
+        "list"
+      ],
+      "handle": [
+        219,
+        82,
+        5,
+        392
+      ],
+      "list": [
+        12,
+        82,
+        210,
+        392
+      ],
+      "minimum": [
+        440,
+        320
+      ],
+      "preview": [
+        221,
+        82,
+        567,
+        392
+      ],
+      "preview_color": "#0f172a",
+      "rows": [
+        {
+          "rect": [
+            2,
+            2,
+            206,
+            44
+          ],
+          "text": "11-04 06:56:42\n400 \u00d7 225"
+        },
+        {
+          "rect": [
+            2,
+            50,
+            206,
+            44
+          ],
+          "text": "11-04 06:56:42\n640 \u00d7 360"
+        }
+      ],
+      "size": [
+        800,
+        520
+      ],
+      "summary": "Screenshot History \u00b7 2",
+      "summary_rect": [
+        12,
+        10,
+        738,
+        30
+      ],
+      "window_color": "#0f172a"
+    }
+  ],
+  "qt_version": "6.12.0",
+  "right_button_copied": false,
+  "right_click_selected": 1,
+  "up_selected": 0
+}
