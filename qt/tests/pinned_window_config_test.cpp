@@ -29,13 +29,15 @@ std::optional<QColor> colorFromConfigValue(const QJsonValue &value)
 }
 
 /**
- * 提供配置解析测试不需要访问的数值解析桩。
+ * 提供配置解析测试使用的数值解析桩，只识别 JSON 数字。
  * @param value 配置数值。
- * @return 空数值结果。
+ * @return JSON 数字返回对应数值，其他类型返回空结果。
  */
 std::optional<qreal> realFromConfigValue(const QJsonValue &value)
 {
-    Q_UNUSED(value);
+    if (value.isDouble()) {
+        return value.toDouble();
+    }
     return std::nullopt;
 }
 
@@ -108,6 +110,27 @@ private slots:
         const markshot::shot::PinnedWindowConfig config =
             markshot::shot::pinnedWindowConfigFromRoot(root);
         QCOMPARE(config.shadowEnabled, true);
+    }
+
+    /**
+     * 验证失焦边框不透明度有默认值，读取配置时截断到 0 到 1。
+     * @return 无返回值。
+     */
+    void readsInactiveBorderOpacity()
+    {
+        const markshot::shot::PinnedWindowConfig defaults =
+            markshot::shot::pinnedWindowConfigFromRoot(QJsonObject());
+        QCOMPARE(defaults.inactiveBorderOpacity, markshot::shot::kPinnedInactiveBorderOpacityDefault);
+
+        QJsonObject pinned;
+        pinned.insert(QStringLiteral("inactiveBorderOpacity"), 0.25);
+        QJsonObject root;
+        root.insert(QStringLiteral("pinnedWindow"), pinned);
+        QCOMPARE(markshot::shot::pinnedWindowConfigFromRoot(root).inactiveBorderOpacity, 0.25);
+
+        pinned.insert(QStringLiteral("inactiveBorderOpacity"), 3.0);
+        root.insert(QStringLiteral("pinnedWindow"), pinned);
+        QCOMPARE(markshot::shot::pinnedWindowConfigFromRoot(root).inactiveBorderOpacity, 1.0);
     }
 };
 

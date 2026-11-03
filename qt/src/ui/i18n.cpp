@@ -406,6 +406,7 @@ const QHash<QString, QString> &chineseTable()
          QStringLiteral("在贴图周围绘制柔和阴影。")},
         {QStringLiteral("Border Color"), QStringLiteral("边框颜色")},
         {QStringLiteral("Border Width"), QStringLiteral("边框宽度")},
+        {QStringLiteral("Unfocused Border Opacity"), QStringLiteral("失焦边框不透明度")},
         {QStringLiteral("OCR and Translation"), QStringLiteral("OCR 与翻译")},
         {QStringLiteral("Configure automatic text recognition for pinned images."),
          QStringLiteral("配置置顶图片的自动文字识别。")},

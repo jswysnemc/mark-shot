@@ -47,6 +47,8 @@ SettingsPagePinned::SettingsPagePinned(QWidget *parent)
     });
     m_borderWidth = addDoubleRow(windowForm, MS_TR("Border Width"), 1.0, 12.0, 1);
     m_borderWidth->setSuffix(QStringLiteral(" px"));
+    m_inactiveBorderOpacity = addDoubleRow(windowForm, MS_TR("Unfocused Border Opacity"), 0.0, 1.0, 2);
+    m_inactiveBorderOpacity->setSingleStep(0.05);
     m_shadowEnabled = addSwitchRow(windowForm,
                                    MS_TR("Pinned Shadow"),
                                    MS_TR("Draw a soft shadow around pinned images."));
@@ -84,6 +86,7 @@ void SettingsPagePinned::setConfig(const SettingsConfig &config)
     m_borderColorValue = config.pinned.borderColor;
     updateBorderColorButton();
     m_borderWidth->setValue(config.pinned.borderWidth);
+    m_inactiveBorderOpacity->setValue(config.pinned.inactiveBorderOpacity);
     m_shadowEnabled->setChecked(config.pinned.shadowEnabled);
     m_ocrEnabled->setChecked(config.pinned.ocrEnabled);
     m_autoOcr->setChecked(config.pinned.autoOcr);
@@ -107,6 +110,7 @@ void SettingsPagePinned::updateConfig(SettingsConfig *config) const
     config->pinned.borderEnabled = m_borderEnabled->isChecked();
     config->pinned.borderColor = m_borderColorValue;
     config->pinned.borderWidth = m_borderWidth->value();
+    config->pinned.inactiveBorderOpacity = m_inactiveBorderOpacity->value();
     config->pinned.shadowEnabled = m_shadowEnabled->isChecked();
     config->pinned.ocrEnabled = m_ocrEnabled->isChecked();
     config->pinned.autoOcr = m_autoOcr->isChecked();

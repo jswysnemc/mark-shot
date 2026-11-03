@@ -243,6 +243,8 @@ qt_add_executable(mark-shot
     src/pinned_window/pinned_image_window_text_selection.cpp
     src/pinned_window/pinned_image_window_translation.cpp
     src/pinned_window/pinned_image_window_chrome.cpp
+    src/pinned_window/pinned_focus_chrome.cpp
+    src/pinned_window/pinned_focus_chrome.h
     src/pinned_window/pinned_non_window_chrome.cpp
     src/pinned_window/pinned_non_window_chrome.h
     src/pinned_window/pinned_layer_shell_geometry.cpp

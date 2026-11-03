@@ -463,16 +463,16 @@ private:
     bool m_recreating = false;
     bool m_layerShellScreenRebindPending = false;
 
-    // --- 新增：非窗口贴图的悬停边缘 ---
+    // --- 新增：非窗口贴图的焦点外观，规则见 pinned_image_window_chrome.cpp ---
     bool m_pinChromeHovered = false;
     /// @brief 把贴图改成不抢焦点的工具层。
     /// @return 无返回值。
     void applyPinnedNonWindowChromeIfEnabled();
-    /// @brief 根据进入或离开更新边缘强调状态。
+    /// @brief 激活状态变化时重绘边框和阴影，并记录指针悬停状态。
     /// @param event 窗口事件。
     /// @return 无返回值。
     void updatePinnedNonWindowHoverIfEnabled(QEvent *event);
-    /// @brief 绘制悬停和未悬停时的边缘与阴影。
+    /// @brief 按聚焦或失焦外观绘制配置的边框。
     /// @param painter 当前画笔。
     /// @param imageRect 图片显示矩形。
     /// @return 已接管边框绘制时返回 true。
@@ -503,7 +503,7 @@ private:
     /// @param size 图片尺寸。
     /// @return 无返回值。
     void expandPinnedGeometryForShadowIfEnabled(QPoint *topLeft, QSize *size) const;
-    /// @brief 在图片后方绘制柔和阴影。
+    /// @brief 在图片后方绘制柔和阴影，聚焦时更深，失焦时更浅。
     /// @param painter 当前画笔。
     /// @param imageRect 图片显示矩形。
     /// @return 无返回值。

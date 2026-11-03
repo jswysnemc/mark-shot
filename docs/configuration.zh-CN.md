@@ -223,7 +223,8 @@ Mark Shot 在 Linux 上从 `~/.config/mark-shot/config.json` 读取应用配置�
 | `pinnedWindow.autoOcr` | 布尔值 | `false` | 控制贴图窗口创建后是否立即在后台自动启动 OCR 文本识别。如果禁用，则在首次拖选文字、复制文字或翻译时按需识别。首次拖选会等待文字位置就绪，并保留按下到释放的选区。别名：`pinned`、`pin`。 |
 | `pinnedWindow.alwaysOnTop` | 布尔值 | `true` | 控制钉图窗口是否保持在其他窗口之上。右键菜单可切换该值并写回 `config.json`。GNOME Wayland 在辅助扩展可用时走扩展接口。KDE Plasma Wayland 通过会话内 KWin 脚本设置 `keepAbove`，不改用 layer-shell。 |
 | `pinnedWindow.border` | 布尔值/对象 | `true` | 贴图窗口外边框的配置。可以为布尔值，或者包含 `enabled` (布尔值)、`color` (十六进制/名称/RGBA对象) 和 `width` (浮点数，`1.0` - `12.0`) 的配置对象。也支持 `borderEnabled`、`borderColor`、`borderWidth` 平铺配置。 |
-| `pinnedWindow.shadow` | 布尔值 | `true` | 控制贴图窗口外部是否显示投影阴影。关闭后贴纸边缘更加纯净，可与桌面紧凑贴合。别名：`shadowEnabled`、`dropShadow`。 |
+| `pinnedWindow.inactiveBorderOpacity` | 数值 | `0.4` | 贴图失去焦点时边框颜色的不透明度系数，范围 `0.0` 到 `1.0`。聚焦时边框始终使用配置颜色原样；设为 `0` 时失焦贴图不显示边框。layer-shell 桌面中，指针停留在贴图上时也显示聚焦边框。参见[贴图与剪贴板](pinned-images.zh-CN.md#焦点外观)。 |
+| `pinnedWindow.shadow` | 布尔值 | `false` | 控制贴图窗口外部是否显示投影阴影。聚焦时阴影更深，失焦时更浅。关闭后贴纸边缘更加纯净，可与桌面紧凑贴合。别名：`shadowEnabled`、`dropShadow`。 |
 | `scrollCapture.frame` | 布尔值/数值/对象 | `5` | 滚动截图外框偏移。数值表示实际捕获区域和外框之间的像素间距；`false` 关闭外框。对象形式支持 `enabled` 和 `gap`。别名：`captureFrame`、`border`、`outline`，也支持平铺的 `frameEnabled` / `frameGap`。 |
 | `scrollCapture.previewGap` | 数值/对象 | `5` | 外框和滚动预览面板之间的像素间距。预览面板会在外框周围选择第一个可用的不重叠位置。别名：`previewDistance`、`previewOffset`、`panelGap`；对象形式支持 `gap`。 |
 | `scrollCapture.hidePreviewDuringCapture` | 布尔值 | `false` | 控制滚动截图运行时是否强制隐藏预览面板。开启后，即使小选区周围有空间，也会隐藏预览面板并显示悬浮拖拽手柄；暂停时仍会显示预览面板。别名：`hidePreviewWhileCapturing`、`hidePanelDuringCapture`、`hideUiDuringCapture`；也支持 `scrollCapture.preview.hideWhileCapturing`。 |

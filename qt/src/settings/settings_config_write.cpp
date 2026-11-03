@@ -232,6 +232,8 @@ void writePinnedSettings(QJsonObject *root, const PinnedSettings &settings)
                    settings.borderColor.name(QColor::HexRgb).toUpper());
     setNestedValue(root, {QStringLiteral("pinnedWindow"), QStringLiteral("borderWidth")},
                    std::clamp(settings.borderWidth, 1.0, 12.0));
+    setNestedValue(root, {QStringLiteral("pinnedWindow"), QStringLiteral("inactiveBorderOpacity")},
+                   std::clamp(settings.inactiveBorderOpacity, 0.0, 1.0));
     setNestedValue(root, {QStringLiteral("pinnedWindow"), QStringLiteral("shadowEnabled")},
                    settings.shadowEnabled);
     setNestedValue(root, {QStringLiteral("ocr"), QStringLiteral("enabled")}, settings.ocrEnabled);

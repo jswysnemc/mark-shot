@@ -37,6 +37,7 @@ private:
     QCheckBox *m_shadowEnabled = nullptr;
     QPushButton *m_borderColor = nullptr;
     QDoubleSpinBox *m_borderWidth = nullptr;
+    QDoubleSpinBox *m_inactiveBorderOpacity = nullptr;
     QCheckBox *m_ocrEnabled = nullptr;
     QCheckBox *m_autoOcr = nullptr;
     QLineEdit *m_ocrBackend = nullptr;
