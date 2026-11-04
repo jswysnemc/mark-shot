@@ -1,0 +1,323 @@
+{
+  "qt_version": "6.12.0",
+  "mouse_delivery": "QtTest spontaneous events",
+  "layout": {
+    "buttons": [
+      {
+        "auto_default": true,
+        "default": true,
+        "down": false,
+        "focused": true,
+        "font_family": "DejaVu LGC Sans",
+        "point_size": 12,
+        "rect": [
+          11,
+          55,
+          144,
+          30
+        ],
+        "text": "Cancel"
+      },
+      {
+        "auto_default": true,
+        "default": false,
+        "down": false,
+        "focused": false,
+        "font_family": "DejaVu LGC Sans",
+        "point_size": 12,
+        "rect": [
+          161,
+          55,
+          143,
+          30
+        ],
+        "text": "Clear History"
+      }
+    ],
+    "color": "#0f172a",
+    "font_family": "Sans Serif",
+    "labels": [
+      {
+        "point_size": 12,
+        "rect": [
+          11,
+          11,
+          293,
+          38
+        ],
+        "text": "Delete all screenshot history? Saved files will be kept.",
+        "wrap": true
+      }
+    ],
+    "minimum": [
+      223,
+      77
+    ],
+    "modal": true,
+    "modality": 1,
+    "point_size": 10,
+    "result": 0,
+    "size": [
+      315,
+      96
+    ],
+    "title": "Clear History",
+    "visible": true
+  },
+  "focus_sequence": [
+    "Clear History",
+    "Cancel",
+    "Clear History",
+    "Cancel"
+  ],
+  "scenarios": [
+    {
+      "name": "layout",
+      "accepted": 0,
+      "rejected": 0,
+      "remaining": 1,
+      "visible": true,
+      "result": 0
+    },
+    {
+      "name": "default-enter",
+      "accepted": 0,
+      "rejected": 1,
+      "remaining": 1,
+      "visible": false,
+      "result": 0
+    },
+    {
+      "name": "escape",
+      "accepted": 0,
+      "rejected": 1,
+      "remaining": 1,
+      "visible": false,
+      "result": 0
+    },
+    {
+      "name": "tab-enter",
+      "accepted": 1,
+      "rejected": 0,
+      "remaining": 0,
+      "visible": false,
+      "result": 1
+    },
+    {
+      "name": "right-enter",
+      "accepted": 1,
+      "rejected": 0,
+      "remaining": 0,
+      "visible": false,
+      "result": 1
+    },
+    {
+      "name": "up-enter",
+      "accepted": 1,
+      "rejected": 0,
+      "remaining": 0,
+      "visible": false,
+      "result": 1
+    },
+    {
+      "name": "down-enter",
+      "accepted": 1,
+      "rejected": 0,
+      "remaining": 0,
+      "visible": false,
+      "result": 1
+    },
+    {
+      "name": "ctrl-enter",
+      "accepted": 0,
+      "rejected": 1,
+      "remaining": 1,
+      "visible": false,
+      "result": 0
+    },
+    {
+      "name": "shift-enter",
+      "accepted": 0,
+      "rejected": 1,
+      "remaining": 1,
+      "visible": false,
+      "result": 0
+    },
+    {
+      "name": "alt-enter",
+      "accepted": 0,
+      "rejected": 1,
+      "remaining": 1,
+      "visible": false,
+      "result": 0
+    },
+    {
+      "name": "ctrl-escape",
+      "accepted": 0,
+      "rejected": 0,
+      "remaining": 1,
+      "visible": true,
+      "result": 0
+    },
+    {
+      "name": "shift-escape",
+      "accepted": 0,
+      "rejected": 0,
+      "remaining": 1,
+      "visible": true,
+      "result": 0
+    },
+    {
+      "name": "ctrl-tab-enter",
+      "accepted": 0,
+      "rejected": 1,
+      "remaining": 1,
+      "visible": false,
+      "result": 0
+    },
+    {
+      "name": "tab-ctrl-enter",
+      "accepted": 1,
+      "rejected": 0,
+      "remaining": 0,
+      "visible": false,
+      "result": 1
+    },
+    {
+      "name": "tab-alt-enter",
+      "accepted": 1,
+      "rejected": 0,
+      "remaining": 0,
+      "visible": false,
+      "result": 1
+    },
+    {
+      "name": "tab-shift-enter",
+      "accepted": 1,
+      "rejected": 0,
+      "remaining": 0,
+      "visible": false,
+      "result": 1
+    },
+    {
+      "name": "logo-enter",
+      "accepted": 0,
+      "rejected": 1,
+      "remaining": 1,
+      "visible": false,
+      "result": 0
+    },
+    {
+      "name": "logo-escape",
+      "accepted": 0,
+      "rejected": 0,
+      "remaining": 1,
+      "visible": true,
+      "result": 0
+    },
+    {
+      "name": "shift-tab-enter",
+      "accepted": 1,
+      "rejected": 0,
+      "remaining": 0,
+      "visible": false,
+      "result": 1
+    },
+    {
+      "name": "right-clear",
+      "accepted": 0,
+      "rejected": 0,
+      "remaining": 1,
+      "visible": true,
+      "result": 0
+    },
+    {
+      "name": "right-clear-enter",
+      "accepted": 1,
+      "rejected": 0,
+      "remaining": 0,
+      "visible": false,
+      "result": 1
+    },
+    {
+      "name": "left-clear-press",
+      "accepted": 0,
+      "rejected": 0,
+      "remaining": 1,
+      "visible": true,
+      "result": 0
+    },
+    {
+      "name": "space-clear",
+      "accepted": 1,
+      "rejected": 0,
+      "remaining": 0,
+      "visible": false,
+      "result": 1,
+      "press_visible": true,
+      "clear_down_on_press": true
+    },
+    {
+      "name": "ctrl-space-clear",
+      "accepted": 1,
+      "rejected": 0,
+      "remaining": 0,
+      "visible": false,
+      "result": 1,
+      "press_visible": true,
+      "clear_down_on_press": true
+    },
+    {
+      "name": "shift-space-clear",
+      "accepted": 1,
+      "rejected": 0,
+      "remaining": 0,
+      "visible": false,
+      "result": 1,
+      "press_visible": true,
+      "clear_down_on_press": true
+    },
+    {
+      "name": "alt-space-clear",
+      "accepted": 1,
+      "rejected": 0,
+      "remaining": 0,
+      "visible": false,
+      "result": 1,
+      "press_visible": true,
+      "clear_down_on_press": true
+    },
+    {
+      "name": "left-clear-release-outside",
+      "accepted": 0,
+      "rejected": 0,
+      "remaining": 1,
+      "visible": true,
+      "result": 0
+    },
+    {
+      "name": "left-clear",
+      "accepted": 1,
+      "rejected": 0,
+      "remaining": 0,
+      "visible": false,
+      "result": 1
+    },
+    {
+      "name": "left-cancel",
+      "accepted": 0,
+      "rejected": 1,
+      "remaining": 1,
+      "visible": false,
+      "result": 0
+    },
+    {
+      "name": "wm-close",
+      "accepted": 0,
+      "rejected": 1,
+      "remaining": 1,
+      "visible": false,
+      "result": 0
+    }
+  ]
+}

@@ -21,6 +21,7 @@ GUI_GROUPS = {
 }
 WINDOW_GROUPS = {"niri-window-ime", "sway-window-ime"}
 HISTORY_GROUPS = {"niri-history", "niri-history-edges", "niri-history-pointer"}
+HISTORY_DIALOG_GROUP = "niri-history-dialog"
 
 
 def require(condition, message):
@@ -93,9 +94,15 @@ class ReleaseManifest:
                 require(window.get("native_protocol") is True and window.get("no_ocr") is True and window.get("no_idle_surface_requests") is True, "missing native window isolation evidence")
         if int(self.tag.rsplit(".", 1)[1]) >= 3:
             histories = report.get("history_gui_groups", [])
-            require(len(histories) == len(HISTORY_GROUPS) and {item.get("name") for item in histories} == HISTORY_GROUPS, "incomplete history verification")
+            expected = HISTORY_GROUPS | ({HISTORY_DIALOG_GROUP} if int(self.tag.rsplit(".", 1)[1]) >= 4 else set())
+            require(len(histories) == len(expected) and {item.get("name") for item in histories} == expected, "incomplete history verification")
             for history in histories:
                 require(history.get("passed") is True, "failed history verification")
                 require(history.get("binary_sha256") == self.binary_sha256, "history verification uses another binary")
                 require(re.fullmatch(r"[0-9a-f]{64}", history.get("evidence_sha256", "")) is not None, "missing history evidence digest")
+                if history.get("name") == HISTORY_DIALOG_GROUP:
+                    result = history.get("result", {})
+                    require(result.get("sha256") == self.binary_sha256, "dialog verification uses another binary")
+                    for key in ("same_process_child", "native_parent_relationship", "default_enter_canceled", "wm_close_canceled", "parent_copy_delete_isolated", "parent_close_reclaimed_child", "space_release_confirmed_once", "unrelated_files_and_links_preserved"):
+                        require(result.get(key) is True, f"missing dialog evidence: {key}")
         return report

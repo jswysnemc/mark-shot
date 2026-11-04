@@ -13,8 +13,8 @@ def flags(path, key):
     return shlex.split(line.split("=", 1)[1])
 
 
-def build(original, output, source=None):
-    """【属性对照】【探针链接】读取 original 当前对象与依赖，将 source 或默认探针链接到 output；返回构建证据，拒绝过期对象"""
+def build(original, output, source=None, qt_test=False):
+    """【属性对照】【探针链接】读取 original 当前对象与依赖，将 source 链接到 output；qt_test 仅增加官方测试库，返回构建证据，拒绝过期对象"""
     original, output = original.resolve(), output.resolve()
     target = original / "CMakeFiles/mark-shot.dir"
     command = shlex.split((target / "link.txt").read_text())
@@ -63,6 +63,8 @@ def build(original, output, source=None):
             arg = str((original / arg).resolve())
         linked.append(arg)
         index += 1
+    if qt_test:
+        linked.append("-lQt6Test")
     subprocess.run(linked, cwd=output.parent, check=True)
     return {"original_build": str(original), "objects": len(objects), "stale_objects": 0,
             "newest_dependency_mtime": newest, "output": str(output), "probe_source": str(source)}
@@ -74,8 +76,9 @@ def main():
     parser.add_argument("--original-build", type=Path, default=Path.home() / "workspace/mark-shot/build/qt")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--source", type=Path)
+    parser.add_argument("--qt-test", action="store_true")
     options = parser.parse_args()
-    result = build(options.original_build, options.output, options.source)
+    result = build(options.original_build, options.output, options.source, options.qt_test)
     options.output.with_suffix(".build.json").write_text(json.dumps(result, indent=2) + "\n")
 
 

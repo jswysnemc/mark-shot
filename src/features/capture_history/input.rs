@@ -46,30 +46,6 @@ impl HistoryWindow {
 
     /// 【截图历史】【键盘处理】处理 input，保留复制和删除快捷键；按钮 Space 等待释放，不把 Enter 当作编辑动作
     fn key(&mut self, input: KeyInput) -> WindowAction {
-        if self.clear_confirmation {
-            return match input.key {
-                Some(Key::Escape) => self.control(Control::ConfirmCancel),
-                Some(Key::Tab | Key::Left | Key::Right) => {
-                    self.confirm_clear = !self.confirm_clear;
-                    WindowAction::Redraw
-                }
-                Some(Key::Enter) => self.control(if self.confirm_clear {
-                    Control::ConfirmClear
-                } else {
-                    Control::ConfirmCancel
-                }),
-                Some(Key::Space) => {
-                    self.pressed = Some(if self.confirm_clear {
-                        Control::ConfirmClear
-                    } else {
-                        Control::ConfirmCancel
-                    });
-                    self.keyboard_pressed = true;
-                    WindowAction::Redraw
-                }
-                _ => WindowAction::None,
-            };
-        }
         if input.key == Some(Key::Escape) {
             return WindowAction::Close;
         }
@@ -133,7 +109,7 @@ impl HistoryWindow {
 
     /// 【截图历史】【鼠标按下】按 position 记录按钮或分隔事务，按钮不在按下时执行，返回窗口动作
     fn press(&mut self, position: (f64, f64)) -> WindowAction {
-        if let Some(control) = self.layout.control(position, self.clear_confirmation) {
+        if let Some(control) = self.layout.control(position) {
             self.last_click = None;
             if !self.enabled(control) {
                 return WindowAction::None;
@@ -142,9 +118,6 @@ impl HistoryWindow {
             self.pressed = Some(control);
             self.keyboard_pressed = false;
             return WindowAction::Redraw;
-        }
-        if self.clear_confirmation {
-            return WindowAction::None;
         }
         if contains(self.layout.splitter, position) {
             self.last_click = None;
@@ -189,7 +162,7 @@ impl HistoryWindow {
         let Some(control) = self.pressed.take() else {
             return WindowAction::None;
         };
-        if self.layout.control(position, self.clear_confirmation) == Some(control) {
+        if self.layout.control(position) == Some(control) {
             self.control(control)
         } else {
             WindowAction::Redraw
@@ -261,16 +234,12 @@ impl HistoryWindow {
 
     /// 【截图历史】【鼠标移动】按 position 更新悬停和分隔宽度，只有状态变化才返回重绘，不增加空闲循环
     fn motion(&mut self, position: (f64, f64)) -> WindowAction {
-        let hovered = self.layout.control(position, self.clear_confirmation);
-        let splitter = !self.clear_confirmation && contains(self.layout.splitter, position);
+        let hovered = self.layout.control(position);
+        let splitter = contains(self.layout.splitter, position);
         let scrollbar = self
             .scrollbar()
             .is_some_and(|bar| contains(bar.track, position));
-        let row = if !self.clear_confirmation
-            && !splitter
-            && !scrollbar
-            && contains(self.layout.list, position)
-        {
+        let row = if !splitter && !scrollbar && contains(self.layout.list, position) {
             Some(
                 self.model.scroll
                     + ((position.1 - self.layout.list.y() as f64) / ROW as f64) as usize,
@@ -343,8 +312,7 @@ pub(super) fn event(state: &mut HistoryWindow, event: WindowEvent) -> WindowActi
             position,
             button: RIGHT_BUTTON,
             pressed: true,
-        } if !state.clear_confirmation
-            && state.pressed.is_none()
+        } if state.pressed.is_none()
             && state.splitter_drag.is_none()
             && state.scrollbar_drag.is_none() =>
         {
@@ -363,9 +331,7 @@ pub(super) fn event(state: &mut HistoryWindow, event: WindowEvent) -> WindowActi
                 WindowAction::None
             }
         }
-        WindowEvent::Scroll { position, delta }
-            if !state.clear_confirmation && contains(state.layout.list, position) =>
-        {
+        WindowEvent::Scroll { position, delta } if contains(state.layout.list, position) => {
             let step = (delta.1 / ROW as f64).round() as isize;
             let step = if step == 0 && delta.1 != 0.0 {
                 delta.1.signum() as isize

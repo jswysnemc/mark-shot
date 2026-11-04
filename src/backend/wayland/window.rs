@@ -1,9 +1,12 @@
 //! 【原生窗口】【接口】普通 xdg-toplevel 窗口与内容之间的事件契约
 
+mod dialog;
+mod dialog_protocol;
 mod input;
 mod protocol;
 mod runtime;
 mod shell;
+mod surface;
 mod text_input;
 mod wake;
 
@@ -12,6 +15,7 @@ use tiny_skia::Pixmap;
 use crate::keys::{Key, Mods};
 use crate::types::text_input::{ChangeCause, Edit, Focus, Snapshot};
 
+pub use dialog::WindowDialog;
 pub use runtime::run;
 pub use wake::WindowWake;
 
@@ -57,6 +61,22 @@ pub enum WindowEvent {
     PointerLeave,
 }
 
+impl WindowEvent {
+    /// 【原生窗口】【交互分类】返回本事件是否为模态时需隔离的用户输入；配置、焦点与后台唤醒不是交互，无参数
+    pub fn is_interaction(&self) -> bool {
+        matches!(
+            self,
+            Self::Key(_)
+                | Self::KeyRelease(_)
+                | Self::TextInput(_)
+                | Self::PointerMove { .. }
+                | Self::PointerButton { .. }
+                | Self::Scroll { .. }
+                | Self::PointerLeave
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum WindowAction {
     #[default]
@@ -78,6 +98,21 @@ pub enum WindowCursor {
 }
 
 pub trait WindowContent {
+    /// 【原生窗口】【对话框请求】取出一个待显示的独立模态子窗口；默认没有请求，无参数
+    fn take_dialog(&mut self) -> Option<WindowDialog> {
+        None
+    }
+
+    /// 【原生窗口】【对话框结果】接收 id 对应子窗口的 accepted 结果；默认不执行业务，无其他返回信息
+    fn dialog_closed(&mut self, _id: u64, _accepted: bool) -> WindowAction {
+        WindowAction::None
+    }
+
+    /// 【原生窗口】【确认结果】内容请求关闭时返回是否明确确认；窗口管理器关闭不使用此值，无参数
+    fn dialog_accepted(&self) -> bool {
+        false
+    }
+
     /// 【原生窗口】【输入目标】返回当前可编辑字段的稳定身份，菜单、原图或只读内容返回空值，无参数
     fn text_input_target(&self) -> Option<u64> {
         None

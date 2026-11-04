@@ -13,6 +13,7 @@ use wayland_protocols::wp::{
 };
 
 use super::runtime::NativeWindow;
+use super::surface::SurfaceId;
 
 impl ShmHandler for NativeWindow {
     /// 【原生窗口】【共享内存】返回当前连接使用的共享内存协议状态
@@ -45,13 +46,13 @@ impl Dispatch<wp_viewporter::WpViewporter, ()> for NativeWindow {
     }
 }
 
-impl Dispatch<wp_viewport::WpViewport, ()> for NativeWindow {
+impl Dispatch<wp_viewport::WpViewport, SurfaceId> for NativeWindow {
     /// 【原生窗口】【视区对象】视区大小随窗口配置更新；无服务器事件
     fn event(
         _: &mut Self,
         _: &wp_viewport::WpViewport,
         _: wp_viewport::Event,
-        _: &(),
+        _: &SurfaceId,
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
@@ -71,19 +72,21 @@ impl Dispatch<wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1, ()> fo
     }
 }
 
-impl Dispatch<wp_fractional_scale_v1::WpFractionalScaleV1, ()> for NativeWindow {
+impl Dispatch<wp_fractional_scale_v1::WpFractionalScaleV1, SurfaceId> for NativeWindow {
     /// 【原生窗口】【分数缩放】根据 event 的 120 分之一缩放值更新缓冲比例；不改变逻辑大小
     fn event(
         state: &mut Self,
         _: &wp_fractional_scale_v1::WpFractionalScaleV1,
         event: wp_fractional_scale_v1::Event,
-        _: &(),
+        id: &SurfaceId,
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        if let wp_fractional_scale_v1::Event::PreferredScale { scale } = event {
-            state.scale = (scale as f32 / 120.0).max(0.25);
-            state.dirty = true;
+        if let wp_fractional_scale_v1::Event::PreferredScale { scale } = event
+            && let Some(surface) = state.surface_mut(*id)
+        {
+            surface.scale = (scale as f32 / 120.0).max(0.25);
+            surface.dirty = true;
         }
     }
 }

@@ -1,45 +1,40 @@
-//! 【原生窗口】【运行时】共享内存双缓冲与无空转的事件循环
+//! 【原生窗口】【运行时】同连接管理父子窗口，共享分配器且保持无空转事件循环
 
 use smithay_client_toolkit::reexports::{
     calloop::{EventLoop, LoopHandle},
     calloop_wayland_source::WaylandSource,
 };
 use smithay_client_toolkit::{
-    compositor::{CompositorState, FrameCallbackData},
+    compositor::CompositorState,
     output::OutputState,
     registry::RegistryState,
     seat::{SeatState, pointer::cursor_shape::CursorShapeManager},
-    shell::{
-        WaylandSurface,
-        xdg::{
-            XdgShell,
-            window::{Window, WindowDecorations},
-        },
-    },
-    shm::{
-        Shm,
-        slot::{Buffer, SlotPool},
-    },
+    shell::xdg::XdgShell,
+    shm::{Shm, slot::SlotPool},
 };
-use tiny_skia::Pixmap;
 use wayland_client::{
-    Connection, QueueHandle,
+    Connection,
     globals::registry_queue_init,
-    protocol::{wl_keyboard, wl_pointer, wl_seat, wl_shm},
+    protocol::{wl_keyboard, wl_pointer, wl_seat},
 };
-use wayland_protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::WpCursorShapeDeviceV1;
 use wayland_protocols::{
     wp::{
-        fractional_scale::v1::client::{wp_fractional_scale_manager_v1, wp_fractional_scale_v1},
-        viewporter::client::{wp_viewport, wp_viewporter},
+        cursor_shape::v1::client::wp_cursor_shape_device_v1::WpCursorShapeDeviceV1,
+        fractional_scale::v1::client::wp_fractional_scale_manager_v1,
+        viewporter::client::wp_viewporter,
     },
-    xdg::shell::client::xdg_toplevel,
+    xdg::{dialog::v1::client::xdg_wm_dialog_v1, shell::client::xdg_toplevel},
 };
 
-use super::{WindowAction, WindowContent, WindowEvent, WindowSpec};
-use crate::backend::wayland::text_input::TextInput;
-use crate::features::text::input_method::focus::Target;
-use crate::{AppResult, keys::Mods};
+use super::{
+    WindowAction, WindowContent, WindowEvent, WindowSpec, WindowWake,
+    dialog::Dialog,
+    surface::{Surface, SurfaceId},
+};
+use crate::{
+    AppResult, backend::wayland::text_input::TextInput,
+    features::text::input_method::focus::Target, keys::Mods,
+};
 
 pub(super) struct NativeWindow {
     pub registry: RegistryState,
@@ -51,110 +46,101 @@ pub(super) struct NativeWindow {
     pub keyboard: Option<wl_keyboard::WlKeyboard>,
     pub pointer_seat: Option<wl_seat::WlSeat>,
     pub keyboard_seat: Option<wl_seat::WlSeat>,
+    pub keyboard_surface: Option<SurfaceId>,
+    pub text_surface: Option<SurfaceId>,
     pub text_input: TextInput,
     pub input_target: Target,
     pub enter_serial: u32,
     pub modifiers: Mods,
+    pub compositor: CompositorState,
+    pub shell: XdgShell,
+    pub viewporter: Option<wp_viewporter::WpViewporter>,
+    pub fractional_manager: Option<wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1>,
+    pub dialog_manager: Option<xdg_wm_dialog_v1::XdgWmDialogV1>,
     pub shm: Shm,
     pub pool: SlotPool,
-    pub buffers: Vec<Buffer>,
-    pub canvas: Option<Pixmap>,
-    pub window: Window,
-    pub viewport: Option<wp_viewport::WpViewport>,
-    pub fractional: Option<wp_fractional_scale_v1::WpFractionalScaleV1>,
+    pub main: Surface,
+    pub dialog: Option<Dialog>,
     pub content: Box<dyn WindowContent>,
-    pub size: (u32, u32),
-    pub scale: f32,
-    pub dirty: bool,
-    pub configured: bool,
-    pub mapped: bool,
-    pub frame_pending: bool,
+    pub wake: WindowWake,
     pub exit: bool,
     pub loop_handle: LoopHandle<'static, Self>,
 }
 
 impl NativeWindow {
-    /// 【原生窗口】【事件处理】把 event 交给内容并执行返回动作；serial 仅用于有效鼠标按下请求
+    /// 【原生窗口】【父窗口事件】将 event 路由到父内容，serial 仅用于有效鼠标按下操作，无返回值
     pub fn dispatch(&mut self, event: WindowEvent, serial: Option<u32>) {
-        match self.content.event(event) {
+        self.dispatch_to(SurfaceId::Main, event, serial);
+    }
+
+    /// 【原生窗口】【独立事件】按 id 路由 event 和 serial，模态时过滤父窗口输入，过期身份不影响新窗口，无返回值
+    pub fn dispatch_to(&mut self, id: SurfaceId, event: WindowEvent, serial: Option<u32>) {
+        if id == SurfaceId::Main && self.dialog.is_some() && event.is_interaction() {
+            return;
+        }
+        let action = match id {
+            SurfaceId::Main => self.content.event(event),
+            SurfaceId::Dialog(id) => {
+                let Some(dialog) = self.dialog.as_mut().filter(|dialog| dialog.id == id) else {
+                    return;
+                };
+                dialog.content.event(event)
+            }
+        };
+        self.apply(id, action, serial);
+        self.reconcile_text_input();
+    }
+
+    /// 【原生窗口】【动作执行】执行 id 内容返回的 action，关闭子窗口只回传结果；serial 限制移动和调整请求，无返回值
+    pub fn apply(&mut self, id: SurfaceId, action: WindowAction, serial: Option<u32>) {
+        match action {
             WindowAction::None => {}
-            WindowAction::Redraw => self.dirty = true,
-            WindowAction::Close => self.exit = true,
-            WindowAction::Move | WindowAction::Resize if serial.is_none() => {}
-            action => {
-                if let (Some(seat), Some(serial)) = (&self.pointer_seat, serial) {
+            WindowAction::Redraw => {
+                if let Some(surface) = self.surface_mut(id) {
+                    surface.dirty = true;
+                }
+            }
+            WindowAction::Close => match id {
+                SurfaceId::Main => self.exit = true,
+                SurfaceId::Dialog(id) => {
+                    let accepted = self
+                        .dialog
+                        .as_ref()
+                        .filter(|dialog| dialog.id == id)
+                        .is_some_and(|dialog| dialog.content.dialog_accepted());
+                    self.finish_dialog(id, accepted);
+                }
+            },
+            WindowAction::Move | WindowAction::Resize => {
+                if let (Some(seat), Some(serial), Some(surface)) =
+                    (&self.pointer_seat, serial, self.surface(id))
+                {
                     if action == WindowAction::Move {
-                        self.window.move_(seat, serial);
+                        surface.window.move_(seat, serial);
                     } else {
-                        self.window
+                        surface
+                            .window
                             .resize(seat, serial, xdg_toplevel::ResizeEdge::BottomRight);
                     }
                 }
             }
         }
-        self.reconcile_text_input();
     }
 
-    /// 【原生窗口】【帧提交】按当前大小绘制一帧并请求帧回调；缓冲未释放时等待后续事件
-    fn render(&mut self, qh: &QueueHandle<Self>) -> AppResult {
-        let width = (self.size.0 as f32 * self.scale).ceil() as i32;
-        let height = (self.size.1 as f32 * self.scale).ceil() as i32;
-        let pixels = i64::from(width) * i64::from(height);
-        if width <= 0 || height <= 0 || pixels > 64 * 1024 * 1024 {
-            return Err("window buffer dimensions exceed the supported limit".into());
+    /// 【原生窗口】【只读表面】按 id 查询存活表面，过期子窗口返回空值，不回退到父窗口
+    pub fn surface(&self, id: SurfaceId) -> Option<&Surface> {
+        match id {
+            SurfaceId::Main => Some(&self.main),
+            SurfaceId::Dialog(id) => self
+                .dialog
+                .as_ref()
+                .filter(|dialog| dialog.id == id)
+                .map(|dialog| &dialog.surface),
         }
-        let fresh = self.canvas.as_ref().is_none_or(|canvas| {
-            canvas.width() != width as u32 || canvas.height() != height as u32
-        });
-        if fresh {
-            self.canvas = Pixmap::new(width as u32, height as u32);
-            self.buffers
-                .retain(|buffer| buffer.height() == height && buffer.stride() == width * 4);
-        }
-        let canvas = self
-            .canvas
-            .as_mut()
-            .ok_or("cannot allocate a window canvas")?;
-        self.content.draw(canvas, self.scale);
-
-        let available = self
-            .buffers
-            .iter()
-            .position(|buffer| buffer.canvas(&mut self.pool).is_some());
-        let index = if let Some(index) = available {
-            index
-        } else {
-            if self.buffers.len() >= 3 {
-                return Ok(());
-            }
-            let (buffer, _) =
-                self.pool
-                    .create_buffer(width, height, width * 4, wl_shm::Format::Argb8888)?;
-            self.buffers.push(buffer);
-            self.buffers.len() - 1
-        };
-        let buffer = &self.buffers[index];
-        let bytes = buffer
-            .canvas(&mut self.pool)
-            .ok_or("window buffer is still active")?;
-        crate::utils::copy_swizzled(bytes, canvas.data());
-        buffer.attach_to(self.window.wl_surface())?;
-        self.window.wl_surface().damage_buffer(0, 0, width, height);
-        self.window
-            .wl_surface()
-            .frame(qh, FrameCallbackData(self.window.wl_surface().clone()));
-        self.window.commit();
-        if !self.mapped {
-            self.content.mapped();
-            self.mapped = true;
-        }
-        self.frame_pending = true;
-        self.dirty = false;
-        Ok(())
     }
 }
 
-/// 【原生窗口】【启动】创建 spec 指定的普通窗口并运行 content；空闲时阻塞，关闭时释放全部窗口资源
+/// 【原生窗口】【启动】创建 spec 指定的父窗口并运行 content，子窗口保持同连接；返回连接或提交错误，空闲阻塞
 pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppResult {
     let connection = Connection::connect_to_env()?;
     let (globals, queue) = registry_queue_init(&connection)?;
@@ -168,9 +154,12 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         .handle()
         .insert_source(source, |(), &mut (), state| {
             state.dispatch(WindowEvent::Wake, None);
+            if let Some(id) = state.dialog.as_ref().map(|dialog| dialog.id) {
+                state.dispatch_to(SurfaceId::Dialog(id), WindowEvent::Wake, None);
+            }
         })
         .map_err(|error| error.error)?;
-    content.connected(wake);
+    content.connected(wake.clone());
     let compositor = CompositorState::bind(&globals, &qh)?;
     let shell = XdgShell::bind(&globals, &qh)?;
     let shm = Shm::bind(&globals, &qh)?;
@@ -181,24 +170,22 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
     let fractional_manager = globals
         .bind::<wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1, _, _>(&qh, 1..=1, ())
         .ok();
-    let window = shell.create_window(
-        compositor.create_surface(&qh),
-        WindowDecorations::ClientOnly,
+    let dialog_manager = globals
+        .bind::<xdg_wm_dialog_v1::XdgWmDialogV1, _, _>(&qh, 1..=1, ())
+        .ok();
+    let main = Surface::new(
+        spec,
+        SurfaceId::Main,
+        &compositor,
+        &shell,
+        viewporter.as_ref(),
+        fractional_manager.as_ref(),
         &qh,
     );
-    window.set_title(spec.title);
-    window.set_app_id(spec.app_id);
-    window.set_min_size(Some(spec.minimum));
-    let viewport = viewporter.map(|manager| manager.get_viewport(window.wl_surface(), &qh, ()));
-    let fractional = viewport.as_ref().and_then(|_| {
-        fractional_manager.map(|manager| manager.get_fractional_scale(window.wl_surface(), &qh, ()))
-    });
-    window.commit();
+    use smithay_client_toolkit::shell::WaylandSurface;
+    main.window.commit();
     let mut text_input = TextInput::default();
-    text_input.manager = globals
-        .bind::<wayland_protocols::wp::text_input::zv3::client::zwp_text_input_manager_v3::ZwpTextInputManagerV3, _, _>(&qh, 1..=1, ())
-        .ok();
-
+    text_input.manager = globals.bind::<wayland_protocols::wp::text_input::zv3::client::zwp_text_input_manager_v3::ZwpTextInputManagerV3, _, _>(&qh, 1..=1, ()).ok();
     let mut state = NativeWindow {
         registry: RegistryState::new(&globals),
         outputs: OutputState::new(&globals, &qh),
@@ -209,36 +196,42 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         keyboard: None,
         pointer_seat: None,
         keyboard_seat: None,
+        keyboard_surface: None,
+        text_surface: None,
         text_input,
         input_target: Target::default(),
         enter_serial: 0,
         modifiers: Mods::default(),
+        compositor,
+        shell,
+        viewporter,
+        fractional_manager,
+        dialog_manager,
         shm,
         pool,
-        buffers: Vec::new(),
-        canvas: None,
-        window,
-        viewport,
-        fractional,
+        main,
+        dialog: None,
         content: Box::new(content),
-        size: spec.size,
-        scale: 1.0,
-        dirty: true,
-        configured: false,
-        mapped: false,
-        frame_pending: false,
+        wake,
         exit: false,
         loop_handle: event_loop.handle(),
     };
     while !state.exit {
-        if state.configured && state.dirty && !state.frame_pending {
-            state.render(&qh)?;
+        state.sync_dialog(&qh);
+        state
+            .main
+            .render(state.content.as_mut(), &mut state.pool, &qh)?;
+        if let Some(dialog) = &mut state.dialog {
+            dialog
+                .surface
+                .render(dialog.content.as_mut(), &mut state.pool, &qh)?;
         }
         state.sync_text_input();
         connection.flush()?;
         event_loop.dispatch(None, &mut state)?;
     }
-    // 1. 【原生窗口】【关闭交接】嵌套窗口不会退出进程，先析构表面再发送销毁请求
+    // 1. 【原生窗口】【关闭交接】先关闭所属子窗口，再析构父表面，最后发送销毁请求
+    state.dialog.take();
     drop(state);
     connection.flush()?;
     Ok(())

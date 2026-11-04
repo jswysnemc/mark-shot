@@ -93,7 +93,7 @@ fn qt_history_right_click_selects_a_record_without_editing() {
     );
     assert_eq!(state.model.selected.as_deref(), Some(name.as_str()));
 }
-/// 【截图历史测试】【清空确认】默认 Enter 取消，确认弹层不允许点击底层复制按钮
+/// 【截图历史测试】【清空确认】子窗口默认 Enter 取消，父窗口输入不能穿透独立确认，无参数、无返回值
 #[test]
 fn clear_confirmation_defaults_to_cancel_and_blocks_click_through() {
     let (mut state, _directory) = state();
@@ -107,15 +107,25 @@ fn clear_confirmation_defaults_to_cancel_and_blocks_click_through() {
         search: String::new(),
     }]);
     state.control(Control::Clear);
-    assert!(state.clear_confirmation);
+    let mut dialog = state.take_dialog().unwrap();
+    assert_eq!(state.clear_dialog, Some(dialog.id));
     state.event(WindowEvent::PointerButton {
         position: (30.0, 410.0),
         button: LEFT_BUTTON,
         pressed: true,
     });
-    assert!(state.clear_confirmation);
-    state.event(key(Key::Enter, Mods::default()));
-    assert!(!state.clear_confirmation);
+    assert_eq!(state.clear_dialog, Some(dialog.id));
+    assert_eq!(
+        state.event(key(Key::Enter, Mods::default())),
+        WindowAction::None
+    );
+    assert_eq!(
+        dialog.content.event(key(Key::Enter, Mods::default())),
+        WindowAction::Close
+    );
+    assert!(!dialog.content.dialog_accepted());
+    state.dialog_closed(dialog.id, false);
+    assert!(state.clear_dialog.is_none());
     assert!(!state.store.directory().exists());
 }
 /// 【截图历史测试】【取消窗口】没有额外搜索或数量事务，Escape 直接关闭且不创建存储，无参数、无返回值
@@ -127,6 +137,76 @@ fn escape_closes_without_extra_field_transactions() {
         WindowAction::Close
     );
     assert!(!state.store.directory().exists());
+}
+
+/// 【截图历史测试】【独立确认】清空按钮必须请求独立模态子窗口，父窗口 Enter 不得取消或确认，无参数、无返回值
+#[test]
+fn clear_requests_a_separate_window_and_keeps_parent_input_blocked() {
+    let (mut state, _directory) = state();
+    records(&mut state, 1);
+    state.control(Control::Clear);
+    let dialog = state
+        .take_dialog()
+        .expect("Clear History still renders an in-window confirmation layer");
+    assert_eq!(dialog.spec.title, "Clear History");
+    assert_eq!(dialog.spec.size, (315, 96));
+    assert!(state.take_dialog().is_none());
+    assert_eq!(
+        state.event(key(Key::Enter, Mods::default())),
+        WindowAction::None
+    );
+    assert!(!state.jobs.foreground());
+    assert_eq!(state.model.entries.len(), 1);
+}
+
+/// 【截图历史测试】【过期结果】旧对话框确认不能关闭或清空新对话框，取消保持文件不变，无参数、无返回值
+#[test]
+fn stale_dialog_result_cannot_clear_a_new_dialog() {
+    let (mut state, _directory) = state();
+    records(&mut state, 2);
+    state.jobs.connect(WindowWake::detached().unwrap());
+    state.control(Control::Clear);
+    let first = state.take_dialog().unwrap();
+    state.dialog_closed(first.id, false);
+    state.control(Control::Clear);
+    let second = state.take_dialog().unwrap();
+    assert_ne!(first.id, second.id);
+    assert_eq!(state.dialog_closed(first.id, true), WindowAction::None);
+    assert_eq!(state.clear_dialog, Some(second.id));
+    assert!(!state.jobs.foreground());
+    state.dialog_closed(second.id, false);
+    assert_eq!(state.store.entries().unwrap().len(), 2);
+}
+
+/// 【截图历史测试】【确认一次】明确确认才提交清空，重复结果不重复提交，工作结束后回收线程，无参数、无返回值
+#[test]
+fn accepted_dialog_submits_one_clear_job() {
+    let (mut state, _directory) = state();
+    records(&mut state, 2);
+    state.jobs.connect(WindowWake::detached().unwrap());
+    state.control(Control::Clear);
+    let dialog = state.take_dialog().unwrap();
+    assert_eq!(state.store.entries().unwrap().len(), 2);
+    assert_eq!(state.dialog_closed(dialog.id, true), WindowAction::Redraw);
+    assert_eq!(state.dialog_closed(dialog.id, true), WindowAction::None);
+    assert!(state.clear_dialog.is_none());
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    loop {
+        if let Some(response) = state.jobs.take() {
+            assert!(matches!(
+                response,
+                Response::Done {
+                    label: "Clear",
+                    result: Ok(())
+                }
+            ));
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::sleep(std::time::Duration::from_millis(2));
+    }
+    assert_eq!(state.store.entries().unwrap().len(), 0);
+    assert!(!state.jobs.foreground());
 }
 
 /// 【截图历史测试】【鼠标构造】按 position 和 pressed 创建左键事件，返回事件，不发送真实桌面输入

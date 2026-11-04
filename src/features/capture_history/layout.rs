@@ -15,8 +15,6 @@ pub(super) enum Control {
     Save,
     Delete,
     Clear,
-    ConfirmCancel,
-    ConfirmClear,
 }
 
 impl Control {
@@ -31,8 +29,6 @@ impl Control {
             Self::Save => "Save As",
             Self::Delete => "Delete",
             Self::Clear => "Clear History",
-            Self::ConfirmCancel => "Cancel",
-            Self::ConfirmClear => "Clear History",
         }
     }
 }
@@ -45,8 +41,6 @@ pub(super) struct Layout {
     pub preview: Rect,
     pub splitter: Rect,
     pub buttons: Vec<(Control, Rect)>,
-    pub confirm: Rect,
-    pub confirm_buttons: [(Control, Rect); 2],
 }
 
 /// 【截图历史】【布局矩形】返回 x、y、width、height 的区域；调用方保证正尺寸
@@ -109,9 +103,6 @@ impl Layout {
             buttons.push((control, rect(x, 46.0, button_width, 30.0)));
             x += button_width + 4.0;
         }
-        let cw = (width - 32.0).min(420.0);
-        let cx = (width - cw) * 0.5;
-        let cy = (height - 152.0) * 0.5;
         Self {
             size: (width, height),
             summary: rect(12.0, 10.0, width - 62.0, 30.0),
@@ -127,28 +118,12 @@ impl Layout {
             preview,
             splitter,
             buttons,
-            confirm: rect(cx, cy, cw, 152.0),
-            confirm_buttons: [
-                (
-                    Control::ConfirmCancel,
-                    rect(cx + cw - 160.0, cy + 110.0, 68.0, 28.0),
-                ),
-                (
-                    Control::ConfirmClear,
-                    rect(cx + cw - 84.0, cy + 110.0, 72.0, 28.0),
-                ),
-            ],
         }
     }
 
-    /// 【截图历史】【控件命中】查找 position 对应控件；清空确认弹层独占操作区域
-    pub fn control(&self, position: (f64, f64), confirmation: bool) -> Option<Control> {
-        let buttons = if confirmation {
-            self.confirm_buttons.as_slice()
-        } else {
-            &self.buttons
-        };
-        buttons
+    /// 【截图历史】【控件命中】查找 position 对应父窗口控件，不包含独立对话框区域
+    pub fn control(&self, position: (f64, f64)) -> Option<Control> {
+        self.buttons
             .iter()
             .find(|(_, rect)| contains(*rect, position))
             .map(|(control, _)| *control)

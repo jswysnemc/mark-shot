@@ -21,7 +21,7 @@ pub(super) const MUTED: Rgba = Rgba(148, 163, 184, 255);
 pub(super) const BORDER: Rgba = Rgba(51, 65, 85, 255);
 pub(super) const HOVER: Rgba = Rgba(30, 41, 59, 255);
 pub(super) const SELECTED: Rgba = Rgba(23, 57, 54, 255);
-const ACCENT: Rgba = Rgba(94, 234, 212, 255);
+pub(super) const ACCENT: Rgba = Rgba(94, 234, 212, 255);
 const CLEAR: &str = include_str!("../../../assets/icons/mark-shot/clear.svg");
 
 /// 【截图历史】【图标缓存】只解析历史窗口使用的原版图标，返回矢量缓存，不加载全部标注工具

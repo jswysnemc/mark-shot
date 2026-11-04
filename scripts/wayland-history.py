@@ -165,10 +165,10 @@ def settings_and_clear(binary, environment, config, history, item, saved, artifa
     actions.footer(item, "delete")
     checks.wait_count(history, retained + 1)
     session.screenshot(artifacts / "clear-confirmation.png")
-    panel_width = min(item["size"][0] - 32, 420)
-    panel_x = (item["size"][0] - panel_width) / 2
-    panel_y = (item["size"][1] - 152) / 2
-    session.click(item, panel_x + panel_width - 48, panel_y + 124)
+    dialog = actions.window("mark-shot-history-clear", pid=item["pid"])
+    reference = json.loads((Path(__file__).resolve().parents[1] / "tests/fixtures/qt-history-dialog.json").read_text())
+    x, y, width, height = reference["layout"]["buttons"][1]["rect"]
+    session.click(dialog, x + width / 2, y + height / 2)
     checks.wait_count(history, 0)
     if not unrelated.exists() or not linked.is_symlink() or broken.exists() or not saved.exists():
         raise AssertionError("Clear crossed the owned-file boundary")

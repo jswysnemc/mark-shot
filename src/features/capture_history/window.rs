@@ -10,7 +10,8 @@ use super::{
 use crate::{
     AppResult,
     backend::wayland::window::{
-        self, WindowAction, WindowContent, WindowCursor, WindowEvent, WindowSpec, WindowWake,
+        self, WindowAction, WindowContent, WindowCursor, WindowDialog, WindowEvent, WindowSpec,
+        WindowWake,
     },
     config::history::History,
     ui::file_picker::{self, Picker},
@@ -39,8 +40,8 @@ pub(super) struct HistoryWindow {
     pub focused: bool,
     pub hovered: Option<Control>,
     pub status: Option<String>,
-    pub clear_confirmation: bool,
-    pub confirm_clear: bool,
+    pub clear_dialog: Option<u64>,
+    pub clear_dialog_pending: bool,
     pub picker: Option<Picker>,
     pub save_snapshot: Option<Arc<Vec<u8>>>,
     pub left_width: f32,
@@ -78,8 +79,8 @@ impl HistoryWindow {
             focused: true,
             hovered: None,
             status: None,
-            clear_confirmation: false,
-            confirm_clear: false,
+            clear_dialog: None,
+            clear_dialog_pending: false,
             picker: None,
             save_snapshot: None,
             left_width: 210.0,
@@ -331,6 +332,27 @@ impl HistoryWindow {
 }
 
 impl WindowContent for HistoryWindow {
+    /// 【截图历史】【独立确认请求】取出本次待显示的子窗口，重复调用不创建第二个窗口，无参数
+    fn take_dialog(&mut self) -> Option<WindowDialog> {
+        if !std::mem::take(&mut self.clear_dialog_pending) {
+            return None;
+        }
+        self.clear_dialog.map(super::clear_dialog::request)
+    }
+
+    /// 【截图历史】【确认回传】只接受当前 id 的 accepted 结果，确认后才请求后台清空；取消不读取或删除文件，返回重绘
+    fn dialog_closed(&mut self, id: u64, accepted: bool) -> WindowAction {
+        if self.clear_dialog != Some(id) {
+            return WindowAction::None;
+        }
+        self.clear_dialog = None;
+        self.clear_dialog_pending = false;
+        if accepted {
+            self.request(Task::Clear);
+        }
+        WindowAction::Redraw
+    }
+
     /// 【截图历史】【窗口连接】接入 wake 后开始按需列表读取；普通截图不创建此状态
     fn connected(&mut self, wake: WindowWake) {
         self.jobs.connect(wake);
@@ -353,6 +375,9 @@ impl WindowContent for HistoryWindow {
     }
     /// 【截图历史】【窗口事件】处理 event；返回重绘、关闭或窗口管理动作
     fn event(&mut self, event: WindowEvent) -> WindowAction {
+        if self.clear_dialog.is_some() && event.is_interaction() {
+            return WindowAction::None;
+        }
         match event {
             WindowEvent::Wake => self.completed(),
             WindowEvent::Resize { size } => {
@@ -392,7 +417,7 @@ impl WindowContent for HistoryWindow {
             } else {
                 WindowCursor::Default
             }
-        } else if self.clear_confirmation {
+        } else if self.clear_dialog.is_some() {
             WindowCursor::Default
         } else if self.splitter_drag.is_some() {
             WindowCursor::HorizontalResize
@@ -404,7 +429,7 @@ impl WindowContent for HistoryWindow {
             WindowCursor::HorizontalResize
         } else if self
             .layout
-            .control(position, false)
+            .control(position)
             .is_some_and(|control| control != Control::Enabled)
         {
             WindowCursor::Pointer

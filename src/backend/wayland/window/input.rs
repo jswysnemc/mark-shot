@@ -11,15 +11,20 @@ use wayland_client::{
 };
 use wayland_protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape;
 
+use super::surface::SurfaceId;
 use super::{KeyInput, WindowCursor, WindowEvent, runtime::NativeWindow};
 use crate::{backend::wayland::keysym, keys::Mods};
 
 impl NativeWindow {
     /// 【原生窗口】【按键转换】将 event 的键名、文字与修饰键发送给内容；不替内容执行快捷键
     fn key_event(&mut self, event: KeyEvent) {
+        let Some(id) = self.keyboard_surface else {
+            return;
+        };
         let key =
             keysym::chord(event.keysym, event.raw_code, self.modifiers).map(|chord| chord.key);
-        self.dispatch(
+        self.dispatch_to(
+            id,
             WindowEvent::Key(KeyInput {
                 key,
                 text: event.utf8.unwrap_or_default(),
@@ -30,9 +35,15 @@ impl NativeWindow {
     }
 
     /// 【原生窗口】【鼠标形状】按 position 对应内容更新指针；无形状协议时保持合成器默认值
-    fn update_cursor(&self, position: (f64, f64)) {
+    fn update_cursor(&self, id: SurfaceId, position: (f64, f64)) {
         if let Some(cursor) = &self.cursor {
-            let shape = match self.content.cursor(position) {
+            let kind = if id == SurfaceId::Main && self.dialog.is_some() {
+                WindowCursor::Default
+            } else {
+                self.content_for(id)
+                    .map_or(WindowCursor::Default, |content| content.cursor(position))
+            };
+            let shape = match kind {
                 WindowCursor::Default => Shape::Default,
                 WindowCursor::Text => Shape::Text,
                 WindowCursor::Pointer => Shape::Pointer,
@@ -54,22 +65,23 @@ impl PointerHandler for NativeWindow {
         events: &[PointerEvent],
     ) {
         for event in events {
-            if &event.surface != self.window.wl_surface() {
+            let Some(id) = self.surface_id(&event.surface) else {
                 continue;
-            }
+            };
             let position = event.position;
             match event.kind {
                 PointerEventKind::Enter { serial } => {
                     self.enter_serial = serial;
-                    self.update_cursor(position);
-                    self.dispatch(WindowEvent::PointerMove { position }, None);
+                    self.update_cursor(id, position);
+                    self.dispatch_to(id, WindowEvent::PointerMove { position }, None);
                 }
                 PointerEventKind::Motion { .. } => {
-                    self.update_cursor(position);
-                    self.dispatch(WindowEvent::PointerMove { position }, None);
+                    self.update_cursor(id, position);
+                    self.dispatch_to(id, WindowEvent::PointerMove { position }, None);
                 }
                 PointerEventKind::Press { button, serial, .. } => {
-                    self.dispatch(
+                    self.dispatch_to(
+                        id,
                         WindowEvent::PointerButton {
                             position,
                             button,
@@ -79,7 +91,8 @@ impl PointerHandler for NativeWindow {
                     );
                 }
                 PointerEventKind::Release { button, .. } => {
-                    self.dispatch(
+                    self.dispatch_to(
+                        id,
                         WindowEvent::PointerButton {
                             position,
                             button,
@@ -93,7 +106,8 @@ impl PointerHandler for NativeWindow {
                     vertical,
                     ..
                 } => {
-                    self.dispatch(
+                    self.dispatch_to(
+                        id,
                         WindowEvent::Scroll {
                             position,
                             delta: (horizontal.absolute, vertical.absolute),
@@ -101,13 +115,13 @@ impl PointerHandler for NativeWindow {
                         None,
                     );
                 }
-                PointerEventKind::Leave { .. } => self.dispatch(WindowEvent::PointerLeave, None),
+                PointerEventKind::Leave { .. } => {
+                    self.dispatch_to(id, WindowEvent::PointerLeave, None)
+                }
             }
         }
     }
 }
-
-use smithay_client_toolkit::shell::WaylandSurface;
 
 impl KeyboardHandler for NativeWindow {
     /// 【原生窗口】【按键按下】转换 event 并交给内容处理
@@ -154,12 +168,16 @@ impl KeyboardHandler for NativeWindow {
         _: &Connection,
         _: &QueueHandle<Self>,
         _: &wl_keyboard::WlKeyboard,
-        _: &wl_surface::WlSurface,
+        surface: &wl_surface::WlSurface,
         _: u32,
         _: &[u32],
         _: &[Keysym],
     ) {
-        self.dispatch(WindowEvent::Focused(true), None);
+        let Some(id) = self.surface_id(surface) else {
+            return;
+        };
+        self.keyboard_surface = Some(id);
+        self.dispatch_to(id, WindowEvent::Focused(true), None);
     }
 
     /// 【原生窗口】【失去焦点】清除修饰键并通知内容；保留编辑历史
@@ -168,11 +186,16 @@ impl KeyboardHandler for NativeWindow {
         _: &Connection,
         _: &QueueHandle<Self>,
         _: &wl_keyboard::WlKeyboard,
-        _: &wl_surface::WlSurface,
+        surface: &wl_surface::WlSurface,
         _: u32,
     ) {
         self.modifiers = Mods::default();
-        self.dispatch(WindowEvent::Focused(false), None);
+        if let Some(id) = self.surface_id(surface) {
+            if self.keyboard_surface == Some(id) {
+                self.keyboard_surface = None;
+            }
+            self.dispatch_to(id, WindowEvent::Focused(false), None);
+        }
     }
 
     /// 【原生窗口】【按键释放】把 event 的释放交给内容，文字编辑默认忽略，按钮可在释放时执行，无返回值
@@ -184,9 +207,13 @@ impl KeyboardHandler for NativeWindow {
         _: u32,
         event: KeyEvent,
     ) {
+        let Some(id) = self.keyboard_surface else {
+            return;
+        };
         let key =
             keysym::chord(event.keysym, event.raw_code, self.modifiers).map(|chord| chord.key);
-        self.dispatch(
+        self.dispatch_to(
+            id,
             WindowEvent::KeyRelease(KeyInput {
                 key,
                 text: String::new(),
@@ -282,6 +309,9 @@ impl SeatHandler for NativeWindow {
                     keyboard.release();
                 }
                 self.keyboard_seat = None;
+                if let Some(id) = self.keyboard_surface.take() {
+                    self.dispatch_to(id, WindowEvent::Focused(false), None);
+                }
                 self.modifiers = Mods::default();
             }
             _ => {}

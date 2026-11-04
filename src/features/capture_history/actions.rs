@@ -8,7 +8,7 @@ use crate::{
 impl HistoryWindow {
     /// 【截图历史】【操作资格】返回 control 是否可用；图像操作等待真实预览，空历史不能请求清空
     pub fn enabled(&self, control: Control) -> bool {
-        if matches!(control, Control::Close | Control::ConfirmCancel) {
+        if control == Control::Close {
             return true;
         }
         if self.jobs.foreground() {
@@ -26,6 +26,9 @@ impl HistoryWindow {
 
     /// 【截图历史】【控件动作】执行 control；当前选择捕获为任务身份，清空必须先确认
     pub fn control(&mut self, control: Control) -> WindowAction {
+        if self.clear_dialog.is_some() {
+            return WindowAction::None;
+        }
         self.splitter_drag = None;
         self.scrollbar_drag = None;
         self.pressed = None;
@@ -58,17 +61,12 @@ impl HistoryWindow {
                 None => return WindowAction::None,
             },
             Control::Clear => {
-                self.clear_confirmation = true;
-                self.confirm_clear = false;
+                self.clear_dialog = Some(crate::features::text::input_method::focus::identity());
+                self.clear_dialog_pending = true;
+                self.last_click = None;
+                self.hovered = None;
+                self.hovered_row = None;
                 return WindowAction::Redraw;
-            }
-            Control::ConfirmCancel => {
-                self.clear_confirmation = false;
-                return WindowAction::Redraw;
-            }
-            Control::ConfirmClear => {
-                self.clear_confirmation = false;
-                Task::Clear
             }
         };
         self.request(task);

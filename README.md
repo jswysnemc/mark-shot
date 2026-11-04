@@ -82,6 +82,7 @@ index_annotations = false
 历史窗口默认 800×520、最小 440×320，始终保持水平列表与预览，分隔条可拖动。
 右键列表只选择记录，右键按钮不执行操作；按钮在左键或 Space 释放时执行，Enter
 不代替按钮点击。实测参考及未完成差异见 `docs/history-window-reference.md`。
+清空采用同进程独立模态窗口，默认取消；详细边界见 `docs/history-clear-dialog.md`。
 
 ## 标记与测量
 

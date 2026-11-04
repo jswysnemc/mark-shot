@@ -20,8 +20,12 @@ use super::{WindowEvent, runtime::NativeWindow};
 
 impl WindowHandler for NativeWindow {
     /// 【原生窗口】【关闭请求】响应合成器对 window 的关闭请求；设置退出状态
-    fn request_close(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &Window) {
-        self.exit = true;
+    fn request_close(&mut self, _: &Connection, _: &QueueHandle<Self>, window: &Window) {
+        match self.surface_id(window.wl_surface()) {
+            Some(super::surface::SurfaceId::Main) => self.exit = true,
+            Some(super::surface::SurfaceId::Dialog(id)) => self.finish_dialog(id, false),
+            None => {}
+        }
     }
 
     /// 【原生窗口】【窗口配置】应用 configure 的大小与边界；通知内容并安排重绘
@@ -29,31 +33,39 @@ impl WindowHandler for NativeWindow {
         &mut self,
         _: &Connection,
         _: &QueueHandle<Self>,
-        _: &Window,
+        window: &Window,
         configure: WindowConfigure,
         _: u32,
     ) {
-        let bounds = configure.suggested_bounds.unwrap_or(self.size);
-        self.size = (
+        let Some(id) = self.surface_id(window.wl_surface()) else {
+            return;
+        };
+        let Some(surface) = self.surface_mut(id) else {
+            return;
+        };
+        let bounds = configure.suggested_bounds.unwrap_or(surface.size);
+        surface.size = (
             configure
                 .new_size
                 .0
-                .map_or(self.size.0.min(bounds.0), |width| width.get())
+                .map_or(surface.size.0.min(bounds.0), |width| width.get())
                 .max(1),
             configure
                 .new_size
                 .1
-                .map_or(self.size.1.min(bounds.1), |height| height.get())
+                .map_or(surface.size.1.min(bounds.1), |height| height.get())
                 .max(1),
         );
-        if let Some(viewport) = &self.viewport {
-            viewport.set_destination(self.size.0 as i32, self.size.1 as i32);
+        if let Some(viewport) = &surface.viewport {
+            viewport.set_destination(surface.size.0 as i32, surface.size.1 as i32);
         }
-        self.window
-            .set_window_geometry(0, 0, self.size.0, self.size.1);
-        self.configured = true;
-        self.dirty = true;
-        self.dispatch(WindowEvent::Resize { size: self.size }, None);
+        surface
+            .window
+            .set_window_geometry(0, 0, surface.size.0, surface.size.1);
+        surface.configured = true;
+        surface.dirty = true;
+        let size = surface.size;
+        self.dispatch_to(id, WindowEvent::Resize { size }, None);
     }
 }
 
@@ -66,12 +78,15 @@ impl CompositorHandler for NativeWindow {
         surface: &wl_surface::WlSurface,
         factor: i32,
     ) {
-        if surface == self.window.wl_surface() && self.fractional.is_none() {
-            self.scale = factor.max(1) as f32;
-            if self.viewport.is_none() {
+        if let Some(id) = self.surface_id(surface)
+            && let Some(state) = self.surface_mut(id)
+            && state.fractional.is_none()
+        {
+            state.scale = factor.max(1) as f32;
+            if state.viewport.is_none() {
                 surface.set_buffer_scale(factor.max(1));
             }
-            self.dirty = true;
+            state.dirty = true;
         }
     }
 
@@ -93,8 +108,10 @@ impl CompositorHandler for NativeWindow {
         surface: &wl_surface::WlSurface,
         _: u32,
     ) {
-        if surface == self.window.wl_surface() {
-            self.frame_pending = false;
+        if let Some(id) = self.surface_id(surface)
+            && let Some(state) = self.surface_mut(id)
+        {
+            state.frame_pending = false;
         }
     }
 

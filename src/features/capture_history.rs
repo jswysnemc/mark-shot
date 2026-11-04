@@ -2,6 +2,8 @@
 
 mod actions;
 mod chrome;
+mod clear_dialog;
+mod clear_dialog_draw;
 mod draw;
 pub mod identity;
 mod input;
