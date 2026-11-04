@@ -28,6 +28,12 @@ SOURCE_MENU_FLAGS = (
     "clipboard_after_popup_destruction", "copy_cut_paste_delete_undo_redo_select_all",
     "disabled_and_mnemonic_navigation", "outside_click_not_forwarded", "no_idle_frames", "no_ocr",
 )
+CONTROL_GROUPS = {"niri-controls", "sway-controls"}
+CONTROL_FLAGS = (
+    "pointer_release_delivery", "outside_release_canceled", "right_focus_without_activation",
+    "return_not_default", "modified_space_release_delivery", "modified_escape_ignored",
+    "close_release_delivery", "persistent_clipboard", "no_ocr",
+)
 
 
 def require(condition, message):
@@ -125,4 +131,16 @@ class ReleaseManifest:
                 require(result.get("qt_menu_size") == [225, 229], "source menu geometry differs from Qt")
                 for key in SOURCE_MENU_FLAGS:
                     require(result.get(key) is True, f"missing source menu evidence: {key}")
+        if int(self.tag.rsplit(".", 1)[1]) >= 6:
+            controls = report.get("ocr_control_gui_groups", [])
+            require(len(controls) == len(CONTROL_GROUPS) and {item.get("name") for item in controls} == CONTROL_GROUPS, "incomplete OCR control verification")
+            for control in controls:
+                require(control.get("passed") is True and control.get("binary_sha256") == self.binary_sha256, "failed OCR control verification or another binary")
+                require(re.fullmatch(r"[0-9a-f]{64}", control.get("evidence_sha256", "")) is not None, "missing OCR control evidence digest")
+                result = control.get("result", {})
+                require(result.get("sha256") == self.binary_sha256 and result.get("bytes") == self.binary_bytes, "OCR control result uses another binary")
+                for key in CONTROL_FLAGS:
+                    require(result.get(key) is True, f"missing OCR control evidence: {key}")
+                before, after = result.get("idle_before", {}), result.get("idle_after", {})
+                require(before.get("threads") == after.get("threads") == 1 and isinstance(before.get("cpu_ticks"), int) and before.get("cpu_ticks") == after.get("cpu_ticks"), "OCR control idle resource evidence failed")
         return report

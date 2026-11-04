@@ -1,5 +1,6 @@
 //! 【文字识别】【结果窗口】可编辑原文、原图预览与表格导出
 
+mod control_input;
 pub mod document;
 mod draw;
 pub mod export;

@@ -86,6 +86,16 @@ impl TextEditor {
         })
     }
 
+    /// 【界面控件】【正文资格】返回是否存在非空白字符；只借用行文本，无参数，不分配全文副本
+    pub fn has_non_whitespace(&self) -> bool {
+        self.editor.with_buffer(|buffer| {
+            buffer
+                .lines
+                .iter()
+                .any(|line| !line.text().trim().is_empty())
+        })
+    }
+
     /// 【界面控件】【选择文字】返回当前选中文字；未选择或空选择返回空值
     pub fn selected_text(&self) -> Option<String> {
         self.editor.copy_selection().filter(|text| !text.is_empty())

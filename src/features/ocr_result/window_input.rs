@@ -1,7 +1,7 @@
 //! 【文字识别】【窗口输入】分离左右键、正文选择和控件操作，菜单抓取期间不编辑正文
 
 use super::{
-    layout::{Control, Layout, contains},
+    layout::{Layout, contains},
     window::{ResultWindow, View},
 };
 use crate::{
@@ -22,6 +22,9 @@ impl ResultWindow {
                 self.menu = false;
                 return WindowAction::Redraw;
             }
+            if input.mods != crate::keys::Mods::default() {
+                return WindowAction::None;
+            }
             if self.view == View::Table
                 && self.table.as_mut().is_some_and(|table| table.finish(false))
             {
@@ -29,26 +32,22 @@ impl ResultWindow {
             }
             return WindowAction::Close;
         }
-        if let Some(control) = self.control_focus {
-            if input.key == Some(Key::Tab) && !input.mods.ctrl && !input.mods.alt {
-                self.control_focus = None;
-                return WindowAction::Redraw;
-            }
-            if matches!(input.key, Some(Key::Enter | Key::Char(' ')))
-                && !input.mods.ctrl
-                && !input.mods.alt
-            {
-                return self.control(control);
-            }
-            if !(input.mods.ctrl && input.mods.shift && input.key == Some(Key::Char('c'))) {
+        if input.mods.ctrl
+            && input.mods.shift
+            && !input.mods.alt
+            && !input.mods.logo
+            && input.key == Some(Key::Char('c'))
+        {
+            if !self.source.has_non_whitespace() {
                 return WindowAction::None;
             }
-        }
-        self.ensure_fonts(&input.text);
-        if input.mods.ctrl && input.mods.shift && input.key == Some(Key::Char('c')) {
             self.copy_text(&self.source.text());
             return WindowAction::Redraw;
         }
+        if let Some(action) = self.control_key(&input) {
+            return action;
+        }
+        self.ensure_fonts(&input.text);
         let event = match self.view {
             View::Text => self.source.key(&mut self.fonts, &input),
             View::Table => self.table.as_mut().map_or(EditEvent::None, |table| {
@@ -102,11 +101,7 @@ impl ResultWindow {
     /// 【文字识别】【鼠标按下】按 position 处理控件、标题移动、尺寸调整或正文编辑；返回窗口动作
     fn press(&mut self, position: (f64, f64)) -> WindowAction {
         if let Some(control) = self.layout.control(position, self.menu) {
-            if matches!(control, Control::Copy | Control::Undo) {
-                super::input_method::cancel(self);
-                self.control_focus = Some(control);
-            }
-            return self.control(control);
+            return self.press_control(control, LEFT_BUTTON);
         }
         if self.menu {
             self.menu = false;
@@ -119,7 +114,8 @@ impl ResultWindow {
             return WindowAction::Move;
         }
         if contains(self.layout.body, position) {
-            self.control_focus = None;
+            self.focus_control(super::control_input::FocusTarget::Content);
+            self.control_press = None;
             self.dragging = self.view != View::Image;
             let clicks = self.clicks(position);
             self.select(position, false, clicks);
@@ -142,6 +138,7 @@ impl ResultWindow {
                 self.focused = focused;
                 self.dragging = false;
                 if !focused {
+                    self.control_press = None;
                     self.source_menu = None;
                     super::input_method::cancel(self);
                     if let Some(table) = &mut self.table {
@@ -152,6 +149,7 @@ impl ResultWindow {
             }
             WindowEvent::TextInput(edit) => super::input_method::apply(self, edit),
             WindowEvent::Key(input) => self.key(input),
+            WindowEvent::KeyRelease(input) => self.release_control_key(&input),
             WindowEvent::PointerButton {
                 position,
                 button: LEFT_BUTTON,
@@ -159,18 +157,33 @@ impl ResultWindow {
             } => self.press(position),
             WindowEvent::PointerButton {
                 position,
-                button: RIGHT_BUTTON,
+                button,
                 pressed: true,
-            } if self.view == View::Text && contains(self.layout.editor, position) => {
-                super::source_menu::open(self, position)
+            } if matches!(button, RIGHT_BUTTON | 0x112) => {
+                if matches!(
+                    self.control_press,
+                    Some(super::control_input::Press::Pointer(_))
+                ) {
+                    return WindowAction::None;
+                }
+                if let Some(control) = self.layout.control(position, self.menu) {
+                    return self.press_control(control, button);
+                }
+                if button == RIGHT_BUTTON
+                    && self.view == View::Text
+                    && contains(self.layout.editor, position)
+                {
+                    return super::source_menu::open(self, position);
+                }
+                WindowAction::None
             }
             WindowEvent::PointerButton {
+                position,
                 button: LEFT_BUTTON,
                 pressed: false,
-                ..
             } => {
                 self.dragging = false;
-                WindowAction::None
+                self.release_control(position)
             }
             WindowEvent::PointerMove { position } => {
                 let hovered = self.layout.control(position, self.menu);

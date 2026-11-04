@@ -8,9 +8,37 @@ use super::{
 };
 use crate::{
     renderer::{Painter, text::TextStyle},
-    theme::{color, font, radius},
+    theme::{Rgba, color, font, radius},
     ui::controls,
 };
+
+/// 【文字识别】【按钮状态绘制】用 painter、rect 和 label 绘制 down、hovered、enabled 状态；按下沿用原版暗色背景和正文前景，无返回值
+fn button(
+    painter: &mut Painter<'_>,
+    rect: Rect,
+    label: &str,
+    down: bool,
+    hovered: bool,
+    enabled: bool,
+) {
+    if down && enabled {
+        controls::icon_button(
+            painter,
+            rect,
+            label,
+            None,
+            controls::ButtonStyle {
+                fill: Rgba(22, 61, 64, 255),
+                foreground: color::foreground(),
+                border: Rgba(0, 0, 0, 0),
+                font_size: font::label(),
+                weight: cosmic_text::Weight::NORMAL,
+            },
+        );
+    } else {
+        controls::button(painter, rect, label, false, hovered, enabled);
+    }
+}
 
 /// 【文字识别】【原图预览】把 image 等比绘制到 canvas 的 body；scale 是物理比例，透明像素显示棋盘底板
 fn image(canvas: &mut Pixmap, image: &Pixmap, body: Rect, scale: f32) {
@@ -59,6 +87,10 @@ fn image(canvas: &mut Pixmap, image: &Pixmap, body: Rect, scale: f32) {
 pub(super) fn draw(state: &mut ResultWindow, canvas: &mut Pixmap, scale: f32) {
     canvas.fill(color::panel().color());
     let can_undo = state.can_undo();
+    let copy_enabled = state.control_enabled(Control::Copy);
+    let close_down = state.control_down(Control::Close);
+    let copy_down = state.control_down(Control::Copy);
+    let undo_down = state.control_down(Control::Undo);
     // 1. 【文字识别】【窗口框架】绘制共用标题、页签、操作按钮和正文底板
     {
         let mut painter = Painter::new(canvas)
@@ -70,11 +102,11 @@ pub(super) fn draw(state: &mut ResultWindow, canvas: &mut Pixmap, scale: f32) {
             "Mark Shot / OCR",
             TextStyle::new(font::label(), color::foreground()),
         );
-        controls::button(
+        button(
             &mut painter,
             layout.close,
             "Close",
-            false,
+            close_down,
             state.hovered == Some(Control::Close),
             true,
         );
@@ -88,23 +120,42 @@ pub(super) fn draw(state: &mut ResultWindow, canvas: &mut Pixmap, scale: f32) {
                 true,
             );
         }
-        controls::button(
+        button(
             &mut painter,
             layout.copy,
             if state.copied { "Copied" } else { "Copy" },
-            false,
+            copy_down,
             state.hovered == Some(Control::Copy),
-            true,
+            copy_enabled,
         );
-        if let Some(rect) = layout.undo {
-            controls::button(
+        if let Some(rect) = layout.undo.filter(|_| can_undo) {
+            button(
                 &mut painter,
                 rect,
                 "Undo",
-                false,
+                undo_down,
                 state.hovered == Some(Control::Undo),
                 can_undo,
             );
+        }
+        if state.focused
+            && let super::control_input::FocusTarget::Button(control) = state.focus_target
+        {
+            let rect = match control {
+                Control::Close => Some(layout.close),
+                Control::Copy if copy_enabled => Some(layout.copy),
+                Control::Undo if can_undo => layout.undo,
+                _ => None,
+            };
+            if let Some(rect) = rect {
+                crate::ui::text_properties::draw::border(
+                    &mut painter,
+                    rect,
+                    6.0,
+                    1.0,
+                    Rgba(94, 234, 212, 255),
+                );
+            }
         }
         painter.fill_rounded(layout.body, radius::item().min(6.0), color::field());
     }
@@ -117,7 +168,9 @@ pub(super) fn draw(state: &mut ResultWindow, canvas: &mut Pixmap, scale: f32) {
             canvas,
             state.layout.editor,
             scale,
-            state.focused && !state.menu && state.control_focus.is_none(),
+            state.focused
+                && !state.menu
+                && state.focus_target == super::control_input::FocusTarget::Content,
         ),
         View::Table => {
             if let Some(table) = &mut state.table {
@@ -127,7 +180,9 @@ pub(super) fn draw(state: &mut ResultWindow, canvas: &mut Pixmap, scale: f32) {
                     canvas,
                     state.layout.body,
                     scale,
-                    state.focused && !state.menu && state.control_focus.is_none(),
+                    state.focused
+                        && !state.menu
+                        && state.focus_target == super::control_input::FocusTarget::Content,
                 );
             }
         }

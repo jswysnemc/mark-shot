@@ -51,7 +51,8 @@ pub(super) struct ResultWindow {
     pub menu: bool,
     pub source_menu: Option<crate::ui::context_menu::ContextMenu>,
     pub focused: bool,
-    pub control_focus: Option<Control>,
+    pub(super) focus_target: super::control_input::FocusTarget,
+    pub(super) control_press: Option<super::control_input::Press>,
     pub status: Option<String>,
     pub copied: bool,
     pub(super) dragging: bool,
@@ -84,7 +85,8 @@ impl ResultWindow {
             menu: false,
             source_menu: None,
             focused: true,
-            control_focus: None,
+            focus_target: super::control_input::FocusTarget::Content,
+            control_press: None,
             status: None,
             copied: false,
             dragging: false,
@@ -190,7 +192,8 @@ impl ResultWindow {
                 if self.view != view {
                     super::input_method::cancel(self);
                 }
-                self.control_focus = None;
+                self.focus_target = super::control_input::FocusTarget::Content;
+                self.control_press = None;
                 if self.view == View::Table
                     && view != View::Table
                     && let Some(table) = &mut self.table

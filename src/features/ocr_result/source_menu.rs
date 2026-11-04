@@ -16,7 +16,8 @@ pub(super) fn open(state: &mut ResultWindow, position: (f64, f64)) -> WindowActi
     super::input_method::cancel(state);
     state.dragging = false;
     state.last_click = None;
-    state.control_focus = None;
+    state.focus_target = super::control_input::FocusTarget::Content;
+    state.control_press = None;
     state.menu = false;
     let clipboard = crate::utils::paste_from_clipboard().is_some_and(|text| !text.is_empty());
     let mut menu = ContextMenu::new(

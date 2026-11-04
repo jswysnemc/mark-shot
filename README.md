@@ -11,6 +11,8 @@ OCR 原文和已开启编辑的表格单元格支持原生 Wayland 输入法，�
 数据隔离。Qt 状态对照、已验证范围与剩余差异见 `docs/window-input-method-compatibility.md`。
 原文右键菜单支持撤销、重做、剪切、复制、粘贴、删除与全选，使用独立原生弹出表面；
 右键保持选区，菜单关闭后才执行动作。对照范围见 `docs/ocr-source-menu-compatibility.md`。
+结果按钮按左键或 Space 释放执行，右键只改变焦点，页签保留按下即切换；
+原版事件对照与未完成范围见 `docs/ocr-control-input-compatibility.md`。
 
 ## 构建
 

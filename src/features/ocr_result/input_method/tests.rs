@@ -77,7 +77,8 @@ fn non_editor_owners_never_accept_input_method_updates() {
     state.event(input("ignored", "wrong"));
     assert_eq!(state.source.text(), "base");
     state.view = View::Text;
-    state.control_focus = Some(super::super::layout::Control::Copy);
+    state.focus_target =
+        super::super::control_input::FocusTarget::Button(super::super::layout::Control::Copy);
     assert!(identity(&state).is_none());
     assert_eq!(
         state.event(WindowEvent::Key(KeyInput {
@@ -87,7 +88,7 @@ fn non_editor_owners_never_accept_input_method_updates() {
         })),
         WindowAction::None
     );
-    state.control_focus = None;
+    state.focus_target = super::super::control_input::FocusTarget::Content;
     state.menu = true;
     assert!(identity(&state).is_none());
     state.menu = false;

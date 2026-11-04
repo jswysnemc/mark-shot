@@ -11,7 +11,10 @@ use crate::{
 
 /// 【文字识别】【输入身份】返回 state 当前可见编辑器的稳定身份，非编辑页面或失焦窗口返回空值
 pub(super) fn identity(state: &ResultWindow) -> Option<u64> {
-    if !state.focused || state.menu || state.source_menu.is_some() || state.control_focus.is_some()
+    if !state.focused
+        || state.menu
+        || state.source_menu.is_some()
+        || state.focus_target != super::control_input::FocusTarget::Content
     {
         return None;
     }
