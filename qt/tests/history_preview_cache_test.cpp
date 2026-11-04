@@ -29,7 +29,8 @@ private slots:
         const QImage first = cache.image(store, name, QSize(300, 200));
         QCOMPARE(first.size(), QSize(300, 200));
         QCOMPARE(first.devicePixelRatio(), 1.0);
-        QImage reference = store.image(name).scaled(QSize(300, 200), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        // 1. 参考图走存储层的缩放读取：Qt 6.8 前 PNG 插件自带盒式缩放，与 QImage::scaled 的平滑插值像素不同
+        QImage reference = store.image(name, QSize(300, 200));
         reference.setDevicePixelRatio(1.0);
         QCOMPARE(first.convertToFormat(QImage::Format_ARGB32), reference.convertToFormat(QImage::Format_ARGB32));
         QCOMPARE(cache.image(store, name, QSize(300, 200)).cacheKey(), first.cacheKey());
