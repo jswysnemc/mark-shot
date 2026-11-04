@@ -75,6 +75,7 @@ class PublishTests(unittest.TestCase):
             self.assertFalse(result["already_published"])
             mutation = [(method, payload) for method, _, payload in github.calls if method in ("POST", "PATCH")]
             self.assertTrue(mutation[0][1]["draft"])
+            self.assertEqual(mutation[0][1]["target_commitish"], manifest.source_commit)
             self.assertFalse(mutation[-1][1]["draft"])
             self.assertTrue(all(payload["make_latest"] == "false" and payload["prerelease"] for _, payload in mutation))
             github.calls.clear()
@@ -93,6 +94,28 @@ class PublishTests(unittest.TestCase):
             self.assertFalse(any(method == "POST" for method, _, _ in github.calls))
             self.assertTrue(any(method == "DELETE" for method, _, _ in github.calls))
             self.assertFalse(github.release["draft"])
+
+    def test_verified_tag_does_not_resend_raw_commit_target(self):
+        """【原生发布测试】【既有标签权限】已验证标签通过引用定位来源，不向创建接口重复发送受额外权限限制的原始提交，无参数、无返回值"""
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, ENVIRONMENT, clear=True):
+            root = Path(directory)
+            _, verification, notes, manifest = fixture(root)
+            github = FakeGitHub(root, manifest, notes, verification)
+            github.tag_exists = True
+            original = github.api
+
+            def restricted(endpoint, method="GET", payload=None, missing_ok=False):
+                """【原生发布测试】【创建权限边界】用 endpoint、method、payload 和 missing_ok 模拟原始提交字段的权限拒绝，其余请求返回替身结果"""
+                if method == "POST" and "target_commitish" in payload:
+                    raise RuntimeError("gh: Resource not accessible by integration (HTTP 403)")
+                return original(endpoint, method, payload, missing_ok)
+
+            with patch.object(github, "api", side_effect=restricted):
+                result = publish(github, manifest, notes, verification, root / "tagged", "b" * 40)
+            self.assertFalse(result["already_published"])
+            created = next(payload for method, _, payload in github.calls if method == "POST")
+            self.assertEqual(created["tag_name"], manifest.tag)
+            self.assertNotIn("target_commitish", created)
 
     def test_versioned_verification_keeps_public_asset_name(self):
         """【原生发布测试】【版本归档】仓库使用版本化证据文件时公开资产仍采用固定名称，无参数、无返回值"""

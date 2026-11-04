@@ -102,14 +102,18 @@ def publish(github, manifest, notes, verification, directory, publication_commit
     shutil.copyfile(verification, verification_asset)
     require(sha256_file(verification_asset) == manifest.verification_sha256, "staged verification digest mismatch")
     if release is None:
-        release = github.api(f"{base}/releases", method="POST", payload={"tag_name": manifest.tag, "target_commitish": manifest.source_commit, "name": f"Mark Shot {manifest.tag}", "body": notes_text, "draft": True, "prerelease": True, "make_latest": "false"})
+        payload = {"tag_name": manifest.tag, "name": f"Mark Shot {manifest.tag}", "body": notes_text, "draft": True, "prerelease": True, "make_latest": "false"}
+        # 3. 【原生发布】【标签引用】已有标签已经核验来源，不重复发送可能触发工作流写权限检查的原始提交
+        if not tag_exists:
+            payload["target_commitish"] = manifest.source_commit
+        release = github.api(f"{base}/releases", method="POST", payload=payload)
     for asset in release.get("assets", []):
         github.api(f"{base}/releases/assets/{asset['id']}", method="DELETE")
     github.command(["release", "upload", manifest.tag, "--repo", REPOSITORY, str(artifacts / ARCHIVE_NAME), str(artifacts / (ARCHIVE_NAME + ".sha256")), str(verification_asset)])
     release = github.api(f"{base}/releases/{release['id']}")
     verify_published_assets(github, manifest, release, directory / "draft-check")
 
-    # 3. 草稿资产全部校验后公开，工作流令牌避免触发原版稳定渠道
+    # 4. 草稿资产全部校验后公开，工作流令牌避免触发原版稳定渠道
     release = github.api(f"{base}/releases/{release['id']}", method="PATCH", payload={"draft": False, "prerelease": True, "make_latest": "false"})
     require(release.get("draft") is False and release.get("prerelease") is True, "release publication did not complete")
     require(verify_tag(github, manifest), "published tag is missing")
