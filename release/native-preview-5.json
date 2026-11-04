@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "repository": "jswysnemc/mark-shot",
+  "branch": "rewrite/native-wayland",
+  "tag": "native-v0.2.0-preview.5",
+  "source_commit": "5b92bb7dfb41a5b372282ade37d03f8dd026c850",
+  "run_id": 41752257600,
+  "artifact_id": 13287277352,
+  "archive_sha256": "f376ae5bbd55397d4a846e42d2abbb23e40386c8f8b0ac0e6a22e8a1d10c8f95",
+  "binary_sha256": "3dc360e091233cb8e59faab37a3625bd21eb38ab8250b5dab8188a739a87e8e3",
+  "binary_bytes": 43333144,
+  "verification_sha256": "9d103fd3a07a00ddbc6e636366cfe9f3116deb4670c30f36df784147b75f5aee",
+  "notes_sha256": "3ef9352ca373126bcfa3bd52d94305e6186fd9ce41110a2ecf22e53e04f471f7"
+}
