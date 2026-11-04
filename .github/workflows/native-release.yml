@@ -40,7 +40,10 @@ jobs:
       - name: Check whether a preview is requested
         id: manifest
         run: |
-          if [ -f release/native-preview-5.json ]; then
+          if [ -f release/native-preview-6.json ]; then
+            echo 'prefix=release/native-preview-6' >> "$GITHUB_OUTPUT"
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          elif [ -f release/native-preview-5.json ]; then
             echo 'prefix=release/native-preview-5' >> "$GITHUB_OUTPUT"
             echo 'present=true' >> "$GITHUB_OUTPUT"
           elif [ -f release/native-preview-4.json ]; then
