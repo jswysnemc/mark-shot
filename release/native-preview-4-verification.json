@@ -1,0 +1,501 @@
+{
+  "schema": 1,
+  "date": "2026-11-04",
+  "repository": "jswysnemc/mark-shot",
+  "branch": "rewrite/native-wayland",
+  "source_commit": "29c190b8881fff0212cce45eb71be60f033b1725",
+  "run_id": 41745121726,
+  "run_url": "https://github.com/jswysnemc/mark-shot/actions/runs/41745121726",
+  "artifact_id": 13282584849,
+  "archive_sha256": "82845bb345ab2bbc4f204fafe67c8531a24692457e0c4518c42a994905629d47",
+  "binary": {
+    "sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+    "bytes": 43307672
+  },
+  "build_platform": "Ubuntu 24.04 x86_64",
+  "minimum_glibc": "2.39",
+  "rust_tests": {
+    "passed": 783,
+    "failed": 0,
+    "ignored": 10
+  },
+  "python_tests": {
+    "passed": 148,
+    "failed": 0
+  },
+  "checks": {
+    "rustfmt": true,
+    "workspace_clippy_all_targets_all_features": true,
+    "python_ruff_imports": true,
+    "archive_checksum": true,
+    "packaged_source_commit": true,
+    "help_smoke": true,
+    "native_runtime_licenses": true,
+    "no_qt_gtk_webview_linkage": true
+  },
+  "gui_groups": [
+    {
+      "name": "niri-layer",
+      "passed": true,
+      "binary_sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+      "scenario_count": 5,
+      "evidence_sha256": "423cc342b9e6b18b83688a198fc0c5577aab6e8e96ce0fc79e227d08cbedd591",
+      "native_protocol": true,
+      "no_ocr": true,
+      "exact_candidate_free_exports": true,
+      "stationary_field_threads": 1,
+      "stationary_field_cpu_ticks_delta": 0,
+      "stationary_field_no_redraw": true
+    },
+    {
+      "name": "niri-window",
+      "passed": true,
+      "binary_sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+      "scenario_count": 5,
+      "evidence_sha256": "1a98b311d51f61847e2c00190ac48c889b870a99ee80393218508e17a0b88cc2",
+      "native_protocol": true,
+      "no_ocr": true,
+      "exact_candidate_free_exports": true,
+      "stationary_field_threads": 1,
+      "stationary_field_cpu_ticks_delta": 0,
+      "stationary_field_no_redraw": true
+    },
+    {
+      "name": "niri-caret",
+      "passed": true,
+      "binary_sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+      "scenario_count": 1,
+      "evidence_sha256": "447b436c803d9799582d45bb85d424d673bd078e5312bc32f1ec13c16c83791c",
+      "no_ocr": true,
+      "no_commit_redraw": true,
+      "narrow_damage_frames": 29,
+      "typing_caret_phases": 2,
+      "selection_caret_phases": 2,
+      "idle_before": {
+        "pid": 3192098,
+        "rss_kib": 72584,
+        "threads": 1,
+        "cpu_ticks": 29
+      },
+      "idle_after": {
+        "pid": 3192098,
+        "rss_kib": 72584,
+        "threads": 1,
+        "cpu_ticks": 29
+      }
+    },
+    {
+      "name": "sway-layer",
+      "passed": true,
+      "binary_sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+      "scenario_count": 5,
+      "evidence_sha256": "fc7c79723f7980ef24b68dd9a077c9aefc92d204d2779bf6a1a5f60f4b26dbbc",
+      "native_protocol": true,
+      "no_ocr": true,
+      "exact_candidate_free_exports": true,
+      "stationary_field_threads": 1,
+      "stationary_field_cpu_ticks_delta": 0,
+      "stationary_field_no_redraw": true
+    },
+    {
+      "name": "sway-window",
+      "passed": true,
+      "binary_sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+      "scenario_count": 6,
+      "evidence_sha256": "8e8faf861f4942396ca9869004b5c5ea3e7ae38dbcd918bccad2cce19a1d774b",
+      "native_protocol": true,
+      "no_ocr": true,
+      "exact_candidate_free_exports": true,
+      "stationary_field_threads": 1,
+      "stationary_field_cpu_ticks_delta": 0,
+      "stationary_field_no_redraw": true
+    },
+    {
+      "name": "sway-caret",
+      "passed": true,
+      "binary_sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+      "scenario_count": 1,
+      "evidence_sha256": "b88e74bc24f147dd4b20c8ee7ea68ecdbac614c5b39aeca35aa97432f6cb2120",
+      "no_ocr": true,
+      "no_commit_redraw": true,
+      "narrow_damage_frames": 24,
+      "typing_caret_phases": 2,
+      "selection_caret_phases": 2,
+      "idle_before": {
+        "pid": 3192673,
+        "rss_kib": 71604,
+        "threads": 1,
+        "cpu_ticks": 29
+      },
+      "idle_after": {
+        "pid": 3192673,
+        "rss_kib": 71604,
+        "threads": 1,
+        "cpu_ticks": 29
+      }
+    }
+  ],
+  "window_gui_groups": [
+    {
+      "name": "niri-window-ime",
+      "passed": true,
+      "binary_sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+      "scenario_count": 2,
+      "evidence_sha256": "ce68b733be415d39dece2b977646a98db08345b9f1d4bb6f42664af91701a7eb",
+      "native_protocol": true,
+      "preedit_delivered": true,
+      "no_ocr": true,
+      "no_idle_surface_requests": true,
+      "source": {
+        "native_protocol": true,
+        "preedit_glyph_pixels": 34,
+        "multiline_hint": true,
+        "independent_commit_undo": true,
+        "supplementary_byte_replacement": true,
+        "invalid_batch_preserved_pixels": true,
+        "hidden_view_ignored_commit": true,
+        "confirmed": "baseXY你"
+      },
+      "table": {
+        "native_protocol": true,
+        "singleline_hint": true,
+        "selected_preedit_removed_only_draft": true,
+        "merged_commit_undo": true,
+        "supplementary_byte_replacement": true,
+        "return_committed_cell": true,
+        "escape_discarded_draft": true,
+        "global_copy_kept_original_source": true,
+        "menu_tsv": "你好\tCount\tTotal\nPaper\t12\t36\nInk\t2\t24"
+      },
+      "idle_before": {
+        "pid": 3194350,
+        "rss_kib": 43064,
+        "threads": 1,
+        "cpu_ticks": 21
+      },
+      "idle_after": {
+        "pid": 3194350,
+        "rss_kib": 43064,
+        "threads": 1,
+        "cpu_ticks": 21
+      }
+    },
+    {
+      "name": "sway-window-ime",
+      "passed": true,
+      "binary_sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+      "scenario_count": 2,
+      "evidence_sha256": "7b6296a28db2115865b069dfca130764ee566b2fc587869aa60ebffd3bb0b953",
+      "native_protocol": true,
+      "preedit_delivered": true,
+      "no_ocr": true,
+      "no_idle_surface_requests": true,
+      "source": {
+        "native_protocol": true,
+        "preedit_glyph_pixels": 26,
+        "multiline_hint": true,
+        "independent_commit_undo": true,
+        "supplementary_byte_replacement": true,
+        "invalid_batch_preserved_pixels": true,
+        "hidden_view_ignored_commit": true,
+        "confirmed": "baseXY你"
+      },
+      "table": {
+        "native_protocol": true,
+        "singleline_hint": true,
+        "selected_preedit_removed_only_draft": true,
+        "merged_commit_undo": true,
+        "supplementary_byte_replacement": true,
+        "return_committed_cell": true,
+        "escape_discarded_draft": true,
+        "global_copy_kept_original_source": true,
+        "menu_tsv": "你好\tCount\tTotal\nPaper\t12\t36\nInk\t2\t24"
+      },
+      "idle_before": {
+        "pid": 3194608,
+        "rss_kib": 43532,
+        "threads": 1,
+        "cpu_ticks": 22
+      },
+      "idle_after": {
+        "pid": 3194608,
+        "rss_kib": 43532,
+        "threads": 1,
+        "cpu_ticks": 22
+      }
+    }
+  ],
+  "history_gui_groups": [
+    {
+      "name": "niri-history",
+      "passed": true,
+      "binary_sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+      "evidence_sha256": "27b913d20173c7f73d579b7bfc9dfde4b001df3cecd5c9deb4a71a956cdd8d2a",
+      "result": {
+        "sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+        "binary_bytes": 43307672,
+        "headless_report": {
+          "path": "/home/snemc/workspace/mark-shot-little/target/native-preview-4-remote/gui/niri-history/headless.png",
+          "width": 1280,
+          "height": 800,
+          "output": "winit",
+          "error": null
+        },
+        "initial_idle": {
+          "before": {
+            "pid": 3195128,
+            "rss_kib": 43428,
+            "threads": 1,
+            "cpu_ticks": 14
+          },
+          "after": {
+            "pid": 3195128,
+            "rss_kib": 43428,
+            "threads": 1,
+            "cpu_ticks": 14
+          }
+        },
+        "compact_idle": {
+          "before": {
+            "pid": 3195128,
+            "rss_kib": 49860,
+            "threads": 1,
+            "cpu_ticks": 115
+          },
+          "after": {
+            "pid": 3195128,
+            "rss_kib": 49860,
+            "threads": 1,
+            "cpu_ticks": 115
+          }
+        },
+        "automatic_recording": true,
+        "default_plaintext_index_off": true,
+        "unicode_index_metadata": true,
+        "source_rgba_preserved": true,
+        "idat_reused": true,
+        "persistent_clipboard": true,
+        "pin_without_duplicates": true,
+        "reedit_records_once": true,
+        "unicode_save_as": true,
+        "default_overwrite_cancel": true,
+        "explicit_overwrite": true,
+        "save_snapshot_survives_source_deletion": true,
+        "count_limits": [
+          1,
+          200
+        ],
+        "configured_pruning_on_capture": true,
+        "recording_toggle": true,
+        "clear_confirmation_isolated": true,
+        "unrelated_files_kept": true,
+        "custom_config_preserved": true,
+        "ocr_not_initialized": true,
+        "window_sizes": [
+          [
+            760,
+            460
+          ],
+          [
+            440,
+            320
+          ]
+        ]
+      }
+    },
+    {
+      "name": "niri-history-edges",
+      "passed": true,
+      "binary_sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+      "evidence_sha256": "11a1b05e594a76e62a8aa69c66e0d1a2a0259b1cc1566e84c73c04ac73ec227d",
+      "result": {
+        "sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+        "binary_bytes": 43307672,
+        "first_disabled": {
+          "capture_created_no_directory": true,
+          "window_created_no_directory": true,
+          "idle": {
+            "before": {
+              "pid": 3197841,
+              "rss_kib": 32988,
+              "threads": 1,
+              "cpu_ticks": 2
+            },
+            "after": {
+              "pid": 3197841,
+              "rss_kib": 32988,
+              "threads": 1,
+              "cpu_ticks": 2
+            }
+          }
+        },
+        "shortcut_guard": {
+          "active_drag_shortcut_ignored": true,
+          "ready_handoff": true,
+          "canceled_capture_not_recorded": true,
+          "idle": {
+            "before": {
+              "pid": 3198361,
+              "rss_kib": 35036,
+              "threads": 1,
+              "cpu_ticks": 1
+            },
+            "after": {
+              "pid": 3198361,
+              "rss_kib": 35036,
+              "threads": 1,
+              "cpu_ticks": 1
+            }
+          }
+        },
+        "long_reedit": {
+          "source_size": [
+            144,
+            20000
+          ],
+          "complete_rgba_preserved": true,
+          "reedit_added_one_record": true,
+          "navigation_save_added_no_record": true,
+          "directory_navigation": {
+            "home": true,
+            "up_button": true,
+            "alt_up": true,
+            "keyboard_directory_navigation": true,
+            "hidden_directory_toggle": true,
+            "new_folder_cancel": true,
+            "unicode_new_folder": true,
+            "save_name_preserved": true
+          },
+          "idle": {
+            "before": {
+              "pid": 3198630,
+              "rss_kib": 42920,
+              "threads": 1,
+              "cpu_ticks": 68
+            },
+            "after": {
+              "pid": 3198630,
+              "rss_kib": 42920,
+              "threads": 1,
+              "cpu_ticks": 68
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "niri-history-pointer",
+      "passed": true,
+      "binary_sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+      "evidence_sha256": "ef3a7f593c12b1f7c7543fb9a5b8d2e71f6b051a8563bf462d58427708698bd3",
+      "result": {
+        "binary_sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+        "right_selected_original_rgba": true,
+        "right_double_click_did_not_edit": true,
+        "right_copy_button_did_not_activate": true,
+        "ctrl_f_kept_image_copy": true,
+        "left_selection_preserved": true,
+        "splitter_drag_expanded_row": true,
+        "scrollbar_drag_preserved_selected_original": true,
+        "idle": {
+          "before": {
+            "pid": 3200603,
+            "rss_kib": 39452,
+            "threads": 1,
+            "cpu_ticks": 19
+          },
+          "after": {
+            "pid": 3200603,
+            "rss_kib": 39452,
+            "threads": 1,
+            "cpu_ticks": 19
+          }
+        },
+        "records": 32,
+        "no_layout_fidelity_claim": true
+      }
+    },
+    {
+      "name": "niri-history-dialog",
+      "passed": true,
+      "binary_sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+      "evidence_sha256": "fcc791caea9a78669d84aee1c9515e864ff26b04d3c6e1099759deb5cc0647bf",
+      "result": {
+        "sha256": "1f36fa22f8a810892cdb8b92e2a7d085265d47c8a165a6c7c3f11cc1192152ff",
+        "binary_bytes": 43307672,
+        "same_process_child": true,
+        "native_parent_relationship": true,
+        "native_modal_protocol": false,
+        "default_enter_canceled": true,
+        "modified_enter_used_default_cancel": true,
+        "modified_escape_did_not_cancel": true,
+        "modified_space_release_confirmed": true,
+        "escape_canceled": true,
+        "wm_close_canceled": true,
+        "parent_copy_delete_isolated": true,
+        "right_click_did_not_confirm": true,
+        "mouse_press_and_outside_release_kept_records": true,
+        "parent_close_reclaimed_child": true,
+        "space_release_confirmed_once": true,
+        "owned_corrupt_record_removed": true,
+        "unrelated_files_and_links_preserved": true,
+        "default_config_unchanged": true,
+        "dialog_size": [
+          315,
+          96
+        ],
+        "parent_idle": {
+          "before": {
+            "pid": 3204028,
+            "rss_kib": 39680,
+            "threads": 1,
+            "cpu_ticks": 10
+          },
+          "after": {
+            "pid": 3204028,
+            "rss_kib": 39680,
+            "threads": 1,
+            "cpu_ticks": 10
+          }
+        },
+        "exact_qt_pixels_proven": false
+      }
+    }
+  ],
+  "user_configuration_modified": false,
+  "original_qt_sources_modified": false,
+  "original_goal_complete": false,
+  "actual_ocr_retested": false,
+  "qt_clear_dialog_reference": {
+    "fixture": "tests/fixtures/qt-history-dialog.json",
+    "scenarios_compared": 30,
+    "mouse_delivery": "QtTest spontaneous events",
+    "independent_dialog_geometry_compared": true,
+    "modified_key_behavior_compared": true,
+    "native_modal_protocol_branch_proven": false,
+    "window_system_decorations_proven": false,
+    "exact_qt_pixels_proven": false
+  },
+  "qt_history_reference": {
+    "fixture": "tests/fixtures/qt-history-window.json",
+    "details_fixture": "tests/fixtures/qt-history-details.json",
+    "qt_version": "6.12.0",
+    "layouts_compared": 4,
+    "splitter_widths_compared": 5,
+    "status_geometry_compared": true,
+    "initial_focus_compared": true,
+    "space_release_compared": true,
+    "exact_qt_pixels_proven": false
+  },
+  "remaining": [
+    "complete history tooltips, long status/empty preview wrapping, exact Qt wheel/page behavior, incremental caches and pixel comparison",
+    "xdg-dialog hint branch, window system decorations, light theme and Chinese history interface",
+    "CJK activation in selected but not editing OCR table cells",
+    "complete Qt focus traversal, OCR text context menu and table multiselection/geometry",
+    "independent OCR window and field caret blinking",
+    "complete Unicode, Bidi, text resize/wrapping/cursor remapping and active large-document input resources",
+    "complete settings, translation, uploads, extensions, tray and configuration migration",
+    "Fcitx/IBus and complete compositor/output matrix",
+    "previous niri first motion after menu dismissal remains unverified in this build"
+  ]
+}
