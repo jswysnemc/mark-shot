@@ -22,6 +22,12 @@ GUI_GROUPS = {
 WINDOW_GROUPS = {"niri-window-ime", "sway-window-ime"}
 HISTORY_GROUPS = {"niri-history", "niri-history-edges", "niri-history-pointer"}
 HISTORY_DIALOG_GROUP = "niri-history-dialog"
+SOURCE_MENU_GROUPS = {"niri-source-menu", "sway-source-menu"}
+SOURCE_MENU_FLAGS = (
+    "native_popup", "preserved_right_click_selection", "right_button_and_shortcut_isolation",
+    "clipboard_after_popup_destruction", "copy_cut_paste_delete_undo_redo_select_all",
+    "disabled_and_mnemonic_navigation", "outside_click_not_forwarded", "no_idle_frames", "no_ocr",
+)
 
 
 def require(condition, message):
@@ -105,4 +111,18 @@ class ReleaseManifest:
                     require(result.get("sha256") == self.binary_sha256, "dialog verification uses another binary")
                     for key in ("same_process_child", "native_parent_relationship", "default_enter_canceled", "wm_close_canceled", "parent_copy_delete_isolated", "parent_close_reclaimed_child", "space_release_confirmed_once", "unrelated_files_and_links_preserved"):
                         require(result.get(key) is True, f"missing dialog evidence: {key}")
+        if int(self.tag.rsplit(".", 1)[1]) >= 5:
+            for window in report["window_gui_groups"]:
+                source = window.get("source", {})
+                require(source.get("source_menu_preedit_canceled") is True and source.get("source_menu_stale_commit_ignored") is True, "missing source menu input method isolation")
+            menus = report.get("source_menu_gui_groups", [])
+            require(len(menus) == len(SOURCE_MENU_GROUPS) and {item.get("name") for item in menus} == SOURCE_MENU_GROUPS, "incomplete source menu verification")
+            for menu in menus:
+                require(menu.get("passed") is True and menu.get("binary_sha256") == self.binary_sha256, "source menu verification uses another binary or failed")
+                require(re.fullmatch(r"[0-9a-f]{64}", menu.get("evidence_sha256", "")) is not None, "missing source menu evidence digest")
+                result = menu.get("result", {})
+                require(result.get("sha256") == self.binary_sha256 and result.get("bytes") == self.binary_bytes, "source menu result uses another binary")
+                require(result.get("qt_menu_size") == [225, 229], "source menu geometry differs from Qt")
+                for key in SOURCE_MENU_FLAGS:
+                    require(result.get(key) is True, f"missing source menu evidence: {key}")
         return report

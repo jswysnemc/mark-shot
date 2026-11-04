@@ -108,6 +108,9 @@ impl CompositorHandler for NativeWindow {
         surface: &wl_surface::WlSurface,
         _: u32,
     ) {
+        if self.popup_frame_done(surface) {
+            return;
+        }
         if let Some(id) = self.surface_id(surface)
             && let Some(state) = self.surface_mut(id)
         {

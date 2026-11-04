@@ -9,6 +9,8 @@ tiny-skia 和 cosmic-text 绘制，不依赖 Qt、GTK、浏览器或 WebView。
 完整功能对照与当前验证状态见 `docs/rewrite-status.md`。
 OCR 原文和已开启编辑的表格单元格支持原生 Wayland 输入法，候选与复制、历史及表格
 数据隔离。Qt 状态对照、已验证范围与剩余差异见 `docs/window-input-method-compatibility.md`。
+原文右键菜单支持撤销、重做、剪切、复制、粘贴、删除与全选，使用独立原生弹出表面；
+右键保持选区，菜单关闭后才执行动作。对照范围见 `docs/ocr-source-menu-compatibility.md`。
 
 ## 构建
 

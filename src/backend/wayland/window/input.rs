@@ -18,6 +18,9 @@ use crate::{backend::wayland::keysym, keys::Mods};
 impl NativeWindow {
     /// 【原生窗口】【按键转换】将 event 的键名、文字与修饰键发送给内容；不替内容执行快捷键
     fn key_event(&mut self, event: KeyEvent) {
+        if self.popup_key(&event) {
+            return;
+        }
         let Some(id) = self.keyboard_surface else {
             return;
         };
@@ -60,11 +63,14 @@ impl PointerHandler for NativeWindow {
     fn pointer_frame(
         &mut self,
         _: &Connection,
-        _: &QueueHandle<Self>,
+        qh: &QueueHandle<Self>,
         _: &wl_pointer::WlPointer,
         events: &[PointerEvent],
     ) {
         for event in events {
+            if self.popup_pointer(event) {
+                continue;
+            }
             let Some(id) = self.surface_id(&event.surface) else {
                 continue;
             };
@@ -89,6 +95,10 @@ impl PointerHandler for NativeWindow {
                         },
                         Some(serial),
                     );
+                    if id == SurfaceId::Main {
+                        let seat = self.pointer_seat.clone();
+                        self.sync_popup(qh, seat.as_ref().map(|seat| (seat, serial)));
+                    }
                 }
                 PointerEventKind::Release { button, .. } => {
                     self.dispatch_to(
@@ -173,6 +183,9 @@ impl KeyboardHandler for NativeWindow {
         _: &[u32],
         _: &[Keysym],
     ) {
+        if self.popup_enter(surface) {
+            return;
+        }
         let Some(id) = self.surface_id(surface) else {
             return;
         };
@@ -190,7 +203,13 @@ impl KeyboardHandler for NativeWindow {
         _: u32,
     ) {
         self.modifiers = Mods::default();
+        if self.popup_leave(surface) {
+            return;
+        }
         if let Some(id) = self.surface_id(surface) {
+            if id == SurfaceId::Main && self.popup.is_some() {
+                return;
+            }
             if self.keyboard_surface == Some(id) {
                 self.keyboard_surface = None;
             }
@@ -207,6 +226,9 @@ impl KeyboardHandler for NativeWindow {
         _: u32,
         event: KeyEvent,
     ) {
+        if self.popup.is_some() {
+            return;
+        }
         let Some(id) = self.keyboard_surface else {
             return;
         };

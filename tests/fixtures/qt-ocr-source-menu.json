@@ -1,0 +1,147 @@
+{
+  "qt_version": "6.12.0",
+  "platform": "offscreen",
+  "component": "original OcrTextPane::showEditorMenu / ContextMenu",
+  "layout": {
+    "active": -1,
+    "family": "DejaVu LGC Sans",
+    "point_size": 12,
+    "rows": [
+      {
+        "enabled": false,
+        "label": "Undo",
+        "rect": [
+          4,
+          4,
+          217,
+          29
+        ],
+        "separator": false,
+        "shortcut": "Ctrl+Z"
+      },
+      {
+        "enabled": false,
+        "label": "Redo",
+        "rect": [
+          4,
+          33,
+          217,
+          29
+        ],
+        "separator": false,
+        "shortcut": "Ctrl+Shift+Z"
+      },
+      {
+        "enabled": true,
+        "label": "",
+        "rect": [
+          4,
+          62,
+          217,
+          9
+        ],
+        "separator": true,
+        "shortcut": ""
+      },
+      {
+        "enabled": true,
+        "label": "Cut",
+        "rect": [
+          4,
+          71,
+          217,
+          29
+        ],
+        "separator": false,
+        "shortcut": "Ctrl+X"
+      },
+      {
+        "enabled": true,
+        "label": "Copy",
+        "rect": [
+          4,
+          100,
+          217,
+          29
+        ],
+        "separator": false,
+        "shortcut": "Ctrl+C"
+      },
+      {
+        "enabled": true,
+        "label": "Paste",
+        "rect": [
+          4,
+          129,
+          217,
+          29
+        ],
+        "separator": false,
+        "shortcut": "Ctrl+V"
+      },
+      {
+        "enabled": true,
+        "label": "Delete",
+        "rect": [
+          4,
+          158,
+          217,
+          29
+        ],
+        "separator": false,
+        "shortcut": "Del"
+      },
+      {
+        "enabled": true,
+        "label": "",
+        "rect": [
+          4,
+          187,
+          217,
+          9
+        ],
+        "separator": true,
+        "shortcut": ""
+      },
+      {
+        "enabled": true,
+        "label": "Select All",
+        "rect": [
+          4,
+          196,
+          217,
+          29
+        ],
+        "separator": false,
+        "shortcut": "Ctrl+A"
+      }
+    ],
+    "size": [
+      225,
+      229
+    ]
+  },
+  "scenarios": [
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"after_press":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"layout","opened":true,"enabled":[false,false,true,true,true,true,true,true,true],"navigation":[]},
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":0,"redo":false,"selected":"","text":"","undo":false},"after_press":{"anchor":0,"clipboard":"pasted text","cursor":0,"redo":false,"selected":"","text":"","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":0,"redo":false,"selected":"","text":"","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":0,"redo":false,"selected":"","text":"","undo":false},"name":"empty","opened":true,"enabled":[false,false,true,false,false,true,false,true,false],"navigation":[]},
+    {"after":{"anchor":0,"clipboard":"","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"after_press":{"anchor":0,"clipboard":"","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"empty-clipboard","opened":true,"enabled":[false,false,true,true,true,false,true,true,true],"navigation":[]},
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":0,"redo":false,"selected":"","text":"alpha beta\ngamma","undo":false},"after_press":{"anchor":0,"clipboard":"pasted text","cursor":0,"redo":false,"selected":"","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":0,"redo":false,"selected":"","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":0,"redo":false,"selected":"","text":"alpha beta\ngamma","undo":false},"name":"unselected","opened":true,"enabled":[false,false,true,false,false,true,false,true,true],"navigation":[]},
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"after_press":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"selection-outside","opened":true,"enabled":[false,false,true,true,true,true,true,true,true],"navigation":[]},
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"after_press":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"readonly","opened":true,"enabled":[false,false,true,false,true,false,false,true,true],"navigation":[]},
+    {"after":{"anchor":16,"clipboard":"pasted text","cursor":16,"redo":true,"selected":"","text":"alpha beta\ngamma","undo":false},"after_press":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma!","undo":true},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma!","undo":true},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma!","undo":true},"name":"undo","opened":true,"enabled":[true,false,true,true,true,true,true,true,true],"navigation":[]},
+    {"after":{"anchor":17,"clipboard":"pasted text","cursor":17,"redo":false,"selected":"","text":"alpha beta\ngamma!","undo":true},"after_press":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":true,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":true,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":true,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"redo","opened":true,"enabled":[false,true,true,true,true,true,true,true,true],"navigation":[]},
+    {"after":{"anchor":0,"clipboard":"alpha","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"after_press":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"copy","opened":true,"enabled":[false,false,true,true,true,true,true,true,true],"navigation":[]},
+    {"after":{"anchor":0,"clipboard":"alpha","cursor":0,"redo":false,"selected":"","text":" beta\ngamma","undo":true},"after_press":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"cut","opened":true,"enabled":[false,false,true,true,true,true,true,true,true],"navigation":[]},
+    {"after":{"anchor":11,"clipboard":"pasted text","cursor":11,"redo":false,"selected":"","text":"pasted text beta\ngamma","undo":true},"after_press":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"paste","opened":true,"enabled":[false,false,true,true,true,true,true,true,true],"navigation":[]},
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":0,"redo":false,"selected":"","text":" beta\ngamma","undo":true},"after_press":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"delete","opened":true,"enabled":[false,false,true,true,true,true,true,true,true],"navigation":[]},
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":16,"redo":false,"selected":"alpha beta\u2029gamma","text":"alpha beta\ngamma","undo":false},"after_press":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"select-all","opened":true,"enabled":[false,false,true,true,true,true,true,true,true],"navigation":[]},
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"after_press":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"press-copy","opened":true,"enabled":[false,false,true,true,true,true,true,true,true],"navigation":[]},
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"after_press":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"right-copy","opened":true,"enabled":[false,false,true,true,true,true,true,true,true],"navigation":[]},
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"outside","opened":true,"enabled":[false,false,true,true,true,true,true,true,true],"navigation":[]},
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"navigation","opened":true,"enabled":[false,false,true,true,true,true,true,true,true],"navigation":[3,4,3,3,8,3]},
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"mnemonic","opened":true,"enabled":[false,false,true,true,true,true,true,true,true],"navigation":[3,4,5]},
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"during":{"anchor":0,"clipboard":"pasted text","cursor":5,"redo":false,"selected":"alpha","text":"alpha beta\ngamma","undo":false},"name":"shortcut","opened":true,"enabled":[false,false,true,true,true,true,true,true,true],"navigation":[-1]},
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":0,"redo":false,"selected":"","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":0,"redo":false,"selected":"","text":"alpha beta\ngamma","undo":false},"name":"keyboard","opened":false,"enabled":[],"navigation":[]},
+    {"after":{"anchor":0,"clipboard":"pasted text","cursor":0,"redo":false,"selected":"","text":"alpha beta\ngamma","undo":false},"before":{"anchor":0,"clipboard":"pasted text","cursor":0,"redo":false,"selected":"","text":"alpha beta\ngamma","undo":false},"name":"menu-key","opened":false,"enabled":[],"navigation":[]}
+  ]
+}

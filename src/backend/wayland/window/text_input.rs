@@ -33,8 +33,12 @@ fn input_content<'a>(
 impl NativeWindow {
     /// 【原生窗口】【输入资格】按原生焦点所属表面更新目标，取消旧候选并停用无主协议，无参数、无返回值
     pub(super) fn reconcile_text_input(&mut self) {
-        let target = input_content(&mut self.content, &mut self.dialog, self.text_surface)
-            .and_then(|content| content.text_input_target());
+        let target = if self.popup.is_some() {
+            None
+        } else {
+            input_content(&mut self.content, &mut self.dialog, self.text_surface)
+                .and_then(|content| content.text_input_target())
+        };
         if self.input_target.reconcile(target)
             && let Some(id) = self.text_surface
         {
@@ -112,8 +116,9 @@ impl Dispatch<zwp_text_input_v3::ZwpTextInputV3, ()> for NativeWindow {
             .map(|dialog| (dialog.id, dialog.surface.window.wl_surface()));
         // 1. 【原生窗口】【输入归属】独立记录表面身份，不把子窗口身份当作输出索引
         let mut entered = None;
+        let popup_open = state.popup.is_some();
         let message = state.text_input.message(proxy, event, |candidate| {
-            entered = if dialog.is_none() && candidate == main {
+            entered = if dialog.is_none() && !popup_open && candidate == main {
                 Some(SurfaceId::Main)
             } else {
                 dialog

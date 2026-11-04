@@ -35,3 +35,26 @@ pub enum PopupEvent {
     },
     Closed,
 }
+
+/// 【截图弹层】【传输校验】验证 frame 尺寸、比例与像素长度，返回合法状态；拒绝溢出或错误比例，避免协议错误
+pub(crate) fn validate(frame: &PopupFrame<'_>) -> crate::AppResult {
+    let expected = (
+        (frame.size.0 as f32 * frame.scale).ceil() as u32,
+        (frame.size.1 as f32 * frame.scale).ceil() as u32,
+    );
+    if frame.id == 0
+        || frame.size.0 == 0
+        || frame.size.1 == 0
+        || frame.size.0 > 4096
+        || frame.size.1 > 4096
+        || !frame.scale.is_finite()
+        || frame.scale <= 0.0
+        || frame.scale > 16.0
+        || frame.pixel_size != expected
+        || u64::from(expected.0) * u64::from(expected.1) > 64 * 1024 * 1024
+        || frame.pixels.len() as u64 != u64::from(expected.0) * u64::from(expected.1) * 4
+    {
+        return Err("invalid native popup frame".into());
+    }
+    Ok(())
+}

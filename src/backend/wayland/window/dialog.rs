@@ -91,6 +91,9 @@ impl NativeWindow {
         let Some(mut request) = self.content.take_dialog() else {
             return;
         };
+        if let Some(id) = self.popup.as_ref().map(|popup| popup.id) {
+            self.finish_popup(id, None);
+        }
         request.content.connected(self.wake.clone());
         // 1. 【原生窗口】【输入隔离】先取消原输入目标，新的子窗口不会继承父窗口候选或按钮按下事务
         self.cancel_for(SurfaceId::Main);

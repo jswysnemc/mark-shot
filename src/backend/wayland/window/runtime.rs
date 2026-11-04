@@ -29,6 +29,7 @@ use wayland_protocols::{
 use super::{
     WindowAction, WindowContent, WindowEvent, WindowSpec, WindowWake,
     dialog::Dialog,
+    popup::WindowPopup,
     surface::{Surface, SurfaceId},
 };
 use crate::{
@@ -61,6 +62,7 @@ pub(super) struct NativeWindow {
     pub pool: SlotPool,
     pub main: Surface,
     pub dialog: Option<Dialog>,
+    pub popup: Option<WindowPopup>,
     pub content: Box<dyn WindowContent>,
     pub wake: WindowWake,
     pub exit: bool,
@@ -75,7 +77,10 @@ impl NativeWindow {
 
     /// 【原生窗口】【独立事件】按 id 路由 event 和 serial，模态时过滤父窗口输入，过期身份不影响新窗口，无返回值
     pub fn dispatch_to(&mut self, id: SurfaceId, event: WindowEvent, serial: Option<u32>) {
-        if id == SurfaceId::Main && self.dialog.is_some() && event.is_interaction() {
+        if id == SurfaceId::Main
+            && (self.dialog.is_some() || self.popup.is_some())
+            && event.is_interaction()
+        {
             return;
         }
         let action = match id {
@@ -211,6 +216,7 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         pool,
         main,
         dialog: None,
+        popup: None,
         content: Box::new(content),
         wake,
         exit: false,
@@ -218,6 +224,7 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
     };
     while !state.exit {
         state.sync_dialog(&qh);
+        state.sync_popup(&qh, None);
         state
             .main
             .render(state.content.as_mut(), &mut state.pool, &qh)?;
@@ -226,11 +233,13 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
                 .surface
                 .render(dialog.content.as_mut(), &mut state.pool, &qh)?;
         }
+        state.paint_popup(&qh)?;
         state.sync_text_input();
         connection.flush()?;
         event_loop.dispatch(None, &mut state)?;
     }
     // 1. 【原生窗口】【关闭交接】先关闭所属子窗口，再析构父表面，最后发送销毁请求
+    state.popup.take();
     state.dialog.take();
     drop(state);
     connection.flush()?;

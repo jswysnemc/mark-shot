@@ -12,7 +12,7 @@ import time
 from PIL import ImageChops
 from wayland_input_method_transport import InputMethod, build, protocol_evidence
 import wayland_text_format_session as session
-from wayland_text_pointer import pointer_context
+from wayland_text_pointer import click, pointer_context
 from wayland_window_input_session import ROWS, cursor_rect, frame, geometry, newer_state, press, presented_candidate, screenshot
 
 
@@ -72,6 +72,33 @@ def source(method, window, environment, root, log):
     copy_source(environment, "baseXY你")
     (root / "source-result.json").write_text(json.dumps({"native_protocol": True, "preedit_glyph_pixels": pixels, "multiline_hint": True, "independent_commit_undo": True, "supplementary_byte_replacement": True, "invalid_batch_preserved_pixels": True, "hidden_view_ignored_commit": True, "confirmed": "baseXY你"}, ensure_ascii=False, indent=2) + "\n")
     return "baseXY你"
+
+
+def source_menu(method, window, environment, root, log, original):
+    """【窗口输入法测试】【菜单候选】用 method 验证 window 原文菜单停用与恢复，environment、root、log 保存实际字形，original 为确认正文；无返回值"""
+    # 1. 【窗口输入法测试】【原文菜单】候选显示后打开真实右键菜单，停用协议并拒绝过期确认，关闭后恢复原文身份
+    session.key("ctrl+End")
+    time.sleep(0.08)
+    baseline = screenshot(root, "source-menu-baseline")
+    old = cursor_rect(log)
+    batch(method, original, preedit="menu-candidate")
+    presented_candidate(root, "source-menu-preedit", baseline, window, old, log)
+    previous_serial = method.states[-1]["serial"]
+    click((window["x"] + 220, window["y"] + 160), "right")
+    newer_state(method, previous_serial, None, active=False)
+    time.sleep(0.12)
+    canceled = screenshot(root, "source-menu-canceled-preedit")
+    region = (round(window["x"] + 18), round(window["y"] + 88), round(window["x"] + 190), round(window["y"] + 114))
+    assert ImageChops.difference(baseline.crop(region), canceled.crop(region)).getbbox() is None, "source menu retained candidate glyphs"
+    method.batch(commit="stale-menu")
+    previous_serial = method.states[-1]["serial"]
+    session.key("Escape")
+    newer_state(method, previous_serial, original)
+    copy_source(environment, original)
+    path = root / "source-result.json"
+    result = json.loads(path.read_text())
+    result.update(source_menu_preedit_canceled=True, source_menu_stale_commit_ignored=True)
+    path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
 
 
 def copy_table(environment, window, expected):
@@ -152,6 +179,7 @@ def run(binary, root, xml):
                     table(method, window, environment, root, original)
                     press(window, 36, 56)
                     method.state(original)
+                    source_menu(method, window, environment, root, log_path, original)
                     session.wait_single_thread(process.pid)
                     before = session.resources(process.pid)
                     commits = log_path.read_text().count("wl_surface")

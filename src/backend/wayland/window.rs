@@ -3,6 +3,8 @@
 mod dialog;
 mod dialog_protocol;
 mod input;
+mod popup;
+mod popup_input;
 mod protocol;
 mod runtime;
 mod shell;
@@ -13,6 +15,7 @@ mod wake;
 use tiny_skia::Pixmap;
 
 use crate::keys::{Key, Mods};
+use crate::types::popup::{PopupEvent, PopupFrame};
 use crate::types::text_input::{ChangeCause, Edit, Focus, Snapshot};
 
 pub use dialog::WindowDialog;
@@ -97,7 +100,36 @@ pub enum WindowCursor {
     HorizontalResize,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum WindowPopupAction {
+    #[default]
+    None,
+    Redraw,
+    Close,
+    Activate(usize),
+}
+
 pub trait WindowContent {
+    /// 【原生窗口】【弹层身份】返回待显示或存活菜单的稳定编号；默认没有菜单，无参数
+    fn popup_id(&self) -> Option<u64> {
+        None
+    }
+
+    /// 【原生窗口】【弹层像素】按父窗口 scale 返回变化后的菜单帧；静止菜单返回空值，关闭通过 popup_id 表达
+    fn popup_frame(&mut self, _scale: f32) -> Option<PopupFrame<'_>> {
+        None
+    }
+
+    /// 【原生窗口】【弹层输入】接收 id 对应 event，返回重绘或待交付动作；此阶段不得执行业务修改
+    fn popup_event(&mut self, _id: u64, _event: PopupEvent) -> WindowPopupAction {
+        WindowPopupAction::None
+    }
+
+    /// 【原生窗口】【弹层交付】原生表面销毁后交付 id 的 action，空值表示取消；返回父窗口动作
+    fn popup_closed(&mut self, _id: u64, _action: Option<usize>) -> WindowAction {
+        WindowAction::None
+    }
+
     /// 【原生窗口】【对话框请求】取出一个待显示的独立模态子窗口；默认没有请求，无参数
     fn take_dialog(&mut self) -> Option<WindowDialog> {
         None
