@@ -164,15 +164,17 @@ void SettingsDialog::saveConfig()
     SettingsConfig nextConfig = collectConfig();
     QString error;
     if (!writeSettingsConfig(nextConfig, &error)) {
+        // 1. 【设置】【保存通知】配置文件可能已写入、只是后续同步开机启动等步骤失败，仍让托盘按磁盘配置重新注册
+        SettingsSavedNotifier::instance().notifySaved();
         setStatus(MS_TR("Failed to save settings: %1").arg(error), true);
         return;
     }
 
     m_config = nextConfig;
-    // 1. 【设置】【保存基线】撤销修改恢复到刚保存的值
+    // 2. 【设置】【保存基线】撤销修改恢复到刚保存的值
     applyConfigToPages(nextConfig);
     applyTheme(m_config.general.uiThemeMode);
-    // 2. 【设置】【保存通知】通知常驻组件重新读取配置，例如托盘全局快捷键
+    // 3. 【设置】【保存通知】通知常驻组件重新读取配置，例如托盘全局快捷键
     SettingsSavedNotifier::instance().notifySaved();
     setStatus(MS_TR("Changes saved"));
     m_statusLabel->setToolTip(MS_TR("Some changes take effect after restarting Mark Shot."));
