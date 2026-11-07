@@ -1,5 +1,6 @@
 //! 【滚动截图】【控制面板】原版六类操作、状态行、细节预览与概览入口
 
+mod capture_marker;
 mod draw;
 mod layout;
 pub mod preview;

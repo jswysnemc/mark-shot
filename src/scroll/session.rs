@@ -30,6 +30,7 @@ pub struct ScrollSession {
     pub frame_count: u32,
     pub total_height: i32,
     pub last_append: i32,
+    pub capture_range: Option<(i32, i32)>,
 }
 
 impl ScrollSession {
@@ -52,6 +53,7 @@ impl ScrollSession {
             frame_count: 0,
             total_height: 0,
             last_append: 0,
+            capture_range: None,
         })
     }
 
@@ -128,6 +130,10 @@ impl ScrollSession {
     }
 
     fn apply(&mut self, outcome: StitchResult) -> bool {
+        let previous_range = self.capture_range;
+        if outcome.status != Status::NoMatch && outcome.frame_length > 0 {
+            self.capture_range = Some((outcome.position, outcome.frame_length));
+        }
         let stats = self.stitcher.stats();
         self.frame_count = stats.frame_count.max(0) as u32;
         self.total_height = stats.total_height;
@@ -142,6 +148,7 @@ impl ScrollSession {
             self.last_progress = Instant::now();
         }
         matches!(outcome.status, Status::FirstFrame | Status::Appended)
+            || previous_range != self.capture_range
     }
 
     pub fn axis(&self) -> Axis {

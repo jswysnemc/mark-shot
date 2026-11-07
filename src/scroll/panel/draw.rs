@@ -87,7 +87,7 @@ pub fn draw(
         if let Some(view) = preview::layout(area, session.stitcher.dimensions(), session.axis())
             && let Some(image) = session.source()
         {
-            preview::draw(p, image, &view, state);
+            preview::draw(p, image, &view, state, session.capture_range);
         }
         super::border(p, area, palette.separator);
     }

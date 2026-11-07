@@ -15,6 +15,7 @@ from pathlib import Path
 
 from PIL import Image, ImageChops
 from wayland_scroll_raw_capture import capture as raw_capture
+from wayland_scroll_markers import check as check_markers
 
 PROJECT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("scroll_priority_support", PROJECT / "scripts/wayland-priority-ui.py")
@@ -151,14 +152,14 @@ def origin(trace):
         return (0, 0)
 
 
-def scroll(trace, axis, horizontal=False):
+def scroll(trace, axis, horizontal=False, direction=1):
     """【长截图回归】【底层滚轮】向真实页面投递轴位移，核对trace对应轴移动四十八逻辑像素，无返回值"""
     before = origin(trace)
     pointer = INPUT.CURRENT.get()[0]
     INPUT.move((160, 160))
-    pointer.scroll(dx=10.0 if horizontal else 0.0, dy=0.0 if horizontal else 10.0)
+    pointer.scroll(dx=10.0 * direction if horizontal else 0.0, dy=0.0 if horizontal else 10.0 * direction)
     expected = list(before)
-    expected[axis] += 48
+    expected[axis] += 48 * direction
     wait(lambda: origin(trace) == tuple(expected), "the live page did not receive the scroll event")
     time.sleep(0.15)
 
@@ -228,11 +229,28 @@ def verify(binary, environment, root, trace, horizontal):
             assert process.poll() is None
         if horizontal:
             INPUT.click(buttons["axis"])
-        for index in range(8):
+        for index in range(20 if horizontal else 8):
             scroll(trace, 0 if horizontal else 1, horizontal)
             current = crop(frame(environment, root, f"source-{index}", True))
             parts.append(current.crop((current.width - step, 0, current.width, current.height) if horizontal else (0, current.height - step, current.width, current.height)))
-        buttons = controls(frame(environment, root, "panel-grown"))
+        grown = frame(environment, root, "panel-grown")
+        buttons = controls(grown)
+        markers = check_markers(grown, buttons)
+        axis = 0 if horizontal else 1
+        for _ in range(2):
+            scroll(trace, axis, horizontal, -1)
+        def marker_position(name, expected):
+            """【长截图回归】【异步位置】等待本次捕获完成并满足expected，返回实际双框，不重复投递滚动"""
+            image = frame(environment, root, name)
+            current = check_markers(image, controls(image))
+            return current if expected(current["yellow"][axis]) else None
+
+        wait(lambda: marker_position("panel-reversed", lambda value: value < markers["yellow"][axis]),
+             "capture marker did not follow reverse scrolling")
+        for _ in range(2):
+            scroll(trace, axis, horizontal)
+        wait(lambda: marker_position("panel-returned", lambda value: abs(value - markers["yellow"][axis]) <= 1),
+             "capture marker did not return to the original source position")
         if not horizontal:
             # 1. 【长截图回归】【底层键盘】鼠标回到页面后方向键必须继续到达页面，不能留在独占捕获层
             INPUT.click((160, 160))
@@ -260,9 +278,14 @@ def verify(binary, environment, root, trace, horizontal):
             # 2. 【长截图回归】【预览浏览】真实滚轮只改变面板细节，之后Enter必须进入完整原图编辑器
             INPUT.move((400, 150))
             before = frame(environment, root, "preview-end")
+            before_markers = check_markers(before, controls(before))
             SUPPORT.SUPPORT.HIT.wheel(1, 2)
             after = frame(environment, root, "preview-browsed")
             assert ImageChops.difference(before, after).getbbox() is not None, "preview wheel did not browse the long image"
+            browsed = check_markers(after, controls(after))
+            # 黄色尾边可能由重叠的青色框遮挡，只比较未被遮挡的捕获起点
+            assert browsed["yellow"][1] == before_markers["yellow"][1], "browsing moved the capture marker"
+            assert browsed["cyan"] != before_markers["cyan"], "browsing did not move the cyan viewport marker"
             # 3. 【长截图回归】【主题轮换】真实面板必须响应双主题切换并恢复同一主题像素
             INPUT.move(buttons["pause"])
             original = frame(environment, root, "panel-light")
@@ -281,7 +304,7 @@ def verify(binary, environment, root, trace, horizontal):
         expected = joined(parts, horizontal)
         expected.save(root / "expected.png")
         result = exported(environment, process, root, expected)
-    return {"horizontal": horizontal, "six_controls": True, "right_button_isolated": True, "paused_commits_stable": True, "paused_capture_and_commit_counts": idle, "save_cancel_restored": True, "export": result}
+    return {"horizontal": horizontal, "markers": markers, "six_controls": True, "right_button_isolated": True, "paused_commits_stable": True, "paused_capture_and_commit_counts": idle, "save_cancel_restored": True, "export": result}
 
 
 def large_region(binary, environment, root, trace):

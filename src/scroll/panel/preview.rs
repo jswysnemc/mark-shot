@@ -134,6 +134,7 @@ pub fn draw(
     image: shot_stitch::StitchedView<'_>,
     layout: &PreviewLayout,
     state: &mut PreviewState,
+    capture_range: Option<(i32, i32)>,
 ) {
     state.sync(layout);
     let origin = if layout.horizontal {
@@ -151,6 +152,9 @@ pub fn draw(
             (0.0, 0.0),
         );
         let length = layout.max_scrub + layout.viewport;
+        if let Some(range) = capture_range {
+            super::capture_marker::draw(p, rect, length, layout.horizontal, range);
+        }
         let marker = if layout.horizontal {
             Rect::from_xywh(
                 rect.left() + rect.width() * state.scrub / length,
@@ -167,9 +171,15 @@ pub fn draw(
             )
         };
         if let Some(marker) = marker {
-            let palette = crate::theme::toolbar::Palette::current();
-            p.fill_rounded(marker, 0.0, palette.selection_fill);
-            super::border(p, marker, palette.active_border);
+            p.fill_rounded(marker, 0.0, crate::theme::Rgba(45, 212, 191, 45));
+            p.stroke_path(
+                &tiny_skia::PathBuilder::from_rect(marker),
+                crate::theme::Rgba(45, 212, 191, 235),
+                &tiny_skia::Stroke {
+                    width: 2.0,
+                    ..Default::default()
+                },
+            );
         }
     }
 }

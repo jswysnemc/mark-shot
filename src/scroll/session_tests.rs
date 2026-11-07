@@ -109,3 +109,19 @@ fn idle_slows_capture_down_but_never_stops_it() {
     assert_eq!(session.capture_interval(), active);
     assert!(!session.should_idle(std::time::Instant::now()));
 }
+
+/// 【滚动截图测试】【往返捕获】无参数，返回已知内容时也更新黄色范围并请求重绘，但不增加长图尺寸，无返回值
+#[test]
+fn capture_range_updates_when_returning_without_growth() {
+    let mut session = ScrollSession::new(region(), 0).unwrap();
+    for origin in [0, 40, 80] {
+        assert!(session.push(frame::crop(&page_frame(origin, 40, 160), CROP).unwrap()));
+        assert_eq!(session.capture_range, Some((origin, 160)));
+    }
+    let dimensions = session.stitcher.dimensions();
+    assert!(session.push(frame::crop(&page_frame(40, 40, 160), CROP).unwrap()));
+    assert_eq!(session.capture_range, Some((40, 160)));
+    assert_eq!(session.stitcher.dimensions(), dimensions);
+    assert!(!session.push(frame::crop(&page_frame(40, 40, 160), CROP).unwrap()));
+    assert_eq!(session.capture_range, Some((40, 160)));
+}

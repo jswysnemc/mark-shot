@@ -27,6 +27,7 @@ pub(super) fn apply(
         run.session.stitcher.revision(),
         run.session.status.clone(),
         run.session.paused,
+        run.session.capture_range,
     );
     let image = frame::crop(data, pixel_rect(run.session.region, scale))?;
     run.scale = scale;
@@ -40,6 +41,7 @@ pub(super) fn apply(
             run.session.stitcher.revision(),
             run.session.status.clone(),
             run.session.paused,
+            run.session.capture_range,
         ))
 }
 
