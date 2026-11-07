@@ -33,7 +33,13 @@ def size(environment, identity, expected):
 
 def menu(environment, root, identity):
     """【Windows贴图回归】【菜单展开】在identity内部右击并等待独立菜单，返回实际菜单窗口编号"""
-    click(environment, identity, 30, 30, button=3)
+    bounds = rectangle(environment, identity)
+    xdo(environment, "windowfocus", "--sync", identity)
+    # 1. 【Windows贴图回归】【静止指针】同位置移动不会生成Motion，不能使用等待Motion的xdotool同步选项
+    xdo(environment, "mousemove", "--window", identity, 30, 30)
+    actual = dict(line.split("=", 1) for line in xdo(environment, "getmouselocation", "--shell").splitlines())
+    assert (int(actual["X"]), int(actual["Y"])) == (bounds["x"] + 30, bounds["y"] + 30)
+    xdo(environment, "click", 3)
     return window(environment, "Mark Shot menu", root)
 
 
@@ -96,3 +102,33 @@ def save_as(binary, environment, root, identity, expected):
     actual = Image.open(target).convert("RGBA")
     assert actual.size == expected.size and actual.tobytes() == expected.tobytes(), "saved pin changed original pixels"
     return {"cancel_restores_pin": True, "saved_equals_original": True, "path": str(target)}
+
+
+def wheel(probe, environment, root, identity, expected):
+    """【Windows贴图回归】【滚轮锚点】在identity实测纵向缩放、锚点位置、反向恢复和横向隔离，返回几何证据并核对expected原件"""
+    before = rectangle(environment, identity)
+    xdo(environment, "windowfocus", "--sync", identity)
+    xdo(environment, "mousemove", "--window", identity, 80, 50)
+    xdo(environment, "click", 4)
+    enlarged = size(environment, identity, (346, 216))
+    assert abs(enlarged["x"] - (before["x"] - 6.5)) <= 1
+    assert abs(enlarged["y"] - (before["y"] - 4)) <= 1
+    copied(probe, environment, root, identity, "wheel-original", expected)
+    # 1. 【Windows贴图回归】【纯横向输入】系统水平滚轮不改变贴图尺寸或位置
+    xdo(environment, "click", 6)
+    time.sleep(0.15)
+    assert rectangle(environment, identity) == enlarged
+    xdo(environment, "click", 5)
+    restored = size(environment, identity, (320, 200))
+    assert abs(restored["x"] - before["x"]) <= 1 and abs(restored["y"] - before["y"]) <= 1
+    copied(probe, environment, root, identity, "wheel-restored-original", expected)
+    # 2. 【Windows贴图回归】【菜单隔离】指针停在菜单外的贴图上，滚轮也不能缩放底层窗口
+    menu(environment, root, identity)
+    xdo(environment, "mousemove", "--window", identity, 10, 10)
+    xdo(environment, "click", 4)
+    time.sleep(0.15)
+    assert rectangle(environment, identity) == restored
+    key(environment, identity, "Escape")
+    absent(environment, "Mark Shot menu")
+    return {"before": before, "enlarged": enlarged, "restored": restored,
+            "original_exact": True, "horizontal_ignored": True, "menu_blocks_zoom": True}

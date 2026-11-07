@@ -110,6 +110,19 @@ impl Surface {
             return Ok(());
         }
         let mut bounds = self.window.bounds()?;
+        let mut geometry_changed = false;
+        if let Some((x, y)) = self.content.take_position_offset()
+            && x.is_finite()
+            && y.is_finite()
+        {
+            bounds.left = bounds
+                .left
+                .saturating_add((x * f64::from(self.scale)).round() as i32);
+            bounds.top = bounds
+                .top
+                .saturating_add((y * f64::from(self.scale)).round() as i32);
+            geometry_changed = true;
+        }
         if let Some(size) = self.content.preferred_size() {
             let physical = (
                 (size.0 as f32 * self.scale).round().max(1.0) as u32,
@@ -118,8 +131,11 @@ impl Surface {
             if (bounds.width, bounds.height) != physical {
                 bounds.width = physical.0;
                 bounds.height = physical.1;
-                self.window.set_bounds(bounds)?;
+                geometry_changed = true;
             }
+        }
+        if geometry_changed {
+            self.window.set_bounds(bounds)?;
         }
         if (self.canvas.width(), self.canvas.height()) != (bounds.width, bounds.height) {
             self.canvas = Pixmap::new(bounds.width, bounds.height)
@@ -195,15 +211,14 @@ impl Surface {
             return Ok(false);
         };
         if let WindowEvent::Key(input) = &event
-            && input.key.is_some_and(|key| {
-                crate::theme::is_toggle(crate::keys::Chord {
+            && super::theme_input::handle(
+                self,
+                input.key.map(|key| crate::keys::Chord {
                     key,
                     mods: input.mods,
-                })
-            })
+                }),
+            )?
         {
-            crate::theme::toggle()?;
-            self.dirty = true;
             return Ok(false);
         }
         if let WindowEvent::PointerMove { position } = event {
@@ -321,6 +336,9 @@ pub fn run(spec: WindowSpec, content: impl WindowContent + 'static) -> crate::Ap
                 let Some(event) = event else {
                     continue;
                 };
+                if super::theme_input::popup(active, &event)? {
+                    continue;
+                }
                 let action = active.content.popup_event(id, event);
                 if super::popup::apply(active, &mut popups, id, action) {
                     return Ok(());
@@ -348,6 +366,9 @@ pub fn run(spec: WindowSpec, content: impl WindowContent + 'static) -> crate::Ap
                         .event(event, active.scale)
                         .and_then(popup_event)
                     {
+                        if super::theme_input::popup(active, &event)? {
+                            continue;
+                        }
                         let action = active.content.popup_event(id, event);
                         if super::popup::apply(active, &mut popups, id, action) {
                             return Ok(());

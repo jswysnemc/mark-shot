@@ -7,10 +7,12 @@ import json
 from pathlib import Path
 import subprocess
 import time
+import tomllib
 
 from PIL import Image, ImageChops
 from windows_ocr_actions import key, path_w, snapshot, stop, visible, window, xdo
-from windows_pin_checks import absent, activate, copied, menu, row, save_as, size
+from windows_pin_checks import absent, activate, copied, menu, row, save_as, size, wheel
+from windows_pin_paste_checks import check as check_paste
 from windows_test_runtime import run
 
 
@@ -45,6 +47,27 @@ def execute(command, environment, root, log):
         absent(environment, "Mark Shot menu")
         assert process.poll() is None
         report["cases"]["menu_transaction"] = True
+        report["cases"]["wheel"] = wheel(probe, environment, root, identity, source)
+        # 2. 【Windows贴图回归】【键盘菜单】首项向下选择右转，Enter确认；Home加Space左转，End加Escape只取消
+        menu(environment, root, identity)
+        key(environment, identity, "Home")
+        key(environment, identity, "Down")
+        key(environment, identity, "Return")
+        absent(environment, "Mark Shot menu")
+        size(environment, identity, (200, 320))
+        copied(probe, environment, root, identity, "keyboard-rotated", source.transpose(Image.Transpose.ROTATE_270))
+        menu(environment, root, identity)
+        key(environment, identity, "Home")
+        key(environment, identity, "space")
+        absent(environment, "Mark Shot menu")
+        size(environment, identity, (320, 200))
+        copied(probe, environment, root, identity, "keyboard-restored", source)
+        menu(environment, root, identity)
+        key(environment, identity, "End")
+        key(environment, identity, "Escape")
+        absent(environment, "Mark Shot menu")
+        assert process.poll() is None
+        report["cases"]["keyboard_menu"] = True
         # 2. 【Windows贴图回归】【无损变换】旋转修改原图方向，显示缩放不能修改交付分辨率与颜色
         activate(environment, root, identity, 1)
         size(environment, identity, (200, 320))
@@ -59,6 +82,7 @@ def execute(command, environment, root, log):
         size(environment, identity, (320, 200))
         copied(probe, environment, root, identity, "restored-original", source)
         report["cases"]["transforms"] = {"rotate_right_left_exact": True, "zoom_keeps_original": True, "reset_size": True}
+        report["cases"]["paste"] = check_paste(probe, environment, root, identity, source)
         # 3. 【Windows贴图回归】【外部主题】菜单存活期间修改配置，实际像素必须刷新并精确恢复
         popup = menu(environment, root, identity)
         xdo(environment, "mousemove", "--sync", 20, 20)
@@ -82,6 +106,20 @@ def execute(command, environment, root, log):
             time.sleep(0.05)
         else:
             raise AssertionError("live pin menu did not restore its exact light frame")
+        # 4. 【Windows贴图回归】【菜单主题键】快捷键不交付菜单动作，原生弹层身份保持不变，配置与画面同时确认
+        for mode in ("dark", "light"):
+            key(environment, identity, "ctrl+shift+l")
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                current = snapshot(environment, root, "menu-key-" + mode)
+                different = ImageChops.difference(light, current).getbbox() is not None
+                if tomllib.loads(config_path.read_text())["ui"]["theme"] == mode and different == (mode == "dark"):
+                    break
+                time.sleep(0.05)
+            else:
+                raise AssertionError(f"live pin menu swallowed theme shortcut: {mode}")
+            assert visible(environment, "Mark Shot menu") == [popup], "theme shortcut replaced or dismissed the menu"
+        report["cases"]["popup_theme_shortcut"] = True
         key(environment, identity, "Escape")
         absent(environment, "Mark Shot menu")
         report["cases"]["external_theme"] = True

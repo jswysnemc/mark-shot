@@ -129,6 +129,11 @@ pub trait WindowContent {
         None
     }
 
+    /// 【原生窗口】【一次性位移】取出内容请求的逻辑位移，默认不移动；原生后端按当前DPI与现有窗口位置应用
+    fn take_position_offset(&mut self) -> Option<(f64, f64)> {
+        None
+    }
+
     /// 【原生窗口】【置顶请求】返回内容当前要求的主窗口置顶状态，默认普通窗口，无参数
     fn always_on_top(&self) -> bool {
         false

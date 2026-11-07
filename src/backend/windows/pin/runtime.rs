@@ -25,6 +25,7 @@ struct Menu {
 }
 struct Pin {
     image: PinnedImage,
+    position_offset: Option<(f64, f64)>,
     initial: Option<(i32, i32)>,
     menu: Option<Menu>,
     next_menu: u64,
@@ -92,6 +93,30 @@ impl WindowContent for Pin {
     fn preferred_size(&self) -> Option<(u32, u32)> {
         Some(self.image.size())
     }
+    /// 【Windows贴图】【锚点位移】取出本轮缩放的逻辑位移，消费后不在后续重绘重复移动
+    fn take_position_offset(&mut self) -> Option<(f64, f64)> {
+        self.position_offset.take()
+    }
+    /// 【Windows贴图】【滚轮预览】按input纵轴缩放并保持原图锚点，返回是否重绘；菜单期间及纯横向输入不修改图像
+    fn scroll(&mut self, input: window::ScrollInput) -> WindowAction {
+        use crate::features::pinned_image::wheel;
+        if self.menu.is_some() {
+            return WindowAction::None;
+        }
+        let Some(factor) = wheel::factor(input.angle.1, -input.delta.1) else {
+            return WindowAction::None;
+        };
+        let before = self.image.size();
+        if !self.image.scale(self.image.zoom * factor) {
+            return WindowAction::None;
+        }
+        let previous = self.position_offset.unwrap_or_default();
+        // 1. 【Windows贴图】【连续消息】绘制前可能收到多个滚轮事件，扣除待应用位移后再计算当前局部锚点
+        let point = (input.position.0 - previous.0, input.position.1 - previous.1);
+        let shift = wheel::offset(point, before, self.image.size());
+        self.position_offset = Some((previous.0 + shift.0, previous.1 + shift.1));
+        WindowAction::Redraw
+    }
     /// 【Windows贴图】【置顶状态】无参数，返回当前原生置顶请求
     fn always_on_top(&self) -> bool {
         self.image.always_on_top
@@ -144,6 +169,12 @@ impl WindowContent for Pin {
                 Some(crate::keys::Key::Char('c')) if input.mods.ctrl => Some(PinAction::Copy),
                 Some(crate::keys::Key::Char('s')) if input.mods.ctrl => Some(PinAction::SaveAs),
                 Some(crate::keys::Key::Char('e')) if input.mods.ctrl => Some(PinAction::Edit),
+                Some(crate::keys::Key::Char('v')) if input.mods.ctrl => {
+                    if let Err(error) = crate::utils::spawn_self(&["--pin-clipboard"], &[]) {
+                        log::error!("【Windows贴图】【剪贴板新窗口】{error}");
+                    }
+                    None
+                }
                 _ => None,
             },
             WindowEvent::Resize { size } => {
@@ -236,15 +267,28 @@ impl WindowContent for Pin {
                     return WindowPopupAction::Activate(hit.unwrap());
                 }
             }
-            PopupEvent::Closed
-            | PopupEvent::Key {
-                chord:
-                    Some(crate::keys::Chord {
-                        key: crate::keys::Key::Escape,
-                        ..
-                    }),
-                ..
-            } => return WindowPopupAction::Close,
+            PopupEvent::Closed => return WindowPopupAction::Close,
+            PopupEvent::Key {
+                chord: Some(chord), ..
+            } => {
+                use crate::{features::pinned_image::menu_navigation, keys::Key};
+                // 1. 【Windows贴图】【键盘事务】键盘接管后清除未完成的鼠标按下，不允许随后释放重复交付
+                popup.armed = None;
+                match chord.key {
+                    Key::Escape => return WindowPopupAction::Close,
+                    Key::Enter | Key::Space => {
+                        if let Some(index) = popup
+                            .hovered
+                            .filter(|index| menu_navigation::available(*index, Self::enabled))
+                        {
+                            return WindowPopupAction::Activate(index);
+                        }
+                    }
+                    key => {
+                        popup.hovered = menu_navigation::navigate(popup.hovered, key, Self::enabled)
+                    }
+                }
+            }
             _ => {}
         }
         WindowPopupAction::Redraw
@@ -304,6 +348,7 @@ pub(super) fn run_at_seed(
         },
         Pin {
             image,
+            position_offset: None,
             initial: position,
             menu: None,
             next_menu: 0,

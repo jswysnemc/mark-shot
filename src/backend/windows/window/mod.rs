@@ -2,5 +2,6 @@
 
 mod popup;
 mod runtime;
+mod theme_input;
 pub use runtime::run;
 pub type WindowWake = super::native::Wake;
