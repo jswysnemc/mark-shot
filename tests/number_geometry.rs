@@ -91,6 +91,9 @@ fn export_scaling_is_homogeneous_and_preserves_label_semantics() {
 #[test]
 fn annotation_transforms_preserve_the_number_and_style() {
     let mut annotation = Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id: 9,
         shape: AnnotationShape::Number {
             mark: mark(NumberStyle::Chinese),

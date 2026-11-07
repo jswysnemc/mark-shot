@@ -12,6 +12,9 @@ use tiny_skia::{Color, Pixmap, Rect};
 fn annotation(kind: MarkerShape, filled: bool) -> Annotation {
     let color = Color::from_rgba8(255, 30, 20, 255);
     let mut annotation = Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id: 23,
         shape: AnnotationShape::Marker {
             start: (80.0, 40.0),

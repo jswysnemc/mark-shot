@@ -2,8 +2,10 @@
 
 pub mod frame;
 pub mod panel;
+pub(crate) mod png;
 pub mod preview;
 pub mod session;
+pub(crate) mod source;
 
 #[cfg(test)]
 mod frame_tests;
@@ -14,5 +16,5 @@ mod session_tests;
 
 pub use session::ScrollSession;
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod overlay_tests;

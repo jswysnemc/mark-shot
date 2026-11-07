@@ -67,8 +67,8 @@ pub struct Measurement {
     pub geometry: RulerGeometry,
     /// 【尺子】【测量比例】每个当前坐标单位对应的原图像素数，导出映射后反向调整
     pub pixel_scale: f32,
-    /// 【尺子】【样式比例】导出坐标相对初始逻辑坐标的比例，不参与测量值计算
-    pub style_scale: f32,
+    /// 【尺子】【样式比例】原图到当前坐标的比例乘以截图补偿，不参与测量值计算
+    pub style_scale: f64,
 }
 
 impl Measurement {
@@ -141,15 +141,15 @@ impl Measurement {
         }
         Self {
             pixel_scale: self.pixel_scale / factor,
-            style_scale: self.style_scale * factor,
+            style_scale: self.style_scale * f64::from(factor),
             ..self.mapped(|point| (point.0 * factor, point.1 * factor))
         }
     }
 
     /// 【尺子】【样式单位】根据 width 返回当前坐标中刻度、数字与标签使用的尺寸单位
     pub fn unit(self, width: f32) -> f32 {
-        let scale = self.style_scale.max(f32::EPSILON);
-        width_unit(width / scale) * scale
+        (f64::from(width_unit(width * self.pixel_scale))
+            * self.style_scale.max(f64::from(f32::EPSILON))) as f32
     }
 }
 

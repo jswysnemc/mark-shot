@@ -18,12 +18,31 @@ pub fn outline(
     line_style: LineStyle,
     width: f32,
 ) -> Option<Path> {
+    outline_rendered(
+        skeleton,
+        style,
+        line_style,
+        clamped_width(width, skeleton.style_scale),
+        skeleton.style_scale,
+    )
+}
+
+/// 【箭头】【窗口轮廓】按skeleton、style、line_style、width与limits_scale返回实际箭头路径，limits_scale为窗口逻辑像素在当前坐标中的尺寸
+pub(crate) fn outline_rendered(
+    skeleton: &LineSkeleton,
+    style: ArrowStyle,
+    line_style: LineStyle,
+    width: f32,
+    limits_scale: f32,
+) -> Option<Path> {
+    if !width.is_finite() || width <= 0.0 {
+        return None;
+    }
     let line = geometry::sampled(skeleton)?;
     if line.length < skeleton.style_scale {
         return None;
     }
-    let width = clamped_width(width, skeleton.style_scale);
-    let metrics = metrics::metrics(line.length, width, skeleton.style_scale, style);
+    let metrics = metrics::rendered_metrics(line.length, width, limits_scale, style);
     if !style.open() && line_style == LineStyle::Solid {
         return fletched::path(&line, metrics, style);
     }
@@ -41,7 +60,7 @@ pub fn outline(
         );
         polyline_path(&points)?
     };
-    builder.push_path(&crate::features::line::draw::stroke_outline(
+    builder.push_path(&crate::features::line::draw::stroke_outline_rendered(
         &center,
         line_style,
         width,

@@ -49,7 +49,7 @@ impl TextLayout {
         let ratio = ((value - range.0) as f32 / (range.1 - range.0).max(1) as f32).clamp(0.0, 1.0);
         Rect::from_xywh(
             cell.left() + ((cell.width() - 14.0) * ratio).round(),
-            cell.top() + 1.0,
+            cell.top() + ((cell.height() - 12.0) / 2.0).floor(),
             14.0,
             12.0,
         )

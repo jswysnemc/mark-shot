@@ -2,7 +2,7 @@
 
 use super::runtime::Pin;
 use crate::{
-    features::pinned_image::menu::{self, PinAction},
+    features::pinned_image::menu::PinAction,
     keys::{Key, Mods},
 };
 use smithay_client_toolkit::seat::{
@@ -14,56 +14,21 @@ use wayland_client::{
     Connection, QueueHandle,
     protocol::{wl_keyboard, wl_pointer, wl_seat, wl_surface},
 };
-use wayland_protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape;
 const LEFT: u32 = 0x110;
 const RIGHT: u32 = 0x111;
 
 impl Pin {
-    /// 【贴图】【菜单按键】导航和确认只操作可用菜单行；返回是否存在菜单并消费按键
-    fn menu_key(&mut self, key: Option<Key>, qh: &QueueHandle<Self>) -> bool {
-        let Some(popup) = &self.popup else {
-            return false;
-        };
-        match key {
-            Some(Key::Escape) => self.popup = None,
-            Some(Key::Enter) => {
-                if let Some(action) = popup.hovered.and_then(|index| menu::ITEMS[index].action) {
-                    self.action(action, qh);
-                }
-            }
-            Some(Key::Up | Key::Down) => {
-                let forward = key == Some(Key::Down);
-                let length = menu::ITEMS.len();
-                let start = popup
-                    .hovered
-                    .unwrap_or(if forward { length - 1 } else { 0 });
-                let next = (1..=length)
-                    .map(|step| {
-                        if forward {
-                            (start + step) % length
-                        } else {
-                            (start + length - step) % length
-                        }
-                    })
-                    .find(|index| {
-                        menu::ITEMS[*index]
-                            .action
-                            .is_some_and(|action| self.menu_enabled(action))
-                    });
-                if let Some(popup) = &mut self.popup {
-                    popup.hovered = next;
-                }
-                let result = self.draw_menu();
-                self.report(result);
-            }
-            _ => {}
-        }
-        true
-    }
-
     /// 【贴图】【快捷键】转换 event 为菜单导航或贴图快捷键；不把菜单 Escape 传给主窗口
     fn key(&mut self, event: KeyEvent, qh: &QueueHandle<Self>) {
         let chord = crate::backend::wayland::keysym::chord(event.keysym, event.raw_code, self.mods);
+        if chord.is_some_and(crate::theme::is_toggle) {
+            if let Err(error) = crate::theme::toggle() {
+                log::error!("【贴图】【主题切换】无法保存主题: {error}");
+            } else {
+                self.refresh_theme();
+            }
+            return;
+        }
         let key = chord.map(|chord| chord.key);
         if self.menu_key(key, qh) {
             return;
@@ -90,6 +55,17 @@ impl Pin {
     }
 }
 
+impl Pin {
+    /// 【贴图】【主题刷新】无参数，刷新主窗口和存活菜单，保留图像、菜单身份与译文选择，无返回值
+    pub(super) fn refresh_theme(&mut self) {
+        self.dirty = true;
+        if self.popup.is_some() {
+            let result = self.draw_menu();
+            self.report(result);
+        }
+    }
+}
+
 impl PointerHandler for Pin {
     /// 【贴图】【指针事件】按 events 顺序区分主表面和菜单表面；右键不能选择菜单动作
     fn pointer_frame(
@@ -101,50 +77,10 @@ impl PointerHandler for Pin {
     ) {
         for event in events {
             let position = event.position;
-            if self
-                .popup
-                .as_ref()
-                .is_some_and(|popup| popup.popup.wl_surface() == &event.surface)
-            {
-                match event.kind {
-                    PointerEventKind::Enter { serial }
-                    | PointerEventKind::Motion { time: serial } => {
-                        if matches!(event.kind, PointerEventKind::Enter { .. }) {
-                            self.serial = serial;
-                            if let Some(cursor) = &self.cursor {
-                                cursor.set_shape(serial, Shape::Default);
-                            }
-                        }
-                        if let Some(popup) = &mut self.popup {
-                            popup.hovered = menu::hit(position);
-                        }
-                        let result = self.draw_menu();
-                        self.report(result);
-                    }
-                    PointerEventKind::Press { button: LEFT, .. } => {
-                        if let Some(popup) = &mut self.popup {
-                            popup.armed = menu::hit(position);
-                        }
-                    }
-                    PointerEventKind::Release { button: LEFT, .. } => {
-                        let action = self.popup.as_ref().and_then(|popup| {
-                            popup
-                                .armed
-                                .filter(|index| Some(*index) == menu::hit(position))
-                                .and_then(|index| menu::ITEMS[index].action)
-                        });
-                        if let Some(action) = action {
-                            self.action(action, qh);
-                        }
-                    }
-                    PointerEventKind::Press { .. } => self.popup = None,
-                    PointerEventKind::Leave { .. } => {
-                        if let Some(popup) = &mut self.popup {
-                            popup.hovered = None;
-                        }
-                    }
-                    _ => {}
-                }
+            if &event.surface == self.shell.surface() {
+                self.last_position = position;
+            }
+            if self.menu_pointer(event, qh) {
                 continue;
             }
             if &event.surface != self.shell.surface() {
@@ -176,7 +112,7 @@ impl PointerHandler for Pin {
                     serial,
                     ..
                 } => {
-                    self.begin_gesture(position, serial, qh);
+                    self.begin_gesture(position, serial);
                 }
                 PointerEventKind::Motion { .. } => self.continue_gesture(position, qh),
                 PointerEventKind::Release { button: LEFT, .. } => {

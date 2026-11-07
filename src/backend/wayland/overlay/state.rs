@@ -5,6 +5,9 @@ pub mod keyboard;
 pub mod layer;
 pub mod output;
 pub mod pointer;
+pub(super) mod pointer_coalescing;
+pub(super) mod primary_selection;
+mod scroll_window;
 pub mod seat;
 pub mod xdg;
 
@@ -27,6 +30,7 @@ use smithay_client_toolkit::output::OutputState;
 use smithay_client_toolkit::shm::Shm;
 
 pub struct OverlayState {
+    pub(super) primary_selection: primary_selection::PrimarySelection,
     pub text_input: crate::backend::wayland::text_input::TextInput,
     pub popup: Option<crate::backend::wayland::overlay_popup::OverlayPopup>,
     pub popup_grabs: VecDeque<(u32, wayland_client::protocol::wl_seat::WlSeat)>,
@@ -71,6 +75,7 @@ pub struct Probe {
 }
 
 pub struct OverlayRunTime {
+    pub(super) globals: wayland_client::globals::GlobalList,
     pub event_queue: EventQueue<OverlayState>,
     pub state: OverlayState,
 }
@@ -135,7 +140,11 @@ impl OverlayRunTime {
         event_queue.roundtrip(&mut state)?;
         event_queue.roundtrip(&mut state)?;
 
-        Ok(Self { event_queue, state })
+        Ok(Self {
+            globals,
+            event_queue,
+            state,
+        })
     }
 }
 
@@ -154,6 +163,7 @@ impl OverlayState {
         viewporter: Option<wp_viewporter::WpViewporter>,
     ) -> Self {
         Self {
+            primary_selection: Default::default(),
             text_input: Default::default(),
             popup: None,
             popup_grabs: VecDeque::new(),

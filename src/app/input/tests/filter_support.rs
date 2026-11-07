@@ -43,7 +43,7 @@ pub(super) fn filter(state: &EditorState, index: usize) -> RegionFilter {
 /// 【滤镜测试】【选中区域】在 state 中进入选择工具并选中 index；dirty 返回属性栏和控制框范围，无返回值
 pub(super) fn pick(state: &mut EditorState, index: usize, dirty: &mut u32) {
     select_tool(state, Tool::Pick, dirty);
-    state.selected_annotation = Some(index);
+    state.select_annotation_index(Some(index));
     crate::app::input::refresh_panels(state, dirty);
 }
 

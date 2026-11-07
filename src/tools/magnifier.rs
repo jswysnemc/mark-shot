@@ -4,7 +4,7 @@ use tiny_skia::Rect;
 
 use crate::editor::annotation_drag::{apply_annotation_drag, commit_drag_if_changed};
 use crate::editor::{DamageZone, EditorState};
-use crate::features::magnifier::{Magnifier, drag};
+use crate::features::magnifier::Magnifier;
 use crate::tools::ToolBehavior;
 use crate::tools::drawing_space::DrawingSpace;
 use crate::types::{
@@ -28,14 +28,14 @@ impl ToolBehavior for MagnifierTool {
             return;
         }
         if pressed {
-            if let Some((index, handle)) = hit(state, state.input.pointer.global) {
+            if let Some((index, handle)) = hit(state, state.canvas_point()) {
                 begin_drag(state, index, handle, dirty_mask);
             } else {
                 begin_draft(state, dirty_mask);
             }
         } else {
             if state.ann_drag.is_some() {
-                apply_annotation_drag(state, state.input.pointer.global);
+                apply_annotation_drag(state, state.canvas_point());
                 commit_drag_if_changed(state);
             } else if state.input.mouse_down {
                 update_draft(state, dirty_mask);
@@ -68,7 +68,7 @@ impl ToolBehavior for MagnifierTool {
             .ann_drag
             .as_ref()
             .map(|drag| drag.handle)
-            .or_else(|| hit(state, state.input.pointer.global).map(|(_, handle)| handle));
+            .or_else(|| hit(state, state.canvas_point()).map(|(_, handle)| handle));
         handle
             .and_then(|handle| cursor_for_handle(handle, state.ann_drag.is_some()))
             .unwrap_or(CursorIcon::Crosshair)
@@ -77,12 +77,11 @@ impl ToolBehavior for MagnifierTool {
 
 /// 【放大镜】【持久框命中】在 state 中优先检查已选框，再从上到下命中其他框；global 为逻辑坐标，返回索引与操作
 fn hit(state: &EditorState, global: (f64, f64)) -> Option<(usize, SelectionHandle)> {
-    let point = (global.0 as f32, global.1 as f32);
-    if let Some(index) = state.selected_annotation
+    if let Some(index) = state.selected_annotation_index()
         && let Some(annotation) = state.annotations.get(index)
-        && let AnnotationShape::Magnifier { magnifier } = annotation.shape
+        && let AnnotationShape::Magnifier { .. } = annotation.shape
     {
-        let handle = drag::hit_test(magnifier, point, true);
+        let handle = state.canvas_handle(annotation, global);
         if handle != SelectionHandle::None {
             return Some((index, handle));
         }
@@ -93,10 +92,10 @@ fn hit(state: &EditorState, global: (f64, f64)) -> Option<(usize, SelectionHandl
         .enumerate()
         .rev()
         .find_map(|(index, annotation)| {
-            let AnnotationShape::Magnifier { magnifier } = annotation.shape else {
+            let AnnotationShape::Magnifier { .. } = annotation.shape else {
                 return None;
             };
-            let handle = drag::hit_test(magnifier, point, false);
+            let handle = state.canvas_special_drag(annotation, global);
             (handle != SelectionHandle::None).then_some((index, handle))
         })
 }
@@ -109,7 +108,7 @@ fn begin_drag(
     dirty_mask: &mut u32,
 ) {
     if let Some(previous) = state
-        .selected_annotation
+        .selected_annotation_index()
         .and_then(|index| state.annotations.get(index))
     {
         damage(state, previous.damage_bbox(true), dirty_mask);
@@ -117,12 +116,12 @@ fn begin_drag(
     let annotation = state.annotations[index].clone();
     state.ann_drag = Some(AnnDragState {
         handle,
-        start_global: state.input.pointer.global,
-        prev_global: state.input.pointer.global,
+        start_global: state.canvas_point(),
+        prev_global: state.canvas_point(),
         orig: annotation.clone(),
         orig_index: index,
     });
-    state.selected_annotation = Some(index);
+    state.select_annotation_index(Some(index));
     state.input.mouse_down = true;
     state.tool_active = true;
     damage(state, annotation.damage_bbox(true), dirty_mask);
@@ -136,7 +135,7 @@ fn begin_draft(state: &mut EditorState, dirty_mask: &mut u32) {
     let Some(space) = DrawingSpace::from_editor(state) else {
         return;
     };
-    let Some(start) = space.start_point(state.input.pointer.global) else {
+    let Some(start) = space.start_point(state.canvas_point()) else {
         return;
     };
     let Some(magnifier) = Magnifier::new(
@@ -149,16 +148,19 @@ fn begin_draft(state: &mut EditorState, dirty_mask: &mut u32) {
         return;
     };
     if let Some(previous) = state
-        .selected_annotation
+        .selected_annotation_index()
         .and_then(|index| state.annotations.get(index))
     {
         damage(state, previous.damage_bbox(true), dirty_mask);
     }
-    state.selected_annotation = None;
-    state.input.drag_start = Some(state.input.pointer.global);
+    state.select_annotation_index(None);
+    state.input.drag_start = Some(state.canvas_point());
     state.input.mouse_down = true;
     state.tool_active = true;
-    let annotation = Annotation {
+    let mut annotation = Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id: state.next_id,
         shape: AnnotationShape::Magnifier { magnifier },
         color: state.tool_settings.color,
@@ -166,6 +168,8 @@ fn begin_draft(state: &mut EditorState, dirty_mask: &mut u32) {
         stroke_width: state.tool_settings.stroke(StrokeGroup::Magnifier),
         bbox: Rect::from_xywh(start.0, start.1, 1.0, 1.0).unwrap(),
     };
+    state.adopt_annotation_style(&mut annotation);
+    annotation.update_bbox();
     state.pending = Some(annotation.clone());
     state.prev_pending = Some(annotation);
 }
@@ -182,10 +186,10 @@ fn update_draft(state: &mut EditorState, dirty_mask: &mut u32) {
     else {
         return;
     };
-    let Some(point) = space.clamp_point(state.input.pointer.global) else {
+    let Some(point) = space.clamp_point(state.canvas_point()) else {
         return;
     };
-    let Some(magnifier) = Magnifier::new(
+    let Some(mut magnifier) = Magnifier::new(
         state.tool_settings.magnifier_shape,
         start,
         state.tool_settings.magnifier_zoom,
@@ -202,9 +206,10 @@ fn update_draft(state: &mut EditorState, dirty_mask: &mut u32) {
         return;
     }
     let old = annotation.damage_bbox(false);
+    magnifier.style_scale = annotation.style_scale;
     annotation.shape = AnnotationShape::Magnifier { magnifier };
     annotation.color = state.tool_settings.color;
-    annotation.stroke_width = state.tool_settings.stroke(StrokeGroup::Magnifier);
+    annotation.set_image_stroke_width(state.tool_settings.stroke(StrokeGroup::Magnifier));
     annotation.update_bbox();
     let new = annotation.damage_bbox(false);
     damage(state, old, dirty_mask);

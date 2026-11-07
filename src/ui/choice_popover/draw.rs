@@ -27,7 +27,7 @@ pub fn draw_choice_popover(
         panel.drawn_look != Some(look),
         |painter| {
             let layout = panel.layout;
-            let theme = &crate::config::get().theme;
+            let theme = crate::theme::color::theme();
             if let Some(rect) = Rect::from_xywh(0.0, 0.0, layout.size.0, layout.size.1) {
                 painter.fill_rounded(rect, radius::panel(), theme.background.color());
             }
@@ -59,7 +59,11 @@ pub fn draw_choice_popover(
                             theme.hover.color()
                         },
                     );
-                    theme.on_accent.color()
+                    if hovered && !selected {
+                        crate::theme::toolbar::Palette::current().hover_icon.color()
+                    } else {
+                        theme.on_accent.color()
+                    }
                 } else {
                     theme.foreground.color()
                 };

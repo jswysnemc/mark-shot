@@ -23,8 +23,16 @@ default_border none
 class TextSwayRuntime:
     """【文字回归】【会话生命周期】管理 root 下配置与日志，binary 只属于本次测试进程"""
 
-    def __init__(self, root, binary):
-        """【文字回归】【状态构造】保存 root、binary，初始化本次资源；不启动服务，无返回值"""
+    def __init__(self, root, binary, scale=1.2, width=1280, height=800, transform="flipped-180"):
+        """【文字回归】【状态构造】保存 root、binary、比例、物理宽高和方向；不启动服务，无返回值"""
+        if not 0.5 <= scale <= 4.0:
+            raise ValueError("private output scale must be between 0.5 and 4")
+        self.scale = scale
+        if not 320 <= width <= 7680 or not 240 <= height <= 4320:
+            raise ValueError("private output dimensions are outside the test limits")
+        if transform not in ("normal", "90", "180", "270", "flipped", "flipped-90", "flipped-180", "flipped-270"):
+            raise ValueError("invalid private output transform")
+        self.width, self.height, self.transform = width, height, transform
         self.root, self.binary = root.resolve(), binary.resolve()
         self.process = None
         self.log = None
@@ -35,7 +43,9 @@ class TextSwayRuntime:
         try:
             self.root.mkdir(parents=True, exist_ok=False, mode=0o700)
             config = self.root / "config.conf"
-            config.write_text(CONFIG)
+            config.write_text(CONFIG.replace("scale 1.2", f"scale {self.scale}")
+                              .replace("1280x800", f"{self.width}x{self.height}")
+                              .replace("flipped-180", self.transform))
             self.runtime = tempfile.TemporaryDirectory(prefix="mark-shot-text-wl-")
             root = Path(self.runtime.name)
             environment = dict(os.environ)
@@ -43,6 +53,7 @@ class TextSwayRuntime:
                 environment.pop(name, None)
             environment.update(XDG_RUNTIME_DIR=str(root), XDG_CONFIG_HOME=str(self.root / "config"),
                                XDG_DATA_HOME=str(self.root / "data"), XDG_STATE_HOME=str(self.root / "state"),
+                               XDG_CACHE_HOME=str(self.root / "cache"),
                                WLR_BACKENDS="headless", WLR_RENDERER="pixman", WLR_HEADLESS_OUTPUTS="1", WLR_LIBINPUT_NO_DEVICES="1",
                                LD_LIBRARY_PATH=str(self.binary.parent.parent / "lib"))
             self.log = (self.root / "sway.log").open("w")
@@ -60,7 +71,9 @@ class TextSwayRuntime:
             else:
                 raise RuntimeError("private text Sway did not create its sockets")
             outputs = json.loads(subprocess.check_output([str(self.binary.parent / "swaymsg"), "-r", "-t", "get_outputs"], env=environment))
-            if len(outputs) != 1 or outputs[0]["name"] != "HEADLESS-1" or outputs[0]["rect"]["width"] != 1066 or outputs[0]["rect"]["height"] != 666:
+            rotated = self.transform in ("90", "270", "flipped-90", "flipped-270")
+            width, height = (self.height, self.width) if rotated else (self.width, self.height)
+            if len(outputs) != 1 or outputs[0]["name"] != "HEADLESS-1" or outputs[0]["rect"]["width"] != int(width / self.scale) or outputs[0]["rect"]["height"] != int(height / self.scale):
                 raise RuntimeError(f"unexpected private text output: {outputs}")
             output = outputs[0]
             logical = dict(output["rect"], scale=output["scale"], transform=output["transform"])
@@ -98,6 +111,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--sway", type=Path, default=Path("target/test-tools/sway/usr/bin/sway"))
+    parser.add_argument("--scale", type=float, default=1.2)
+    parser.add_argument("--width", type=int, default=1280)
+    parser.add_argument("--height", type=int, default=800)
+    parser.add_argument("--transform", default="flipped-180")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     options = parser.parse_args()
     command = options.command
@@ -105,7 +122,7 @@ def main():
         command = command[1:]
     if not command:
         parser.error("a test command is required after --")
-    with TextSwayRuntime(options.root, options.sway) as environment:
+    with TextSwayRuntime(options.root, options.sway, options.scale, options.width, options.height, options.transform) as environment:
         return subprocess.run(command, env=environment).returncode
 
 

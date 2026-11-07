@@ -80,6 +80,9 @@ fn cancellation_preserves_existing_partial_rasters_at_fractional_scale() {
     state.annotations_layer[0] = Pixmap::new(768, 576).unwrap();
     let color = Color::from_rgba8(40, 220, 180, 128);
     let mut annotation = Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id: 0,
         shape: AnnotationShape::Marker {
             start: (120.3, 128.7),

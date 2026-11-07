@@ -129,7 +129,7 @@ fn draw_tile(
     color: Color,
     pixel_origin: (i32, i32),
 ) {
-    let width = magnifier.border_width(width);
+    let width = painter.window_units().stroke(width, 1.5, Some(18.0));
     if let Some(connectors) = magnifier.connectors() {
         let mut path = PathBuilder::new();
         for (start, end) in connectors {
@@ -167,7 +167,8 @@ pub fn draw(painter: &mut Painter<'_>, magnifier: Magnifier, width: f32, color: 
     if !scale.is_finite() || scale <= 0.0 {
         return;
     }
-    let padding = magnifier.border_width(width) / 2.0 + 2.0 * magnifier.style_scale;
+    let window = painter.window_units();
+    let padding = window.stroke(width, 1.5, Some(18.0)) / 2.0 + window.canvas(2.0);
     let Some(body) = magnifier
         .bounds()
         .and_then(|rect| rect.outset(padding, padding))

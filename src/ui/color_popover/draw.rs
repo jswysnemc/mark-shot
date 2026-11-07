@@ -35,8 +35,17 @@ pub fn draw_color_popover(p: &mut Painter, picker: &mut ColorPickerPopover) {
 /// 【属性取色】【子控件合成】将 picker 绘入 p；历史色块按实际 Qt 子控件边界裁切，不扩张面板
 fn content(p: &mut Painter, picker: &mut ColorPickerPopover) {
     let rect = Rect::from_xywh(0.5, 0.5, layout::WIDTH - 1.0, layout::HEIGHT - 1.0).unwrap();
-    p.fill_rounded(rect, 11.0, Rgba(15, 17, 23, 240));
-    tracks::border(p, rect, 11.0, Rgba(255, 255, 255, 14));
+    p.fill_rounded(
+        rect,
+        11.0,
+        crate::theme::toolbar::Palette::current().popup_fill,
+    );
+    tracks::border(
+        p,
+        rect,
+        11.0,
+        crate::theme::toolbar::Palette::current().popup_border,
+    );
     // 1. 【属性取色】【子控件边界】在独立取色器缓冲绘制，保留 Qt 历史色块的重叠与末项裁切
     let scale = p.scale();
     let content = layout::content((0.0, 0.0));

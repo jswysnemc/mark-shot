@@ -192,6 +192,9 @@ fn filters_sample_frozen_pixels_and_keep_annotation_order() {
     source.fill(Color::from_rgba8(10, 30, 50, 255));
     let bounds = Rect::from_xywh(20.0, 20.0, 120.0, 60.0).unwrap();
     let mut old = Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id: 1,
         shape: AnnotationShape::Rectangle {
             start: (20.0, 20.0),
@@ -205,6 +208,9 @@ fn filters_sample_frozen_pixels_and_keep_annotation_order() {
     };
     old.update_bbox();
     let filter = Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id: 2,
         shape: AnnotationShape::Redact {
             filter: RegionFilter::new((20.0, 20.0), (140.0, 80.0), 14.0, FilterMode::Invert)

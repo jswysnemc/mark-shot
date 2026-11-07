@@ -6,6 +6,11 @@ mod dispatch;
 mod headless;
 mod help;
 mod pin_clipboard;
+#[cfg(target_os = "linux")]
+mod single_instance;
+#[cfg(target_os = "windows")]
+#[path = "single_instance_windows.rs"]
+mod single_instance;
 mod tool_names;
 
 pub mod arguments;

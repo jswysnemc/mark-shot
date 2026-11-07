@@ -30,8 +30,10 @@ pub const COPY: &str = include_str!("../../assets/icons/mark-shot/copy.svg");
 pub const GLOBE: &str = include_str!("../../assets/icons/globe.svg");
 pub const DOWNLOAD: &str = include_str!("../../assets/icons/download.svg");
 pub const CLOSE: &str = include_str!("../../assets/icons/mark-shot/cancel.svg");
+pub const CHEVRON_DOWN: &str = include_str!("../../assets/icons/mark-shot/chevron-down.svg");
 pub const TRASH: &str = include_str!("../../assets/icons/trash.svg");
 pub const CHECK: &str = include_str!("../../assets/icons/check.svg");
+pub const MARK_SHOT_CHECK: &str = include_str!("../../assets/icons/mark-shot/check.svg");
 pub const PIN: &str = include_str!("../../assets/icons/mark-shot/pin.svg");
 pub const SAVE: &str = include_str!("../../assets/icons/mark-shot/save.svg");
 pub const SCROLL: &str = include_str!("../../assets/icons/mark-shot/scroll-capture.svg");
@@ -92,8 +94,10 @@ pub const EXTRA_ICONS: &[&str] = &[
     GLOBE,
     DOWNLOAD,
     CLOSE,
+    CHEVRON_DOWN,
     TRASH,
     CHECK,
+    MARK_SHOT_CHECK,
     PIN,
     SAVE,
     SCROLL,

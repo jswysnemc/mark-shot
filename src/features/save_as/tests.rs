@@ -4,7 +4,7 @@ use super::{
     Snapshot,
     jobs::{Jobs, Response, Task},
 };
-use crate::backend::wayland::window::WindowWake;
+use crate::backend::window::WindowWake;
 use std::{
     sync::{Arc, OnceLock},
     time::{Duration, Instant},

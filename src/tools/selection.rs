@@ -3,7 +3,7 @@ use crate::editor::{DamageZone, EditorState};
 use crate::interaction::ClickTarget;
 use crate::tools::ToolBehavior;
 use crate::types::{CursorIcon, MouseButton, Placement, SelectionEdges, SelectionHandle};
-use crate::utils::{apply_handle_drag, cursor_for_handle, hit_test_rect_handle, make_rect};
+use crate::utils::{apply_handle_drag, cursor_for_handle, hit_test_rect_handle};
 use tiny_skia::Rect;
 
 pub struct SelectionTool;
@@ -48,6 +48,7 @@ impl ToolBehavior for SelectionTool {
         dirty_mask: &mut u32,
     ) {
         if matches!(button, MouseButton::Right) && pressed {
+            state.selection.creating = false;
             let drawing = state.input.mouse_down && state.input.drag_start.is_some();
             if drawing {
                 state.input.mouse_down = false;
@@ -70,13 +71,11 @@ impl ToolBehavior for SelectionTool {
                 .selection
                 .zone
                 .as_ref()
-                .map(|sel| hit_test_rect_handle(sel, state.input.pointer.global))
+                .map(|sel| hit_test_rect_handle(sel, state.canvas_point()))
                 .unwrap_or(SelectionHandle::None);
 
-            let pos = (
-                state.input.pointer.global.0 as f32,
-                state.input.pointer.global.1 as f32,
-            );
+            let pos = (state.canvas_point().0 as f32, state.canvas_point().1 as f32);
+            state.selection.creating = handle == SelectionHandle::None;
             // double click on selection is equal to saving the screenshot
             if handle == SelectionHandle::Move
                 && state.input.clicks.register(ClickTarget::Selection, pos)
@@ -92,15 +91,33 @@ impl ToolBehavior for SelectionTool {
                 if let Some(sel) = state.selection.zone {
                     state
                         .selection
-                        .set_drag(handle, Some(state.input.pointer.global), Some(sel));
+                        .set_drag(handle, Some(state.canvas_point()), Some(sel));
                     state.input.drag_start = None;
                 }
             } else {
                 state.selection.set_drag(SelectionHandle::None, None, None);
-                state.input.drag_start = Some(state.input.pointer.global);
+                state.input.drag_start = Some(state.canvas_point());
             }
         } else {
             state.tool_active = false;
+            state.selection.creating = false;
+            if state.input.drag_start.is_some() {
+                // 1. 【选区尺寸】【创建确认】原版先归一化图像范围，不足八像素时返回选择阶段，不切换默认工具
+                let image = crate::editor::selection_geometry::ImageSpace::for_editor(state)
+                    .and_then(|space| {
+                        state
+                            .selection
+                            .zone
+                            .and_then(|zone| space.image(zone))
+                            .map(|image| (space, image))
+                    });
+                state.selection.zone = image
+                    .filter(|(_, image)| image.width >= 8.0 && image.height >= 8.0)
+                    .and_then(|(space, image)| space.global(image));
+                if state.selection.zone.is_none() {
+                    mark_all_dirty(dirty_mask, state.placements.len());
+                }
+            }
             let first_selection =
                 state.input.drag_start.is_some() && state.selection.zone.is_some();
             if first_selection
@@ -132,13 +149,22 @@ impl ToolBehavior for SelectionTool {
             ) {
                 let delta = ((global.0 - origin.0).round(), (global.1 - origin.1).round());
                 state.selection.zone =
-                    apply_handle_drag(&sel_start, state.selection.active_handle, delta).to_rect();
+                    apply_handle_drag(&sel_start, state.selection.active_handle, delta)
+                        .to_rect()
+                        .map(|adjusted| {
+                            super::selection_constraints::adjust(
+                                state,
+                                sel_start,
+                                adjusted,
+                                state.selection.active_handle,
+                            )
+                        });
                 selection_changed = true;
             }
         } else if state.input.mouse_down {
             // new selection drag
             if let Some(start) = state.input.drag_start {
-                state.selection.zone = make_rect(start, global);
+                state.selection.zone = super::selection_constraints::create(state, start, global);
                 selection_changed = true;
             }
         }
@@ -159,10 +185,8 @@ impl ToolBehavior for SelectionTool {
                 .unwrap_or(CursorIcon::Crosshair);
         }
         if let Some(sel) = state.selection.zone
-            && let Some(icon) = cursor_for_handle(
-                hit_test_rect_handle(&sel, state.input.pointer.global),
-                false,
-            )
+            && let Some(icon) =
+                cursor_for_handle(hit_test_rect_handle(&sel, state.canvas_point()), false)
         {
             return icon;
         }

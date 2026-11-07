@@ -114,7 +114,7 @@ pub fn read(mut reader: impl Read) -> AppResult<OcrDocument> {
 pub fn spawn(document: &OcrDocument) -> AppResult {
     let mut bytes = Vec::with_capacity(document.png.len() + 4096);
     write(document, &mut bytes)?;
-    crate::utils::spawn_self_ready(&[RESULT_ARG], &bytes, std::time::Duration::from_secs(3))
+    crate::utils::spawn_self_ready(&[RESULT_ARG], &bytes, crate::backend::window::READY_TIMEOUT)
 }
 
 /// 【文字识别】【结果入口】读取标准输入中的文档并打开普通窗口；args 非空时返回参数错误

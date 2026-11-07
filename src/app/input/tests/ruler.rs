@@ -303,28 +303,45 @@ fn angle_handles_rotation_and_proportional_resize_are_undoable() {
     assert_eq!(state.annotations[0], original);
 }
 
-/// 【尺子测试】【选择工具旋转】选择工具先命中已选尺子的旋转把手，不能因把手位于测量框外而取消选择
+/// 【尺子测试】【选择工具旋转】按实际笔宽命中已选尺子的框外旋转把手，验证完整拖动与撤销，无参数、无返回值
 #[test]
 fn pick_tool_can_rotate_a_selected_ruler_using_its_outside_handle() {
-    let mut dirty = 0;
-    let mut state = ruler_editor(RulerMode::Length, &mut dirty);
-    draw(&mut state, (224.0, 220.0), (384.0, 345.0), &mut dirty);
-    select_tool(&mut state, Tool::Pick, &mut dirty);
-    click(&mut state, (304.0, 221.0), &mut dirty);
-    assert_eq!(state.selected_annotation, Some(0));
-    let original = state.annotations[0].clone();
-    let handle = drag::rotation_handle(measurement(&state, 0), 3.0).unwrap();
-    draw(
-        &mut state,
-        (handle.0 as f64, handle.1 as f64),
-        (424.0, 282.5),
-        &mut dirty,
-    );
-    assert_eq!(state.selected_annotation, Some(0));
-    assert_ne!(state.annotations[0], original);
-    assert_eq!(state.undo_stack.len(), 2);
-    key(&mut state, "Ctrl+Z", &mut dirty);
-    assert_eq!(state.annotations, [original]);
+    for width in [3.0, 7.0, 15.0] {
+        let mut dirty = 0;
+        let mut state = ruler_editor(RulerMode::Length, &mut dirty);
+        state.tool_settings.set_stroke(StrokeGroup::Ruler, width);
+        draw(&mut state, (224.0, 220.0), (384.0, 345.0), &mut dirty);
+        select_tool(&mut state, Tool::Pick, &mut dirty);
+        click(&mut state, (304.0, 221.0), &mut dirty);
+        assert_eq!(state.selected_annotation_index(), Some(0));
+        let original = state.annotations[0].clone();
+        assert_eq!(original.stroke_width, width);
+        let handle = drag::rotation_handle(measurement(&state, 0), original.stroke_width).unwrap();
+        assert_eq!(
+            crate::editor::annotation_drag::handle_hit_test_for_annotation(
+                &original,
+                (handle.0 as f64, handle.1 as f64),
+            ),
+            crate::types::SelectionHandle::Rotate,
+        );
+        // 1. 【尺子测试】【按下事务】框外把手必须建立旋转事务，不能取消当前选择
+        pointer(&mut state, handle.0 as f64, handle.1 as f64, &mut dirty);
+        handle_pointer_button(&mut state, MouseButton::Left, true, &mut dirty);
+        assert_eq!(state.selected_annotation_index(), Some(0));
+        assert_eq!(
+            state.ann_drag.as_ref().unwrap().handle,
+            crate::types::SelectionHandle::Rotate
+        );
+        // 2. 【尺子测试】【移动交付】释放后只提交一次历史，撤销恢复完整原标注
+        pointer(&mut state, 424.0, 282.5, &mut dirty);
+        assert!(state.pending.is_some());
+        handle_pointer_button(&mut state, MouseButton::Left, false, &mut dirty);
+        assert_eq!(state.selected_annotation_index(), Some(0));
+        assert_ne!(state.annotations[0], original);
+        assert_eq!(state.undo_stack.len(), 2);
+        key(&mut state, "Ctrl+Z", &mut dirty);
+        assert_eq!(state.annotations, [original]);
+    }
 }
 
 /// 【尺子测试】【独立笔宽】修改尺子默认笔宽不改变标记、激光或普通绘图；未完成撤销不产生空历史

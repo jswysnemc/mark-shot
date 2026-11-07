@@ -243,6 +243,18 @@ impl OcrView {
         self.set_span(first, last)
     }
 
+    /// 【贴图文字】【整行选择】按 line 只选择当前显示行，返回需重绘区域，双击不扩大到识别段落的其他行
+    pub fn select_line(&mut self, line: usize) -> Option<Rect> {
+        self.lines.get(line)?;
+        self.anchor_block = self.block_of.get(line).copied();
+        self.set_span(line, line)
+    }
+
+    /// 【贴图文字】【逐行复制】按 selected 决定复制当前选择或全文，返回单换行行文本，不在段落之间额外插入空行
+    pub fn line_text(&self, selected: bool) -> String {
+        self.copy_text_with_separator(if selected { self.sel } else { None }, "\n")
+    }
+
     pub fn select_all(&mut self) -> Option<Rect> {
         self.anchor_block = None;
         let (Some(&first), Some(&last)) = (self.order.first(), self.order.last()) else {
@@ -325,6 +337,15 @@ impl OcrView {
 
     /// 【文字识别】【文字提取】按 sel 提取原文；空选择提取全部文字，段落之间保留空行
     fn copy_text(&self, sel: Option<(Caret, Caret)>) -> String {
+        self.copy_text_with_separator(sel, "\n\n")
+    }
+
+    /// 【文字识别】【分隔复制】按 sel 和 paragraph_break 提取当前原文，返回文本，不改变字符选择或双向文字顺序
+    fn copy_text_with_separator(
+        &self,
+        sel: Option<(Caret, Caret)>,
+        paragraph_break: &str,
+    ) -> String {
         let mut out = String::new();
         let mut prev_block: Option<usize> = None;
         for &li in &self.order {
@@ -340,7 +361,7 @@ impl OcrView {
             let block = self.block_of[li];
             match prev_block {
                 Some(pb) if pb == block => out.push('\n'),
-                Some(_) => out.push_str("\n\n"),
+                Some(_) => out.push_str(paragraph_break),
                 None => {}
             }
             out.push_str(&segment);

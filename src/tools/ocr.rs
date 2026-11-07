@@ -62,12 +62,9 @@ impl ToolBehavior for OcrTool {
             return;
         }
 
-        let hit = state.ocr.view.line_at(state.input.pointer.global);
+        let hit = state.ocr.view.line_at(state.canvas_point());
         if let Some(line) = hit {
-            let pos = (
-                state.input.pointer.global.0 as f32,
-                state.input.pointer.global.1 as f32,
-            );
+            let pos = (state.canvas_point().0 as f32, state.canvas_point().1 as f32);
             if state.input.clicks.register(ClickTarget::OcrLine(line), pos) {
                 let damage = state.ocr.view.select_block(line);
                 damage_overlay(state, damage);
@@ -77,7 +74,7 @@ impl ToolBehavior for OcrTool {
 
         // Empty space inside the scanned area still starts a text drag
         if hit.is_some() || pressed_inside_region(state) {
-            let damage = state.ocr.view.begin_drag(state.input.pointer.global);
+            let damage = state.ocr.view.begin_drag(state.canvas_point());
             damage_overlay(state, damage);
             return;
         }
@@ -139,9 +136,7 @@ impl ToolBehavior for OcrTool {
     }
 
     fn cursor(&self, state: &EditorState) -> CursorIcon {
-        if state.ocr.view.is_active()
-            && state.ocr.view.line_at(state.input.pointer.global).is_some()
-        {
+        if state.ocr.view.is_active() && state.ocr.view.line_at(state.canvas_point()).is_some() {
             CursorIcon::Text
         } else {
             CursorIcon::Crosshair
@@ -195,10 +190,7 @@ fn boxed_out(state: &EditorState) -> bool {
 /// "select a new area".
 fn pressed_inside_region(state: &EditorState) -> bool {
     state.ocr.view.region().is_some_and(|region| {
-        let (x, y) = (
-            state.input.pointer.global.0 as f32,
-            state.input.pointer.global.1 as f32,
-        );
+        let (x, y) = (state.canvas_point().0 as f32, state.canvas_point().1 as f32);
         x >= region.left() && x <= region.right() && y >= region.top() && y <= region.bottom()
     })
 }
@@ -220,7 +212,7 @@ fn begin_region_drag(state: &mut EditorState) {
     state.ocr.redrag_from = state.selection.zone;
     state.tool_active = true;
     state.selection.set_drag(SelectionHandle::None, None, None);
-    state.input.drag_start = Some(state.input.pointer.global);
+    state.input.drag_start = Some(state.canvas_point());
 }
 
 fn end_region_drag(state: &mut EditorState) {

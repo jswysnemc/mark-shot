@@ -14,6 +14,7 @@ use crate::types::{
     MouseButton, OverlayEvent, ScrollAxis, ScrollDirection, ScrollEvent, ScrollSource,
 };
 impl PointerHandler for OverlayState {
+    /// 【Wayland覆盖层】【指针分派】按 pointer 与 events 保留真实按钮时间、序列号和坐标，回调连接与队列不参与转换，无返回值
     fn pointer_frame(
         &mut self,
         _: &Connection,
@@ -31,6 +32,11 @@ impl PointerHandler for OverlayState {
                 .iter()
                 .find(|(_, sd)| sd.surface == event.surface)
                 .map(|(id, _)| *id);
+            let panel = monitor_idx.and_then(|index| self.surfaces.get(&index));
+            let position = panel.map_or(event.position, |surface| {
+                surface.canvas_point(event.position)
+            });
+            let scroll_window = panel.is_some_and(|surface| surface.canvas_rect.is_some());
             match event.kind {
                 PointerEventKind::Enter { serial } => {
                     self.pointer_enter_serial = serial;
@@ -42,8 +48,9 @@ impl PointerHandler for OverlayState {
                     if let Some(idx) = monitor_idx {
                         self.events.push_back(OverlayEvent::PointerMove {
                             monitor_idx: idx,
-                            x: event.position.0,
-                            y: event.position.1,
+                            x: position.0,
+                            y: position.1,
+                            history: Vec::new(),
                         });
                     }
                 }
@@ -56,15 +63,25 @@ impl PointerHandler for OverlayState {
                     if let Some(idx) = self.pointer_surface_idx {
                         self.events.push_back(OverlayEvent::PointerMove {
                             monitor_idx: idx,
-                            x: event.position.0,
-                            y: event.position.1,
+                            x: position.0,
+                            y: position.1,
+                            history: Vec::new(),
                         });
                     }
                 }
 
-                PointerEventKind::Press { button, .. }
-                | PointerEventKind::Release { button, .. } => {
+                PointerEventKind::Press { button, time, .. }
+                | PointerEventKind::Release { button, time, .. } => {
                     let pressed = matches!(event.kind, PointerEventKind::Press { .. });
+                    // 3. 【滚动截图】【点击位置】布局更新后即使指针未移动，也使用本次按钮事件的真实窗口坐标
+                    if scroll_window && let Some(index) = monitor_idx {
+                        self.events.push_back(OverlayEvent::PointerMove {
+                            monitor_idx: index,
+                            x: position.0,
+                            y: position.1,
+                            history: Vec::new(),
+                        });
+                    }
                     let serial = match event.kind {
                         PointerEventKind::Press { serial, .. } => {
                             if let Some(data) = wayland_client::Proxy::data::<
@@ -85,10 +102,24 @@ impl PointerHandler for OverlayState {
                         0x112 => MouseButton::Middle,
                         _ => continue,
                     };
+                    // 2. 【主选择区】【释放授权】每个应用按钮保留独立座席序列，菜单 serial 仍仅限按下事件
+                    if let Some(data) = wayland_client::Proxy::data::<
+                        smithay_client_toolkit::seat::pointer::PointerData<()>,
+                    >(pointer)
+                    {
+                        let serial = match event.kind {
+                            PointerEventKind::Press { serial, .. }
+                            | PointerEventKind::Release { serial, .. } => serial,
+                            _ => unreachable!(),
+                        };
+                        self.primary_selection.button(data.seat().clone(), serial);
+                    }
+                    // 1. 【Wayland覆盖层】【按钮时间】平台时间与菜单序列号分别保存，输入处理延迟不能改变双击间隔
                     self.events.push_back(OverlayEvent::PointerButton {
                         button: mb,
                         pressed,
                         serial,
+                        timestamp: Some(time),
                     });
                 }
 
@@ -98,6 +129,14 @@ impl PointerHandler for OverlayState {
                     source,
                     ..
                 } => {
+                    if scroll_window && let Some(index) = monitor_idx {
+                        self.events.push_back(OverlayEvent::PointerMove {
+                            monitor_idx: index,
+                            x: position.0,
+                            y: position.1,
+                            history: Vec::new(),
+                        });
+                    }
                     let event = ScrollEvent {
                         horizontal: scroll_axis(horizontal, false),
                         vertical: scroll_axis(vertical, true),

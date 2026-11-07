@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 
 use tiny_skia::{Color, Path, Rect};
 
+use crate::features::annotation_style::units::Units;
 use crate::renderer::stroke_path::freehand_path;
 
 pub const LIFETIME: Duration = Duration::from_millis(1800);
@@ -25,6 +26,7 @@ pub struct LaserStroke {
     pub(super) path: Option<Path>,
     pub(super) color: Color,
     pub(super) width: f32,
+    units: Units,
     canvas_bounds: Rect,
     visual_bounds: Rect,
     expires_at: Option<Instant>,
@@ -39,12 +41,24 @@ impl LaserTrace {
         width: f32,
         bounds: Rect,
     ) -> Option<Rect> {
+        self.begin_in_units(point, color, width, bounds, Units::default())
+    }
+
+    /// 【激光】【原图手势】按point、color、原图width、bounds与units创建画布草稿，返回新旧重绘范围，不保存导航倍率
+    pub(crate) fn begin_in_units(
+        &mut self,
+        point: (f32, f32),
+        color: Color,
+        width: f32,
+        bounds: Rect,
+        units: Units,
+    ) -> Option<Rect> {
         if !width.is_finite() || width <= 0.0 {
             return None;
         }
         let point = clamp_point(point, bounds)?;
         let old = self.cancel_draft();
-        let draft = LaserStroke::new(point, color, width, bounds);
+        let draft = LaserStroke::new(point, color, units.canvas(width), bounds, units);
         let damage = union(old, Some(draft.bounds()));
         self.draft = Some(draft);
         union(damage, self.trim_capacity())
@@ -56,7 +70,9 @@ impl LaserTrace {
         let next = clamp_point(point, draft.canvas_bounds)?;
         let last = *draft.points.last()?;
         let distance = (next.0 - last.0).hypot(next.1 - last.1);
-        let step = (draft.width * 0.38).max(2.0);
+        let step = draft
+            .units
+            .canvas((draft.image_stroke_width() * 0.38).max(2.0));
         if !distance.is_finite() || distance < step * 0.35 {
             return None;
         }
@@ -149,13 +165,14 @@ impl LaserTrace {
 }
 
 impl LaserStroke {
-    /// 【激光】【草稿构造】使用有效 point、color、width、bounds 初始化采样和辉光边界；返回草稿
-    fn new(point: (f32, f32), color: Color, width: f32, bounds: Rect) -> Self {
+    /// 【激光】【草稿构造】按point、color、画布width、bounds与units初始化采样和辉光边界，返回独立草稿
+    fn new(point: (f32, f32), color: Color, width: f32, bounds: Rect, units: Units) -> Self {
         let mut stroke = Self {
             points: vec![point],
             path: None,
             color,
             width,
+            units,
             canvas_bounds: bounds,
             visual_bounds: bounds,
             expires_at: None,
@@ -167,6 +184,11 @@ impl LaserStroke {
     /// 【激光】【采样读取】返回只读逻辑坐标数组
     pub fn points(&self) -> &[(f32, f32)] {
         &self.points
+    }
+
+    /// 【激光】【原图笔宽】无参数，返回创建时的原图笔宽，不受当前窗口和导航状态影响
+    pub fn image_stroke_width(&self) -> f32 {
+        self.units.image(self.width)
     }
 
     /// 【激光】【重绘边界】返回包含 2.6 倍辉光宽度和抗锯齿留量的逻辑区域

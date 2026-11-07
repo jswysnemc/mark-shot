@@ -26,7 +26,7 @@ impl ToolBehavior for FilterTool {
             return;
         };
         if pressed {
-            let Some(point) = space.start_point(state.input.pointer.global) else {
+            let Some(point) = space.start_point(state.canvas_point()) else {
                 return;
             };
             let mut filter = RegionFilter::new(
@@ -39,6 +39,9 @@ impl ToolBehavior for FilterTool {
             filter.style_scale = 1.0 / space.pixel_scale;
             let color = state.tool_settings.color;
             let mut annotation = Annotation {
+                style_scale: 1.0,
+                rotation_degrees: 0.0,
+                frozen_bounds: None,
                 id: state.next_id,
                 shape: AnnotationShape::Redact { filter },
                 color,
@@ -47,11 +50,12 @@ impl ToolBehavior for FilterTool {
                 bbox: Rect::from_xywh(point.0, point.1, filter.style_scale, filter.style_scale)
                     .unwrap(),
             };
+            state.adopt_annotation_style(&mut annotation);
             annotation.update_bbox();
             state.pending = Some(annotation.clone());
             state.prev_pending = Some(annotation);
         } else {
-            self.on_move(state, state.input.pointer.global, dirty_mask);
+            self.on_move(state, state.canvas_point(), dirty_mask);
             let valid = state.pending.as_ref().is_some_and(|annotation| {
                 matches!(annotation.shape, AnnotationShape::Redact { filter }
                     if space.rectangle_measures(filter.start, filter.end, 2.0))

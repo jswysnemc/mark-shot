@@ -60,7 +60,7 @@ pub(super) fn skeleton(state: &EditorState, index: usize) -> &LineSkeleton {
 /// 【线条测试】【选中标注】在 state 中进入选择工具并选中 index，刷新对应属性；dirty 接收重绘，无返回值
 pub(super) fn pick(state: &mut EditorState, index: usize, dirty: &mut u32) {
     select_tool(state, Tool::Pick, dirty);
-    state.selected_annotation = Some(index);
+    state.select_annotation_index(Some(index));
     crate::app::input::refresh_panels(state, dirty);
 }
 

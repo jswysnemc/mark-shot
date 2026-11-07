@@ -1,6 +1,6 @@
 //! 【字体弹层】【有界预览】只保留当前可见行字库，页面变化时释放旧 FontSystem 和字形缓存
 
-use crate::{fonts::font_catalog::FontCatalog, renderer::Painter, theme::Rgba};
+use crate::{fonts::font_catalog::FontCatalog, renderer::Painter, theme::toolbar::Palette};
 use cosmic_text::{Attrs, Buffer, FontSystem, Metrics, Shaping, SwashCache, fontdb};
 use tiny_skia::{Pixmap, Rect};
 
@@ -60,7 +60,7 @@ impl Preview {
         self.key = visible.to_vec();
     }
 
-    /// 【字体弹层】【可见文字】按 catalog、rows、list、scale 绘制独立列表文字缓冲，返回裁切后的图像，背景由面板绘制
+    /// 【字体弹层】【可见文字】按 catalog、rows、list、scale 与 palette 绘制列表文字，active 指定选中家族，返回裁切图像
     pub fn render(
         &mut self,
         catalog: &FontCatalog,
@@ -68,6 +68,7 @@ impl Preview {
         list: Rect,
         scale: f32,
         active: &str,
+        palette: Palette,
     ) -> Option<Pixmap> {
         let visible = rows.iter().map(|(index, _)| *index).collect::<Vec<_>>();
         self.prepare(catalog, &visible);
@@ -109,9 +110,9 @@ impl Preview {
                 }
             }
             let color = if family.name == active {
-                Rgba(4, 47, 46, 255)
+                palette.hover_text
             } else {
-                Rgba(229, 231, 235, 255)
+                palette.text
             };
             Painter::new(&mut image)
                 .with_scale(scale)

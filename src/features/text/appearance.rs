@@ -7,7 +7,6 @@ pub struct TextAppearance {
     pub family: String,
     pub background: Color,
     pub size_scale: f32,
-    pub wrap_width: Option<f32>,
 }
 
 impl Default for TextAppearance {
@@ -17,17 +16,15 @@ impl Default for TextAppearance {
             family: "Sans Serif".into(),
             background: Color::TRANSPARENT,
             size_scale: 1.0,
-            wrap_width: None,
         }
     }
 }
 
 impl TextAppearance {
-    /// 【文字标注】【比例映射】按 scale 映射背景内边距与换行宽度，返回新外观，不改变背景颜色和字体家族
+    /// 【文字标注】【比例映射】按 scale 映射字体及背景内边距的预览比例，返回新外观，不改变背景颜色和字体家族
     pub fn scaled(&self, scale: f32) -> Self {
         Self {
             size_scale: self.size_scale * scale,
-            wrap_width: self.wrap_width.map(|width| width * scale),
             ..self.clone()
         }
     }

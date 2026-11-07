@@ -19,6 +19,9 @@ fn annotation(
     mark.tip = tip;
     mark.rotation = rotation;
     let mut annotation = Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id: 2,
         shape: AnnotationShape::Number { mark },
         color: Color::from_rgba8(210, 30, 50, 128),
@@ -38,11 +41,31 @@ fn render(
     origin: (f32, f32),
     with_fonts: bool,
 ) -> Pixmap {
+    render_in_window(
+        annotations,
+        size,
+        scale,
+        origin,
+        with_fonts,
+        mark_shot::features::annotation_style::window::WindowUnits::default(),
+    )
+}
+
+/// 【序号测试】【窗口绘制】按annotations、size、scale、origin、with_fonts和window返回同一窗口单位下的像素，设备比例与坐标换算保持独立
+fn render_in_window(
+    annotations: &[Annotation],
+    size: (u32, u32),
+    scale: f32,
+    origin: (f32, f32),
+    with_fonts: bool,
+    window: mark_shot::features::annotation_style::window::WindowUnits,
+) -> Pixmap {
     let mut image = Pixmap::new(size.0, size.1).unwrap();
     let mut fonts = mark_shot::fonts::bundled();
     let mut cache = cosmic_text::SwashCache::new();
     let mut painter = Painter::new(&mut image)
         .with_scale(scale)
+        .with_window_units(window)
         .with_origin(origin);
     if with_fonts {
         painter = painter.with_text(&mut fonts, &mut cache);
@@ -133,7 +156,7 @@ fn translucent_bubbles_keep_an_opaque_white_ring_and_label() {
     assert_eq!(pixel(&image, 0, 0), [0; 4]);
 }
 
-/// 【序号测试】【原图导出】固定留量、笔宽和半透明尾部在导出缩放后与预览保持逐像素一致
+/// 【序号测试】【坐标映射】固定留量、笔宽和半透明尾部在相同窗口单位下换坐标后仍逐像素一致
 #[test]
 fn native_export_preserves_body_geometry_and_alpha() {
     let annotation = annotation(
@@ -150,12 +173,13 @@ fn native_export_preserves_body_geometry_and_alpha() {
         (0.0, 0.0),
         false,
     );
-    let exported = render(
+    let exported = render_in_window(
         &[annotation.scaled(2.0)],
         (1280, 960),
         1.0,
         (0.0, 0.0),
         false,
+        mark_shot::features::annotation_style::window::WindowUnits::new(2.0),
     );
     same(&preview, &exported);
 }
@@ -274,6 +298,9 @@ fn dragged_numbers_stay_below_newer_translucent_annotations() {
 /// 【序号测试】【背景标注】返回 id、rect、color 对应的填充矩形，用于层序回归
 fn rectangle(id: u64, rect: Rect, color: Color) -> Annotation {
     let mut annotation = Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id,
         shape: AnnotationShape::Rectangle {
             start: (rect.left(), rect.top()),
@@ -289,9 +316,9 @@ fn rectangle(id: u64, rect: Rect, color: Color) -> Annotation {
     annotation
 }
 
-/// 【序号测试】【标签约束】较长罗马数字和整数上限标签拟合在圆框内，不越界绘制白色字形
+/// 【序号测试】【标签下限】长标签逐点缩小至八点后可超出圆框，外部新增像素只来自白色字形，不放大圆框或填充
 #[test]
-fn long_labels_fit_inside_the_bubble_without_large_text_buffers() {
+fn long_labels_keep_the_minimum_point_size_and_only_white_glyphs_overflow() {
     for (style, number) in [
         (NumberStyle::UpperRoman, 10_888),
         (NumberStyle::Arabic, u32::MAX),
@@ -306,15 +333,77 @@ fn long_labels_fit_inside_the_bubble_without_large_text_buffers() {
             false,
         );
         let actual = render(&[annotation], (320, 280), 1.0, (0.0, 0.0), true);
+        let mut overflow = 0;
         for y in 0..280 {
             for x in 0..320 {
                 if (x as f32 - 140.0).hypot(y as f32 - 140.0) > 16.0 {
-                    assert_eq!(
-                        pixel(&actual, x, y),
-                        pixel(&expected, x, y),
-                        "glyph outside bubble at {x}, {y}"
-                    );
+                    let actual = pixel(&actual, x, y);
+                    if pixel(&expected, x, y) == [0; 4] {
+                        assert!(
+                            actual[0] == actual[1]
+                                && actual[1] == actual[2]
+                                && actual[2] == actual[3],
+                            "nonwhite pixels outside bubble at {x}, {y}"
+                        );
+                        overflow += usize::from(actual[3] > 0);
+                    }
                 }
+            }
+        }
+        if style == NumberStyle::Arabic {
+            assert!(
+                overflow > 0,
+                "the minimum eight-point label must not be continuously shrunk to fit"
+            );
+        }
+    }
+}
+
+/// 【序号测试】【长标签缓存】只重绘旧圆框外的窄条时保留八点标签的外伸字形，持久损坏范围必须覆盖全部实际像素
+#[test]
+fn long_label_overflow_survives_cached_partial_rebuilds_outside_the_body() {
+    let annotation = annotation(
+        NumberStyle::Arabic,
+        u32::MAX,
+        (140.0, 140.0),
+        (140.0, 140.0),
+        0.0,
+    );
+    let expected = render(
+        std::slice::from_ref(&annotation),
+        (320, 280),
+        1.0,
+        (0.0, 0.0),
+        true,
+    );
+    let mut actual = expected.clone();
+    let mut fonts = mark_shot::fonts::bundled();
+    let mut cache = cosmic_text::SwashCache::new();
+    for rect in [
+        Rect::from_xywh(90.0, 120.0, 28.0, 40.0).unwrap(),
+        Rect::from_xywh(162.0, 120.0, 28.0, 40.0).unwrap(),
+    ] {
+        rebuild_annotations_layer(
+            &mut Painter::new(&mut actual).with_text(&mut fonts, &mut cache),
+            std::slice::from_ref(&annotation),
+            &mut HashMap::new(),
+            &HashMap::new(),
+            None,
+            Some(rect),
+        );
+    }
+    same(&actual, &expected);
+    let damage = annotation.damage_bbox(false);
+    for y in 0..280 {
+        for x in 0..320 {
+            if pixel(&expected, x, y)[3] != 0 {
+                assert!(
+                    (x as f32) >= damage.left()
+                        && (x as f32) < damage.right()
+                        && (y as f32) >= damage.top()
+                        && (y as f32) < damage.bottom(),
+                    "actual glyph outside persistent damage at {x},{y}"
+                );
             }
         }
     }
@@ -329,15 +418,14 @@ fn oversized_rotated_glyphs_have_seamless_chunked_rendering() {
         (50.0, 50.0),
         (50.0, 50.0),
         0.35,
-    )
-    .scaled(40.0);
-    annotation.stroke_width = 72.0 * 40.0;
+    );
+    annotation.stroke_width = 72.0;
     annotation.update_bbox();
-    let origin = (1750.0, 1100.0);
+    let origin = (1750.0 / 40.0, 1100.0 / 40.0);
     let expected = render(
         std::slice::from_ref(&annotation),
         (512, 512),
-        1.0,
+        40.0,
         origin,
         true,
     );
@@ -346,8 +434,8 @@ fn oversized_rotated_glyphs_have_seamless_chunked_rendering() {
         let piece = render(
             std::slice::from_ref(&annotation),
             (256, 256),
-            1.0,
-            (origin.0 + x as f32, origin.1 + y as f32),
+            40.0,
+            (origin.0 + x as f32 / 40.0, origin.1 + y as f32 / 40.0),
             true,
         );
         mark_shot::renderer::paste(&mut actual, &piece, x, y);

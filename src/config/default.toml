@@ -14,6 +14,13 @@
 # tinker with if you want but it's not really recommended and can result in breaking the application.
 # Useful, important options will be moved to the GUI later on.
 
+[ui]
+# 【界面主题】【明暗选择】默认浅色；Ctrl+Shift+L 切换并保存，设置窗口无需打开
+theme = "light"
+
+# system | english | chinese; MARK_SHOT_LANG takes precedence
+language = ""
+
 [general]
 # What happens to every screenshot, on top of what you choose in the editor:
 # e.g. with to = "s" copying also saves the file.
@@ -37,10 +44,31 @@ to = "cs"
 # auto    layer on niri, where a window would open as a new column, and on COSMIC, window everywhere else
 overlay = "auto"
 
+[startup]
+# 【启动配置】【鼠标像素】仅在明确启用时把鼠标收入原始截图
+include_cursor = false
+
+[region_detection]
+# 【区域识别】【图像分析】冻结截图仅分析一次，滚轮切换父子区域
+enabled = true
+
+[window_detection]
+# 【窗口识别】【桌面快照】显示截图覆盖层前读取同一合成器的窗口边界
+enabled = true
+
 [save]
 directory = "screenshots"
 month_format = "%Y-%m"
 filename_format = "%Y-%m-%d_%H-%M"
+
+[export.image_frame]
+# 【图像导出】【Mac 风格外框】只应用到编辑器保存、另存为和复制；边距使用物理像素
+enabled = false
+padding = 112
+corner_radius = 18.0
+shadow_radius = 72
+shadow_offset_y = 28
+shadow_opacity = 0.32
 
 [pinned]
 always_on_top = true
@@ -70,22 +98,22 @@ font_size = 11.0
 small_font_size = 11.0
 # ratio of the font size
 line_height = 1.2
-background = "#0F1117E6"
-foreground = "#E5E7EB"
-muted = "#9CA3AF"
-hover = "#2DD4BF"
+# background = "#0F1117E6"
+# foreground = "#E5E7EB"
+# muted = "#9CA3AF"
+# hover = "#2DD4BF"
 # selected and active things, progress bars, titles
-accent = "#99F6E44E"
+# accent = "#99F6E44E"
 # icons and text drawn over a hover or accent fill
-on_accent = "#1A1814"
-border = "#FFFFFF1C"
+# on_accent = "#1A1814"
+# border = "#FFFFFF1C"
 # used instead of border when the background is light
-border_on_light = "#10161737"
-field = "#272D2F"
+# border_on_light = "#10161737"
+# field = "#272D2F"
 # the empty part of progress bars
-track = "#3B4647"
-caret = "#F5E0DC"
-text_selection = "#89B4FA6E"
+# track = "#3B4647"
+# caret = "#F5E0DC"
+# text_selection = "#89B4FA6E"
 panel_height = 42.0
 panel_padding = 6.0
 # gap between a panel and what it is attached to
@@ -107,6 +135,10 @@ accept = "Return"
 copy = "Ctrl+C"
 save = "Ctrl+S"
 save_as = "Ctrl+Alt+S"
+open_with = []
+extensions = []
+upload = []
+translate = []
 pin = "Ctrl+P"
 cancel = "Escape"
 undo = "Ctrl+Z"
@@ -115,6 +147,7 @@ select_all = "Ctrl+A"
 delete = ["Delete", "Backspace"]
 toggle_ui = "Space"
 toggle_magnifier = "Shift+M"
+toggle_theme = "Ctrl+Shift+L"
 scroll_capture = "Ctrl+Shift+S"
 history = "Ctrl+H"
 size_up = "]"
@@ -498,6 +531,18 @@ toolbar_slide_distance = 340.0
 toast_fade_in = 0.18
 toast_fade_out = 0.14
 
+[ocr_result_window]
+# 【OCR 结果窗口】【独立置顶】只影响结果窗口，不继承 pinned.always_on_top
+always_on_top = false
+
+[translation]
+# 【翻译配置】【默认选择】只在用户主动翻译时启动任务，凭据可放在环境变量或对应厂商子节
+target_language = "Simplified Chinese"
+provider = "auto"
+command = ""
+# 【翻译配置】【超时存在性】缺省使用厂商超时；如需统一覆盖，可显式添加 timeout_ms
+# 【翻译配置】【厂商子节】支持 openai、gemini、anthropic、tencent、baidu、youdao，不在模板中保存凭据
+
 [ocr]
 threads = 4
 # 【文字识别】【结果窗口】主 OCR 命令识别后打开可编辑窗口；关闭后保留截图内逐字选择
@@ -572,7 +617,18 @@ rule_contrast = 32
 rule_coverage = 0.9
 rule_reach = 0.5
 
+
 [log]
 # off | error | info; unset keeps each process's own default
 # level = "info"
 max_file_size_mb = 1
+[upload]
+# 留空时使用内置 HTTP 上传，端点和凭据通过下方 env 或同名环境变量配置
+command = ""
+timeout_ms = 60000
+
+[upload.env]
+# MARK_SHOT_UPLOAD_URL = "https://image-host.example/upload"
+# MARK_SHOT_UPLOAD_API_KEY = ""
+# MARK_SHOT_UPLOAD_FIELD = "image"
+# MARK_SHOT_UPLOAD_URL_PATH = "data.url"

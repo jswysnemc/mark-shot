@@ -10,7 +10,7 @@ use super::{Launch, delay, init};
 
 type Result = std::result::Result<(), Box<dyn std::error::Error>>;
 
-pub async fn full(conn: wayland_client::Connection, launch: Launch) -> Result {
+pub async fn full(conn: crate::backend::session::Session, launch: Launch) -> Result {
     let mut prof = Profiler::new(launch.speed);
 
     // 'overlay' may be misleading, we use get monitor list and probe of the active
@@ -67,17 +67,21 @@ pub async fn full(conn: wayland_client::Connection, launch: Launch) -> Result {
     Ok(())
 }
 
-pub async fn window(conn: wayland_client::Connection, launch: Launch) -> Result {
+pub async fn window(conn: crate::backend::session::Session, launch: Launch) -> Result {
     let mut prof = Profiler::new(launch.speed);
     if launch.one_monitor {
         log::info!("--monitor does nothing with --window, ignoring it");
     }
 
-    let method = crate::backend::initialize_capture_with_cursor(&conn, launch.include_cursor);
+    let method = crate::backend::initialize_window_capture(
+        &conn,
+        launch.include_cursor,
+        launch.outputs().copy,
+    );
     delay::wait(launch.shot_at, &*method, &mut prof).await?;
     let capture = method.capture_active_window().await?;
     prof.mark("capture");
-    let png = encode_png_with_alpha(capture.pixmap);
+    let png = encode_png_with_alpha(capture.pixmap.into_pixmap());
     prof.mark("png encoded");
 
     deliver(

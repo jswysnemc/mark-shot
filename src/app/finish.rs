@@ -2,33 +2,44 @@
 
 use std::path::Path;
 
-use crate::app::{Launch, render_final, scroll};
+use crate::app::{render_final, scroll};
 use crate::backend::notify::{self, Notice};
 use crate::backend::{ScreenOverlay, initialize_clipboard};
 use crate::editor::EditorState;
 use crate::types::Outputs;
 use crate::utils::{save_to_file, write_to_stdout};
 
-/// Runs the scrolling capture on the still-open overlay, then delivers
-/// whatever it produced. An empty result means the user cancelled.
+/// 【滚动截图】【用户交付】按用户操作复制或保存，标注操作返回原图及输出名称供调用方创建编辑会话
 pub async fn finish_scroll(
-    conn: &wayland_client::Connection,
+    conn: &crate::backend::session::Session,
     editor_state: &mut EditorState,
     overlay: &mut Box<dyn ScreenOverlay>,
-    launch: &Launch,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let png = scroll::capture(conn, editor_state, overlay).await?;
-    if let Some(png) = png {
-        deliver(
-            png,
-            1.0,
-            launch.outputs(),
-            editor_state.output.as_deref(),
-            "",
-        )
-        .await;
+) -> crate::AppResult<Option<(tiny_skia::Pixmap, String)>> {
+    match scroll::capture(conn, editor_state, overlay).await? {
+        scroll::Outcome::Cancelled => {}
+        scroll::Outcome::Annotate { image, monitor_idx } => {
+            let output = overlay
+                .surface_output(monitor_idx)
+                .ok_or("the scroll capture output is gone")?;
+            let name = crate::backend::output_selection::name(output, monitor_idx);
+            return Ok(Some((image, name)));
+        }
+        scroll::Outcome::Copy { png, scale } => {
+            deliver(
+                png,
+                scale,
+                Outputs {
+                    copy: true,
+                    ..Default::default()
+                },
+                None,
+                "",
+            )
+            .await;
+        }
+        scroll::Outcome::Saved(path) => notify::send(Notice::Saved(path)).await,
     }
-    Ok(())
+    Ok(None)
 }
 
 pub async fn finish_capture(
@@ -45,6 +56,10 @@ pub async fn finish_capture(
     let Some((png, _, scale)) = render_final(editor_state) else {
         return Ok(());
     };
+    let pin_translation = (outputs | editor_state.to)
+        .pin
+        .then(|| super::selection_translation::handoff::prepare(editor_state))
+        .flatten();
     let search = if crate::config::history::current().index_annotations {
         crate::features::capture_history::png_metadata::joined_search(
             editor_state
@@ -68,6 +83,8 @@ pub async fn finish_capture(
             .selection
             .zone
             .map(|rect| (rect.left().round() as i32, rect.top().round() as i32)),
+        true,
+        pin_translation,
     )
     .await;
     Ok(())
@@ -75,7 +92,7 @@ pub async fn finish_capture(
 
 /// 【截图】【完成交付】记录最终 png 后按 outputs 贴图、保存与复制；scale 为设备比例，dir 为输出目录，search 为搜索文字
 pub async fn deliver(png: Vec<u8>, scale: f32, outputs: Outputs, dir: Option<&Path>, search: &str) {
-    deliver_positioned(png, scale, outputs, dir, search, None).await;
+    deliver_positioned(png, scale, outputs, dir, search, None, false, None).await;
 }
 
 /// 【截图】【定位交付】按 position 恢复贴图位置，其余保存、复制与历史流程保持相同
@@ -86,19 +103,43 @@ async fn deliver_positioned(
     dir: Option<&Path>,
     search: &str,
     position: Option<(i32, i32)>,
+    user_image: bool,
+    pin_translation: Option<super::selection_translation::handoff::Image>,
 ) {
-    crate::features::capture_history::remember(&png, scale, search);
-    if outputs.pin
-        && let Err(e) = crate::backend::wayland::pin::spawn_at(&png, scale, position)
-    {
-        log::error!("pin failed: {e}");
-        notify::send(Notice::PinFailed(e.to_string())).await;
+    // 1. 【图像导出】【共享图片】只在用户保存或复制时合成一次外框，贴图与标准输出始终使用原图
+    let exported = match crate::features::export_image::for_delivery(
+        &png,
+        user_image && (outputs.save || outputs.copy),
+    ) {
+        Ok(exported) => exported,
+        Err(error) => {
+            log::error!("【图像导出】【外框合成】{error}");
+            let notice = if outputs.save {
+                Notice::SaveFailed(error.to_string())
+            } else {
+                Notice::CopyFailed(error.to_string())
+            };
+            notify::send(notice).await;
+            return;
+        }
+    };
+    crate::features::capture_history::remember(&exported, scale, search);
+    if outputs.pin {
+        let result = if let Some(image) = pin_translation {
+            crate::backend::pin::spawn_translated(&image.png, scale, position, &image.seed)
+        } else {
+            crate::backend::pin::spawn_at(&png, scale, position)
+        };
+        if let Err(e) = result {
+            log::error!("pin failed: {e}");
+            notify::send(Notice::PinFailed(e.to_string())).await;
+        }
     }
     if outputs.stdout {
         to_stdout(&png, true).await;
     }
     let saved = if outputs.save {
-        match save_to_file(&png, dir) {
+        match save_to_file(&exported, dir) {
             Ok(path) => Some(path),
             Err(e) => {
                 log::error!("save failed: {e}");
@@ -110,9 +151,9 @@ async fn deliver_positioned(
         None
     };
     if outputs.copy {
-        match initialize_clipboard().copy_image_to_clipboard(&png) {
+        match initialize_clipboard().copy_image_to_clipboard(&exported) {
             Ok(()) => {
-                let preview = saved.is_none().then_some(png.as_slice());
+                let preview = saved.is_none().then_some(exported.as_ref());
                 notify::send(Notice::Copied(saved, preview)).await
             }
             Err(e) => {

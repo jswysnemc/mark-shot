@@ -5,6 +5,7 @@ use tiny_skia::Rect;
 use super::angle_draft::constrained_point;
 use super::geometry::{contains, distance, points_bounds, rect_center, rotated};
 use super::{Measurement, Point, RulerGeometry, RulerMode};
+use crate::features::annotation_style::window::WindowUnits;
 use crate::types::SelectionHandle;
 
 pub const HANDLE_TOLERANCE: f32 = 8.0;
@@ -14,7 +15,18 @@ pub const ANGLE_FRAME_PADDING: f32 = 14.0;
 pub fn frame(measurement: Measurement) -> Option<Rect> {
     let bounds = measurement.unrotated_bounds()?;
     let padding = if measurement.mode() == RulerMode::Angle {
-        ANGLE_FRAME_PADDING * measurement.style_scale
+        ANGLE_FRAME_PADDING * measurement.style_scale as f32
+    } else {
+        0.0
+    };
+    bounds.outset(padding, padding)
+}
+
+/// 【尺子】【窗口选框】按measurement和window返回当前窗口操作框，角度尺留白保持十四个窗口逻辑像素
+pub fn window_frame(measurement: Measurement, window: WindowUnits) -> Option<Rect> {
+    let bounds = measurement.unrotated_bounds()?;
+    let padding = if measurement.mode() == RulerMode::Angle {
+        window.canvas(14.0)
     } else {
         0.0
     };
@@ -74,23 +86,13 @@ pub fn handles(measurement: Measurement, tolerance: f32) -> Vec<(Point, Selectio
 
 /// 【尺子】【旋转把手】根据 measurement 与 width 返回旋转把手位置；长度把手随测量框一起旋转
 pub fn rotation_handle(measurement: Measurement, width: f32) -> Option<Point> {
-    let bounds = measurement.unrotated_bounds()?;
-    let center = rect_center(bounds);
-    let unit = measurement.unit(width);
-    let clearance = if measurement.mode() == RulerMode::Angle {
-        ANGLE_FRAME_PADDING * measurement.style_scale
-    } else {
-        32.0 * unit
-    };
-    let point = (
-        center.0,
-        bounds.top() - clearance - 20.0 * measurement.style_scale,
-    );
-    let rotation = match measurement.geometry {
-        RulerGeometry::Length { rotation, .. } => rotation,
-        _ => 0.0,
-    };
-    Some(rotated(point, center, rotation))
+    super::window_chrome::connector(
+        measurement,
+        width,
+        None,
+        WindowUnits::new(measurement.style_scale as f32),
+    )
+    .map(|(_, end)| end)
 }
 
 /// 【尺子】【线段距离】返回 point 到 start、end 线段的最短距离；零长度线段退化为点
@@ -127,12 +129,41 @@ pub fn hit_test(
     selected: bool,
     interior_moves: bool,
 ) -> SelectionHandle {
-    let tolerance = HANDLE_TOLERANCE * measurement.style_scale;
+    let tolerance = HANDLE_TOLERANCE * measurement.style_scale as f32;
     if selected
         && rotation_handle(measurement, width)
             .is_some_and(|handle| distance(point, handle) <= tolerance * 1.4)
     {
         return SelectionHandle::Rotate;
+    }
+    let handle = body_hit(measurement, point, tolerance, interior_moves);
+    if handle != SelectionHandle::None {
+        return handle;
+    }
+    if selected
+        && measurement.mode() == RulerMode::Angle
+        && let Some(frame) = frame(measurement)
+    {
+        let handle = nearest(frame_handles(frame), point, tolerance * 1.4);
+        if handle != SelectionHandle::None {
+            return handle;
+        }
+        if contains(frame, point) {
+            return SelectionHandle::Move;
+        }
+    }
+    SelectionHandle::None
+}
+
+/// 【尺子】【窗口正文命中】按measurement、point与tolerance查找最近定点及正文，interior_moves决定长度框内部职责，容差不读取样式倍率
+pub fn body_hit(
+    measurement: Measurement,
+    point: Point,
+    tolerance: f32,
+    interior_moves: bool,
+) -> SelectionHandle {
+    if !point.0.is_finite() || !point.1.is_finite() || !tolerance.is_finite() || tolerance <= 0.0 {
+        return SelectionHandle::None;
     }
     let handle = nearest(handles(measurement, tolerance), point, tolerance * 1.4);
     if handle != SelectionHandle::None {
@@ -145,15 +176,6 @@ pub fn hit_test(
                 .any(|end| segment_distance(point, points[0], *end) <= tolerance)
             {
                 return SelectionHandle::Move;
-            }
-            if selected && let Some(frame) = frame(measurement) {
-                let handle = nearest(frame_handles(frame), point, tolerance * 1.4);
-                if handle != SelectionHandle::None {
-                    return handle;
-                }
-                if contains(frame, point) {
-                    return SelectionHandle::Move;
-                }
             }
         }
         RulerGeometry::Length { rotation, .. } => {
@@ -185,6 +207,27 @@ pub fn dragged(
     keep_aspect: bool,
     snap: bool,
 ) -> Measurement {
+    dragged_with_window(
+        before,
+        handle,
+        start,
+        point,
+        keep_aspect,
+        snap,
+        WindowUnits::new(before.style_scale as f32),
+    )
+}
+
+/// 【尺子】【窗口拖动】按before、handle、start和point计算手势；keep_aspect保持比例，snap吸附，window提供与实际选框相同的角度留白，返回新测量
+pub fn dragged_with_window(
+    before: Measurement,
+    handle: SelectionHandle,
+    start: Point,
+    point: Point,
+    keep_aspect: bool,
+    snap: bool,
+    window: WindowUnits,
+) -> Measurement {
     if !point.0.is_finite() || !point.1.is_finite() {
         return before;
     }
@@ -199,7 +242,9 @@ pub fn dragged(
         SelectionHandle::None => before,
         _ => match before.geometry {
             RulerGeometry::Length { .. } => length_resize(before, handle, point),
-            RulerGeometry::Angle { .. } => angle_resize(before, handle, point, keep_aspect),
+            RulerGeometry::Angle { .. } => {
+                angle_resize(before, handle, point, keep_aspect, window.canvas(14.0))
+            }
         },
     }
 }
@@ -314,6 +359,7 @@ fn angle_resize(
     handle: SelectionHandle,
     mut point: Point,
     keep_aspect: bool,
+    padding: f32,
 ) -> Measurement {
     let Some(bounds) = before.unrotated_bounds() else {
         return before;
@@ -321,7 +367,6 @@ fn angle_resize(
     let Some((anchor, changes_x, changes_y)) = anchor(bounds, handle) else {
         return before;
     };
-    let padding = ANGLE_FRAME_PADDING * before.style_scale;
     if changes_x {
         point.0 += if anchor.0 == bounds.right() {
             padding

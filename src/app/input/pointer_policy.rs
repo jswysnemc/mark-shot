@@ -78,6 +78,7 @@ pub(super) fn consume(
     if state.ann_drag.is_some() {
         state.undo(dirty);
     }
+    state.end_collection_interaction();
     crate::editor::drawing_gesture::cancel(state, dirty);
     state.laser.cancel_draft();
     state.toolbar_drag = None;
@@ -164,7 +165,7 @@ pub(super) fn toolbar_click(
             if !state.annotations.is_empty() {
                 state.push_undo();
                 state.annotations.clear();
-                state.selected_annotation = None;
+                state.select_annotation_index(None);
                 state.number_sequence = Default::default();
                 state.text.editors.clear();
                 state.text.editing = None;

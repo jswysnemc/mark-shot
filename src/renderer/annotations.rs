@@ -1,3 +1,4 @@
+mod body;
 mod shadow;
 pub use shadow::{selection_chrome_pad, shadow_color_for, visual_pad};
 use shadow::{stroke_segment_with_shadow, transforms_for};
@@ -14,11 +15,12 @@ mod shadow_stroke;
 use shadow_stroke::stroke_with_shadow;
 mod numbered;
 use numbered::draw_numerated_arrow;
+#[cfg(test)]
+mod selection_chrome_tests;
 
 use super::Painter;
 use super::paths::{luminance, normalized_rect, oval_path, rect_bounds, scale_rect};
 use super::text::shape_single_line;
-use crate::renderer::paths::KAPPA;
 use crate::tools::text::render_text_annotation_with_caret;
 use crate::types::annotations::{Annotation, AnnotationShape};
 
@@ -37,116 +39,17 @@ pub fn draw_annotation(
     filters: &HashMap<u64, crate::features::filter::raster::Raster>,
     active_text_id: Option<u64>,
 ) {
-    match &ann.shape {
-        AnnotationShape::Number { mark } => {
-            crate::features::number::draw::draw(p, *mark, ann.stroke_width, ann.color);
-        }
-        AnnotationShape::Magnifier { magnifier } => {
-            crate::features::magnifier::draw::draw(p, *magnifier, ann.stroke_width, ann.color);
-        }
-        AnnotationShape::Ruler { measurement } => {
-            crate::features::ruler::body_draw::draw(p, *measurement, ann.stroke_width, ann.color);
-        }
-        AnnotationShape::Arrow {
-            line,
-            style,
-            line_style,
-        } => {
-            crate::features::arrow::draw::draw(
-                p,
-                line,
-                *style,
-                *line_style,
-                ann.stroke_width,
-                ann.color,
-            );
-        }
-        AnnotationShape::Rectangle { start, end, filled } => {
-            if let Some(rect) = normalized_rect(*start, *end) {
-                if *filled {
-                    fill_rect(p, &rect, ann.color, ann.stroke_width, ann.shadow_color);
-                } else {
-                    draw_rect(p, &rect, ann.color, ann.stroke_width, ann.shadow_color);
-                }
-            }
-        }
-        AnnotationShape::Marker {
-            start,
-            end,
-            kind,
-            filled,
-        } => {
-            if let Some(rect) = normalized_rect(*start, *end) {
-                crate::features::marker::draw_marker(
-                    p,
-                    *kind,
-                    rect,
-                    ann.color,
-                    ann.stroke_width,
-                    *filled,
-                );
-            }
-        }
-        AnnotationShape::Circle { start, end, filled } => {
-            if let Some(rect) = normalized_rect(*start, *end) {
-                if *filled {
-                    fill_circle(p, &rect, ann.color, ann.stroke_width, ann.shadow_color);
-                } else {
-                    draw_circle(p, &rect, ann.color, ann.stroke_width, ann.shadow_color);
-                }
-            }
-        }
-        AnnotationShape::Line { line, style } => {
-            crate::features::line::draw::draw(p, line, *style, ann.stroke_width, ann.color);
-        }
-        AnnotationShape::Pen { points } => {
-            draw_pen(p, points, ann.color, ann.stroke_width, ann.shadow_color);
-        }
-        AnnotationShape::Redact { filter } => {
-            crate::features::filter::draw::draw(
-                p,
-                *filter,
-                ann.color.alpha(),
-                filters.get(&ann.id),
-            );
-        }
-        AnnotationShape::Highlighter { points, flat_ends } => {
-            draw_highlighter(p, points, *flat_ends, ann.color, ann.stroke_width);
-        }
-        AnnotationShape::Text { .. } => {
-            let is_editing = active_text_id == Some(ann.id);
-            let scale = p.scale();
-            let pixel_phase = p.pixel_phase();
-            if let Some(fonts) = p.fonts.as_mut() {
-                let editor =
-                    crate::tools::text::ensure_text_editor(ann, text_editors, fonts.system);
-                let mut pixmap_mut = p.canvas.as_mut();
-                render_text_annotation_with_caret(
-                    ann,
-                    editor,
-                    fonts.system,
-                    fonts.cache,
-                    &mut pixmap_mut,
-                    p.origin,
-                    scale,
-                    is_editing,
-                    p.text_caret_visible,
-                    Some(pixel_phase),
-                );
-            }
-        }
-        AnnotationShape::NumeratedArrow { start, end, number } => {
-            draw_numerated_arrow(
-                p,
-                *start,
-                *end,
-                *number,
-                ann.color,
-                ann.stroke_width,
-                ann.shadow_color,
-            );
-        }
-    }
+    let painted = if matches!(ann.shape, AnnotationShape::Text { .. }) {
+        p.fonts.as_mut().map(|fonts| {
+            let editor = crate::tools::text::ensure_text_editor(ann, text_editors, fonts.system);
+            crate::tools::text::text_bounds(ann, editor)
+        })
+    } else {
+        None
+    };
+    super::annotation_rotation::draw(p, ann, painted, active_text_id == Some(ann.id), |p| {
+        body::draw(p, ann, text_editors, filters, active_text_id);
+    });
     if selected {
         draw_annotation_handles_only(p, ann);
     }
@@ -154,7 +57,19 @@ pub fn draw_annotation(
 
 /// 【标注渲染】【编辑控制框】仅把 ann 的控制点绘入 p，不绘制正文或修改数据，无返回值
 pub fn draw_annotation_handles_only(p: &mut Painter, ann: &Annotation) {
-    if ann.shape.line().is_some() {
+    if let Some(corners) = ann.generic_frame_corners() {
+        let draw = crate::ui::annotation_selection::draw::frame;
+        draw(p, corners, 1.0);
+        for point in crate::features::annotation_selection::chrome::handles(corners) {
+            crate::ui::annotation_selection::draw::square(p, point, 1.0);
+        }
+        if let Some((top, handle)) = ann.generic_rotation_handle() {
+            crate::ui::annotation_selection::draw::rotation(p, top, handle, 1.0);
+        }
+        if ann.shape.line().is_some() {
+            super::line_handles::anchors(p, ann);
+        }
+    } else if ann.shape.line().is_some() {
         super::line_handles::draw(p, ann);
     } else if let AnnotationShape::Redact { filter } = ann.shape {
         super::filter_handles::draw(p, filter);
@@ -167,7 +82,9 @@ pub fn draw_annotation_handles_only(p: &mut Painter, ann: &Annotation) {
     } else if matches!(ann.shape, AnnotationShape::Text { .. }) {
         draw_text_box(p, &ann.bbox);
     } else {
-        draw_annotation_handles(p, &ann.bbox);
+        if let Some(bounds) = crate::features::annotation_selection::chrome::bounds(ann) {
+            draw_annotation_handles(p, &bounds);
+        }
     }
 }
 

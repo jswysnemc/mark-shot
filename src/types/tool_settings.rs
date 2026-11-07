@@ -26,10 +26,11 @@ pub enum StrokeGroup {
     Ruler,
     Magnifier,
     Number,
+    Highlighter,
 }
 
 impl StrokeGroup {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Rectangle,
         Self::Circle,
         Self::Arrow,
@@ -41,6 +42,7 @@ impl StrokeGroup {
         Self::Ruler,
         Self::Magnifier,
         Self::Number,
+        Self::Highlighter,
     ];
 
     /// name in the saved state file
@@ -57,6 +59,7 @@ impl StrokeGroup {
             Self::Ruler => "ruler",
             Self::Magnifier => "magnifier",
             Self::Number => "number",
+            Self::Highlighter => "highlighter",
         }
     }
 
@@ -68,7 +71,8 @@ impl StrokeGroup {
             Tool::Line => Self::Line,
             Tool::NumeratedArrow => Self::Numbered,
             Tool::Number => Self::Number,
-            Tool::Pen | Tool::Highlighter => Self::Freehand,
+            Tool::Pen => Self::Freehand,
+            Tool::Highlighter => Self::Highlighter,
             Tool::Laser => Self::Laser,
             Tool::Marker => Self::Marker,
             Tool::Ruler => Self::Ruler,
@@ -84,7 +88,8 @@ impl StrokeGroup {
             AnnotationShape::Line { .. } => Self::Line,
             AnnotationShape::NumeratedArrow { .. } => Self::Numbered,
             AnnotationShape::Number { .. } => Self::Number,
-            AnnotationShape::Pen { .. } | AnnotationShape::Highlighter { .. } => Self::Freehand,
+            AnnotationShape::Pen { .. } => Self::Freehand,
+            AnnotationShape::Highlighter { .. } => Self::Highlighter,
             AnnotationShape::Marker { .. } => Self::Marker,
             AnnotationShape::Ruler { .. } => Self::Ruler,
             AnnotationShape::Magnifier { .. } => Self::Magnifier,

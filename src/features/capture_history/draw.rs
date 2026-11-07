@@ -30,15 +30,15 @@ pub(super) fn image(canvas: &mut Pixmap, image: &Pixmap, bounds: Rect, scale: f3
 
 /// 【截图历史】【历史绘制】按 state 与 scale 绘制 canvas；只读取已有缓存，不初始化 OCR 或执行磁盘读取
 pub(super) fn draw(state: &mut HistoryWindow, canvas: &mut Pixmap, scale: f32) {
-    canvas.fill(chrome::BACKGROUND.color());
+    canvas.fill(chrome::background().color());
     chrome::draw(state, canvas, scale);
     super::list_draw::draw(state, canvas, scale);
     let preview = state.layout.preview;
     controls::frame(
         &mut Painter::new(canvas).with_scale(scale),
         preview,
-        chrome::BACKGROUND,
-        chrome::BORDER,
+        chrome::background(),
+        chrome::border(),
         6.0,
     );
     // 1. 【截图历史】【预览内容】原版样式内边距七像素，再扣除窗口预览的六像素留白
@@ -70,7 +70,7 @@ pub(super) fn draw(state: &mut HistoryWindow, canvas: &mut Pixmap, scale: f32) {
             .text(
                 inner,
                 label,
-                TextStyle::new(40.0 / 3.0, chrome::FOREGROUND).center(),
+                TextStyle::new(40.0 / 3.0, chrome::foreground()).center(),
             );
     }
     // 2. 【截图历史】【交互隔离】文件选择器最后绘制，清空确认由独立模态窗口处理

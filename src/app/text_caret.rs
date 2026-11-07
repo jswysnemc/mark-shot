@@ -19,6 +19,7 @@ fn focused(state: &EditorState) -> bool {
         && !state.font_panel.open
         && !state.color_popover.is_visible()
         && !state.settings_panel.is_editing()
+        && !state.selection_size.interacting()
         && state.selected_tool != crate::tools::Tool::Ocr
         && state.text_session.as_ref().is_none_or(|session| {
             session

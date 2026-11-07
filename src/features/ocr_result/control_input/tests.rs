@@ -1,5 +1,5 @@
 use crate::{
-    backend::wayland::window::{
+    backend::window::{
         KeyInput, LEFT_BUTTON, RIGHT_BUTTON, WindowAction, WindowContent, WindowEvent,
     },
     features::ocr_result::{
@@ -154,6 +154,7 @@ fn modified_space_activates_only_on_release() {
 fn undo_waits_for_release_and_focuses_copy_when_the_button_disappears() {
     let mut state = window("alpha");
     state.source.insert(&mut state.fonts, "!");
+    state.refresh_layout();
     let before = state.source.text();
     let at = point(&state, Control::Undo);
     state.event(mouse(at, LEFT_BUTTON, true));
@@ -194,7 +195,7 @@ fn disabled_copy_never_grants_editor_input_or_copies_whitespace() {
 #[test]
 fn tabs_keep_the_qt_press_behavior_and_right_focus() {
     let mut state = window("alpha");
-    let image = state.layout.tabs[1].1;
+    let image = state.layout.titlebar.tabs[1].1;
     let at = (f64::from(image.x() + 10.0), f64::from(image.y() + 10.0));
     state.event(mouse(at, RIGHT_BUTTON, true));
     assert_eq!(state.view, View::Text);
@@ -236,6 +237,60 @@ fn modified_escape_is_not_the_window_close_shortcut() {
         window("alpha").event(key(Key::Escape, Mods::default(), true)),
         WindowAction::Close
     );
+}
+
+/// 【结果反馈测试】【事件保留】切页、编辑和撤销只修改正文，不撤销其他分区的独立复制反馈，无参数、无返回值
+#[test]
+fn view_edit_and_undo_events_keep_the_independent_feedback() {
+    use crate::features::ocr_result::feedback::Pane;
+    let mut state = window("alpha");
+    let now = std::time::Instant::now();
+    state.feedback.show(Pane::Source, true, now);
+    state.feedback.show(Pane::Table, false, now);
+    state.control(Control::View(View::Image));
+    assert_eq!(state.feedback.label(Pane::Source), "Copied");
+    state.control(Control::View(View::Text));
+    state.source.insert(&mut state.fonts, "!");
+    state.edit_event(crate::ui::text_editor::EditEvent::Changed);
+    state.control(Control::Undo);
+    assert_eq!(state.feedback.label(Pane::Source), "Copied");
+    assert_eq!(state.feedback.label(Pane::Table), "Copy failed");
+    assert_eq!(state.source.text(), "alpha");
+}
+
+/// 【结果反馈测试】【真实唤醒】到期 Wake 只重绘一次并清除最近期限，后续无期限 Wake 没有周期工作，无参数、无返回值
+#[test]
+fn expired_feedback_wake_is_consumed_once() {
+    use crate::features::ocr_result::feedback::Pane;
+    let mut state = window("alpha");
+    let before = std::time::Instant::now() - std::time::Duration::from_secs(3);
+    state.feedback.show(Pane::Source, true, before);
+    state.feedback.show(Pane::Table, true, before);
+    assert!(state.next_deadline().is_some());
+    assert_eq!(state.event(WindowEvent::Wake), WindowAction::Redraw);
+    assert_eq!(state.next_deadline(), None);
+    assert_eq!(state.event(WindowEvent::Wake), WindowAction::None);
+}
+
+/// 【结果反馈测试】【几何刷新】复制反馈收窄后重新核对实际指针位置，原按钮之外不保留悬停，无参数、无返回值
+#[test]
+fn feedback_expiry_rechecks_hover_against_the_new_copy_geometry() {
+    use crate::features::ocr_result::feedback::Pane;
+    let mut state = window("alpha");
+    let normal_left = state.layout.copy.left();
+    state.feedback.show(
+        Pane::Source,
+        true,
+        std::time::Instant::now() - std::time::Duration::from_secs(3),
+    );
+    state.refresh_layout();
+    state.event(WindowEvent::PointerMove {
+        position: (f64::from(normal_left - 4.0), 19.0),
+    });
+    assert!(state.hovered == Some(Control::Copy));
+    state.event(WindowEvent::Wake);
+    assert!(state.hovered.is_none());
+    assert_eq!(state.layout.copy.left(), normal_left);
 }
 
 /// 【结果按钮测试】【原版回放】回放冻结 Qt 窗口的关闭、Enter 和 Escape 事件，比较焦点、按下状态与窗口关闭时机

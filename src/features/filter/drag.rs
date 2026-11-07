@@ -6,11 +6,9 @@ use super::{RegionFilter, model::Point};
 use crate::types::{SelectionHandle, SignedRect};
 use crate::utils::apply_handle_drag;
 
-/// 【滤镜】【编辑外框】返回 filter 正文外六个原图像素的未旋转控制框；无效区域返回空值
+/// 【滤镜】【编辑外框】按filter返回生产未旋转正文选框，不额外扩容，无效区域返回空值
 pub fn frame(filter: RegionFilter) -> Option<Rect> {
-    filter
-        .rect()?
-        .outset(6.0 * filter.style_scale, 6.0 * filter.style_scale)
+    filter.rect()
 }
 
 /// 【滤镜】【缩放控制点】返回 filter 的八个实际视觉控制点；空区域返回空列表
@@ -39,12 +37,12 @@ pub fn controls(filter: RegionFilter) -> Vec<(SelectionHandle, Point)> {
     .to_vec()
 }
 
-/// 【滤镜】【旋转把手】返回 filter 上边中点外二十八个原图像素的视觉位置；空区域返回空值
+/// 【滤镜】【旋转把手】按filter返回上边中点外二十六样式单位的视觉位置；空区域返回空值
 pub fn rotation_handle(filter: RegionFilter) -> Option<Point> {
     let rect = filter.rect()?;
     Some(filter.to_visual((
         (rect.left() + rect.right()) / 2.0,
-        rect.top() - 28.0 * filter.style_scale,
+        rect.top() - 26.0 * filter.style_scale,
     )))
 }
 

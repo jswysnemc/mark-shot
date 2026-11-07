@@ -1,5 +1,9 @@
 //! 【字体弹层】【业务生命周期】管理弹层互斥、属性同步与鼠标输入，字体字形缓存只用于可见行
 
+#[cfg(test)]
+#[path = "font_popup_tests.rs"]
+mod tests;
+
 use crate::{
     editor::{
         EditorState,
@@ -185,6 +189,7 @@ pub(crate) fn set_size_text(state: &mut EditorState) {
 pub fn press(state: &mut EditorState, dirty: &mut u32) {
     let hit = state.font_panel.hit(state.input.pointer.local);
     state.font_panel.pressed = hit;
+    state.font_panel.dirty = true;
     match hit {
         Some(Hit::Search) => focus(state, Field::Search, CursorInit::End),
         Some(Hit::Size) => focus(state, Field::Size, CursorInit::SelectAll),
@@ -222,12 +227,16 @@ pub fn press(state: &mut EditorState, dirty: &mut u32) {
 /// 【字体弹层】【鼠标释放】在 state 相同控件内确认动作，dirty 返回变化，返回是否消费，不同显示器或移出控件不应用
 pub fn release(state: &mut EditorState, dirty: &mut u32) -> bool {
     let had_drag = state.font_panel.scrollbar_drag.take().is_some();
+    // 1. 【字体弹层】【释放刷新】按下和拖动颜色立即失效，移出控件释放也不能保留原按下底板
+    state.font_panel.dirty |= had_drag || state.font_panel.pressed.is_some();
     let Some(hit) = state.font_panel.pressed.take() else {
+        update(state, dirty);
         return had_drag;
     };
     if state.input.pointer.monitor_idx != state.font_panel.monitor_idx
         || state.font_panel.hit(state.input.pointer.local) != Some(hit)
     {
+        update(state, dirty);
         return true;
     }
     match hit {

@@ -39,9 +39,11 @@ class TextPropertyLocatorTests(unittest.TestCase):
 
     def test_size_field_locates_panel_when_search_loses_focus(self):
         """【文字属性定位测试】【字号焦点】搜索失去焦点时仍按真实字号底板定位面板，返回 None"""
-        image = Image.new("RGB", (640, 480), (30, 34, 38))
-        ImageDraw.Draw(image).rectangle((107, 367, 392, 390), fill=(255, 255, 255))
-        self.assertEqual(font_popup(image), (100, 40, 460, 400))
+        for background, field in [((248, 250, 252), (239, 241, 244)), ((15, 17, 23), (30, 32, 38))]:
+            with self.subTest(field=field):
+                image = Image.new("RGB", (640, 480), background)
+                ImageDraw.Draw(image).rectangle((107, 367, 392, 390), fill=field)
+                self.assertEqual(font_popup(image), (100, 40, 460, 400))
 
 
 if __name__ == "__main__":

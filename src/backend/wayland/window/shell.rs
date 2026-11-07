@@ -5,6 +5,7 @@ use smithay_client_toolkit::{
     output::{OutputHandler, OutputState},
     shell::{
         WaylandSurface,
+        wlr_layer::{LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
         xdg::{
             XdgSurface,
             window::{Window, WindowConfigure, WindowHandler},
@@ -59,13 +60,49 @@ impl WindowHandler for NativeWindow {
         if let Some(viewport) = &surface.viewport {
             viewport.set_destination(surface.size.0 as i32, surface.size.1 as i32);
         }
-        surface
-            .window
-            .set_window_geometry(0, 0, surface.size.0, surface.size.1);
+        if let Some(window) = surface.role.as_window() {
+            window.set_window_geometry(0, 0, surface.size.0, surface.size.1);
+        }
         surface.configured = true;
         surface.dirty = true;
         let size = surface.size;
         self.dispatch_to(id, WindowEvent::Resize { size }, None);
+    }
+}
+
+impl LayerShellHandler for NativeWindow {
+    /// 【原生窗口】【浮层关闭】只关闭当前 layer 对应主窗口，旧角色事件不关闭新角色，无返回值
+    fn closed(&mut self, _: &Connection, _: &QueueHandle<Self>, layer: &LayerSurface) {
+        if self.main.matches(layer.wl_surface()) {
+            self.exit = true;
+        }
+    }
+
+    /// 【原生窗口】【浮层配置】应用 layer 的 configure 大小并更新视区，通知同一业务对象，不重置编辑历史，无返回值
+    fn configure(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        layer: &LayerSurface,
+        configure: LayerSurfaceConfigure,
+        _: u32,
+    ) {
+        if !self.main.matches(layer.wl_surface()) {
+            return;
+        }
+        let size = (configure.new_size.0.max(1), configure.new_size.1.max(1));
+        self.main.size = size;
+        self.layer_geometry.size = size;
+        if let Some(viewport) = &self.main.viewport {
+            viewport.set_destination(size.0 as i32, size.1 as i32);
+        }
+        self.main.configured = true;
+        self.main.dirty = true;
+        self.dispatch_to(
+            super::surface::SurfaceId::Main,
+            WindowEvent::Resize { size },
+            None,
+        );
     }
 }
 

@@ -66,12 +66,18 @@ impl Magnifier {
         centered_rect(self.center, self.size)
     }
 
-    /// 【放大镜】【源框读取】按固定倍率返回未旋转的完整源框；空草稿返回空值
+    /// 【放大镜】【源框读取】按固定倍率返回原图内的完整源框，圆形采用镜框短边，不改写请求源点，空草稿返回空值
     pub fn source_rect(self) -> Option<Rect> {
-        centered_rect(
-            self.source,
-            (self.size.0 / self.zoom, self.size.1 / self.zoom),
-        )
+        let size = if self.shape == MagnifierShape::Circle {
+            let diameter = self.size.0.min(self.size.1) / self.zoom;
+            (diameter, diameter)
+        } else {
+            (
+                (self.size.0 / self.zoom).min(self.image_bounds.width()),
+                (self.size.1 / self.zoom).min(self.image_bounds.height()),
+            )
+        };
+        centered_rect(clamped_center(self.source, size, self.image_bounds), size)
     }
 
     /// 【放大镜】【尺寸有效性】返回镜框两边是否均达到四个原图像素，不把空手势提交为标注
@@ -193,7 +199,14 @@ impl Magnifier {
     pub fn connectors(self) -> Option<[(Point, Point); 2]> {
         let source = self.source_rect()?;
         let lens = self.lens_rect()?;
-        let delta = (self.center.0 - self.source.0, self.center.1 - self.source.1);
+        let source_center = (
+            (source.left() + source.right()) / 2.0,
+            (source.top() + source.bottom()) / 2.0,
+        );
+        let delta = (
+            self.center.0 - source_center.0,
+            self.center.1 - source_center.1,
+        );
         let length = delta.0.hypot(delta.1);
         let (source_radius, lens_radius) = (source.width() / 2.0, lens.width() / 2.0);
         if length <= lens_radius + source_radius * 0.65 {
@@ -204,10 +217,10 @@ impl Magnifier {
         let (across, along) = 34.0_f32.to_radians().sin_cos();
         Some([1.0, -1.0].map(|sign| {
             let source = (
-                self.source.0
+                source_center.0
                     + unit.0 * source_radius * along
                     + normal.0 * source_radius * across * sign,
-                self.source.1
+                source_center.1
                     + unit.1 * source_radius * along
                     + normal.1 * source_radius * across * sign,
             );

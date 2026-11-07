@@ -30,6 +30,33 @@ pub(super) fn draw_layers(req: &mut RenderRequest<'_>) {
         );
         return;
     }
+    let annotations = if req.annotations_layer_empty {
+        &[][..]
+    } else {
+        req.annotations
+    };
+    if annotations
+        .iter()
+        .chain(req.pending)
+        .any(|annotation| matches!(annotation.shape, AnnotationShape::Highlighter { .. }))
+    {
+        // 1. 【荧光笔】【背景合成】乘法混合必须读取实际底图，按原顺序绘制当前损坏区域，透明缓存不能保存此效果
+        draw_ordered(
+            &mut Painter::new(req.canvas)
+                .with_scale(req.scale)
+                .with_text_caret(req.text_caret_visible)
+                .with_frozen_image(req.frozen_image)
+                .with_drawing_bounds(req.drawing_bounds)
+                .with_origin(req.offset)
+                .with_text(req.text.font_system, req.text.swash_cache),
+            annotations.iter().chain(req.pending),
+            req.text.editors,
+            req.filters,
+            req.active_text_id,
+            req.dirty_rect.copied(),
+        );
+        return;
+    }
     if !req.annotations_layer_empty {
         if let Some(dirty) = req.dirty_rect {
             super::dimming::blit_annotations(req.annotations_layer, req.canvas, dirty, req.scale);
@@ -54,6 +81,7 @@ pub(super) fn draw_layers(req: &mut RenderRequest<'_>) {
         .with_origin(req.offset)
         .with_text(text.font_system, text.swash_cache);
     if !req.is_pending_selected
+        && pending.rotation_degrees == 0.0
         && let AnnotationShape::Pen { points } = &pending.shape
     {
         annotations::draw_pen_active_tail(
@@ -64,6 +92,7 @@ pub(super) fn draw_layers(req: &mut RenderRequest<'_>) {
             pending.stroke_width,
         );
     } else if !req.is_pending_selected
+        && pending.rotation_degrees == 0.0
         && let AnnotationShape::Highlighter { points, flat_ends } = &pending.shape
     {
         annotations::draw_highlighter_live(
@@ -99,6 +128,36 @@ pub fn draw_dragged(
     active_text_id: Option<u64>,
     dirty: Option<Rect>,
 ) {
+    let index = index.min(annotations.len());
+    draw_ordered(
+        painter,
+        annotations[..index]
+            .iter()
+            .chain(std::iter::once(pending))
+            .chain(annotations[index..].iter()),
+        editors,
+        filters,
+        active_text_id,
+        dirty,
+    );
+}
+
+/// 【标注渲染】【有序合成】按ordered顺序把相交成员绘入painter，editors、filters与active_text_id提供内容，dirty限制范围，无返回值
+pub(crate) fn draw_ordered<'a, I>(
+    painter: &mut Painter<'_>,
+    ordered: I,
+    editors: &mut HashMap<u64, Editor<'static>>,
+    filters: &HashMap<u64, crate::features::filter::raster::Raster>,
+    active_text_id: Option<u64>,
+    dirty: Option<Rect>,
+) where
+    I: IntoIterator<Item = &'a Annotation>,
+    I::IntoIter: Clone,
+{
+    let ordered = ordered.into_iter();
+    let multiply = ordered
+        .clone()
+        .any(|annotation| matches!(annotation.shape, AnnotationShape::Highlighter { .. }));
     let size = painter.size();
     let Some(viewport) = Rect::from_xywh(0.0, 0.0, size.0, size.1) else {
         return;
@@ -129,40 +188,54 @@ pub fn draw_dragged(
     ) else {
         return;
     };
-    let Some(mut temporary) = Pixmap::new(width, height) else {
-        return;
-    };
-    let index = index.min(annotations.len());
-    {
-        let mut local = painter.sub(&mut temporary).with_origin(local_origin);
-        let mut draw = |annotation: &Annotation| {
-            let bounds = annotation.damage_bbox(false);
-            if bounds.left() < global.right()
-                && bounds.right() > global.left()
-                && bounds.top() < global.bottom()
-                && bounds.bottom() > global.top()
-            {
-                annotations::draw_annotation(
-                    &mut local,
-                    annotation,
-                    false,
-                    editors,
-                    filters,
-                    active_text_id,
-                );
-            }
-        };
-        // 1. 【标注渲染】【拖动合成】只重绘损坏区域内相交的标注，插入草稿不复制整个标注数组
-        for (position, annotation) in annotations.iter().enumerate() {
-            if position == index {
-                draw(pending);
-            }
-            draw(annotation);
-        }
-        if index == annotations.len() {
-            draw(pending);
+    if multiply {
+        // 1. 【荧光笔】【有序绘制】乘法混合读取当前局部底图，完成后直接覆盖当前损坏范围
+        painter.clipped(dirty, |local| {
+            draw_visible(local, ordered, global, editors, filters, active_text_id)
+        });
+    } else if let Some(mut temporary) = Pixmap::new(width, height) {
+        // 2. 【标注渲染】【有序绘制】普通标注继续使用与持久缓存相同的透明合成，保证草稿和提交后的舍入一致
+        draw_visible(
+            &mut painter.sub(&mut temporary).with_origin(local_origin),
+            ordered,
+            global,
+            editors,
+            filters,
+            active_text_id,
+        );
+        painter.draw_pixmap(x as i32, y as i32, &temporary);
+    }
+}
+
+/// 【标注渲染】【可见成员】按ordered顺序将与global相交的实际正文绘入local，editors、filters和active_text_id提供内容，无返回值
+pub(super) fn draw_visible<'a>(
+    local: &mut Painter<'_>,
+    ordered: impl Iterator<Item = &'a Annotation>,
+    global: Rect,
+    editors: &mut HashMap<u64, Editor<'static>>,
+    filters: &HashMap<u64, crate::features::filter::raster::Raster>,
+    active_text_id: Option<u64>,
+) {
+    for annotation in ordered {
+        let bounds = super::annotation_style::damage(
+            annotation,
+            local.window_units(),
+            local.drawing_bounds(),
+            local.ruler_projection(),
+        );
+        if bounds.left() < global.right()
+            && bounds.right() > global.left()
+            && bounds.top() < global.bottom()
+            && bounds.bottom() > global.top()
+        {
+            annotations::draw_annotation(
+                local,
+                annotation,
+                false,
+                editors,
+                filters,
+                active_text_id,
+            );
         }
     }
-    // 2. 【标注渲染】【拖动合成】透明图像与半透明描边只合成一次，不覆盖较新的标注或重复叠加已有图层
-    painter.draw_pixmap(x as i32, y as i32, &temporary);
 }

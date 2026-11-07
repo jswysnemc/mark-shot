@@ -18,23 +18,45 @@ fn matched(pattern: String) -> Option<(String, String)> {
     cache
         .entry(pattern.clone())
         .or_insert_with(|| {
-            let output = std::process::Command::new("fc-match")
-                .args(["-f", "%{file}\n%{family[0]}", &pattern])
-                .output()
-                .ok()?;
-            if !output.status.success() {
-                return None;
+            #[cfg(target_os = "windows")]
+            {
+                super::fontconfig::matched(&pattern)
             }
-            let text = std::str::from_utf8(&output.stdout).ok()?;
-            let mut lines = text.lines();
-            Some((lines.next()?.to_owned(), lines.next()?.to_owned()))
+            #[cfg(target_os = "linux")]
+            {
+                let output = std::process::Command::new("fc-match")
+                    .args(["-f", "%{file}\n%{family[0]}", &pattern])
+                    .output()
+                    .ok()?;
+                if !output.status.success() {
+                    return None;
+                }
+                let text = std::str::from_utf8(&output.stdout).ok()?;
+                let mut lines = text.lines();
+                Some((lines.next()?.to_owned(), lines.next()?.to_owned()))
+            }
         })
         .clone()
 }
 
 /// 【文字字体】【样式匹配】按 family、bold、italic 查询并加载字体，返回可用于排版的实际家族；失败时采用已加载回退
 pub fn family(fonts: &mut FontSystem, family: &str, bold: bool, italic: bool) -> String {
-    resolve(fonts, family, bold, italic, None)
+    family_with_weight(
+        fonts,
+        family,
+        if bold { Weight(600) } else { Weight::NORMAL },
+        italic,
+    )
+}
+
+/// 【文字字体】【指定字重】按fonts、family、weight与italic定向加载字体，返回实际家族，不以半粗体替代粗体
+pub(crate) fn family_with_weight(
+    fonts: &mut FontSystem,
+    family: &str,
+    weight: Weight,
+    italic: bool,
+) -> String {
+    resolve(fonts, family, weight, italic, None)
 }
 
 /// 【文字字体】【缺字回退】按 family、样式和 character 查询系统首选字体，加载必要文件并返回家族；只用于主字体缺少字形的片段
@@ -45,14 +67,20 @@ pub fn fallback(
     italic: bool,
     character: char,
 ) -> String {
-    resolve(fonts, family, bold, italic, Some(character))
+    resolve(
+        fonts,
+        family,
+        if bold { Weight(600) } else { Weight::NORMAL },
+        italic,
+        Some(character),
+    )
 }
 
-/// 【文字字体】【定向加载】用 family、样式与可选 character 匹配字体；返回已有或新加载家族，不重复读取字体文件
+/// 【文字字体】【定向加载】用fonts、family、weight、italic与可选character匹配字体，返回已有或新加载家族，不重复读取字体文件
 fn resolve(
     fonts: &mut FontSystem,
     family: &str,
-    bold: bool,
+    weight: Weight,
     italic: bool,
     character: Option<char>,
 ) -> String {
@@ -62,7 +90,17 @@ fn resolve(
     let mut pattern = format!(
         "{}:weight={}:slant={}",
         if generic { "sans-serif" } else { family },
-        if bold { "demibold" } else { "regular" },
+        match weight.0 {
+            0..=100 => "thin",
+            101..=200 => "extralight",
+            201..=300 => "light",
+            301..=400 => "regular",
+            401..=500 => "medium",
+            501..=600 => "demibold",
+            601..=700 => "bold",
+            701..=800 => "extrabold",
+            _ => "black",
+        },
         if italic { "italic" } else { "roman" }
     );
     if let Some(character) = character {
@@ -127,7 +165,9 @@ pub fn line_height(
     });
     if let Some(font) = id.and_then(|id| fonts.get_font(id, weight)) {
         let metrics = font.as_swash().metrics(&[]).scale(pixels);
-        return (metrics.ascent + metrics.descent + metrics.leading)
+        // 1. 【文字字体】【定点行高】原版先将字体各项度量截断到六十四分之一像素，再对总行高取整
+        let fixed = |value: f32| ((f64::from(value) * 64.0 + 0.0001).floor() / 64.0) as f32;
+        return (fixed(metrics.ascent) + fixed(metrics.descent) + fixed(metrics.leading))
             .ceil()
             .max(pixels);
     }

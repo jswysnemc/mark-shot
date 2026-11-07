@@ -1,0 +1,11 @@
+{
+  "cases": 96,
+  "seed": 159,
+  "source_sha256": {
+    "scripts/mark-shot-window-detection-niri": "9e94ce63c6ba0cefb2d5e7e451c1b6263343c1671277f67e6fc2b671f333a12e",
+    "scripts/lib/mark_shot_window_detection/niri_dms.py": "3f293f51d4e13288a5055047aae5289a6be788e244872e77ac221a81dabcebc5",
+    "scripts/lib/mark_shot_window_detection/niri_geometry.py": "ba261f15bdf805b067fa0bbcca0dfe4f89e39a3998be74b24de08f56d41a5a0c"
+  },
+  "fixture_sha256": "01d1434ec660981e2d394c161ebfd79f6ad477c1b5c154bbc21f4a4dd461fa37",
+  "method": "Direct original window_rect and tiled_rects_for_workspace calls with fixed DMS settings"
+}

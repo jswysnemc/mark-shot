@@ -14,7 +14,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::Duration;
 
-use nix::fcntl::{Flock, FlockArg};
 use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
 
 use super::models::{Asset, BASE_URL, on_disk};
@@ -73,6 +72,10 @@ impl Default for Downloader {
 }
 
 impl Downloader {
+    /// 【识别模型】【任务排空】返回是否仍有未消费的真实任务完成消息，取消后的任务也需要排空，避免保留空闲工作通道
+    pub fn has_pending(&self) -> bool {
+        self.pending > 0
+    }
     pub fn push(&mut self, job: Job) {
         if self.stop.load(Ordering::Relaxed) {
             return;
@@ -217,7 +220,7 @@ pub fn fetch(
         .truncate(false)
         .open(&part_path)
         .map_err(err)?;
-    let mut file = Flock::lock(file, FlockArg::LockExclusiveNonblock)
+    let mut file = crate::utils::fs_lock::acquire(file, Duration::ZERO)
         .map_err(|_| format!("{} is being downloaded by another window", asset.file))?;
 
     let mut have = file.metadata().map_err(err)?.len();
@@ -283,6 +286,7 @@ pub fn fetch(
         return Err(STOPPED.into());
     }
     file.sync_all().map_err(err)?;
+    drop(file);
     fs::rename(&part_path, dir.join(asset.file)).map_err(err)
 }
 

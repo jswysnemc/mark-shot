@@ -18,6 +18,21 @@ pub(crate) mod fields;
 
 /// 【输入法】【正文资格】按 state 返回可输入正文的会话身份；字段、菜单和识别界面拥有输入时返回空值
 fn session(state: &EditorState) -> Option<u64> {
+    if state.upload.busy()
+        || state.selection_translation.busy()
+        || state.selection_translation.popup.is_some()
+        || state.selection_size.popup.is_some()
+    {
+        return None;
+    }
+    if let Some((id, monitor)) = super::selection_size::input_method::identity(state) {
+        return state
+            .input
+            .text_input
+            .focus
+            .filter(|focus| focus.monitor_idx == monitor)
+            .map(|_| id);
+    }
     if let Some(id) = fields::identity(state) {
         return state
             .input
@@ -42,6 +57,7 @@ fn session(state: &EditorState) -> Option<u64> {
 fn reconcile(state: &mut EditorState, dirty: &mut u32) {
     let session = session(state);
     if state.input.text_input.reconcile(session) {
+        super::selection_size::input_method::cancel(state, dirty);
         fields::cancel(state, dirty);
         text_composition::cancel(state, dirty);
     }
@@ -51,6 +67,7 @@ fn reconcile(state: &mut EditorState, dirty: &mut u32) {
 pub(crate) fn event(state: &mut EditorState, event: OverlayEvent, dirty: &mut u32) {
     match event {
         OverlayEvent::TextInputFocus(focus) => {
+            super::selection_size::input_method::cancel(state, dirty);
             text_composition::cancel(state, dirty);
             fields::cancel(state, dirty);
             state.input.text_input.enter(focus);
@@ -58,6 +75,7 @@ pub(crate) fn event(state: &mut EditorState, event: OverlayEvent, dirty: &mut u3
         }
         OverlayEvent::TextInputLeave { focus_id } => {
             if state.input.text_input.leave(focus_id) {
+                super::selection_size::input_method::cancel(state, dirty);
                 text_composition::cancel(state, dirty);
                 fields::cancel(state, dirty);
             }
@@ -68,6 +86,11 @@ pub(crate) fn event(state: &mut EditorState, event: OverlayEvent, dirty: &mut u3
                 return;
             }
             if let Some(edit) = crate::types::text_input::Edit::from_batch(update.batch) {
+                if super::selection_size::input_method::identity(state).is_some() {
+                    super::selection_size::input_method::apply(state, edit, dirty);
+                    state.input.text_input.cause = ChangeCause::InputMethod;
+                    return;
+                }
                 if fields::identity(state).is_some() {
                     fields::apply(state, edit, dirty);
                     state.input.text_input.cause = ChangeCause::InputMethod;
@@ -125,11 +148,16 @@ fn cursor_rect(state: &EditorState, monitor_idx: usize) -> Option<(i32, i32, i32
     editor.with_buffer(|buffer| {
         buffer.layout_runs().find_map(|run| {
             let x = run.cursor_position(&cursor)?;
+            let view = state.canvas_transform();
+            let point = view.to_screen((
+                f64::from(start.0 + padding.0 + x),
+                f64::from(start.1 + padding.1 + run.line_top),
+            ));
             Some((
-                (start.0 + padding.0 + x - placement.position.0 as f32).floor() as i32,
-                (start.1 + padding.1 + run.line_top - placement.position.1 as f32).floor() as i32,
+                (point.0 - f64::from(placement.position.0)).floor() as i32,
+                (point.1 - f64::from(placement.position.1)).floor() as i32,
                 1,
-                run.line_height.ceil().max(1.0) as i32,
+                (f64::from(run.line_height) * view.scale).ceil().max(1.0) as i32,
             ))
         })
     })
@@ -156,6 +184,14 @@ pub(crate) fn sync_with(
         return send(None);
     };
     if !target.sync_allowed {
+        return Ok(());
+    }
+    if super::selection_size::input_method::identity(state).is_some() {
+        if let Some(next) = super::selection_size::input_method::snapshot(state, focus, target_id) {
+            send(Some(&next))?;
+            state.input.text_input.snapshot = Some(next);
+            state.input.text_input.cause = ChangeCause::Other;
+        }
         return Ok(());
     }
     if fields::identity(state).is_some() {

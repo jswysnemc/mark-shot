@@ -52,9 +52,21 @@ pub fn selection_render_info(
 /// Returns the final PNG and the global position of its top-left corner.
 /// position is required for the pin feature ^^^
 pub(crate) fn render_final(editor_state: &mut EditorState) -> Option<(Vec<u8>, (i32, i32), f32)> {
+    let (png, origin, scale) = render_final_precise(editor_state)?;
+    Some((
+        png,
+        (origin.0.round() as i32, origin.1.round() as i32),
+        scale,
+    ))
+}
+
+/// 【截图导出】【精确原点】按 editor_state 返回物理裁切 PNG、双精度全局原点和比例，标注与译文交接共用原点
+pub(in crate::app) fn render_final_precise(
+    editor_state: &mut EditorState,
+) -> Option<(Vec<u8>, (f64, f64), f32)> {
     crate::editor::text_session::commit(editor_state, &mut 0);
     if editor_state.file_canvas.is_some() {
-        return super::image_export::render(editor_state);
+        return super::image_export::render_precise(editor_state);
     }
     let sel = match editor_state.selection.zone {
         Some(s) => s,
@@ -62,14 +74,17 @@ pub(crate) fn render_final(editor_state: &mut EditorState) -> Option<(Vec<u8>, (
     };
 
     let scale = renderer::capture_scale(&editor_state.captures, &editor_state.placements, sel);
-    let (mut out, origin, _) = renderer::composite(
+    let (mut out, origin, _) = renderer::composite_precise(
         &editor_state.captures,
         &editor_state.placements,
         sel,
         Some(scale),
     )?;
 
-    let offset = (origin.0 as f32 * scale, origin.1 as f32 * scale);
+    let offset = (
+        (origin.0 * f64::from(scale)) as f32,
+        (origin.1 * f64::from(scale)) as f32,
+    );
     let mut scaled_editors = HashMap::new();
     // 1. 【截图】【原图滤镜】导出重新读取冻结原图，预览缓存和先前标注都不会成为滤镜来源
     let in_place = HashMap::new();

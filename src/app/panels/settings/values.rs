@@ -9,6 +9,12 @@ use crate::ui::settings_panel::{StepperRange, ToggleField};
 
 /// 【属性面板】【数值读写】根据 editor_state 返回选中标注或工具颜色
 pub fn current_color(editor_state: &EditorState) -> tiny_skia::Color {
+    if crate::editor::annotation_collection::properties::active(editor_state) {
+        return crate::editor::annotation_collection::properties::first(editor_state)
+            .map_or(editor_state.tool_settings.color, |annotation| {
+                annotation.color
+            });
+    }
     active_annotation_idx(editor_state)
         .and_then(|idx| editor_state.annotations.get(idx))
         .map_or(editor_state.tool_settings.color, |ann| ann.color)
@@ -92,7 +98,7 @@ pub(super) fn apply_stepper_field(
         move |ann| match &mut ann.shape {
             AnnotationShape::Text { font_size, .. } => *font_size = new_value,
             AnnotationShape::Redact { filter } => filter.strength = new_value,
-            _ => ann.stroke_width = new_value,
+            _ => ann.set_image_stroke_width(new_value),
         },
         dirty_mask,
     );
@@ -163,7 +169,7 @@ pub fn apply_toggle_field(
 }
 
 /// 【属性面板】【数值读写】根据 editor_state 与 range 返回当前标注或工具数值
-pub(super) fn stepper_value(editor_state: &EditorState, range: StepperRange) -> f32 {
+pub(crate) fn stepper_value(editor_state: &EditorState, range: StepperRange) -> f32 {
     if range == StepperRange::Magnification {
         return crate::editor::magnifier_edits::current_zoom(editor_state);
     }
@@ -172,7 +178,7 @@ pub(super) fn stepper_value(editor_state: &EditorState, range: StepperRange) -> 
         Some(ann) => match &ann.shape {
             AnnotationShape::Text { font_size, .. } => *font_size,
             AnnotationShape::Redact { filter } => filter.strength,
-            _ => ann.stroke_width,
+            _ => ann.image_stroke_width(),
         },
         None => match range {
             StepperRange::Stroke | StepperRange::NumberWidth | StepperRange::LineWidth => {

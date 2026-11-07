@@ -12,25 +12,27 @@ use wayland_protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::
 impl NativeWindow {
     /// 【原生窗口】【菜单表面】返回 surface 是否为当前存活弹层，比较协议对象而非可复用数字编号
     pub fn is_popup_surface(&self, surface: &WlSurface) -> bool {
-        self.popup
-            .as_ref()
-            .is_some_and(|popup| popup.popup.wl_surface() == surface)
+        self.popup.iter().any(|popup| popup.surface() == surface)
     }
 
     /// 【原生窗口】【菜单指针】转换 event 的菜单本地坐标，返回是否消费；父窗口按下只关闭菜单，禁止穿透
     pub fn popup_pointer(&mut self, event: &PointerEvent) -> bool {
-        let Some(popup) = &self.popup else {
-            return false;
-        };
-        let id = popup.id;
-        if popup.popup.wl_surface() != &event.surface {
+        let Some(popup) = self
+            .popup
+            .iter()
+            .find(|popup| popup.surface() == &event.surface)
+        else {
+            if self.popup.is_empty() {
+                return false;
+            }
             if self.main.matches(&event.surface)
                 && matches!(event.kind, PointerEventKind::Press { .. })
             {
-                self.finish_popup(id, None);
+                self.close_popups();
             }
             return true;
-        }
+        };
+        let id = popup.id;
         let (x, y) = event.position;
         let input = match event.kind {
             PointerEventKind::Enter { serial } => {
@@ -56,7 +58,13 @@ impl NativeWindow {
                     pressed: matches!(event.kind, PointerEventKind::Press { .. }),
                 }
             }
-            PointerEventKind::Axis { .. } => return true,
+            PointerEventKind::Axis {
+                horizontal,
+                vertical,
+                ..
+            } => PopupEvent::Scroll {
+                delta: (horizontal.absolute, vertical.absolute),
+            },
         };
         self.popup_dispatch(id, input);
         true
@@ -64,7 +72,13 @@ impl NativeWindow {
 
     /// 【原生窗口】【菜单按键】菜单获得焦点或父窗口暂时仍拥有焦点时消费 event，返回是否分派；快捷键不能穿透正文
     pub fn popup_key(&mut self, event: &KeyEvent) -> bool {
-        let Some(popup) = &self.popup else {
+        let Some(popup) = self
+            .popup
+            .iter()
+            .rev()
+            .find(|popup| popup.keyboard_focused)
+            .or_else(|| self.popup.last())
+        else {
             return false;
         };
         if !popup.keyboard_focused && self.keyboard_surface != Some(SurfaceId::Main) {
@@ -88,17 +102,27 @@ impl NativeWindow {
         if !self.is_popup_surface(surface) {
             return false;
         }
-        self.popup.as_mut().unwrap().keyboard_focused = true;
+        for popup in &mut self.popup {
+            popup.keyboard_focused = popup.surface() == surface;
+        }
         true
     }
 
-    /// 【原生窗口】【菜单焦点离开】surface 为菜单时取消抓取并清理父窗口焦点，返回是否消费；过期表面不影响新输入
+    /// 【原生窗口】【菜单焦点离开】父菜单转向后代时保留抓取，最深菜单失焦才关闭整树；按 surface 返回是否消费
     pub fn popup_leave(&mut self, surface: &WlSurface) -> bool {
         if !self.is_popup_surface(surface) {
             return false;
         }
-        let id = self.popup.as_ref().unwrap().id;
-        self.finish_popup(id, None);
+        let index = self
+            .popup
+            .iter()
+            .position(|popup| popup.surface() == surface)
+            .unwrap();
+        self.popup[index].keyboard_focused = false;
+        if index + 1 < self.popup.len() {
+            return true;
+        }
+        self.close_popups();
         self.keyboard_surface = None;
         self.dispatch(WindowEvent::Focused(false), None);
         true

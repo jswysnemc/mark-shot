@@ -5,7 +5,7 @@ use crate::tools::dispatch_cursor;
 use crate::types::CursorIcon;
 use crate::ui::line_properties::LineChoice;
 
-pub(super) enum UiHit {
+pub(in crate::app) enum UiHit {
     FontPanelInside,
     FontPanelOutside,
     FilterPopoverInside,
@@ -32,7 +32,7 @@ pub(super) enum UiHit {
 }
 
 /// 【界面】【界面命中】按弹层优先级检查 editor_state 中显示器本地 local；返回命中类别
-pub(super) fn hit_test_ui(editor_state: &EditorState, local: (f64, f64)) -> UiHit {
+pub(in crate::app) fn hit_test_ui(editor_state: &EditorState, local: (f64, f64)) -> UiHit {
     if editor_state.font_panel.open {
         return if editor_state.input.pointer.monitor_idx == editor_state.font_panel.monitor_idx
             && editor_state.font_panel.hit_test(local)
@@ -151,8 +151,59 @@ pub(super) fn hit_test_ui(editor_state: &EditorState, local: (f64, f64)) -> UiHi
 
 /// 【界面】【光标选择】依据 editor_state 的弹层、按钮和工具状态返回光标类型
 pub fn compute_cursor(editor_state: &EditorState) -> CursorIcon {
+    if editor_state.upload.busy() || editor_state.selection_translation.busy() {
+        return CursorIcon::Progress;
+    }
+    if editor_state.selection_translation.popup.is_some() {
+        return CursorIcon::Pointer;
+    }
+    if editor_state.selection_size.popup.is_some() {
+        return CursorIcon::Pointer;
+    }
+    if let Some(bar) = &editor_state.selection_translation.bar
+        && bar.monitor == editor_state.input.pointer.monitor_idx
+        && crate::ui::selection_translation::draw::contains(
+            bar.rect,
+            editor_state.input.pointer.local,
+        )
+    {
+        return if bar.hit(editor_state.input.pointer.local).is_some() {
+            CursorIcon::Pointer
+        } else {
+            CursorIcon::Default
+        };
+    }
+    if editor_state.external_panel.kind.is_some() {
+        return if editor_state
+            .external_panel
+            .hit(
+                editor_state.input.pointer.monitor_idx,
+                editor_state.input.pointer.local,
+            )
+            .is_some()
+        {
+            CursorIcon::Pointer
+        } else {
+            CursorIcon::Default
+        };
+    }
     if editor_state.text_context_menu.is_some() {
         return CursorIcon::Default;
+    }
+    if let Some(hit) = super::super::selection_size::input::hit(editor_state) {
+        return match hit {
+            crate::ui::selection_size::state::Hit::Field(_) => CursorIcon::Text,
+            crate::ui::selection_size::state::Hit::Lock
+            | crate::ui::selection_size::state::Hit::Ratio => CursorIcon::Pointer,
+            crate::ui::selection_size::state::Hit::Background => CursorIcon::Default,
+        };
+    }
+    if super::super::canvas_navigation::input::owns_pointer(editor_state) {
+        return if editor_state.navigation.pan.is_some() {
+            CursorIcon::Grabbing
+        } else {
+            CursorIcon::Default
+        };
     }
     let picker = &editor_state.color_popover;
     if picker.open && picker.sv_square.dragging {

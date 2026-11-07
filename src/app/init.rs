@@ -5,13 +5,13 @@
 use crate::backend::ScreenOverlay;
 use crate::editor::EditorState;
 use crate::profiler::Profiler;
-use crate::renderer;
 use crate::types::{Capture, MonitorFrame, Output, Placement};
 use crate::ui::icons;
 use std::collections::HashMap;
 use tiny_skia::{IntSize, Pixmap};
 use usvg::Tree;
 
+/// 【截图初始化】【冻结缓冲】按 frames 导入原始像素和 Wayland 分数比例，返回截图列表或尺寸错误，不按逻辑尺寸重采样
 pub fn build_captures(frames: Vec<MonitorFrame>) -> Result<Vec<Capture>, String> {
     frames
         .into_iter()
@@ -22,7 +22,10 @@ pub fn build_captures(frames: Vec<MonitorFrame>) -> Result<Vec<Capture>, String>
                 format!("Invalid frame size for monitor {monitor_idx}: {src_w}x{src_h}")
             })?;
             let logical_w = f.info.size.map_or(src_w as i32, |s| s.0).max(1);
-            let scale = src_w as f32 / logical_w as f32;
+            let ratio = src_w as f32 / logical_w as f32;
+            // 1. 【截图初始化】【分数比例】协议使用一百二十分之一单位，逻辑尺寸取整不能引入额外像素缩放
+            let quantized = (ratio * 120.0).round() / 120.0;
+            let scale = if quantized > 0.0 { quantized } else { ratio };
 
             let row_bytes = (src_w as usize) * 4;
             let src_stride = f.pw_stride as usize;
@@ -33,7 +36,10 @@ pub fn build_captures(frames: Vec<MonitorFrame>) -> Result<Vec<Capture>, String>
                 f.pixels.truncate(tight_len);
                 let pixmap = Pixmap::from_vec(f.pixels, size)
                     .ok_or_else(|| format!("Invalid frame for monitor {monitor_idx}"))?;
-                return Ok(Capture { pixmap, scale });
+                return Ok(Capture {
+                    pixmap: crate::types::frozen_pixmap::FrozenPixmap::cached(pixmap),
+                    scale,
+                });
             }
 
             let mut pixmap = Pixmap::new(src_w, src_h).ok_or_else(|| {
@@ -66,28 +72,20 @@ pub fn build_captures(frames: Vec<MonitorFrame>) -> Result<Vec<Capture>, String>
                     .copy_from_slice(&src[src_off..src_off + row_bytes]);
             }
 
-            Ok(Capture { pixmap, scale })
+            Ok(Capture {
+                pixmap: crate::types::frozen_pixmap::FrozenPixmap::cached(pixmap),
+                scale,
+            })
         })
         .collect()
 }
 
-pub fn build_layers(placements: &[Placement]) -> (Vec<Pixmap>, Vec<Pixmap>, Vec<Pixmap>) {
-    let len = placements.len();
-    let mut canvases = Vec::with_capacity(len);
-    let mut dimmed_layers = Vec::with_capacity(len);
-    let mut annotation_layers = Vec::with_capacity(len);
-
-    for p in placements {
-        let (w, h) = p.px_size();
-
-        let mut dimmed = Pixmap::new(w, h).expect("Failed to create dimmed");
-        renderer::init_dimming(&mut dimmed, None, None, p.scale);
-        canvases.push(dimmed.clone());
-        dimmed_layers.push(dimmed);
-        annotation_layers.push(Pixmap::new(w, h).expect("Failed to create annotations"));
-    }
-
-    (canvases, dimmed_layers, annotation_layers)
+/// 【截图初始化】【初始前景】按placements和transparent构造输出图层，返回画布与占位缓存；明确全屏原生前景不写入随后会清除的遮罩
+pub(super) fn build_layers_with_transparency(
+    placements: &[Placement],
+    transparent: bool,
+) -> (Vec<Pixmap>, Vec<Pixmap>, Vec<Pixmap>) {
+    super::layers::build_with_transparency(placements, transparent)
 }
 
 pub fn build_placements(outputs: &[Output], hidpi: bool) -> Vec<Placement> {
@@ -131,8 +129,8 @@ pub fn initial_paint(
     overlay: &mut Box<dyn ScreenOverlay>,
     prof: &mut Profiler,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    for (i, canvas) in editor_state.canvas.iter().enumerate() {
-        overlay.stage_frame(i, canvas.data(), None)?;
+    for i in 0..editor_state.canvas.len() {
+        super::frame_backdrop::stage(editor_state, overlay.as_mut(), i, None)?;
     }
     overlay.flush()?;
     prof.mark("frames staged + flushed");
@@ -244,6 +242,12 @@ mod tests {
     fn the_scale_comes_from_the_logical_size() {
         let cases = [
             ("hidpi", 3840u32, Some((1920, 1080)), 2.0),
+            (
+                "fractional logical dimensions are rounded",
+                1280,
+                Some((853, 533)),
+                1.5,
+            ),
             ("no logical size at all", 1920, None, 1.0),
         ];
 

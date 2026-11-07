@@ -64,6 +64,7 @@ pub struct Source {
     color: Color,
     outline: Option<Color>,
     appearance: TextAppearance,
+    stored_size: (Option<f32>, Option<f32>),
 }
 
 impl Source {
@@ -72,6 +73,7 @@ impl Source {
         let AnnotationShape::Text {
             outline,
             appearance,
+            frame,
             ..
         } = &annotation.shape
         else {
@@ -82,6 +84,7 @@ impl Source {
             color: annotation.color,
             outline: *outline,
             appearance: appearance.clone(),
+            stored_size: (frame.width, frame.height),
         }
     }
 
@@ -121,6 +124,7 @@ pub fn sync(state: &mut EditorState, force: bool, dirty: &mut u32) {
         return;
     }
     let reformat = force || source.font != session.source.font;
+    let resized = source.stored_size != session.source.stored_size;
     if reformat {
         let before = Font::read(&session.working);
         let editor = state.text.editors.get_mut(&PREVIEW_ID).unwrap();
@@ -145,6 +149,7 @@ pub fn sync(state: &mut EditorState, force: bool, dirty: &mut u32) {
     if let AnnotationShape::Text {
         outline,
         appearance,
+        frame,
         ..
     } = &mut session.working.shape
     {
@@ -152,6 +157,10 @@ pub fn sync(state: &mut EditorState, force: bool, dirty: &mut u32) {
         let family = appearance.family.clone();
         *appearance = source.appearance.clone();
         appearance.family = family;
+        if reformat || resized {
+            frame.width = source.stored_size.0;
+            frame.height = source.stored_size.1;
+        }
     }
     session.source = source;
     session.properties_hidden = false;

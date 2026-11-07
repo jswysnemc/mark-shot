@@ -1,11 +1,8 @@
 //! 【截图历史】【配置】记录策略与保留其他配置的原子更新
 
 use std::{
-    fs::{self, File, OpenOptions},
-    io::{self, Read, Write},
-    os::unix::fs::{MetadataExt, OpenOptionsExt},
+    io,
     path::{Path, PathBuf},
-    time::Duration,
 };
 
 use serde::{Deserialize, Serialize};
@@ -82,15 +79,21 @@ fn path() -> io::Result<PathBuf> {
 }
 
 /// 【截图历史】【策略读取】从 text 单独读取历史配置并约束范围；无效类型返回错误
-fn parse(text: &str) -> io::Result<History> {
+fn parse_at(path: &Path, text: &str) -> io::Result<History> {
     #[derive(Deserialize, Default)]
     #[serde(default)]
     struct Section {
         history: History,
     }
-    let mut settings = toml::from_str::<Section>(text)
+    let mut settings = if super::document::is_json(path, text) {
+        let root = super::document::root(path, text)?;
+        serde_json::from_value(
+            super::legacy::history::section(&root).unwrap_or_else(|| serde_json::json!({})),
+        )
         .map_err(io::Error::other)?
-        .history;
+    } else {
+        super::document::decode::<Section>(path, text)?.history
+    };
     settings.normalize();
     Ok(settings)
 }
@@ -98,30 +101,13 @@ fn parse(text: &str) -> io::Result<History> {
 /// 【截图历史】【最新策略】重新读取历史配置，使其他窗口的开关立即影响导出；读取失败保留启动配置
 pub fn current() -> History {
     path()
-        .and_then(|path| read_config(&path))
-        .and_then(|text| parse(&text))
+        .and_then(|path| read_config(&path).and_then(|text| parse_at(&path, &text)))
         .unwrap_or_else(|_| super::get().history.clone())
 }
 
 /// 【截图历史】【安全读取】读取 path 的普通配置文件；拒绝链接及超过一 MiB 的内容
 fn read_config(path: &Path) -> io::Result<String> {
-    let file = OpenOptions::new()
-        .read(true)
-        .custom_flags(nix::libc::O_NOFOLLOW | nix::libc::O_NONBLOCK)
-        .open(path)?;
-    let metadata = file.metadata()?;
-    if !metadata.is_file() || metadata.nlink() != 1 || metadata.len() > 1024 * 1024 {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "invalid config file",
-        ));
-    }
-    let mut text = String::new();
-    file.take(1024 * 1024 + 1).read_to_string(&mut text)?;
-    if text.len() > 1024 * 1024 {
-        return Err(io::Error::other("config file is too large"));
-    }
-    Ok(text)
+    super::persistence::read(path)
 }
 
 /// 【截图历史】【策略持久化】更新一项 update，原子保存到当前配置；返回实际保存的历史策略
@@ -131,61 +117,51 @@ pub fn update(update: Update) -> io::Result<History> {
 
 /// 【截图历史】【配置更新】在 path 上串行化 update，保留未知字段与注释；失败不改变原文件
 pub(crate) fn update_at(path: &Path, update: Update) -> io::Result<History> {
-    let parent = path
-        .parent()
-        .filter(|parent| !parent.as_os_str().is_empty())
-        .unwrap_or(Path::new("."));
-    fs::create_dir_all(parent)?;
-    // 1. 【截图历史】【配置锁】使用独立锁文件，原子替换配置不会丢失进程间互斥
-    let lock_path = path.with_extension("toml.history.lock");
-    let lock = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .mode(0o600)
-        .custom_flags(nix::libc::O_NOFOLLOW | nix::libc::O_NONBLOCK)
-        .open(lock_path)?;
-    if !lock.metadata()?.is_file() || lock.metadata()?.nlink() != 1 {
-        return Err(io::Error::other("invalid config lock"));
-    }
-    let _lock = crate::utils::fs_lock::acquire(lock, Duration::from_secs(1))?;
-    let text = match read_config(path) {
-        Ok(text) => text,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => super::TEMPLATE.into(),
-        Err(error) => return Err(error),
-    };
-    let mut document = text
-        .parse::<toml_edit::DocumentMut>()
-        .map_err(io::Error::other)?;
-    parse(&text)?;
-    // 2. 【截图历史】【字段更新】仅改变用户操作的字段，避免覆盖其他窗口刚刚保存的设置
-    let history = document
-        .entry("history")
-        .or_insert(toml_edit::Item::Table(toml_edit::Table::new()));
-    let history = history
-        .as_table_like_mut()
-        .ok_or_else(|| io::Error::other("history must be a table"))?;
-    let (key, value) = match update {
-        Update::Enabled(enabled) => ("enabled", toml_edit::Value::from(enabled)),
-        Update::Limit(limit) => ("limit", toml_edit::Value::from(limit.clamp(1, 200) as i64)),
-    };
-    if let Some(previous) = history.get(key).and_then(toml_edit::Item::as_value) {
-        let mut value = value;
-        *value.decor_mut() = previous.decor().clone();
-        history.insert(key, toml_edit::Item::Value(value));
-    } else {
-        history.insert(key, toml_edit::Item::Value(value));
-    }
-    let updated = document.to_string();
-    let result = parse(&updated)?;
-    // 3. 【截图历史】【原子保存】临时文件使用私有权限，同步后替换，目录同步保证名称落盘
-    let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
-    temporary.write_all(updated.as_bytes())?;
-    temporary.as_file().sync_all()?;
-    temporary.persist(path).map_err(|error| error.error)?;
-    File::open(parent)?.sync_all()?;
-    Ok(result)
+    super::persistence::update(path, |text| {
+        if super::document::is_json(path, text) {
+            parse_at(path, text)?;
+            let updated = super::document::update_json(text, |root| {
+                let table = super::document::section(
+                    root,
+                    &["history", "captureHistory"],
+                    "captureHistory",
+                )?;
+                let (key, value) = match update {
+                    Update::Enabled(enabled) => ("enabled", serde_json::Value::Bool(enabled)),
+                    Update::Limit(limit) => ("limit", (limit.clamp(1, 200) as u64).into()),
+                };
+                table.insert(key.into(), value);
+                Ok(())
+            })?;
+            let settings = parse_at(path, &updated)?;
+            return Ok((updated, settings));
+        }
+        let mut document = text
+            .parse::<toml_edit::DocumentMut>()
+            .map_err(io::Error::other)?;
+        parse_at(path, text)?;
+        // 1. 【截图历史】【字段更新】在共享配置锁内只改变用户操作的字段，保留其他窗口的设置
+        let history = document
+            .entry("history")
+            .or_insert(toml_edit::Item::Table(toml_edit::Table::new()));
+        let history = history
+            .as_table_like_mut()
+            .ok_or_else(|| io::Error::other("history must be a table"))?;
+        let (key, value) = match update {
+            Update::Enabled(enabled) => ("enabled", toml_edit::Value::from(enabled)),
+            Update::Limit(limit) => ("limit", toml_edit::Value::from(limit.clamp(1, 200) as i64)),
+        };
+        if let Some(previous) = history.get(key).and_then(toml_edit::Item::as_value) {
+            let mut value = value;
+            *value.decor_mut() = previous.decor().clone();
+            history.insert(key, toml_edit::Item::Value(value));
+        } else {
+            history.insert(key, toml_edit::Item::Value(value));
+        }
+        let updated = document.to_string();
+        let result = parse_at(path, &updated)?;
+        Ok((updated, result))
+    })
 }
 
 #[cfg(test)]

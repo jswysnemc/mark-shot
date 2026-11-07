@@ -32,6 +32,7 @@ pub struct Toolbar {
     pub dirty: bool,
 
     pub selected: Option<usize>,
+    pub translating: bool,
     pub hovered: Option<usize>,
     pub to: Outputs,
     pub marker_shape: crate::types::MarkerShape,
@@ -47,7 +48,9 @@ pub struct Toolbar {
 /// while only its position or opacity changes, the cached picture is reused
 #[derive(Clone, PartialEq)]
 pub struct ToolbarLook {
+    theme: crate::theme::Mode,
     selected: Option<usize>,
+    translating: bool,
     hovered: Option<usize>,
     to: Outputs,
     size: (f32, f32),
@@ -180,6 +183,7 @@ impl Toolbar {
 
             dirty: false,
             selected: Some(0),
+            translating: false,
             hovered: None,
             to: Outputs::default(),
             marker_shape: crate::types::MarkerShape::default(),
@@ -210,7 +214,9 @@ impl Toolbar {
 
     pub fn look(&self) -> ToolbarLook {
         ToolbarLook {
+            theme: crate::theme::Mode::current(),
             selected: self.selected,
+            translating: self.translating,
             hovered: self.hovered,
             to: self.to,
             size: self.size,

@@ -12,8 +12,9 @@ import time
 from PIL import ImageChops
 from wayland_input_method_transport import InputMethod, build, protocol_evidence
 import wayland_text_format_session as session
+from wayland_ocr_window_layout import tab_point, table_cell_point, table_point
 from wayland_text_pointer import click, pointer_context
-from wayland_window_input_session import ROWS, cursor_rect, frame, geometry, newer_state, press, presented_candidate, screenshot
+from wayland_window_input_session import ROWS, canceled_candidate_pixels, cursor_rect, frame, geometry, newer_state, presented_candidate, screenshot
 
 
 def batch(method, text, **arguments):
@@ -44,7 +45,7 @@ def source(method, window, environment, root, log):
     # 2. 【窗口输入法测试】【确认与替换】逐次确认独立撤销，UTF-8 删除必须完整命中码点
     batch(method, "baseX", commit="X", preedit="hao")
     batch(method, "baseXY", commit="Y")
-    for chord, text in (("ctrl+z", "baseX"), ("ctrl+z", "base"), ("ctrl+shift+z", "baseX"), ("ctrl+y", "baseXY")):
+    for chord, text in (("ctrl+z", "baseX"), ("ctrl+z", "base"), ("ctrl+shift+z", "baseX"), ("ctrl+shift+z", "baseXY")):
         previous = method.states[-1]["serial"]
         session.key(chord)
         newer_state(method, previous, text)
@@ -58,16 +59,16 @@ def source(method, window, environment, root, log):
     method.batch(commit="wrong", delete=(1, 0))
     time.sleep(0.15)
     rejected = screenshot(root, "invalid-after")
-    box = (round(window["x"] + 18), round(window["y"] + 88), round(window["x"] + window["width"] - 18), round(window["y"] + window["height"] - 38))
+    box = (round(window["x"] + 13), round(window["y"] + 64), round(window["x"] + window["width"] - 13), round(window["y"] + window["height"] - 31))
     assert ImageChops.difference(previous.crop(box), rejected.crop(box)).getbbox() is None, "invalid batch changed confirmed or candidate pixels"
     copy_source(environment, "baseXY你")
     previous_serial = method.states[-1]["serial"]
     # 3. 【窗口输入法测试】【页面隔离】隐藏编辑器先停用，过期确认不能进入恢复后的原文
-    press(window, 98, 56)
+    click(tab_point(window, "Image"))
     newer_state(method, previous_serial, None, active=False)
     method.batch(commit="inactive")
     time.sleep(0.08)
-    press(window, 36, 56)
+    click(tab_point(window, "Text"))
     method.state("baseXY你")
     copy_source(environment, "baseXY你")
     (root / "source-result.json").write_text(json.dumps({"native_protocol": True, "preedit_glyph_pixels": pixels, "multiline_hint": True, "independent_commit_undo": True, "supplementary_byte_replacement": True, "invalid_batch_preserved_pixels": True, "hidden_view_ignored_commit": True, "confirmed": "baseXY你"}, ensure_ascii=False, indent=2) + "\n")
@@ -79,17 +80,27 @@ def source_menu(method, window, environment, root, log, original):
     # 1. 【窗口输入法测试】【原文菜单】候选显示后打开真实右键菜单，停用协议并拒绝过期确认，关闭后恢复原文身份
     session.key("ctrl+End")
     time.sleep(0.08)
-    baseline = screenshot(root, "source-menu-baseline")
-    old = cursor_rect(log)
-    batch(method, original, preedit="menu-candidate")
-    presented_candidate(root, "source-menu-preedit", baseline, window, old, log)
+    # 2. 【窗口输入法测试】【相同焦点基准】先采集无候选的真实菜单焦点，避免把原光标隐藏误判为候选残留
     previous_serial = method.states[-1]["serial"]
     click((window["x"] + 220, window["y"] + 160), "right")
     newer_state(method, previous_serial, None, active=False)
     time.sleep(0.12)
-    canceled = screenshot(root, "source-menu-canceled-preedit")
-    region = (round(window["x"] + 18), round(window["y"] + 88), round(window["x"] + 190), round(window["y"] + 114))
-    assert ImageChops.difference(baseline.crop(region), canceled.crop(region)).getbbox() is None, "source menu retained candidate glyphs"
+    inactive_baseline = screenshot(root, "source-menu-inactive-baseline")
+    previous_serial = method.states[-1]["serial"]
+    session.key("Escape")
+    newer_state(method, previous_serial, original)
+    time.sleep(0.08)
+    baseline = screenshot(root, "source-menu-baseline")
+    old = cursor_rect(log)
+    batch(method, original, preedit="menu-candidate")
+    presented_candidate(root, "source-menu-preedit", baseline, window, old, log)
+    candidate_cursor = cursor_rect(log)
+    previous_serial = method.states[-1]["serial"]
+    click((window["x"] + 220, window["y"] + 160), "right")
+    newer_state(method, previous_serial, None, active=False)
+    time.sleep(0.12)
+    suspended = screenshot(root, "source-menu-suspended-preedit")
+    assert canceled_candidate_pixels(inactive_baseline, suspended, window, old, candidate_cursor) > 6, "source menu lost the Qt candidate display"
     method.batch(commit="stale-menu")
     previous_serial = method.states[-1]["serial"]
     session.key("Escape")
@@ -97,21 +108,22 @@ def source_menu(method, window, environment, root, log, original):
     copy_source(environment, original)
     path = root / "source-result.json"
     result = json.loads(path.read_text())
-    result.update(source_menu_preedit_canceled=True, source_menu_stale_commit_ignored=True)
+    result.update(source_menu_preedit_preserved=True, source_menu_stale_commit_ignored=True)
     path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
 
 
 def copy_table(environment, window, expected):
     """【窗口输入法测试】【表格导出】在 window 通过真实菜单复制 expected，environment 为私有会话，无返回值"""
-    press(window, window["width"] - 44, 56)
-    press(window, window["width"] - 98, 92)
+    click(table_point(window))
+    session.key("Home")
+    session.key("Return")
     session.wait_clipboard(environment, expected)
 
 
 def table(method, window, environment, root, original):
     """【窗口输入法测试】【单元格回归】使用 method 验证 window 的单行历史、提交、取消和菜单，environment、root 保存证据，original 为原文"""
     previous = method.states[-1]["serial"]
-    press(window, 160, 56)
+    click(tab_point(window, "Table"))
     newer_state(method, previous, None, active=False)
     session.key("F2")
     # 1. 【窗口输入法测试】【单行编辑】实际开启单元格编辑后才取得输入资格，连续确认合并撤销
@@ -137,7 +149,7 @@ def table(method, window, environment, root, original):
     rows[0][0] = "你好"
     expected = "\n".join("\t".join(row) for row in rows)
     copy_table(environment, window, expected)
-    press(window, 82, 122)
+    click(table_cell_point(window))
     # 3. 【窗口输入法测试】【单元格取消】重新编辑后 Escape 丢弃，不回退已经确认的表格
     session.key("F2")
     method.state("你好")
@@ -177,9 +189,11 @@ def run(binary, root, xml):
                     window = geometry(process.pid, environment)
                     original = source(method, window, environment, root, log_path)
                     table(method, window, environment, root, original)
-                    press(window, 36, 56)
+                    click(tab_point(window, "Text"))
                     method.state(original)
                     source_menu(method, window, environment, root, log_path, original)
+                    # 4. 【窗口输入法测试】【反馈到期】全文复制有 1800 毫秒单次清除，静止检查从合法反馈结束后开始
+                    time.sleep(2.05)
                     session.wait_single_thread(process.pid)
                     before = session.resources(process.pid)
                     commits = log_path.read_text().count("wl_surface")

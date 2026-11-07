@@ -55,7 +55,7 @@ fn draw_settings_content(
         return;
     }
     let cfg = &crate::config::get().settings_panel;
-    let theme = &crate::config::get().theme;
+    let theme = crate::theme::color::theme();
     let (w, h) = panel.size;
     let Some(rect) = Rect::from_xywh(0.0, 0.0, w, h) else {
         return;

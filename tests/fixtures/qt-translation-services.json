@@ -1,0 +1,666 @@
+{
+  "aliases": [
+    {
+      "input": "ar",
+      "key": "ar"
+    },
+    {
+      "input": "ara",
+      "key": "ar"
+    },
+    {
+      "input": "arabic",
+      "key": "ar"
+    },
+    {
+      "input": "cantonese",
+      "key": "yue"
+    },
+    {
+      "input": "chinese",
+      "key": "zh-Hans"
+    },
+    {
+      "input": "chinesesimplified",
+      "key": "zh-Hans"
+    },
+    {
+      "input": "chinesetraditional",
+      "key": "zh-Hant"
+    },
+    {
+      "input": "chs",
+      "key": "zh-Hans"
+    },
+    {
+      "input": "cht",
+      "key": "zh-Hant"
+    },
+    {
+      "input": "de",
+      "key": "de"
+    },
+    {
+      "input": "deu",
+      "key": "de"
+    },
+    {
+      "input": "dut",
+      "key": "nl"
+    },
+    {
+      "input": "dutch",
+      "key": "nl"
+    },
+    {
+      "input": "en",
+      "key": "en"
+    },
+    {
+      "input": "eng",
+      "key": "en"
+    },
+    {
+      "input": "engb",
+      "key": "en"
+    },
+    {
+      "input": "english",
+      "key": "en"
+    },
+    {
+      "input": "enus",
+      "key": "en"
+    },
+    {
+      "input": "es",
+      "key": "es"
+    },
+    {
+      "input": "fr",
+      "key": "fr"
+    },
+    {
+      "input": "fra",
+      "key": "fr"
+    },
+    {
+      "input": "french",
+      "key": "fr"
+    },
+    {
+      "input": "ger",
+      "key": "de"
+    },
+    {
+      "input": "german",
+      "key": "de"
+    },
+    {
+      "input": "hi",
+      "key": "hi"
+    },
+    {
+      "input": "hin",
+      "key": "hi"
+    },
+    {
+      "input": "hindi",
+      "key": "hi"
+    },
+    {
+      "input": "id",
+      "key": "id"
+    },
+    {
+      "input": "ind",
+      "key": "id"
+    },
+    {
+      "input": "indonesian",
+      "key": "id"
+    },
+    {
+      "input": "it",
+      "key": "it"
+    },
+    {
+      "input": "ita",
+      "key": "it"
+    },
+    {
+      "input": "italian",
+      "key": "it"
+    },
+    {
+      "input": "ja",
+      "key": "ja"
+    },
+    {
+      "input": "japanese",
+      "key": "ja"
+    },
+    {
+      "input": "jp",
+      "key": "ja"
+    },
+    {
+      "input": "jpn",
+      "key": "ja"
+    },
+    {
+      "input": "ko",
+      "key": "ko"
+    },
+    {
+      "input": "kor",
+      "key": "ko"
+    },
+    {
+      "input": "korean",
+      "key": "ko"
+    },
+    {
+      "input": "malay",
+      "key": "ms"
+    },
+    {
+      "input": "may",
+      "key": "ms"
+    },
+    {
+      "input": "ms",
+      "key": "ms"
+    },
+    {
+      "input": "nl",
+      "key": "nl"
+    },
+    {
+      "input": "pl",
+      "key": "pl"
+    },
+    {
+      "input": "pol",
+      "key": "pl"
+    },
+    {
+      "input": "polish",
+      "key": "pl"
+    },
+    {
+      "input": "por",
+      "key": "pt"
+    },
+    {
+      "input": "portuguese",
+      "key": "pt"
+    },
+    {
+      "input": "pt",
+      "key": "pt"
+    },
+    {
+      "input": "ru",
+      "key": "ru"
+    },
+    {
+      "input": "rus",
+      "key": "ru"
+    },
+    {
+      "input": "russian",
+      "key": "ru"
+    },
+    {
+      "input": "simplifiedchinese",
+      "key": "zh-Hans"
+    },
+    {
+      "input": "spa",
+      "key": "es"
+    },
+    {
+      "input": "spanish",
+      "key": "es"
+    },
+    {
+      "input": "th",
+      "key": "th"
+    },
+    {
+      "input": "tha",
+      "key": "th"
+    },
+    {
+      "input": "thai",
+      "key": "th"
+    },
+    {
+      "input": "tr",
+      "key": "tr"
+    },
+    {
+      "input": "traditionalchinese",
+      "key": "zh-Hant"
+    },
+    {
+      "input": "tur",
+      "key": "tr"
+    },
+    {
+      "input": "turkish",
+      "key": "tr"
+    },
+    {
+      "input": "vi",
+      "key": "vi"
+    },
+    {
+      "input": "vie",
+      "key": "vi"
+    },
+    {
+      "input": "vietnamese",
+      "key": "vi"
+    },
+    {
+      "input": "yue",
+      "key": "yue"
+    },
+    {
+      "input": "zh",
+      "key": "zh-Hans"
+    },
+    {
+      "input": "zhcn",
+      "key": "zh-Hans"
+    },
+    {
+      "input": "zhhans",
+      "key": "zh-Hans"
+    },
+    {
+      "input": "zhhant",
+      "key": "zh-Hant"
+    },
+    {
+      "input": "zhhk",
+      "key": "zh-Hant"
+    },
+    {
+      "input": "zhsg",
+      "key": "zh-Hans"
+    },
+    {
+      "input": "zhtw",
+      "key": "zh-Hant"
+    },
+    {
+      "input": "中文",
+      "key": "zh-Hans"
+    },
+    {
+      "input": "俄语",
+      "key": "ru"
+    },
+    {
+      "input": "印地语",
+      "key": "hi"
+    },
+    {
+      "input": "印尼语",
+      "key": "id"
+    },
+    {
+      "input": "土耳其语",
+      "key": "tr"
+    },
+    {
+      "input": "德语",
+      "key": "de"
+    },
+    {
+      "input": "意大利语",
+      "key": "it"
+    },
+    {
+      "input": "日文",
+      "key": "ja"
+    },
+    {
+      "input": "日本語",
+      "key": "ja"
+    },
+    {
+      "input": "日语",
+      "key": "ja"
+    },
+    {
+      "input": "汉语",
+      "key": "zh-Hans"
+    },
+    {
+      "input": "法语",
+      "key": "fr"
+    },
+    {
+      "input": "波兰语",
+      "key": "pl"
+    },
+    {
+      "input": "泰语",
+      "key": "th"
+    },
+    {
+      "input": "简体中文",
+      "key": "zh-Hans"
+    },
+    {
+      "input": "粤语",
+      "key": "yue"
+    },
+    {
+      "input": "繁体中文",
+      "key": "zh-Hant"
+    },
+    {
+      "input": "繁體中文",
+      "key": "zh-Hant"
+    },
+    {
+      "input": "英文",
+      "key": "en"
+    },
+    {
+      "input": "英语",
+      "key": "en"
+    },
+    {
+      "input": "荷兰语",
+      "key": "nl"
+    },
+    {
+      "input": "葡萄牙语",
+      "key": "pt"
+    },
+    {
+      "input": "西班牙语",
+      "key": "es"
+    },
+    {
+      "input": "越南语",
+      "key": "vi"
+    },
+    {
+      "input": "阿拉伯语",
+      "key": "ar"
+    },
+    {
+      "input": "韩文",
+      "key": "ko"
+    },
+    {
+      "input": "韩语",
+      "key": "ko"
+    },
+    {
+      "input": "马来语",
+      "key": "ms"
+    }
+  ],
+  "baidu": [
+    {
+      "query": "hello",
+      "signature": "12ba1d6a22337bb40ca29ef0be890d20"
+    },
+    {
+      "query": "原文加号+与空格 %\n第二行",
+      "signature": "2216d77d1eb2b2a658be93d63434ef76"
+    },
+    {
+      "query": "12345678901234567890",
+      "signature": "7f091e29de5ee30920ead19cfa7514b8"
+    },
+    {
+      "query": "123456789012345678901",
+      "signature": "b9dba6bfc7880bb8c3f9297aa4df25cb"
+    },
+    {
+      "query": "123456789🚀abcdefghijkmnopqrstuv",
+      "signature": "1189904590e6bea8a6e53d4ad4b9bbb0"
+    },
+    {
+      "query": "abcdefghijklmnopqrstuvw🚀123456789",
+      "signature": "d3844056711c3b45d2849dd34b089966"
+    }
+  ],
+  "content": [
+    {
+      "error": "",
+      "input": "{\"translations\":[{\"id\":2,\"text\":\" first \"},{\"id\":2,\"text\":\"last\"}]}",
+      "ok": true,
+      "translations": {
+        "2": "last"
+      }
+    },
+    {
+      "error": "",
+      "input": "```json\n{\"translations\":[{\"id\":0,\"text\":\"译文\"}]}\n```",
+      "ok": true,
+      "translations": {
+        "0": "译文"
+      }
+    },
+    {
+      "error": "",
+      "input": "{\"translations\":[null,{\"text\":\"missing id\"},{\"id\":\"7\",\"text\":\"string id\"},{\"id\":3.5,\"text\":\"fraction\"},{\"id\":2.0,\"text\":true}]}",
+      "ok": true,
+      "translations": {
+        "0": "fraction",
+        "2": ""
+      }
+    },
+    {
+      "error": "",
+      "input": "{\"translations\":[]}",
+      "ok": true,
+      "translations": {}
+    },
+    {
+      "error": "llm response missing translations array",
+      "input": "{}",
+      "ok": false,
+      "translations": {}
+    },
+    {
+      "error": "llm response is not valid JSON",
+      "input": "not JSON",
+      "ok": false,
+      "translations": {}
+    }
+  ],
+  "form": {
+    "baidu": "A%2BB+%25~%2A",
+    "plain": "A+B %~*",
+    "youdao": "A%2BB%20%25~%2A"
+  },
+  "languages": [
+    {
+      "input": "",
+      "key": "zh-Hans",
+      "ui_value": ""
+    },
+    {
+      "input": "Simplified Chinese",
+      "key": "zh-Hans",
+      "ui_value": "Simplified Chinese"
+    },
+    {
+      "input": "zh_CN",
+      "key": "zh-Hans",
+      "ui_value": "zh_CN"
+    },
+    {
+      "input": "繁體中文",
+      "key": "zh-Hant",
+      "ui_value": "繁體中文"
+    },
+    {
+      "input": "简体中文",
+      "key": "zh-Hans",
+      "ui_value": "简体中文"
+    },
+    {
+      "input": "繁体中文",
+      "key": "zh-Hant",
+      "ui_value": "繁体中文"
+    },
+    {
+      "input": "English",
+      "key": "en",
+      "ui_value": "English"
+    },
+    {
+      "input": "Japanese",
+      "key": "ja",
+      "ui_value": "Japanese"
+    },
+    {
+      "input": "Korean",
+      "key": "ko",
+      "ui_value": "Korean"
+    },
+    {
+      "input": "Deutsch",
+      "key": "",
+      "ui_value": "Deutsch"
+    },
+    {
+      "input": "French",
+      "key": "fr",
+      "ui_value": "French"
+    },
+    {
+      "input": "Spanish",
+      "key": "es",
+      "ui_value": "Spanish"
+    },
+    {
+      "input": "Italian",
+      "key": "it",
+      "ui_value": "Italian"
+    },
+    {
+      "input": "Klingon",
+      "key": "",
+      "ui_value": "Klingon"
+    }
+  ],
+  "localized": [
+    {
+      "input": "简体中文",
+      "ui_value": "Simplified Chinese"
+    },
+    {
+      "input": "繁体中文",
+      "ui_value": "Traditional Chinese"
+    },
+    {
+      "input": "英语",
+      "ui_value": "English"
+    },
+    {
+      "input": "日语",
+      "ui_value": "Japanese"
+    },
+    {
+      "input": "韩语",
+      "ui_value": "Korean"
+    },
+    {
+      "input": "法语",
+      "ui_value": "French"
+    },
+    {
+      "input": "德语",
+      "ui_value": "German"
+    },
+    {
+      "input": "西班牙语",
+      "ui_value": "Spanish"
+    },
+    {
+      "input": "俄语",
+      "ui_value": "Russian"
+    }
+  ],
+  "tc3": [
+    {
+      "authorization": "TC3-HMAC-SHA256 Credential=test-id/2019-02-25/tmt/tc3_request, SignedHeaders=content-type;host, Signature=ee6efa9ac7e75021315cc12ab45a0e95fc93a449e49e6d7d6027e59db2498c45",
+      "body": "{\"ProjectId\":0,\"Source\":\"auto\",\"SourceTextList\":[\"hello\"],\"Target\":\"zh\"}",
+      "canonical": "POST\n/\n\ncontent-type:application/json; charset=utf-8\nhost:tmt.tencentcloudapi.com\n\ncontent-type;host\n89301f9cbcaa780fe6ab31d7295d6af0abbf0a98e9e5286aa9c58b805da66619",
+      "date": "2019-02-25",
+      "timestamp": 1551113065
+    },
+    {
+      "authorization": "TC3-HMAC-SHA256 Credential=test-id/1970-01-01/tmt/tc3_request, SignedHeaders=content-type;host, Signature=9017c0edf84f3a70d9a04f935660a248b856736ceab8d28e382a1fca7dc3d2a9",
+      "body": "{\"ProjectId\":0,\"Source\":\"auto\",\"SourceTextList\":[\"hello\"],\"Target\":\"zh\"}",
+      "canonical": "POST\n/\n\ncontent-type:application/json; charset=utf-8\nhost:tmt.tencentcloudapi.com\n\ncontent-type;host\n89301f9cbcaa780fe6ab31d7295d6af0abbf0a98e9e5286aa9c58b805da66619",
+      "date": "1970-01-01",
+      "timestamp": 0
+    },
+    {
+      "authorization": "TC3-HMAC-SHA256 Credential=test-id/1970-01-02/tmt/tc3_request, SignedHeaders=content-type;host, Signature=54f5103acb30b543b1c212993cfb33387ce7ae7b56023533b07a7f620131111b",
+      "body": "{\"ProjectId\":0,\"Source\":\"auto\",\"SourceTextList\":[\"hello\"],\"Target\":\"zh\"}",
+      "canonical": "POST\n/\n\ncontent-type:application/json; charset=utf-8\nhost:tmt.tencentcloudapi.com\n\ncontent-type;host\n89301f9cbcaa780fe6ab31d7295d6af0abbf0a98e9e5286aa9c58b805da66619",
+      "date": "1970-01-02",
+      "timestamp": 86400
+    },
+    {
+      "authorization": "TC3-HMAC-SHA256 Credential=test-id/1969-12-31/tmt/tc3_request, SignedHeaders=content-type;host, Signature=86e38ec4a386b659c039523b4e5f11195bf7e98fc6ffc7286c14dce74f8c2d69",
+      "body": "{\"ProjectId\":0,\"Source\":\"auto\",\"SourceTextList\":[\"hello\"],\"Target\":\"zh\"}",
+      "canonical": "POST\n/\n\ncontent-type:application/json; charset=utf-8\nhost:tmt.tencentcloudapi.com\n\ncontent-type;host\n89301f9cbcaa780fe6ab31d7295d6af0abbf0a98e9e5286aa9c58b805da66619",
+      "date": "1969-12-31",
+      "timestamp": -1
+    }
+  ],
+  "youdao": [
+    {
+      "input_utf8_hex": "68656c6c6f",
+      "query": "hello",
+      "signature": "7c74f73d1d3e3c116832c0b6363b5ff161dae52d20f6f09c67b60cfba74c5adc",
+      "utf16_length": 5
+    },
+    {
+      "input_utf8_hex": "e58e9fe69687e58aa0e58fb72be4b88ee7a9bae6a0bc20250ae7acace4ba8ce8a18c",
+      "query": "原文加号+与空格 %\n第二行",
+      "signature": "ac417ed9debbf5d4c20376bfb44ba0739b3ffe612c16bebf2cb540b0373044ea",
+      "utf16_length": 14
+    },
+    {
+      "input_utf8_hex": "3132333435363738393031323334353637383930",
+      "query": "12345678901234567890",
+      "signature": "0e7769e73e9f87e54e4885e3cc2354cfaf6072b9626d232bcc05288f44dd6d58",
+      "utf16_length": 20
+    },
+    {
+      "input_utf8_hex": "31323334353637383930323132333435363738393031",
+      "query": "123456789012345678901",
+      "signature": "2be9ef079d42621bfcb380e5d89dc24dc072be9fc10da45d11897c503d1bd62b",
+      "utf16_length": 21
+    },
+    {
+      "input_utf8_hex": "31323334353637383933326d6e6f70717273747576",
+      "query": "123456789🚀abcdefghijkmnopqrstuv",
+      "signature": "353b786ba294e574cc6e42a46d936450235c4c594f5301fd946e129006e33fa9",
+      "utf16_length": 32
+    },
+    {
+      "input_utf8_hex": "6162636465666768696a3334313233343536373839",
+      "query": "abcdefghijklmnopqrstuvw🚀123456789",
+      "signature": "4fa5b5b028ee24fa21fa36bd05799bc095cd823eda03db66a6751ac2e1d4f61d",
+      "utf16_length": 34
+    }
+  ]
+}

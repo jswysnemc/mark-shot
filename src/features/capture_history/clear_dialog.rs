@@ -2,7 +2,7 @@
 
 use super::clear_dialog_draw::Layout;
 use crate::{
-    backend::wayland::window::{
+    backend::window::{
         KeyInput, LEFT_BUTTON, RIGHT_BUTTON, WindowAction, WindowContent, WindowDialog,
         WindowEvent, WindowSpec,
     },

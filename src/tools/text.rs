@@ -2,11 +2,14 @@ mod keyboard;
 pub use keyboard::apply_key_to_editor;
 mod behavior;
 mod layout;
+mod source_layout;
 use layout::sync_content_from_editor;
 pub use layout::{
     ensure_text_editor, reflow_text_editor, shape_entire_buffer, text_bounds,
     update_text_bbox_inline,
 };
+pub(crate) use source_layout::wrapped_box_width;
+pub use source_layout::{fit_frame, has_wrapped_paragraph, source_bounds};
 mod background;
 mod render;
 pub use render::{render_text_annotation, render_text_annotation_with_caret};
@@ -14,7 +17,7 @@ mod selection;
 pub mod session_input;
 use selection::extract_selected_text;
 
-use crate::editor::annotation_drag::{apply_annotation_drag, handle_hit_test_for_annotation};
+use crate::editor::annotation_drag::apply_annotation_drag;
 use crate::editor::{DamageZone, EditorState};
 use crate::theme::color;
 use crate::tools::ToolBehavior;

@@ -57,11 +57,11 @@ fn desktop_sampling_respects_offsets_scales_and_uncovered_gaps() {
     blue.fill(Color::from_rgba8(0, 0, 255, 255));
     let captures = [
         Capture {
-            pixmap: red,
+            pixmap: red.into(),
             scale: 2.0,
         },
         Capture {
-            pixmap: blue,
+            pixmap: blue.into(),
             scale: 1.5,
         },
     ];

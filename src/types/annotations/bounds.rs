@@ -144,65 +144,13 @@ impl Annotation {
             _ => self.damage_bbox(false),
         }
     }
-    /// 【标注】【初步命中】判断全局 coordinates 是否处于可操作边界内；返回布尔值
+    /// 【标注】【初步命中】判断稳定画布coordinates是否命中正文，未传持续视图时使用一比一窗口单位，返回布尔值
     pub fn initial_hit_test(&self, coordinates: (f64, f64)) -> bool {
-        if let Some(line) = self.shape.line() {
-            let point = (coordinates.0 as f32, coordinates.1 as f32);
-            let tolerance = crate::config::get().input.handle_hit_width * 0.5;
-            return match self.shape {
-                AnnotationShape::Arrow { style, .. } => crate::features::arrow::path::hit_test(
-                    line,
-                    style,
-                    self.stroke_width,
-                    point,
-                    tolerance,
-                ),
-                _ => crate::features::line::geometry::insertion_at(
-                    line,
-                    point,
-                    tolerance + self.stroke_width * 0.5,
-                )
-                .is_some(),
-            };
-        }
-        if let AnnotationShape::Redact { filter } = self.shape {
-            return crate::features::filter::drag::hit_test(
-                filter,
-                (coordinates.0 as f32, coordinates.1 as f32),
-                false,
-            ) != crate::types::SelectionHandle::None;
-        }
-        if let AnnotationShape::Number { mark } = self.shape {
-            return crate::features::number::drag::hit_test(
-                mark,
-                self.stroke_width,
-                (coordinates.0 as f32, coordinates.1 as f32),
-                false,
-            ) != crate::types::SelectionHandle::None;
-        }
-        if let AnnotationShape::Magnifier { magnifier } = self.shape {
-            return crate::features::magnifier::drag::hit_test(
-                magnifier,
-                (coordinates.0 as f32, coordinates.1 as f32),
-                false,
-            ) != crate::types::SelectionHandle::None;
-        }
-        if let AnnotationShape::Ruler { measurement } = self.shape {
-            return crate::features::ruler::drag::hit_test(
-                measurement,
-                (coordinates.0 as f32, coordinates.1 as f32),
-                self.stroke_width,
-                false,
-                true,
-            ) != crate::types::SelectionHandle::None;
-        }
-        let (x, y) = (coordinates.0 as f32, coordinates.1 as f32);
-        let pad = crate::config::get().input.handle_hit_width;
-
-        x >= self.bbox.left() - pad
-            && x <= self.bbox.right() + pad
-            && y >= self.bbox.top() - pad
-            && y <= self.bbox.bottom() + pad
+        crate::features::annotation_selection::body_hit::initial(
+            self,
+            (coordinates.0 as f32, coordinates.1 as f32),
+            crate::features::annotation_style::window::WindowUnits::default(),
+        )
     }
     /// 【标注】【视觉留量】返回描边、阴影和文字外伸所需的逻辑边界留量
     pub fn visual_pad(&self) -> f32 {
@@ -222,7 +170,7 @@ impl Annotation {
                     width.max(height).to_string().len()
                 });
             return ((16.0 + digits as f32 * 8.0).max(34.0) * measurement.unit(self.stroke_width))
-                .max(64.0 * measurement.style_scale);
+                .max((64.0 * measurement.style_scale) as f32);
         }
         let stroke_width = match &self.shape {
             AnnotationShape::Text {
@@ -258,10 +206,28 @@ impl Annotation {
                 .bbox
                 .outset(self.visual_pad(), self.visual_pad())
                 .unwrap_or(self.bbox);
+            if self.rotation_degrees != 0.0 {
+                let mut area = self.rotated_bounds(body);
+                if is_selected
+                    && let Some(bounds) =
+                        crate::features::annotation_selection::chrome::bounds(self)
+                            .and_then(|bounds| bounds.outset(8.0, 8.0))
+                {
+                    area = area.join(&self.rotated_bounds(bounds)).unwrap_or(area);
+                }
+                if is_selected
+                    && let Some((_, point)) = self.generic_rotation_handle()
+                    && let Some(handle) = Rect::from_xywh(point.0 - 8.0, point.1 - 8.0, 16.0, 16.0)
+                {
+                    area = area.join(&handle).unwrap_or(area);
+                }
+                return area;
+            }
             if is_selected
                 && let Some(editing) = crate::features::line::drag::editing_bounds(
                     line,
-                    self.bbox,
+                    crate::features::annotation_selection::chrome::bounds(self)
+                        .unwrap_or(self.bbox),
                     crate::renderer::selection_chrome_pad()
                         - crate::config::get().input.handle_hit_width * 0.5,
                 )
@@ -271,8 +237,19 @@ impl Annotation {
             return body;
         }
         if let AnnotationShape::Number { mark } = self.shape {
+            let window = crate::features::annotation_style::window::WindowUnits::default();
             let body = self
                 .bbox
+                .join(
+                    &crate::features::number::window_geometry::Geometry::new(
+                        mark,
+                        self.stroke_width,
+                        window,
+                    )
+                    .painted_bounds(window)
+                    .unwrap_or(self.bbox),
+                )
+                .unwrap_or(self.bbox)
                 .outset(self.visual_pad(), self.visual_pad())
                 .unwrap_or(self.bbox);
             if !is_selected {
@@ -338,12 +315,26 @@ impl Annotation {
         } else {
             self.visual_pad()
         };
-        Rect::from_ltrb(
-            self.bbox.left() - pad,
-            self.bbox.top() - pad,
-            self.bbox.right() + pad,
-            self.bbox.bottom() + pad,
+        let bounds = self.text_painted_bounds();
+        let body = Rect::from_ltrb(
+            bounds.left() - pad,
+            bounds.top() - pad,
+            bounds.right() + pad,
+            bounds.bottom() + pad,
         )
-        .unwrap_or(self.bbox)
+        .unwrap_or(self.bbox);
+        let mut body = self.rotated_bounds(body);
+        if is_selected
+            && let Some(frame) = crate::features::annotation_selection::chrome::bounds(self)
+            && let Some(frame) = frame.outset(pad, pad)
+        {
+            body = body.join(&self.rotated_bounds(frame)).unwrap_or(body);
+        }
+        if is_selected && let Some((_, handle)) = self.generic_rotation_handle() {
+            return Rect::from_xywh(handle.0 - 8.0, handle.1 - 8.0, 16.0, 16.0)
+                .and_then(|handle| body.join(&handle))
+                .unwrap_or(body);
+        }
+        body
     }
 }

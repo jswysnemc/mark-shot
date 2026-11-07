@@ -6,7 +6,6 @@ use crate::editor::annotation_drag::{apply_annotation_drag, commit_drag_if_chang
 use crate::editor::ruler_session::{cancel_draft, clear_hover};
 use crate::editor::{DamageZone, EditorState};
 use crate::features::ruler::angle_draft::{self, DraftStep};
-use crate::features::ruler::drag;
 use crate::features::ruler::labels::{InfoLabel, clamped};
 use crate::features::ruler::state::RulerHover;
 use crate::features::ruler::{Measurement, RulerGeometry, RulerMode};
@@ -39,9 +38,9 @@ impl ToolBehavior for RulerTool {
         if pressed {
             let pending = angle_pending(state);
             let position = if pending {
-                space.clamp_point(state.input.pointer.global)
+                space.clamp_point(state.canvas_point())
             } else {
-                space.start_point(state.input.pointer.global)
+                space.start_point(state.canvas_point())
             };
             let Some(position) = position else {
                 return;
@@ -64,7 +63,7 @@ impl ToolBehavior for RulerTool {
                 commit_drag_if_changed(state);
                 return;
             }
-            let Some(position) = space.clamp_point(state.input.pointer.global) else {
+            let Some(position) = space.clamp_point(state.canvas_point()) else {
                 return;
             };
             update_draft(state, position, space, dirty_mask);
@@ -112,10 +111,7 @@ impl ToolBehavior for RulerTool {
         if angle_pending(state) {
             return CursorIcon::Crosshair;
         }
-        let position = (
-            state.input.pointer.global.0 as f32,
-            state.input.pointer.global.1 as f32,
-        );
+        let position = (state.canvas_point().0 as f32, state.canvas_point().1 as f32);
         hit(state, position)
             .and_then(|(_, handle)| cursor_for_handle(handle, false))
             .unwrap_or(CursorIcon::Crosshair)
@@ -129,11 +125,16 @@ pub fn angle_pending(state: &EditorState) -> bool {
 
 /// 【尺子】【已有尺子命中】在 state 中优先命中选中尺子，再从上到下查找其他尺子；position 为全局坐标，返回索引和调整方式
 fn hit(state: &EditorState, position: (f32, f32)) -> Option<(usize, SelectionHandle)> {
-    if let Some(index) = state.selected_annotation
+    if let Some(index) = state.selected_annotation_index()
         && let Some(annotation) = state.annotations.get(index)
-        && let AnnotationShape::Ruler { measurement } = annotation.shape
+        && let AnnotationShape::Ruler { .. } = annotation.shape
     {
-        let handle = drag::hit_test(measurement, position, annotation.stroke_width, true, false);
+        let handle = state.canvas_ruler_handle(
+            annotation,
+            (f64::from(position.0), f64::from(position.1)),
+            true,
+            false,
+        );
         if handle != SelectionHandle::None {
             return Some((index, handle));
         }
@@ -144,11 +145,15 @@ fn hit(state: &EditorState, position: (f32, f32)) -> Option<(usize, SelectionHan
         .enumerate()
         .rev()
         .find_map(|(index, annotation)| {
-            let AnnotationShape::Ruler { measurement } = annotation.shape else {
+            let AnnotationShape::Ruler { .. } = annotation.shape else {
                 return None;
             };
-            let handle =
-                drag::hit_test(measurement, position, annotation.stroke_width, false, false);
+            let handle = state.canvas_ruler_handle(
+                annotation,
+                (f64::from(position.0), f64::from(position.1)),
+                false,
+                false,
+            );
             (handle != SelectionHandle::None).then_some((index, handle))
         })
 }
@@ -161,17 +166,17 @@ fn select_for_drag(
     dirty_mask: &mut u32,
 ) {
     if let Some(previous) = state
-        .selected_annotation
+        .selected_annotation_index()
         .and_then(|index| state.annotations.get(index))
     {
         damage(state, previous.damage_bbox(true), dirty_mask);
     }
     let annotation = state.annotations[index].clone();
-    state.selected_annotation = Some(index);
+    state.select_annotation_index(Some(index));
     state.ann_drag = Some(AnnDragState {
         handle,
-        start_global: state.input.pointer.global,
-        prev_global: state.input.pointer.global,
+        start_global: state.canvas_point(),
+        prev_global: state.canvas_point(),
         orig: annotation.clone(),
         orig_index: index,
     });
@@ -191,13 +196,16 @@ fn begin(state: &mut EditorState, position: (f32, f32), space: DrawingSpace, dir
         return;
     };
     if let Some(previous) = state
-        .selected_annotation
+        .selected_annotation_index()
         .and_then(|index| state.annotations.get(index))
     {
         damage(state, previous.damage_bbox(true), dirty_mask);
     }
-    state.selected_annotation = None;
+    state.select_annotation_index(None);
     let mut annotation = Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id: state.next_id,
         shape: AnnotationShape::Ruler { measurement },
         color: state.tool_settings.color,
@@ -205,6 +213,7 @@ fn begin(state: &mut EditorState, position: (f32, f32), space: DrawingSpace, dir
         stroke_width: state.tool_settings.stroke(StrokeGroup::Ruler),
         bbox: Rect::from_xywh(position.0, position.1, 1.0, 1.0).unwrap(),
     };
+    state.adopt_annotation_style(&mut annotation);
     annotation.update_bbox();
     state.input.mouse_down = true;
     state.tool_active = true;
@@ -237,7 +246,7 @@ fn update_draft(
         }
     }
     annotation.color = state.tool_settings.color;
-    annotation.stroke_width = state.tool_settings.stroke(StrokeGroup::Ruler);
+    annotation.set_image_stroke_width(state.tool_settings.stroke(StrokeGroup::Ruler));
     annotation.update_bbox();
     let new = annotation.damage_bbox(false);
     damage(state, old, dirty_mask);
@@ -323,12 +332,12 @@ fn over_ui(state: &EditorState) -> bool {
 /// 【尺子】【悬停更新】用 space 的原图比例读取 state 指针位置与颜色；dirty_mask 返回旧十字线与新十字线区域，无返回值
 fn update_hover(state: &mut EditorState, space: DrawingSpace, dirty_mask: &mut u32) {
     if !state.input.mouse_down
-        && (over_ui(state) || space.start_point(state.input.pointer.global).is_none())
+        && (over_ui(state) || space.start_point(state.canvas_point()).is_none())
     {
         clear_hover(state, dirty_mask);
         return;
     }
-    let Some(point) = space.clamp_point(state.input.pointer.global) else {
+    let Some(point) = space.clamp_point(state.canvas_point()) else {
         return;
     };
     let image_point = (

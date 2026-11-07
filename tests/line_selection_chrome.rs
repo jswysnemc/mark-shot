@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use mark_shot::features::{
     arrow::ArrowStyle,
-    line::{LineSkeleton, LineStyle, drag},
+    line::{LineSkeleton, LineStyle},
 };
 use mark_shot::renderer::{Painter, draw_annotation};
 use mark_shot::types::{Annotation, AnnotationShape};
@@ -26,6 +26,9 @@ fn annotation(head: Option<ArrowStyle>, width: f32) -> Annotation {
         },
     };
     let mut annotation = Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id: 1,
         shape,
         color: Color::TRANSPARENT,
@@ -89,7 +92,7 @@ fn all_visible_selection_pixels_are_inside_the_declared_editing_damage() {
 #[test]
 fn painted_frame_corners_match_the_skeleton_hit_targets() {
     let annotation = annotation(Some(ArrowStyle::Fletched), 3.0);
-    let frame = drag::frame(annotation.bbox).unwrap();
+    let frame = mark_shot::features::annotation_selection::chrome::bounds(&annotation).unwrap();
     let image = chrome(&annotation, 1.0);
     for (x, y) in [
         (frame.left(), frame.top()),

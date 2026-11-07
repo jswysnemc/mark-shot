@@ -5,6 +5,24 @@ use tiny_skia::{Pixmap, Rect};
 use super::{Painter, rect_bounds, scale_rect};
 
 impl Painter<'_> {
+    /// 【局部绘制】【场景裁切】按 area 场景逻辑坐标限制 draw，返回值为空；嵌套缓冲先扣除当前原点，不改变 clipped 的本地坐标约定
+    pub fn clipped_scene(&mut self, area: Option<Rect>, draw: impl FnOnce(&mut Painter<'_>)) {
+        let Some(area) = area else {
+            self.clipped(None, draw);
+            return;
+        };
+        let origin = self.origin();
+        let Some(local) = Rect::from_xywh(
+            area.x() - origin.0,
+            area.y() - origin.1,
+            area.width(),
+            area.height(),
+        ) else {
+            return;
+        };
+        self.clipped(Some(local), draw);
+    }
+
     /// 【局部绘制】【范围回调】用 dirty 本地逻辑区域限制 draw，返回值为空；整屏损坏直接绘制，部分损坏只分配范围缓冲
     pub fn clipped(&mut self, dirty: Option<Rect>, draw: impl FnOnce(&mut Painter<'_>)) {
         let Some(area) = dirty else {

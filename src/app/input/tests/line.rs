@@ -62,7 +62,9 @@ fn empty_right_button_and_outside_image_gestures_do_not_commit() {
     state.ui_hidden = true;
     let viewport = tiny_skia::Rect::from_xywh(100.0, 100.0, 320.0, 200.0).unwrap();
     state.file_canvas = Some(crate::editor::file_canvas::FileCanvas {
-        original: tiny_skia::Pixmap::new(320, 200).unwrap(),
+        original: crate::image_source::ImageSource::memory(
+            tiny_skia::Pixmap::new(320, 200).unwrap(),
+        ),
         viewport,
     });
     state.selection.zone = Some(viewport);

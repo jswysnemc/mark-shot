@@ -22,13 +22,33 @@ use super::panels::settings::{
 
 /// 【界面】【动作分派】在 editor_state 中执行 action 并处理工具上下文；dirty_mask 返回重绘显示器，无返回值
 pub fn run(editor_state: &mut EditorState, action: Action, dirty_mask: &mut u32) {
-    if matches!(action, Action::Accept | Action::Finish(_) | Action::SaveAs) {
+    if editor_state.selection_translation.busy() {
+        if action == Action::Cancel {
+            super::selection_translation::tasks::cancel(editor_state, dirty_mask);
+        }
+        return;
+    }
+    if editor_state.upload.busy() {
+        if action == Action::Cancel {
+            super::upload::cancel(editor_state, dirty_mask);
+        }
+        return;
+    }
+    if matches!(
+        action,
+        Action::Accept
+            | Action::Finish(_)
+            | Action::SaveAs
+            | Action::OpenWith
+            | Action::Extensions
+            | Action::Upload
+    ) {
         crate::editor::text_session::commit(editor_state, dirty_mask);
     }
     if editor_state.mode == Mode::Ocr
         && !matches!(
             action,
-            Action::Cancel | Action::ToggleMagnifier | Action::History
+            Action::Cancel | Action::ToggleMagnifier | Action::ToggleTheme | Action::History
         )
     {
         return;
@@ -43,6 +63,18 @@ pub fn run(editor_state: &mut EditorState, action: Action, dirty_mask: &mut u32)
         || editor_state.color_popover.hue_dragging
         || editor_state.color_popover.alpha_dragging;
     match action {
+        Action::Translate => super::selection_translation::toggle(editor_state, dirty_mask),
+        Action::Upload => super::upload::request(editor_state, dirty_mask),
+        Action::OpenWith => super::external_actions::toggle(
+            editor_state,
+            crate::ui::external_panel::Kind::OpenWith,
+            dirty_mask,
+        ),
+        Action::Extensions => super::external_actions::toggle(
+            editor_state,
+            crate::ui::external_panel::Kind::Extensions,
+            dirty_mask,
+        ),
         Action::Accept => {
             if !tool_copy(editor_state, dirty_mask) && !editor_state.to.is_empty() {
                 editor_state.finish = Some(editor_state.to);
@@ -120,6 +152,7 @@ pub fn run(editor_state: &mut EditorState, action: Action, dirty_mask: &mut u32)
         Action::ToggleUi | Action::Tool(_) if editor_state.region() => {}
         Action::ToggleUi => toggle_ui(editor_state, dirty_mask),
         Action::ToggleMagnifier => toggle_magnifier(editor_state, dirty_mask),
+        Action::ToggleTheme => super::theme_switch::toggle(editor_state, dirty_mask),
         Action::ScrollCapture => begin_scroll_capture(editor_state, dirty_mask),
         // 1. 【截图历史】【手势保护】旧画笔与选择拖动未设置忙碌标志，草稿和拖动快照也必须阻止交接
         Action::History
@@ -268,7 +301,22 @@ fn begin_scroll_capture(editor_state: &mut EditorState, dirty_mask: &mut u32) {
     editor_state.tool_active = false;
 }
 
+/// 【光标放大区】【开关更新】为 editor_state 保存明确配置后更新显示，dirty_mask 接收损坏范围，保存失败保留当前开关，无返回值
 fn toggle_magnifier(editor_state: &mut EditorState, dirty_mask: &mut u32) {
+    // 1. 【光标放大区】【配置保存】原版配置和明确原生开关随操作保存，旧工具偏好继续使用原有存储
+    if crate::config::get().startup.selection_loupe.is_some()
+        && let Err(error) = crate::config::startup::save_loupe(editor_state.magnifier.hidden)
+    {
+        log::error!("【光标放大区】【配置保存】保存失败：{error}");
+        editor_state.toasts.show_text(
+            crate::ui::toast::ToastKind::SettingsFailed,
+            "Failed to save settings".into(),
+            &mut editor_state.text.font_system,
+        );
+        mark_dirty(dirty_mask, editor_state.input.pointer.monitor_idx);
+        return;
+    }
+    // 2. 【光标放大区】【阶段更新】开关只影响支持的选择阶段，取色仍使用独立职责
     let was_shown = editor_state.magnifier_shown();
     editor_state.magnifier.hidden = !editor_state.magnifier.hidden;
     if editor_state.magnifier_shown() == was_shown {

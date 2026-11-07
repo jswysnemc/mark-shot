@@ -1,17 +1,11 @@
 //! 【原生窗口】【表面状态】主窗口与子窗口分别维护配置、缩放和缓冲，复用相同提交路径
 
 use super::runtime::NativeWindow;
-use super::{WindowContent, WindowSpec};
+use super::{WindowContent, WindowSpec, role::Role};
 use crate::AppResult;
 use smithay_client_toolkit::{
     compositor::{CompositorState, FrameCallbackData},
-    shell::{
-        WaylandSurface,
-        xdg::{
-            XdgShell,
-            window::{Window, WindowDecorations},
-        },
-    },
+    shell::xdg::XdgShell,
     shm::slot::{Buffer, SlotPool},
 };
 use tiny_skia::Pixmap;
@@ -31,7 +25,8 @@ pub(super) enum SurfaceId {
 }
 
 pub(super) struct Surface {
-    pub window: Window,
+    pub role: Role,
+    pub spec: WindowSpec,
     pub viewport: Option<wp_viewport::WpViewport>,
     pub fractional: Option<wp_fractional_scale_v1::WpFractionalScaleV1>,
     pub size: (u32, u32),
@@ -55,24 +50,30 @@ impl Surface {
         fractional_manager: Option<&wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1>,
         qh: &QueueHandle<NativeWindow>,
     ) -> Self {
-        let window = shell.create_window(
-            compositor.create_surface(qh),
-            WindowDecorations::ClientOnly,
-            qh,
-        );
-        window.set_title(spec.title);
-        window.set_app_id(spec.app_id);
-        window.set_min_size(Some(spec.minimum));
-        let viewport = viewporter.map(|manager| manager.get_viewport(window.wl_surface(), qh, id));
+        let role = Role::window(&spec, compositor, shell, qh);
+        Self::from_role(spec, id, role, viewporter, fractional_manager, qh)
+    }
+
+    /// 【原生窗口】【角色表面】用 spec、id、role 及缩放资源建立独立缓冲状态，返回未提交表面，不重建业务内容
+    pub fn from_role(
+        spec: WindowSpec,
+        id: SurfaceId,
+        role: Role,
+        viewporter: Option<&wp_viewporter::WpViewporter>,
+        fractional_manager: Option<&wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1>,
+        qh: &QueueHandle<NativeWindow>,
+    ) -> Self {
+        let viewport = viewporter.map(|manager| manager.get_viewport(role.wl_surface(), qh, id));
         let fractional = viewport.as_ref().and_then(|_| {
             fractional_manager
-                .map(|manager| manager.get_fractional_scale(window.wl_surface(), qh, id))
+                .map(|manager| manager.get_fractional_scale(role.wl_surface(), qh, id))
         });
         Self {
-            window,
+            size: spec.size,
+            spec,
+            role,
             viewport,
             fractional,
-            size: spec.size,
             scale: 1.0,
             dirty: true,
             configured: false,
@@ -83,9 +84,32 @@ impl Surface {
         }
     }
 
+    /// 【原生窗口】【角色替换】用 role、size 和缩放资源替换当前协议状态，保留逻辑首帧通知资格，释放旧缓冲及附属协议，无返回值
+    pub fn recreate(
+        &mut self,
+        role: Role,
+        size: (u32, u32),
+        viewporter: Option<&wp_viewporter::WpViewporter>,
+        fractional_manager: Option<&wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1>,
+        qh: &QueueHandle<NativeWindow>,
+    ) {
+        let mut spec = self.spec.clone();
+        spec.size = size;
+        let mut next = Self::from_role(
+            spec,
+            SurfaceId::Main,
+            role,
+            viewporter,
+            fractional_manager,
+            qh,
+        );
+        next.mapped = self.mapped;
+        *self = next;
+    }
+
     /// 【原生窗口】【表面匹配】返回 surface 是否属于本窗口，比较完整协议对象身份，不使用可复用数字编号
     pub fn matches(&self, surface: &wl_surface::WlSurface) -> bool {
-        surface == self.window.wl_surface()
+        surface == self.role.wl_surface()
     }
 
     /// 【原生窗口】【独立帧提交】把 content 绘制到本表面，pool 复用共享内存分配，qh 接收对应帧回调，返回提交错误
@@ -135,12 +159,12 @@ impl Surface {
         let buffer = &self.buffers[index];
         let bytes = buffer.canvas(pool).ok_or("window buffer is still active")?;
         crate::utils::copy_swizzled(bytes, canvas.data());
-        buffer.attach_to(self.window.wl_surface())?;
-        self.window.wl_surface().damage_buffer(0, 0, width, height);
-        self.window
+        buffer.attach_to(self.role.wl_surface())?;
+        self.role.wl_surface().damage_buffer(0, 0, width, height);
+        self.role
             .wl_surface()
-            .frame(qh, FrameCallbackData(self.window.wl_surface().clone()));
-        self.window.commit();
+            .frame(qh, FrameCallbackData(self.role.wl_surface().clone()));
+        self.role.commit();
         if !self.mapped {
             content.mapped();
             self.mapped = true;

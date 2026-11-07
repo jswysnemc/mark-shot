@@ -1,20 +1,44 @@
 //! 【标注】【拖动事务】管理持久标注的命中、移动、缩放和历史提交
 
+mod generic;
+
 use crate::editor::{DamageZone, EditorState};
 use crate::tools::text::update_text_bbox_inline;
-use crate::types::{AnnDragState, Annotation, AnnotationShape, SelectionHandle, SignedRect};
+use crate::types::{AnnDragState, Annotation, AnnotationShape, SelectionHandle};
 use crate::utils::{apply_handle_drag, hit_test_rect_handle};
-use tiny_skia::Rect;
 
 /// 【标注】【控制点命中】判断 ann 在全局 pos 下的操作类型；返回移动、缩放或空控制点
 pub fn handle_hit_test_for_annotation(ann: &Annotation, pos: (f64, f64)) -> SelectionHandle {
+    if let Some(line) = ann.shape.line()
+        && ann.rotation_degrees != 0.0
+    {
+        let local = ann.to_unrotated((pos.0 as f32, pos.1 as f32));
+        if let Some((index, _)) = line
+            .points()
+            .enumerate()
+            .map(|(index, point)| (index, (point.0 - local.0).hypot(point.1 - local.1)))
+            .filter(|(_, distance)| *distance <= 10.0)
+            .min_by(|first, second| first.1.total_cmp(&second.1))
+        {
+            return SelectionHandle::LinePoint(index);
+        }
+        if ann.generic_rotation_handle().is_some_and(|(_, point)| {
+            (f64::from(point.0) - pos.0).hypot(f64::from(point.1) - pos.1) <= 11.2
+        }) {
+            return SelectionHandle::Rotate;
+        }
+        return crate::features::annotation_selection::chrome::bounds(ann)
+            .map_or(SelectionHandle::None, |bounds| {
+                hit_test_rect_handle(&bounds, (f64::from(local.0), f64::from(local.1)))
+            });
+    }
     if let AnnotationShape::Redact { filter } = ann.shape {
         return crate::features::filter::drag::hit_test(filter, (pos.0 as f32, pos.1 as f32), true);
     }
     if let Some(line) = ann.shape.line() {
         return crate::features::line::drag::hit_test(
             line,
-            ann.bbox,
+            crate::features::annotation_selection::chrome::bounds(ann).unwrap_or(ann.bbox),
             ann.stroke_width,
             (pos.0 as f32, pos.1 as f32),
             true,
@@ -44,24 +68,22 @@ pub fn handle_hit_test_for_annotation(ann: &Annotation, pos: (f64, f64)) -> Sele
             true,
         );
     }
-    let out_pad = crate::config::get().input.handle_hit_width / 2.0;
-    let bbox = ann.bbox;
-
-    let visual_bbox = Rect::from_ltrb(
-        bbox.left() - out_pad,
-        bbox.top() - out_pad,
-        bbox.right() + out_pad,
-        bbox.bottom() + out_pad,
-    )
-    .unwrap_or(bbox);
-
-    hit_test_rect_handle(&visual_bbox, pos)
+    let bbox = crate::features::annotation_selection::chrome::bounds(ann).unwrap_or(ann.bbox);
+    if let Some((_, handle)) = ann.generic_rotation_handle() {
+        let tolerance = crate::config::get().input.handle_hit_width * 0.5 * 1.4;
+        if (pos.0 - f64::from(handle.0)).hypot(pos.1 - f64::from(handle.1)) <= f64::from(tolerance)
+        {
+            return SelectionHandle::Rotate;
+        }
+    }
+    let local = ann.to_unrotated((pos.0 as f32, pos.1 as f32));
+    hit_test_rect_handle(&bbox, (f64::from(local.0), f64::from(local.1)))
 }
 
 /// 【标注】【开始拖动】为 state 中 idx 标注保存原始快照与指针位置；无返回值
 pub fn begin_drag_for_annotation(state: &mut EditorState, idx: usize) {
     let ann = &state.annotations[idx];
-    let handle = handle_hit_test_for_annotation(ann, state.input.pointer.global);
+    let handle = state.canvas_handle(ann, state.canvas_point());
     if ann.shape.line().is_some() {
         let selected_point = match handle {
             SelectionHandle::LinePoint(index) => Some((ann.id, index)),
@@ -77,8 +99,8 @@ pub fn begin_drag_for_annotation(state: &mut EditorState, idx: usize) {
 
     state.ann_drag = Some(AnnDragState {
         handle,
-        start_global: state.input.pointer.global,
-        prev_global: state.input.pointer.global,
+        start_global: state.canvas_point(),
+        prev_global: state.canvas_point(),
         orig: ann.clone(),
         orig_index: idx,
     });
@@ -89,7 +111,8 @@ pub fn commit_drag_if_changed(state: &mut EditorState) {
     if let Some(drag) = state.ann_drag.take()
         && let Some(ann) = state.pending.take()
     {
-        let actually_changed = !matches!(drag.handle, SelectionHandle::None) && ann != drag.orig;
+        let actually_changed =
+            !matches!(drag.handle, SelectionHandle::None) && !ann.same_edit_state(&drag.orig);
 
         let insert_idx = drag.orig_index.min(state.annotations.len());
         if actually_changed {
@@ -104,6 +127,7 @@ pub fn commit_drag_if_changed(state: &mut EditorState) {
                     annotations: pre_drag,
                     number_sequence: state.number_sequence,
                     selected_id: Some(ann.id),
+                    selected_ids: vec![ann.id],
                     next_id: state.next_id,
                 });
             state.redo_stack.clear();
@@ -114,7 +138,7 @@ pub fn commit_drag_if_changed(state: &mut EditorState) {
             .push(DamageZone::Global(ann.damage_bbox(true)));
         state.annotations.insert(insert_idx, ann);
         state.prev_pending = None;
-        state.selected_annotation = Some(insert_idx);
+        state.select_annotation_index(Some(insert_idx));
     }
 }
 
@@ -156,6 +180,7 @@ pub fn apply_annotation_drag(state: &mut EditorState, global: (f64, f64)) {
     } else {
         None
     };
+    let ruler_window = state.hit_window_units();
     let magnifier_geometry = state.ann_drag.as_ref().and_then(|drag| {
         if let AnnotationShape::Magnifier { magnifier } = drag.orig.shape {
             Some(magnifier)
@@ -174,14 +199,33 @@ pub fn apply_annotation_drag(state: &mut EditorState, global: (f64, f64)) {
         crate::tools::drawing_space::DrawingSpace::from_editor(state).map(|space| space.bounds)
     });
     let line_geometry = state.ann_drag.as_ref().and_then(|drag| {
-        drag.orig
-            .shape
-            .line()
-            .map(|line| (line.clone(), drag.orig.bbox))
+        if drag.orig.rotation_degrees != 0.0 {
+            return None;
+        }
+        drag.orig.shape.line().map(|line| {
+            (
+                line.clone(),
+                crate::features::annotation_selection::chrome::bounds(&drag.orig)
+                    .unwrap_or(drag.orig.bbox),
+            )
+        })
     });
     let line_bounds = line_geometry.as_ref().and_then(|_| {
         crate::tools::drawing_space::DrawingSpace::from_editor(state).map(|space| space.bounds)
     });
+    let generic_options = state
+        .ann_drag
+        .as_ref()
+        .filter(|drag| drag.orig.uses_generic_rotation())
+        .and_then(|_| crate::tools::drawing_space::DrawingSpace::from_editor(state))
+        .map(
+            |space| crate::features::annotation_rotation::drag::Options {
+                bounds: space.bounds,
+                pixel_scale: space.pixel_scale,
+                keep_aspect: state.input.ctrl,
+                snap_rotation: state.input.shift,
+            },
+        );
     // 1. 【标注】【更新拖动】暂时移出持久图层，避免每次移动重建全部标注
     if state.pending.is_none() {
         if orig_index < state.annotations.len() {
@@ -192,7 +236,6 @@ pub fn apply_annotation_drag(state: &mut EditorState, global: (f64, f64)) {
                 .push(DamageZone::Global(ann.damage_bbox(true)));
             state.pending = Some(ann.clone());
             state.prev_pending = Some(ann);
-            state.selected_annotation = None;
         } else {
             return;
         }
@@ -206,7 +249,7 @@ pub fn apply_annotation_drag(state: &mut EditorState, global: (f64, f64)) {
         .damage_rects
         .push(DamageZone::Global(ann.damage_bbox(true)));
 
-    // 2. 【标注】【更新拖动】平移使用增量，图形缩放始终以原始快照为基准
+    // 2. 【标注】【更新拖动】普通手势和专用工具均以开始时的几何快照计算，不累计旋转或缩放误差
     if let (Some(before), Some(bounds)) = (filter_geometry, filter_bounds) {
         ann.shape = AnnotationShape::Redact {
             filter: crate::features::filter::drag::dragged(
@@ -262,16 +305,28 @@ pub fn apply_annotation_drag(state: &mut EditorState, global: (f64, f64)) {
         ann.update_bbox();
     } else if let (Some(before), Some(point)) = (ruler_geometry, ruler_point) {
         ann.shape = AnnotationShape::Ruler {
-            measurement: crate::features::ruler::drag::dragged(
+            measurement: crate::features::ruler::drag::dragged_with_window(
                 before,
                 handle,
                 (start_global.0 as f32, start_global.1 as f32),
                 point,
                 state.input.ctrl,
                 state.input.shift,
+                ruler_window,
             ),
         };
         ann.update_bbox();
+    } else if let Some(options) = generic_options {
+        let before = &state.ann_drag.as_ref().unwrap().orig;
+        generic::apply(
+            ann,
+            before,
+            handle,
+            start_global,
+            global,
+            options,
+            &mut state.text,
+        );
     } else {
         match handle {
             SelectionHandle::Move => {
@@ -348,27 +403,10 @@ fn apply_shape_resize_from_orig(
     total_dx: f32,
     total_dy: f32,
 ) {
-    let out_pad = crate::config::get().input.handle_hit_width / 2.0;
-
-    let visual_bbox = Rect::from_ltrb(
-        orig.bbox.left() - out_pad,
-        orig.bbox.top() - out_pad,
-        orig.bbox.right() + out_pad,
-        orig.bbox.bottom() + out_pad,
-    )
-    .unwrap_or(orig.bbox);
-
-    let new_visual_bbox =
-        apply_handle_drag(&visual_bbox, handle, (total_dx as f64, total_dy as f64));
-
-    let clean_bbox = SignedRect {
-        left: new_visual_bbox.left + out_pad,
-        top: new_visual_bbox.top + out_pad,
-        right: new_visual_bbox.right - out_pad,
-        bottom: new_visual_bbox.bottom - out_pad,
-    };
-
-    *ann = orig.resize_to_bbox(clean_bbox);
+    let mut source = orig.clone();
+    source.bbox = crate::features::annotation_selection::chrome::bounds(orig).unwrap_or(orig.bbox);
+    let target = apply_handle_drag(&source.bbox, handle, (total_dx as f64, total_dy as f64));
+    *ann = source.resize_to_bbox(target);
 }
 /// 【标注】【文字缩放】依据 handle 与 prev、global 变化调整 ann 字号和位置；无返回值
 fn apply_text_resize_incremental(

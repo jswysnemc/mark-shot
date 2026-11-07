@@ -3,6 +3,7 @@
 use tiny_skia::{Color, PathBuilder, Pixmap, Rect, Stroke};
 
 use super::NumberMark;
+use super::window_geometry::Geometry;
 use crate::renderer::{Painter, number_text};
 
 const TILE_PIXELS: i32 = 1024;
@@ -13,9 +14,19 @@ pub fn draw(painter: &mut Painter<'_>, mark: NumberMark, width: f32, color: Colo
     if !mark.valid() || !scale.is_finite() || scale <= 0.0 {
         return;
     }
-    let Some(body) = mark
-        .body_bounds(width)
-        .and_then(|body| body.outset(2.0 * mark.style_scale, 2.0 * mark.style_scale))
+    let geometry = Geometry::new(mark, width, painter.window_units());
+    let label = number_text::prepare(painter, geometry);
+    let pad = painter.window_units().canvas(2.0);
+    let Some(body) = geometry
+        .bounds()
+        .map(|bounds| {
+            label
+                .as_ref()
+                .and_then(|label| label.bounds(mark))
+                .and_then(|label| bounds.join(&label))
+                .unwrap_or(bounds)
+        })
+        .and_then(|body| body.outset(pad, pad))
     else {
         return;
     };
@@ -43,7 +54,6 @@ pub fn draw(painter: &mut Painter<'_>, mark: NumberMark, width: f32, color: Colo
         / TILE_PIXELS as u32;
     let last_row = (((visible.bottom() * scale).ceil() as i32 - pixels.y()).max(1) - 1) as u32
         / TILE_PIXELS as u32;
-    let label = number_text::prepare(painter, mark, width);
     // 1. 【序号】【分块绘制】完整正文决定块索引，分数缩放和局部重绘保持相同光栅采样相位
     for row in first_row..=last_row {
         for column in first_column..=last_column {
@@ -57,7 +67,7 @@ pub fn draw(painter: &mut Painter<'_>, mark: NumberMark, width: f32, color: Colo
             let local_origin = (x as f32 / scale, y as f32 / scale);
             {
                 let mut local = painter.sub(&mut temporary).with_origin(local_origin);
-                body_draw(&mut local, mark, width, color);
+                body_draw(&mut local, geometry, color);
                 if let Some(label) = &label {
                     number_text::draw(&mut local, label, mark, Color::WHITE);
                 }
@@ -73,9 +83,10 @@ pub fn draw(painter: &mut Painter<'_>, mark: NumberMark, width: f32, color: Colo
     }
 }
 
-/// 【序号】【圆框与尾部】按 mark、width、color 绘入 painter；白色边框遵循原版独立于填充透明度的规则，无返回值
-fn body_draw(painter: &mut Painter<'_>, mark: NumberMark, width: f32, color: Color) {
-    if let Some(points) = mark.tail(width) {
+/// 【序号】【圆框与尾部】按geometry与color绘入painter，白色边框遵循原版独立于填充透明度的规则，无返回值
+fn body_draw(painter: &mut Painter<'_>, geometry: Geometry, color: Color) {
+    let mark = geometry.mark;
+    if let Some(points) = geometry.tail() {
         let mut path = PathBuilder::new();
         path.move_to(points[0].0, points[0].1);
         path.line_to(points[1].0, points[1].1);
@@ -86,14 +97,14 @@ fn body_draw(painter: &mut Painter<'_>, mark: NumberMark, width: f32, color: Col
         }
     }
     let mut circle = PathBuilder::new();
-    circle.push_circle(mark.bubble.0, mark.bubble.1, mark.bubble_radius(width));
+    circle.push_circle(mark.bubble.0, mark.bubble.1, geometry.radius);
     if let Some(circle) = circle.finish() {
         painter.fill_path(&circle, color);
         painter.stroke_path(
             &circle,
             Color::WHITE,
             &Stroke {
-                width: mark.outline_width(width),
+                width: geometry.outline,
                 ..Stroke::default()
             },
         );

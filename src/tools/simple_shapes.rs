@@ -16,20 +16,25 @@ pub struct SimpleShapeTool {
 }
 
 impl ToolBehavior for SimpleShapeTool {
+    /// 【框形标注】【创建提交】按state、button与pressed创建草稿或提交标注，dirty_mask返回调用方重绘范围，无返回值
     fn on_button(
         &self,
         state: &mut EditorState,
-        _button: MouseButton,
+        button: MouseButton,
         pressed: bool,
         _dirty_mask: &mut u32,
     ) {
-        let pos = (
-            state.input.pointer.global.0 as f32,
-            state.input.pointer.global.1 as f32,
-        );
+        if button != MouseButton::Left {
+            return;
+        }
+        let pos = (state.canvas_point().0 as f32, state.canvas_point().1 as f32);
         if pressed {
             let color = self.settings.color;
             let mut ann = Annotation {
+                style_scale: 1.0,
+                rotation_degrees: 0.0,
+                frozen_bounds: crate::tools::drawing_space::DrawingSpace::from_editor(state)
+                    .map(|space| space.bounds),
                 id: state.next_id,
                 shape: (self.make_shape)(pos, pos, &self.settings),
                 color,
@@ -37,6 +42,7 @@ impl ToolBehavior for SimpleShapeTool {
                 stroke_width: self.stroke_width,
                 bbox: Rect::from_xywh(pos.0, pos.1, 1.0, 1.0).unwrap(),
             };
+            state.adopt_annotation_style(&mut ann);
             ann.update_bbox();
 
             state.damage_rects.push(DamageZone::Global(ann.bbox));
@@ -54,14 +60,13 @@ impl ToolBehavior for SimpleShapeTool {
         }
     }
 
+    /// 【画布导航】【工具移动】按state稳定画布指针更新草稿，_global提供已转换位置，_dirty_mask返回重绘范围，无返回值
     fn on_move(&self, state: &mut EditorState, _global: (f64, f64), _dirty_mask: &mut u32) {
+        let canvas_point = state.canvas_point();
         if let Some(ann) = state.pending.as_mut() {
             state.damage_rects.push(DamageZone::Global(ann.bbox));
 
-            let pos = (
-                state.input.pointer.global.0 as f32,
-                state.input.pointer.global.1 as f32,
-            );
+            let pos = (canvas_point.0 as f32, canvas_point.1 as f32);
             let start = ann.shape.start_point();
             let end = if self.snap && state.input.shift {
                 snap_line(start, pos)

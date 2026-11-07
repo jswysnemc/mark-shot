@@ -1,9 +1,7 @@
 //! 【截图历史】【窗口动作】选择操作、保存快照和配置更改
 
 use super::{jobs::Task, layout::Control, window::HistoryWindow};
-use crate::{
-    backend::wayland::window::WindowAction, config::history::Update, ui::file_picker::Action,
-};
+use crate::{backend::window::WindowAction, config::history::Update, ui::file_picker::Action};
 
 impl HistoryWindow {
     /// 【截图历史】【操作资格】返回 control 是否可用；图像操作等待真实预览，空历史不能请求清空

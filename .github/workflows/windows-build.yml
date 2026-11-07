@@ -1,0 +1,84 @@
+name: Windows Rust Build
+
+on:
+  push:
+    branches:
+      - rewrite/native-wayland
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  CARGO_PROFILE_TEST_DEBUG: '0'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  VSLANG: '1033'
+
+jobs:
+  windows:
+    name: Windows x86_64 MSVC (CPU OCR)
+    runs-on: windows-2022
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure MSVC x64 tools
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+          components: clippy,rustfmt
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-msvc-cpu
+          cache-on-failure: true
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      # ocr-gpu contains Linux-only Dawn assembly; never use --all-features here.
+      - name: Check all Rust targets with default features
+        run: cargo clippy --workspace --all-targets --target x86_64-pc-windows-msvc --locked -j 2 -- -D warnings
+
+      - name: Run Windows unit tests
+        run: ./scripts/windows-test.ps1
+
+      - name: Compile CPU OCR release
+        run: cargo build --release --bin mark-shot --target x86_64-pc-windows-msvc --locked -j 2
+
+      - name: Package and verify standalone build
+        run: ./scripts/windows-package.ps1 -SourceSha $env:GITHUB_SHA
+
+      - name: Upload Windows build (not a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mark-shot-native-windows-x86_64-msvc
+          path: |
+            target/mark-shot-native-windows-x86_64-msvc.zip
+            target/mark-shot-native-windows-x86_64-msvc.zip.sha256
+          if-no-files-found: error
+
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-evidence
+          path: target/windows-evidence/
+          if-no-files-found: warn

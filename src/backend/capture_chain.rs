@@ -27,6 +27,40 @@ impl CaptureChain {
 
 #[async_trait]
 impl CaptureMethod for CaptureChain {
+    /// 【持续捕获】【后端选择】按 outputs 验证候选首帧后固定会话，失败候选先关闭，返回有首帧的持续捕获器
+    async fn open_session(
+        &self,
+        outputs: &[Output],
+    ) -> super::capture_session::Result<Box<dyn super::capture_session::CaptureSession>> {
+        let mut failures = Vec::new();
+        for candidate in &self.candidates {
+            let mut session = match candidate.method.open_session(outputs).await {
+                Ok(session) => session,
+                Err(error) => {
+                    failures.push(format!("{}: {error}", candidate.name));
+                    continue;
+                }
+            };
+            let error = match session.next_frame().await {
+                Ok(first) if !first.frames.is_empty() => {
+                    log::info!("【持续捕获】【后端选择】固定使用 {}", candidate.name);
+                    return Ok(super::capture_session::seeded(session, first));
+                }
+                Ok(_) => "the backend returned no frames".to_owned(),
+                Err(error) => error.to_string(),
+            };
+            if let Err(close_error) = session.close().await {
+                log::error!("【持续捕获】【候选关闭】{}: {close_error}", candidate.name);
+            }
+            log::info!("【持续捕获】【后端回退】{}: {error}", candidate.name);
+            failures.push(format!("{}: {error}", candidate.name));
+        }
+        Err(format!(
+            "no continuous capture backend succeeded: {}",
+            failures.join("; ")
+        )
+        .into())
+    }
     /// 【Wayland】【帧捕获】依次尝试可用后端；成功后返回像素，全部失败时返回完整诊断
     async fn capture_frame(
         &self,
@@ -68,6 +102,9 @@ impl CaptureMethod for CaptureChain {
 
     /// 【Wayland】【窗口捕获】寻找支持活动窗口的后端；不把显示器截图冒充窗口截图
     async fn capture_active_window(&self) -> Result<Capture, Box<dyn std::error::Error>> {
+        if self.candidates.is_empty() {
+            return Err("active-window capture requires a supported KDE or niri backend".into());
+        }
         let mut failures = Vec::new();
         for candidate in &self.candidates {
             match candidate.method.capture_active_window().await {

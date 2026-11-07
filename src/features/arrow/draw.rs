@@ -15,7 +15,14 @@ pub fn draw(
     width: f32,
     color: Color,
 ) {
-    if let Some(path) = path::outline(skeleton, style, line_style, width) {
+    let width = painter.window_units().stroke(width, 1.5, None);
+    if let Some(path) = path::outline_rendered(
+        skeleton,
+        style,
+        line_style,
+        width,
+        painter.window_units().canvas(1.0),
+    ) {
         crate::renderer::fixed_path::fill(painter, &path, color);
     }
 }

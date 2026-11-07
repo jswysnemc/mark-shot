@@ -1,6 +1,9 @@
 //! 【标注】【数据类型】持久标注、形状和拖动快照，不承担编辑事务
 
 mod bounds;
+mod rotation;
+mod style;
+mod text_frame;
 mod transform;
 pub use bounds::arrow_head;
 
@@ -59,6 +62,7 @@ pub enum AnnotationShape {
         flat_ends: [bool; 2],
     },
     Text {
+        frame: crate::features::text::TextFrame,
         appearance: crate::features::text::TextAppearance,
         start: (f32, f32),
         content: String,
@@ -119,6 +123,12 @@ impl AnnotationShape {
 #[derive(Clone, PartialEq, Debug)]
 pub struct Annotation {
     pub id: u64,
+    /// 【标注样式】【原图比例】一个原图像素在当前坐标中的尺寸，导出换坐标时同步缩放，交互缩放保留此比例
+    pub style_scale: f32,
+    /// 【普通标注】【旋转角度】独立于原始几何保存顺时针角度，专用工具继续使用自身旋转模型
+    pub rotation_degrees: f64,
+    /// 【普通标注】【冻结画布】保存正文坐标所在画布，边缘选框先裁切再计算轴心，测试或独立几何可省略
+    pub frozen_bounds: Option<Rect>,
     pub shape: AnnotationShape,
     pub color: Color,
     pub shadow_color: Color,

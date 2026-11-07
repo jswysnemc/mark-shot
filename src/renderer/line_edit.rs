@@ -6,7 +6,9 @@ use super::{
     text_preedit,
 };
 use crate::{theme::Rgba, ui::text_field::LineEditState};
-use cosmic_text::{AttrsOwned, Buffer, Cursor, FontSystem, Style, UnderlineStyle, Weight};
+use cosmic_text::{
+    AttrsOwned, Buffer, Cursor, FontSystem, LayoutLine, LayoutRun, Style, UnderlineStyle, Weight,
+};
 use tiny_skia::{Color, Paint, Rect, Transform};
 
 #[cfg(test)]
@@ -18,6 +20,85 @@ pub(crate) struct Shape {
     pub caret: f32,
     pub caret_visible: bool,
     pub selections: Vec<(f32, f32)>,
+    layouts: Option<Vec<LayoutLine>>,
+}
+
+impl Shape {
+    /// 【字段绘制】【布局读取】返回原始或指定字形布局的行迭代器，文字和行高沿用原缓冲，无参数
+    pub fn runs(&self) -> impl Iterator<Item = LayoutRun<'_>> {
+        self.buffer.layout_runs().enumerate().map(|(index, run)| {
+            if let Some(layout) = self.layouts.as_ref().and_then(|layouts| layouts.get(index)) {
+                LayoutRun {
+                    glyphs: &layout.glyphs,
+                    decorations: &layout.decorations,
+                    line_w: layout.w,
+                    line_y: run.line_top + layout.max_ascent,
+                    line_height: layout.line_height_opt.unwrap_or(run.line_height),
+                    ..run
+                }
+            } else {
+                run
+            }
+        })
+    }
+
+    /// 【字段绘制】【布局替换】按 layouts 与 field 使用定点字形，重新度量实际光标和选择，无返回值
+    pub fn use_layout(&mut self, layouts: Vec<LayoutLine>, field: &LineEditState) {
+        self.layouts = Some(layouts);
+        let cursor = field.displayed_cursor().unwrap_or_else(|| {
+            field
+                .composition
+                .as_ref()
+                .map_or(field.cursor_byte(), |composition| composition.position)
+        });
+        let caret = self
+            .runs()
+            .find_map(|run| run.cursor_position(&Cursor::new(0, cursor)))
+            .unwrap_or(0.0);
+        let selections = field
+            .displayed_selection()
+            .map_or_else(Vec::new, |(start, end)| {
+                self.runs()
+                    .flat_map(|run| run.highlight(Cursor::new(0, start), Cursor::new(0, end)))
+                    .collect()
+            });
+        self.caret = caret;
+        self.selections = selections;
+        self.height = self.runs().map(|run| run.line_height).sum();
+    }
+
+    /// 【字段绘制】【布局命中】按 x、y 把指定布局坐标映射到原字形簇，返回光标；双向文字和组合簇沿用原缓冲规则
+    pub fn hit(&self, x: f32, y: f32) -> Option<Cursor> {
+        let Some(layouts) = &self.layouts else {
+            return self.buffer.hit(x, y);
+        };
+        for (run, layout) in self.buffer.layout_runs().zip(layouts) {
+            if y < run.line_top || y >= run.line_top + run.line_height {
+                continue;
+            }
+            let raw = run
+                .glyphs
+                .iter()
+                .zip(&layout.glyphs)
+                .find_map(|(raw, glyph)| {
+                    (x >= glyph.x && x <= glyph.x + glyph.w && glyph.w > 0.0)
+                        .then(|| raw.x + (x - glyph.x) * raw.w / glyph.w)
+                })
+                .unwrap_or_else(|| {
+                    if let (Some(raw), Some(glyph)) = (run.glyphs.first(), layout.glyphs.first())
+                        && x < glyph.x
+                    {
+                        return raw.x + x - glyph.x;
+                    }
+                    match (run.glyphs.last(), layout.glyphs.last()) {
+                        (Some(raw), Some(glyph)) => raw.x + raw.w + x - glyph.x - glyph.w,
+                        _ => x,
+                    }
+                });
+            return self.buffer.hit(raw, y);
+        }
+        self.buffer.hit(x, y)
+    }
 }
 
 /// 【字段绘制】【布局计算】按 field、fonts、size、weight 排版显示文字，selected_color 可覆盖选择前景；返回实际光标与选择几何
@@ -99,6 +180,7 @@ pub(crate) fn shape(
         caret,
         caret_visible: field.displayed_cursor().is_some(),
         selections,
+        layouts: None,
     }
 }
 
@@ -125,12 +207,14 @@ pub(crate) fn caret_rect(cursor_x: f32, rect: Rect, scroll: bool) -> (i32, i32, 
 
 /// 【字段绘制】【字形装饰】将 shape 绘入 p 的 origin，ink 为默认前景；字形与下划线使用同一个缩放锚点，无返回值
 pub(crate) fn text(p: &mut Painter, shape: &Shape, origin: (f32, f32), ink: Color) {
-    p.text_buffer(&shape.buffer, origin, ink);
+    for run in shape.runs() {
+        p.text_layout_run(&run, origin, ink);
+    }
     let scale = p.scale();
     let origin = (origin.0 - p.origin.0, origin.1 - p.origin.1);
     let rgba = ink.to_color_u8();
     let mut paint = Paint::default();
-    for run in shape.buffer.layout_runs() {
+    for run in shape.runs() {
         text_preedit::draw_at(
             &run,
             scale,

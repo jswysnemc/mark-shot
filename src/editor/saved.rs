@@ -179,7 +179,13 @@ fn load() -> Saved {
 
 impl Saved {
     pub fn stroke(&self, group: StrokeGroup) -> Option<f32> {
-        let width = self.stroke_widths.get(group.key()).copied();
+        let width = self.stroke_widths.get(group.key()).copied().or_else(|| {
+            if group == StrokeGroup::Highlighter {
+                self.stroke_widths.get("freehand").copied()
+            } else {
+                None
+            }
+        });
         if group == StrokeGroup::Number {
             width
         } else {
@@ -265,7 +271,12 @@ pub fn save(
     initial_history: &[Color],
     magnifier: bool,
 ) {
-    let magnifier_unchanged = get().magnifier.unwrap_or(true) == magnifier;
+    let magnifier_unchanged = crate::config::get()
+        .startup
+        .selection_loupe
+        .or(get().magnifier)
+        .unwrap_or(true)
+        == magnifier;
     if *settings == ToolSettings::default() && history == initial_history && magnifier_unchanged {
         return;
     }
@@ -328,6 +339,18 @@ pub fn save(
 
 #[cfg(test)]
 mod tests {
+    /// 【荧光笔偏好】【旧值兼容】独立分组优先，缺失时读取旧画笔分组，设置一项不覆盖另一项
+    #[test]
+    fn highlighter_width_keeps_explicit_values_and_legacy_freehand_fallback() {
+        let mut saved = Saved {
+            stroke_widths: BTreeMap::from([("freehand".into(), 5.0)]),
+            ..Saved::default()
+        };
+        assert_eq!(saved.stroke(StrokeGroup::Highlighter), Some(5.0));
+        saved.stroke_widths.insert("highlighter".into(), 48.0);
+        assert_eq!(saved.stroke(StrokeGroup::Highlighter), Some(48.0));
+        assert_eq!(saved.stroke(StrokeGroup::Freehand), Some(5.0));
+    }
     use super::*;
 
     /// 【文字偏好】【单位迁移】旧像素字号、新点字号与边界转换一致，未知单位不影响字体家族和背景

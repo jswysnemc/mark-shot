@@ -1,19 +1,12 @@
 //! 【原生窗口】【父子对话框】同连接建立模态关系，过滤父窗口输入并只回传一次明确结果
 
 use super::{
-    WindowContent, WindowSpec,
+    WindowContent,
     runtime::NativeWindow,
     surface::{Surface, SurfaceId},
 };
-use smithay_client_toolkit::shell::WaylandSurface;
 use wayland_client::{QueueHandle, protocol::wl_surface};
 use wayland_protocols::xdg::dialog::v1::client::xdg_dialog_v1::XdgDialogV1;
-
-pub struct WindowDialog {
-    pub id: u64,
-    pub spec: WindowSpec,
-    pub content: Box<dyn WindowContent>,
-}
 
 pub(super) struct Dialog {
     pub id: u64,
@@ -91,9 +84,7 @@ impl NativeWindow {
         let Some(mut request) = self.content.take_dialog() else {
             return;
         };
-        if let Some(id) = self.popup.as_ref().map(|popup| popup.id) {
-            self.finish_popup(id, None);
-        }
+        self.close_popups();
         request.content.connected(self.wake.clone());
         // 1. 【原生窗口】【输入隔离】先取消原输入目标，新的子窗口不会继承父窗口候选或按钮按下事务
         self.cancel_for(SurfaceId::Main);
@@ -101,6 +92,12 @@ impl NativeWindow {
             self.leave_text_input(focus.id);
         }
         self.text_input.sync(None);
+        if let Err(error) = self.main.role.modal(true, &self.compositor) {
+            log::error!("【原生窗口】【模态隔离】无法隔离父浮层: {error}");
+            let action = self.content.dialog_closed(request.id, false);
+            self.apply(SurfaceId::Main, action, None);
+            return;
+        }
         let surface = Surface::new(
             request.spec,
             SurfaceId::Dialog(request.id),
@@ -110,14 +107,15 @@ impl NativeWindow {
             self.fractional_manager.as_ref(),
             qh,
         );
-        surface.window.set_parent(Some(&self.main.window));
+        let window = surface.role.as_window().unwrap();
+        window.set_parent(self.main.role.as_window());
         let modal = self.dialog_manager.as_ref().map(|manager| {
-            let dialog = manager.get_xdg_dialog(surface.window.xdg_toplevel(), qh, ());
+            let dialog = manager.get_xdg_dialog(window.xdg_toplevel(), qh, ());
             dialog.set_modal();
             dialog
         });
         // 2. 【原生窗口】【首次呈现】父子关系和模态提示在首次提交前设置，避免短暂显示为无关普通窗口
-        surface.window.commit();
+        surface.role.commit();
         log::info!("【原生窗口】【对话框打开】id={}", request.id);
         self.dialog = Some(Dialog {
             id: request.id,
@@ -139,6 +137,9 @@ impl NativeWindow {
             self.text_surface = None;
         }
         self.dialog.take();
+        if let Err(error) = self.main.role.modal(false, &self.compositor) {
+            log::error!("【原生窗口】【模态恢复】无法恢复父浮层: {error}");
+        }
         log::info!("【原生窗口】【对话框完成】id={id}, accepted={accepted}");
         if self.keyboard_surface == Some(SurfaceId::Dialog(id)) {
             self.keyboard_surface = None;

@@ -1,0 +1,28 @@
+{
+  "sources": {
+    "ui/theme.cpp": "2d4aa9e3c2c37a912a687f10b9d8028dfe6b44b686c07f1644705fb74ba05c69",
+    "text_annotation_layout.cpp": "576e009f1f31a8bf24787bc825169e70a6bf20d66e00e9580031f912919da54a"
+  },
+  "functions": {
+    "makeFont": "c41af75f5e82830b97be37f51be40bb04b3a981fe55f39859367ceccb2ed071a",
+    "uiFontFamily": "a93cdd481694ecc620b398375b38aec7c9b6e8d0da20c617ecd2aa892415cc43",
+    "textFontFamily": "913a2da08fd84cbb1a1c2af81f5db1822fc0ad611880e00bf5ec49b89e87c934",
+    "textFont": "931edc3dd0bcfd92a70edbf4df5f56b4c9caa7c266e656937a1257a669d8927b",
+    "prepareTextDocument": "73915737b95cb20d52cfaf50f6aa4a5074d46f2bcfce30f6c14f3d07d29a82b8",
+    "textWrapWidth": "8ed9820fd4f187cf28eddce28bd10e430e9eeea4e089a509a6c50fc55deeabe4",
+    "textAnnotationBaseRect": "23f0b622c4d8287134b09ba027d0dea225f4cc30d257cac688610d26534ca98b",
+    "textAnnotationWraps": "df2dab3865d369ffd9c8a2b3348f384f470eadc86046dcaebb2468877d03e43c",
+    "textAnnotationBoxSize": "3750b55ac59173f97cd6311f9dbf80a245cbdfcc8318a7a35de8dfe8510c19a3"
+  },
+  "harness": {
+    "text_reference.cpp": "56be24d8c172f37a927e090d531a852cd2153d2e21c250efb4d65fea08ba31c7",
+    "text_probe.h": "e4976605e5970d8853d73a022197ccbd5bb4322d9c89a890383ebd9d9f35c169"
+  },
+  "binary": "5d52b44188bdec07c4481db092aec034f9681356329930aa082a725cb06e48be",
+  "reference": "8c963e09ebbefb2b86d510ca3effcce75f7a1a91c9f35d314f28401e0cb4dbc9",
+  "samples": 162,
+  "qt": "6.12.0",
+  "dpi": 96,
+  "family": "Noto Sans",
+  "fixture_sha256": "b0e7dd17604905c0232ea7d62ab61ae90f118352f38d6bfa335560d70253d5dc"
+}

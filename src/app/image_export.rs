@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::editor::EditorState;
 
-/// 【图片编辑】【原图导出】在原始像素上合成标注并保留透明度；返回 PNG、逻辑位置与像素比例
-pub(super) fn render(editor: &mut EditorState) -> Option<(Vec<u8>, (i32, i32), f32)> {
+/// 【图片编辑】【原图导出】按editor的原件与选区合成标注并保留透明度，返回PNG、逻辑位置与像素比例
+pub(super) fn render_precise(editor: &mut EditorState) -> Option<(Vec<u8>, (f64, f64), f32)> {
     let file = editor.file_canvas.as_ref()?;
     let crop = file.crop(editor.selection.zone.unwrap_or(file.viewport))?;
     let mut pixels = crop.pixels;
@@ -55,11 +55,13 @@ pub(super) fn render(editor: &mut EditorState) -> Option<(Vec<u8>, (i32, i32), f
             .with_text(&mut editor.text.font_system, &mut editor.text.swash_cache),
         &labels,
     );
+    // 1. 【图像原件】【导出读取结束】编码输入已经持有独立输出像素，原件采样页可以归还
+    file.original.release_pages();
     Some((
         crate::utils::encode_png_with_alpha(pixels),
         (
-            crop.global_origin.0.round() as i32,
-            crop.global_origin.1.round() as i32,
+            f64::from(crop.global_origin.0),
+            f64::from(crop.global_origin.1),
         ),
         crop.scale,
     ))

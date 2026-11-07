@@ -31,6 +31,9 @@ fn image(width: u32, height: u32, pattern: bool) -> Pixmap {
 /// 【绘制测试】【图像标注】返回 rect、color 对应的填充矩形，id 用于区别历史对象
 fn rectangle(id: u64, rect: Rect, color: Color) -> Annotation {
     let mut annotation = Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id,
         shape: AnnotationShape::Rectangle {
             start: (rect.left(), rect.top()),
@@ -58,6 +61,9 @@ fn magnifier(
         .unwrap()
         .draft_to(center);
     let mut annotation = Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id: 2,
         shape: AnnotationShape::Magnifier { magnifier },
         color,

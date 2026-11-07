@@ -25,6 +25,7 @@ pub enum ChoiceEvent {
 
 #[derive(Clone, Copy, PartialEq)]
 pub(super) struct ChoiceLook {
+    theme: crate::theme::Mode,
     active: Option<usize>,
     hovered: Option<usize>,
     first_row: usize,
@@ -215,6 +216,7 @@ impl ChoicePopover {
     /// 【选择面板】【绘制快照】返回影响网格内容的状态，不包含位置或透明度
     pub(super) fn look(&self) -> ChoiceLook {
         ChoiceLook {
+            theme: crate::theme::Mode::current(),
             active: self.active,
             hovered: self.hovered,
             first_row: self.first_row,

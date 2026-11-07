@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    backend::wayland::window::{KeyInput, WindowContent, WindowEvent},
+    backend::window::{KeyInput, WindowContent, WindowEvent},
     features::ocr_result::{document::OcrDocument, window::View},
     keys::{Chord, Key, Mods},
     types::{
@@ -21,7 +21,7 @@ fn window() -> ResultWindow {
 
 /// 【原文菜单测试】【私有菜单】按 state 当前编辑状态构造菜单，clipboard 指定可用资格，返回固定会话编号；不访问系统剪贴板
 fn menu(state: &mut ResultWindow, clipboard: bool) -> u64 {
-    super::super::input_method::cancel(state);
+    super::super::input_method::cancel_non_text(state);
     let rows = actions::rows(state, clipboard);
     let mut menu = ContextMenu::new(rows, &mut state.fonts, (120.0, 120.0), (760.0, 460.0), 0);
     menu.id = 42;
@@ -68,7 +68,7 @@ fn menu_layout_and_shortcuts_match_actual_ocr_pane() {
     }
 }
 
-/// 【原文菜单测试】【输入隔离】菜单取消候选，拒绝正文键盘、鼠标和输入法；关闭后恢复原文身份，无参数、无返回值
+/// 【原文菜单测试】【输入隔离】菜单保留候选外观，拒绝正文键盘、鼠标和输入法；关闭后恢复原文身份，无参数、无返回值
 #[test]
 fn popup_suspends_composition_without_changing_selection_or_text() {
     let mut state = window();
@@ -83,7 +83,7 @@ fn popup_suspends_composition_without_changing_selection_or_text() {
     }));
     assert!(state.source.preedit().is_some());
     let id = menu(&mut state, true);
-    assert!(state.source.preedit().is_none());
+    assert_eq!(state.source.preedit().unwrap().text, "ni");
     assert!(state.text_input_target().is_none());
     assert!(state.source.selected_text().is_none());
     let before = state.source.text();
@@ -220,10 +220,19 @@ fn stale_or_disabled_actions_never_change_a_new_session() {
     state.view = View::Image;
     state.event(WindowEvent::PointerButton {
         position: (120.0, 120.0),
-        button: crate::backend::wayland::window::RIGHT_BUTTON,
+        button: crate::backend::window::RIGHT_BUTTON,
         pressed: true,
     });
-    assert!(state.source_menu.is_none());
+    let image_menu = state.source_menu.as_ref().unwrap();
+    assert_eq!(
+        image_menu
+            .rows
+            .iter()
+            .map(|row| row.label)
+            .collect::<Vec<_>>(),
+        ["Edit", "Pin image"]
+    );
+    assert_eq!(state.source.text(), "alpha beta\ngamma");
 }
 
 /// 【原文菜单测试】【增量像素】一倍、分数和两倍菜单有独立像素且静止不重复绘制，配置不修改锚点，无参数、无返回值

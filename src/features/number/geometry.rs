@@ -60,9 +60,18 @@ impl NumberMark {
         ])
     }
 
-    /// 【序号】【未旋转边界】按 width 返回包含圆框白色边框和未旋转尖端的边界；无效数据返回空值
+    /// 【序号】【未旋转选框】按width返回生产圆框范围，不计白边与独立尖端；无效数据返回空值
     pub fn unrotated_bounds(self, width: f32) -> Option<Rect> {
-        self.bounds_with_tip(width, self.tip)
+        if !self.valid() {
+            return None;
+        }
+        let radius = self.bubble_radius(width);
+        Rect::from_xywh(
+            self.bubble.0 - radius,
+            self.bubble.1 - radius,
+            radius * 2.0,
+            radius * 2.0,
+        )
     }
 
     /// 【序号】【正文边界】按 width 返回包含圆框白色边框和旋转后尖端的实际边界；无效数据返回空值

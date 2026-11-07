@@ -6,7 +6,7 @@ use super::{
     window::{Focus, HistoryWindow},
 };
 use crate::{
-    backend::wayland::window::{KeyInput, LEFT_BUTTON, RIGHT_BUTTON, WindowAction, WindowEvent},
+    backend::window::{KeyInput, LEFT_BUTTON, RIGHT_BUTTON, WindowAction, WindowEvent},
     keys::{Key, Mods},
 };
 use std::time::{Duration, Instant};

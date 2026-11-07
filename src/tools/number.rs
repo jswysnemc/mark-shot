@@ -30,7 +30,7 @@ impl ToolBehavior for NumberTool {
                 return;
             }
             let Some(position) = DrawingSpace::from_editor(state)
-                .and_then(|space| space.start_point(state.input.pointer.global))
+                .and_then(|space| space.start_point(state.canvas_point()))
             else {
                 return;
             };
@@ -46,6 +46,9 @@ impl ToolBehavior for NumberTool {
                 return;
             };
             let mut annotation = Annotation {
+                style_scale: 1.0,
+                rotation_degrees: 0.0,
+                frozen_bounds: None,
                 id: state.next_id,
                 shape: AnnotationShape::Number { mark },
                 color: state.tool_settings.color,
@@ -53,6 +56,7 @@ impl ToolBehavior for NumberTool {
                 stroke_width: state.tool_settings.stroke(StrokeGroup::Number),
                 bbox: Rect::from_xywh(position.0, position.1, 1.0, 1.0).unwrap(),
             };
+            state.adopt_annotation_style(&mut annotation);
             annotation.update_bbox();
             state.input.mouse_down = true;
             state.tool_active = true;
@@ -105,7 +109,7 @@ impl ToolBehavior for NumberTool {
         mark.tip = point;
         mark.style = state.tool_settings.number_style;
         annotation.color = state.tool_settings.color;
-        annotation.stroke_width = state.tool_settings.stroke(StrokeGroup::Number);
+        annotation.set_image_stroke_width(state.tool_settings.stroke(StrokeGroup::Number));
         annotation.update_bbox();
         let new = annotation.damage_bbox(false);
         for area in [old, new] {

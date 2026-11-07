@@ -1,7 +1,7 @@
 //! 【截图历史测试】【确认回归】真实 Qt 几何、右键焦点及按下释放事务
 
 use super::*;
-use crate::backend::wayland::window::KeyInput;
+use crate::backend::window::KeyInput;
 
 /// 【截图历史测试】【按键事件】为 key 和 mods 创建原生事件，返回事件，不发送真实桌面输入
 fn key(key: Key, mods: Mods) -> WindowEvent {

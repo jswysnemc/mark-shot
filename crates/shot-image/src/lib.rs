@@ -4,6 +4,7 @@
 
 pub mod blur;
 pub mod buffer;
+pub mod export;
 pub mod filters;
 pub mod pixelate;
 

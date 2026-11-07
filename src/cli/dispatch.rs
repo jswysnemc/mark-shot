@@ -3,10 +3,10 @@ use std::time::Instant;
 
 use super::arguments::{self, Command};
 use crate::AppResult;
-use crate::backend::wayland::{clipboard, pin};
+use crate::backend::{clipboard, pin};
 use crate::logging::Process;
 
-/// 【命令行】【执行】解析参数并调度任务；帮助和辅助进程不创建截图运行时
+/// 【命令行】【执行】按values解析系统字符串参数并调度任务，返回执行结果；帮助和辅助进程不创建截图运行时
 pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
     let options = arguments::parse(values, Instant::now())?;
     match options.command {
@@ -25,7 +25,9 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
         _ => {}
     }
 
-    // 1. 初始化配置后再启动日志，命令行覆盖只影响当前进程
+    // 1. 【内存生命周期】【启动顺序】创建字体和捕获线程前设置大对象策略，辅助进程也使用同一分配规则
+    crate::utils::memory::configure();
+    // 2. 【命令行】【运行配置】初始化配置后再启动日志，命令行覆盖只影响当前进程
     crate::config::init(options.config.clone(), |config| {
         if options.no_notify {
             config.notifications.enabled = false;
@@ -108,15 +110,19 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
         command => (None, command),
     };
 
-    // 2. 【截图运行时】【任务调度】阻塞任务结束后释放空闲线程，交互会话不保留十秒工作线程
+    // 3. 【截图运行时】【任务调度】阻塞任务结束后释放空闲线程，交互会话不保留十秒工作线程
     let runtime = super::capture_runtime::build()?;
     runtime.block_on(async {
         match command {
-            Command::Capture(capture) => super::headless::run(&capture).await,
-            Command::Editor(launch) => {
-                let connection = wayland_client::Connection::connect_to_env()
+            Command::Capture(mut capture) => {
+                capture.include_cursor |= crate::config::get().startup.include_cursor;
+                super::headless::run(&capture).await
+            }
+            Command::Editor(mut launch) => {
+                crate::config::get().startup.apply(&mut launch);
+                let connection = crate::backend::session::Session::connect_to_env()
                     .map_err(|error| format!("cannot connect to Wayland: {error}"))?;
-                let result = crate::app::run(connection, launch).await;
+                let result = super::single_instance::run(connection, launch).await;
                 if let Err(error) = &result {
                     log::error!("【MarkShot】【截图】截图会话失败: {error}");
                     crate::backend::notify::send(crate::backend::notify::Notice::Failed(

@@ -1,0 +1,854 @@
+{
+    "dark": {
+        "menu": {
+            "accent": [
+                94,
+                234,
+                212,
+                255
+            ],
+            "background": [
+                24,
+                27,
+                35,
+                246
+            ],
+            "border": [
+                255,
+                255,
+                255,
+                30
+            ],
+            "checked_background": [
+                45,
+                212,
+                191,
+                36
+            ],
+            "danger_hover_background": [
+                239,
+                68,
+                68,
+                52
+            ],
+            "danger_hover_text": [
+                252,
+                165,
+                165,
+                255
+            ],
+            "danger_text": [
+                248,
+                113,
+                113,
+                255
+            ],
+            "disabled_text": [
+                100,
+                116,
+                139,
+                255
+            ],
+            "hover_background": [
+                45,
+                212,
+                191,
+                46
+            ],
+            "hover_text": [
+                248,
+                250,
+                252,
+                255
+            ],
+            "secondary_text": [
+                148,
+                163,
+                184,
+                255
+            ],
+            "separator": [
+                255,
+                255,
+                255,
+                22
+            ],
+            "text": [
+                229,
+                231,
+                235,
+                255
+            ]
+        },
+        "toolbar": {
+            "accent_border": [
+                45,
+                212,
+                191,
+                96
+            ],
+            "accent_fill": [
+                45,
+                212,
+                191,
+                34
+            ],
+            "accent_hover_border": [
+                94,
+                234,
+                212,
+                150
+            ],
+            "accent_hover_fill": [
+                45,
+                212,
+                191,
+                64
+            ],
+            "active_border": [
+                153,
+                246,
+                228,
+                150
+            ],
+            "active_fill": [
+                153,
+                246,
+                228,
+                78
+            ],
+            "control_border": [
+                255,
+                255,
+                255,
+                24
+            ],
+            "control_fill": [
+                255,
+                255,
+                255,
+                16
+            ],
+            "control_hover_fill": [
+                255,
+                255,
+                255,
+                26
+            ],
+            "danger_hover_border": [
+                252,
+                165,
+                165,
+                140
+            ],
+            "danger_hover_fill": [
+                239,
+                68,
+                68,
+                70
+            ],
+            "danger_hover_text": [
+                252,
+                165,
+                165,
+                255
+            ],
+            "focus_border": [
+                45,
+                212,
+                191,
+                150
+            ],
+            "grip_dot": [
+                148,
+                163,
+                184,
+                150
+            ],
+            "grip_dot_disabled": [
+                148,
+                163,
+                184,
+                60
+            ],
+            "grip_dot_hover": [
+                203,
+                213,
+                225,
+                220
+            ],
+            "grip_hover_fill": [
+                148,
+                163,
+                184,
+                40
+            ],
+            "hover_border": [
+                94,
+                234,
+                212,
+                255
+            ],
+            "hover_fill": [
+                45,
+                212,
+                191,
+                255
+            ],
+            "hover_icon": [
+                26,
+                24,
+                20,
+                255
+            ],
+            "hover_text": [
+                4,
+                47,
+                46,
+                255
+            ],
+            "list_border": [
+                255,
+                255,
+                255,
+                18
+            ],
+            "list_fill": [
+                17,
+                24,
+                39,
+                255
+            ],
+            "muted_text": [
+                156,
+                163,
+                175,
+                255
+            ],
+            "panel_border": [
+                255,
+                255,
+                255,
+                28
+            ],
+            "panel_fill": [
+                15,
+                17,
+                23,
+                230
+            ],
+            "popup_border": [
+                255,
+                255,
+                255,
+                14
+            ],
+            "popup_fill": [
+                15,
+                17,
+                23,
+                240
+            ],
+            "pressed_border": [
+                45,
+                212,
+                191,
+                255
+            ],
+            "pressed_fill": [
+                20,
+                184,
+                166,
+                255
+            ],
+            "primary_border": [
+                52,
+                211,
+                153,
+                255
+            ],
+            "primary_bottom": [
+                5,
+                150,
+                105,
+                255
+            ],
+            "primary_hover_border": [
+                110,
+                231,
+                183,
+                255
+            ],
+            "primary_hover_bottom": [
+                16,
+                185,
+                129,
+                255
+            ],
+            "primary_hover_top": [
+                52,
+                211,
+                153,
+                255
+            ],
+            "primary_text": [
+                255,
+                255,
+                255,
+                255
+            ],
+            "primary_top": [
+                16,
+                185,
+                129,
+                255
+            ],
+            "selection_fill": [
+                45,
+                212,
+                191,
+                70
+            ],
+            "separator": [
+                148,
+                163,
+                184,
+                70
+            ],
+            "slider_end": [
+                45,
+                212,
+                191,
+                255
+            ],
+            "slider_groove": [
+                255,
+                255,
+                255,
+                22
+            ],
+            "slider_handle": [
+                255,
+                255,
+                255,
+                255
+            ],
+            "slider_handle_border": [
+                15,
+                17,
+                23,
+                100
+            ],
+            "slider_handle_hover_border": [
+                94,
+                234,
+                212,
+                255
+            ],
+            "slider_start": [
+                13,
+                148,
+                136,
+                255
+            ],
+            "soft_hover_border": [
+                45,
+                212,
+                191,
+                80
+            ],
+            "soft_hover_fill": [
+                45,
+                212,
+                191,
+                28
+            ],
+            "strong_text": [
+                248,
+                250,
+                252,
+                255
+            ],
+            "text": [
+                229,
+                231,
+                235,
+                255
+            ],
+            "tile_border": [
+                148,
+                163,
+                184,
+                50
+            ],
+            "tile_checked_border": [
+                153,
+                246,
+                228,
+                255
+            ],
+            "tile_checked_bottom": [
+                45,
+                212,
+                191,
+                255
+            ],
+            "tile_checked_text": [
+                4,
+                47,
+                46,
+                255
+            ],
+            "tile_checked_top": [
+                94,
+                234,
+                212,
+                255
+            ],
+            "tile_fill": [
+                30,
+                41,
+                59,
+                220
+            ],
+            "tile_hover_border": [
+                45,
+                212,
+                191,
+                90
+            ],
+            "tile_hover_fill": [
+                45,
+                212,
+                191,
+                40
+            ]
+        }
+    },
+    "light": {
+        "menu": {
+            "accent": [
+                13,
+                148,
+                136,
+                255
+            ],
+            "background": [
+                255,
+                255,
+                255,
+                250
+            ],
+            "border": [
+                15,
+                23,
+                42,
+                26
+            ],
+            "checked_background": [
+                13,
+                148,
+                136,
+                30
+            ],
+            "danger_hover_background": [
+                254,
+                226,
+                226,
+                255
+            ],
+            "danger_hover_text": [
+                185,
+                28,
+                28,
+                255
+            ],
+            "danger_text": [
+                220,
+                38,
+                38,
+                255
+            ],
+            "disabled_text": [
+                160,
+                174,
+                192,
+                255
+            ],
+            "hover_background": [
+                15,
+                23,
+                42,
+                14
+            ],
+            "hover_text": [
+                15,
+                23,
+                42,
+                255
+            ],
+            "secondary_text": [
+                100,
+                116,
+                139,
+                255
+            ],
+            "separator": [
+                15,
+                23,
+                42,
+                20
+            ],
+            "text": [
+                31,
+                41,
+                55,
+                255
+            ]
+        },
+        "toolbar": {
+            "accent_border": [
+                13,
+                148,
+                136,
+                90
+            ],
+            "accent_fill": [
+                13,
+                148,
+                136,
+                26
+            ],
+            "accent_hover_border": [
+                13,
+                148,
+                136,
+                150
+            ],
+            "accent_hover_fill": [
+                13,
+                148,
+                136,
+                52
+            ],
+            "active_border": [
+                13,
+                148,
+                136,
+                110
+            ],
+            "active_fill": [
+                13,
+                148,
+                136,
+                36
+            ],
+            "control_border": [
+                15,
+                23,
+                42,
+                30
+            ],
+            "control_fill": [
+                15,
+                23,
+                42,
+                10
+            ],
+            "control_hover_fill": [
+                15,
+                23,
+                42,
+                18
+            ],
+            "danger_hover_border": [
+                220,
+                38,
+                38,
+                110
+            ],
+            "danger_hover_fill": [
+                239,
+                68,
+                68,
+                40
+            ],
+            "danger_hover_text": [
+                185,
+                28,
+                28,
+                255
+            ],
+            "focus_border": [
+                13,
+                148,
+                136,
+                170
+            ],
+            "grip_dot": [
+                100,
+                116,
+                139,
+                150
+            ],
+            "grip_dot_disabled": [
+                100,
+                116,
+                139,
+                60
+            ],
+            "grip_dot_hover": [
+                51,
+                65,
+                85,
+                220
+            ],
+            "grip_hover_fill": [
+                100,
+                116,
+                139,
+                36
+            ],
+            "hover_border": [
+                20,
+                184,
+                166,
+                255
+            ],
+            "hover_fill": [
+                13,
+                148,
+                136,
+                255
+            ],
+            "hover_icon": [
+                255,
+                255,
+                255,
+                255
+            ],
+            "hover_text": [
+                255,
+                255,
+                255,
+                255
+            ],
+            "list_border": [
+                15,
+                23,
+                42,
+                26
+            ],
+            "list_fill": [
+                255,
+                255,
+                255,
+                255
+            ],
+            "muted_text": [
+                100,
+                116,
+                139,
+                255
+            ],
+            "panel_border": [
+                15,
+                23,
+                42,
+                30
+            ],
+            "panel_fill": [
+                248,
+                250,
+                252,
+                242
+            ],
+            "popup_border": [
+                15,
+                23,
+                42,
+                26
+            ],
+            "popup_fill": [
+                255,
+                255,
+                255,
+                248
+            ],
+            "pressed_border": [
+                13,
+                148,
+                136,
+                255
+            ],
+            "pressed_fill": [
+                15,
+                118,
+                110,
+                255
+            ],
+            "primary_border": [
+                52,
+                211,
+                153,
+                255
+            ],
+            "primary_bottom": [
+                5,
+                150,
+                105,
+                255
+            ],
+            "primary_hover_border": [
+                110,
+                231,
+                183,
+                255
+            ],
+            "primary_hover_bottom": [
+                16,
+                185,
+                129,
+                255
+            ],
+            "primary_hover_top": [
+                52,
+                211,
+                153,
+                255
+            ],
+            "primary_text": [
+                255,
+                255,
+                255,
+                255
+            ],
+            "primary_top": [
+                16,
+                185,
+                129,
+                255
+            ],
+            "selection_fill": [
+                13,
+                148,
+                136,
+                40
+            ],
+            "separator": [
+                100,
+                116,
+                139,
+                70
+            ],
+            "slider_end": [
+                20,
+                184,
+                166,
+                255
+            ],
+            "slider_groove": [
+                15,
+                23,
+                42,
+                30
+            ],
+            "slider_handle": [
+                255,
+                255,
+                255,
+                255
+            ],
+            "slider_handle_border": [
+                15,
+                23,
+                42,
+                90
+            ],
+            "slider_handle_hover_border": [
+                13,
+                148,
+                136,
+                255
+            ],
+            "slider_start": [
+                13,
+                148,
+                136,
+                255
+            ],
+            "soft_hover_border": [
+                13,
+                148,
+                136,
+                80
+            ],
+            "soft_hover_fill": [
+                13,
+                148,
+                136,
+                22
+            ],
+            "strong_text": [
+                15,
+                23,
+                42,
+                255
+            ],
+            "text": [
+                51,
+                65,
+                85,
+                255
+            ],
+            "tile_border": [
+                148,
+                163,
+                184,
+                90
+            ],
+            "tile_checked_border": [
+                13,
+                148,
+                136,
+                255
+            ],
+            "tile_checked_bottom": [
+                45,
+                212,
+                191,
+                255
+            ],
+            "tile_checked_text": [
+                4,
+                47,
+                46,
+                255
+            ],
+            "tile_checked_top": [
+                94,
+                234,
+                212,
+                255
+            ],
+            "tile_fill": [
+                241,
+                245,
+                249,
+                255
+            ],
+            "tile_hover_border": [
+                13,
+                148,
+                136,
+                100
+            ],
+            "tile_hover_fill": [
+                13,
+                148,
+                136,
+                30
+            ]
+        }
+    }
+}

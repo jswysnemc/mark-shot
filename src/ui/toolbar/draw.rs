@@ -56,7 +56,7 @@ fn content(p: &mut Painter, toolbar: &Toolbar) {
                 grip.left() + grip.width() / 2.0 + dx,
                 grip.top() + grip.height() / 2.0 + dy,
                 1.25,
-                Rgba(148, 163, 184, 150),
+                crate::theme::toolbar::Palette::current().grip_dot,
             );
         }
     }
@@ -81,32 +81,38 @@ fn content(p: &mut Painter, toolbar: &Toolbar) {
                 )
             };
             if let Some(separator) = separator {
-                p.fill_rounded(separator, 0.0, icons::SEPARATOR);
+                p.fill_rounded(
+                    separator,
+                    0.0,
+                    crate::theme::toolbar::Palette::current().separator,
+                );
             }
             continue;
         };
         let disabled = toolbar.disabled.contains(&index);
         let hovered = toolbar.hovered == Some(index) && !disabled;
-        let selected = toolbar.selected == Some(index);
+        let selected = toolbar.selected == Some(index)
+            || (toolbar.translating
+                && *button == ToolbarButton::Integration(super::Integration::Translate));
         let save = *button == ToolbarButton::SaveAs;
         let copy = *button == ToolbarButton::Finish(Finish::Copy);
         let cancel = *button == ToolbarButton::Cancel;
         let fill = if save {
             Some(if hovered {
-                Rgba(16, 185, 129, 255)
+                crate::theme::toolbar::Palette::current().primary_top
             } else {
-                Rgba(5, 150, 105, 255)
+                crate::theme::toolbar::Palette::current().primary_bottom
             })
         } else if hovered && cancel {
-            Some(Rgba(239, 68, 68, 70))
+            Some(crate::theme::toolbar::Palette::current().danger_hover_fill)
         } else if hovered && copy {
-            Some(Rgba(45, 212, 191, 64))
+            Some(crate::theme::toolbar::Palette::current().accent_hover_fill)
         } else if hovered {
-            Some(icons::HOVER_FILL)
+            Some(crate::theme::toolbar::Palette::current().hover_fill)
         } else if selected {
-            Some(icons::ACTIVE_FILL)
+            Some(crate::theme::toolbar::Palette::current().active_fill)
         } else if copy {
-            Some(Rgba(45, 212, 191, 34))
+            Some(crate::theme::toolbar::Palette::current().accent_fill)
         } else {
             None
         };
@@ -116,9 +122,9 @@ fn content(p: &mut Painter, toolbar: &Toolbar) {
                     cell,
                     6.0,
                     if hovered {
-                        Rgba(52, 211, 153, 255)
+                        crate::theme::toolbar::Palette::current().primary_border
                     } else {
-                        Rgba(16, 185, 129, 255)
+                        crate::theme::toolbar::Palette::current().primary_top
                     }
                     .into(),
                     fill.into(),
@@ -127,19 +133,19 @@ fn content(p: &mut Painter, toolbar: &Toolbar) {
                 p.fill_rounded(cell, 6.0, fill);
             }
             let edge = if save && hovered {
-                Rgba(110, 231, 183, 255)
+                crate::theme::toolbar::Palette::current().primary_hover_border
             } else if save {
-                Rgba(52, 211, 153, 255)
+                crate::theme::toolbar::Palette::current().primary_border
             } else if hovered && cancel {
-                Rgba(252, 165, 165, 140)
+                crate::theme::toolbar::Palette::current().danger_hover_border
             } else if hovered && copy {
-                Rgba(94, 234, 212, 150)
+                crate::theme::toolbar::Palette::current().accent_hover_border
             } else if hovered {
-                Rgba(94, 234, 212, 255)
+                crate::theme::toolbar::Palette::current().hover_border
             } else if selected {
-                icons::ACTIVE_BORDER
+                crate::theme::toolbar::Palette::current().active_border
             } else if copy {
-                Rgba(45, 212, 191, 96)
+                crate::theme::toolbar::Palette::current().accent_border
             } else {
                 fill
             };
@@ -150,9 +156,9 @@ fn content(p: &mut Painter, toolbar: &Toolbar) {
         } else if save {
             Rgba(255, 255, 255, 255)
         } else if hovered && cancel {
-            Rgba(252, 165, 165, 255)
+            crate::theme::toolbar::Palette::current().danger_hover_text
         } else if hovered && !copy {
-            icons::HOVER_INK
+            crate::theme::toolbar::Palette::current().hover_icon
         } else {
             cfg.icon.get()
         };

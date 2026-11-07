@@ -151,6 +151,12 @@ impl LineEditState {
         self.cursor = self.text.chars().count();
     }
 
+    /// 【字段编辑】【指定位置】按 index 与 extend 移动光标或扩展选择，限制到正文范围并分隔历史，无返回值
+    pub fn move_to(&mut self, index: usize, extend: bool) {
+        self.begin_or_clear_selection(extend);
+        self.cursor = index.min(self.text.chars().count());
+    }
+
     /// 【字段编辑】【全文选择】选择全部正文并分隔连续输入，取消候选，无参数、无返回值
     pub fn select_all(&mut self) {
         self.revision = self.revision.wrapping_add(1);

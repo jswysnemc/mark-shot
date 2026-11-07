@@ -52,6 +52,17 @@ fn apply_selection(
     reformat: bool,
     dirty: &mut u32,
 ) {
+    if super::annotation_collection::properties::active(state) {
+        super::annotation_collection::properties::set_color(
+            state,
+            color,
+            !reformat,
+            record_undo,
+            dirty,
+        );
+        refresh(state, dirty);
+        return;
+    }
     let target = state.color_popover.target;
     let index = active_annotation_idx(state);
     let detailed = state.color_popover.open && state.color_popover.radial.is_none();

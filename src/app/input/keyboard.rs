@@ -60,8 +60,23 @@ pub fn handle_key(
     text: Option<String>,
     dirty_mask: &mut u32,
 ) {
+    // 1. 【截图界面】【主题快捷键】主题切换不提交文字或改变拖动事务，所有弹层与字段共用入口
+    if chord.is_some_and(crate::theme::is_toggle) {
+        super::super::theme_switch::toggle(editor_state, dirty_mask);
+        return;
+    }
+    if super::super::selection_translation::input::key(editor_state, chord, dirty_mask) {
+        return;
+    }
+    if super::super::external_actions::key(editor_state, chord, dirty_mask) {
+        return;
+    }
     if super::text_context_menu::key(editor_state, chord, dirty_mask) {
         apply_damage_rects(editor_state, dirty_mask);
+        return;
+    }
+    if super::super::selection_size::keyboard::key(editor_state, chord, text.as_deref(), dirty_mask)
+    {
         return;
     }
     if super::super::text_input::fields::key(editor_state, chord, dirty_mask) {
@@ -106,6 +121,8 @@ pub fn handle_key(
                 action,
                 keys::Action::Finish(crate::types::Finish::Save | crate::types::Finish::Pin)
                     | keys::Action::SaveAs
+                    | keys::Action::OpenWith
+                    | keys::Action::Extensions
             ) || matches!(action, keys::Action::Finish(crate::types::Finish::Copy))
                 && !crate::tools::text::session_input::has_selection(editor_state))
         {

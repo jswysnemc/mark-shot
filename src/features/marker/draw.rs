@@ -22,7 +22,7 @@ pub fn draw_marker(
         painter.fill_path(&path, color);
     }
     let stroke = Stroke {
-        width: width.max(1.5),
+        width: painter.window_units().stroke(width, 1.5, None),
         line_cap: LineCap::Round,
         line_join: LineJoin::Round,
         ..Stroke::default()

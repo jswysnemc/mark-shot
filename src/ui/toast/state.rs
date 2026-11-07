@@ -25,7 +25,12 @@ pub enum ToastKind {
     RulerMode,
     NumberExhausted,
     HistoryFailed,
+    SettingsFailed,
     SaveAsFailed,
+    ExternalActionFailed,
+    UploadFeedback,
+    TranslationFeedback,
+    SelectionTooSmall,
 }
 
 #[derive(Clone, Copy)]
@@ -59,7 +64,24 @@ impl ToastKind {
             ToastLife::Timed(Duration::try_from_secs_f32(secs.max(0.0)).unwrap_or(Duration::MAX))
         };
         match self {
-            ToastKind::SaveAsFailed => ToastSpec {
+            ToastKind::SettingsFailed => ToastSpec {
+                text: "Failed to save settings",
+                anchor: ToastAnchor::CursorMonitorCenter,
+                life: ToastLife::Timed(Duration::from_millis(2500)),
+                fade_in,
+                fade_out,
+            },
+            ToastKind::SelectionTooSmall => ToastSpec {
+                text: "Selection is too small",
+                anchor: ToastAnchor::CursorMonitorCenter,
+                life: ToastLife::Timed(Duration::from_millis(1400)),
+                fade_in,
+                fade_out,
+            },
+            ToastKind::SaveAsFailed
+            | ToastKind::ExternalActionFailed
+            | ToastKind::UploadFeedback
+            | ToastKind::TranslationFeedback => ToastSpec {
                 text: "Cannot save screenshot",
                 anchor: ToastAnchor::CursorMonitorCenter,
                 life: timed(cfg.lifetime),
@@ -253,10 +275,21 @@ impl Toasts {
         }
     }
 
+    /// 【界面提示】【动画资格】返回是否仍需淡入或淡出帧，无参数；完整显示的限时提示只等待到期时间
     pub fn is_animating(&self) -> bool {
+        self.items.iter().any(|t| t.closing || t.progress < 1.0)
+    }
+
+    /// 【界面提示】【到期期限】返回尚未关闭的限时提示最早期限，无参数，不为稳定画面安排周期帧
+    pub fn deadline(&self) -> Option<Instant> {
         self.items
             .iter()
-            .any(|t| t.closing || t.progress < 1.0 || matches!(t.spec.life, ToastLife::Timed(_)))
+            .filter(|toast| !toast.closing)
+            .filter_map(|toast| match toast.spec.life {
+                ToastLife::Timed(duration) => toast.shown_at.checked_add(duration),
+                ToastLife::Manual => None,
+            })
+            .min()
     }
 
     pub fn tick(

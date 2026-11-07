@@ -1,10 +1,7 @@
 //! 【属性取色】【文本绘制】使用原版字体、青色选择背景与白色光标，不继承旧主题输入样式
 
 use super::{ColorField, ColorPickerPopover, layout, tracks};
-use crate::{
-    renderer::{Painter, line_edit},
-    theme::Rgba,
-};
+use crate::renderer::{Painter, line_edit};
 use cosmic_text::{FontSystem, Weight};
 use tiny_skia::Rect;
 
@@ -23,7 +20,7 @@ pub(super) fn shape(picker: &ColorPickerPopover, fonts: &mut FontSystem) -> HexR
             fonts,
             12.0,
             Weight(600),
-            Some(Rgba(4, 47, 46, 255)),
+            Some(crate::theme::toolbar::Palette::current().hover_text),
         )
     } else {
         let field = crate::ui::text_field::LineEditState::new(picker.field_text(ColorField::Hex));
@@ -43,16 +40,20 @@ pub(super) fn draw(p: &mut Painter, picker: &ColorPickerPopover, render: &HexRen
         rect.height() - 1.0,
     )
     .unwrap();
-    p.fill_rounded(inner, 6.0, Rgba(255, 255, 255, 16));
+    p.fill_rounded(
+        inner,
+        6.0,
+        crate::theme::toolbar::Palette::current().control_fill,
+    );
     let editing = picker.fields.is_editing();
     tracks::border(
         p,
         inner,
         6.0,
         if editing {
-            Rgba(45, 212, 191, 150)
+            crate::theme::toolbar::Palette::current().focus_border
         } else {
-            Rgba(255, 255, 255, 24)
+            crate::theme::toolbar::Palette::current().control_border
         },
     );
     let width = rect.width() - 22.0;
@@ -69,20 +70,20 @@ pub(super) fn draw(p: &mut Painter, picker: &ColorPickerPopover, render: &HexRen
                 p.fill_rounded(
                     Rect::from_xywh(x - shift, 5.0, w.max(1.0), 16.0).unwrap(),
                     0.0,
-                    Rgba(45, 212, 191, 255),
+                    crate::theme::toolbar::Palette::current().hover_fill,
                 );
             }
             line_edit::text(
                 p,
                 render,
                 (-shift, (rect.height() - render.height) / 2.0 + 1.0),
-                Rgba(229, 231, 235, 255).color(),
+                crate::theme::toolbar::Palette::current().text.color(),
             );
             if render.caret_visible && render.selections.is_empty() {
                 p.fill_rounded(
                     Rect::from_xywh((render.caret - shift).round(), 5.0, 1.0, 16.0).unwrap(),
                     0.0,
-                    Rgba(229, 231, 235, 255),
+                    crate::theme::toolbar::Palette::current().text,
                 );
             }
         },

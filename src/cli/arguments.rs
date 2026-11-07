@@ -96,12 +96,13 @@ pub struct Arguments {
     pub xdg_window: bool,
 }
 
-/// 【命令行】【延迟参数】把秒数转换为有效时长；拒绝负数、非有限数和溢出
+/// 【命令行】【延迟参数】把 text 秒数转换为原版零至六十秒范围内的有效时长，返回非法值错误
 fn delay(text: &str) -> Result<Duration, &'static str> {
     text.parse::<f64>()
         .ok()
+        .filter(|value| (0.0..=60.0).contains(value))
         .and_then(|value| Duration::try_from_secs_f64(value).ok())
-        .ok_or("--delay expects non-negative seconds, e.g. 0.5")
+        .ok_or("--delay expects 0 to 60 seconds, e.g. 0.5")
 }
 
 /// 【命令行】【路径参数】保留系统路径编码，不把非 UTF-8 文件名转换为空字符串
@@ -147,8 +148,8 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
     };
     let xdg_window = args.contains("--xdg-window");
     for kind in [
-        crate::backend::wayland::clipboard::DAEMON_ARG,
-        crate::backend::wayland::pin::PIN_ARG,
+        crate::backend::clipboard::DAEMON_ARG,
+        crate::backend::pin::PIN_ARG,
         crate::ocr::daemon::DAEMON_ARG,
         crate::features::ocr_result::transport::RESULT_ARG,
         crate::features::capture_history::transport::READY_ARG,
@@ -200,8 +201,8 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
     let quick_region = args.contains(["-r", "--select-region"]);
     let ocr = args.contains("--ocr");
     let scroll = args.contains(["-S", "--scroll"]);
-    let fullscreen = args.contains("--fullscreen");
-    let all_outputs = args.contains("--all-outputs");
+    let fullscreen = args.contains("--fullscreen") | args.contains("--full-screen");
+    let all_outputs = args.contains("--all-outputs") | args.contains("--all-output");
     let monitor = args.contains(["-m", "--monitor"]);
     let _capture = args.contains("--capture");
     let include_cursor = args.contains("--include-cursor");
@@ -236,6 +237,8 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
     let default_tool = args.opt_value_from_fn("--default-tool", super::tool_names::parse)?;
     let fullscreen_default_tool =
         args.opt_value_from_fn("--fullscreen-default-tool", super::tool_names::parse)?;
+    let file_default_tool =
+        args.opt_value_from_fn("--file-default-tool", super::tool_names::parse)?;
     let default_color = args.opt_value_from_fn("--default-color", |value| {
         Rgba::parse_hex(value).ok_or("expected #RRGGBB or #RRGGBBAA")
     })?;
@@ -298,6 +301,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
             || to.is_some()
             || default_tool.is_some()
             || fullscreen_default_tool.is_some()
+            || file_default_tool.is_some()
             || default_color.is_some()
             || !displays.is_empty()
             || shot_at.is_some()
@@ -361,6 +365,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
             include_cursor,
             default_tool,
             fullscreen_default_tool,
+            file_default_tool,
             default_color,
         })
     };
@@ -372,4 +377,45 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
         debug_log,
         xdg_window,
     })
+}
+
+#[cfg(test)]
+#[path = "arguments/startup_tests.rs"]
+mod startup_tests;
+
+#[cfg(test)]
+mod delay_tests {
+    use super::*;
+
+    /// 【命令行回归】【延迟范围】超过原版一分钟上限及非有限秒数在参数阶段拒绝，无参数、无返回值
+    #[test]
+    fn delay_outside_qt_range_is_rejected_before_graphics() {
+        for value in ["60.000001", "61", "-0.5", "inf", "NaN"] {
+            assert!(
+                parse(
+                    [OsString::from("--delay"), OsString::from(value)],
+                    Instant::now()
+                )
+                .is_err(),
+                "delay={value}"
+            );
+        }
+    }
+
+    /// 【命令行回归】【有效秒数】零、小数及一分钟边界保留准确期限，无参数、无返回值
+    #[test]
+    fn qt_delay_endpoints_and_fractional_seconds_are_accepted() {
+        let now = Instant::now();
+        for (value, duration) in [
+            ("0", Duration::ZERO),
+            ("0.5", Duration::from_millis(500)),
+            ("60", Duration::from_secs(60)),
+        ] {
+            let options = parse([OsString::from("--delay"), OsString::from(value)], now).unwrap();
+            let Command::Editor(launch) = options.command else {
+                panic!("expected editor");
+            };
+            assert_eq!(launch.shot_at, now.checked_add(duration));
+        }
+    }
 }

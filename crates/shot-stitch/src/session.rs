@@ -74,6 +74,30 @@ impl Stitcher {
         }
     }
 
+    /// 【长图拼接】【像素存储】无参数，返回拼接长图的实际分配范围，不创建快照或统计其他缓存
+    pub fn pixel_storage(&self) -> crate::PixelStorage {
+        self.long.storage()
+    }
+
+    /// 【长图拼接】【原图转交】无参数，取出完整分块原图并释放帧及签名缓存，返回拥有原始像素的结果，空图返回None
+    pub fn take_image(&mut self) -> Option<crate::StitchedImage> {
+        if self.long.height() == 0 {
+            return None;
+        }
+        let axis = self.axis;
+        let mut empty = Self::new(self.config).expect("existing stitch configuration is valid");
+        empty.axis = axis;
+        let previous = std::mem::replace(self, empty);
+        Some(crate::StitchedImage::new(previous.long.into_rows(), axis))
+    }
+
+    /// 【长图拼接】【预览借用】无参数，返回当前长图的显示坐标视图；空图返回 None，不创建修订快照
+    pub fn image_view(&self) -> Option<crate::StitchedView<'_>> {
+        self.long
+            .view()
+            .map(|view| crate::StitchedView::new(view, self.axis))
+    }
+
     /// Switches scrolling axis before initial growth has locked it.
     pub fn set_axis(&mut self, axis: Axis) -> Result<bool, ImageError> {
         if self.axis == axis {

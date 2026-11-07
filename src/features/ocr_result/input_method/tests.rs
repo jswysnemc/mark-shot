@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    backend::wayland::window::{KeyInput, LEFT_BUTTON, WindowContent, WindowEvent},
+    backend::window::{KeyInput, LEFT_BUTTON, WindowContent, WindowEvent},
     features::ocr_result::{document::OcrDocument, table::Table, table_view::TableView},
     keys::{Key, Mods},
     types::text_input::{Batch, Preedit, Replacement, Update},
@@ -66,14 +66,22 @@ fn source_preedit_and_undo_use_qt_text_edit_semantics() {
 fn non_editor_owners_never_accept_input_method_updates() {
     let mut state = window();
     state.event(input("ni", ""));
+    let image = state
+        .layout
+        .titlebar
+        .tabs
+        .iter()
+        .find(|(view, _)| *view == View::Image)
+        .unwrap()
+        .1;
     state.event(WindowEvent::PointerButton {
-        position: (98.0, 56.0),
+        position: (f64::from(image.x() + 10.0), f64::from(image.y() + 10.0)),
         button: LEFT_BUTTON,
         pressed: true,
     });
     assert_eq!(state.view, View::Image);
     assert!(identity(&state).is_none());
-    assert!(state.source.preedit().is_none());
+    assert!(state.source.preedit().is_some());
     state.event(input("ignored", "wrong"));
     assert_eq!(state.source.text(), "base");
     state.view = View::Text;
@@ -89,9 +97,15 @@ fn non_editor_owners_never_accept_input_method_updates() {
         WindowAction::None
     );
     state.focus_target = super::super::control_input::FocusTarget::Content;
-    state.menu = true;
+    state.source_menu = Some(crate::ui::context_menu::ContextMenu::new(
+        vec![],
+        &mut state.fonts,
+        (0.0, 0.0),
+        (760.0, 460.0),
+        0,
+    ));
     assert!(identity(&state).is_none());
-    state.menu = false;
+    state.source_menu = None;
     state.event(input("ni", ""));
     state.event(WindowEvent::Focused(false));
     assert!(state.source.preedit().is_none());
@@ -127,9 +141,12 @@ fn returning_to_the_source_uses_a_fresh_protocol_target() {
 #[test]
 fn table_drafts_do_not_change_persistent_cells_before_commit() {
     let mut fonts = crate::fonts::bundled();
-    let mut table = TableView::new(Table {
-        rows: vec![vec!["cell".into(), "other".into()]],
-    });
+    let mut table = TableView::new(
+        Table {
+            rows: vec![vec!["cell".into(), "other".into()]],
+        },
+        &mut fonts,
+    );
     table.active = Some((0, 0));
     assert!(table.editor.is_none());
     table.begin_edit(&mut fonts);
@@ -190,12 +207,15 @@ fn table_navigation_and_commit_match_real_qt_editor_states() {
             continue;
         }
         let mut fonts = crate::fonts::bundled();
-        let mut table = TableView::new(Table {
-            rows: vec![
-                vec!["cell".into(), "other".into()],
-                vec!["other".into(), "other".into()],
-            ],
-        });
+        let mut table = TableView::new(
+            Table {
+                rows: vec![
+                    vec!["cell".into(), "other".into()],
+                    vec!["other".into(), "other".into()],
+                ],
+            },
+            &mut fonts,
+        );
         table.active = Some((0, 0));
         if kind != "enter-selection" {
             table.key(

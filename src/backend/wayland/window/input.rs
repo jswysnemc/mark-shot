@@ -18,6 +18,9 @@ use crate::{backend::wayland::keysym, keys::Mods};
 impl NativeWindow {
     /// 【原生窗口】【按键转换】将 event 的键名、文字与修饰键发送给内容；不替内容执行快捷键
     fn key_event(&mut self, event: KeyEvent) {
+        if self.theme_key(keysym::chord(event.keysym, event.raw_code, self.modifiers)) {
+            return;
+        }
         if self.popup_key(&event) {
             return;
         }
@@ -40,7 +43,15 @@ impl NativeWindow {
     /// 【原生窗口】【鼠标形状】按 position 对应内容更新指针；无形状协议时保持合成器默认值
     fn update_cursor(&self, id: SurfaceId, position: (f64, f64)) {
         if let Some(cursor) = &self.cursor {
-            let kind = if id == SurfaceId::Main && self.dialog.is_some() {
+            let kind = if id == SurfaceId::Main
+                && let Some(gesture) = self.layer_gesture
+            {
+                if gesture.resizing() {
+                    WindowCursor::Resize
+                } else {
+                    WindowCursor::Grabbing
+                }
+            } else if id == SurfaceId::Main && self.dialog.is_some() {
                 WindowCursor::Default
             } else {
                 self.content_for(id)
@@ -50,8 +61,11 @@ impl NativeWindow {
                 WindowCursor::Default => Shape::Default,
                 WindowCursor::Text => Shape::Text,
                 WindowCursor::Pointer => Shape::Pointer,
+                WindowCursor::Grab => Shape::Grab,
+                WindowCursor::Grabbing => Shape::Grabbing,
                 WindowCursor::Resize => Shape::SeResize,
                 WindowCursor::HorizontalResize => Shape::ColResize,
+                WindowCursor::VerticalResize => Shape::RowResize,
             };
             cursor.set_shape(self.enter_serial, shape);
         }
@@ -75,6 +89,9 @@ impl PointerHandler for NativeWindow {
                 continue;
             };
             let position = event.position;
+            if id == SurfaceId::Main {
+                self.pointer_position = position;
+            }
             match event.kind {
                 PointerEventKind::Enter { serial } => {
                     self.enter_serial = serial;
@@ -82,10 +99,23 @@ impl PointerHandler for NativeWindow {
                     self.dispatch_to(id, WindowEvent::PointerMove { position }, None);
                 }
                 PointerEventKind::Motion { .. } => {
-                    self.update_cursor(id, position);
+                    if id == SurfaceId::Main && self.layer_motion(position) {
+                        continue;
+                    }
                     self.dispatch_to(id, WindowEvent::PointerMove { position }, None);
+                    self.update_cursor(id, position);
                 }
                 PointerEventKind::Press { button, serial, .. } => {
+                    if id == SurfaceId::Main
+                        && self.dialog.is_none()
+                        && let Some(seat) = &self.pointer_seat
+                    {
+                        self.pointer_grabs.begin(
+                            button,
+                            serial,
+                            (seat.clone(), event.surface.clone()),
+                        );
+                    }
                     self.dispatch_to(
                         id,
                         WindowEvent::PointerButton {
@@ -95,12 +125,21 @@ impl PointerHandler for NativeWindow {
                         },
                         Some(serial),
                     );
+                    self.update_cursor(id, position);
                     if id == SurfaceId::Main {
                         let seat = self.pointer_seat.clone();
                         self.sync_popup(qh, seat.as_ref().map(|seat| (seat, serial)));
                     }
                 }
                 PointerEventKind::Release { button, .. } => {
+                    if id == SurfaceId::Main && button == super::LEFT_BUTTON {
+                        self.layer_gesture = None;
+                    }
+                    let seat = self.pointer_seat.clone();
+                    let serial = seat.as_ref().and_then(|seat| {
+                        self.pointer_grabs
+                            .release(button, &(seat.clone(), event.surface.clone()))
+                    });
                     self.dispatch_to(
                         id,
                         WindowEvent::PointerButton {
@@ -110,20 +149,29 @@ impl PointerHandler for NativeWindow {
                         },
                         None,
                     );
+                    self.update_cursor(id, position);
+                    if id == SurfaceId::Main {
+                        self.sync_popup(qh, seat.as_ref().zip(serial));
+                    }
                 }
                 PointerEventKind::Axis {
                     horizontal,
                     vertical,
+                    source,
                     ..
                 } => {
                     self.dispatch_to(
                         id,
-                        WindowEvent::Scroll {
+                        WindowEvent::Wheel(super::ScrollInput::from_axes(
                             position,
-                            delta: (horizontal.absolute, vertical.absolute),
-                        },
+                            horizontal,
+                            vertical,
+                            source,
+                            self.modifiers,
+                        )),
                         None,
                     );
+                    self.update_cursor(id, position);
                 }
                 PointerEventKind::Leave { .. } => {
                     self.dispatch_to(id, WindowEvent::PointerLeave, None)
@@ -134,16 +182,32 @@ impl PointerHandler for NativeWindow {
 }
 
 impl KeyboardHandler for NativeWindow {
-    /// 【原生窗口】【按键按下】转换 event 并交给内容处理
+    /// 【原生窗口】【按键按下】记录 serial 与 event 对应配对，再转换并交付内容；qh 用于当前事件的菜单，无返回值
     fn press_key(
         &mut self,
         _: &Connection,
-        _: &QueueHandle<Self>,
+        qh: &QueueHandle<Self>,
         _: &wl_keyboard::WlKeyboard,
-        _: u32,
+        serial: u32,
         event: KeyEvent,
     ) {
+        let id = self.keyboard_surface;
+        let seat = self.keyboard_seat.clone();
+        if id == Some(SurfaceId::Main)
+            && self.popup.is_empty()
+            && self.dialog.is_none()
+            && let Some(seat) = &seat
+        {
+            self.keyboard_grabs.begin(
+                event.raw_code,
+                serial,
+                (seat.clone(), self.main.role.wl_surface().clone()),
+            );
+        }
         self.key_event(event);
+        if id == Some(SurfaceId::Main) {
+            self.sync_popup(qh, seat.as_ref().map(|seat| (seat, serial)));
+        }
     }
 
     /// 【原生窗口】【重复按键】重复输入采用与按下相同的转换规则
@@ -203,11 +267,12 @@ impl KeyboardHandler for NativeWindow {
         _: u32,
     ) {
         self.modifiers = Mods::default();
+        self.keyboard_grabs.cancel();
         if self.popup_leave(surface) {
             return;
         }
         if let Some(id) = self.surface_id(surface) {
-            if id == SurfaceId::Main && self.popup.is_some() {
+            if id == SurfaceId::Main && !self.popup.is_empty() {
                 return;
             }
             if self.keyboard_surface == Some(id) {
@@ -217,16 +282,23 @@ impl KeyboardHandler for NativeWindow {
         }
     }
 
-    /// 【原生窗口】【按键释放】把 event 的释放交给内容，文字编辑默认忽略，按钮可在释放时执行，无返回值
+    /// 【原生窗口】【按键释放】把 event 释放交付内容，仅使用本次配对的按下序号打开菜单，qh 提供协议资源，无返回值
     fn release_key(
         &mut self,
         _: &Connection,
-        _: &QueueHandle<Self>,
+        qh: &QueueHandle<Self>,
         _: &wl_keyboard::WlKeyboard,
         _: u32,
         event: KeyEvent,
     ) {
-        if self.popup.is_some() {
+        let seat = self.keyboard_seat.clone();
+        let serial = seat.as_ref().and_then(|seat| {
+            self.keyboard_grabs.release(
+                event.raw_code,
+                &(seat.clone(), self.main.role.wl_surface().clone()),
+            )
+        });
+        if !self.popup.is_empty() {
             return;
         }
         let Some(id) = self.keyboard_surface else {
@@ -243,6 +315,9 @@ impl KeyboardHandler for NativeWindow {
             }),
             None,
         );
+        if id == SurfaceId::Main {
+            self.sync_popup(qh, seat.as_ref().zip(serial));
+        }
     }
 
     /// 【原生窗口】【重复配置】重复时序由输入设备与工具包负责；不增加空闲定时器
@@ -311,6 +386,7 @@ impl SeatHandler for NativeWindow {
     ) {
         match capability {
             Capability::Pointer if self.pointer_seat.as_ref() == Some(&seat) => {
+                self.pointer_grabs.cancel();
                 if let Some(cursor) = self.cursor.take() {
                     cursor.destroy();
                 }
@@ -322,6 +398,7 @@ impl SeatHandler for NativeWindow {
                 self.pointer_seat = None;
             }
             Capability::Keyboard if self.keyboard_seat.as_ref() == Some(&seat) => {
+                self.keyboard_grabs.cancel();
                 if let Some(focus) = self.text_input.remove(&seat) {
                     self.leave_text_input(focus.id);
                 }

@@ -147,3 +147,45 @@ fn config_and_session_isolation() {
     first.push(frame(0, 80, 180)).unwrap();
     assert_eq!(second.stats().frame_count, 0);
 }
+
+/// 【长图拼接回归】【借用像素】双轴增长、重访和前插后，视图必须与独立原图逐像素一致，不丢失预留区偏移，无参数、无返回值
+#[test]
+fn borrowed_view_preserves_pixels_across_growth_revisit_and_prepend() {
+    for axis in [Axis::Vertical, Axis::Horizontal] {
+        let mut stitch = Stitcher::new(config()).unwrap();
+        assert!(stitch.image_view().is_none());
+        stitch.set_axis(axis).unwrap();
+        for origin in [
+            100, 145, 190, 235, 280, 325, 370, 415, 460, 505, 550, 595, 550, 460, 370, 280, 190,
+            100, 60,
+        ] {
+            let image = frame(origin, 80, 180);
+            let image = if axis == Axis::Horizontal {
+                image.transpose().unwrap()
+            } else {
+                image
+            };
+            stitch.push(image).unwrap();
+        }
+        let expected = frame(60, 80, 715);
+        let expected = if axis == Axis::Horizontal {
+            expected.transpose().unwrap()
+        } else {
+            expected
+        };
+        let view = stitch.image_view().unwrap();
+        assert_eq!(
+            (view.width(), view.height()),
+            (expected.width(), expected.height())
+        );
+        for y in 0..expected.height() {
+            for x in 0..expected.width() {
+                assert_eq!(
+                    view.pixel(x, y),
+                    expected.row(y)[x as usize],
+                    "axis={axis:?}, x={x}, y={y}"
+                );
+            }
+        }
+    }
+}

@@ -150,6 +150,7 @@ pub struct ArrowHoldState {
 pub enum SettingsSource {
     Tool(Tool),
     Annotation(u64),
+    Collection { revision: u64, count: usize },
     OcrScanning,
     OcrAwaiting { downloading: bool },
     OcrNoModel { downloading: bool },

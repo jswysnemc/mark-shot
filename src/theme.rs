@@ -1,3 +1,14 @@
+pub(crate) mod config_watch;
+pub mod context_menu;
+mod mode;
+mod roles;
+pub mod toolbar;
+pub mod window;
+pub use mode::Mode;
+pub(crate) use mode::apply_saved;
+pub use mode::{is_toggle, toggle};
+pub use roles::Role;
+
 // color, radius, stroke, font, anim, shadow and etc, everything visual.
 // but here are only tokens that are shared between at least two components.
 // if not, its constants stay in their prespective file.
@@ -67,8 +78,9 @@ impl From<Rgba> for Color {
 pub mod color {
     use super::Rgba;
 
-    fn theme() -> &'static crate::config::Theme {
-        &crate::config::get().theme
+    /// 【界面主题】【共享令牌】返回当前进程共享主题，无参数，不访问磁盘
+    pub fn theme() -> &'static crate::config::Theme {
+        super::mode::theme()
     }
 
     /// background color of all panels, popovers and toasts

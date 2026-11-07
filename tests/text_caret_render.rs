@@ -13,8 +13,12 @@ use tiny_skia::{Color, Pixmap, Rect};
 /// 【文字光标测试】【标注构造】按 content 与 alpha 返回普通二十点测试文字，使用内置字体，不连接显示服务器
 fn annotation(content: &str, alpha: u8) -> Annotation {
     Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id: 7,
         shape: AnnotationShape::Text {
+            frame: Default::default(),
             start: (10.0, 10.0),
             content: content.into(),
             font_size: 20.0,

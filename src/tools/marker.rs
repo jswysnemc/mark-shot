@@ -26,11 +26,15 @@ impl ToolBehavior for MarkerTool {
                 return;
             }
             let Some(position) = DrawingSpace::from_editor(state)
-                .and_then(|space| space.start_point(state.input.pointer.global))
+                .and_then(|space| space.start_point(state.canvas_point()))
             else {
                 return;
             };
             let mut annotation = Annotation {
+                style_scale: 1.0,
+                rotation_degrees: 0.0,
+                frozen_bounds: crate::tools::drawing_space::DrawingSpace::from_editor(state)
+                    .map(|space| space.bounds),
                 id: state.next_id,
                 shape: AnnotationShape::Marker {
                     start: position,
@@ -43,6 +47,7 @@ impl ToolBehavior for MarkerTool {
                 stroke_width: state.tool_settings.stroke(StrokeGroup::Marker),
                 bbox: Rect::from_xywh(position.0, position.1, 1.0, 1.0).unwrap(),
             };
+            state.adopt_annotation_style(&mut annotation);
             annotation.update_bbox();
             state.input.mouse_down = true;
             state.tool_active = true;
@@ -105,7 +110,7 @@ impl ToolBehavior for MarkerTool {
         *end = space.rectangle_end(*start, position, state.input.ctrl);
         *kind = state.tool_settings.marker_shape;
         *filled = state.tool_settings.marker_filled;
-        annotation.stroke_width = state.tool_settings.stroke(StrokeGroup::Marker);
+        annotation.set_image_stroke_width(state.tool_settings.stroke(StrokeGroup::Marker));
         annotation.color = state.tool_settings.color;
         annotation.update_bbox();
         let new = annotation.damage_bbox(false);

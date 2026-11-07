@@ -193,6 +193,7 @@ pub struct ColorPickerPopover {
     pub initial_history: Vec<Color>,
     pub fields: TextFieldGroup<ColorField>,
     pub pre_edit_snapshot: Option<crate::editor::history_snapshot::HistorySnapshot>,
+    pub(crate) pre_edit_checkpointed: bool,
 
     /// Scroll accumulator for scrollable fields (hex/rgba)
     /// Keeps scroll fractional state separate from raw events to avoid
@@ -248,6 +249,19 @@ impl ColorPickerPopover {
             fields: TextFieldGroup::new(),
             scroll: ScrollAccumulator::new(),
             pre_edit_snapshot: None,
+            pre_edit_checkpointed: false,
+        }
+    }
+
+    /// 【属性取色】【事务取出】返回尚未提交的颜色快照并清除状态，已经提前记录历史的群组事务返回空值，无参数
+    pub(crate) fn take_edit_snapshot(
+        &mut self,
+    ) -> Option<crate::editor::history_snapshot::HistorySnapshot> {
+        let snapshot = self.pre_edit_snapshot.take();
+        if std::mem::take(&mut self.pre_edit_checkpointed) {
+            None
+        } else {
+            snapshot
         }
     }
 

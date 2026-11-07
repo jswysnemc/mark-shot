@@ -1,0 +1,483 @@
+{
+    "configurations": [
+        {
+            "commands": [
+                {
+                    "close_on_start": false,
+                    "command": "echo {slurp}",
+                    "description": "",
+                    "name": "One",
+                    "save_image": false,
+                    "working_directory": "/tmp"
+                }
+            ],
+            "error": "",
+            "source": "{\"name\":\" One \",\"command\":\" echo {slurp} \",\"cwd\":\" /tmp \",\"closeOnStart\":false}"
+        },
+        {
+            "commands": [
+                {
+                    "close_on_start": true,
+                    "command": "viewer {imageUrl}",
+                    "description": "",
+                    "name": "Image",
+                    "save_image": true,
+                    "working_directory": ""
+                },
+                {
+                    "close_on_start": true,
+                    "command": "viewer",
+                    "description": "",
+                    "name": "Alias",
+                    "save_image": true,
+                    "working_directory": ""
+                }
+            ],
+            "error": "",
+            "source": "{\"commands\":[{\"name\":\"Image\",\"command\":\"viewer {imageUrl}\"},{\"name\":\"Alias\",\"command\":\"viewer\",\"needsImage\":true,\"closeOnStart\":\"false\"},17,{\"name\":42,\"command\":\"bad\"}]}"
+        },
+        {
+            "commands": [
+            ],
+            "error": "No extension commands found",
+            "source": "[]"
+        },
+        {
+            "commands": [
+            ],
+            "error": "No extension commands found",
+            "source": "{}"
+        },
+        {
+            "commands": [
+            ],
+            "error": "Invalid JSON at offset 0: illegal value",
+            "source": "null"
+        }
+    ],
+    "exec": [
+        {
+            "args": [
+                "viewer",
+                "/tmp/image name.png"
+            ],
+            "exec": "viewer %f"
+        },
+        {
+            "args": [
+                "viewer",
+                "file:///tmp/image name.png",
+                "Image Editor",
+                "/apps/image editor.desktop",
+                "%"
+            ],
+            "exec": "viewer %U %c %k %i %% %d"
+        },
+        {
+            "args": [
+                "/opt/Image Editor",
+                "a b",
+                "/tmp/image name.png"
+            ],
+            "exec": "\"/opt/Image Editor\" \"a b\" %F"
+        },
+        {
+            "args": [
+                "viewer",
+                "--full",
+                "/tmp/image name.png"
+            ],
+            "exec": "viewer --full"
+        },
+        {
+            "args": [
+                "program",
+                "\"quoted\"",
+                "/tmp/image name.png"
+            ],
+            "exec": "program \"\"\"quoted\"\"\""
+        },
+        {
+            "args": [
+                "viewer",
+                "'a",
+                "b'",
+                "/tmp/image name.png"
+            ],
+            "exec": "viewer 'a b'"
+        }
+    ],
+    "panels": [
+        {
+            "count": 0,
+            "kind": "extension",
+            "panel": [
+                652,
+                220,
+                300,
+                80
+            ],
+            "title": {
+                "font_pixels": 10,
+                "rect": [
+                    8,
+                    8,
+                    284,
+                    30
+                ],
+                "text": "Extensions"
+            }
+        },
+        {
+            "count": 0,
+            "kind": "open",
+            "panel": [
+                672,
+                220,
+                280,
+                80
+            ],
+            "title": {
+                "font_pixels": 10,
+                "rect": [
+                    8,
+                    8,
+                    264,
+                    30
+                ],
+                "text": "Open with"
+            }
+        },
+        {
+            "count": 1,
+            "kind": "extension",
+            "list": {
+                "font_pixels": 16,
+                "rect": [
+                    8,
+                    29,
+                    284,
+                    48
+                ],
+                "rows": [
+                    [
+                        0,
+                        0,
+                        284,
+                        40
+                    ]
+                ],
+                "scroll_max": 0,
+                "viewport": [
+                    0,
+                    0,
+                    284,
+                    48
+                ]
+            },
+            "panel": [
+                652,
+                220,
+                300,
+                85
+            ],
+            "title": {
+                "font_pixels": 10,
+                "rect": [
+                    8,
+                    8,
+                    284,
+                    17
+                ],
+                "text": "Extensions"
+            }
+        },
+        {
+            "count": 1,
+            "kind": "open",
+            "list": {
+                "font_pixels": 16,
+                "rect": [
+                    8,
+                    29,
+                    264,
+                    48
+                ],
+                "rows": [
+                    [
+                        0,
+                        0,
+                        264,
+                        40
+                    ]
+                ],
+                "scroll_max": 0,
+                "viewport": [
+                    0,
+                    0,
+                    264,
+                    48
+                ]
+            },
+            "panel": [
+                672,
+                220,
+                280,
+                85
+            ],
+            "title": {
+                "font_pixels": 10,
+                "rect": [
+                    8,
+                    8,
+                    264,
+                    17
+                ],
+                "text": "Open with"
+            }
+        },
+        {
+            "count": 3,
+            "kind": "extension",
+            "list": {
+                "font_pixels": 16,
+                "rect": [
+                    8,
+                    29,
+                    284,
+                    108
+                ],
+                "rows": [
+                    [
+                        0,
+                        0,
+                        275,
+                        40
+                    ],
+                    [
+                        0,
+                        40,
+                        275,
+                        40
+                    ],
+                    [
+                        0,
+                        80,
+                        275,
+                        40
+                    ]
+                ],
+                "scroll_max": 12,
+                "viewport": [
+                    0,
+                    0,
+                    275,
+                    108
+                ]
+            },
+            "panel": [
+                652,
+                220,
+                300,
+                145
+            ],
+            "title": {
+                "font_pixels": 10,
+                "rect": [
+                    8,
+                    8,
+                    284,
+                    17
+                ],
+                "text": "Extensions"
+            }
+        },
+        {
+            "count": 3,
+            "kind": "open",
+            "list": {
+                "font_pixels": 16,
+                "rect": [
+                    8,
+                    29,
+                    264,
+                    108
+                ],
+                "rows": [
+                    [
+                        0,
+                        0,
+                        255,
+                        40
+                    ],
+                    [
+                        0,
+                        40,
+                        255,
+                        40
+                    ],
+                    [
+                        0,
+                        80,
+                        255,
+                        40
+                    ]
+                ],
+                "scroll_max": 12,
+                "viewport": [
+                    0,
+                    0,
+                    255,
+                    108
+                ]
+            },
+            "panel": [
+                672,
+                220,
+                280,
+                145
+            ],
+            "title": {
+                "font_pixels": 10,
+                "rect": [
+                    8,
+                    8,
+                    264,
+                    17
+                ],
+                "text": "Open with"
+            }
+        },
+        {
+            "count": 24,
+            "kind": "extension",
+            "list": {
+                "font_pixels": 16,
+                "rect": [
+                    8,
+                    29,
+                    284,
+                    360
+                ],
+                "rows": [
+                    [
+                        0,
+                        0,
+                        275,
+                        40
+                    ],
+                    [
+                        0,
+                        40,
+                        275,
+                        40
+                    ],
+                    [
+                        0,
+                        80,
+                        275,
+                        40
+                    ]
+                ],
+                "scroll_max": 600,
+                "viewport": [
+                    0,
+                    0,
+                    275,
+                    360
+                ]
+            },
+            "panel": [
+                652,
+                220,
+                300,
+                397
+            ],
+            "title": {
+                "font_pixels": 10,
+                "rect": [
+                    8,
+                    8,
+                    284,
+                    17
+                ],
+                "text": "Extensions"
+            }
+        },
+        {
+            "count": 24,
+            "kind": "open",
+            "list": {
+                "font_pixels": 16,
+                "rect": [
+                    8,
+                    29,
+                    264,
+                    360
+                ],
+                "rows": [
+                    [
+                        0,
+                        0,
+                        255,
+                        40
+                    ],
+                    [
+                        0,
+                        40,
+                        255,
+                        40
+                    ],
+                    [
+                        0,
+                        80,
+                        255,
+                        40
+                    ]
+                ],
+                "scroll_max": 600,
+                "viewport": [
+                    0,
+                    0,
+                    255,
+                    360
+                ]
+            },
+            "panel": [
+                672,
+                220,
+                280,
+                397
+            ],
+            "title": {
+                "font_pixels": 10,
+                "rect": [
+                    8,
+                    8,
+                    264,
+                    17
+                ],
+                "text": "Open with"
+            }
+        }
+    ],
+    "qt": "6.12.0",
+    "urls": [
+        {
+            "path": "/tmp/image name.png",
+            "url": "file:///tmp/image name.png"
+        },
+        {
+            "path": "/tmp/a b%u'$(echo bad).png",
+            "url": "file:///tmp/a b%25u'$(echo bad).png"
+        },
+        {
+            "path": "/tmp/中文 #?%.png",
+            "url": "file:///tmp/中文 %23%3F%25.png"
+        },
+        {
+            "path": "/tmp/new\nline.png",
+            "url": "file:///tmp/new%0Aline.png"
+        }
+    ]
+}

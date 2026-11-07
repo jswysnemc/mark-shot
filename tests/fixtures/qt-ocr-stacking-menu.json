@@ -1,0 +1,18 @@
+{
+  "source": "target/ocr-translation-input-qt-sway-r12/result.json",
+  "reference_sha256": "1319298e9652e0ed4ae5680153a2188e1b3b54d9673d46c02646045a02a22b9f",
+  "operations": {
+    "source-menu": {
+      "after_text": "base!stale-menu",
+      "candidate_tested": true,
+      "candidate_or_committed_glyphs_visible": true,
+      "pixels": 793,
+      "stale_commit_ignored": false,
+      "input_active_while_menu": true,
+      "restored_selection_utf16": [
+        5,
+        5
+      ]
+    }
+  }
+}

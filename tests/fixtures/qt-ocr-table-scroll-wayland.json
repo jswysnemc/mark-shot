@@ -1,0 +1,198 @@
+{
+  "requests": [
+    {
+      "name": "wheel",
+      "source": 0,
+      "absolute": 15,
+      "discrete": 1,
+      "qt_events": [
+        {
+          "angle": [
+            0,
+            -120
+          ],
+          "inverted": false,
+          "mods": 0,
+          "offset": [
+            0,
+            84
+          ],
+          "phase": 0,
+          "pixel": [
+            0,
+            -15
+          ],
+          "source": 0,
+          "values": [
+            0,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "name": "wheel-half",
+      "source": 0,
+      "absolute": 7.5,
+      "discrete": 0,
+      "qt_events": [
+        {
+          "angle": [
+            0,
+            -90
+          ],
+          "inverted": false,
+          "mods": 0,
+          "offset": [
+            0,
+            140
+          ],
+          "phase": 0,
+          "pixel": [
+            0,
+            -8
+          ],
+          "source": 0,
+          "values": [
+            0,
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "name": "finger",
+      "source": 1,
+      "absolute": 15,
+      "discrete": 0,
+      "qt_events": [
+        {
+          "angle": [
+            0,
+            0
+          ],
+          "inverted": false,
+          "mods": 0,
+          "offset": [
+            0,
+            252
+          ],
+          "phase": 1,
+          "pixel": [
+            0,
+            0
+          ],
+          "source": 0,
+          "values": [
+            0,
+            9
+          ]
+        },
+        {
+          "angle": [
+            0,
+            0
+          ],
+          "inverted": false,
+          "mods": 0,
+          "offset": [
+            0,
+            252
+          ],
+          "phase": 1,
+          "pixel": [
+            0,
+            0
+          ],
+          "source": 0,
+          "values": [
+            0,
+            9
+          ]
+        },
+        {
+          "angle": [
+            0,
+            -180
+          ],
+          "inverted": false,
+          "mods": 0,
+          "offset": [
+            0,
+            252
+          ],
+          "phase": 2,
+          "pixel": [
+            0,
+            -15
+          ],
+          "source": 1,
+          "values": [
+            0,
+            9
+          ]
+        }
+      ]
+    },
+    {
+      "name": "continuous",
+      "source": 2,
+      "absolute": 15,
+      "discrete": 0,
+      "qt_events": [
+        {
+          "angle": [
+            0,
+            -180
+          ],
+          "inverted": false,
+          "mods": 0,
+          "offset": [
+            0,
+            392
+          ],
+          "phase": 2,
+          "pixel": [
+            0,
+            -15
+          ],
+          "source": 1,
+          "values": [
+            0,
+            14
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tilt",
+      "source": 3,
+      "absolute": 15,
+      "discrete": 0,
+      "qt_events": [
+        {
+          "angle": [
+            0,
+            -180
+          ],
+          "inverted": false,
+          "mods": 0,
+          "offset": [
+            0,
+            504
+          ],
+          "phase": 2,
+          "pixel": [
+            0,
+            -15
+          ],
+          "source": 0,
+          "values": [
+            0,
+            18
+          ]
+        }
+      ]
+    }
+  ]
+}

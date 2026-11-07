@@ -9,7 +9,7 @@ use super::{
 };
 use crate::{
     AppResult,
-    backend::wayland::window::{
+    backend::window::{
         self, WindowAction, WindowContent, WindowCursor, WindowDialog, WindowEvent, WindowSpec,
         WindowWake,
     },

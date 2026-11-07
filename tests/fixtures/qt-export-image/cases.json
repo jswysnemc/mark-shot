@@ -1,0 +1,476 @@
+[
+    {
+        "dpr": 2,
+        "frame": null,
+        "name": "case-0",
+        "size": [
+            36,
+            24
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": null,
+        "name": "case-1",
+        "size": [
+            36,
+            24
+        ]
+    },
+    {
+        "dpr": 2,
+        "frame": false,
+        "name": "case-2",
+        "size": [
+            36,
+            24
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": false,
+        "name": "case-3",
+        "size": [
+            36,
+            24
+        ]
+    },
+    {
+        "dpr": 2,
+        "frame": true,
+        "name": "case-4",
+        "size": [
+            260,
+            248
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": true,
+        "name": "case-5",
+        "size": [
+            260,
+            248
+        ]
+    },
+    {
+        "dpr": 2,
+        "frame": 0,
+        "name": "case-6",
+        "size": [
+            36,
+            24
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": 0,
+        "name": "case-7",
+        "size": [
+            36,
+            24
+        ]
+    },
+    {
+        "dpr": 2,
+        "frame": -2,
+        "name": "case-8",
+        "size": [
+            260,
+            248
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": -2,
+        "name": "case-9",
+        "size": [
+            260,
+            248
+        ]
+    },
+    {
+        "dpr": 2,
+        "frame": " ON ",
+        "name": "case-10",
+        "size": [
+            260,
+            248
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": " ON ",
+        "name": "case-11",
+        "size": [
+            260,
+            248
+        ]
+    },
+    {
+        "dpr": 2,
+        "frame": "unknown",
+        "name": "case-12",
+        "size": [
+            36,
+            24
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": "unknown",
+        "name": "case-13",
+        "size": [
+            36,
+            24
+        ]
+    },
+    {
+        "dpr": 2,
+        "frame": {
+            "cornerRadius": 0,
+            "enabled": true,
+            "padding": 7,
+            "shadowRadius": 0
+        },
+        "name": "case-14",
+        "size": [
+            50,
+            38
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": {
+            "cornerRadius": 0,
+            "enabled": true,
+            "padding": 7,
+            "shadowRadius": 0
+        },
+        "name": "case-15",
+        "size": [
+            50,
+            38
+        ]
+    },
+    {
+        "dpr": 2,
+        "frame": {
+            "cornerRadius": 4,
+            "enabled": true,
+            "padding": 8,
+            "shadowOffsetY": 3,
+            "shadowOpacity": 0.45,
+            "shadowRadius": 6
+        },
+        "name": "case-16",
+        "size": [
+            52,
+            40
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": {
+            "cornerRadius": 4,
+            "enabled": true,
+            "padding": 8,
+            "shadowOffsetY": 3,
+            "shadowOpacity": 0.45,
+            "shadowRadius": 6
+        },
+        "name": "case-17",
+        "size": [
+            52,
+            40
+        ]
+    },
+    {
+        "dpr": 2,
+        "frame": {
+            "margin": -12,
+            "radius": "-7",
+            "shadowAlpha": 2.5,
+            "shadowBlur": 999,
+            "shadowYOffset": "-4",
+            "show": "yes"
+        },
+        "name": "case-18",
+        "size": [
+            36,
+            24
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": {
+            "margin": -12,
+            "radius": "-7",
+            "shadowAlpha": 2.5,
+            "shadowBlur": 999,
+            "shadowYOffset": "-4",
+            "show": "yes"
+        },
+        "name": "case-19",
+        "size": [
+            36,
+            24
+        ]
+    },
+    {
+        "dpr": 2,
+        "frame": {
+            "cornerRadius": "NaN",
+            "enabled": null,
+            "margin": 5,
+            "padding": null,
+            "shadowOpacity": "inf",
+            "shadowRadius": 4.5,
+            "show": true
+        },
+        "name": "case-20",
+        "size": [
+            36,
+            24
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": {
+            "cornerRadius": "NaN",
+            "enabled": null,
+            "margin": 5,
+            "padding": null,
+            "shadowOpacity": "inf",
+            "shadowRadius": 4.5,
+            "show": true
+        },
+        "name": "case-21",
+        "size": [
+            36,
+            24
+        ]
+    },
+    {
+        "dpr": 2,
+        "frame": {
+            "cornerRadius": 6,
+            "enabled": true,
+            "padding": 24,
+            "shadowOffsetY": 10,
+            "shadowOpacity": 0.55,
+            "shadowRadius": 18
+        },
+        "name": "case-22",
+        "size": [
+            84,
+            72
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": {
+            "cornerRadius": 6,
+            "enabled": true,
+            "padding": 24,
+            "shadowOffsetY": 10,
+            "shadowOpacity": 0.55,
+            "shadowRadius": 18
+        },
+        "name": "case-23",
+        "size": [
+            84,
+            72
+        ]
+    },
+    {
+        "dpr": 2,
+        "frame": {
+            "cornerRadius": 8,
+            "enabled": true,
+            "padding": 0,
+            "shadowOffsetY": 128,
+            "shadowRadius": 10
+        },
+        "name": "case-24",
+        "size": [
+            36,
+            24
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": {
+            "cornerRadius": 8,
+            "enabled": true,
+            "padding": 0,
+            "shadowOffsetY": 128,
+            "shadowRadius": 10
+        },
+        "name": "case-25",
+        "size": [
+            36,
+            24
+        ]
+    },
+    {
+        "dpr": 2,
+        "frame": {
+            "cornerRadius": 128,
+            "enabled": true,
+            "padding": 256,
+            "shadowOffsetY": 128,
+            "shadowOpacity": 1,
+            "shadowRadius": 128
+        },
+        "name": "case-26",
+        "size": [
+            548,
+            536
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": {
+            "cornerRadius": 128,
+            "enabled": true,
+            "padding": 256,
+            "shadowOffsetY": 128,
+            "shadowOpacity": 1,
+            "shadowRadius": 128
+        },
+        "name": "case-27",
+        "size": [
+            548,
+            536
+        ]
+    },
+    {
+        "dpr": 2,
+        "frame": {
+            "cornerRadius": "8.25",
+            "padding": "12",
+            "shadowOffsetY": "5",
+            "shadowOpacity": "0.4",
+            "shadowRadius": "10",
+            "visible": true
+        },
+        "name": "case-28",
+        "size": [
+            60,
+            48
+        ]
+    },
+    {
+        "dpr": 1.25,
+        "frame": {
+            "cornerRadius": "8.25",
+            "padding": "12",
+            "shadowOffsetY": "5",
+            "shadowOpacity": "0.4",
+            "shadowRadius": "10",
+            "visible": true
+        },
+        "name": "case-29",
+        "size": [
+            60,
+            48
+        ]
+    },
+    {
+        "dpr": 1,
+        "frame": {
+            "cornerRadius": 4,
+            "enabled": true,
+            "padding": 8,
+            "shadowOffsetY": 3,
+            "shadowOpacity": 0.45,
+            "shadowRadius": 6
+        },
+        "name": "case-30",
+        "size": [
+            17,
+            17
+        ]
+    },
+    {
+        "dpr": 1,
+        "frame": {
+            "cornerRadius": 4,
+            "enabled": true,
+            "padding": 8,
+            "shadowOffsetY": 3,
+            "shadowOpacity": 0.45,
+            "shadowRadius": 6
+        },
+        "name": "case-31",
+        "size": [
+            18,
+            19
+        ]
+    },
+    {
+        "dpr": 1,
+        "frame": {
+            "cornerRadius": 4,
+            "enabled": true,
+            "padding": 8,
+            "shadowOffsetY": 3,
+            "shadowOpacity": 0.45,
+            "shadowRadius": 6
+        },
+        "name": "case-32",
+        "size": [
+            19,
+            26
+        ]
+    },
+    {
+        "dpr": 1,
+        "frame": {
+            "cornerRadius": 4,
+            "enabled": true,
+            "padding": 8,
+            "shadowOffsetY": 3,
+            "shadowOpacity": 0.45,
+            "shadowRadius": 6
+        },
+        "name": "case-33",
+        "size": [
+            20,
+            20
+        ]
+    },
+    {
+        "dpr": 1,
+        "frame": {
+            "cornerRadius": 4,
+            "enabled": true,
+            "padding": 8,
+            "shadowOffsetY": 3,
+            "shadowOpacity": 0.45,
+            "shadowRadius": 6
+        },
+        "name": "case-34",
+        "size": [
+            21,
+            21
+        ]
+    },
+    {
+        "dpr": 1,
+        "frame": {
+            "cornerRadius": 4,
+            "enabled": true,
+            "padding": 8,
+            "shadowOffsetY": 3,
+            "shadowOpacity": 0.45,
+            "shadowRadius": 6
+        },
+        "name": "case-35",
+        "size": [
+            96,
+            64
+        ]
+    }
+]

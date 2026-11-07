@@ -1,6 +1,7 @@
 //! 【图像采样】【冻结原图】提供轻量像素视图，屏幕绘制和导出均不读取已标注图层
 
-use tiny_skia::{Pixmap, Rect};
+use crate::image_source::PixelView;
+use tiny_skia::{Pixmap, PixmapRef, Rect};
 
 use crate::editor::file_canvas::FileCanvas;
 use crate::types::{Capture, Placement};
@@ -8,7 +9,7 @@ use crate::types::{Capture, Placement};
 #[derive(Clone, Copy)]
 enum Source<'a> {
     Image {
-        pixels: &'a Pixmap,
+        pixels: PixmapRef<'a>,
         viewport: Rect,
     },
     Desktop {
@@ -25,6 +26,50 @@ pub struct FrozenImage<'a> {
 }
 
 impl<'a> FrozenImage<'a> {
+    /// 【画布导航】【完整像素矩阵】按canvas与transform绘制冻结像素，局部缓冲仅减去整数物理原点，无返回值
+    pub(crate) fn draw_transformed(self, canvas: &mut Pixmap, transform: tiny_skia::Transform) {
+        let mut image = |pixels: PixmapRef<'_>, viewport: Rect| {
+            let source = tiny_skia::Transform::from_scale(
+                viewport.width() / pixels.width() as f32 * self.factor,
+                viewport.height() / pixels.height() as f32 * self.factor,
+            )
+            .post_translate(
+                viewport.left() * self.factor + self.offset.0,
+                viewport.top() * self.factor + self.offset.1,
+            )
+            .post_concat(transform);
+            canvas.draw_pixmap(
+                0,
+                0,
+                pixels,
+                &tiny_skia::PixmapPaint {
+                    quality: tiny_skia::FilterQuality::Bilinear,
+                    ..Default::default()
+                },
+                source,
+                None,
+            );
+        };
+        match self.source {
+            Source::Image { pixels, viewport } => image(pixels, viewport),
+            Source::Desktop {
+                captures,
+                placements,
+            } => {
+                for (capture, placement) in captures.iter().zip(placements) {
+                    if let Some(viewport) = Rect::from_xywh(
+                        placement.position.0 as f32,
+                        placement.position.1 as f32,
+                        placement.size.0 as f32,
+                        placement.size.1 as f32,
+                    ) {
+                        image(capture.pixmap.as_ref(), viewport);
+                    }
+                }
+            }
+        }
+    }
+
     /// 【图像采样】【原图网格】返回当前绘图坐标对应的原始像素范围和比例，不复制图像或读取标注
     pub fn native_grid(self) -> Option<crate::features::filter::geometry::PixelGrid> {
         let (bounds, scale, width, height) = match self.source {
@@ -81,9 +126,12 @@ impl<'a> FrozenImage<'a> {
     }
 
     /// 【图像采样】【本地图像】以 pixels 和全局 viewport 创建零复制原图视图；返回采样器
-    pub fn image(pixels: &'a Pixmap, viewport: Rect) -> Self {
+    pub fn image(pixels: &'a impl PixelView, viewport: Rect) -> Self {
         Self {
-            source: Source::Image { pixels, viewport },
+            source: Source::Image {
+                pixels: pixels.pixels_view(),
+                viewport,
+            },
             factor: 1.0,
             offset: (0.0, 0.0),
         }
@@ -170,7 +218,7 @@ impl<'a> FrozenImage<'a> {
                         f64::from(point.0 - bounds.left()),
                         f64::from(point.1 - bounds.top()),
                     );
-                    bilinear(&capture.pixmap, capture.to_native(local))
+                    bilinear(capture.pixmap.as_ref(), capture.to_native(local))
                 }),
         }
     }
@@ -185,7 +233,7 @@ fn contains(bounds: Rect, point: (f32, f32)) -> bool {
 }
 
 /// 【图像采样】【双线性插值】以 point 的原图像素中心坐标读取 pixels；返回预乘 RGBA，边界使用最近有效像素
-fn bilinear(pixels: &Pixmap, point: (f64, f64)) -> Option<[u8; 4]> {
+fn bilinear(pixels: PixmapRef<'_>, point: (f64, f64)) -> Option<[u8; 4]> {
     if !point.0.is_finite() || !point.1.is_finite() {
         return None;
     }

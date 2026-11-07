@@ -1,6 +1,14 @@
 //! 【截图历史测试】【配置】覆盖独立策略和安全持久化
 
 use super::*;
+use std::fs;
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::MetadataExt;
+
+/// 【截图历史测试】【原生解析】以 TOML 路径读取 text；返回约束后的历史策略或类型错误
+fn parse(text: &str) -> io::Result<History> {
+    parse_at(Path::new("config.toml"), text)
+}
 
 /// 【截图历史测试】【默认范围】空配置使用原版默认值，数量限制在一至二百
 #[test]
@@ -28,6 +36,7 @@ fn atomic_updates_preserve_comments_and_other_settings() {
     assert_eq!(document["general"]["to"].as_str(), Some("p"));
     assert_eq!(document["custom"]["value"].as_integer(), Some(17));
     assert_eq!(document["history"]["directory"].as_str(), Some("/custom"));
+    #[cfg(target_os = "linux")]
     assert_eq!(fs::metadata(path).unwrap().mode() & 0o777, 0o600);
 }
 
@@ -42,7 +51,7 @@ fn invalid_config_and_links_are_not_overwritten() {
     fs::remove_file(&path).unwrap();
     let target = dir.path().join("target.toml");
     fs::write(&target, "# target\n").unwrap();
-    std::os::unix::fs::symlink(&target, &path).unwrap();
+    crate::utils::test_files::link_file(&target, &path).unwrap();
     assert!(update_at(&path, Update::Limit(5)).is_err());
     assert_eq!(fs::read_to_string(target).unwrap(), "# target\n");
 }

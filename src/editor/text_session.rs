@@ -84,7 +84,12 @@ fn begin(
         id: crate::features::text::input_method::focus::identity(),
         composition: None,
         caret: Default::default(),
-        source: super::text_session_format::Source::read(&annotation),
+        source: original_id
+            .and_then(|id| state.annotations.iter().find(|value| value.id == id))
+            .map_or_else(
+                || super::text_session_format::Source::read(&annotation),
+                super::text_session_format::Source::read,
+            ),
         working: annotation,
         original_id,
         history,
@@ -102,8 +107,13 @@ fn begin(
 pub fn begin_new(state: &mut EditorState, position: (f32, f32), size_scale: f32, dirty: &mut u32) {
     let tools = &state.tool_settings;
     let annotation = Annotation {
+        style_scale: size_scale,
+        rotation_degrees: 0.0,
+        frozen_bounds: crate::tools::drawing_space::DrawingSpace::from_editor(state)
+            .map(|space| space.bounds),
         id: PREVIEW_ID,
         shape: AnnotationShape::Text {
+            frame: Default::default(),
             start: position,
             content: String::new(),
             font_size: tools.font_size,
@@ -114,7 +124,6 @@ pub fn begin_new(state: &mut EditorState, position: (f32, f32), size_scale: f32,
                 family: tools.text_family.clone(),
                 background: tools.text_background,
                 size_scale,
-                wrap_width: None,
             },
         },
         color: tools.color,
@@ -122,7 +131,7 @@ pub fn begin_new(state: &mut EditorState, position: (f32, f32), size_scale: f32,
         stroke_width: 0.0,
         bbox: tiny_skia::Rect::from_xywh(position.0, position.1, 1.0, 1.0).unwrap(),
     };
-    state.selected_annotation = None;
+    state.select_annotation_index(None);
     begin(state, annotation, None, dirty);
 }
 
@@ -134,8 +143,9 @@ pub fn begin_existing(state: &mut EditorState, id: u64, dirty: &mut u32) -> bool
     }) else {
         return false;
     };
-    let annotation = state.annotations[index].clone();
-    state.selected_annotation = Some(index);
+    let mut annotation = state.annotations[index].clone();
+    super::text_session_layout::begin_existing(&mut annotation);
+    state.select_annotation_index(Some(index));
     begin(state, annotation, Some(id), dirty);
     true
 }
@@ -198,6 +208,12 @@ pub fn commit(state: &mut EditorState, dirty: &mut u32) -> bool {
         return false;
     }
     sync_style(state, dirty);
+    let wrapped_width =
+        state.text_session.as_ref().and_then(|session| {
+            state.text.editors.get(&PREVIEW_ID).and_then(|editor| {
+                super::text_session_layout::wrapped_width(&session.working, editor)
+            })
+        });
     super::text_session_format::prepare_commit(state);
     let mut session = state.text_session.take().unwrap();
     damage_annotation(
@@ -214,6 +230,13 @@ pub fn commit(state: &mut EditorState, dirty: &mut u32) -> bool {
         .trim_end_matches(char::is_whitespace)
         .to_owned();
     let empty = content.is_empty();
+    if !empty {
+        super::text_session_layout::finish(
+            &mut session.working,
+            wrapped_width,
+            &mut state.text.font_system,
+        );
+    }
     // 1. 【文字事务】【已有提交】持久样式已经独立记录，正文提交只替换当前对象并保留原身份
     if let Some(id) = session.original_id {
         if let Some(index) = state
@@ -230,7 +253,7 @@ pub fn commit(state: &mut EditorState, dirty: &mut u32) -> bool {
                     &removed,
                 );
                 state.text.editors.remove(&id);
-                state.selected_annotation = None;
+                state.select_annotation_index(None);
             } else {
                 session.working.id = id;
                 let editor = crate::tools::text::ensure_text_editor(
@@ -244,12 +267,12 @@ pub fn commit(state: &mut EditorState, dirty: &mut u32) -> bool {
                     editor,
                     &mut state.text.font_system,
                 );
-                if state.annotations[index] != session.working {
+                if !state.annotations[index].same_edit_state(&session.working) {
                     state.push_undo();
                     state.annotations[index] = session.working;
                     rebuild_annotation(state, index);
                 }
-                state.selected_annotation = (state.selected_tool == Tool::Pick).then_some(index);
+                state.select_annotation_index((state.selected_tool == Tool::Pick).then_some(index));
             }
         }
     // 2. 【文字事务】【新建提交】只有非空成稿才分配编号和保存全局撤销快照
@@ -259,7 +282,7 @@ pub fn commit(state: &mut EditorState, dirty: &mut u32) -> bool {
         state.next_id += 1;
         state.annotations.push(session.working);
         rebuild_annotation(state, state.annotations.len() - 1);
-        state.selected_annotation = None;
+        state.select_annotation_index(None);
     }
     state.annotations_dirty = true;
     mark_all_dirty(dirty, state.placements.len());

@@ -140,6 +140,15 @@ fn history_is_deduplicated_and_hit_testing_honors_qt_clipping() {
     assert_eq!(picker.swatch_hit((192.0, 207.0)), None);
 }
 
+/// 【取色器测试】【主题底色】按 sample 核对宿主实际 RGBA，允许一单位预乘舍入；返回是否为未泄漏控件的底色
+fn is_popup_background(sample: tiny_skia::ColorU8) -> bool {
+    let color = mark_shot::theme::toolbar::Palette::current().popup_fill;
+    [sample.red(), sample.green(), sample.blue(), sample.alpha()]
+        .into_iter()
+        .zip([color.0, color.1, color.2, color.3])
+        .all(|(actual, expected)| actual.abs_diff(expected) <= 1)
+}
+
 /// 【取色器测试】【分数缩放】逻辑尺寸保持不变，子控件末端不泄漏历史色块，外部像素透明
 #[test]
 fn rendering_preserves_logical_geometry_at_fractional_scale() {
@@ -161,7 +170,7 @@ fn rendering_preserves_logical_geometry_at_fractional_scale() {
             .pixel((196.0 * scale) as u32, (207.0 * scale) as u32)
             .unwrap()
             .demultiply();
-        assert!(sample.red() < 25 && sample.green() < 25 && sample.blue() < 30);
+        assert!(is_popup_background(sample));
     }
 }
 
@@ -176,10 +185,7 @@ fn handles_are_clipped_to_each_individual_control() {
     color_popover::draw_color_popover(&mut Painter::new(&mut canvas), &mut picker);
     for (x, y) in [(100, 123), (100, 125), (100, 139), (100, 143), (100, 156)] {
         let sample = canvas.pixel(x, y).unwrap().demultiply();
-        assert!(
-            sample.red() < 25 && sample.green() < 25 && sample.blue() < 30,
-            "pixel at {x},{y}: {sample:?}"
-        );
+        assert!(is_popup_background(sample), "pixel at {x},{y}: {sample:?}");
     }
 }
 

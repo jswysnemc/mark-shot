@@ -26,11 +26,14 @@ pub(super) struct Fonts<'a> {
 pub struct Painter<'a> {
     pub(super) canvas: &'a mut Pixmap,
     scale: f32,
+    chrome_scale: f32,
+    scene_transform: Transform,
     // top-left corner position in the coorindates callers drawn in
     pub(super) origin: (f32, f32),
     pub(super) icons: Option<&'a Icons>,
     pub(super) fonts: Option<Fonts<'a>>,
     drawing_bounds: Option<Rect>,
+    ruler_projection: crate::editor::canvas_navigation::transform::ViewTransform,
     frozen_image: Option<super::FrozenImage<'a>>,
     pixel_phase: Option<(f64, f64)>,
     pub(super) text_caret_visible: bool,
@@ -41,10 +44,13 @@ impl<'a> Painter<'a> {
         Self {
             canvas,
             scale: 1.0,
+            chrome_scale: 1.0,
+            scene_transform: Transform::identity(),
             origin: (0.0, 0.0),
             icons: None,
             fonts: None,
             drawing_bounds: None,
+            ruler_projection: Default::default(),
             frozen_image: None,
             pixel_phase: None,
             text_caret_visible: true,
@@ -91,6 +97,22 @@ impl<'a> Painter<'a> {
         self.drawing_bounds
     }
 
+    /// 【尺子渲染】【窗口投影】按projection记录当前完整窗口矩阵，返回绘制器，局部缓冲原点不改变布局
+    pub(crate) fn with_ruler_projection(
+        mut self,
+        projection: crate::editor::canvas_navigation::transform::ViewTransform,
+    ) -> Self {
+        self.ruler_projection = projection;
+        self
+    }
+
+    /// 【尺子渲染】【投影读取】无参数，返回尺子布局使用的完整窗口投影
+    pub(crate) fn ruler_projection(
+        &self,
+    ) -> crate::editor::canvas_navigation::transform::ViewTransform {
+        self.ruler_projection
+    }
+
     /// 【渲染】【冻结图像】设置 image 为持久图像标注的零复制采样来源；返回绘制器，不使用当前画布作为原图
     pub fn with_frozen_image(mut self, image: super::FrozenImage<'a>) -> Self {
         self.frozen_image = Some(image);
@@ -104,6 +126,31 @@ impl<'a> Painter<'a> {
 
     pub fn canvas(&mut self) -> &mut Pixmap {
         self.canvas
+    }
+
+    /// 【画布导航】【控件比例】按unit设置屏幕控件的反向比例，返回绘制器，不修改正文几何
+    pub(crate) fn with_chrome_scale(mut self, unit: f32) -> Self {
+        self.chrome_scale = unit;
+        self
+    }
+
+    /// 【标注样式】【窗口上下文】按window设置当前坐标相对窗口逻辑像素的比例，返回绘制器，设备像素比例仍由with_scale独立提供
+    pub fn with_window_units(
+        mut self,
+        window: crate::features::annotation_style::window::WindowUnits,
+    ) -> Self {
+        self.chrome_scale = window.canvas(1.0);
+        self
+    }
+
+    /// 【画布导航】【控件单位】无参数，返回抵消持续视图缩放的逻辑单位
+    pub(crate) fn chrome_scale(&self) -> f32 {
+        self.chrome_scale
+    }
+
+    /// 【标注样式】【绘制单位】无参数，返回抵消持续导航倍率的窗口单位，设备像素比例不参与窗口限制
+    pub(crate) fn window_units(&self) -> crate::features::annotation_style::window::WindowUnits {
+        crate::features::annotation_style::window::WindowUnits::new(self.chrome_scale)
     }
 
     pub fn scale(&self) -> f32 {
@@ -148,13 +195,47 @@ impl<'a> Painter<'a> {
         )
     }
 
+    /// 【标注绘制】【完整矩阵】返回场景变换、设备比例及画布偏移组成的矩阵，无参数，不改变状态
     pub fn transform(&self) -> Transform {
-        Transform::from_translate(-self.origin.0, -self.origin.1).post_scale(self.scale, self.scale)
+        if self.scene_transform.is_identity() {
+            return Transform::from_translate(-self.origin.0, -self.origin.1)
+                .post_scale(self.scale, self.scale);
+        }
+        self.transformed_viewport(self.scene_transform)
     }
 
+    /// 【标注绘制】【偏移矩阵】按 dx、dy 返回先平移再执行场景变换的矩阵，供旋转正文保持阴影方向
     pub fn transform_shifted(&self, dx: f32, dy: f32) -> Transform {
-        Transform::from_translate(-self.origin.0 + dx, -self.origin.1 + dy)
-            .post_scale(self.scale, self.scale)
+        if self.scene_transform.is_identity() {
+            return Transform::from_translate(-self.origin.0 + dx, -self.origin.1 + dy)
+                .post_scale(self.scale, self.scale);
+        }
+        self.transformed_viewport(
+            Transform::from_translate(dx, dy).post_concat(self.scene_transform),
+        )
+    }
+
+    /// 【标注绘制】【固定视口】按 scene 和原始像素相位返回完整矩阵，局部缓冲原点吸附同一物理网格
+    fn transformed_viewport(&self, scene: Transform) -> Transform {
+        let phase = self.pixel_phase();
+        let scale = f64::from(self.scale);
+        let origin = |value: f32, phase: f64| (f64::from(value) * scale - phase).round() + phase;
+        Transform::from_row(
+            scene.sx * self.scale,
+            scene.ky * self.scale,
+            scene.kx * self.scale,
+            scene.sy * self.scale,
+            (f64::from(scene.tx) * scale - origin(self.origin.0, phase.0)) as f32,
+            (f64::from(scene.ty) * scale - origin(self.origin.1, phase.1)) as f32,
+        )
+    }
+
+    /// 【标注绘制】【局部变换】在 scene 坐标变换中执行 draw，结束后恢复父变换，无返回值，不修改画布或字体比例
+    pub(crate) fn transformed(&mut self, scene: Transform, draw: impl FnOnce(&mut Painter<'_>)) {
+        let previous = self.scene_transform;
+        self.scene_transform = scene.post_concat(previous);
+        draw(self);
+        self.scene_transform = previous;
     }
 
     /// paints into another pixmap with the same stuff (icons, fonts, and scale)
@@ -165,9 +246,12 @@ impl<'a> Painter<'a> {
         Painter {
             canvas,
             scale: self.scale,
+            chrome_scale: self.chrome_scale,
+            scene_transform: self.scene_transform,
             origin: (0.0, 0.0),
             icons: self.icons,
             drawing_bounds: self.drawing_bounds,
+            ruler_projection: self.ruler_projection,
             frozen_image: self.frozen_image,
             pixel_phase,
             text_caret_visible: self.text_caret_visible,

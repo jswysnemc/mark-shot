@@ -221,7 +221,7 @@ fn point(state: &EditorState, global: (f64, f64)) -> Option<(i32, i32)> {
 pub fn inside(state: &EditorState) -> bool {
     state.text_session.as_ref().is_some_and(|session| {
         let rect = session.presented().bbox;
-        let (x, y) = state.input.pointer.global;
+        let (x, y) = state.canvas_point();
         x >= rect.left() as f64
             && x < rect.right() as f64
             && y >= rect.top() as f64
@@ -253,7 +253,7 @@ pub fn button(
                 .rev()
                 .find(|annotation| {
                     matches!(annotation.shape, crate::types::AnnotationShape::Text { .. })
-                        && annotation.initial_hit_test(state.input.pointer.global)
+                        && annotation.initial_hit_test(state.canvas_point())
                 })
                 .map(|annotation| annotation.id)
             {
@@ -263,13 +263,10 @@ pub fn button(
         }
         return false;
     }
-    let (x, y) = point(state, state.input.pointer.global).unwrap();
+    let (x, y) = point(state, state.canvas_point()).unwrap();
     let double = state.input.clicks.register(
         crate::interaction::ClickTarget::TextAnnotation(PREVIEW_ID),
-        (
-            state.input.pointer.global.0 as f32,
-            state.input.pointer.global.1 as f32,
-        ),
+        (state.canvas_point().0 as f32, state.canvas_point().1 as f32),
     );
     mutate(
         state,

@@ -48,6 +48,28 @@ fn zoom_does_not_change_export() {
     assert!(output.pixels().all(|pixel| pixel[3] == 128));
 }
 
+/// 【贴图测试】【交接一致】截图原图交给贴图后，复制 PNG 的全部 RGBA 与截图输出一致，覆盖不同透明度，无参数、无返回值
+#[test]
+fn pin_copy_preserves_the_screenshot_png_color_quantization() {
+    let input = tiny_skia::Pixmap::decode_png(include_bytes!(
+        "fixtures/qt-export-image/case-17-source.png"
+    ))
+    .unwrap();
+    let screenshot = mark_shot::utils::encode_png_with_alpha(input);
+    let pinned = PinnedImage::decode(&screenshot, 1.25).unwrap();
+    let copied = image::load_from_memory(&pinned.png().unwrap())
+        .unwrap()
+        .into_rgba8();
+    let expected = image::load_from_memory(&screenshot).unwrap().into_rgba8();
+    let difference = copied
+        .enumerate_pixels()
+        .find(|(x, y, color)| *color != expected.get_pixel(*x, *y));
+    assert!(
+        difference.is_none(),
+        "first pin handoff color mismatch: {difference:?}"
+    );
+}
+
 /// 【贴图测试】【缩放输入】非法缩放不会改变状态，合法极端值仍限制在屏幕范围
 #[test]
 fn scale_and_size_are_bounded() {
@@ -92,11 +114,110 @@ fn unavailable_actions_are_not_executable() {
         PinAction::CopySelectedText,
         true,
         false,
+        true,
+        false,
+        false
+    ));
+    assert!(menu::enabled(
+        PinAction::CopySelectedText,
+        true,
+        true,
+        true,
+        false,
+        false
+    ));
+    assert!(!menu::enabled(
+        PinAction::AlwaysOnTop,
+        false,
+        false,
+        false,
+        false,
+        false
+    ));
+    assert!(menu::enabled(
+        PinAction::TextSelection,
+        true,
+        false,
+        false,
+        false,
+        false
+    ));
+    assert!(menu::enabled(
+        PinAction::Translate,
+        true,
+        false,
+        false,
+        false,
+        false
+    ));
+    assert!(!menu::enabled(
+        PinAction::Translate,
+        true,
+        false,
+        true,
+        true,
         true
     ));
-    assert!(menu::enabled(PinAction::CopySelectedText, true, true, true));
-    assert!(!menu::enabled(PinAction::AlwaysOnTop, false, false, false));
-    assert!(menu::enabled(PinAction::TextSelection, true, false, false));
+    assert!(menu::enabled(
+        PinAction::TargetLanguage,
+        true,
+        false,
+        false,
+        true,
+        false
+    ));
+    assert!(!menu::enabled(
+        PinAction::ToggleTranslation,
+        true,
+        false,
+        true,
+        false,
+        false
+    ));
+    assert!(menu::enabled(
+        PinAction::ToggleTranslation,
+        true,
+        false,
+        true,
+        false,
+        true
+    ));
+    assert!(!menu::enabled(
+        PinAction::ToggleTranslation,
+        true,
+        false,
+        true,
+        true,
+        true
+    ));
+}
+
+/// 【贴图测试】【原版逐行选择】双击只复制当前行，跨段全文只使用一个换行，不改变 OCR 结果窗口的分段复制
+#[test]
+fn pin_selection_keeps_single_line_double_click_and_single_newline_copy() {
+    let mut view = mark_shot::ocr::OcrView::default();
+    view.set_lines(
+        [("Alpha", 10.0), ("Beta", 34.0), ("Separate", 200.0)]
+            .into_iter()
+            .map(|(text, y)| {
+                let bounds = tiny_skia::Rect::from_xywh(10.0, y, 200.0, 20.0).unwrap();
+                let count = text.chars().count();
+                mark_shot::ocr::OcrLine {
+                    text: text.into(),
+                    bounds,
+                    char_x: (0..=count)
+                        .map(|index| 10.0 + index as f32 * 200.0 / count as f32)
+                        .collect(),
+                }
+            })
+            .collect(),
+    );
+    view.select_line(0);
+    assert_eq!(view.line_text(true), "Alpha");
+    assert!(view.line_selection(1).is_none());
+    assert!(view.line_selection(2).is_none());
+    assert_eq!(view.line_text(false), "Alpha\nBeta\nSeparate");
+    assert!(view.all_text().contains("\n\n"));
 }
 
 /// 【贴图测试】【识别进程边界】错误任务返回有界错误帧，不连接 Wayland，也不创建模型目录

@@ -1,22 +1,71 @@
 # Mark Shot
 
-面向 Linux Wayland 的 Rust 截图与标注应用。界面直接使用 Wayland 共享内存表面、
-tiny-skia 和 cosmic-text 绘制，不依赖 Qt、GTK、浏览器或 WebView。
+面向 Wayland 与 Windows 的 Rust 截图与标注应用。Windows 主应用已接入原生截图、
+编辑、系统剪贴板、保存、基本贴图和 OCR 结果流程，并通过私有 Wine 实际回归；完整 Windows 交互和
+真实 Windows 11 验证仍未完成。界面使用 tiny-skia 和 cosmic-text 绘制，Wayland
+通过共享内存表面交付，不依赖 Qt、GTK、浏览器或 WebView。可运行候选、证据和
+平台边界见 [Windows 工作流](docs/windows-platform-workflow.md)。
 
 本次重写参考 `/home/snemc/workspace/LumineCapture` 的原生架构，界面与操作以 Mark Shot Qt
 实现为依据。截图、编辑、贴图、OCR 和滚动截图基础工作流已实现，完整界面一致性仍在补齐。
 二维码扫描和录像不在本次范围内。
+界面默认使用浅色主题，按 `Ctrl+Shift+L` 切换并保存明暗主题；可在 `[ui]` 设置
+`theme = "light"` 或 `theme = "dark"`，快捷键使用 `keys.toggle_theme` 配置。
+主题范围、原版配色和实际验证边界见 [主题对照](docs/theme-compatibility.md)。
+字体弹层、尺子悬停和画布滚动条跟随主题，Linux 同配置的独立窗口与贴图通过目录事件
+同步切换。当前候选与七组同构建实际回归见
+[字体与主题通知验证](docs/font-ruler-theme-verification.md)。
+工具滚轮在指针旁显示实际数值和颜色示意，提示跟随指针并在九百毫秒后消失；
+置顶图中文菜单按需加载缺字字体。当前实现与原生证据见
+[优先界面问题处理](docs/priority-ui-compatibility.md)。
 完整功能对照与当前验证状态见 `docs/rewrite-status.md`。
+内存修复候选使用独立映射的固定行块增长长图，逐块交付原图并逐行编码 PNG；滚动控件仅绘制
+局部面板与边线。普通遮罩按损坏区域恢复，标注缓存按需分配。选用 R20 单表面合成，
+按最多 1 MiB 交付并消费 CPU 前景，至多两个原生缓冲等待释放后复用；不兼容网格
+保留原采样路径。完整导出保持原始像素。
+GNU Linux 在工作线程创建前固定大对象映射阈值，释放大临时帧后及时归还其像素页。
+图片编辑的大原件分批写入私有只读磁盘缓存，预览按完整画布坐标分批采样，
+读取结束后同时回收映射页和干净文件缓存；
+缓存不可用时保留原始像素，裁切、翻译写回与导出保持完整颜色和透明度。
+R20 计入未映射文件与原生共享页后，普通 4K 稳定 RSS 为 67.4 MiB、长截图为 160.7 MiB、
+结果编辑为 68.4 MiB。普通与滚动流程通过本轮门槛，部分工具峰值仍超标，文字内存尚未验证。
+自由画笔已修复合并输入丢失轨迹，完整长图及十四类标注实际流程通过。
+内存优化按最新目标结束，浅色主题与 Windows 工作提升为最高优先级。选用结果及验证边界见
+[R20 方案](docs/selected-memory-scheme.md)，历史记录见
+[内存对照](docs/memory-compatibility.md)。
+Linux 普通截图与全屏编辑共用单实例，再次启动会转交命令并退出；延迟期间的新请求替换尚未开始
+的期限和范围，活动截图保持当前编辑内容。另存为窗口也接收转交，作用范围与证据见
+[单实例对照](docs/single-instance-compatibility.md)。
+活动窗口截图支持 KDE 与 niri。niri 的兼容截图接口会写入剪贴板，因此本次输出必须包含
+复制，例如 `--window --to c` 或 `--window --to co`；仅保存、贴图或标准输出时明确拒绝。
+精确窗口、透明度、指针与当前支持边界见 [活动窗口截图](docs/window-capture-compatibility.md)。
+编辑器保存、另存为和复制支持原版 Mac 风格外框，默认关闭，通过 `export.image_frame`
+配置启用；预览和贴图保留原图。配置、像素对照和验证边界见
+`docs/export-image-compatibility.md`。
 OCR 原文和已开启编辑的表格单元格支持原生 Wayland 输入法，候选与复制、历史及表格
 数据隔离。Qt 状态对照、已验证范围与剩余差异见 `docs/window-input-method-compatibility.md`。
+表格采用原版固定行高、内容列宽、末列拉伸与数字表头，编辑不自动改变行列尺寸；
+网格对照与剩余差异见 `docs/ocr-table-grid-compatibility.md`。
 原文右键菜单支持撤销、重做、剪切、复制、粘贴、删除与全选，使用独立原生弹出表面；
 右键保持选区，菜单关闭后才执行动作。对照范围见 `docs/ocr-source-menu-compatibility.md`。
 结果按钮按左键或 Space 释放执行，右键只改变焦点，页签保留按下即切换；
 原版事件对照与未完成范围见 `docs/ocr-control-input-compatibility.md`。
+原图页面支持滚轮缩放、左键平移和双击复位，右键菜单使用原始图像执行编辑与贴图；
+标题栏始终复制原文，表格使用独立原生复制菜单。对照边界见 `docs/ocr-source-preview-compatibility.md`。
+原文与表格分别管理复制反馈期限，切页和编辑不取消反馈，普通选区复制不触发全文按钮反馈；
+OCR 窗口已接入单行标题栏、页签裁切、独立撤销行及 Noto Sans 局部编辑样式；
+更多入口使用真实父子原生菜单，快捷键说明保持禁用；对照见 `docs/ocr-more-menu-compatibility.md`。
+OCR 翻译窗口已接入目标语言、响应式分栏、独立译文编辑与复制、取消和过期提示；
+窗口对照及验证边界见 `docs/ocr-translation-compatibility.md`，六类服务与剩余接入差异见
+`docs/translation-service-compatibility.md`。
+独立置顶已接入，当前实现和验证边界见 `docs/ocr-stacking-compatibility.md`。
+截图工具栏上传按钮支持 Rust 内置 HTTP 和原版自定义命令配置，上传最终标注 PNG，
+成功复制 URL 后关闭；失败、取消和超时保留编辑内容。配置与实际验证边界见
+[上传对照](docs/upload-compatibility.md)。
 
 ## 构建
 
-需要 Rust 1.95 或更新版本，以及 Wayland、xkbcommon、PipeWire、Fontconfig 开发库。文字系统匹配使用
+Linux 构建需要 Rust 1.95 或更新版本，以及 Wayland、xkbcommon、PipeWire、Fontconfig 开发库。文字系统匹配使用
 Fontconfig 提供的 `fc-match`；缺少该工具时使用已加载字体回退，不能保证与原版字体一致。OCR 依赖的
 最低编译器版本为 1.95，当前使用 Rust 1.98 验证。
 
@@ -40,12 +89,51 @@ sudo apt install cargo rustc pkg-config libwayland-dev libxkbcommon-dev libpipew
 
 发行版自带 Rust 版本不足时，应使用 rustup 提供的稳定工具链。
 
+Windows 使用 `x86_64-pc-windows-msvc` 目标，主库和二进制已通过严格 Clippy；Linux 专用
+依赖不会进入 Windows 构建。当前可运行文件为
+`target/windows-platform-candidate-r3/mark-shot.exe`，与同目录 `DirectML.dll` 一起使用。
+该候选的实际 Windows 运行证据来自 Wine，详情见
+[Windows 工作流](docs/windows-platform-workflow.md)。
+
+R3 同一可执行文件通过首次真实模型下载、内置 CPU 推理、独立结果窗口、中文粘贴、
+撤销重做、页签切换和窄窗口回归。Windows 全目标严格 Clippy 与主库 66 项私有 Wine
+测试通过。中文显示回归使用私有测试字体，真实 Windows 输入法和性能矩阵仍待验证。
+
 ## 工具栏与贴图
 
 选区完成后显示原版分组主栏与纵向动作副栏，全图编辑将副栏动作合并到主栏。
-工具栏使用 Mark Shot SVG、握柄、细分隔线及原版暗色配色，支持左键拖动握柄与窄屏换行。
+工具栏使用 Mark Shot SVG、握柄、细分隔线及原版明暗配色，支持左键拖动握柄与窄屏换行。
 右键不执行工具栏按钮；选择阶段右键取消，编辑阶段右键取消草稿并切回标注选择，
 双击右键打开颜色面板。
+
+标注选择工具使用统一橙色虚线与方块控制点，右上角红色叉号在左键按下时删除完整标注；
+右键不执行删除。撤销恢复正文和选中身份，选框与按钮不进入导出。
+原版依据与删除回归见[标注选框对照](docs/annotation-selection-compatibility.md)。
+矩形、椭圆、标记、画笔、荧光笔和文字支持旋转、Shift吸附、旋转后编辑与原图导出；
+正文局部重绘、原版文字收框及剩余差异见
+[普通标注旋转对照](docs/annotation-rotation-compatibility.md)。文字连续缩放保留独立存储宽高，
+原图选框、预览字形与编辑提交分别测量，依据及回归见
+[文字存储对照](docs/text-storage-compatibility.md)。后续源码已接入相交框选、群组变换、批量属性、
+整组删除和完整选择历史，依据及候选状态见
+[标注多选对照](docs/annotation-collection-compatibility.md)。R3 已修正边缘放大镜轴心与派生边界，
+通过同指纹 Sway/niri 原生矩阵；该实现尚未发布。
+
+图片入口现按原版等比适配整个窗口，小图允许放大，原图尺寸与预乘像素独立保存。
+`--file-default-tool` 指定打开图片后的初始工具；未提供时依次继承
+`--fullscreen-default-tool`、`--default-tool`。文件选项不改变屏幕截图工具。
+原版范围别名 `--all-output` 与 `--full-screen` 同样可用。
+
+```sh
+mark-shot --file-default-tool rectangle picture.png
+mark-shot --full-screen --all-output --fullscreen-default-tool pen
+```
+
+后续源码已接入锚点滚轮缩放、中键直接平移、双击 Ctrl 复位、边缘滚动条和限时倍率提示。
+视图独立于标注与历史，绘制从冻结原图采样；验证范围和未发布候选见
+[画布导航对照](docs/canvas-navigation-compatibility.md)。
+R4 修复了导航下重新编辑已有文字时的重复合成；后续旋转候选保持普通标注和群组的
+26 像素窗口间隔。默认工作区 1174 项 Rust 测试及十二个同指纹私有 Sway/niri 导航、
+多选与旋转场景通过。候选尚未发布，完整 Qt 行为与像素对照仍在继续。
 
 贴图右键提供原生菜单，可旋转、缩放、重置大小、切换置顶、编辑、复制、识别文字、
 另存为和关闭。左键拖动，双击左键关闭，滚轮只改变显示大小；复制和保存保留原图像素。
@@ -54,8 +142,10 @@ sudo apt install cargo rustc pkg-config libwayland-dev libxkbcommon-dev libpipew
 普通窗口使用合成器的系统移动和缩放。
 普通贴图不初始化 OCR；首次文字识别显示模型下载引导，下载需要用户主动点击。
 
-默认贴图使用两像素青色边框，相关选项位于 `[pinned]`。翻译、上传、扩展、打开方式和完整
-设置入口尚未实现；全部差异及交互细节见 `docs/interface-compatibility.md`。
+默认贴图使用两像素青色边框，相关选项位于 `[pinned]`。截图打开方式和扩展已接入原版
+侧边列表，支持桌面应用、`extensions.json`、区域参数与实际进程交付，详见
+`docs/external-actions-compatibility.md`。光标圆形放大区按选择、调整与取色阶段显示。
+设置窗口不在本阶段范围内。其他交互差异见 `docs/interface-compatibility.md`。
 
 ## 截图历史
 
@@ -222,7 +312,7 @@ OCR 内置 PP-OCRv5 推理，不执行 Python 或外部 OCR 程序。默认按�
 `mark-shot --ocr IMAGE` 默认打开独立的可编辑结果窗口。文字与原图共用内容区域，切换
 页面保留编辑、撤销与滚动位置。识别框形成多行多列时显示表格页，支持单元格编辑和
 TSV、CSV、Markdown、HTML 复制。`Ctrl+C` 复制选中文字，`Ctrl+Shift+C` 复制全文；
-表格页使用后一个快捷键复制整张表格的 TSV。
+全文快捷键在所有页面都复制原文，表格导出使用分区复制菜单。
 
 结果窗口不加载模型。截图进程收到结果窗口首帧确认后退出，关闭结果窗口不会丢失已复制
 内容。将 `[ocr]` 中的 `result_panel` 设置为 `false`，可以保留截图内的逐字选择流程；

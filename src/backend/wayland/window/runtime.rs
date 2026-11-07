@@ -9,13 +9,13 @@ use smithay_client_toolkit::{
     output::OutputState,
     registry::RegistryState,
     seat::{SeatState, pointer::cursor_shape::CursorShapeManager},
-    shell::xdg::XdgShell,
+    shell::{wlr_layer::LayerShell, xdg::XdgShell},
     shm::{Shm, slot::SlotPool},
 };
 use wayland_client::{
     Connection,
     globals::registry_queue_init,
-    protocol::{wl_keyboard, wl_pointer, wl_seat},
+    protocol::{wl_keyboard, wl_pointer, wl_seat, wl_surface},
 };
 use wayland_protocols::{
     wp::{
@@ -29,13 +29,15 @@ use wayland_protocols::{
 use super::{
     WindowAction, WindowContent, WindowEvent, WindowSpec, WindowWake,
     dialog::Dialog,
-    popup::WindowPopup,
+    input_grab::PressGrabs,
+    popup_resources::WindowPopup,
     surface::{Surface, SurfaceId},
 };
 use crate::{
     AppResult, backend::wayland::text_input::TextInput,
     features::text::input_method::focus::Target, keys::Mods,
 };
+use std::time::Instant;
 
 pub(super) struct NativeWindow {
     pub registry: RegistryState,
@@ -48,6 +50,8 @@ pub(super) struct NativeWindow {
     pub pointer_seat: Option<wl_seat::WlSeat>,
     pub keyboard_seat: Option<wl_seat::WlSeat>,
     pub keyboard_surface: Option<SurfaceId>,
+    pub pointer_grabs: PressGrabs<(wl_seat::WlSeat, wl_surface::WlSurface)>,
+    pub keyboard_grabs: PressGrabs<(wl_seat::WlSeat, wl_surface::WlSurface)>,
     pub text_surface: Option<SurfaceId>,
     pub text_input: TextInput,
     pub input_target: Target,
@@ -55,6 +59,10 @@ pub(super) struct NativeWindow {
     pub modifiers: Mods,
     pub compositor: CompositorState,
     pub shell: XdgShell,
+    pub layers: Option<LayerShell>,
+    pub layer_geometry: super::layer_geometry::Geometry,
+    pub layer_gesture: Option<super::layer_geometry::Gesture>,
+    pub pointer_position: (f64, f64),
     pub viewporter: Option<wp_viewporter::WpViewporter>,
     pub fractional_manager: Option<wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1>,
     pub dialog_manager: Option<xdg_wm_dialog_v1::XdgWmDialogV1>,
@@ -62,11 +70,20 @@ pub(super) struct NativeWindow {
     pub pool: SlotPool,
     pub main: Surface,
     pub dialog: Option<Dialog>,
-    pub popup: Option<WindowPopup>,
+    pub popup: Vec<WindowPopup>,
     pub content: Box<dyn WindowContent>,
     pub wake: WindowWake,
     pub exit: bool,
     pub loop_handle: LoopHandle<'static, Self>,
+}
+
+impl Drop for NativeWindow {
+    /// 【原生窗口】【异常回收】异常退出也按最深子菜单到根菜单释放表面，无参数、无返回值
+    fn drop(&mut self) {
+        while let Some(popup) = self.popup.pop() {
+            drop(popup);
+        }
+    }
 }
 
 impl NativeWindow {
@@ -77,19 +94,30 @@ impl NativeWindow {
 
     /// 【原生窗口】【独立事件】按 id 路由 event 和 serial，模态时过滤父窗口输入，过期身份不影响新窗口，无返回值
     pub fn dispatch_to(&mut self, id: SurfaceId, event: WindowEvent, serial: Option<u32>) {
+        if matches!(event, WindowEvent::Focused(false)) {
+            self.pointer_grabs.cancel();
+            self.keyboard_grabs.cancel();
+            self.layer_gesture = None;
+        }
         if id == SurfaceId::Main
-            && (self.dialog.is_some() || self.popup.is_some())
+            && (self.dialog.is_some() || !self.popup.is_empty())
             && event.is_interaction()
         {
             return;
         }
         let action = match id {
-            SurfaceId::Main => self.content.event(event),
+            SurfaceId::Main => match event {
+                WindowEvent::Wheel(input) => self.content.scroll(input),
+                event => self.content.event(event),
+            },
             SurfaceId::Dialog(id) => {
                 let Some(dialog) = self.dialog.as_mut().filter(|dialog| dialog.id == id) else {
                     return;
                 };
-                dialog.content.event(event)
+                match event {
+                    WindowEvent::Wheel(input) => dialog.content.scroll(input),
+                    event => dialog.content.event(event),
+                }
             }
         };
         self.apply(id, action, serial);
@@ -117,15 +145,20 @@ impl NativeWindow {
                 }
             },
             WindowAction::Move | WindowAction::Resize => {
+                if id == SurfaceId::Main && self.begin_layer_gesture(action) {
+                    return;
+                }
                 if let (Some(seat), Some(serial), Some(surface)) =
                     (&self.pointer_seat, serial, self.surface(id))
                 {
                     if action == WindowAction::Move {
-                        surface.window.move_(seat, serial);
+                        if let Some(window) = surface.role.as_window() {
+                            window.move_(seat, serial);
+                        }
                     } else {
-                        surface
-                            .window
-                            .resize(seat, serial, xdg_toplevel::ResizeEdge::BottomRight);
+                        if let Some(window) = surface.role.as_window() {
+                            window.resize(seat, serial, xdg_toplevel::ResizeEdge::BottomRight);
+                        }
                     }
                 }
             }
@@ -151,9 +184,15 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
     let (globals, queue) = registry_queue_init(&connection)?;
     let qh = queue.handle();
     let mut event_loop: EventLoop<NativeWindow> = EventLoop::try_new()?;
+    super::super::theme_notifications::install(&event_loop.handle(), NativeWindow::refresh_theme)?;
     WaylandSource::new(connection.clone(), queue)
         .insert(event_loop.handle())
         .map_err(|error| error.error)?;
+    let mut control = crate::features::single_instance::context::current()
+        .map(|controller| {
+            super::single_instance::Binding::install(&event_loop.handle(), controller)
+        })
+        .transpose()?;
     let (wake, source) = super::wake::source()?;
     event_loop
         .handle()
@@ -167,6 +206,8 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
     content.connected(wake.clone());
     let compositor = CompositorState::bind(&globals, &qh)?;
     let shell = XdgShell::bind(&globals, &qh)?;
+    let layers = LayerShell::bind(&globals, &qh).ok();
+    content.stacking_supported(layers.is_some());
     let shm = Shm::bind(&globals, &qh)?;
     let pool = SlotPool::new(4096, &shm)?;
     let viewporter = globals
@@ -178,17 +219,23 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
     let dialog_manager = globals
         .bind::<xdg_wm_dialog_v1::XdgWmDialogV1, _, _>(&qh, 1..=1, ())
         .ok();
-    let main = Surface::new(
+    let layer_geometry = super::layer_geometry::Geometry::new(spec.size);
+    let role = if content.always_on_top()
+        && let Some(layers) = &layers
+    {
+        super::role::Role::layer(&spec, layer_geometry, None, &compositor, layers, &qh)
+    } else {
+        super::role::Role::window(&spec, &compositor, &shell, &qh)
+    };
+    let main = Surface::from_role(
         spec,
         SurfaceId::Main,
-        &compositor,
-        &shell,
+        role,
         viewporter.as_ref(),
         fractional_manager.as_ref(),
         &qh,
     );
-    use smithay_client_toolkit::shell::WaylandSurface;
-    main.window.commit();
+    main.role.commit();
     let mut text_input = TextInput::default();
     text_input.manager = globals.bind::<wayland_protocols::wp::text_input::zv3::client::zwp_text_input_manager_v3::ZwpTextInputManagerV3, _, _>(&qh, 1..=1, ()).ok();
     let mut state = NativeWindow {
@@ -202,6 +249,8 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         pointer_seat: None,
         keyboard_seat: None,
         keyboard_surface: None,
+        pointer_grabs: PressGrabs::default(),
+        keyboard_grabs: PressGrabs::default(),
         text_surface: None,
         text_input,
         input_target: Target::default(),
@@ -209,6 +258,10 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         modifiers: Mods::default(),
         compositor,
         shell,
+        layers,
+        layer_geometry,
+        layer_gesture: None,
+        pointer_position: (0.0, 0.0),
         viewporter,
         fractional_manager,
         dialog_manager,
@@ -216,13 +269,14 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         pool,
         main,
         dialog: None,
-        popup: None,
+        popup: Vec::new(),
         content: Box::new(content),
         wake,
         exit: false,
         loop_handle: event_loop.handle(),
     };
     while !state.exit {
+        state.sync_stacking(&qh);
         state.sync_dialog(&qh);
         state.sync_popup(&qh, None);
         state
@@ -236,10 +290,30 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         state.paint_popup(&qh)?;
         state.sync_text_input();
         connection.flush()?;
-        event_loop.dispatch(None, &mut state)?;
+        let deadline = [
+            state.next_deadline(),
+            control.as_ref().and_then(|control| control.deadline()),
+        ]
+        .into_iter()
+        .flatten()
+        .min();
+        event_loop.dispatch(
+            deadline.map(|deadline| deadline.saturating_duration_since(Instant::now())),
+            &mut state,
+        )?;
+        if let Some(control) = &mut control {
+            control.progress(&event_loop.handle())?;
+        }
+        // 1. 【原生窗口】【单次到期】只处理真实到期期限；重复操作可以在输入事件中更新旧期限
+        if super::deadline::due(state.next_deadline(), Instant::now()) {
+            state.dispatch(WindowEvent::Wake, None);
+            if let Some(id) = state.dialog.as_ref().map(|dialog| dialog.id) {
+                state.dispatch_to(SurfaceId::Dialog(id), WindowEvent::Wake, None);
+            }
+        }
     }
     // 1. 【原生窗口】【关闭交接】先关闭所属子窗口，再析构父表面，最后发送销毁请求
-    state.popup.take();
+    state.close_popups();
     state.dialog.take();
     drop(state);
     connection.flush()?;

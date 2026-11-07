@@ -29,6 +29,34 @@ pub(super) fn run_overlay(
         poll_background_work(editor_state, &mut dirty_mask);
 
         match overlay.next_event(timeout)? {
+            OverlayEvent::EscapePressed if editor_state.selection_size.interacting() => {
+                super::selection_size::keyboard::key(
+                    editor_state,
+                    Some(crate::keys::Chord {
+                        key: crate::keys::Key::Escape,
+                        mods: Default::default(),
+                    }),
+                    None,
+                    &mut dirty_mask,
+                );
+            }
+            OverlayEvent::EscapePressed
+                if editor_state.selection_translation.busy()
+                    || editor_state.selection_translation.popup.is_some()
+                    || editor_state.selection_translation.session.is_some() =>
+            {
+                super::selection_translation::input::key(
+                    editor_state,
+                    Some(crate::keys::Chord {
+                        key: crate::keys::Key::Escape,
+                        mods: Default::default(),
+                    }),
+                    &mut dirty_mask,
+                );
+            }
+            OverlayEvent::EscapePressed if editor_state.upload.busy() => {
+                super::upload::cancel(editor_state, &mut dirty_mask)
+            }
             OverlayEvent::EscapePressed => break,
             ev => {
                 match ev {
@@ -44,8 +72,14 @@ pub(super) fn run_overlay(
                     _ => {}
                 }
                 handle_event(editor_state, ev, &mut dirty_mask);
+                super::cursor_magnifier::sync(editor_state, &mut dirty_mask);
             }
         }
+        super::region_detection::task::poll(editor_state, &mut dirty_mask);
+        super::region_detection::input::sync(editor_state, &mut dirty_mask);
+        super::upload::start(editor_state, overlay.as_mut(), &mut dirty_mask);
+        super::annotation_selection::sync(editor_state, &mut dirty_mask);
+        super::upload::poll(editor_state, &mut dirty_mask);
 
         if pointer_wait.is_some_and(|deadline| Instant::now() >= deadline) {
             pointer_wait = None;
@@ -69,7 +103,32 @@ pub(super) fn run_overlay(
         if editor_state.finish.is_some() || editor_state.cancel {
             break;
         }
-        super::text_menu_surface::sync(editor_state, overlay.as_mut(), &mut dirty_mask)?;
+        if let Some(action) = editor_state.external_action_requested.take() {
+            if super::external_actions::start(editor_state, overlay.as_mut(), action)? {
+                editor_state.cancel = true;
+                break;
+            }
+            pacing = Pacing::new(editor_state.captures.len());
+            mark_all_dirty(&mut dirty_mask, editor_state.captures.len());
+            pointer_wait = None;
+        }
+        if !super::selection_translation::panels::sync(editor_state, overlay.as_mut())?
+            && !super::selection_size::popup::sync(editor_state, overlay.as_mut())?
+        {
+            super::text_menu_surface::sync(editor_state, overlay.as_mut(), &mut dirty_mask)?;
+        }
+        if super::selection_translation::tasks::start(
+            editor_state,
+            overlay.as_mut(),
+            &mut dirty_mask,
+        )? {
+            pacing = Pacing::new(editor_state.captures.len());
+            mark_all_dirty(&mut dirty_mask, editor_state.captures.len());
+            pointer_wait = None;
+        }
+        super::selection_translation::tasks::poll(editor_state, overlay.as_mut(), &mut dirty_mask);
+        super::selection_translation::panels::sync(editor_state, overlay.as_mut())?;
+        super::selection_size::field_clipboard::sync(editor_state, overlay.as_mut());
         super::text_input::sync(editor_state, overlay.as_mut(), &mut dirty_mask)?;
 
         // hand off to the scrolling session once a region is selected and mouse is released
@@ -130,12 +189,31 @@ pub(super) fn poll_timeout(editor_state: &EditorState) -> Option<Duration> {
 
     let mut timeout = if is_animating || stepper_holding || ocr_working {
         Some(anim::frame())
-    } else if editor_state.ocr.models.is_downloading() {
+    } else if editor_state.ocr.models.needs_poll() {
         Some(DOWNLOAD_POLL)
     } else {
         None
     };
+    if let Some(interval) = editor_state.selection_translation.poll_interval() {
+        timeout = Some(timeout.map_or(interval, |other| other.min(interval)));
+    }
+    if let Some(deadline) = editor_state.selection_translation.ocr_deadline {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        timeout = Some(timeout.map_or(remaining, |other| other.min(remaining)));
+    }
+    if let Some(preview) = &editor_state.navigation.preview {
+        let remaining = preview.deadline.saturating_duration_since(Instant::now());
+        timeout = Some(timeout.map_or(remaining, |other| other.min(remaining)));
+    }
     if let Some(deadline) = editor_state.text_size_history.deadline {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        timeout = Some(timeout.map_or(remaining, |other| other.min(remaining)));
+    }
+    if let Some(deadline) = editor_state.upload.deadline() {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        timeout = Some(timeout.map_or(remaining, |other| other.min(remaining)));
+    }
+    if let Some(deadline) = editor_state.toasts.deadline() {
         let remaining = deadline.saturating_duration_since(Instant::now());
         timeout = Some(timeout.map_or(remaining, |other| other.min(remaining)));
     }
@@ -144,6 +222,10 @@ pub(super) fn poll_timeout(editor_state: &EditorState) -> Option<Duration> {
         .as_ref()
         .and_then(|session| session.caret.deadline())
     {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        timeout = Some(timeout.map_or(remaining, |other| other.min(remaining)));
+    }
+    if let Some(deadline) = editor_state.selection_size.caret.deadline() {
         let remaining = deadline.saturating_duration_since(Instant::now());
         timeout = Some(timeout.map_or(remaining, |other| other.min(remaining)));
     }
@@ -172,28 +254,62 @@ pub(super) fn poll_background_work(editor_state: &mut EditorState, dirty_mask: &
 }
 
 pub(super) fn handle_event(editor_state: &mut EditorState, ev: OverlayEvent, dirty_mask: &mut u32) {
+    if super::selection_size::field_clipboard::event(editor_state, &ev, dirty_mask) {
+        return;
+    }
+    if super::upload::event(editor_state, &ev, dirty_mask) {
+        return;
+    }
     match ev {
+        OverlayEvent::ThemeChanged => super::theme_switch::refresh(editor_state, dirty_mask),
+        OverlayEvent::PopupSerial(serial) => editor_state.input.popup_serial = Some(serial),
         ev @ (OverlayEvent::TextInputFocus(_)
         | OverlayEvent::TextInputLeave { .. }
         | OverlayEvent::TextInput(_)) => {
             super::text_input::event(editor_state, ev, dirty_mask);
         }
-        OverlayEvent::Tick | OverlayEvent::EscapePressed | OverlayEvent::FrameDone { .. } => {}
+        OverlayEvent::Tick
+        | OverlayEvent::EscapePressed
+        | OverlayEvent::FrameDone { .. }
+        | OverlayEvent::ScrollPanelConfigured { .. }
+        | OverlayEvent::PrimaryText { .. } => {}
         OverlayEvent::Focus { monitor_idx } => {
             editor_state.input.keyboard_focus = Some(monitor_idx)
         }
         OverlayEvent::FocusLost { monitor_idx } => {
+            super::canvas_navigation::input::focus_lost(editor_state, dirty_mask);
+            super::annotation_collection::input::focus_lost(editor_state, dirty_mask);
+            super::selection_size::apply::commit(editor_state, dirty_mask);
+            super::external_actions::close(editor_state, dirty_mask);
             if editor_state.input.keyboard_focus == Some(monitor_idx) {
                 editor_state.input.keyboard_focus = None;
             }
         }
-        OverlayEvent::PointerMove { monitor_idx, x, y } => {
-            input::handle_pointer_move(editor_state, monitor_idx, x, y, dirty_mask);
+        OverlayEvent::PointerMove {
+            monitor_idx,
+            x,
+            y,
+            history,
+        } => {
+            super::region_detection::motion::history(editor_state, &history);
+            // 1. 【选区尺寸】【移动轨迹】极值先转换为全局坐标，移出后返回也必须终止平台双击候选
+            for range in &history {
+                if let Some(output) = editor_state.placements.get(range.monitor_idx) {
+                    for point in [range.min, range.max] {
+                        editor_state.selection_size.clicks.moved((
+                            f64::from(output.position.0) + point.0,
+                            f64::from(output.position.1) + point.1,
+                        ));
+                    }
+                }
+            }
+            super::pointer_history::dispatch(editor_state, &history, monitor_idx, x, y, dirty_mask);
         }
         OverlayEvent::PointerButton {
             button,
             pressed,
             serial,
+            timestamp,
         } => {
             let text_pointer = matches!(button, crate::types::MouseButton::Left)
                 && (crate::tools::text::session_input::inside(editor_state)
@@ -204,15 +320,30 @@ pub(super) fn handle_event(editor_state: &mut EditorState, ev: OverlayEvent, dir
             if pressed {
                 editor_state.input.popup_serial = serial;
             }
+            editor_state.input.pointer_timestamp = timestamp;
             input::handle_pointer_button(editor_state, button, pressed, dirty_mask);
+            editor_state.input.pointer_timestamp = None;
             if text_pointer {
                 super::text_caret::pointer_activity(editor_state, Instant::now(), dirty_mask);
             }
         }
         OverlayEvent::Popup { id, event } => {
-            super::text_menu_surface::event(editor_state, id, event, dirty_mask)
+            if !super::selection_translation::input::popup(
+                editor_state,
+                id,
+                event.clone(),
+                dirty_mask,
+            ) && !super::selection_size::popup::event(
+                editor_state,
+                id,
+                event.clone(),
+                dirty_mask,
+            ) {
+                super::text_menu_surface::event(editor_state, id, event, dirty_mask)
+            }
         }
         OverlayEvent::Key { chord, text } => {
+            super::canvas_navigation::preview::clear(editor_state, dirty_mask);
             input::handle_key(editor_state, chord, text, dirty_mask);
             super::text_caret::activity(editor_state, dirty_mask);
         }
@@ -220,13 +351,21 @@ pub(super) fn handle_event(editor_state: &mut EditorState, ev: OverlayEvent, dir
             input::handle_modifiers(editor_state, ctrl, shift, dirty_mask);
         }
         OverlayEvent::Scroll(event) => {
-            input::handle_axis_scroll(editor_state, event, dirty_mask);
+            if !editor_state.selection_translation.busy()
+                && editor_state.selection_translation.popup.is_none()
+            {
+                input::handle_axis_scroll(editor_state, event, dirty_mask);
+            }
         }
     }
+    super::selection_size::panels::update(editor_state, dirty_mask);
+    super::selection_translation::panels::update(editor_state, dirty_mask);
 }
 
 /// tick animation
 pub(super) fn tick_panels(editor_state: &mut EditorState, dirty_mask: &mut u32) {
+    super::canvas_navigation::preview::tick(editor_state, Instant::now(), dirty_mask);
+    super::selection_size::caret::tick(editor_state, Instant::now(), dirty_mask);
     super::text_caret::tick(editor_state, Instant::now(), dirty_mask);
     editor_state.tick_text_size_wheel(Instant::now());
     panels::text::properties::tick(editor_state, Instant::now(), dirty_mask);

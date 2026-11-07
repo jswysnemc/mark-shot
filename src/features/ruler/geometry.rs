@@ -198,3 +198,50 @@ impl Measurement {
         }
     }
 }
+
+/// 【尺子】【角度圆弧】根据 measurement 与 unit 返回半径、第一边方向和较小有向夹角；不完整角度返回空值
+pub fn angle_arc(measurement: Measurement, unit: f32) -> Option<(f32, f32, f32)> {
+    let RulerGeometry::Angle { points, count: 3 } = measurement.geometry else {
+        return None;
+    };
+    let first = (points[1].0 - points[0].0, points[1].1 - points[0].1);
+    let second = (points[2].0 - points[0].0, points[2].1 - points[0].1);
+    let shorter = first.0.hypot(first.1).min(second.0.hypot(second.1));
+    let radius = (shorter * 0.4 * unit / measurement.style_scale as f32)
+        .clamp(14.0 * unit, 44.0 * unit)
+        .min(shorter * 0.8);
+    let start = first.1.atan2(first.0);
+    let sweep =
+        (first.0 * second.1 - first.1 * second.0).atan2(first.0 * second.0 + first.1 * second.1);
+    Some((radius, start, sweep))
+}
+
+impl Measurement {
+    /// 【尺子】【刻度视觉范围】在几何边界上加入 unit 对应的刻度与数字留量；返回旋转后的外接矩形
+    pub fn visual_bounds(self, unit: f32) -> Option<Rect> {
+        if let RulerGeometry::Length { rotation, .. } = self.geometry {
+            let bounds = self.unrotated_bounds()?;
+            let digits = self.length_metrics().map_or(1, |(width, height, _, _)| {
+                width.max(height).to_string().len()
+            });
+            let left = (14.0 + digits as f32 * 8.0) * unit;
+            let top = 32.0 * unit;
+            let local = Rect::from_ltrb(
+                bounds.left() - left,
+                bounds.top() - top,
+                bounds.right() + left,
+                bounds.bottom() + top,
+            )?;
+            let center = rect_center(bounds);
+            let points = [
+                (local.left(), local.top()),
+                (local.right(), local.top()),
+                (local.right(), local.bottom()),
+                (local.left(), local.bottom()),
+            ]
+            .map(|point| rotated(point, center, rotation));
+            return super::geometry::points_bounds(&points, 1.0 / self.pixel_scale);
+        }
+        self.bounds()?.outset(4.0 * unit, 4.0 * unit)
+    }
+}

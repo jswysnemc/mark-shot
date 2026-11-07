@@ -1,5 +1,5 @@
-use cosmic_text::{Attrs, Buffer, FontSystem, Metrics, Shaping, Style, SwashContent, Weight};
-use tiny_skia::{Color, Paint, Pixmap, PixmapPaint, PremultipliedColorU8, Rect, Transform};
+use cosmic_text::{Attrs, Buffer, FontSystem, Metrics, Shaping, Style, Weight};
+use tiny_skia::{Color, Paint, Rect};
 
 use super::Painter;
 use crate::theme::{color, font};
@@ -120,63 +120,10 @@ pub fn measure_text_prefix_width(
 }
 
 impl Painter<'_> {
+    /// 【文字绘制】【缓冲输出】按 buffer、pos 和 color 绘制实际布局行，所有字形复用同一缓存路径，无返回值
     pub fn text_buffer(&mut self, buffer: &Buffer, pos: (f32, f32), color: Color) {
-        let s = self.scale();
-        let Some(fonts) = self.fonts.as_mut() else {
-            return;
-        };
-        let (x_start, y_start) = pos;
-        let offset = self.origin;
-
         for run in buffer.layout_runs() {
-            for glyph in run.glyphs.iter() {
-                let color = glyph.color_opt.map_or(color, |color| {
-                    Color::from_rgba8(color.r(), color.g(), color.b(), color.a())
-                });
-                let physical = glyph.physical((0., 0.), s);
-
-                if let Some(image) = fonts.cache.get_image(fonts.system, physical.cache_key) {
-                    let width = image.placement.width;
-                    let height = image.placement.height;
-
-                    if width == 0 || height == 0 {
-                        continue;
-                    }
-
-                    let draw_x = (x_start * s + physical.x as f32 + image.placement.left as f32
-                        - offset.0 * s) as i32;
-                    let draw_y = ((y_start + run.line_y) * s
-                        - image.placement.top as f32
-                        - offset.1 * s) as i32;
-
-                    if image.content == SwashContent::Mask
-                        && let Some(mut glyph_pixmap) = Pixmap::new(width, height)
-                    {
-                        let pixels = glyph_pixmap.pixels_mut();
-
-                        for (i, mask_alpha) in image.data.iter().enumerate() {
-                            let a_f32 = (*mask_alpha as f32 / 255.0) * color.alpha();
-                            let a_u8 = (a_f32 * 255.0) as u8;
-
-                            let pr = (color.red() * a_f32 * 255.0) as u8;
-                            let pg = (color.green() * a_f32 * 255.0) as u8;
-                            let pb = (color.blue() * a_f32 * 255.0) as u8;
-
-                            pixels[i] = PremultipliedColorU8::from_rgba(pr, pg, pb, a_u8)
-                                .unwrap_or(PremultipliedColorU8::TRANSPARENT);
-                        }
-
-                        self.canvas.draw_pixmap(
-                            draw_x,
-                            draw_y,
-                            glyph_pixmap.as_ref(),
-                            &PixmapPaint::default(),
-                            Transform::identity(),
-                            None,
-                        );
-                    }
-                }
-            }
+            self.text_layout_run(&run, pos, color);
         }
     }
 

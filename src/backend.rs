@@ -1,14 +1,26 @@
+#[cfg(any(target_os = "linux", test))]
 mod capture_chain;
+pub mod capture_session;
 pub mod notify;
 pub mod output_selection;
+mod platform;
+pub mod session;
+pub mod task_wake;
+#[cfg(target_os = "linux")]
 pub mod wayland;
+pub mod window;
+#[cfg(target_os = "windows")]
+pub mod windows;
+pub use platform::{
+    initialize_capture, initialize_capture_with_cursor, initialize_clipboard, initialize_notifier,
+    initialize_overlay, initialize_window_capture,
+};
+pub mod window_detection;
 
 use crate::types::{Capture, CaptureResult, CursorIcon, DamageRect, Output, OverlayEvent};
 use async_trait::async_trait;
-use log::info;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use wayland_client::Connection;
 
 pub const FRAME_FALLBACK: Duration = Duration::from_millis(150);
 
@@ -23,74 +35,17 @@ pub trait CaptureMethod: Send + Sync {
         Ok(())
     }
 
+    /// 【持续捕获】【会话创建】按 outputs 创建固定目标的捕获会话，不支持时明确返回错误
+    async fn open_session(
+        &self,
+        _outputs: &[Output],
+    ) -> capture_session::Result<Box<dyn capture_session::CaptureSession>> {
+        Err("this capture backend does not support continuous sessions".into())
+    }
+
     /// 【Wayland】【窗口捕获】后端未提供精确窗口捕获时返回错误，不替换为整屏图片
     async fn capture_active_window(&self) -> Result<Capture, Box<dyn std::error::Error>> {
-        Err("capturing the active window is only supported on KDE Plasma".into())
-    }
-}
-
-/// 【Wayland】【捕获初始化】为普通截图选择原生后端；默认不捕获鼠标指针
-pub fn initialize_capture(conn: &Connection) -> Box<dyn CaptureMethod> {
-    initialize_capture_with_cursor(conn, false)
-}
-
-/// 【Wayland】【捕获初始化】根据桌面和协议选择后端；include_cursor 控制是否合成鼠标指针
-pub fn initialize_capture_with_cursor(
-    conn: &Connection,
-    include_cursor: bool,
-) -> Box<dyn CaptureMethod> {
-    let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
-    let forced = std::env::var("MARK_SHOT_CAPTURE").unwrap_or_default();
-    if matches!(
-        forced.as_str(),
-        "kde" | "image-copy" | "screencopy" | "portal"
-    ) {
-        info!("【Wayland】【捕获初始化】强制使用后端 {forced}");
-        return capture_method(&forced, conn, include_cursor);
-    }
-    if !forced.is_empty() {
-        info!("【Wayland】【捕获初始化】忽略未知后端 {forced}");
-    }
-    let mut names = Vec::new();
-    if desktop
-        .split(':')
-        .any(|part| part.eq_ignore_ascii_case("KDE"))
-    {
-        names.push("kde");
-    }
-    if wayland::capture::image_copy::supported(conn) {
-        names.push("image-copy");
-    }
-    if wayland::capture::screencopy::supported(conn) {
-        names.push("screencopy");
-    }
-    names.push("portal");
-    info!("【Wayland】【捕获初始化】后端顺序: {}", names.join(", "));
-    let candidates = names
-        .into_iter()
-        .map(|name| capture_chain::Candidate {
-            name,
-            method: capture_method(name, conn, include_cursor),
-        })
-        .collect();
-    Box::new(capture_chain::CaptureChain::new(candidates))
-}
-
-/// 【Wayland】【捕获后端】创建 name 对应的协议实现；构造过程不初始化 portal 或读取像素
-fn capture_method(name: &str, conn: &Connection, include_cursor: bool) -> Box<dyn CaptureMethod> {
-    match name {
-        "kde" => Box::new(wayland::capture::kde::KdeMethod::with_cursor(
-            include_cursor,
-        )),
-        "image-copy" => Box::new(wayland::capture::image_copy::ImageCopyMethod::with_cursor(
-            conn.clone(),
-            include_cursor,
-        )),
-        "screencopy" => Box::new(wayland::capture::screencopy::ScreencopyMethod::with_cursor(
-            conn.clone(),
-            include_cursor,
-        )),
-        _ => Box::new(wayland::capture::portal::PortalMethod { include_cursor }),
+        Err("this backend does not support active-window capture".into())
     }
 }
 
@@ -98,7 +53,57 @@ pub trait ClipboardProvider {
     fn copy_image_to_clipboard(&self, png_data: &[u8]) -> Result<(), Box<dyn std::error::Error>>;
 }
 
-pub trait ScreenOverlay: Send {
+pub(crate) mod native_backdrop;
+
+pub trait ScreenOverlay {
+    /// 【截图绘制】【原生背景能力】无参数，返回后端是否能够在原生缓冲中合成同网格冻结背景
+    fn supports_native_frame_background(&self) -> bool {
+        false
+    }
+    /// 【截图绘制】【前景消费能力】无参数，返回后端是否支持复制已交付字节后归还CPU前景，未交付字节必须保留
+    fn supports_consumed_frame_background(&self) -> bool {
+        false
+    }
+    /// 【截图绘制】【消费背景提交】按monitor_idx、pixels、background和damage交付并消费CPU前景，返回协议结果；调用方在下一帧按损坏区域重建前景
+    fn stage_consumed_frame_with_background(
+        &mut self,
+        _monitor_idx: usize,
+        _pixels: &mut tiny_skia::Pixmap,
+        _background: &crate::image_source::ImageSource,
+        _damage: Option<DamageRect>,
+    ) -> crate::AppResult {
+        Err("consumed native foreground staging is unavailable".into())
+    }
+    /// 【截图绘制】【原生背景提交】按monitor_idx、pixels、background和damage提交原始前景及冻结背景，返回协议结果；不支持的后端由调用方使用既有合成路径
+    fn stage_frame_with_background(
+        &mut self,
+        _monitor_idx: usize,
+        _pixels: &[u8],
+        _background: &crate::image_source::ImageSource,
+        _damage: Option<DamageRect>,
+    ) -> crate::AppResult {
+        Err("native frozen background staging is unavailable".into())
+    }
+    /// 【截图绘制】【背景模式】按enabled选择由调用方合成完整背景，返回实际启用状态，默认后端继续接收独立背景
+    fn set_composited_background(&mut self, _enabled: bool) -> bool {
+        false
+    }
+    /// 【主选择区】【协议启用】按需启用当前截图连接的主选择支持，无参数，返回是否具备协议
+    fn enable_primary_selection(&mut self) -> bool {
+        false
+    }
+    /// 【主选择区】【正文拥有】用当前按钮授权拥有 text，返回是否成功，不启动后台剪贴板进程
+    fn set_primary_text(&mut self, _text: &str) -> bool {
+        false
+    }
+    /// 【主选择区】【正文接收】按 id 与 limit 请求有界正文，无返回值，完成后投递 PrimaryText
+    fn request_primary_text(&mut self, _id: u64, _limit: usize) {}
+    /// 【主选择区】【接收取消】取消 id 对应过期请求，无返回值，不影响来源拥有权
+    fn cancel_primary_text(&mut self, _id: u64) {}
+    /// 【截图覆盖层】【任务通知】按需返回后台完成句柄，无参数；不支持通知的后端明确返回错误，不增加周期轮询
+    fn task_wake(&mut self) -> crate::AppResult<task_wake::Wake> {
+        Err("overlay task wake is unavailable".into())
+    }
     /// 【输入法】【状态同步】把 snapshot 交给原生协议，空值停用正文输入；默认保留普通键盘后端，返回协议结果
     fn set_text_input(
         &mut self,
@@ -121,6 +126,42 @@ pub trait ScreenOverlay: Send {
     fn resume(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         Err("overlay resumption is unavailable".into())
     }
+    /// 【滚动截图】【输入角色】为 monitor_idx 释放独占键盘并移除其他输出表面；返回协议执行结果
+    fn begin_scroll(&mut self, _monitor_idx: usize) -> crate::AppResult {
+        Err("scroll capture requires an overlay with on-demand keyboard focus".into())
+    }
+    /// 【滚动截图】【面板配置】按 rect 和 paused 同步控制布局；普通窗口后端可以独立于输出大小呈现，无返回值
+    fn configure_scroll_panel(
+        &mut self,
+        _rect: tiny_skia::Rect,
+        _paused: bool,
+    ) -> crate::AppResult {
+        Ok(())
+    }
+    /// 【滚动截图】【窗口角色】返回当前控制面板是否使用普通窗口，无参数，不根据配置猜测协议能力
+    fn is_scroll_window(&self) -> bool {
+        false
+    }
+    /// 【滚动截图】【面板边界】返回 monitor_idx 控制表面的合成器尺寸限制，无限制时返回空值
+    fn scroll_panel_limits(&self, _monitor_idx: usize) -> Option<(u32, u32)> {
+        None
+    }
+    /// 【滚动截图】【帧隔离】核对 frame 与 region，必要时隐藏重叠控制窗口；返回是否可以接受该帧
+    fn allow_scroll_frame(
+        &mut self,
+        _frame: &crate::types::MonitorFrame,
+        _region: tiny_skia::Rect,
+    ) -> crate::AppResult<bool> {
+        Ok(true)
+    }
+    /// 【滚动截图】【控制可见性】返回是否因捕获区域重叠暂时隐藏了控制窗口，无参数
+    fn scroll_controls_hidden(&self) -> bool {
+        false
+    }
+    /// 【滚动截图】【输出绑定】按表面 monitor_idx 返回原输出身份；索引超界时返回空值
+    fn surface_output(&self, monitor_idx: usize) -> Option<&Output> {
+        self.discovered_outputs().get(monitor_idx)
+    }
     fn prefault(&mut self);
     fn present(&mut self, targets: &[usize]) -> Result<(), Box<dyn std::error::Error>>;
     fn stage_frame(
@@ -129,6 +170,14 @@ pub trait ScreenOverlay: Send {
         pixels: &[u8],
         damage: Option<DamageRect>,
     ) -> Result<(), Box<dyn std::error::Error>>;
+    /// 【滚动截图】【局部面板】按monitor_idx和frame提交控制像素与独立边线，返回协议结果，不要求调用方保留整屏画布
+    fn stage_scroll_panel(
+        &mut self,
+        _monitor_idx: usize,
+        _frame: &crate::types::scroll_panel::ScrollPanelFrame<'_>,
+    ) -> crate::AppResult {
+        Err("the overlay cannot present a local scroll panel".into())
+    }
     fn flush(&mut self) -> Result<(), Box<dyn std::error::Error>>;
     /// `None` waits for the compositor indefinitely, a duration wakes up with
     /// `OverlayEvent::Tick` once it runs out.
@@ -150,6 +199,14 @@ pub trait ScreenOverlay: Send {
         width: u32,
         height: u32,
     ) -> Result<(), Box<dyn std::error::Error>>;
+    /// 【冻结背景】【来源交付】按monitor_idx和source安装冻结背景，返回协议结果；默认后端兼容已有完整像素接口
+    fn set_background_source(
+        &mut self,
+        monitor_idx: usize,
+        source: &crate::image_source::ImageSource,
+    ) -> crate::AppResult {
+        self.set_background(monitor_idx, source.data(), source.width(), source.height())
+    }
     fn set_cursor(&mut self, icon: CursorIcon);
     /// Drops the static snapshot subsurface on `monitor_idx` to expose the live screen beneath.
     fn clear_background(&mut self, monitor_idx: usize) -> Result<(), Box<dyn std::error::Error>>;
@@ -180,26 +237,6 @@ pub enum OverlayShell {
 /// COSMIC gets layer_shell too since a full-screen window there flashes gray while it opens,
 /// and there is few focus grabbing issues.
 /// Make sense to return to Window if these issues get fixed
-pub fn initialize_overlay(
-    conn: Connection,
-) -> Result<Box<dyn ScreenOverlay>, Box<dyn std::error::Error>> {
-    let layer = match crate::config::get().general.overlay {
-        OverlayShell::Auto => true,
-        shell => shell == OverlayShell::Layer,
-    };
-    info!(
-        "overlay surface: {}",
-        if layer { "layer" } else { "window" }
-    );
-    Ok(Box::new(wayland::overlay::WaylandOverlay::new(
-        conn, layer,
-    )?))
-}
-
-pub fn initialize_clipboard() -> Box<dyn ClipboardProvider> {
-    Box::new(wayland::clipboard::ext_data_control::ClipboardMethod)
-}
-
 #[async_trait]
 pub trait Notifier {
     async fn notify(
@@ -208,6 +245,7 @@ pub trait Notifier {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
 }
 
-pub fn initialize_notifier() -> Box<dyn Notifier> {
-    Box::new(notify::freedesktop::FreedesktopNotifier)
-}
+#[cfg(target_os = "linux")]
+pub use wayland::{clipboard, pin};
+#[cfg(target_os = "windows")]
+pub use windows::{clipboard, pin};

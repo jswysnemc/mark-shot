@@ -1,19 +1,26 @@
+pub(crate) mod canvas_navigation;
 // panels, popovers, toasts, magnifier, etc. Every component has its own folder
 // with its state.rs, and draw.rs files.
+pub(crate) mod annotation_collection;
+pub mod annotation_selection;
 pub mod choice_popover;
 pub mod color_popover;
 pub mod context_menu;
 pub mod controls;
+pub mod external_panel;
 pub mod file_picker;
 pub mod filter_properties;
 pub mod font_panel;
 pub mod fonts;
 pub mod icons;
+pub mod language;
 pub mod line_properties;
 pub mod magnifier;
 pub mod model_popover;
 pub mod panel;
 pub mod radial_palette;
+pub mod selection_size;
+pub mod selection_translation;
 pub mod settings_panel;
 pub mod single_line;
 pub mod text_editor;

@@ -1,0 +1,275 @@
+{
+  "configs": [
+    {
+      "command": "",
+      "env": {},
+      "input": {},
+      "timeout_ms": 60000
+    },
+    {
+      "command": "",
+      "env": {},
+      "input": {
+        "upload": {}
+      },
+      "timeout_ms": 60000
+    },
+    {
+      "command": "receiver {image}",
+      "env": {},
+      "input": {
+        "imageUpload": {
+          "path": "  receiver {image}  ",
+          "timeoutMs": 1
+        }
+      },
+      "timeout_ms": 1000
+    },
+    {
+      "command": "receiver",
+      "env": {
+        "TOKEN": "value"
+      },
+      "input": {
+        "uploader": {
+          "helper": "receiver",
+          "variables": {
+            " TOKEN ": "value",
+            "invalid": 7
+          }
+        }
+      },
+      "timeout_ms": 60000
+    },
+    {
+      "command": "",
+      "env": {},
+      "input": {
+        "imageHost": {
+          "command": "",
+          "path": "ignored"
+        }
+      },
+      "timeout_ms": 60000
+    },
+    {
+      "command": "fallback",
+      "env": {},
+      "input": {
+        "upload": {
+          "command": false,
+          "path": "fallback",
+          "timeoutMs": 2500
+        }
+      },
+      "timeout_ms": 2500
+    },
+    {
+      "command": "",
+      "env": {},
+      "input": {
+        "imageUpload": {
+          "command": "ignored"
+        },
+        "upload": {}
+      },
+      "timeout_ms": 60000
+    },
+    {
+      "command": "",
+      "env": {},
+      "input": {
+        "upload": {
+          "env": {},
+          "environment": {
+            "A": "value"
+          }
+        }
+      },
+      "timeout_ms": 60000
+    },
+    {
+      "command": "",
+      "env": {},
+      "input": {
+        "upload": {
+          "timeoutMs": 2000
+        }
+      },
+      "timeout_ms": 2000
+    },
+    {
+      "command": "",
+      "env": {},
+      "input": {
+        "upload": {
+          "timeoutMs": 2000.5
+        }
+      },
+      "timeout_ms": 60000
+    },
+    {
+      "command": "",
+      "env": {},
+      "input": {
+        "upload": {
+          "timeoutMs": 2147483648
+        }
+      },
+      "timeout_ms": 60000
+    },
+    {
+      "command": "",
+      "env": {},
+      "input": {
+        "upload": {
+          "timeoutMs": -2
+        }
+      },
+      "timeout_ms": 1000
+    }
+  ],
+  "qt": "6.12.0",
+  "results": [
+    {
+      "busy": false,
+      "closed": true,
+      "input_removed": true,
+      "kind": "json",
+      "toast": "Image URL copied",
+      "url": "https://images.example/json"
+    },
+    {
+      "busy": false,
+      "closed": true,
+      "input_removed": true,
+      "kind": "plain",
+      "toast": "Image URL copied",
+      "url": "https://images.example/plain"
+    },
+    {
+      "busy": false,
+      "closed": false,
+      "input_removed": true,
+      "kind": "empty",
+      "toast": "Upload failed",
+      "url": ""
+    },
+    {
+      "busy": false,
+      "closed": false,
+      "input_removed": true,
+      "kind": "failed",
+      "toast": "Upload failed",
+      "url": ""
+    },
+    {
+      "busy": false,
+      "closed": false,
+      "input_removed": true,
+      "kind": "copy-failed",
+      "toast": "Copy failed",
+      "url": "https://images.example/json"
+    },
+    {
+      "busy": false,
+      "closed": false,
+      "input_removed": true,
+      "kind": "timeout",
+      "toast": "Upload timed out",
+      "url": ""
+    },
+    {
+      "busy": false,
+      "closed": true,
+      "input_removed": true,
+      "kind": "json-local",
+      "toast": "Image URL copied",
+      "url": "file:///tmp/returned-image.png"
+    },
+    {
+      "busy": false,
+      "closed": true,
+      "input_removed": true,
+      "kind": "plain-prefix",
+      "toast": "Image URL copied",
+      "url": "HTTPS://"
+    }
+  ],
+  "extract": [
+    {
+      "path": "data.0.url",
+      "input": {
+        "data": [
+          {
+            "url": "https://example.test/array"
+          }
+        ]
+      },
+      "output": "https://example.test/array"
+    },
+    {
+      "path": "data.-1.url",
+      "input": {
+        "data": [
+          {
+            "url": "https://example.test/array"
+          }
+        ]
+      },
+      "output": ""
+    },
+    {
+      "path": "data.8.url",
+      "input": {
+        "data": []
+      },
+      "output": ""
+    },
+    {
+      "path": "data.value",
+      "input": {
+        "data": {
+          "value": 7
+        }
+      },
+      "output": ""
+    },
+    {
+      "path": "url",
+      "input": {
+        "url": "https://example.test/top"
+      },
+      "output": "https://example.test/top"
+    },
+    {
+      "path": "",
+      "input": {
+        "url": "https://example.test/top"
+      },
+      "output": ""
+    }
+  ],
+  "multipart": [
+    {
+      "fields": {},
+      "boundary": "----mark-shot-upload-boundary",
+      "body": "2d2d2d2d2d2d6d61726b2d73686f742d75706c6f61642d626f756e646172790d0a436f6e74656e742d446973706f736974696f6e3a20666f726d2d646174613b206e616d653d22696d616765223b2066696c656e616d653d2273637265656e73686f742e706e67220d0a436f6e74656e742d547970653a20696d6167652f706e670d0a0d0a0102030d0a2d2d2d2d2d2d6d61726b2d73686f742d75706c6f61642d626f756e646172792d2d0d0a"
+    },
+    {
+      "fields": {
+        "album": "local",
+        "token": "test-value"
+      },
+      "boundary": "----mark-shot-upload-boundary",
+      "body": "2d2d2d2d2d2d6d61726b2d73686f742d75706c6f61642d626f756e646172790d0a436f6e74656e742d446973706f736974696f6e3a20666f726d2d646174613b206e616d653d22616c62756d220d0a0d0a6c6f63616c0d0a2d2d2d2d2d2d6d61726b2d73686f742d75706c6f61642d626f756e646172790d0a436f6e74656e742d446973706f736974696f6e3a20666f726d2d646174613b206e616d653d22746f6b656e220d0a0d0a746573742d76616c75650d0a2d2d2d2d2d2d6d61726b2d73686f742d75706c6f61642d626f756e646172790d0a436f6e74656e742d446973706f736974696f6e3a20666f726d2d646174613b206e616d653d22696d616765223b2066696c656e616d653d2273637265656e73686f742e706e67220d0a436f6e74656e742d547970653a20696d6167652f706e670d0a0d0a0102030d0a2d2d2d2d2d2d6d61726b2d73686f742d75706c6f61642d626f756e646172792d2d0d0a"
+    },
+    {
+      "fields": {
+        "label": "中文\nvalue"
+      },
+      "boundary": "----mark-shot-upload-boundary",
+      "body": "2d2d2d2d2d2d6d61726b2d73686f742d75706c6f61642d626f756e646172790d0a436f6e74656e742d446973706f736974696f6e3a20666f726d2d646174613b206e616d653d226c6162656c220d0a0d0ae4b8ade696870a76616c75650d0a2d2d2d2d2d2d6d61726b2d73686f742d75706c6f61642d626f756e646172790d0a436f6e74656e742d446973706f736974696f6e3a20666f726d2d646174613b206e616d653d22696d616765223b2066696c656e616d653d2273637265656e73686f742e706e67220d0a436f6e74656e742d547970653a20696d6167652f706e670d0a0d0a0102030d0a2d2d2d2d2d2d6d61726b2d73686f742d75706c6f61642d626f756e646172792d2d0d0a"
+    }
+  ]
+}

@@ -82,6 +82,8 @@ def run(binary, root, overlay="layer", menu_hold=0.04, pointer_backend="virtual"
                                                 "bytes": binary.stat().st_size}, indent=2) + "\n")
     environment = session.environment()
     with session.input_context(), pointer_context(menu_hold, pointer_backend), tempfile.TemporaryDirectory(prefix="mark-shot-format-test-") as temporary:
+        if session.backend() is session.sway:
+            session.sway.keyboard_ready()
         private = Path(temporary)
         config, state = private / "config/mark-shot", private / "state/mark-shot"
         config.mkdir(parents=True)

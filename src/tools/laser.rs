@@ -35,12 +35,14 @@ impl ToolBehavior for LaserTool {
             else {
                 return;
             };
-            let position = state.input.pointer.global;
-            let damage = state.laser.begin(
+            let position = state.canvas_point();
+            let units = state.annotation_units();
+            let damage = state.laser.begin_in_units(
                 (position.0 as f32, position.1 as f32),
                 state.tool_settings.color,
                 state.tool_settings.stroke(StrokeGroup::Laser),
                 bounds,
+                units,
             );
             state.input.mouse_down = damage.is_some();
             state.tool_active = damage.is_some();

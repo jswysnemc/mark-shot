@@ -125,6 +125,7 @@ impl PinnedImage {
 
     /// 【贴图】【PNG输出】返回当前旋转后原图的 PNG，不添加显示边框、不应用缩放
     pub fn png(&self) -> AppResult<Vec<u8>> {
-        Ok(self.image.encode_png()?)
+        // 1. 【贴图】【原图编码】使用截图相同的透明颜色舍入，避免复制、保存和再次编辑改变交接像素
+        Ok(crate::utils::encode_png_with_alpha(self.image.clone()))
     }
 }

@@ -8,7 +8,7 @@ use std::{
 };
 
 use crate::{
-    backend::wayland::window::WindowWake,
+    backend::window::WindowWake,
     ui::file_picker::{
         Listing,
         save::{self, ExistingFile},

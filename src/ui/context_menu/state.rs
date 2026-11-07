@@ -38,6 +38,9 @@ pub struct ContextMenu {
     pub active: Option<usize>,
     pub dirty: bool,
     pub pixmap: Option<Pixmap>,
+    pub drawn_theme: Option<crate::theme::Mode>,
+    pub submenu_rows: Vec<usize>,
+    pub control_anchor: Option<Rect>,
     left_pressed: bool,
 }
 
@@ -63,7 +66,19 @@ impl ContextMenu {
             active: None,
             dirty: true,
             pixmap: None,
+            drawn_theme: None,
+            submenu_rows: Vec::new(),
+            control_anchor: None,
             left_pressed: false,
+        }
+    }
+
+    /// 【上下文菜单】【子菜单标记】用 index 和 fonts 为可用行保留箭头列，无返回值；同一行不重复标记
+    pub fn submenu(&mut self, index: usize, fonts: &mut FontSystem) {
+        if index < self.rows.len() && !self.submenu_rows.contains(&index) {
+            self.submenu_rows.push(index);
+            self.layout = Layout::with_submenus(&self.rows, fonts, &self.submenu_rows);
+            self.dirty = true;
         }
     }
 

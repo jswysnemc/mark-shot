@@ -33,6 +33,9 @@ pub fn set(state: &mut EditorState, points: f32, record_undo: bool, dirty: &mut 
         false
     };
     // 1. 【文字字号】【默认同步】同值输入已经返回，只有实际修改才覆盖工具默认字号
+    let stored_height = index
+        .and_then(|index| state.annotations[index].text_stored_bounds())
+        .map(|bounds| bounds.height());
     commit_settings_change(
         state,
         true,
@@ -40,16 +43,18 @@ pub fn set(state: &mut EditorState, points: f32, record_undo: bool, dirty: &mut 
         |tools| tools.font_size = points,
         |annotation| {
             if let AnnotationShape::Text {
-                font_size,
-                appearance,
-                ..
+                font_size, frame, ..
             } = &mut annotation.shape
             {
                 // 2. 【文字字号】【换行缩放】原有换行按字号比例保留框宽，单行改用自然宽度
-                appearance.wrap_width = if wrapped {
+                frame.height = if wrapped {
+                    frame.height.or(stored_height)
+                } else {
+                    None
+                };
+                frame.width = if wrapped {
                     Some(
-                        (appearance.wrap_width.unwrap_or(annotation.bbox.width()) * points
-                            / *font_size)
+                        (frame.width.unwrap_or(annotation.bbox.width()) * points / *font_size)
                             .max(1.0),
                     )
                 } else {

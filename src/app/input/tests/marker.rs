@@ -83,7 +83,7 @@ fn editing_an_existing_marker_records_one_undo_transaction() {
     assert_eq!(state.annotations.len(), 1);
     let original = state.annotations[0].clone();
     select_tool(&mut state, Tool::Pick, &mut dirty);
-    state.selected_annotation = Some(0);
+    state.select_annotation_index(Some(0));
     panels::settings::update_settings_panel(&mut state, &mut dirty);
     let history_len = state.undo_stack.len();
     open(&mut state, &mut dirty);
@@ -104,7 +104,7 @@ fn editing_an_existing_marker_records_one_undo_transaction() {
     assert_eq!(state.settings_panel.marker_shape, MarkerShape::Triangle);
     key(&mut state, "Ctrl+Shift+Z", &mut dirty);
     assert_eq!(state.annotations, [modified]);
-    assert_eq!(state.selected_annotation, Some(0));
+    assert_eq!(state.selected_annotation_index(), Some(0));
     assert_eq!(state.settings_panel.marker_shape, MarkerShape::SpeechBubble);
 }
 
@@ -386,7 +386,12 @@ fn image_markers_require_an_inside_start_and_use_native_pixel_sizes() {
     let viewport = file.viewport;
     state.file_canvas = Some(file);
     state.selection.zone = Some(viewport);
-    pointer(&mut state, 20.0, 200.0, &mut dirty);
+    pointer(
+        &mut state,
+        f64::from(viewport.width()) / 2.0 + f64::from(viewport.left()),
+        f64::from(viewport.top()) - 1.0,
+        &mut dirty,
+    );
     handle_pointer_button(&mut state, MouseButton::Left, true, &mut dirty);
     assert!(state.pending.is_none());
     assert!(!state.input.mouse_down);

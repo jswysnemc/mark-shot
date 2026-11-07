@@ -15,6 +15,7 @@ pub struct Layout {
     pub rows: Vec<Rect>,
     pub text: Vec<Text>,
     pub line_height: f32,
+    pub arrow_column: bool,
 }
 
 /// 【上下文菜单】【文字排版】按 fonts、family、height 排版 text，返回缓冲及舍入宽度，与原版整数文字度量一致
@@ -39,15 +40,30 @@ fn shape(fonts: &mut FontSystem, family: &str, height: f32, text: &str) -> (Buff
 impl Layout {
     /// 【上下文菜单】【行布局】按 rows 和 fonts 返回单列布局，只定向加载菜单字体，不扫描完整字库
     pub fn new(rows: &[Row], fonts: &mut FontSystem) -> Self {
+        Self::with_submenus(rows, fonts, &[])
+    }
+
+    /// 【上下文菜单】【子菜单布局】按 rows、fonts 和 submenu_rows 排列文字、快捷键及箭头列，返回统一布局
+    pub fn with_submenus(rows: &[Row], fonts: &mut FontSystem, submenu_rows: &[usize]) -> Self {
         let family = crate::fonts::text_faces::family(fonts, "DejaVu LGC Sans", false, false);
         let line_height = crate::fonts::text_faces::line_height(fonts, &family, 16.0, false, false);
         let mut label_width: f32 = 0.0;
         let mut shortcut_width: f32 = 0.0;
         let text = rows
             .iter()
-            .map(|row| {
+            .enumerate()
+            .map(|(index, row)| {
                 let (label, width) = shape(fonts, &family, line_height, row.label);
-                let (shortcut, key_width) = shape(fonts, &family, line_height, row.shortcut);
+                let (shortcut, key_width) = shape(
+                    fonts,
+                    &family,
+                    line_height,
+                    if submenu_rows.contains(&index) {
+                        ""
+                    } else {
+                        row.shortcut
+                    },
+                );
                 label_width = label_width.max(width);
                 shortcut_width = shortcut_width.max(key_width);
                 Text {
@@ -63,7 +79,8 @@ impl Layout {
                 24.0 + shortcut_width
             } else {
                 0.0
-            })
+            }
+            + if submenu_rows.is_empty() { 0.0 } else { 16.0 })
         .clamp(168.0, 420.0);
         let mut top = 4.0;
         let rects = rows
@@ -84,6 +101,7 @@ impl Layout {
             rows: rects,
             text,
             line_height,
+            arrow_column: !submenu_rows.is_empty(),
         }
     }
 }

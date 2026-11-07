@@ -1,0 +1,38 @@
+{
+  "cases": 116,
+  "binary_sha256": "bd0d15701661cb33d24a2261b409db673b2857da29041ad88728e2a3b9433557",
+  "source_sha256": {
+    "src/region_detection/image_components.cpp": "50066adb3064dca5d69ec7ceb52928e91453209a19375b6c2fd6cacffa696b66",
+    "src/region_detection/image_components.h": "eb9c59f92e60517734258985d04a891d25ef5a0e569b5b113245e818dc03ffa0",
+    "src/region_detection/image_filters.cpp": "d5c39e46cc8ea79929a0472e4779bab47dbdaea7f5a486a3c4e3fbb16bc91445",
+    "src/region_detection/image_filters.h": "3231a0fc043b98bb04af06db316b095f8c511b37fa0eb9bea4d60ab3ac21c06d",
+    "src/region_detection/image_gray.cpp": "9152db77f24f3bc805418ee02bc8d8b1e7a4694ff506d14718cfc1d336dd0e99",
+    "src/region_detection/image_gray.h": "19da657a22a4e5d31af6480f361dd4d0a0441edf19d870773eded21e727e69f9",
+    "src/region_detection/region_detection.cpp": "cbbc85c04b9d2d208fe91d727a1a22d88b889b5cf324e0b2a2e32d49cabb87ae",
+    "src/region_detection/region_detection_config.cpp": "b228dab2f59088ab21da4f22865ce1ad0d2c48887626ac4f9a15a0f80da13b3c",
+    "src/region_detection/region_detection_config.h": "fe12b942c6d97a68710ee4c9f401b2cfdb7dd7c669e0ba20c3fa2c9aba2f50bb",
+    "src/region_detection/region_detection_internal.h": "787c046e842a308e80c99fe1d25deb8da27cb7245b640c45ea7cf93f0c620bae",
+    "src/region_detection/region_detection_scheduler.cpp": "e187711a3356ea2933733835ab27d903112d8ea7d68101c9d170bed9d0ac822d",
+    "src/region_detection/region_detection_scheduler.h": "5ddfb3470a12f813ea4cf44658572addf7bf9801764b3e18078b407f954b05b3",
+    "src/region_detection/region_detector.cpp": "06b5e4170ac8fb514b86900278ef34d9a1cb2ff960995e397e518a1f5f33d442",
+    "src/region_detection/region_detector.h": "e7339fa741497f01e4358bcc42620dba6fb2efae319077db629a4e0b5a4b98b5",
+    "src/region_detection/region_edge_field.cpp": "3a5a2b5f1a3ac237776566fec014d1a3eb57e5d077b464f9b7cd74176a4d1ec2",
+    "src/region_detection/region_proposals.cpp": "ddc853c3d68442dac1e360ce5697edd3970cf8f2cca03567b8a558c8440e5111",
+    "src/region_detection/region_scoring.cpp": "f62f3a31bfe648dbf5b0d36e60ba0c0704dbef90bd232d537e0921e0c269a7f5",
+    "src/window_hover_selection.cpp": "4702f926c15685127b42f1db703cee2a0089cbb236196c31283878172059ae39",
+    "src/window_hover_selection.h": "eae88c32e19bbef7b6dc33378e326d791ea2ca9c5bc475b0d0f52bc19ee4c1a6"
+  },
+  "input_sha256": "3e056b3bfb5757e8d6b59608d2b61a6093cc9696823d2c1146dd1c28169b5133",
+  "expected_sha256": "5401fd599da40e14b2776c1d7235c113796228ab386f7ad943d41eab42718eed",
+  "qt_version": "6.12.0",
+  "group_sha256": {
+    "manual-input.json": "1f0231e981a654f774bc98e8f519d23b685f27b28c38e3e0fc8339383083ee38",
+    "manual-expected.json": "10f020290f4d426301ed652fa74b3566b1df8538e9c106839a3f7e78bd04e01a",
+    "image-input.json": "7234da5e20cd70dcf2f6c0712aa5a2319787695f1ffeff710a84be192bb53556",
+    "image-expected.json": "3159558e3929552eedbd02ef61b62f140558b0f9b8f61acc8ffd20fefc2d8b13",
+    "windows-input.json": "ae6cfefe65b18d53b07598c43505e0111f5302d935b808ea674d73481630f1ec",
+    "windows-expected.json": "5041ba98809a646e28201fda2a70965210be950ee8630a9ae78bed1fd8b679a1"
+  },
+  "compact_binary_sha256": "78169b7da30ec1efa34c066406a8abd0c49cd3def44174d3b5243f5b8eae5f10",
+  "compact_replay_equal": true
+}

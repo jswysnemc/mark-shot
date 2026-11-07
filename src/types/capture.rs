@@ -1,4 +1,5 @@
 pub type DamageRect = (u32, u32, u32, u32);
+#[derive(Clone)]
 pub struct Placement {
     pub size: (i32, i32),
     pub position: (i32, i32),
@@ -27,15 +28,19 @@ pub fn px_size((w, h): (u32, u32), scale: f32) -> (u32, u32) {
     (px(w), px(h))
 }
 // Wayland outputs
+#[cfg(target_os = "linux")]
 use smithay_client_toolkit::output::OutputInfo as SctkOutputInfo;
+#[cfg(target_os = "linux")]
 use wayland_client::protocol::wl_output;
 
+#[cfg(target_os = "linux")]
 #[derive(Debug, Clone)]
 pub struct Output {
     pub wl_output: wl_output::WlOutput,
     pub info: SctkOutputInfo,
 }
 
+#[cfg(target_os = "linux")]
 impl Output {
     /// physical pixels per logical one
     /// (compoared by longer side to avoid issues with rotated)
@@ -61,6 +66,9 @@ impl Output {
     }
 }
 
+#[cfg(target_os = "windows")]
+pub use super::windows_output::Output;
+
 // Pipewire and pixels
 pub struct StreamInfo {
     pub node_id: u32,
@@ -77,8 +85,9 @@ pub struct MonitorFrame {
     pub info: StreamInfo,
 }
 
+#[derive(Clone)]
 pub struct Capture {
-    pub pixmap: tiny_skia::Pixmap,
+    pub pixmap: super::frozen_pixmap::FrozenPixmap,
     pub scale: f32,
 }
 

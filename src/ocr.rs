@@ -33,6 +33,10 @@
 // takes much more time, so it makes sense for it to be in a daemon. Yet, daemon takes GPU memory, and having a background
 // daemon with always 100+mb taken is not a good idea, sooo it's not optimal
 pub mod bidi;
+#[cfg(target_os = "linux")]
+pub mod daemon;
+#[cfg(target_os = "windows")]
+#[path = "ocr/daemon_windows.rs"]
 pub mod daemon;
 pub mod dawn;
 pub mod download;
@@ -49,6 +53,7 @@ pub mod settings;
 #[cfg(test)]
 pub mod testing;
 pub mod view;
+pub mod worker;
 
 use tiny_skia::Rect;
 

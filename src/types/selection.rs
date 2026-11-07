@@ -1,6 +1,9 @@
 use tiny_skia::Rect;
 
 pub struct SelectionState {
+    pub aspect_ratio: f64,
+    /// 【选区尺寸】【创建阶段】只标记范围创建手势，不把普通标注拖动当作选区创建
+    pub creating: bool,
     pub zone: Option<Rect>,
     pub prev_zone: Option<Rect>,
     pub active_handle: SelectionHandle,
@@ -61,6 +64,8 @@ impl SelectionHandle {
 impl Default for SelectionState {
     fn default() -> Self {
         Self {
+            aspect_ratio: 0.0,
+            creating: false,
             zone: None,
             prev_zone: None,
             active_handle: SelectionHandle::None,

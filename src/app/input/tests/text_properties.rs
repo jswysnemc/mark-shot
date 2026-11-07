@@ -256,7 +256,7 @@ fn text_size_shortcuts_do_not_depend_on_removed_stepper_widgets() {
     assert_eq!(crate::editor::text_edits::current_points(&state), 21.0);
     state.undo(&mut dirty);
     assert_eq!(state.annotations[0], original);
-    state.selected_annotation = None;
+    state.select_annotation_index(None);
     state.selected_tool = Tool::Text;
     super::super::refresh_panels(&mut state, &mut dirty);
     let points = state.tool_settings.font_size;

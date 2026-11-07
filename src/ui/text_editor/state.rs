@@ -29,6 +29,7 @@ pub(super) struct HistoryEntry {
 
 pub struct TextEditor {
     pub(super) editor: Editor<'static>,
+    pub(super) style: super::EditorStyle,
     undo: VecDeque<HistoryEntry>,
     redo: Vec<HistoryEntry>,
     history_bytes: usize,
@@ -47,8 +48,12 @@ impl TextEditor {
 
     /// 【界面控件】【编辑初始化】用 text 与 fonts 创建多行编辑器；初始内容不进入撤销历史
     pub fn new(text: &str, fonts: &mut FontSystem) -> Self {
-        let size = crate::theme::font::label();
-        let mut buffer = Buffer::new(fonts, Metrics::new(size, size * 1.65));
+        Self::new_with_style(text, fonts, super::EditorStyle::default())
+    }
+
+    /// 【界面控件】【样式初始化】用 text、fonts 和局部 style 创建编辑器，返回无修改历史的实例，不改变其他编辑器
+    pub fn new_with_style(text: &str, fonts: &mut FontSystem, style: super::EditorStyle) -> Self {
+        let mut buffer = Buffer::new(fonts, Metrics::new(style.size, style.line_height));
         buffer.set_text(text, &Attrs::new(), Shaping::Advanced, None);
         buffer.set_size(Some(640.0), Some(360.0));
         let mut editor = Editor::new(buffer);
@@ -56,6 +61,7 @@ impl TextEditor {
         editor.shape_as_needed(fonts, false);
         Self {
             editor,
+            style,
             undo: VecDeque::new(),
             redo: Vec::new(),
             history_bytes: 0,
@@ -66,9 +72,19 @@ impl TextEditor {
 
     /// 【界面控件】【单行初始化】用 text 和 fonts 创建 Qt 单行语义编辑器，限制三万二千七百六十七个 UTF-16 单元，返回编辑器
     pub fn new_single_line(text: &str, fonts: &mut FontSystem) -> Self {
-        let mut value = Self::new(
+        Self::new_single_line_with_style(text, fonts, super::EditorStyle::default())
+    }
+
+    /// 【界面控件】【单行样式】用 text、fonts、style 创建局部样式单行编辑器，保留原版 UTF-16 长度上限，返回独立编辑器
+    pub fn new_single_line_with_style(
+        text: &str,
+        fonts: &mut FontSystem,
+        style: super::EditorStyle,
+    ) -> Self {
+        let mut value = Self::new_with_style(
             super::input_method::composition::clipped(text, 32767),
             fonts,
+            style,
         );
         value.single_line(fonts);
         value
@@ -83,6 +99,16 @@ impl TextEditor {
                 text.push_str(line.ending().as_str());
             }
             text
+        })
+    }
+
+    /// 【界面控件】【空文本判断】返回正文是否为空字符串，无参数，空白或换行仍属于文本，不分配全文副本
+    pub fn is_empty(&self) -> bool {
+        self.editor.with_buffer(|buffer| {
+            buffer
+                .lines
+                .iter()
+                .all(|line| line.text().is_empty() && line.ending().as_str().is_empty())
         })
     }
 

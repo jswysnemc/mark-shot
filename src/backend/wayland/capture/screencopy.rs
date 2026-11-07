@@ -40,6 +40,18 @@ pub fn supported(conn: &Connection) -> bool {
 
 #[async_trait]
 impl CaptureMethod for ScreencopyMethod {
+    /// 【持续捕获】【原生屏幕会话】按 outputs 创建固定输出的无授权请求后端，返回会话
+    async fn open_session(
+        &self,
+        outputs: &[Output],
+    ) -> crate::backend::capture_session::Result<
+        Box<dyn crate::backend::capture_session::CaptureSession>,
+    > {
+        super::isolation::open(outputs, |connection| {
+            Box::new(Self::with_cursor(connection, self.include_cursor))
+        })
+        .await
+    }
     async fn capture_frame(
         &self,
         outputs: &[Output],

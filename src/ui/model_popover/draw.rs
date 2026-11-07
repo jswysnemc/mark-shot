@@ -47,11 +47,11 @@ fn draw_content(p: &mut Painter, popover: &ModelPopover) {
         .iter()
         .all(|row| row.status != ModelStatus::Installed);
     let parts: &[(&str, Rgba, f32)] = if no_model {
-        &[(TITLE_NO_MODEL, color::active(), font::label())]
+        &[(TITLE_NO_MODEL, emphasis(), font::label())]
     } else {
         &[
             (TITLE, color::muted(), note_font_size()),
-            (TITLE_ENGLISH, color::active(), note_font_size()),
+            (TITLE_ENGLISH, emphasis(), note_font_size()),
         ]
     };
     let mut x = title_x;
@@ -110,7 +110,7 @@ fn draw_row(p: &mut Painter, idx: usize, row: ModelRow, hovered: Option<ModelPop
     let text_w = (button.left() - cfg.status_width - left).max(0.0);
 
     let name_color = if row.active {
-        color::active()
+        emphasis()
     } else {
         color::foreground()
     };
@@ -134,7 +134,7 @@ fn draw_row(p: &mut Painter, idx: usize, row: ModelRow, hovered: Option<ModelPop
                 Rect::from_xywh(left, rect.top() + cfg.note_top, text_w, cfg.note_height)
             {
                 let (note, note_color) = if row.recommended {
-                    (RECOMMENDED, color::active())
+                    (RECOMMENDED, emphasis())
                 } else {
                     (model.note, color::muted())
                 };
@@ -190,7 +190,7 @@ fn draw_row(p: &mut Painter, idx: usize, row: ModelRow, hovered: Option<ModelPop
         );
     }
     let tint = if checked {
-        color::active()
+        emphasis()
     } else if button_hovered {
         color::hover()
     } else {
@@ -207,4 +207,9 @@ fn draw_row(p: &mut Painter, idx: usize, row: ModelRow, hovered: Option<ModelPop
 
 fn size_label(bytes: u64) -> String {
     format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+}
+
+/// 【识别模型】【强调文字】返回当前主题的不透明强调色，标题和选中状态不能使用半透明背景填色，无参数
+fn emphasis() -> Rgba {
+    crate::theme::context_menu::Palette::current().accent
 }

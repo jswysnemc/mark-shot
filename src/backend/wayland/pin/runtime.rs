@@ -114,6 +114,12 @@ pub(super) struct Pin {
     pub generation: u64,
     pub ocr_cancel: Option<Arc<AtomicBool>>,
     pub ocr_sender: Sender<(u64, Result<OcrText, String>)>,
+    pub copy_after_ocr: bool,
+    pub translation: crate::features::pinned_image::translation::Translation,
+    pub translation_task: Option<crate::translation::task::Task>,
+    pub translation_retired: Vec<crate::translation::task::Task>,
+    pub translation_wake: smithay_client_toolkit::reexports::calloop::ping::Ping,
+    pub last_position: (f64, f64),
 }
 
 impl Pin {
@@ -166,6 +172,12 @@ impl Drop for Pin {
         if let Some(cancel) = &self.ocr_cancel {
             cancel.store(true, std::sync::atomic::Ordering::Relaxed);
         }
+        if let Some(mut task) = self.translation_task.take() {
+            task.shutdown();
+        }
+        for mut task in self.translation_retired.drain(..) {
+            task.shutdown();
+        }
     }
 }
 
@@ -210,15 +222,32 @@ pub(super) fn run_at(
     density: f32,
     initial_position: Option<(i32, i32)>,
 ) -> AppResult {
+    run_at_seed(bytes, density, initial_position, None)
+}
+
+/// 【贴图】【译文启动】按 bytes、density、initial_position 和 seed 初始化原图与译文，返回窗口执行结果，已有识别结果不再启动模型
+pub(super) fn run_at_seed(
+    bytes: &[u8],
+    density: f32,
+    initial_position: Option<(i32, i32)>,
+    seed: Option<crate::features::image_translation::seed::Seed>,
+) -> AppResult {
     let mut image = PinnedImage::decode(bytes, density)?;
     let connection = Connection::connect_to_env()?;
     let (globals, queue) = registry_queue_init(&connection)?;
     let qh = queue.handle();
     let mut event_loop: EventLoop<Pin> = EventLoop::try_new()?;
+    super::super::theme_notifications::install(&event_loop.handle(), Pin::refresh_theme)?;
     WaylandSource::new(connection.clone(), queue)
         .insert(event_loop.handle())
         .map_err(|error| error.error)?;
     let (sender, receiver) = channel::channel();
+    let (translation_wake, translation_source) =
+        smithay_client_toolkit::reexports::calloop::ping::make_ping()?;
+    event_loop
+        .handle()
+        .insert_source(translation_source, |_, _, state| state.poll_translation())
+        .map_err(|error| error.error)?;
     event_loop
         .handle()
         .insert_source(receiver, |event, _, state| {
@@ -326,14 +355,28 @@ pub(super) fn run_at(
         generation: 0,
         ocr_cancel: None,
         ocr_sender: sender,
+        copy_after_ocr: false,
+        translation: crate::features::pinned_image::translation::Translation::new(
+            crate::config::get().translation.target_language.clone(),
+        ),
+        translation_task: None,
+        translation_retired: Vec::new(),
+        translation_wake,
+        last_position: (0.0, 0.0),
     };
     pin.resize(false, &qh);
+    if let Some(seed) = seed {
+        pin.apply_translation_seed(seed);
+    }
     while !pin.exit {
+        pin.poll_translation();
         pin.render_preview(&qh)?;
         if pin.dirty && pin.configured && !pin.frame_pending {
             pin.render(&qh)?;
         }
-        event_loop.dispatch(None, &mut pin)?;
+        let timeout =
+            (!pin.translation_retired.is_empty()).then_some(std::time::Duration::from_millis(10));
+        event_loop.dispatch(timeout, &mut pin)?;
     }
     Ok(())
 }

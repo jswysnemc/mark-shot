@@ -5,7 +5,7 @@ use tiny_skia::{IntRect, IntSize, Pixmap, Rect};
 use crate::AppResult;
 
 pub struct FileCanvas {
-    pub original: Pixmap,
+    pub original: crate::image_source::ImageSource,
     pub viewport: Rect,
 }
 
@@ -43,22 +43,27 @@ impl FileCanvas {
         Self::new(original, bounds).ok_or_else(|| "invalid image viewport".into())
     }
 
-    /// 【图片编辑】【视口布局】将原图等比居中到 bounds；原图不缩小，仅显示预览按比例缩放
+    /// 【图片编辑】【视口布局】按original和bounds返回等比适配窗口的原版视口，小图允许放大，大原件按需使用只读缓存，不改变原始像素
     pub fn new(original: Pixmap, bounds: Rect) -> Option<Self> {
-        let available_width = (bounds.width() - 64.0).max(1.0);
-        let available_height = (bounds.height() - 96.0).max(1.0);
-        let scale = (available_width / original.width() as f32)
-            .min(available_height / original.height() as f32)
-            .min(1.0);
-        let width = original.width() as f32 * scale;
-        let height = original.height() as f32 * scale;
-        let viewport = Rect::from_xywh(
-            bounds.left() + (bounds.width() - width) / 2.0,
-            bounds.top() + (bounds.height() - height) / 2.0,
-            width,
-            height,
+        let view = crate::features::canvas_navigation::model::Navigation::new(
+            (original.width(), original.height()),
+            (
+                bounds.width().round() as u32,
+                bounds.height().round() as u32,
+            ),
+            true,
         )?;
-        Some(Self { original, viewport })
+        let fitted = view.projection().widget_rect;
+        let viewport = Rect::from_xywh(
+            bounds.left() + fitted.x as f32,
+            bounds.top() + fitted.y as f32,
+            fitted.width as f32,
+            fitted.height as f32,
+        )?;
+        Some(Self {
+            original: crate::image_source::ImageSource::store(original),
+            viewport,
+        })
     }
 
     /// 【图片编辑】【原图裁切】把全局逻辑选区映射回原始像素；返回裁切图、精确原点与比例
@@ -74,27 +79,25 @@ impl FileCanvas {
     /// 【图片编辑】【区域映射】计算 region 对应的原图像素范围；返回坐标和比例，不复制图像缓冲
     pub fn source_region(&self, region: Rect) -> Option<SourceRegion> {
         let region = region.intersect(&self.viewport)?;
-        let scale = self.original.width() as f32 / self.viewport.width();
-        let x = ((region.left() - self.viewport.left()) * scale)
-            .floor()
-            .max(0.0) as i32;
-        let y = ((region.top() - self.viewport.top()) * scale)
-            .floor()
-            .max(0.0) as i32;
-        let right = ((region.right() - self.viewport.left()) * scale)
-            .ceil()
-            .min(self.original.width() as f32) as i32;
-        let bottom = ((region.bottom() - self.viewport.top()) * scale)
-            .ceil()
-            .min(self.original.height() as f32) as i32;
-        let rect = IntRect::from_xywh(x, y, (right - x) as u32, (bottom - y) as u32)?;
+        let scale = f64::from(self.original.width()) / f64::from(self.viewport.width());
+        let rect = crate::renderer::pixel_bounds::map(
+            region,
+            (self.viewport.left(), self.viewport.top()),
+            scale,
+        )?
+        .intersect(&IntRect::from_xywh(
+            0,
+            0,
+            self.original.width(),
+            self.original.height(),
+        )?)?;
         Some(SourceRegion {
             bounds: rect,
             global_origin: (
-                self.viewport.left() + x as f32 / scale,
-                self.viewport.top() + y as f32 / scale,
+                (f64::from(self.viewport.left()) + f64::from(rect.x()) / scale) as f32,
+                (f64::from(self.viewport.top()) + f64::from(rect.y()) / scale) as f32,
             ),
-            scale,
+            scale: scale as f32,
         })
     }
 }

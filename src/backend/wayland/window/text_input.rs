@@ -8,7 +8,6 @@ use crate::{
     features::text::input_method::focus::identity,
     types::text_input::{ChangeCause, Edit, Focus},
 };
-use smithay_client_toolkit::shell::WaylandSurface;
 use wayland_client::{Connection, Dispatch, QueueHandle};
 use wayland_protocols::wp::text_input::zv3::client::{
     zwp_text_input_manager_v3, zwp_text_input_v3,
@@ -31,9 +30,9 @@ fn input_content<'a>(
 }
 
 impl NativeWindow {
-    /// 【原生窗口】【输入资格】按原生焦点所属表面更新目标，取消旧候选并停用无主协议，无参数、无返回值
+    /// 【原生窗口】【输入资格】按原生焦点所属表面更新目标，停用旧交互而由内容决定候选外观，无参数、无返回值
     pub(super) fn reconcile_text_input(&mut self) {
-        let target = if self.popup.is_some() {
+        let target = if !self.popup.is_empty() {
             None
         } else {
             input_content(&mut self.content, &mut self.dialog, self.text_surface)
@@ -42,10 +41,19 @@ impl NativeWindow {
         if self.input_target.reconcile(target)
             && let Some(id) = self.text_surface
         {
-            self.cancel_for(id);
+            self.suspend_for(id);
         }
         if self.input_target.id.is_none() {
             self.text_input.sync(None);
+        }
+    }
+
+    /// 【原生窗口】【内容停用】暂停 id 对应内容的输入交互，必要时标记重绘；过期身份不影响新表面，无返回值
+    fn suspend_for(&mut self, id: SurfaceId) {
+        let changed = input_content(&mut self.content, &mut self.dialog, Some(id))
+            .is_some_and(|content| content.suspend_text_input());
+        if changed && let Some(surface) = self.surface_mut(id) {
+            surface.dirty = true;
         }
     }
 
@@ -109,14 +117,14 @@ impl Dispatch<zwp_text_input_v3::ZwpTextInputV3, ()> for NativeWindow {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        let main = state.main.window.wl_surface();
+        let main = state.main.role.wl_surface();
         let dialog = state
             .dialog
             .as_ref()
-            .map(|dialog| (dialog.id, dialog.surface.window.wl_surface()));
+            .map(|dialog| (dialog.id, dialog.surface.role.wl_surface()));
         // 1. 【原生窗口】【输入归属】独立记录表面身份，不把子窗口身份当作输出索引
         let mut entered = None;
-        let popup_open = state.popup.is_some();
+        let popup_open = !state.popup.is_empty();
         let message = state.text_input.message(proxy, event, |candidate| {
             entered = if dialog.is_none() && !popup_open && candidate == main {
                 Some(SurfaceId::Main)

@@ -48,6 +48,9 @@ impl CompositorHandler for OverlayState {
             .find(|(_, sd)| &sd.surface == surface)
         {
             sd.frame_sent = None;
+            if super::super::frame_staging::has_writable_buffer(sd) {
+                sd.waiting_release = false;
+            }
             self.events
                 .push_back(OverlayEvent::FrameDone { monitor_idx });
         }
@@ -87,7 +90,7 @@ impl ShmHandler for OverlayState {
 // and attach the window to the surface.
 
 impl OverlayState {
-    /// shared code between window and layer overlay
+    /// 【截图覆盖层】【缓冲配置】按surface和size映射输出，滚动父表面在具备视区协议时只使用透明像素，返回值为空
     pub fn configure_surface(&mut self, surface: &wl_surface::WlSurface, size: Option<(u32, u32)>) {
         let Some(sd) = self.surfaces.values_mut().find(|sd| &sd.surface == surface) else {
             return;
@@ -104,15 +107,27 @@ impl OverlayState {
         }
         // creating buffers and attaching
         let pool = &mut self.pool;
-        let (bw, bh) = crate::types::px_size((w, h), sd.scale);
+        let transparent_parent = sd.scroll_layer.is_some()
+            || matches!(
+                &sd.role,
+                crate::backend::wayland::utils::surface::Role::ScrollParent(_)
+            );
+        let (bw, bh) = if transparent_parent && sd.viewport.is_some() {
+            (1, 1)
+        } else {
+            crate::types::px_size((w, h), sd.scale)
+        };
 
-        let shm_buffer = match create_shm_buffer(pool, bw, bh) {
+        let mut shm_buffer = match create_shm_buffer(pool, bw, bh) {
             Ok(buffer) => buffer,
             Err(e) => {
                 self.configure_error = Some(e.to_string());
                 return;
             }
         };
+        if transparent_parent {
+            shm_buffer.clear(pool);
+        }
 
         // apply configured input region with the first frame after mapping
         sd.mapped = true;
@@ -121,11 +136,23 @@ impl OverlayState {
         if let Some(viewport) = &sd.viewport {
             viewport.set_destination(w as i32, h as i32);
         }
-        sd.surface.attach(Some(shm_buffer.wl_buffer()), 0, 0);
+        if transparent_parent {
+            shm_buffer
+                .buffer
+                .attach_to(&sd.surface)
+                .expect("newly created buffer is inactive");
+        } else {
+            shm_buffer
+                .buffer
+                .attach_to(&sd.surface)
+                .expect("newly created buffer is inactive");
+            sd.waiting_release = true;
+        }
         sd.surface.damage_buffer(0, 0, bw as i32, bh as i32);
         sd.surface.commit();
 
         sd.shm_buffer = Some(shm_buffer);
+        sd.spare_buffer = None;
         sd.width = w;
         sd.height = h;
     }

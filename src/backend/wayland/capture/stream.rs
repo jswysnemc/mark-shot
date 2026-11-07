@@ -1,15 +1,16 @@
-use crate::utils::to_rgba;
-use pipewire as pw;
-use pw::{properties::properties, spa};
-use spa::param::video::VideoFormat;
-use spa::pod::Pod;
-use std::os::fd::{BorrowedFd, OwnedFd};
-use std::sync::mpsc::{self, RecvTimeoutError, SyncSender};
-use std::time::Duration;
+//! 【PipeWire】【按需会话】一个可取消的原生线程复用视频连接，帧等待不阻塞异步运行时
 
-struct UserData {
-    format: spa::param::video::VideoInfoRaw,
-}
+mod format;
+mod pixels;
+mod worker;
+
+use std::{
+    os::fd::BorrowedFd,
+    sync::{Arc, Mutex},
+    thread::JoinHandle,
+    time::Duration,
+};
+use tokio::sync::oneshot;
 
 pub struct PipewireFrame {
     pub pixels: Vec<u8>,
@@ -18,222 +19,107 @@ pub struct PipewireFrame {
     pub stride: u32,
 }
 
+type FrameResult = Result<PipewireFrame, String>;
 const FRAME_TIMEOUT: Duration = Duration::from_secs(5);
 
-type FrameResult = Result<PipewireFrame, String>;
+struct Request {
+    id: u64,
+    reply: oneshot::Sender<FrameResult>,
+}
+enum Command {
+    Frame(Request),
+    Cancel(u64),
+    Stop,
+}
 
-pub fn capture_frame(
-    node_id: u32,
-    fd: BorrowedFd<'_>,
-) -> Result<PipewireFrame, Box<dyn std::error::Error>> {
-    let (tx, rx) = mpsc::sync_channel::<FrameResult>(1);
+pub struct PipewireStream {
+    commands: pipewire::channel::Sender<Command>,
+    thread: Option<JoinHandle<()>>,
+    failure: Arc<Mutex<Option<String>>>,
+    next_id: u64,
+}
 
-    let owned_fd: OwnedFd = fd
-        .try_clone_to_owned()
-        .map_err(|e| format!("Failed to clone file descriptor: {}", e))?;
+struct PendingRequest {
+    commands: pipewire::channel::Sender<Command>,
+    id: u64,
+}
 
-    std::thread::spawn(move || {
-        if let Err(e) = run_stream(node_id, owned_fd, tx.clone()) {
-            let _ = tx.try_send(Err(e));
-        }
-    });
-
-    match rx.recv_timeout(FRAME_TIMEOUT) {
-        Ok(frame) => frame.map_err(Into::into),
-        Err(RecvTimeoutError::Timeout) => Err("PipeWire didn't deliver a frame in time".into()),
-        Err(RecvTimeoutError::Disconnected) => {
-            Err("PipeWire capture thread exited without a frame".into())
-        }
+impl Drop for PendingRequest {
+    /// 【PipeWire】【请求取消】取消已结束或中途丢弃的帧等待，不关闭所属会话，无参数、无返回值
+    fn drop(&mut self) {
+        let _ = self.commands.send(Command::Cancel(self.id));
     }
 }
 
-fn run_stream(node_id: u32, fd: OwnedFd, tx: SyncSender<FrameResult>) -> Result<(), String> {
-    pw::init();
-
-    let mainloop = pw::main_loop::MainLoopRc::new(None)
-        .map_err(|e| format!("Failed to create main loop: {e}"))?;
-    let context = pw::context::ContextRc::new(&mainloop, None)
-        .map_err(|e| format!("Failed to create context: {e}"))?;
-
-    let core = context
-        .connect_fd_rc(fd, None)
-        .map_err(|e| format!("Failed to connect via FD: {e}"))?;
-
-    let data = UserData {
-        format: Default::default(),
-    };
-
-    let stream = pw::stream::StreamRc::new(
-        core.clone(),
-        "mark-shot",
-        properties! {
-            *pw::keys::MEDIA_TYPE => "Video",
-            *pw::keys::MEDIA_CATEGORY => "Capture",
-            *pw::keys::MEDIA_ROLE => "Screen",
-        },
-    )
-    .map_err(|e| format!("Failed to create stream: {e}"))?;
-
-    let mainloop_clone = mainloop.clone();
-    let tx_clone = tx.clone();
-    let mainloop_state = mainloop.clone();
-
-    let _listener = stream
-        .add_local_listener_with_user_data(data)
-        .state_changed(move |_, _, _, new| {
-            if let pw::stream::StreamState::Error(msg) = new {
-                let _ = tx.try_send(Err(format!("PipeWire stream error: {msg}")));
-                mainloop_state.quit();
-            }
-        })
-        .param_changed(|_, user_data, id, param| {
-            let Some(param) = param else { return };
-            if id != spa::param::ParamType::Format.as_raw() {
-                return;
-            }
-
-            let (media_type, media_subtype) = match spa::param::format_utils::parse_format(param) {
-                Ok(v) => v,
-                Err(_) => return,
-            };
-
-            if media_type != spa::param::format::MediaType::Video
-                || media_subtype != spa::param::format::MediaSubtype::Raw
-            {
-                return;
-            }
-
-            let _ = user_data.format.parse(param);
-        })
-        .process(move |stream, user_data| {
-            if let Some(mut buffer) = stream.dequeue_buffer() {
-                let datas = buffer.datas_mut();
-                if let Some(data) = datas.first_mut() {
-                    let (offset, size, chunk_stride) = {
-                        let chunk = data.chunk();
-                        (
-                            chunk.offset() as usize,
-                            chunk.size() as usize,
-                            chunk.stride(),
-                        )
-                    };
-                    if size == 0 {
-                        return;
-                    }
-
-                    let Some(bytes) = data.data() else {
-                        let _ = tx_clone.try_send(Err(
-                            "PipeWire sent a buffer that can't be mapped (DMA-BUF?)".to_string(),
-                        ));
-                        mainloop_clone.quit();
-                        return;
-                    };
-                    let width = user_data.format.size().width;
-                    let height = user_data.format.size().height;
-                    if width == 0 || height == 0 {
-                        return;
-                    }
-                    let Some(pixels) = bytes.get(offset..offset + size) else {
-                        return;
-                    };
-                    let bgr = match user_data.format.format() {
-                        VideoFormat::BGRA | VideoFormat::BGRx => true,
-                        VideoFormat::RGBA | VideoFormat::RGBx => false,
-                        other => {
-                            let _ = tx_clone.try_send(Err(format!(
-                                "PipeWire picked unsupported format {other:?}"
-                            )));
-                            mainloop_clone.quit();
-                            return;
-                        }
-                    };
-
-                    let default_stride = width.saturating_mul(4);
-                    let stride = match chunk_stride {
-                        s if s > 0 => s as u32,
-                        _ => default_stride,
-                    };
-
-                    let mut pixels = pixels.to_vec();
-                    to_rgba(&mut pixels, bgr, false);
-
-                    let frame_data = PipewireFrame {
-                        pixels,
-                        width,
-                        height,
-                        stride,
-                    };
-                    let _ = tx_clone.try_send(Ok(frame_data));
-                    mainloop_clone.quit();
+impl PipewireStream {
+    /// 【PipeWire】【会话建立】按 node_id 和授权 fd 建立唯一后台流，返回句柄；设置错误由首帧请求交付
+    pub fn new(node_id: u32, fd: BorrowedFd<'_>) -> std::io::Result<Self> {
+        let owned = fd.try_clone_to_owned()?;
+        let (commands, receiver) = pipewire::channel::channel();
+        let failure = Arc::new(Mutex::new(None));
+        let thread_failure = failure.clone();
+        let thread = std::thread::Builder::new()
+            .name("mark-shot-pipewire".into())
+            .spawn(move || {
+                if let Err(error) = worker::run(node_id, owned, receiver, thread_failure.clone()) {
+                    *thread_failure.lock().unwrap() = Some(error);
                 }
-            }
+            })?;
+        Ok(Self {
+            commands,
+            thread: Some(thread),
+            failure,
+            next_id: 0,
         })
-        .register()
-        .map_err(|e| format!("Failed to register stream listener: {e}"))?;
+    }
 
-    let mut params_buf = Vec::new();
-    let pod = build_format_pod(&mut params_buf);
+    /// 【PipeWire】【下一帧】激活同一流并等待本次请求结果，返回紧密RGBA帧；超时或取消会停用流，无参数
+    pub async fn next_frame(&mut self) -> Result<PipewireFrame, String> {
+        if let Some(error) = self.failure.lock().unwrap().clone() {
+            return Err(error);
+        }
+        if self.thread.as_ref().is_none_or(JoinHandle::is_finished) {
+            return Err("PipeWire stream has ended".into());
+        }
+        self.next_id = self.next_id.wrapping_add(1);
+        let id = self.next_id;
+        let (reply, response) = oneshot::channel();
+        let _pending = PendingRequest {
+            commands: self.commands.clone(),
+            id,
+        };
+        self.commands
+            .send(Command::Frame(Request { id, reply }))
+            .map_err(|_| "PipeWire request channel is unavailable")?;
+        match tokio::time::timeout(FRAME_TIMEOUT, response).await {
+            Ok(Ok(frame)) => frame,
+            Ok(Err(_)) => Err(self
+                .failure
+                .lock()
+                .unwrap()
+                .clone()
+                .unwrap_or_else(|| "PipeWire worker ended without a frame".into())),
+            Err(_) => Err("PipeWire did not deliver a frame in time".into()),
+        }
+    }
 
-    stream
-        .connect(
-            spa::utils::Direction::Input,
-            Some(node_id),
-            pw::stream::StreamFlags::AUTOCONNECT | pw::stream::StreamFlags::MAP_BUFFERS,
-            &mut [pod],
-        )
-        .map_err(|e| format!("Failed to connect stream: {e}"))?;
-
-    mainloop.run();
-    Ok(())
+    /// 【PipeWire】【会话关闭】通知原生循环退出并回收唯一线程，重复调用无副作用，无参数，返回线程结果
+    pub fn close(&mut self) -> Result<(), String> {
+        let Some(thread) = self.thread.take() else {
+            return Ok(());
+        };
+        let _ = self.commands.send(Command::Stop);
+        thread
+            .join()
+            .map_err(|_| "PipeWire capture thread panicked".to_owned())
+    }
 }
 
-fn build_format_pod(buffer: &mut Vec<u8>) -> &Pod {
-    use spa::pod::serialize::PodSerializer;
-    use spa::pod::{ChoiceValue, Object, Property, PropertyFlags, Value};
-    use spa::sys::*;
-    use spa::utils::{Choice, ChoiceEnum, ChoiceFlags, Id};
-
-    PodSerializer::serialize(
-        std::io::Cursor::new(&mut *buffer),
-        &Value::Object(Object {
-            type_: SPA_TYPE_OBJECT_Format,
-            id: SPA_PARAM_EnumFormat,
-            properties: vec![
-                Property {
-                    key: SPA_FORMAT_mediaType,
-                    flags: PropertyFlags::empty(),
-                    value: Value::Id(Id(SPA_MEDIA_TYPE_video)),
-                },
-                Property {
-                    key: SPA_FORMAT_mediaSubtype,
-                    flags: PropertyFlags::empty(),
-                    value: Value::Id(Id(SPA_MEDIA_SUBTYPE_raw)),
-                },
-                Property {
-                    // previously it supported only BGRA
-                    // added some of the others since cosmic didn't return BGRA
-                    key: SPA_FORMAT_VIDEO_format,
-                    flags: PropertyFlags::empty(),
-                    value: Value::Choice(ChoiceValue::Id(Choice(
-                        ChoiceFlags::empty(),
-                        ChoiceEnum::Enum {
-                            default: Id(VideoFormat::BGRx.as_raw()),
-                            alternatives: [
-                                VideoFormat::BGRx,
-                                VideoFormat::BGRA,
-                                VideoFormat::RGBx,
-                                VideoFormat::RGBA,
-                            ]
-                            .iter()
-                            .map(|f| Id(f.as_raw()))
-                            .collect(),
-                        },
-                    ))),
-                },
-            ],
-        }),
-    )
-    .unwrap();
-
-    Pod::from_bytes(buffer).unwrap()
+impl Drop for PipewireStream {
+    /// 【PipeWire】【资源回收】在异常或调用方遗漏关闭时回收线程，无参数、无返回值
+    fn drop(&mut self) {
+        if let Err(error) = self.close() {
+            log::error!("【PipeWire】【资源回收】{error}");
+        }
+    }
 }

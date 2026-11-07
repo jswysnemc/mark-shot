@@ -1,8 +1,17 @@
 use cosmic_text::FontSystem;
+pub(crate) mod fixed_layout;
 pub mod font_catalog;
+#[cfg(target_os = "linux")]
 mod fontconfig;
+#[cfg(target_os = "windows")]
+#[path = "fonts/windows.rs"]
+mod fontconfig;
+pub(crate) mod ocr_ui;
+pub(crate) mod ruler;
+pub(crate) mod selection_ui;
 pub mod text_faces;
 pub mod text_spans;
+pub mod ui_fallback;
 use cosmic_text::fontdb::{Database, Source};
 use std::sync::Arc;
 

@@ -2,9 +2,9 @@
 
 use super::table_view::TableView;
 use crate::{
-    backend::wayland::window::KeyInput,
+    backend::window::KeyInput,
     keys::Key,
-    ui::text_editor::{EditEvent, TextEditor},
+    ui::text_editor::{EditEvent, EditorStyle, TextEditor},
 };
 use cosmic_text::FontSystem;
 use tiny_skia::Rect;
@@ -31,7 +31,16 @@ impl TableView {
         if self.editor.is_some() {
             return true;
         }
-        let mut editor = TextEditor::new_single_line(&self.table.rows[row][column], fonts);
+        let colors = super::palette::Palette::current();
+        let mut editor = TextEditor::new_single_line_with_style(
+            &self.table.rows[row][column],
+            fonts,
+            EditorStyle {
+                size: super::table_grid_layout::CELL_FONT,
+                line_height: 18.0,
+                colors: Some([colors.text, colors.text, colors.accent, colors.on_accent]),
+            },
+        );
         editor.select_all(fonts);
         self.editor = Some(editor);
         self.editor_offset = 0.0;

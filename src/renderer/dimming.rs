@@ -2,10 +2,14 @@
 
 use super::*;
 
-/// Radius of the bright area
-pub(super) fn hole_radius() -> f32 {
+#[cfg(test)]
+#[path = "selection_border_tests.rs"]
+mod tests;
+
+/// 【截图选框】【遮罩半径】按 radius 和配置描边宽度返回透明区域半径，零半径保留直角
+pub(super) fn hole_radius(radius: f32) -> f32 {
     let sel = &crate::config::get().selection;
-    sel.border_radius - sel.border_width / 2.0
+    radius - sel.border_width / 2.0
 }
 
 pub(super) fn dim_pixel() -> [u8; 4] {
@@ -27,12 +31,29 @@ pub fn init_dimming(
 
     if let Some(sel) = selection {
         fill_rect(dimmed, sel, [0; 4], scale);
-        dim_hole_corners(dimmed, sel, edges, scale);
+        dim_hole_corners(dimmed, sel, edges, scale, 0.0);
     }
 }
 
-pub(super) fn draw_selection_border(p: &mut Painter, sel: &Rect, edges: Option<&SelectionEdges>) {
+/// 【截图选框】【边框绘制】按 radius 把 sel 和可见 edges 绘入 p，局部损坏不改变描边栅格，无返回值
+pub(super) fn draw_selection_border(
+    p: &mut Painter,
+    sel: &Rect,
+    edges: Option<&SelectionEdges>,
+    radius: f32,
+) {
     let cfg = &crate::config::get().selection;
+    let origin = p.origin();
+    let size = p.size();
+    let inset = radius + cfg.border_width * 2.0 + 2.0 / p.scale();
+    // 1. 【截图选框】【内部损坏】尺子和画笔只改变选区内部时跳过外围描边，不创建固定路径临时缓冲
+    if origin.0 >= sel.left() + inset
+        && origin.1 >= sel.top() + inset
+        && origin.0 + size.0 <= sel.right() - inset
+        && origin.1 + size.1 <= sel.bottom() - inset
+    {
+        return;
+    }
     let stroke = Stroke {
         width: cfg.border_width,
         ..Stroke::default()
@@ -50,13 +71,16 @@ pub(super) fn draw_selection_border(p: &mut Painter, sel: &Rect, edges: Option<&
 
         if let Some(path) = rounded_rect_path(
             &outer,
-            cfg.border_radius,
+            radius,
             edges.top && edges.left,
             edges.top && edges.right,
             edges.bottom && edges.right,
             edges.bottom && edges.left,
         ) {
-            p.stroke_path(&path, cfg.border.get(), &stroke);
+            // 2. 【截图选框】【固定栅格】先生成完整描边，再按固定像素原点填充，局部裁切不会重新采样圆角
+            if let Some(outline) = path.stroke(&stroke, p.scale()) {
+                super::fixed_path::fill(p, &outline, cfg.border.get().color());
+            }
         }
     }
 }
@@ -72,15 +96,32 @@ pub(super) fn dim_hole_corners(
     sel: &Rect,
     edges: Option<&SelectionEdges>,
     scale: f32,
+    radius: f32,
+) {
+    draw_hole_corners(
+        &mut Painter::new(canvas).with_scale(scale),
+        sel,
+        edges,
+        radius,
+    );
+}
+
+/// 【截图选框】【圆角遮罩】按p、sel、edges与radius绘制圆角内侧遮罩，继承局部原点，无返回值
+pub(super) fn draw_hole_corners(
+    p: &mut Painter<'_>,
+    sel: &Rect,
+    edges: Option<&SelectionEdges>,
+    radius: f32,
 ) {
     let Some(edges) = edges else { return };
-    let radius = hole_radius().min(sel.width() / 2.0).min(sel.height() / 2.0);
+    let radius = hole_radius(radius)
+        .min(sel.width() / 2.0)
+        .min(sel.height() / 2.0);
     if radius <= 0.0 {
         return;
     }
 
     let dim = crate::config::get().selection.dim;
-    let mut p = Painter::new(canvas).with_scale(scale);
 
     // corner point, then the direction the rectangle's interior lies in
     let corners = [
@@ -130,13 +171,14 @@ pub(super) fn update_dimming_delta(
     next: Option<&Rect>,
     edges: Option<&SelectionEdges>,
     scale: f32,
+    radius: f32,
 ) {
     if let Some(old) = prev {
         fill_rect(dimmed, old, dim_pixel(), scale);
     }
     if let Some(cur) = next {
         fill_rect(dimmed, cur, [0; 4], scale);
-        dim_hole_corners(dimmed, cur, edges, scale);
+        dim_hole_corners(dimmed, cur, edges, scale, radius);
     }
 }
 

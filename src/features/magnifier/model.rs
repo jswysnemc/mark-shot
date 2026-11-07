@@ -166,6 +166,16 @@ impl Magnifier {
 
     /// 【放大镜】【边界映射】以 map 映射双框中心、镜框对角点与轴心；返回新几何，原图范围不变
     pub fn mapped(self, map: impl Fn(Point) -> Point) -> Self {
+        let mut result = self.mapped_storage(map);
+        if result.shape == MagnifierShape::Circle {
+            let side = result.size.0.min(result.size.1);
+            result.size = (side, side);
+        }
+        result
+    }
+
+    /// 【放大镜】【存储映射】按map映射完整镜框矩形、源点与轴心，返回保留长宽的新成员，群组缩放允许圆形变为椭圆
+    pub(crate) fn mapped_storage(self, map: impl Fn(Point) -> Point) -> Self {
         let start = map((
             self.center.0 - self.size.0 / 2.0,
             self.center.1 - self.size.1 / 2.0,
@@ -174,10 +184,7 @@ impl Magnifier {
             self.center.0 + self.size.0 / 2.0,
             self.center.1 + self.size.1 / 2.0,
         ));
-        let mut size = ((end.0 - start.0).abs(), (end.1 - start.1).abs());
-        if self.shape == MagnifierShape::Circle {
-            size = (size.0.min(size.1), size.0.min(size.1));
-        }
+        let size = ((end.0 - start.0).abs(), (end.1 - start.1).abs());
         Self {
             source: map(self.source),
             center: ((start.0 + end.0) / 2.0, (start.1 + end.1) / 2.0),

@@ -6,7 +6,6 @@ use crate::ui::single_line::SingleLine;
 use std::{
     ffi::OsString,
     fs, io,
-    os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
 };
 
@@ -36,7 +35,7 @@ impl Listing {
             }
             let item = item?;
             let name = item.file_name();
-            if !hidden && name.as_bytes().first() == Some(&b'.') {
+            if !hidden && name.to_string_lossy().starts_with('.') {
                 continue;
             }
             let path = item.path();

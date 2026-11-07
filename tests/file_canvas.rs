@@ -52,10 +52,18 @@ fn tall_history_images_can_be_reopened_without_resizing_source() {
     image::RgbaImage::from_pixel(32, 20_000, image::Rgba([128, 64, 32, 128]))
         .save(&path)
         .unwrap();
-    let file = FileCanvas::load(&path, Rect::from_xywh(0.0, 0.0, 1000.0, 700.0).unwrap()).unwrap();
+    let bounds = Rect::from_xywh(0.0, 0.0, 1000.0, 700.0).unwrap();
+    let file = FileCanvas::load(&path, bounds).unwrap();
     assert_eq!(
         (file.original.width(), file.original.height()),
         (32, 20_000)
     );
-    assert!(file.viewport.height() <= 604.0);
+    let tolerance = 0.0001;
+    assert!(file.viewport.left() >= bounds.left() - tolerance);
+    assert!(file.viewport.top() >= bounds.top() - tolerance);
+    assert!(file.viewport.right() <= bounds.right() + tolerance);
+    assert!(file.viewport.bottom() <= bounds.bottom() + tolerance);
+    let crop = file.crop(file.viewport).unwrap();
+    assert_eq!((crop.pixels.width(), crop.pixels.height()), (32, 20_000));
+    assert_eq!(crop.pixels.data(), file.original.data());
 }

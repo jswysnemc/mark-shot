@@ -1,46 +1,22 @@
+mod modifiers;
+mod pointer_move;
+pub(crate) use modifiers::handle_canvas_modifiers;
+pub(crate) use pointer_move::handle_canvas_pointer_move;
 mod color_button;
 mod keyboard;
 mod pointer_policy;
 mod text_context_menu;
-mod ui_hit;
+pub(in crate::app) mod ui_hit;
+pub(crate) mod wheel_preview;
 pub use ui_hit::compute_cursor;
 use ui_hit::{UiHit, hit_test_ui};
 #[cfg(test)]
-mod tests;
+pub(in crate::app) mod tests;
+pub(crate) use super::canvas_navigation::input::{
+    handle_modifiers, handle_pointer_button, handle_pointer_move,
+};
 pub use keyboard::handle_key;
 mod scroll;
-pub use scroll::handle_axis_scroll;
-#[cfg(test)]
-pub use scroll::handle_scroll;
-use scroll::languages_button_hit;
-
-// Processing of pointer and keyboard events: translating
-// coordinates into local/global, dispatching to the active tool,
-
-// priority hits in Toolbar/SettingsPanel. logic of the Toolbar/SettingsPanel
-// (what to show, where to commit changes) is in toolbar_logic.rs / settings_logic.rs,
-// only event routing and update_pointer/update_magnifier as their direct side effects
-
-use crate::editor::dirty::{apply_damage_rects, mark_all_dirty, mark_dirty};
-use crate::editor::{DamageZone, EditorState};
-use crate::interaction::ClickTarget;
-use crate::keys::{self, Chord, Key};
-use crate::theme::font;
-use crate::tools::{
-    Tool, dispatch_activate, dispatch_button, dispatch_deactivate, dispatch_key, dispatch_move,
-    dispatch_text,
-};
-use crate::types::{MouseButton, PointerState, SpecialKey};
-use crate::ui::magnifier::MagnifierState;
-use crate::ui::panel::UiPanel;
-use crate::ui::settings_panel::char_index_for_x;
-use crate::ui::settings_panel::{ArrowHoldState, SettingsWidget, StepperArrow};
-use crate::ui::text_field::CursorInit;
-use crate::ui::toolbar::{ToolbarButton, ToolbarItem};
-use crate::utils::{get_full_workspace_rect, global_point_to_local};
-
-use std::time::Instant;
-
 use super::panels::color::{
     close_color_popover, commit_color_field_edit, handle_color_field_key_press,
     handle_color_field_text_input, handle_color_popover_click, handle_color_popover_drag,
@@ -57,136 +33,60 @@ use super::panels::settings::{
 use super::panels::text::{font_popup, properties as text_properties};
 use super::panels::toolbar::update_toolbar;
 use super::panels::{filter, line, marker};
-
-/// 【界面】【指针移动】转换 x、y 所属 monitor_idx 的坐标并更新 editor_state；dirty_mask 返回重绘显示器
-pub fn handle_pointer_move(
-    editor_state: &mut EditorState,
-    monitor_idx: usize,
-    x: f64,
-    y: f64,
-    dirty_mask: &mut u32,
-) {
-    let global = (
-        editor_state.placements[monitor_idx].position.0 as f64 + x,
-        editor_state.placements[monitor_idx].position.1 as f64 + y,
-    );
-    let (current_monitor_idx, local_x, local_y) =
-        global_point_to_local(&editor_state.placements, global, monitor_idx, (x, y));
-    update_pointer(
-        editor_state,
-        current_monitor_idx,
-        (local_x, local_y),
-        global,
-    );
-    if text_context_menu::pointer(editor_state, dirty_mask) {
-        apply_damage_rects(editor_state, dirty_mask);
-        return;
-    }
-    update_magnifier(editor_state, dirty_mask);
-    if editor_state.toolbar_drag.is_some() {
-        pointer_policy::move_toolbar(editor_state, dirty_mask);
-        apply_damage_rects(editor_state, dirty_mask);
-        return;
-    }
-    if text_properties::pointer_move(editor_state, dirty_mask) || editor_state.font_panel.open {
-        font_popup::pointer_move(editor_state, dirty_mask);
-        apply_damage_rects(editor_state, dirty_mask);
-        return;
-    }
-    if crate::tools::text::session_input::pointer_move(editor_state, global, dirty_mask) {
-        apply_damage_rects(editor_state, dirty_mask);
-        return;
-    }
-    dispatch_move(editor_state.selected_tool, editor_state, global, dirty_mask);
-    update_toolbar(editor_state, dirty_mask);
-    if editor_state.settings_panel.visible {
-        update_settings_panel(editor_state, dirty_mask);
-    }
-    if editor_state.color_popover.open {
-        update_color_popover(editor_state, dirty_mask);
-        handle_color_popover_drag(editor_state, dirty_mask);
-    }
-    if editor_state.model_popover.open {
-        update_model_popover(editor_state, dirty_mask);
-    }
-    if editor_state.marker_popover.is_visible() {
-        marker::pointer_move(editor_state, dirty_mask);
-    }
-    if editor_state.ruler_popover.is_visible() {
-        ruler::pointer_move(editor_state, dirty_mask);
-    }
-    if editor_state.number_popover.is_visible() {
-        number::pointer_move(editor_state, dirty_mask);
-    }
-    if editor_state.arrow_popover.is_visible() || editor_state.line_popover.is_visible() {
-        line::pointer_move(editor_state, dirty_mask);
-    }
-    if editor_state.filter_popover.is_visible() {
-        filter::pointer_move(editor_state, dirty_mask);
-    }
-    apply_damage_rects(editor_state, dirty_mask);
-}
-
-/// 【界面】【修饰键更新】同步 editor_state 的 ctrl、shift，按工具约束更新未提交绘图；dirty_mask 返回重绘显示器
-pub fn handle_modifiers(
-    editor_state: &mut EditorState,
-    ctrl: bool,
-    shift: bool,
-    dirty_mask: &mut u32,
-) {
-    let ctrl_changed = ctrl != editor_state.input.ctrl;
-    let shift_changed = shift != editor_state.input.shift;
-    let shift_pressed = shift && !editor_state.input.shift;
-    editor_state.input.ctrl = ctrl;
-    editor_state.input.shift = shift;
-    let constrained = matches!(
-        editor_state.selected_tool,
-        Tool::Ruler | Tool::Magnifier | Tool::Line | Tool::Arrow
-    ) || (editor_state.selected_tool == Tool::Pick
-        && editor_state.ann_drag.as_ref().is_some_and(|drag| {
-            matches!(
-                drag.orig.shape,
-                crate::types::AnnotationShape::Redact { .. }
-                    | crate::types::AnnotationShape::Ruler { .. }
-                    | crate::types::AnnotationShape::Magnifier { .. }
-                    | crate::types::AnnotationShape::Number { .. }
-                    | crate::types::AnnotationShape::Line { .. }
-                    | crate::types::AnnotationShape::Arrow { .. }
-            )
-        }));
-    if constrained
-        && (ctrl_changed || shift_changed)
-        && (editor_state.pending.is_some() || editor_state.ann_drag.is_some())
-    {
-        let global = editor_state.input.pointer.global;
-        dispatch_move(editor_state.selected_tool, editor_state, global, dirty_mask);
-        apply_damage_rects(editor_state, dirty_mask);
-        return;
-    }
-    if !shift {
-        editor_state.input.straight = false;
-    }
-    if (shift_pressed || (ctrl_changed && editor_state.selected_tool == Tool::Marker))
-        && editor_state.pending.is_some()
-        && editor_state.ann_drag.is_none()
-    {
-        let global = editor_state.input.pointer.global;
-        dispatch_move(editor_state.selected_tool, editor_state, global, dirty_mask);
-        apply_damage_rects(editor_state, dirty_mask);
-    }
-}
-
+use crate::editor::dirty::{apply_damage_rects, mark_all_dirty, mark_dirty};
+use crate::editor::{DamageZone, EditorState};
+use crate::interaction::ClickTarget;
+use crate::keys::{self, Chord, Key};
+use crate::theme::font;
+use crate::tools::{
+    Tool, dispatch_activate, dispatch_button, dispatch_key, dispatch_move, dispatch_text,
+};
+use crate::types::{MouseButton, PointerState, SpecialKey};
+use crate::ui::magnifier::MagnifierState;
+use crate::ui::panel::UiPanel;
+use crate::ui::settings_panel::char_index_for_x;
+use crate::ui::settings_panel::{ArrowHoldState, SettingsWidget, StepperArrow};
+use crate::ui::text_field::CursorInit;
+use crate::ui::toolbar::{ToolbarButton, ToolbarItem};
+use crate::utils::{get_full_workspace_rect, global_point_to_local};
+pub use scroll::handle_axis_scroll;
+#[cfg(test)]
+pub use scroll::handle_scroll;
+use scroll::languages_button_hit;
+use std::time::Instant;
 /// 【界面】【鼠标按钮】将 button 的 pressed 状态分派到 editor_state 的弹层或工具；dirty_mask 返回重绘显示器
-pub fn handle_pointer_button(
+pub(crate) fn handle_canvas_pointer_button(
     editor_state: &mut EditorState,
     button: MouseButton,
     pressed: bool,
     dirty_mask: &mut u32,
 ) {
+    if super::annotation_selection::release(editor_state, button, pressed) {
+        return;
+    }
+    // 1. 【选区尺寸】【平台点击】观测本次实际事件，其他界面消费按钮时也保留正确的平台点击序列
+    editor_state.selection_size.clicks.button(
+        button,
+        pressed,
+        editor_state.input.pointer.global,
+        editor_state.input.pointer_timestamp,
+        Instant::now(),
+    );
+    if super::selection_translation::input::button(editor_state, button, pressed, dirty_mask) {
+        apply_damage_rects(editor_state, dirty_mask);
+        return;
+    }
     if pressed {
         editor_state.commit_text_size_wheel();
     }
+    if super::external_actions::button(editor_state, button, pressed, dirty_mask) {
+        return;
+    }
     if text_context_menu::button(editor_state, button, pressed, dirty_mask) {
+        apply_damage_rects(editor_state, dirty_mask);
+        return;
+    }
+    if super::selection_size::input::button(editor_state, button, pressed, dirty_mask) {
         apply_damage_rects(editor_state, dirty_mask);
         return;
     }
@@ -241,7 +141,6 @@ pub fn handle_pointer_button(
     editor_state.arrow_popover.cancel_scroll();
     editor_state.line_popover.cancel_scroll();
     editor_state.filter_popover.cancel_scroll();
-
     let is_left_click_pressed = matches!(button, MouseButton::Left) && pressed;
 
     if matches!(button, MouseButton::Left) && !pressed {
@@ -528,6 +427,9 @@ pub fn handle_pointer_button(
 
     // ── 2. dispatch event to active tool ─────────────────────────────────────
 
+    if is_left_click_pressed && super::annotation_selection::press(editor_state, dirty_mask) {
+        return;
+    }
     if is_left_click_pressed {
         editor_state.input.left_canvas = true;
         editor_state.settings_panel.dirty = true;
@@ -553,6 +455,7 @@ pub fn handle_pointer_button(
         return;
     }
 
+    super::region_detection::input::button(editor_state, button, pressed, dirty_mask);
     dispatch_button(
         editor_state.selected_tool,
         editor_state,
@@ -560,6 +463,8 @@ pub fn handle_pointer_button(
         pressed,
         dirty_mask,
     );
+
+    super::region_detection::input::sync(editor_state, dirty_mask);
 
     if (matches!(button, MouseButton::Left) && !pressed) || matches!(button, MouseButton::Right) {
         update_toolbar(editor_state, dirty_mask);
@@ -571,6 +476,10 @@ pub fn handle_pointer_button(
 
 /// 【界面】【工具切换】在 editor_state 中切换到 tool 并结束旧手势与弹层；dirty_mask 返回重绘显示器
 pub fn select_tool(editor_state: &mut EditorState, tool: Tool, dirty_mask: &mut u32) {
+    if editor_state.selected_tool != tool {
+        editor_state.selection.creating = false;
+    }
+    super::selection_size::apply::commit(editor_state, dirty_mask);
     crate::editor::text_session::commit(editor_state, dirty_mask);
     let tb_button =
         editor_state.toolbar.items.iter().position(
@@ -612,7 +521,7 @@ pub fn select_tool(editor_state: &mut EditorState, tool: Tool, dirty_mask: &mut 
         editor_state.selection.zone = get_full_workspace_rect(&editor_state.placements);
         mark_all_dirty(dirty_mask, editor_state.placements.len());
     }
-    dispatch_deactivate(editor_state.selected_tool, editor_state, dirty_mask);
+    super::annotation_collection::input::deactivate(editor_state, tool, dirty_mask);
     editor_state.selected_tool = tool;
     editor_state.toolbar.selected = tb_button;
     editor_state.action_toolbar.dirty = true;
@@ -654,6 +563,8 @@ pub fn refresh_panels(editor_state: &mut EditorState, dirty_mask: &mut u32) {
     if editor_state.filter_popover.is_visible() {
         filter::update(editor_state, dirty_mask);
     }
+    super::selection_size::panels::update(editor_state, dirty_mask);
+    super::selection_translation::panels::update(editor_state, dirty_mask);
 }
 
 fn update_pointer(

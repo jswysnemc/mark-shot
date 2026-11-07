@@ -61,7 +61,7 @@ impl TextEditor {
         scale: f32,
         focused: bool,
     ) {
-        self.draw_at(fonts, cache, canvas, rect, scale, focused, 0.0);
+        self.draw_at(fonts, cache, canvas, rect, None, scale, focused, 0.0);
     }
 
     /// 【界面控件】【横向字段】在 rect 内绘制不换行字段，offset 保存横向视区；自动保持光标可见
@@ -75,6 +75,21 @@ impl TextEditor {
         focused: bool,
         offset: &mut f32,
     ) {
+        self.draw_single_line_clipped(fonts, cache, canvas, rect, rect, scale, focused, offset);
+    }
+
+    /// 【界面控件】【字段视区】用 fonts、cache 在 canvas 的 rect 绘制单行字段，viewport 额外裁切，scale、focused、offset 保持原光标和滚动坐标，无返回值
+    pub fn draw_single_line_clipped(
+        &mut self,
+        fonts: &mut FontSystem,
+        cache: &mut SwashCache,
+        canvas: &mut Pixmap,
+        rect: Rect,
+        viewport: Rect,
+        scale: f32,
+        focused: bool,
+        offset: &mut f32,
+    ) {
         self.resize(fonts, rect.width(), rect.height());
         if focused && let Some((x, _)) = self.display_editor(fonts).cursor_position() {
             if x as f32 <= *offset {
@@ -84,7 +99,16 @@ impl TextEditor {
                 *offset = (x as f32 - rect.width() + 4.0).max(0.0);
             }
         }
-        self.draw_at(fonts, cache, canvas, rect, scale, focused, *offset);
+        self.draw_at(
+            fonts,
+            cache,
+            canvas,
+            rect,
+            Some(viewport),
+            scale,
+            focused,
+            *offset,
+        );
     }
 
     /// 【界面控件】【裁切绘制】按 offset 移动画面但保持 rect 裁切范围；其他参数与公共绘制接口一致
@@ -94,6 +118,7 @@ impl TextEditor {
         cache: &mut SwashCache,
         canvas: &mut Pixmap,
         rect: Rect,
+        viewport: Option<Rect>,
         scale: f32,
         focused: bool,
         offset: f32,
@@ -103,31 +128,43 @@ impl TextEditor {
             ((rect.left() - offset) * scale).round() as i32,
             (rect.top() * scale).round() as i32,
         );
+        let Some(visible_rect) = viewport.map_or(Some(rect), |viewport| rect.intersect(&viewport))
+        else {
+            return;
+        };
         let clip = [
-            (rect.left() * scale).round() as i32,
-            origin.1,
-            (rect.right() * scale).ceil() as i32,
-            (rect.bottom() * scale).ceil() as i32,
+            (visible_rect.left() * scale).round() as i32,
+            (visible_rect.top() * scale).round() as i32,
+            (visible_rect.right() * scale).ceil() as i32,
+            (visible_rect.bottom() * scale).ceil() as i32,
         ];
         let visible = self
             .preedit()
             .is_none_or(|preedit| preedit.cursor.is_some());
+        let mut colors = self
+            .style
+            .colors
+            .unwrap_or_else(|| {
+                [
+                    color::foreground(),
+                    color::caret(),
+                    color::text_selection(),
+                    color::foreground(),
+                ]
+            })
+            .map(|color| color.cosmic());
         let cursor = if focused && visible {
-            color::caret().cosmic()
+            colors[1]
         } else {
             cosmic_text::Color::rgba(0, 0, 0, 0)
         };
+        colors[1] = cursor;
         crate::renderer::editor_text::draw_editor(
             self.display_editor(fonts),
             fonts,
             cache,
             scale,
-            [
-                color::foreground().cosmic(),
-                cursor,
-                color::text_selection().cosmic(),
-                color::foreground().cosmic(),
-            ],
+            colors,
             |x, y, width, height, color| {
                 blend(
                     canvas,

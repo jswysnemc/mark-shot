@@ -75,7 +75,7 @@ impl OverlayState {
         self.pending_flush = true;
     }
 
-    /// 【截图弹层】【创建更新】按 frame 与 qh 创建或更新菜单；序列号必须属于真实按钮及同一座席，返回协议结果
+    /// 【截图弹层】【创建更新】按 frame 与 qh 创建或更新菜单；序列号必须属于真实按钮或按键及同一座席，返回协议结果
     pub fn sync_popup(&mut self, frame: PopupFrame<'_>, qh: &QueueHandle<Self>) -> AppResult {
         validate(&frame)?;
         if self.viewporter.is_none() && (frame.scale < 1.0 || frame.scale.fract() != 0.0) {
@@ -112,8 +112,9 @@ impl OverlayState {
                     | ConstraintAdjustment::FlipY,
             );
             let xdg_parent = match &parent.role {
-                Role::Window(window) => Some(window.xdg_surface()),
+                Role::Window(window) | Role::ScrollParent(window) => Some(window.xdg_surface()),
                 Role::Layer(_) => None,
+                Role::ScrollPopup(popup) => Some(popup.popup.xdg_surface()),
             };
             let popup = Popup::from_surface(
                 xdg_parent,
@@ -230,6 +231,28 @@ impl PopupHandler for OverlayState {
         popup: &Popup,
         configure: PopupConfigure,
     ) {
+        if let Some((&index, surface)) = self.surfaces.iter_mut().find(|(_, surface)| {
+            matches!(&surface.role, Role::ScrollPopup(current) if &current.popup == popup)
+        }) {
+            let size = (configure.width.max(1) as u32, configure.height.max(1) as u32);
+            if let Role::ScrollPopup(current) = &mut surface.role
+                && !current.configured(size, &configure.kind)
+            {
+                return;
+            }
+            surface.width = size.0;
+            surface.height = size.1;
+            if surface.scroll_frame.is_some() {
+                if let Err(error) = self.paint_scroll_frame(index, qh) {
+                    log::error!("【滚动截图】【尺寸提交】{error}");
+                    self.events.push_back(OverlayEvent::EscapePressed);
+                }
+            } else {
+                self.configure_surface(popup.wl_surface(), Some(size));
+            }
+            self.events.push_back(OverlayEvent::ScrollPanelConfigured { monitor_idx: index });
+            return;
+        }
         let Some(current) = self
             .popup
             .as_mut()
@@ -248,7 +271,10 @@ impl PopupHandler for OverlayState {
         }
     }
     /// 【截图弹层】【合成器取消】仅关闭 popup 对应的当前菜单，过期通知不影响新会话，无返回值
-    fn done(&mut self, _: &Connection, _: &QueueHandle<Self>, popup: &Popup) {
+    fn done(&mut self, _: &Connection, qh: &QueueHandle<Self>, popup: &Popup) {
+        if self.reopen_scroll_popup(popup, qh) {
+            return;
+        }
         if self
             .popup
             .as_ref()

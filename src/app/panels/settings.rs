@@ -26,10 +26,27 @@ use crate::ui::settings_panel::{
     compute_settings_placement, widgets_for_annotation, widgets_for_tool,
 };
 use stepper::format_stepper_number;
-use values::stepper_value;
+pub(crate) use values::stepper_value;
 
 /// 【属性面板】【面板同步】根据 editor_state 同步属性内容与可见位置；dirty_mask 返回重绘显示器，无返回值
 pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u32) {
+    if crate::editor::annotation_collection::properties::active(editor_state) {
+        let text = crate::ui::annotation_collection::layout::title(
+            editor_state.selected_annotation_ids().len(),
+        );
+        if editor_state
+            .settings_panel
+            .collection_title
+            .as_ref()
+            .is_none_or(|title| title.text != text)
+        {
+            editor_state.settings_panel.collection_title =
+                Some(crate::ui::annotation_collection::title::Title::new(
+                    text,
+                    &mut editor_state.text.font_system,
+                ));
+        }
+    }
     crate::editor::text_session::sync_style(editor_state, dirty_mask);
     if editor_state
         .text_session
@@ -106,11 +123,18 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
         _ if scanning => SettingsSource::OcrScanning,
         _ if awaiting => SettingsSource::OcrAwaiting { downloading },
         _ if ocr => SettingsSource::OcrResult { downloading },
+        _ if crate::editor::annotation_collection::properties::active(editor_state) => {
+            SettingsSource::Collection {
+                revision: editor_state.collection.revision,
+                count: editor_state.selected_annotation_ids().len(),
+            }
+        }
         Some(ann) => SettingsSource::Annotation(ann.id),
         None => SettingsSource::Tool(editor_state.selected_tool),
     };
 
     let mut new_widgets = match new_source {
+        SettingsSource::Collection { .. } => &crate::ui::settings_panel::TEXT_WIDGETS[..3],
         SettingsSource::OcrScanning => OCR_SCANNING_WIDGETS,
         SettingsSource::OcrNoModel { downloading: false } => OCR_NO_MODEL_WIDGETS,
         SettingsSource::OcrAwaiting { downloading: false } => OCR_AWAITING_WIDGETS,
@@ -125,14 +149,24 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
         selected_ann.map(|ann| &ann.shape),
         Some(AnnotationShape::Text { .. })
     ) || (selected_ann.is_none() && editor_state.selected_tool == Tool::Text);
-    let text_layout = text.then(|| {
-        crate::ui::text_properties::layout::TextLayout::new(
-            30.0,
-            11.0,
-            22.0,
-            selected_ann.is_some() && editor_state.selected_tool == Tool::Pick,
-        )
-    });
+    let text_layout = if let SettingsSource::Collection { .. } = new_source {
+        Some(crate::ui::annotation_collection::layout::new(
+            editor_state
+                .settings_panel
+                .collection_title
+                .as_ref()
+                .map_or(58.0, |title| title.cell_width),
+        ))
+    } else {
+        text.then(|| {
+            crate::ui::text_properties::layout::TextLayout::new(
+                30.0,
+                11.0,
+                22.0,
+                selected_ann.is_some() && editor_state.selected_tool == Tool::Pick,
+            )
+        })
+    };
     if text_layout.is_some_and(|layout| layout.controls[5].is_some()) {
         new_widgets = crate::ui::settings_panel::TEXT_EDIT_WIDGETS;
     }
@@ -144,7 +178,21 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
             _ => None,
         })
         .unwrap_or(editor_state.tool_settings.font_size);
+    if crate::editor::annotation_collection::properties::active(editor_state) {
+        editor_state.settings_panel.text_points =
+            crate::editor::annotation_collection::properties::first(editor_state).map_or(
+                20.0,
+                |annotation| {
+                    crate::editor::annotation_collection::properties::width(annotation) + 19.0
+                },
+            );
+    }
     editor_state.settings_panel.text_alpha = (selected_ann
+        .or_else(|| {
+            crate::editor::annotation_collection::properties::active(editor_state)
+                .then(|| crate::editor::annotation_collection::properties::first(editor_state))
+                .flatten()
+        })
         .map_or(editor_state.tool_settings.color, |ann| ann.color)
         .alpha()
         * 100.0)

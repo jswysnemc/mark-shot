@@ -24,7 +24,7 @@ pub fn sync(
         return Ok(());
     }
     let menu = state.text_context_menu.as_mut().unwrap();
-    if menu.native && !menu.dirty {
+    if menu.native && !menu.dirty && menu.drawn_theme == Some(crate::theme::Mode::current()) {
         return Ok(());
     }
     let scale = state.placements[menu.monitor_idx].scale;
@@ -98,6 +98,7 @@ pub fn event(state: &mut EditorState, id: u64, event: PopupEvent, dirty: &mut u3
             chord.map_or(Event::None, |chord| menu.key(chord.key, chord.mods.shift))
         }
         PopupEvent::Closed => Event::Close,
+        PopupEvent::Scroll { .. } => Event::None,
     };
     crate::app::text_context_menu::event(state, event, dirty);
 }

@@ -16,7 +16,7 @@ pub(super) fn draw_rect(
         color,
         stroke_width,
         LineCap::Butt,
-        LineJoin::Miter,
+        LineJoin::Round,
         shadow_color,
     );
 }

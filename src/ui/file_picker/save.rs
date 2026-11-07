@@ -1,9 +1,9 @@
 //! 【文件选择】【安全保存】同目录原子保存和明确覆盖授权
 
+#[cfg(any(target_os = "linux", test))]
+use std::fs;
 use std::{
-    fs::{self, File},
     io::{self, Write},
-    os::unix::fs::MetadataExt,
     path::Path,
 };
 
@@ -16,7 +16,9 @@ pub struct ExistingFile {
 }
 
 /// 【文件选择】【目标检查】检查 path 是否为普通文件；返回可用于覆盖确认的身份，拒绝链接与目录
+#[cfg(target_os = "linux")]
 pub fn existing(path: &Path) -> io::Result<Option<ExistingFile>> {
+    use std::os::unix::fs::MetadataExt;
     let metadata = match fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
@@ -53,7 +55,44 @@ pub fn write(png: &[u8], path: &Path, expected: Option<ExistingFile>) -> io::Res
             .persist_noclobber(path)
             .map_err(|error| error.error)?;
     }
-    File::open(parent)?.sync_all()
+    #[cfg(target_os = "linux")]
+    {
+        fs::File::open(parent)?.sync_all()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Ok(())
+    }
+}
+
+#[cfg(target_os = "windows")]
+/// 【Windows文件选择】【目标身份】按path返回系统卷、文件索引、长度与修改时间，拒绝链接或多重硬链接，供覆盖确认使用
+pub fn existing(path: &Path) -> io::Result<Option<ExistingFile>> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{
+        BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle,
+    };
+    let file = match crate::utils::platform::open_regular(path, false) {
+        Ok(file) => file,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    if !crate::utils::platform::regular(&file)? {
+        return Err(io::Error::other("target is not a single-link regular file"));
+    }
+    let mut info: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
+    if unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut info) } == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(Some(ExistingFile {
+        dev: u64::from(info.dwVolumeSerialNumber),
+        ino: (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow),
+        size: file.metadata()?.len(),
+        modified: (
+            i64::from(info.ftLastWriteTime.dwHighDateTime),
+            i64::from(info.ftLastWriteTime.dwLowDateTime),
+        ),
+    }))
 }
 
 #[cfg(test)]
@@ -80,7 +119,7 @@ mod tests {
         let target = directory.path().join("target");
         let link = directory.path().join("image.png");
         fs::write(&target, b"private").unwrap();
-        std::os::unix::fs::symlink(&target, &link).unwrap();
+        crate::utils::test_files::link_file(&target, &link).unwrap();
         assert!(existing(&link).is_err());
         assert!(write(b"changed", &link, None).is_err());
         assert_eq!(fs::read(target).unwrap(), b"private");

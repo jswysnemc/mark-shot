@@ -2,7 +2,7 @@
 
 use crate::ui::fonts::UiFonts;
 use crate::{
-    backend::wayland::window::KeyInput,
+    backend::window::KeyInput,
     keys::Key,
     ui::text_editor::{EditEvent, TextEditor},
 };

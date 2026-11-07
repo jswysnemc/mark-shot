@@ -1,0 +1,7 @@
+{"qt_version":"6.12.0","cases":[
+{"actions":[[10,10,40,40],[0,0,80,80],[0,0,80,80],null,null],"name":"window-z-None"},
+{"actions":[[10,10,40,40],[0,0,80,80],[0,0,80,80],null,null],"name":"window-z--5"},
+{"actions":[[0,0,80,80],[0,0,80,80],[0,0,80,80],null,null],"name":"window-z--2147483648"},
+{"actions":[[10,10,40,40],[0,0,80,80],[0,0,80,80],null,null],"name":"window-z-0"},
+{"actions":[[10,10,40,40],[0,0,80,80],[0,0,80,80],null,null],"name":"window-z-20"}
+]}

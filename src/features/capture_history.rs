@@ -19,6 +19,10 @@ pub mod transport;
 mod window;
 
 pub use window::run;
+#[cfg(target_os = "linux")]
+mod storage;
+#[cfg(target_os = "windows")]
+#[path = "capture_history/storage/windows.rs"]
 mod storage;
 pub mod store;
 

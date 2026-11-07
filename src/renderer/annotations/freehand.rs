@@ -10,6 +10,7 @@ pub(super) fn draw_pen(
     stroke_width: f32,
     shadow_color: Color,
 ) {
+    let stroke_width = p.window_units().stroke(stroke_width, 1.5, None);
     let Some(path) = freehand_path(points, 0, None) else {
         return;
     };
@@ -41,8 +42,9 @@ pub(super) fn draw_pen(
         .stroke_path(&path, &paint, &stroke, transform, None);
 }
 
+/// 【荧光笔】【颜色比例】按color返回原版二百级透明度颜色，保留八位四舍五入，不读取旧配置透明度
 pub(super) fn highlighter_color(mut color: Color) -> Color {
-    color.apply_opacity(crate::config::get().tools.highlighter.opacity);
+    color.set_alpha((color.alpha() * 200.0).round() / 255.0);
     color
 }
 
@@ -66,6 +68,7 @@ pub(super) fn stroke_highlighter(
     color: Color,
     stroke_width: f32,
 ) {
+    let stroke_width = p.window_units().stroke(stroke_width, 6.0, None);
     let flat_ends = if points.windows(2).all(|w| w[0] == w[1]) {
         [false; 2]
     } else {
@@ -74,6 +77,7 @@ pub(super) fn stroke_highlighter(
     let transform = p.transform();
     let mut paint = Paint::default();
     paint.set_color(highlighter_color(color));
+    paint.blend_mode = tiny_skia::BlendMode::Multiply;
     paint.anti_alias = true;
     let mut stroke = Stroke::default();
     stroke.width = stroke_width;
@@ -159,6 +163,7 @@ pub fn stroke_pen_segment(
     color: Color,
     stroke_width: f32,
 ) {
+    let stroke_width = p.window_units().stroke(stroke_width, 1.5, None);
     let transform = p.transform();
     let mut paint = Paint::default();
     paint.set_color(color);

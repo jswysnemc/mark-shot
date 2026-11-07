@@ -13,8 +13,12 @@ use tiny_skia::{Color, Pixmap, Rect};
 /// 【文字测试】【标注构造】按 text 创建二十点半粗体文字，使用内置 Inter 使普通测试不依赖系统字体；返回未排版标注
 fn annotation(text: &str) -> Annotation {
     Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id: 7,
         shape: AnnotationShape::Text {
+            frame: Default::default(),
             start: (16.0, 16.0),
             content: text.into(),
             font_size: 20.0,
@@ -361,8 +365,8 @@ fn wrapping_uses_content_width_and_scales_with_the_background() {
     let mut ann = annotation("one two three four five six");
     let (mut editor, mut fonts) = layout(&mut ann);
     let unwrapped = ann.bbox;
-    if let AnnotationShape::Text { appearance, .. } = &mut ann.shape {
-        appearance.wrap_width = Some(100.0);
+    if let AnnotationShape::Text { frame, .. } = &mut ann.shape {
+        frame.width = Some(100.0);
     }
     update_text_bbox_inline(&mut ann, &mut editor, &mut fonts);
     assert_eq!(editor.with_buffer(|buffer| buffer.size().0), Some(88.0));
@@ -371,16 +375,17 @@ fn wrapping_uses_content_width_and_scales_with_the_background() {
     assert!(ann.bbox.width() <= 100.0);
     if let AnnotationShape::Text {
         appearance,
+        frame,
         font_size,
         ..
     } = ann.scaled(0.5).shape
     {
-        assert_eq!(appearance.wrap_width, Some(50.0));
+        assert_eq!(frame.width, Some(50.0));
         assert_eq!(appearance.size_scale, 0.5);
         assert_eq!(font_size, 20.0);
     }
-    if let AnnotationShape::Text { appearance, .. } = &mut ann.shape {
-        appearance.wrap_width = None;
+    if let AnnotationShape::Text { frame, .. } = &mut ann.shape {
+        frame.width = None;
     }
     update_text_bbox_inline(&mut ann, &mut editor, &mut fonts);
     assert_eq!(ann.bbox, unwrapped);
@@ -391,9 +396,12 @@ fn wrapping_uses_content_width_and_scales_with_the_background() {
 fn too_narrow_boxes_disable_wrapping_at_every_scale() {
     for scale in [0.5, 0.75, 1.0, 1.25] {
         let mut ann = annotation("Mark Shot");
-        if let AnnotationShape::Text { appearance, .. } = &mut ann.shape {
+        if let AnnotationShape::Text {
+            frame, appearance, ..
+        } = &mut ann.shape
+        {
             appearance.size_scale = scale;
-            appearance.wrap_width = Some(20.0 * scale);
+            frame.width = Some(20.0 * scale);
         }
         let (editor, _) = layout(&mut ann);
         assert_eq!(
@@ -454,6 +462,7 @@ fn render_reference_fixture() {
         if let AnnotationShape::Text {
             start,
             appearance,
+            frame,
             font_size,
             bold,
             italic,
@@ -466,7 +475,7 @@ fn render_reference_fixture() {
             *italic = config["italic"].as_bool().unwrap_or(false);
             appearance.family = config["family"].as_str().unwrap_or("Sans Serif").into();
             appearance.size_scale = scale;
-            appearance.wrap_width = config["wrap_width"]
+            frame.width = config["wrap_width"]
                 .as_f64()
                 .map(|width| width as f32 * scale);
             appearance.background = mark_shot::ui::color_popover::parse_hex_color(

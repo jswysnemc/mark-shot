@@ -7,4 +7,6 @@ license = "MIT"
 publish = false
 
 [dependencies]
+bytemuck = "1.25"
+memmap2 = "0.9"
 shot-image = { path = "../shot-image" }

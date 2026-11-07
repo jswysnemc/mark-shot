@@ -15,6 +15,7 @@ from wayland_test_keyboard import focused_environment
 from wayland_text_pointer import CURRENT, click, pointer_context
 from wayland_virtual_pointer import transform_for_pointer
 from wayland_window_input_session import geometry
+from wayland_ocr_window_layout import source_point
 
 SOURCE = "alpha beta\ngamma"
 
@@ -72,8 +73,8 @@ def run(binary, root):
             process.stdin.close()
             assert select.select([process.stdout], [], [], 5)[0] and process.stdout.readline() == b"\n"
             window = geometry(process.pid, environment)
-            copy = (window["x"] + window["width"] - 44, window["y"] + 56)
-            close = (window["x"] + window["width"] - 34, window["y"] + 19)
+            copy = source_point(window)
+            close = (window["x"] + window["width"] - 21, window["y"] + 19)
             # 1. 【结果按钮测试】【左键时机】按下不能复制，释放后持久剪贴板才取得原文
             sentinel(environment)
             mouse(copy, True)
@@ -103,6 +104,8 @@ def run(binary, root):
             session.key("Return")
             session.key("ctrl+Escape")
             assert process.poll() is None, "right focus or a modified key closed the result window"
+            # 5. 【结果按钮测试】【反馈到期】先等待全文复制的单次反馈期限，不把合法清除当作空闲轮询
+            time.sleep(2.05)
             before = session.resources(process.pid)
             time.sleep(1.1)
             after = session.resources(process.pid)

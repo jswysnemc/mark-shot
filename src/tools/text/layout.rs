@@ -58,17 +58,20 @@ pub fn text_bounds(ann: &Annotation, editor: &Editor<'static>) -> Rect {
     let (width, height) = editor.with_buffer(|buffer| {
         let mut width = 0.0_f32;
         let mut height = buffer.metrics().line_height;
+        // 1. 【文字标注】【自然收框】未换行时按实际字形收框，存储矩形高度不改变文字排版高度
         for run in buffer.layout_runs() {
             width = width.max(run.line_w);
             height = height.max(run.line_top + run.line_height);
         }
-        // 1. 【文字标注】【换行框宽】实际原版测量保留换行文档的可用宽度，不能只按最长字形行收框
+        // 2. 【文字标注】【换行宽度】预览沿用文档分配宽度，原图选框另外排除软换行尾部空格
         if buffer.wrap() != cosmic_text::Wrap::None {
             width = width.max(buffer.size().0.unwrap_or(0.0));
         }
         (width, height)
     });
-    geometry::bounds(*start, width, height, appearance.size_scale)
+    let base = ann.text_stored_bounds();
+    let origin = base.map_or(*start, |bounds| (bounds.left(), bounds.top()));
+    geometry::bounds(origin, width, height, appearance.size_scale)
 }
 
 /// 【文字标注】【输入同步】把 id 对应 editor 正文同步到 annotations；font_system 排版并更新背景边界，无返回值
@@ -85,7 +88,7 @@ pub(super) fn sync_content_from_editor(
             *content = text;
         }
         synchronize_editor(ann, editor, font_system, true);
-        ann.bbox = text_bounds(ann, editor);
+        update_bounds(ann, editor, font_system);
     }
 }
 
@@ -103,7 +106,7 @@ pub fn ensure_text_editor<'a>(
 }
 
 /// 【文字标注】【样式同步】用 ann 内容与外观更新 editor；font_system 提供字体，force_reflow 用于实际输入后重新检查缺字与换行，无返回值
-fn synchronize_editor(
+pub(super) fn synchronize_editor(
     ann: &Annotation,
     editor: &mut Editor<'static>,
     font_system: &mut cosmic_text::FontSystem,
@@ -111,6 +114,7 @@ fn synchronize_editor(
 ) {
     let AnnotationShape::Text {
         content,
+        frame,
         font_size,
         bold,
         italic,
@@ -135,10 +139,14 @@ fn synchronize_editor(
     } else {
         cosmic_text::Style::Normal
     };
-    let width = appearance.wrap_width.and_then(|width| {
-        let available = width - geometry::padding(appearance.size_scale).0 * 2.0;
-        (available >= 16.0 * appearance.size_scale).then_some(available)
-    });
+    let width = frame
+        .width
+        .and_then(|_| ann.text_stored_bounds())
+        .and_then(|bounds| {
+            let width = bounds.width();
+            let available = width - geometry::padding(appearance.size_scale).0 * 2.0;
+            (available >= 16.0 * appearance.size_scale).then_some(available)
+        });
     let changed = editor.with_buffer(|buffer| {
         let style_differs = buffer.lines.first().is_none_or(|line| {
             let attrs = line.attrs_list().defaults();
@@ -163,12 +171,7 @@ fn synchronize_editor(
                 let source_width = if appearance.size_scale == 1.0 {
                     natural_width(buffer)
                 } else {
-                    let pixels = geometry::pixels(*font_size, 1.0);
-                    let mut source = Buffer::new_empty(Metrics::new(pixels, pixels * 1.4));
-                    source.set_wrap(cosmic_text::Wrap::None);
-                    crate::fonts::text_spans::set_text(&mut source, font_system, content, &attrs);
-                    shape_entire_buffer(&mut source, font_system, true);
-                    natural_width(&source)
+                    super::source_layout::natural_width(ann, font_system)
                 };
                 source_width > available / appearance.size_scale + 0.5
             });
@@ -184,11 +187,25 @@ fn synchronize_editor(
 }
 
 /// 【文字标注】【自然宽度】返回 buffer 所有段落中的最大自然行宽，用于原图换行判断
-fn natural_width(buffer: &Buffer) -> f32 {
+pub(super) fn natural_width(buffer: &Buffer) -> f32 {
     buffer
         .layout_runs()
         .map(|run| run.line_w)
         .fold(0.0, f32::max)
+}
+
+/// 【文字标注】【双重边界】按ann、editor和font_system更新原图选框及当前字形缓存，存储宽高保持独立，无返回值
+fn update_bounds(
+    ann: &mut Annotation,
+    editor: &Editor<'static>,
+    font_system: &mut cosmic_text::FontSystem,
+) {
+    let painted = text_bounds(ann, editor);
+    let bounds = super::source_layout::source_bounds(ann, font_system);
+    ann.bbox = bounds;
+    if let AnnotationShape::Text { frame, .. } = &mut ann.shape {
+        frame.painted = Some(painted);
+    }
 }
 
 /// 【文字标注】【边界更新】按 ann 与 editor 当前正文刷新排版及背景边界；font_system 提供字形，无返回值
@@ -199,7 +216,7 @@ pub fn update_text_bbox_inline(
 ) {
     synchronize_editor(ann, editor, font_system, false);
     editor.with_buffer_mut(|buffer| shape_entire_buffer(buffer, font_system, true));
-    ann.bbox = text_bounds(ann, editor);
+    update_bounds(ann, editor, font_system);
 }
 
 /// 【文字标注】【确认重排】按 ann 已确认正文重新解析字体与缺字回退，editor 保留光标和选区，font_system 提供字体，无返回值
@@ -209,5 +226,5 @@ pub fn reflow_text_editor(
     font_system: &mut cosmic_text::FontSystem,
 ) {
     synchronize_editor(ann, editor, font_system, true);
-    ann.bbox = text_bounds(ann, editor);
+    update_bounds(ann, editor, font_system);
 }

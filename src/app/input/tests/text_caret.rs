@@ -179,7 +179,7 @@ fn fractional_selected_text_does_not_accumulate_outside_caret_damage() {
         let size = ((640.0 * scale) as u32, (480.0 * scale) as u32);
         let mut source = tiny_skia::Pixmap::new(size.0, size.1).unwrap();
         source.fill(tiny_skia::Color::from_rgba8(30, 34, 38, 255));
-        state.captures[0].pixmap = source.clone();
+        state.captures[0].pixmap = source.clone().into();
         state.captures[0].scale = scale;
         state.canvas[0] = source.clone();
         state.dimmed[0] = source;

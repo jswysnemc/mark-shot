@@ -9,21 +9,26 @@ use tiny_skia::Rect;
 pub struct HighlighterTool;
 
 impl ToolBehavior for HighlighterTool {
+    /// 【荧光笔】【创建提交】按state、button与pressed更新草稿或提交笔迹，dirty_mask返回重绘范围，无返回值
     fn on_button(
         &self,
         state: &mut EditorState,
-        _button: MouseButton,
+        button: MouseButton,
         pressed: bool,
         dirty_mask: &mut u32,
     ) {
-        let pos = (
-            state.input.pointer.global.0 as f32,
-            state.input.pointer.global.1 as f32,
-        );
+        if button != MouseButton::Left {
+            return;
+        }
+        let pos = (state.canvas_point().0 as f32, state.canvas_point().1 as f32);
 
         if pressed {
             state.input.straight = false;
             let mut ann = Annotation {
+                style_scale: 1.0,
+                rotation_degrees: 0.0,
+                frozen_bounds: crate::tools::drawing_space::DrawingSpace::from_editor(state)
+                    .map(|space| space.bounds),
                 id: state.next_id,
                 shape: AnnotationShape::Highlighter {
                     points: vec![pos],
@@ -31,9 +36,10 @@ impl ToolBehavior for HighlighterTool {
                 },
                 color: state.tool_settings.color,
                 shadow_color: shadow_color_for(state.tool_settings.color),
-                stroke_width: state.tool_settings.stroke(StrokeGroup::Freehand),
+                stroke_width: state.tool_settings.stroke(StrokeGroup::Highlighter),
                 bbox: Rect::from_xywh(pos.0, pos.1, 1.0, 1.0).unwrap(),
             };
+            state.adopt_annotation_style(&mut ann);
             ann.update_bbox();
             let tail_bbox = ann.pen_active_tail_bbox();
             state.damage_rects.push(DamageZone::Global(tail_bbox));
@@ -55,16 +61,14 @@ impl ToolBehavior for HighlighterTool {
         }
     }
 
+    /// 【画布导航】【工具移动】按state稳定画布指针更新草稿，_global提供已转换位置，dirty_mask返回重绘范围，无返回值
     fn on_move(&self, state: &mut EditorState, _global: (f64, f64), dirty_mask: &mut u32) {
         if state.input.shift {
             straighten(state);
             return;
         }
 
-        let raw_pos = (
-            state.input.pointer.global.0 as f32,
-            state.input.pointer.global.1 as f32,
-        );
+        let raw_pos = (state.canvas_point().0 as f32, state.canvas_point().1 as f32);
 
         let Some(ann) = state.pending.as_mut() else {
             return;

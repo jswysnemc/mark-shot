@@ -260,6 +260,20 @@ async fn capture_one(
 
 #[async_trait]
 impl CaptureMethod for KdeMethod {
+    /// 【持续捕获】【KWin会话】按 outputs 创建复用系统总线的捕获后端，返回固定目标会话
+    async fn open_session(
+        &self,
+        outputs: &[Output],
+    ) -> crate::backend::capture_session::Result<
+        Box<dyn crate::backend::capture_session::CaptureSession>,
+    > {
+        let method = Self::with_cursor(self.include_cursor);
+        method.session_bus().await?;
+        Ok(crate::backend::capture_session::repeated(
+            Box::new(method),
+            outputs,
+        ))
+    }
     async fn capture_frame(&self, outputs: &[Output]) -> Result<CaptureResult, Box<dyn Error>> {
         let inner = async {
             let proxy = ScreenShot2Proxy::new(self.session_bus().await?).await?;
@@ -326,7 +340,7 @@ impl CaptureMethod for KdeMethod {
         let pixmap = tiny_skia::Pixmap::from_vec(shot.pixels, size)
             .ok_or("KWin sent fewer pixels than the window size")?;
         Ok(Capture {
-            pixmap,
+            pixmap: pixmap.into(),
             scale: shot.scale.unwrap_or(1.0) as f32,
         })
     }

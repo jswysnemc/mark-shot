@@ -124,7 +124,7 @@ fn selected_text_editor_keeps_tool_and_commits_one_global_change() {
     key(&mut state, "Ctrl+Return", &mut dirty);
     assert_eq!(content(&state), "updated");
     assert_eq!(state.annotations[0].id, id);
-    assert_eq!(state.selected_annotation, Some(0));
+    assert_eq!(state.selected_annotation_index(), Some(0));
     assert_eq!(state.undo_stack.len(), 1);
     state.undo(&mut dirty);
     assert_eq!(content(&state), "original");
@@ -144,7 +144,7 @@ fn observed(state: &EditorState) -> serde_json::Value {
             }
         })
         .collect::<Vec<_>>();
-    serde_json::json!({"texts":texts,"editor_text":session.map(|session|crate::editor::text_session::plain_text(if let AnnotationShape::Text {content,..}=&session.working.shape {content} else {""})).unwrap_or_default(),"editor_visible":session.is_some(),"editor_undo":session.is_some_and(|session|session.history.available(false)),"editor_redo":session.is_some_and(|session|session.history.available(true)),"selected":state.selected_annotation.is_some(),"tool":if state.selected_tool==Tool::Text {"text"} else {"select"}})
+    serde_json::json!({"texts":texts,"editor_text":session.map(|session|crate::editor::text_session::plain_text(if let AnnotationShape::Text {content,..}=&session.working.shape {content} else {""})).unwrap_or_default(),"editor_visible":session.is_some(),"editor_undo":session.is_some_and(|session|session.history.available(false)),"editor_redo":session.is_some_and(|session|session.history.available(true)),"selected":state.selected_annotation_index().is_some(),"tool":if state.selected_tool==Tool::Text {"text"} else {"select"}})
 }
 
 /// 【文字事务测试】【原版差分】经真实输入路由比较九组 Qt 新建、已有对象和局部撤销记录，显式目录可保存实际结果
@@ -307,9 +307,9 @@ fn deleting_text_restores_its_selection_on_undo() {
     key(&mut state, "Backspace", &mut dirty);
     key(&mut state, "Ctrl+Return", &mut dirty);
     assert!(state.annotations.is_empty());
-    assert!(state.selected_annotation.is_none());
+    assert!(state.selected_annotation_index().is_none());
     state.undo(&mut dirty);
-    assert_eq!(state.selected_annotation, Some(0));
+    assert_eq!(state.selected_annotation_index(), Some(0));
     assert_eq!(state.annotations[0].id, id);
     assert_eq!(content(&state), "original");
     state.redo(&mut dirty);

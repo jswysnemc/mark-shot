@@ -1,0 +1,46 @@
+{
+  "sources": {
+    "shot_window_layout.cpp": "c6a9cb7039df7721d7f2acf2e3aa55a2c451ea87f60525a07a2fc7118dc3cece",
+    "shot_window_hit_testing.cpp": "d997705150a17f9b79bdc66b073e2f1514861396b5d013f7cb0b2ba08667a526",
+    "shot_window_annotation_editing.cpp": "598a863a3f157b2d6a8e284938a2411598ef07e6e80924df29a98dc3456734ca",
+    "shot_window_input_shortcuts.cpp": "0fbc6e5587b85cd7b49343cd36f47054206ba71bde5b566eb6758fb233cde081",
+    "shot_window_internal.cpp": "7dfb3071a6f507a919496b23bf78dd2fd1bcf80321f714c8883fe362ab381dce",
+    "shot_window_internal.h": "b85b747c97b6bde1c2d1bb4e55bfac4c9ae1db5433d712af25e13a0d2090b14d",
+    "ui/canvas_scrollbar_style.cpp": "099eaf27042d27e1cc2ac8f9fff307a81ccc68ec02e52cc77748d2d15345e543",
+    "ui/canvas_scrollbar_style.h": "8fcef8bfe512b25a7512293fe956b08e0b58da41363b1094f33ec36d7d9a5830",
+    "shot_window_types.h": "5a45c02ba978e133a3b661e3e65fb706dcd03efa0d4d33eb7254e395d487f340"
+  },
+  "functions": {
+    "ShotWindow::updateFrozenImageRect": "dddabae7d3c132952cfc8db2210b8f9250b722469de0a3fe447e7abc7c364526",
+    "ShotWindow::zoomImageAt": "53d2b5cb38ec75e234f5421d542a4f773bccc2c39988c01d43a20028b6a47f69",
+    "ShotWindow::resetImageZoom": "20523466e2a75da2898fb4846894496d4e7f676afadad3366ab89974535b5bab",
+    "ShotWindow::panImageTo": "e3f05abab479c2fed6978e90b4823a26a4da2d33390cf8b3f3e52ae3c72f2763",
+    "ShotWindow::updateImageScrollBars": "9d6e9f8f7d432e7639d5f486909e5e89e9e102356c601aac057a4ddc38542e19",
+    "ShotWindow::setImageCenterFromScrollBars": "afacd62a844a4d59bcdf348ed0440d5987a29a6e7556677ca07836c22c3adc64",
+    "ShotWindow::imageNavigationAvailable": "3f99f4a67af8fe3ab90ea07cada0fedaf6f902e8fa2322af888d009955fa7d21",
+    "ShotWindow::wheelZoomsImage": "55bfb8be9cd1ecb8c9f7fd676f65afed27fa16bd26f6e38be24c379fe1234c93",
+    "ShotWindow::clampImagePoint": "d48479badf8cbaec858ab0ccff45f390b24242e15b73152cb15dcef6813afcc6",
+    "ShotWindow::widgetToImage": "8d719e29106b1b6306b345e7637785fc0e9d9ab4edb9b1a6564c285779e1ffb1",
+    "ShotWindow::imageToWidget": "d877a46eaf238801bf355e494d71d9a0474e79af4399dcfe12130d3cfb42e8f8",
+    "annotationWidthWheelSteps": "5397dfe7a244df9ddbeaff32bdd016da074e52ebf0f915fb34b72bab6c2bc6f2",
+    "annotationWidthWheelStepSize": "a8aae6f82d72006a35fd3fd234b5f3a8f109b49048bfc7e3823d73ce17bb80e0",
+    "ShotWindow::wheelEvent": "8ef456ce5b1bd2b84a25541f84c371dd33b95ea8e5e04edbd11d98edd836ae41",
+    "imageNavigationWheelFactor": "314e69137a62bd15a618eec9c219bcf1ec8e0d8890efe13263dd809a47479cab"
+  },
+  "harness": {
+    "probe.h": "bb956b0943d6d6584d38d904e69d2200b2ae6f38722ae53d66baf130d03178ea",
+    "reference.cpp": "64f628a64ad7996d9a003508e4c1c9bb285489461101367e1c7f6b180bc578fe",
+    "style_reference.cpp": "d098f40aa6a4a05c8c8443541696b125d48a7ea4caff0572408888a504164391"
+  },
+  "binary": "9d123b781702b2987f16e576e4fc4617b4bae811a4f01607bfe421bd01184a6c",
+  "reference": "978676f31900e3b3fc02092f6df6edc2a6763ed0f2199039d9b1ebee36827485",
+  "counts": {
+    "geometry": 28,
+    "wheel": 720,
+    "factor": 56,
+    "styles": 96
+  },
+  "geometry_steps": 420,
+  "qt": "6.12.0",
+  "scope": "Complete production navigation, coordinate and wheel functions; real native scrollbars with complete production style; fixture callbacks only record width routing and omit full ShotWindow setup."
+}

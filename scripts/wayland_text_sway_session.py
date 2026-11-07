@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 
 from wayland_test_keyboard import canonical_chord
+from wayland_sway_keyboard import Keyboard
 
 KEYBOARD = ContextVar("private_sway_keyboard", default=None)
 
@@ -17,31 +18,24 @@ KEYBOARD = ContextVar("private_sway_keyboard", default=None)
 @contextmanager
 def input_context():
     """【文字回归】【键盘范围】记录本次测试设备，首次按键才启动；退出时只终止本次键盘进程，无参数、无返回值"""
-    state = {"process": None}
+    state = {"keyboard": None}
     token = KEYBOARD.set(state)
     try:
         yield
     finally:
-        process = state["process"]
-        if process is not None and process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=3)
+        if state["keyboard"] is not None:
+            state["keyboard"].close()
         KEYBOARD.reset(token)
 
 
 def keyboard_ready():
-    """【文字回归】【持续键盘】在已验证私有会话保留一个无按键设备，避免每次命令撤销键盘能力；没有测试范围时拒绝，无返回值"""
+    """【文字回归】【持续键盘】在已验证私有会话保留有效映射设备，避免每次命令撤销键盘能力；没有测试范围时拒绝，无返回值"""
     state = KEYBOARD.get()
     if state is None:
         raise RuntimeError("Sway keyboard requires an owned private input context")
-    if state["process"] is None:
-        state["process"] = subprocess.Popen(["wtype", "-s", "600000"], env=environment(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(0.1)
-    if state["process"].poll() is not None:
+    if state["keyboard"] is None:
+        state["keyboard"] = Keyboard(environment())
+    if state["keyboard"].process.poll() is not None:
         raise RuntimeError("the private persistent keyboard exited unexpectedly")
 
 
@@ -62,18 +56,10 @@ def environment():
 
 def key(value):
     """【文字回归】【私有按键】将 value 转为规范键名并送入已校验的 Sway，无返回值；不连接外部显示服务器"""
-    chord = canonical_chord(value).split("+")
+    canonical_chord(value)
     keyboard_ready()
-    modifiers = ["logo" if item == "super" else item for item in chord[:-1]]
-    # 1. 【文字回归】【键盘就绪】无界面座席没有常驻键盘，先等待能力通知与客户端绑定，再发送实际按下
-    command = ["wtype", "-s", "100"]
-    for modifier in modifiers:
-        command += ["-M", modifier]
-    command += ["-k", chord[-1]]
-    for modifier in reversed(modifiers):
-        command += ["-m", modifier]
-    command += ["-s", "50"]
-    subprocess.run(command, env=environment(), check=True, timeout=3)
+    environment()
+    KEYBOARD.get()["keyboard"].key(value)
     time.sleep(0.04)
 
 

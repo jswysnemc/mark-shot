@@ -31,13 +31,15 @@ impl EditorState {
             .selection
             .zone
             .as_ref()
-            .and_then(|sel| global_selection_to_local(sel, placement));
+            .and_then(|sel| self.canvas_transform().rect(*sel))
+            .and_then(|sel| global_selection_to_local(&sel, placement));
 
         let prev_local = self
             .selection
             .prev_zone
             .as_ref()
-            .and_then(|sel| global_selection_to_local(sel, placement));
+            .and_then(|sel| self.canvas_transform().rect(*sel))
+            .and_then(|sel| global_selection_to_local(&sel, placement));
 
         if let Some(r) = local_sel
             .as_ref()
@@ -90,29 +92,28 @@ impl EditorState {
         let offset = placement.offset();
         let (mw, mh) = (placement.size.0 as f32, placement.size.1 as f32);
 
-        fn global_to_local_padded(
-            global_bbox: &Rect,
-            offset: (f32, f32),
-            pad: f32,
-            mw: f32,
-            mh: f32,
-        ) -> Option<Rect> {
-            let l = global_bbox.left() - offset.0 - pad;
-            let t = global_bbox.top() - offset.1 - pad;
-            let r = global_bbox.right() - offset.0 + pad;
-            let b = global_bbox.bottom() - offset.1 + pad;
+        let global_to_local_padded =
+            |global_bbox: &Rect, offset: (f32, f32), pad: f32, mw: f32, mh: f32| -> Option<Rect> {
+                let view = self.canvas_transform();
+                let global_bbox = view.rect(*global_bbox)?;
+                let pad =
+                    (pad * view.scale as f32).max(if view.is_identity() { 4.0 } else { 32.0 });
+                let l = global_bbox.left() - offset.0 - pad;
+                let t = global_bbox.top() - offset.1 - pad;
+                let r = global_bbox.right() - offset.0 + pad;
+                let b = global_bbox.bottom() - offset.1 + pad;
 
-            let ix1 = l.max(0.0);
-            let iy1 = t.max(0.0);
-            let ix2 = r.min(mw);
-            let iy2 = b.min(mh);
+                let ix1 = l.max(0.0);
+                let iy1 = t.max(0.0);
+                let ix2 = r.min(mw);
+                let iy2 = b.min(mh);
 
-            if ix2 <= ix1 || iy2 <= iy1 {
-                return None;
-            }
+                if ix2 <= ix1 || iy2 <= iy1 {
+                    return None;
+                }
 
-            Rect::from_ltrb(ix1, iy1, ix2, iy2)
-        }
+                Rect::from_ltrb(ix1, iy1, ix2, iy2)
+            };
 
         let is_pen_drawing = matches!(
             self.selected_tool,
@@ -121,28 +122,43 @@ impl EditorState {
 
         if !is_pen_drawing {
             if let Some(ann) = &self.pending {
-                let pad = ann.visual_pad();
+                let area = self.ruler_window_damage(ann, self.ann_drag.is_some());
+                let pad = if area.is_some() {
+                    0.0
+                } else {
+                    ann.visual_pad()
+                };
                 dirty = union_rect(
                     dirty,
-                    global_to_local_padded(&ann.bbox, offset, pad, mw, mh),
+                    global_to_local_padded(&area.unwrap_or(ann.bbox), offset, pad, mw, mh),
                 );
             }
             if let Some(ann) = &self.prev_pending {
-                let pad = ann.visual_pad();
+                let area = self.ruler_window_damage(ann, self.ann_drag.is_some());
+                let pad = if area.is_some() {
+                    0.0
+                } else {
+                    ann.visual_pad()
+                };
                 dirty = union_rect(
                     dirty,
-                    global_to_local_padded(&ann.bbox, offset, pad, mw, mh),
+                    global_to_local_padded(&area.unwrap_or(ann.bbox), offset, pad, mw, mh),
                 );
             }
         }
         if self.text_session.is_none()
-            && let Some(ann_idx) = self.selected_annotation
+            && let Some(ann_idx) = self.selected_annotation_index()
             && let Some(ann) = self.annotations.get(ann_idx)
         {
-            let pad = crate::renderer::selection_chrome_pad().max(ann.visual_pad());
+            let area = self.ruler_window_damage(ann, true);
+            let pad = if area.is_some() {
+                0.0
+            } else {
+                crate::renderer::selection_chrome_pad().max(ann.visual_pad())
+            };
             dirty = union_rect(
                 dirty,
-                global_to_local_padded(&ann.bbox, offset, pad, mw, mh),
+                global_to_local_padded(&area.unwrap_or(ann.bbox), offset, pad, mw, mh),
             );
         }
 
@@ -283,19 +299,39 @@ pub fn apply_damage_rects(editor_state: &mut EditorState, dirty_mask: &mut u32) 
 
     if !is_pen_drawing {
         if let Some(ann) = &editor_state.pending {
-            *dirty_mask |= get_overlapping_monitors(&ann.bbox, &editor_state.placements);
+            *dirty_mask |= editor_state
+                .canvas_transform()
+                .rect(ann.bbox)
+                .map_or(0, |rect| {
+                    get_overlapping_monitors(&rect, &editor_state.placements)
+                });
         }
         if let Some(ann) = &editor_state.prev_pending {
-            *dirty_mask |= get_overlapping_monitors(&ann.bbox, &editor_state.placements);
+            *dirty_mask |= editor_state
+                .canvas_transform()
+                .rect(ann.bbox)
+                .map_or(0, |rect| {
+                    get_overlapping_monitors(&rect, &editor_state.placements)
+                });
         }
     }
     for rect in &editor_state.layer_damage_rects {
-        *dirty_mask |= get_overlapping_monitors(rect, &editor_state.placements);
+        *dirty_mask |= editor_state
+            .canvas_transform()
+            .rect(*rect)
+            .map_or(0, |rect| {
+                get_overlapping_monitors(&rect, &editor_state.placements)
+            });
     }
     for zone in &editor_state.damage_rects {
         match zone {
             DamageZone::Global(rect) => {
-                *dirty_mask |= get_overlapping_monitors(rect, &editor_state.placements);
+                *dirty_mask |= editor_state
+                    .canvas_transform()
+                    .rect(*rect)
+                    .map_or(0, |rect| {
+                        get_overlapping_monitors(&rect, &editor_state.placements)
+                    });
             }
             DamageZone::Local { monitor_idx, .. } => {
                 mark_dirty(dirty_mask, *monitor_idx);

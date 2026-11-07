@@ -1,6 +1,6 @@
 use crate::keys::Chord;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MouseButton {
     Left,
     Right,
@@ -26,6 +26,11 @@ impl PointerState {
 
 #[derive(Debug, Clone)]
 pub enum OverlayEvent {
+    /// 【主选择区】【接收完成】id 绑定本次粘贴，空正文表示来源不可用或传输失败
+    PrimaryText {
+        id: u64,
+        text: Option<String>,
+    },
     TextInputFocus(super::text_input::Focus),
     TextInputLeave {
         focus_id: u64,
@@ -35,6 +40,8 @@ pub enum OverlayEvent {
         monitor_idx: usize,
         x: f64,
         y: f64,
+        /// 【截图输入】【合并轨迹】保存有界实际位置和同输出共线端点，未合并事件保持空列表
+        history: Vec<super::pointer_motion::PointerMotion>,
     },
     Focus {
         monitor_idx: usize,
@@ -46,15 +53,24 @@ pub enum OverlayEvent {
         button: MouseButton,
         pressed: bool,
         serial: Option<u32>,
+        /// 【截图输入】【按钮时间】Wayland 原始毫秒时间，未使用协议输入的调用保持空值
+        timestamp: Option<u32>,
     },
     Popup {
         id: u64,
         event: super::popup::PopupEvent,
     },
+    /// 【截图弹层】【键盘序列】真实按键的原生序列号，先于对应按键动作分派，用于建立新的菜单抓取
+    PopupSerial(u32),
     EscapePressed,
+    /// 【界面主题】【外部通知】同配置的另一个进程已更新主题，存活控件需要刷新
+    ThemeChanged,
     Tick,
     /// compositor showed the last frame of this monitor, it can take the next one
     FrameDone {
+        monitor_idx: usize,
+    },
+    ScrollPanelConfigured {
         monitor_idx: usize,
     },
     Key {

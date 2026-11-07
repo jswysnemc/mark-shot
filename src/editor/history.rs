@@ -14,10 +14,14 @@ impl EditorState {
             annotations: self.annotations.clone(),
             number_sequence: self.number_sequence,
             selected_id: self.ann_drag.as_ref().map(|drag| drag.orig.id).or_else(|| {
-                self.selected_annotation
+                self.selected_annotation_index()
                     .and_then(|index| self.annotations.get(index))
                     .map(|annotation| annotation.id)
             }),
+            selected_ids: self.ann_drag.as_ref().map_or_else(
+                || self.selected_annotation_ids().to_vec(),
+                |drag| vec![drag.orig.id],
+            ),
             next_id: self.next_id,
         }
     }
@@ -71,7 +75,7 @@ impl EditorState {
                     &drag.orig,
                 );
                 self.annotations.insert(insert_idx, drag.orig);
-                self.selected_annotation = Some(insert_idx);
+                self.select_annotation_index(Some(insert_idx));
             }
             self.prev_pending = None;
             self.line_session.clear();
@@ -90,7 +94,7 @@ impl EditorState {
             self.damage_rects
                 .push(DamageZone::Global(ann.damage_bbox(true)));
             self.prev_pending = None;
-            self.selected_annotation = None;
+            self.select_annotation_index(None);
             self.restore_pen_segments(dirty_mask);
             self.pending_pen_baked = 0;
             self.input.mouse_down = false;
@@ -107,7 +111,7 @@ impl EditorState {
         // Commit any uncommitted settings/color stepper or slider snapshot
         let settings_snapshot = self.settings_panel.pre_edit_snapshot.take();
         self.commit_snapshot(settings_snapshot);
-        let color_snapshot = self.color_popover.pre_edit_snapshot.take();
+        let color_snapshot = self.color_popover.take_edit_snapshot();
         self.commit_snapshot(color_snapshot);
 
         let restored = match step {
@@ -117,8 +121,10 @@ impl EditorState {
         let Some(restored) = restored else {
             return;
         };
+        self.damage_collection();
+        self.end_collection_interaction();
 
-        if let Some(sel_idx) = self.selected_annotation
+        if let Some(sel_idx) = self.selected_annotation_index()
             && let Some(ann) = self.annotations.get(sel_idx)
         {
             self.damage_rects
@@ -132,13 +138,15 @@ impl EditorState {
         );
 
         let previous_selected_id = self
-            .selected_annotation
+            .selected_annotation_index()
             .and_then(|index| self.annotations.get(index))
             .map(|annotation| annotation.id);
+        let previous_selected_ids = self.selected_annotation_ids().to_vec();
         let replaced = HistorySnapshot {
             annotations: std::mem::replace(&mut self.annotations, restored.annotations),
             number_sequence: std::mem::replace(&mut self.number_sequence, restored.number_sequence),
             selected_id: previous_selected_id,
+            selected_ids: previous_selected_ids,
             next_id: std::mem::replace(&mut self.next_id, restored.next_id),
         };
         match step {
@@ -146,7 +154,13 @@ impl EditorState {
             Step::Redo => self.undo_stack.push(replaced),
         }
 
-        self.reselect_by_id(restored.selected_id);
+        let selected_ids = if restored.selected_ids.is_empty() {
+            restored.selected_id.into_iter().collect()
+        } else {
+            restored.selected_ids
+        };
+        self.select_annotation_ids(selected_ids);
+        self.damage_collection();
         self.line_session.clear();
 
         self.ann_drag = None;
@@ -157,17 +171,6 @@ impl EditorState {
         self.relayout_text_annotations();
 
         *dirty_mask = u32::MAX;
-    }
-
-    /// Annotations returns as copies, selection is followed by id.
-    fn reselect_by_id(&mut self, selected_id: Option<u64>) {
-        self.selected_annotation =
-            selected_id.and_then(|id| self.annotations.iter().position(|ann| ann.id == id));
-
-        if let Some(idx) = self.selected_annotation {
-            self.damage_rects
-                .push(DamageZone::Global(self.annotations[idx].damage_bbox(true)));
-        }
     }
 
     fn relayout_text_annotations(&mut self) {

@@ -13,7 +13,7 @@ use tiny_skia::Color;
 use crate::editor::{DamageZone, EditorState};
 use crate::tools::ToolBehavior;
 use crate::types::{MouseButton, SpecialKey};
-use crate::ui::magnifier::{magnifier_rect, sample_pixel};
+use crate::ui::magnifier::magnifier_rect;
 use crate::ui::settings_panel::ValueField;
 use crate::ui::toast::ToastKind;
 
@@ -99,11 +99,21 @@ pub fn copy_value(state: &mut EditorState, field: ValueField, color: Color) {
 }
 
 fn color_under_pointer(state: &EditorState) -> Option<Color> {
-    let capture = state.captures.get(state.input.pointer.monitor_idx)?;
-    sample_pixel(
-        &capture.pixmap,
-        capture.to_native(state.input.pointer.local),
+    let point = state.canvas_point();
+    let pixel = crate::renderer::FrozenImage::from_parts(
+        state.file_canvas.as_ref(),
+        &state.captures,
+        &state.placements,
     )
+    .sample((point.0 as f32, point.1 as f32))?;
+    let pixel = tiny_skia::PremultipliedColorU8::from_rgba(pixel[0], pixel[1], pixel[2], pixel[3])?
+        .demultiply();
+    Some(Color::from_rgba8(
+        pixel.red(),
+        pixel.green(),
+        pixel.blue(),
+        pixel.alpha(),
+    ))
 }
 
 fn damage_loupe(state: &mut EditorState, dirty_mask: &mut u32) {

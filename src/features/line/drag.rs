@@ -6,10 +6,10 @@ use super::{LineSkeleton, Point, geometry, polyline::distance};
 use crate::types::{SelectionHandle, SignedRect};
 use crate::utils::{apply_handle_drag, hit_test_rect_handle};
 
-const FRAME_PADDING: f32 = 10.0;
+const FRAME_PADDING: f32 = 0.0;
 const POINT_HIT: f32 = 10.0;
 
-/// 【线条】【外框几何】返回 bbox 向外留出定点空间的框，避免细直线端点遮挡缩放把手
+/// 【线条】【外框几何】按bbox返回生产原图选框，不额外扩容，返回范围或空值
 pub fn frame(bbox: Rect) -> Option<Rect> {
     bbox.outset(FRAME_PADDING, FRAME_PADDING)
 }
@@ -22,7 +22,7 @@ pub fn rotation_point(skeleton: &LineSkeleton, bbox: Rect) -> Point {
         .fold(bbox.top(), f32::min);
     (
         (bbox.left() + bbox.right()) * 0.5,
-        top - FRAME_PADDING - 24.0,
+        top - FRAME_PADDING - 26.0,
     )
 }
 

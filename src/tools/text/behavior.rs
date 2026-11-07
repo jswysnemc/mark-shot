@@ -23,7 +23,7 @@ impl ToolBehavior for TextTool {
             .rev()
             .find(|annotation| {
                 matches!(annotation.shape, AnnotationShape::Text { .. })
-                    && annotation.initial_hit_test(state.input.pointer.global)
+                    && annotation.initial_hit_test(state.canvas_point())
             })
             .map(|annotation| annotation.id)
         {
@@ -33,7 +33,7 @@ impl ToolBehavior for TextTool {
         let Some(space) = crate::tools::drawing_space::DrawingSpace::from_editor(state) else {
             return;
         };
-        let Some(point) = space.start_point(state.input.pointer.global) else {
+        let Some(point) = space.start_point(state.canvas_point()) else {
             return;
         };
         if !state.selection.zone.is_some_and(|rect| {
@@ -151,7 +151,7 @@ impl ToolBehavior for TextTool {
                 editor.set_selection(Selection::None);
             }
         }
-        if let Some(old_idx) = state.selected_annotation.take()
+        if let Some(old_idx) = state.take_selected_annotation()
             && let Some(old_ann) = state.annotations.get(old_idx)
         {
             state.layer_damage_rects.push(old_ann.damage_bbox(false));
@@ -163,7 +163,7 @@ impl ToolBehavior for TextTool {
             }
         }
         state.text.editing = None;
-        state.selected_annotation = None;
+        state.select_annotation_index(None);
         state.annotations_dirty = true;
     }
 
@@ -173,13 +173,11 @@ impl ToolBehavior for TextTool {
             return cursor_for_handle(drag.handle, true).unwrap_or(CursorIcon::Text);
         }
         if let Some(ann) = state
-            .selected_annotation
+            .selected_annotation_index()
             .and_then(|idx| state.annotations.get(idx))
             && matches!(ann.shape, AnnotationShape::Text { .. })
-            && let Some(icon) = cursor_for_handle(
-                handle_hit_test_for_annotation(ann, state.input.pointer.global),
-                false,
-            )
+            && let Some(icon) =
+                cursor_for_handle(state.canvas_handle(ann, state.canvas_point()), false)
         {
             return icon;
         }

@@ -1,7 +1,8 @@
 //! 【文字识别】【原文菜单动作】共享编辑器历史和纯文本剪贴板，不调用截图标注文字的业务命令
 
+use super::translation::input::{self, Field};
 use super::window::ResultWindow;
-use crate::{backend::wayland::window::WindowAction, ui::context_menu::Row};
+use crate::{backend::window::WindowAction, ui::context_menu::Row};
 
 const ITEMS: [(&str, &str); 9] = [
     ("Undo", "Ctrl+Z"),
@@ -17,17 +18,24 @@ const ITEMS: [(&str, &str); 9] = [
 
 /// 【文字识别】【菜单资格】根据 state 的正文、选择和历史以及 clipboard 是否有纯文本构造原版九行，返回菜单行
 pub(super) fn rows(state: &ResultWindow, clipboard: bool) -> Vec<Row> {
-    let selected = state.source.selected_text().is_some();
+    rows_for(state, Field::Source, clipboard)
+}
+
+/// 【文字识别】【字段资格】按 state、field 和 clipboard 返回原版菜单资格，只读译文保留复制与全选，不允许历史或修改
+pub(super) fn rows_for(state: &ResultWindow, field: Field, clipboard: bool) -> Vec<Row> {
+    let editor = input::editor(state, field).unwrap();
+    let editable = input::editable(state, field);
+    let selected = editor.selected_text().is_some();
     let enabled = [
-        state.source.can_undo(),
-        state.source.can_redo(),
+        editable && editor.can_undo(),
+        editable && editor.can_redo(),
         false,
+        editable && selected,
         selected,
-        selected,
-        clipboard,
-        selected,
+        editable && clipboard,
+        editable && selected,
         false,
-        !state.source.text().is_empty(),
+        !editor.is_empty(),
     ];
     ITEMS
         .iter()
@@ -55,15 +63,28 @@ fn copy(state: &mut ResultWindow, text: &str) -> bool {
 
 /// 【文字识别】【菜单执行】对 state 执行 index 对应已启用动作；原生表面已销毁，重新检查选择和历史，返回重绘动作
 pub(super) fn activate(state: &mut ResultWindow, index: usize) -> WindowAction {
+    activate_for(state, Field::Source, index)
+}
+
+/// 【文字识别】【字段执行】对 state 的 field 执行已启用 index，返回重绘；所属资格再次校验，不把译文或语言修改写入原文
+pub(super) fn activate_for(state: &mut ResultWindow, field: Field, index: usize) -> WindowAction {
+    let editable = input::editable(state, field);
+    if !editable && matches!(index, 0 | 1 | 3 | 5 | 6) {
+        return WindowAction::None;
+    }
     let changed = match index {
-        0 => state.source.undo(&mut state.fonts),
-        1 => state.source.redo(&mut state.fonts),
+        0 => input::with_editor(state, field, |editor, fonts| editor.undo(fonts)).unwrap_or(false),
+        1 => input::with_editor(state, field, |editor, fonts| editor.redo(fonts)).unwrap_or(false),
         3 | 4 => {
-            let Some(text) = state.source.selected_text() else {
+            let Some(text) = input::editor(state, field).and_then(|editor| editor.selected_text())
+            else {
                 return WindowAction::None;
             };
             let copied = copy(state, &text);
-            copied && index == 3 && state.source.delete_selection(&mut state.fonts)
+            copied
+                && index == 3
+                && input::with_editor(state, field, |editor, fonts| editor.delete_selection(fonts))
+                    .unwrap_or(false)
         }
         5 => {
             let Some(text) = crate::utils::paste_from_clipboard().filter(|text| !text.is_empty())
@@ -71,18 +92,19 @@ pub(super) fn activate(state: &mut ResultWindow, index: usize) -> WindowAction {
                 return WindowAction::None;
             };
             state.ensure_fonts(&text);
-            state.source.insert(&mut state.fonts, &text)
+            input::with_editor(state, field, |editor, fonts| editor.insert(fonts, &text))
+                .unwrap_or(false)
         }
-        6 => state.source.delete_selection(&mut state.fonts),
+        6 => input::with_editor(state, field, |editor, fonts| editor.delete_selection(fonts))
+            .unwrap_or(false),
         8 => {
-            state.source.select_all(&mut state.fonts);
+            input::with_editor(state, field, |editor, fonts| editor.select_all(fonts));
             false
         }
         _ => return WindowAction::None,
     };
     if changed {
         state.status = None;
-        state.copied = false;
     }
     WindowAction::Redraw
 }

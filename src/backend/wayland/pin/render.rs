@@ -22,7 +22,7 @@ pub(super) fn buffer(
 impl Pin {
     /// 【贴图】【可见图像】按 pixels、scale、placement 返回裁切显示缓冲；原图、边框和文字层共用完整逻辑原点
     pub fn draw_image(
-        &self,
+        &mut self,
         pixels: (u32, u32),
         scale: f32,
         placement: Placement,
@@ -48,6 +48,22 @@ impl Pin {
             ),
             None,
         );
+        if self.translation.active {
+            crate::features::image_translation::paint::viewport_xy(
+                &mut canvas,
+                &self.translation.blocks,
+                (
+                    placement.offset.0 as f32 * sx,
+                    placement.offset.1 as f32 * sy,
+                ),
+                (
+                    placement.logical.width as f32 * sx / self.image.image.width() as f32,
+                    placement.logical.height as f32 * sy / self.image.image.height() as f32,
+                ),
+                &mut self.font_system,
+                &mut self.swash,
+            );
+        }
         if self.text_selection {
             let mut painter = Painter::new(&mut canvas)
                 .with_scale(scale)

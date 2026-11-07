@@ -1,0 +1,35 @@
+{
+  "sources": {
+    "shot_window_annotation_painting.cpp": "422f709943ee09cf1b0df98bd16a1af49d781251dbeef6e8a8b643f7a77f4508",
+    "shot_window_hit_testing.cpp": "d997705150a17f9b79bdc66b073e2f1514861396b5d013f7cb0b2ba08667a526",
+    "shot_window_annotation_editing.cpp": "598a863a3f157b2d6a8e284938a2411598ef07e6e80924df29a98dc3456734ca",
+    "shot_window_internal.cpp": "7dfb3071a6f507a919496b23bf78dd2fd1bcf80321f714c8883fe362ab381dce",
+    "ui/theme.cpp": "2d4aa9e3c2c37a912a687f10b9d8028dfe6b44b686c07f1644705fb74ba05c69",
+    "line_skeleton_path.cpp": "10f2efca2cf27e23658f68b330a581882fde24089ec688c9c2067e9d74e6d217",
+    "annotation/arrow_rendering.cpp": "525d8c45e206f80e8369ecc6e4a719bad8aa42d2be73a391679cc172d2692e25",
+    "shot_window_internal.h": "b85b747c97b6bde1c2d1bb4e55bfac4c9ae1db5433d712af25e13a0d2090b14d",
+    "shot_window_types.h": "5a45c02ba978e133a3b661e3e65fb706dcd03efa0d4d33eb7254e395d487f340",
+    "ui/theme.h": "0c70dcc15a811cac820acdfef8a8552c146aed866418b0b657561dc6beab02e9",
+    "annotation/arrow_rendering.h": "1d18f8288cf7daf264ddf016d32880f3dfdfe21a4ccba842289f44e6001fc40b",
+    "annotation/arrow_style.h": "205fff267ff9e90724952521a2742fe9c13a6208082a90eebea6defe126b4e4a",
+    "line_skeleton_path.h": "51c3b9b986bbdf18f7851e49652a274b4b4909bb0dfc45b8fba7cec7ab719126"
+  },
+  "functions": {
+    "ShotWindow::drawAnnotation": "6729d8461d98347e529fb2d354a8fb27d46f4180a5b23b8d9f180aa968acea42",
+    "ShotWindow::drawNumber": "91523d31a1f205ea974a313a983c31f858b4a571dfef2b3f39405203de3a75e5",
+    "ShotWindow::annotationSizeScale": "3875a2556125160b3dc266601a458cc4e0a4a9b87090249a69d4551e7b76a18e",
+    "ShotWindow::imageToWidget": "d877a46eaf238801bf355e494d71d9a0474e79af4399dcfe12130d3cfb42e8f8",
+    "ShotWindow::imageRectToWidget": "e05c153310e02b71bba238c7755bb514350ffd4cf57df77338d0653db6b7cc5f",
+    "smoothedStrokePath": "133a0fca7a8056730946c38594c71c7a131994b0362e00ec1eb23cf15c0acdb9"
+  },
+  "harness": {
+    "probe.h": "24ab2ec0aae614f4221be79c934979d28d7e9b25ab8fffabd182cc0cb7327a2d",
+    "reference.cpp": "84df1372653b189875e1209c7b3d23ff6816a4313c1eef384379c101663d8b84"
+  },
+  "binary": "7cccfe40cc85a9f734dc894163f4ace22c25d4f6a6b053f503e726857cb2cd76",
+  "reference": "b35cc0566bb3e353de182fc62e525b4eb83df439094f382d02492816b705825f",
+  "samples": 144,
+  "qt": "6.12.0",
+  "scope": "Complete production drawAnnotation, drawNumber, view conversion and smoothing; complete linked theme, line skeleton and arrow rendering. Nonrotated pen, line, freehand highlighter, ellipse, arrow and Arabic number only. Rectangle, marker, ruler, filter, magnifier, text and nonzero rotation branches abort if reached. No full ShotWindow setup or native input is claimed.",
+  "metrics": "780e4c25cd783c540892beb76d92f70f3821b490a7bb37f126946744a1da2d38"
+}

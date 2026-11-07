@@ -72,6 +72,30 @@ impl ScrollSession {
         now.duration_since(self.last_capture) >= self.capture_interval()
     }
 
+    /// 【滚动截图】【下一期限】以 now 返回下次捕获剩余时间，暂停时无期限，避免定时空闲重绘
+    pub fn next_capture(&self, now: Instant) -> Option<Duration> {
+        (!self.paused)
+            .then(|| (self.last_capture + self.capture_interval()).saturating_duration_since(now))
+    }
+
+    /// 【滚动截图】【暂停切换】按 paused 更新状态，恢复后清除重复帧签名并立即捕获，无返回值
+    pub fn set_paused(&mut self, paused: bool) {
+        self.paused = paused;
+        self.status = if paused { "Paused" } else { "Capturing" }.into();
+        if !paused {
+            self.last_signature.clear();
+            self.last_progress = Instant::now();
+            self.last_capture = Instant::now() - Duration::from_millis(CAPTURE_INTERVAL_MS);
+        }
+    }
+
+    /// 【滚动截图】【区域移动】按 region 更新裁切区域并清除签名，不重置已经拼接的原图，无返回值
+    pub fn move_region(&mut self, region: Rect) {
+        self.region = region;
+        self.last_signature.clear();
+        self.status = "Region adjusted".into();
+    }
+
     /// Checks if scrolling has stopped to back off frame capture.
     pub fn should_idle(&self, now: Instant) -> bool {
         self.frame_count > 0
@@ -137,23 +161,24 @@ impl ScrollSession {
             Ok(true) => {
                 self.last_signature.clear();
                 self.status = "Waiting for scroll".into();
-                info!("scrolling capture switched axis to {next:?}");
+                info!("【滚动截图】【方向切换】捕获方向={next:?}");
                 true
             }
             Ok(false) => false,
             Err(e) => {
-                log::error!("failed to switch axis: {e}");
+                log::error!("【滚动截图】【方向切换】{e}");
                 false
             }
         }
     }
 
+    /// 【滚动截图】【缩略预览】无参数，返回当前修订的小图缓存，仅读取原图视图，不创建完整长图快照
     pub fn preview(&mut self) -> Option<&Pixmap> {
         let revision = self.stitcher.revision();
         if self.preview.is_none() || revision != self.preview_revision {
-            let image = self.stitcher.full_image().ok().flatten();
-            self.preview = image
-                .as_ref()
+            self.preview = self
+                .stitcher
+                .image_view()
                 .and_then(|image| preview::thumbnail(image, PREVIEW_WIDTH));
             self.preview_revision = revision;
         }
@@ -162,6 +187,11 @@ impl ScrollSession {
 
     pub fn result(&mut self) -> Option<Image> {
         self.stitcher.full_image().ok().flatten()
+    }
+
+    /// 【滚动截图】【原图借用】无参数，返回当前拼接像素的只读显示视图，不保存完整修订快照
+    pub fn source(&self) -> Option<shot_stitch::StitchedView<'_>> {
+        self.stitcher.image_view()
     }
 
     pub fn length_label(&self) -> String {

@@ -1,5 +1,9 @@
+pub(crate) mod annotation_collection;
 pub mod annotation_drag;
+mod annotation_style;
+pub mod canvas_navigation;
 pub mod color_selection;
+pub mod cursor_magnifier;
 pub mod dirty;
 pub mod drawing_gesture;
 pub mod edits;
@@ -14,21 +18,24 @@ pub mod magnifier_edits;
 pub mod number_edits;
 mod pen_cache;
 pub mod pen_layer_backup;
+pub(crate) mod region_rendering;
 pub mod ruler_labels;
 pub mod ruler_session;
 pub mod saved;
+pub mod selection_geometry;
 pub mod text_composition;
 pub mod text_edits;
 pub mod text_session;
 pub mod text_session_format;
 pub mod text_session_history;
+mod text_session_layout;
 pub mod text_size;
 pub mod text_size_history;
 
 use cosmic_text::{Editor, FontSystem, SwashCache};
 use std::collections::HashMap;
 use std::time::Instant;
-use tiny_skia::{Color, PathBuilder, Pixmap, Rect};
+use tiny_skia::{Pixmap, Rect};
 use usvg::Tree;
 
 use crate::editor::filter_cache::FilterCache;
@@ -50,6 +57,8 @@ pub struct InputState {
     pub keyboard_focus: Option<usize>,
     pub popup_serial: Option<u32>,
     pub pointer: PointerState,
+    /// 【选区尺寸】【平台时间】本次按钮携带的 Wayland 毫秒时间，事件分派结束后清理
+    pub pointer_timestamp: Option<u32>,
     pub drag_start: Option<(f64, f64)>,
     pub mouse_down: bool,
     pub left_canvas: bool,
@@ -71,6 +80,7 @@ impl Default for InputState {
             keyboard_focus: None,
             popup_serial: None,
             pointer: PointerState::default(),
+            pointer_timestamp: None,
             drag_start: None,
             mouse_down: false,
             left_canvas: false,
@@ -93,6 +103,8 @@ pub struct Magnifier {
     pub current: Option<MagnifierState>,
     pub prev: Option<MagnifierState>,
     pub hidden: bool,
+    pub visible: bool,
+    pub with_label: bool,
 }
 
 /// Text shaping and the live editors, one per text annotation.
@@ -138,10 +150,12 @@ pub struct EditorState {
     pub selected_tool: Tool,
     pub after_selection_tool: Tool,
     pub file_canvas: Option<file_canvas::FileCanvas>,
+    pub(crate) navigation: canvas_navigation::state::State,
     pub tool_active: bool,
     pub input: InputState,
     pub magnifier: Magnifier,
     pub selection: SelectionState,
+    pub(crate) region_detection: crate::app::region_detection::State,
     pub icons_cache: HashMap<&'static str, Tree>,
     pub damage_rects: Vec<DamageZone>,
 
@@ -153,6 +167,11 @@ pub struct EditorState {
     pub fullscreen_scope: bool,
     pub settings_panel: SettingsPanel,
     pub font_panel: crate::ui::font_panel::FontPanel,
+    pub external_panel: crate::ui::external_panel::ExternalPanel,
+    pub external_action_requested: Option<crate::features::external_actions::Action>,
+    pub(crate) upload: crate::app::upload::State,
+    pub(crate) selection_translation: crate::app::selection_translation::State,
+    pub(crate) selection_size: crate::app::selection_size::State,
     pub color_popover: ColorPickerPopover,
     pub model_popover: crate::ui::model_popover::ModelPopover,
     pub marker_popover: crate::ui::choice_popover::ChoicePopover,
@@ -173,10 +192,12 @@ pub struct EditorState {
     pub number_sequence: crate::features::number::NumberSequence,
     pub line_session: line_session::LineSession,
 
-    pub selected_annotation: Option<usize>,
+    pub(crate) collection: annotation_collection::state::State,
+    pub(crate) annotation_selection: crate::app::annotation_selection::State,
     pub ann_drag: Option<AnnDragState>,
 
     pub annotations_layer: Vec<Pixmap>,
+    pub(crate) region_rendering: region_rendering::State,
     pub annotations_dirty: bool,
     pub filters: FilterCache,
     /// 【激光】【临时状态】不进入持久标注、撤销记录或导出图像
@@ -247,6 +268,7 @@ impl EditorState {
             canvas: layers.canvas,
             dimmed: layers.dimmed,
             annotations_layer: layers.annotations,
+            region_rendering: Default::default(),
             placements,
             icons_cache,
             text,
@@ -260,11 +282,17 @@ impl EditorState {
             selected_tool: Tool::Selection,
             after_selection_tool: Tool::Selection,
             file_canvas: None,
+            navigation: Default::default(),
+            selection_size: Default::default(),
             tool_active: false,
             selection: SelectionState::default(),
+            region_detection: Default::default(),
             input: InputState::default(),
             magnifier: Magnifier {
-                hidden: crate::editor::saved::get().magnifier == Some(false),
+                hidden: crate::config::get().startup.selection_loupe.map_or_else(
+                    || crate::editor::saved::get().magnifier == Some(false),
+                    |enabled| !enabled,
+                ),
                 ..Magnifier::default()
             },
 
@@ -275,6 +303,10 @@ impl EditorState {
             fullscreen_scope: false,
             settings_panel: SettingsPanel::new(),
             font_panel: Default::default(),
+            external_panel: Default::default(),
+            external_action_requested: None,
+            upload: Default::default(),
+            selection_translation: Default::default(),
             color_popover: ColorPickerPopover::new(),
             model_popover: crate::ui::model_popover::ModelPopover::new(),
             marker_popover: crate::ui::choice_popover::ChoicePopover::new(
@@ -314,7 +346,8 @@ impl EditorState {
             redo_stack: Vec::new(),
             number_sequence: crate::features::number::NumberSequence::default(),
             line_session: line_session::LineSession::default(),
-            selected_annotation: None,
+            collection: Default::default(),
+            annotation_selection: Default::default(),
             ann_drag: None,
             annotations_dirty: false,
             filters: FilterCache::default(),
@@ -350,14 +383,15 @@ impl EditorState {
     }
 
     pub fn magnifier_shown(&self) -> bool {
-        !self.magnifier.hidden || self.picking()
+        cursor_magnifier::visible(self)
     }
 
-    // to avoid revbuilding the entire annotation layer like it was implemented before
-    // instead commited annotations are `baked`, so pending new annotations are separate from them
-    // so there will be absolutely no lags while drawing something on top of 10000th circles
+    /// 【标注绘制】【正文提交】按ann建立滤镜来源；区域模式保留矢量正文，旧缓存模式绘入持久图层，无返回值
     pub fn bake_annotation(&mut self, ann: &Annotation) {
         self.cache_filter(ann);
+        if !self.cache_annotation_pixels(ann) {
+            return;
+        }
         for (i, placement) in self.placements.iter().enumerate() {
             let offset = placement.offset();
             let pad = ann.visual_pad();
@@ -387,97 +421,17 @@ impl EditorState {
                     &self.filters.images,
                     None,
                 );
+                // 1. 【标注缓存】【提交后归还】完整正文已经落入原有栅格，归还透明页而不裁切笔迹或改变预乘颜色
+                crate::utils::transparent_pixmap::reclaim_blank(&mut self.annotations_layer[i]);
             }
         }
     }
 
-    /// where the dragged annotation is drawn, it's out of `annotations` while dragged
+    /// 【标注编辑】【调整顺序】无额外参数，返回实时标注在持久数组中的原始位置；没有调整草稿时返回空值
     pub fn dragged_index(&self) -> Option<usize> {
         self.ann_drag
             .as_ref()
             .filter(|_| self.pending.is_some())
             .map(|drag| drag.orig_index.min(self.annotations.len()))
-    }
-
-    /// 【画笔缓存】【片段绘制】缓存 start、control、end 构成的笔迹；color、stroke_width 控制样式，返回全局重绘区域
-    pub fn bake_pen_segment(
-        &mut self,
-        start: (f32, f32),
-        control: Option<(f32, f32)>,
-        end: (f32, f32),
-        color: Color,
-        stroke_width: f32,
-    ) -> Rect {
-        let mut pb = PathBuilder::new();
-        pb.move_to(start.0, start.1);
-        if let Some(ctrl) = control {
-            pb.quad_to(ctrl.0, ctrl.1, end.0, end.1);
-        } else {
-            pb.line_to(end.0, end.1);
-        }
-
-        let pad = crate::renderer::visual_pad(stroke_width);
-        let min_x = start
-            .0
-            .min(end.0)
-            .min(control.map(|c| c.0).unwrap_or(start.0))
-            - pad;
-        let min_y = start
-            .1
-            .min(end.1)
-            .min(control.map(|c| c.1).unwrap_or(start.1))
-            - pad;
-        let max_x = start
-            .0
-            .max(end.0)
-            .max(control.map(|c| c.0).unwrap_or(start.0))
-            + pad;
-        let max_y = start
-            .1
-            .max(end.1)
-            .max(control.map(|c| c.1).unwrap_or(start.1))
-            + pad;
-        let segment_bbox = Rect::from_ltrb(min_x, min_y, max_x, max_y).unwrap_or_else(|| {
-            Rect::from_xywh(start.0 - pad, start.1 - pad, pad * 2.0, pad * 2.0).unwrap()
-        });
-
-        if let Some(path) = pb.finish() {
-            for (i, placement) in self.placements.iter().enumerate() {
-                let offset = placement.offset();
-                let visual = Rect::from_ltrb(
-                    segment_bbox.left() - offset.0,
-                    segment_bbox.top() - offset.1,
-                    segment_bbox.right() - offset.0,
-                    segment_bbox.bottom() - offset.1,
-                );
-                if let (Some(vis), Some(mon)) = (visual, placement.rect())
-                    && rects_overlap(&vis, &mon)
-                {
-                    // 1. 【画笔缓存】【片段绘制】先保存当前像素，提交和取消时才能精确还原
-                    if let Some(pixel_rect) = crate::renderer::scale_rect(&vis, placement.scale)
-                        && let Some((x, y, width, height)) = crate::renderer::rect_bounds(
-                            &pixel_rect,
-                            self.annotations_layer[i].width(),
-                            self.annotations_layer[i].height(),
-                        )
-                        && let Some(rect) =
-                            tiny_skia::IntRect::from_xywh(x as i32, y as i32, width, height)
-                    {
-                        self.pen_backup
-                            .snapshot(i, &self.annotations_layer[i], rect);
-                    }
-                    crate::renderer::stroke_pen_segment(
-                        &mut crate::renderer::Painter::new(&mut self.annotations_layer[i])
-                            .with_scale(placement.scale)
-                            .with_origin(offset),
-                        &path,
-                        color,
-                        stroke_width,
-                    );
-                }
-            }
-        }
-
-        segment_bbox
     }
 }

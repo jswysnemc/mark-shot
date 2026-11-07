@@ -15,13 +15,34 @@ use crate::{
 use cosmic_text::{Attrs, Buffer, FontSystem, Metrics, Shaping, Weight};
 use tiny_skia::Pixmap;
 
-pub(super) const BACKGROUND: Rgba = Rgba(15, 23, 42, 255);
-pub(super) const FOREGROUND: Rgba = Rgba(241, 245, 249, 255);
-pub(super) const MUTED: Rgba = Rgba(148, 163, 184, 255);
-pub(super) const BORDER: Rgba = Rgba(51, 65, 85, 255);
-pub(super) const HOVER: Rgba = Rgba(30, 41, 59, 255);
-pub(super) const SELECTED: Rgba = Rgba(23, 57, 54, 255);
-pub(super) const ACCENT: Rgba = Rgba(94, 234, 212, 255);
+/// 【截图历史】【主题角色】返回当前主题的窗口底色，无参数
+pub(super) fn background() -> Rgba {
+    crate::theme::window::Palette::current().window
+}
+/// 【截图历史】【主题角色】返回当前主题的主要文字颜色，无参数
+pub(super) fn foreground() -> Rgba {
+    crate::theme::window::Palette::current().text
+}
+/// 【截图历史】【主题角色】返回当前主题的次要文字颜色，无参数
+pub(super) fn muted() -> Rgba {
+    crate::theme::window::Palette::current().muted
+}
+/// 【截图历史】【主题角色】返回当前主题的边框颜色，无参数
+pub(super) fn border() -> Rgba {
+    crate::theme::window::Palette::current().border
+}
+/// 【截图历史】【主题角色】返回当前主题的按钮底色，无参数
+pub(super) fn hover() -> Rgba {
+    crate::theme::window::Palette::current().alternate
+}
+/// 【截图历史】【主题角色】返回当前主题的选中底色，无参数
+pub(super) fn selected() -> Rgba {
+    crate::theme::window::Palette::current().pressed
+}
+/// 【截图历史】【主题角色】返回当前主题的强调颜色，无参数
+pub(super) fn accent() -> Rgba {
+    crate::theme::window::Palette::current().accent
+}
 const CLEAR: &str = include_str!("../../../assets/icons/mark-shot/clear.svg");
 
 /// 【截图历史】【图标缓存】只解析历史窗口使用的原版图标，返回矢量缓存，不加载全部标注工具
@@ -76,40 +97,40 @@ fn icon(control: Control) -> Option<&'static str> {
 /// 【截图历史】【按钮样式】用 state 和 control 生成原版前景、背景及边框，不改变业务状态
 fn button_style(state: &HistoryWindow, control: Control) -> ButtonStyle {
     let enabled = state.enabled(control);
-    let hover =
+    let hovered =
         state.hovered == Some(control) || (state.focused && state.focus == Focus::Control(control));
     let quiet = matches!(control, Control::Close | Control::Clear);
     let primary = control == Control::Copy;
     let fill = if !enabled {
-        HOVER
+        hover()
     } else if primary {
-        ACCENT
-    } else if quiet && !hover {
+        accent()
+    } else if quiet && !hovered {
         Rgba(0, 0, 0, 0)
     } else {
-        HOVER
+        hover()
     };
-    let foreground = if !enabled {
-        MUTED
+    let ink = if !enabled {
+        muted()
     } else if primary {
-        BACKGROUND
+        background()
     } else {
-        FOREGROUND
+        foreground()
     };
-    let border = if !enabled || (quiet && hover) {
-        BORDER
-    } else if primary && hover {
-        FOREGROUND
-    } else if primary || hover {
-        ACCENT
+    let border = if !enabled || (quiet && hovered) {
+        border()
+    } else if primary && hovered {
+        foreground()
+    } else if primary || hovered {
+        accent()
     } else if quiet {
         Rgba(0, 0, 0, 0)
     } else {
-        BORDER
+        border()
     };
     ButtonStyle {
         fill,
-        foreground,
+        foreground: ink,
         border,
         font_size: 40.0 / 3.0,
         weight: Weight(if primary { 600 } else { 500 }),
@@ -131,7 +152,7 @@ pub(super) fn draw(state: &mut HistoryWindow, canvas: &mut Pixmap, scale: f32) {
     painter.text(
         state.layout.summary,
         &format!("Screenshot History · {}", state.model.entries.len()),
-        TextStyle::new(40.0 / 3.0, FOREGROUND).weight(Weight(600)),
+        TextStyle::new(40.0 / 3.0, foreground()).weight(Weight(600)),
     );
     for ((control, bounds), style) in state.layout.buttons.iter().copied().zip(styles) {
         if control == Control::Enabled {
@@ -142,17 +163,17 @@ pub(super) fn draw(state: &mut HistoryWindow, canvas: &mut Pixmap, scale: f32) {
                 control.label(),
                 checked,
                 ButtonStyle {
-                    fill: if checked { ACCENT } else { BACKGROUND },
+                    fill: if checked { accent() } else { background() },
                     foreground: style.foreground,
                     border: if checked || state.hovered == Some(control) {
-                        ACCENT
+                        accent()
                     } else {
-                        BORDER
+                        border()
                     },
                     font_size: 12.0,
                     weight: Weight::NORMAL,
                 },
-                BACKGROUND,
+                background(),
             );
         } else {
             controls::icon_button(
@@ -169,7 +190,7 @@ pub(super) fn draw(state: &mut HistoryWindow, canvas: &mut Pixmap, scale: f32) {
         }
     }
     if state.splitter_hovered || state.splitter_drag.is_some() {
-        painter.fill_rounded(state.layout.splitter, 3.0, BORDER);
+        painter.fill_rounded(state.layout.splitter, 3.0, border());
     }
     if let Some(bounds) = state.layout.status
         && let Some(buffer) =
@@ -178,7 +199,7 @@ pub(super) fn draw(state: &mut HistoryWindow, canvas: &mut Pixmap, scale: f32) {
         let mut painter = Painter::new(canvas)
             .with_scale(scale)
             .with_text(&mut state.fonts, &mut state.cache);
-        painter.text_buffer(&buffer, (bounds.x(), bounds.y()), MUTED.color());
+        painter.text_buffer(&buffer, (bounds.x(), bounds.y()), muted().color());
     }
 }
 

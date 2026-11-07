@@ -8,6 +8,7 @@ use tiny_skia::{
 };
 
 use super::{Painter, text::shape_single_line};
+use crate::features::number::window_geometry::Geometry;
 use crate::features::number::{NumberMark, NumberStyle};
 
 pub(crate) struct NumberLabel {
@@ -15,29 +16,87 @@ pub(crate) struct NumberLabel {
     position: (f32, f32),
 }
 
-/// 【序号】【标签拟合】按 mark、width 在 painter 字体中排版白色标签；返回圆框内的排版，缺少字体时返回空值
-pub(crate) fn prepare(
-    painter: &mut Painter<'_>,
-    mark: NumberMark,
-    width: f32,
-) -> Option<NumberLabel> {
+impl NumberLabel {
+    /// 【序号】【实际标签边界】按mark返回旋转后的排版边界，包含已降到八点仍超出圆框的长标签，缺少有效排版时返回空值
+    pub(crate) fn bounds(&self, mark: NumberMark) -> Option<Rect> {
+        let width = self
+            .buffer
+            .layout_runs()
+            .map(|run| run.line_w)
+            .fold(0.0, f32::max);
+        let height: f32 = self.buffer.layout_runs().map(|run| run.line_height).sum();
+        let rect = Rect::from_xywh(
+            self.position.0,
+            self.position.1,
+            width.max(1.0),
+            height.max(1.0),
+        )?;
+        let corners = [
+            (rect.left(), rect.top()),
+            (rect.right(), rect.top()),
+            (rect.right(), rect.bottom()),
+            (rect.left(), rect.bottom()),
+        ]
+        .map(|point| mark.to_visual(point));
+        Rect::from_ltrb(
+            corners
+                .iter()
+                .map(|point| point.0)
+                .fold(f32::INFINITY, f32::min),
+            corners
+                .iter()
+                .map(|point| point.1)
+                .fold(f32::INFINITY, f32::min),
+            corners
+                .iter()
+                .map(|point| point.0)
+                .fold(f32::NEG_INFINITY, f32::max),
+            corners
+                .iter()
+                .map(|point| point.1)
+                .fold(f32::NEG_INFINITY, f32::max),
+        )
+    }
+}
+
+/// 【序号】【标签拟合】按geometry在painter字体中排版白色标签，返回逐点调整的排版，缺少字体时返回空值
+pub(crate) fn prepare(painter: &mut Painter<'_>, geometry: Geometry) -> Option<NumberLabel> {
+    let window = painter.window_units();
+    let mark = geometry.mark;
     let fonts = painter.fonts.as_mut()?;
-    let radius = mark.bubble_radius(width);
+    let radius = geometry.radius;
     let label = mark.style.label(mark.number);
-    let size = (radius * 0.92).clamp(12.0 * mark.style_scale, 54.0 * mark.style_scale);
+    let mut points = (window.window(radius) * 0.92).clamp(12.0, 54.0).round();
     let rect = Rect::from_xywh(
         mark.bubble.0 - radius * 0.79,
         mark.bubble.1 - radius * 0.8,
         radius * 1.58,
         radius * 1.6,
     )?;
-    Some(fit_label(
+    let cjk = mark.style.is_cjk() && !label.is_ascii();
+    let (mut buffer, mut width, mut height) = shape(
         fonts.system,
         &label,
-        size,
-        rect,
-        mark.style.is_cjk() && !label.is_ascii(),
-    ))
+        window.font_pixels(window.canvas(points)),
+        cjk,
+    );
+    // 1. 【序号】【窗口字号】原版逐点减小字号直到文字宽度可容纳，最低八点，不连续缩放既有字形
+    while points > 8.0 && width > rect.width() {
+        points -= 1.0;
+        (buffer, width, height) = shape(
+            fonts.system,
+            &label,
+            window.font_pixels(window.canvas(points)),
+            cjk,
+        );
+    }
+    Some(NumberLabel {
+        buffer,
+        position: (
+            rect.left() + (rect.width() - width) / 2.0,
+            rect.top() + (rect.height() - height) / 2.0,
+        ),
+    })
 }
 
 /// 【序号】【界面预览】把 style 的短预览按 color 绘入 painter 的 rect；中文强制使用内置子集，不依赖系统字体，无返回值

@@ -76,7 +76,7 @@ impl Dispatch<wp_fractional_scale_v1::WpFractionalScaleV1, SurfaceId> for Native
     /// 【原生窗口】【分数缩放】根据 event 的 120 分之一缩放值更新缓冲比例；不改变逻辑大小
     fn event(
         state: &mut Self,
-        _: &wp_fractional_scale_v1::WpFractionalScaleV1,
+        proxy: &wp_fractional_scale_v1::WpFractionalScaleV1,
         event: wp_fractional_scale_v1::Event,
         id: &SurfaceId,
         _: &Connection,
@@ -84,6 +84,7 @@ impl Dispatch<wp_fractional_scale_v1::WpFractionalScaleV1, SurfaceId> for Native
     ) {
         if let wp_fractional_scale_v1::Event::PreferredScale { scale } = event
             && let Some(surface) = state.surface_mut(*id)
+            && surface.fractional.as_ref() == Some(proxy)
         {
             surface.scale = (scale as f32 / 120.0).max(0.25);
             surface.dirty = true;

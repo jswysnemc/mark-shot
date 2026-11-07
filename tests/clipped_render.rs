@@ -71,3 +71,32 @@ fn partial_damage_keeps_an_isolated_buffer_and_preserves_outside_pixels() {
         }
     }
 }
+
+/// 【局部绘制测试】【嵌套场景坐标】两层场景裁切与直接裁切逐像素一致，同时保留既有本地坐标接口，无参数、无返回值
+#[test]
+fn nested_scene_clipping_matches_direct_damage_at_fractional_scales() {
+    for scale in [1.0, 1.25, 2.0] {
+        let mut direct = Pixmap::new(160, 100).unwrap();
+        direct.fill(Color::from_rgba8(30, 34, 38, 255));
+        let mut nested = direct.clone();
+        let viewport = Rect::from_xywh(30.0, 31.0, 80.0, 35.0).unwrap();
+        let cell = Rect::from_xywh(33.0, 34.0, 27.0, 20.0).unwrap();
+        Painter::new(&mut direct)
+            .with_scale(scale)
+            .clipped_scene(Some(cell), |painter| {
+                painter.fill_rounded(cell, 0.0, Color::from_rgba8(120, 230, 180, 255));
+            });
+        Painter::new(&mut nested)
+            .with_scale(scale)
+            .clipped_scene(Some(viewport), |painter| {
+                painter.clipped_scene(Some(cell), |painter| {
+                    painter.fill_rounded(cell, 0.0, Color::from_rgba8(120, 230, 180, 255));
+                });
+            });
+        assert_eq!(direct.data(), nested.data(), "scale {scale}");
+        assert_ne!(
+            direct.pixel((40.0 * scale) as u32, (40.0 * scale) as u32),
+            Some(tiny_skia::PremultipliedColorU8::from_rgba(30, 34, 38, 255).unwrap())
+        );
+    }
+}

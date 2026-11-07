@@ -158,7 +158,7 @@ pub fn insert_control(
         },
         dirty_mask,
     );
-    state.selected_annotation = Some(index);
+    state.select_annotation_index(Some(index));
     state.line_session.selected_point = Some((id, insertion.index));
     state.line_session.clear_click();
     true

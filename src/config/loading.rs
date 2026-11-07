@@ -18,17 +18,29 @@ pub fn log_warnings() {
 }
 
 pub(super) fn config_path() -> Option<PathBuf> {
-    Some(dirs::config_dir()?.join("mark-shot").join("config.toml"))
+    super::OVERRIDE_PATH
+        .get()
+        .cloned()
+        .or_else(super::paths::default_path)
 }
 
 pub(super) const MAX_BAD_LINES: usize = 64;
 
 pub(super) fn parse(text: &str, origin: &str) -> Config {
+    if super::document::is_json(std::path::Path::new(origin), text) {
+        return super::legacy::decode(text).unwrap_or_else(|_| {
+            complain(format!(
+                "【应用配置】【JSON 读取】无法读取 {origin}，使用默认配置"
+            ));
+            Config::default()
+        });
+    }
     let mut text = text.to_owned();
     for _ in 0..MAX_BAD_LINES {
         match toml::from_str::<Config>(&text) {
             Ok(mut config) => {
                 warn_unknown_keys(&text, origin);
+                super::interface_theme::apply(&mut config, &text);
                 config.resolve();
                 validate(&mut config);
                 return config;
@@ -57,10 +69,17 @@ pub(super) fn parse(text: &str, origin: &str) -> Config {
 
 /// Options without a default value
 pub(super) const UNSET_BY_DEFAULT: &[&str] = &[
+    "language",
     "log.level",
     "log.path",
     "tools.redact.mode",
     "tools.redact.pixelate",
+    "startup.default_tool",
+    "startup.normal_tool",
+    "startup.fullscreen_default_tool",
+    "startup.file_default_tool",
+    "startup.default_color",
+    "startup.selection_loupe",
 ];
 
 pub(super) fn warn_unknown_keys(text: &str, origin: &str) {
@@ -80,8 +99,9 @@ pub(super) fn warn_unknown_keys(text: &str, origin: &str) {
             match (known.get(key), value) {
                 (None, _) if UNSET_BY_DEFAULT.contains(&full.as_str()) => {}
                 (None, _) => complain(format!("config: {origin}: unknown key {full}, ignoring it")),
-                // keys.rs names the unknown actions itself
-                (Some(_), _) if full == "keys" => {}
+                // 1. 【配置】【独立校验】快捷键、翻译厂商和导出兼容字段由各自解析器处理，额外请求正文允许服务专有字段
+                (Some(_), _)
+                    if matches!(full.as_str(), "keys" | "translation" | "export" | "upload") => {}
                 (Some(toml::Value::Table(known)), toml::Value::Table(user)) => {
                     walk(user, known, &full, origin)
                 }
@@ -95,6 +115,7 @@ pub(super) fn warn_unknown_keys(text: &str, origin: &str) {
 /// 【配置】【参数校验】约束 config 的数值范围，非法参数回退到对应默认值；无返回值
 pub(super) fn validate(config: &mut Config) {
     config.history.normalize();
+    config.translation.normalize();
     config.pinned.border_width = if config.pinned.border_width.is_finite() {
         config.pinned.border_width.clamp(0.0, 16.0)
     } else {
@@ -191,13 +212,27 @@ pub(super) fn validate(config: &mut Config) {
     }
 }
 
-pub(super) fn write_template(path: &PathBuf) {
-    let written = path
+/// 【应用配置】【首次文件】按 path 原子创建对应格式的初始内容，返回文本；已有或竞争创建的文件重新读取，不覆盖现有配置
+pub(super) fn write_template(path: &PathBuf) -> std::io::Result<String> {
+    use std::io::Write;
+    let text = if super::document::is_json(path, "") {
+        "{}\n"
+    } else {
+        TEMPLATE
+    };
+    let parent = path
         .parent()
-        .map_or(Ok(()), std::fs::create_dir_all)
-        .and_then(|()| std::fs::write(path, TEMPLATE));
-    if let Err(e) = written {
-        complain(format!("config: cannot write {}: {e}", path.display()));
+        .ok_or_else(|| std::io::Error::other("configuration parent is unavailable"))?;
+    std::fs::create_dir_all(parent)?;
+    let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
+    temporary.write_all(text.as_bytes())?;
+    temporary.as_file().sync_all()?;
+    match temporary.persist_noclobber(path) {
+        Ok(_) => Ok(text.into()),
+        Err(error) if error.error.kind() == std::io::ErrorKind::AlreadyExists => {
+            super::persistence::read(path)
+        }
+        Err(error) => Err(error.error),
     }
 }
 
@@ -265,12 +300,12 @@ pub(super) fn migrate(text: &str) -> Option<String> {
 
 /// Config overide path set via `--config`. Only the first call takes effect
 pub fn init(override_path: Option<PathBuf>, overrides: impl FnOnce(&mut Config)) {
-    if let Some(path) = &override_path {
+    let path = override_path.or_else(config_path);
+    if let Some(path) = &path {
         let _ = OVERRIDE_PATH.set(std::path::absolute(path).unwrap_or_else(|_| path.clone()));
     }
-    let path = override_path.or_else(config_path);
     let mut config = match &path {
-        Some(path) => match std::fs::read_to_string(path) {
+        Some(path) => match super::persistence::read(path) {
             Ok(mut text) => {
                 if let Some(migrated) = migrate(&text) {
                     match std::fs::write(path, &migrated) {
@@ -287,8 +322,23 @@ pub fn init(override_path: Option<PathBuf>, overrides: impl FnOnce(&mut Config))
                 }
                 parse(&text, &path.display().to_string())
             }
-            Err(_) => {
-                write_template(path);
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                match write_template(path) {
+                    Ok(text) => parse(&text, &path.display().to_string()),
+                    Err(error) => {
+                        complain(format!(
+                            "【应用配置】【首次文件】无法创建 {}：{error}",
+                            path.display()
+                        ));
+                        Config::default()
+                    }
+                }
+            }
+            Err(error) => {
+                complain(format!(
+                    "【应用配置】【文件读取】无法读取 {}：{error}",
+                    path.display()
+                ));
                 Config::default()
             }
         },

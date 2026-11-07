@@ -1,12 +1,11 @@
 use std::io::Write;
 
+use crate::backend::session::Session as Connection;
 use serde::Serialize;
-use wayland_client::Connection;
 
 use super::arguments::CaptureOptions;
 use super::capture_output::{self, Report};
 use crate::AppResult;
-use crate::backend::wayland::overlay::WaylandOverlay;
 use crate::backend::{ScreenOverlay, output_selection};
 use crate::types::Output;
 
@@ -23,9 +22,9 @@ struct Display {
 }
 
 /// 【截图】【显示器发现】建立未映射的 Wayland 客户端，只读取输出信息，不显示编辑器
-fn discover() -> AppResult<(Connection, WaylandOverlay)> {
+fn discover() -> AppResult<(Connection, Box<dyn ScreenOverlay>)> {
     let connection = Connection::connect_to_env()?;
-    let overlay = WaylandOverlay::new(connection.clone(), false)?;
+    let overlay = crate::backend::initialize_overlay(connection.clone())?;
     Ok((connection, overlay))
 }
 

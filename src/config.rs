@@ -29,6 +29,7 @@ macro_rules! section {
     };
 }
 
+mod component_theme;
 mod values;
 pub use values::*;
 mod sections;
@@ -37,8 +38,30 @@ mod bindings;
 pub use bindings::*;
 mod loading;
 pub use loading::*;
+mod document;
+mod legacy;
+mod paths;
+pub(crate) mod startup;
+pub use startup::Startup;
 pub mod history;
+mod persistence;
 pub use history::History;
+pub mod translation;
+pub use translation::Translation;
+pub mod upload;
+pub use upload::Upload;
+pub mod ocr_result_window;
+pub use ocr_result_window::OcrResultWindow;
+pub mod interface_language;
+pub mod interface_theme;
+pub use interface_language::Ui;
+pub mod export;
+pub use export::Export;
+mod region_detection;
+pub use region_detection::Detection;
+#[cfg(test)]
+#[path = "config/tests/legacy_config.rs"]
+mod legacy_config_tests;
 #[cfg(test)]
 mod tests;
 
@@ -49,22 +72,30 @@ const fn rgb(r: u8, g: u8, b: u8) -> Rgba {
 // 【界面】【默认主题】紧凑石墨色面板，薄荷绿色用于交互强调
 const TEXT: Rgba = rgb(229, 237, 239);
 const OVERLAY2: Rgba = rgb(147, 153, 178);
-const SURFACE0: Rgba = rgb(39, 45, 47);
-const SURFACE1: Rgba = rgb(59, 70, 71);
 const CRUST: Rgba = rgb(16, 22, 23);
 const BLUE: Rgba = rgb(137, 180, 250);
-const ROSEWATER: Rgba = rgb(245, 224, 220);
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Config {
+    pub ui: Ui,
+    pub startup: Startup,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
     pub general: General,
+    #[serde(alias = "regionDetection")]
+    pub region_detection: Detection,
+    #[serde(alias = "windowDetection")]
+    pub window_detection: Detection,
     pub save: Save,
+    pub export: Export,
     pub pinned: Pinned,
     pub history: History,
     pub notifications: Notifications,
     pub animation: Animation,
     pub theme: Theme,
+    #[serde(skip)]
+    pub(crate) theme_custom: u16,
     pub toolbar: Toolbar,
     pub settings_panel: SettingsPanel,
     pub color_picker: ColorPicker,
@@ -77,6 +108,11 @@ pub struct Config {
     pub toasts: Toasts,
     pub input: Input,
     pub ocr: Ocr,
+    #[serde(alias = "ocrResultWindow")]
+    pub ocr_result_window: OcrResultWindow,
+    pub translation: Translation,
+    #[serde(alias = "imageUpload", alias = "uploader", alias = "imageHost")]
+    pub upload: Upload,
     pub log: Log,
     pub keys: Keys,
 }
@@ -84,13 +120,20 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         let mut config = Self {
+            ui: Ui::default(),
+            startup: Startup::default(),
+            language: None,
             general: General::default(),
+            region_detection: Detection::default(),
+            window_detection: Detection::default(),
             save: Save::default(),
+            export: Export::default(),
             pinned: Pinned::default(),
             history: History::default(),
             notifications: Notifications::default(),
             animation: Animation::default(),
             theme: Theme::default(),
+            theme_custom: 0,
             toolbar: Toolbar::default(),
             settings_panel: SettingsPanel::default(),
             color_picker: ColorPicker::default(),
@@ -103,6 +146,9 @@ impl Default for Config {
             toasts: Toasts::default(),
             input: Input::default(),
             ocr: Ocr::default(),
+            ocr_result_window: OcrResultWindow::default(),
+            translation: Translation::default(),
+            upload: Upload::default(),
             log: Log::default(),
             keys: Keys::default(),
         };
@@ -116,47 +162,91 @@ impl Config {
     fn resolve(&mut self) {
         let t = &self.theme;
         let toolbar = &mut self.toolbar;
-        toolbar.background.or(t.background);
-        toolbar.icon.or(t.foreground);
-        toolbar.icon_hovered.or(t.on_accent);
-        toolbar.icon_selected.or(t.on_accent);
-        toolbar.icon_to.or(t.accent);
-        toolbar.button_hovered.or(t.hover);
-        toolbar.button_selected.or(t.accent);
-        toolbar.separator.or(t.foreground);
+        toolbar
+            .background
+            .or(t.background, crate::theme::Role::Background);
+        toolbar
+            .icon
+            .or(t.foreground, crate::theme::Role::Foreground);
+        toolbar
+            .icon_hovered
+            .or(t.on_accent, crate::theme::Role::OnAccent);
+        toolbar
+            .icon_selected
+            .or(t.on_accent, crate::theme::Role::OnAccent);
+        toolbar.icon_to.or(t.accent, crate::theme::Role::Accent);
+        toolbar
+            .button_hovered
+            .or(t.hover, crate::theme::Role::Hover);
+        toolbar
+            .button_selected
+            .or(t.accent, crate::theme::Role::Accent);
+        toolbar
+            .separator
+            .or(t.foreground, crate::theme::Role::Foreground);
 
         let panel = &mut self.settings_panel;
-        panel.background.or(t.background);
-        panel.text.or(t.foreground);
-        panel.icon.or(t.foreground);
-        panel.icon_hovered.or(t.hover);
-        panel.icon_active.or(t.accent);
-        panel.separator.or(t.foreground);
+        panel
+            .background
+            .or(t.background, crate::theme::Role::Background);
+        panel.text.or(t.foreground, crate::theme::Role::Foreground);
+        panel.icon.or(t.foreground, crate::theme::Role::Foreground);
+        panel.icon_hovered.or(t.hover, crate::theme::Role::Hover);
+        panel.icon_active.or(t.accent, crate::theme::Role::Accent);
+        panel
+            .separator
+            .or(t.foreground, crate::theme::Role::Foreground);
 
         let picker = &mut self.color_picker;
-        picker.background.or(t.background);
-        picker.text.or(t.foreground);
-        picker.label.or(t.muted);
-        picker.marker.or(t.foreground);
+        picker
+            .background
+            .or(t.background, crate::theme::Role::Background);
+        picker.text.or(t.foreground, crate::theme::Role::Foreground);
+        picker.label.or(t.muted, crate::theme::Role::Muted);
+        picker
+            .marker
+            .or(t.foreground, crate::theme::Role::Foreground);
 
-        self.model_picker.background.or(t.background);
+        self.model_picker
+            .background
+            .or(t.background, crate::theme::Role::Background);
 
         let magnifier = &mut self.magnifier;
-        magnifier.outline.or(t.foreground);
-        magnifier.label_background.or(t.background);
-        magnifier.label_text.or(t.foreground);
+        magnifier
+            .outline
+            .or(t.foreground, crate::theme::Role::Foreground);
+        magnifier
+            .label_background
+            .or(t.background, crate::theme::Role::Background);
+        magnifier
+            .label_text
+            .or(t.foreground, crate::theme::Role::Foreground);
 
-        self.selection.border.or(t.foreground);
-        self.annotations.handles.color.or(t.foreground);
-        self.annotations.text.selected_text.or(t.foreground);
+        self.selection
+            .border
+            .or(t.foreground, crate::theme::Role::Foreground);
+        self.annotations
+            .handles
+            .color
+            .or(t.foreground, crate::theme::Role::Foreground);
+        self.annotations
+            .text
+            .selected_text
+            .or(t.foreground, crate::theme::Role::Foreground);
 
-        self.toasts.background.or(t.background);
-        self.toasts.text.or(t.foreground);
+        self.toasts
+            .background
+            .or(t.background, crate::theme::Role::Background);
+        self.toasts
+            .text
+            .or(t.foreground, crate::theme::Role::Foreground);
 
         let look = &mut self.ocr.look;
-        look.badge_background.or(t.background);
-        look.badge_icon.or(t.foreground);
-        look.scan.or(t.accent);
+        look.badge_background
+            .or(t.background, crate::theme::Role::Background);
+        look.badge_icon
+            .or(t.foreground, crate::theme::Role::Foreground);
+        look.scan.or(t.accent, crate::theme::Role::Accent);
     }
 }
 

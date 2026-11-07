@@ -93,6 +93,9 @@ pub fn set(state: &mut EditorState, mut property: Property, record_undo: bool, d
         let wrapped = cosmic_text::Edit::with_buffer(editor, |buffer| {
             buffer.wrap() != cosmic_text::Wrap::None
         });
+        let stored_height = state.annotations[index]
+            .text_stored_bounds()
+            .map(|bounds| bounds.height());
         if record_undo {
             state.push_undo();
         }
@@ -107,12 +110,16 @@ pub fn set(state: &mut EditorState, mut property: Property, record_undo: bool, d
             bold,
             italic,
             appearance,
+            frame,
             ..
         } = &mut state.annotations[index].shape
         {
             // 2. 【文字属性】【单行保持】原本没有换行的文字在字体变化后仍按自然宽度收框
             if !wrapped {
-                appearance.wrap_width = None;
+                frame.width = None;
+                frame.height = None;
+            } else {
+                frame.height = frame.height.or(stored_height);
             }
             match property {
                 Property::Points(value) => *font_size = value,

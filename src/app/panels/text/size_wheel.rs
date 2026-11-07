@@ -40,6 +40,13 @@ pub fn properties(state: &mut EditorState, event: ScrollEvent, dirty: &mut u32) 
 
 /// 【文字滚轮】【画布输入】按 event 和 now 调整 state 当前文字，dirty 返回重绘范围；默认值变化不入历史，拖动时不修改
 pub fn canvas(state: &mut EditorState, event: ScrollEvent, now: Instant, dirty: &mut u32) {
+    if crate::editor::annotation_collection::properties::active(state) {
+        if crate::editor::annotation_collection::properties::canvas_wheel(state, event, now, dirty)
+        {
+            super::super::settings::update_settings_panel(state, dirty);
+        }
+        return;
+    }
     if state.tool_active
         || state.input.mouse_down
         || state.ann_drag.is_some()

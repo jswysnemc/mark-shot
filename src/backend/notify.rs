@@ -1,4 +1,6 @@
+#[cfg(target_os = "linux")]
 pub mod freedesktop;
+#[cfg(target_os = "linux")]
 mod temp;
 
 use log::info;
@@ -35,6 +37,7 @@ pub enum Notice<'a> {
     StdoutFailed(String),
     Failed(String),
     TextCopied(String),
+    ImageUrlCopied,
     TextInPrimary(String),
     NoText,
     TextFailed(String),
@@ -67,6 +70,7 @@ impl<'a> Notice<'a> {
             Notice::StdoutFailed(e) => ("Couldn't write to stdout", e, true, None),
             Notice::Failed(e) => ("Screenshot failed", e, true, None),
             Notice::TextCopied(text) => ("Text copied", preview(&text), false, None),
+            Notice::ImageUrlCopied => ("Image URL copied", String::new(), false, None),
             Notice::TextInPrimary(text) => (
                 "Text ready to paste with the middle click",
                 preview(&text),

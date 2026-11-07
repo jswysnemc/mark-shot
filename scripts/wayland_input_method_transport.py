@@ -14,15 +14,15 @@ def protocol_evidence(text):
     """【输入法测试】【协议证据】从 text 分别识别 Rust 请求与事件格式，返回绑定、交付和提交计数；不能用全局广告代替实际绑定"""
     return {
         "native_protocol": bool(
-            re.search(r"zwp_text_input_manager_v3@\d+\.get_text_input\(", text)
+            re.search(r"zwp_text_input_manager_v3[@#]\d+\.get_text_input\(", text)
         )
-        and bool(re.search(r"zwp_text_input_v3@\d+\.enable\(\)", text))
-        and bool(re.search(r"zwp_text_input_v3@\d+\.set_surrounding_text\(", text))
-        and bool(re.search(r"zwp_text_input_v3@\d+\.done(?:, \(|\()", text)),
+        and bool(re.search(r"zwp_text_input_v3[@#]\d+\.enable\(\)", text))
+        and bool(re.search(r"zwp_text_input_v3[@#]\d+\.set_surrounding_text\(", text))
+        and bool(re.search(r"zwp_text_input_v3[@#]\d+\.done(?:, \(|\()", text)),
         "preedit_delivered": bool(
-            re.search(r"zwp_text_input_v3@\d+\.preedit_string(?:, \(|\()", text)
+            re.search(r"zwp_text_input_v3[@#]\d+\.preedit_string(?:, \(|\()", text)
         ),
-        "protocol_commits": len(re.findall(r"zwp_text_input_v3@\d+\.commit\(\)", text)),
+        "protocol_commits": len(re.findall(r"zwp_text_input_v3[@#]\d+\.commit\(\)", text)),
     }
 
 

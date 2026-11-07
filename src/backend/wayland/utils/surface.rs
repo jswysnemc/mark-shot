@@ -37,7 +37,21 @@ impl Drop for Background {
 // for keeping role alive
 pub enum Role {
     Window(smithay_client_toolkit::shell::xdg::window::Window),
+    ScrollParent(smithay_client_toolkit::shell::xdg::window::Window),
     Layer(smithay_client_toolkit::shell::wlr_layer::LayerSurface),
+    ScrollPopup(Box<super::scroll_popup::ScrollPopup>),
+}
+
+pub struct ScrollFrame {
+    pub rgba: Vec<u8>,
+    pub size: (u32, u32),
+    pub stamp: Option<super::scroll_stamp::Stamp>,
+}
+
+pub struct PresentedPanel {
+    pub stamp: super::scroll_stamp::Stamp,
+    pub source: (u32, u32),
+    pub logical: (u32, u32),
 }
 
 /// Scope of pointer events accepted by the overlay surface.
@@ -53,15 +67,21 @@ pub enum InputRegion {
 
 pub struct SurfaceData {
     pub background: Option<Background>,
+    pub(crate) scroll_layer: Option<crate::backend::wayland::overlay::scroll_layer::ScrollLayer>,
     pub role: Role,
     pub surface: wl_surface::WlSurface,
     pub viewport: Option<wp_viewport::WpViewport>,
 
     pub shm_buffer: Option<ShmBuffer>,
+    pub(crate) spare_buffer: Option<ShmBuffer>,
+    pub(crate) waiting_release: bool,
     /// Whether the surface currently has a buffer attached.
     pub mapped: bool,
     /// Pending input region applied upon configure/commit.
     pub input: InputRegion,
+    pub canvas_rect: Option<tiny_skia::Rect>,
+    pub scroll_frame: Option<ScrollFrame>,
+    pub scroll_stamps: std::collections::VecDeque<PresentedPanel>,
 
     pub width: u32,
     pub height: u32,
@@ -70,6 +90,15 @@ pub struct SurfaceData {
 }
 
 impl SurfaceData {
+    /// 【滚动截图】【窗口坐标】将 point 从实际窗口映射到原面板画布，返回逻辑坐标；普通截图表面保持原坐标
+    pub fn canvas_point(&self, point: (f64, f64)) -> (f64, f64) {
+        self.canvas_rect.map_or(point, |rect| {
+            (
+                rect.left() as f64 + point.0 * rect.width() as f64 / self.width.max(1) as f64,
+                rect.top() as f64 + point.1 * rect.height() as f64 / self.height.max(1) as f64,
+            )
+        })
+    }
     pub fn buffer_size(&self) -> (u32, u32) {
         crate::types::px_size((self.width, self.height), self.scale)
     }

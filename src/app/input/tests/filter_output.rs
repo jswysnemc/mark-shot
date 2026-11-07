@@ -66,7 +66,7 @@ fn fractional_capture_export_does_not_scale_brightness_strength() {
     let mut state = filter_editor(&mut dirty);
     let mut original = Pixmap::new(768, 576).unwrap();
     original.fill(Color::from_rgba8(200, 100, 50, 255));
-    state.captures[0].pixmap = original;
+    state.captures[0].pixmap = original.into();
     state.captures[0].scale = 1.2;
     state.placements[0].scale = 1.2;
     state.selection.zone = Rect::from_xywh(100.0, 60.0, 320.0, 220.0);

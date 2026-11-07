@@ -1,7 +1,22 @@
+pub(crate) mod annotation_collection;
+pub(crate) mod annotation_selection;
+pub(crate) mod canvas_navigation;
 mod capture_setup;
+mod cursor_magnifier;
 use capture_setup::start_capture;
 mod event_loop;
+mod external_actions;
+pub(crate) mod region_detection;
+pub(crate) mod selection_size;
+pub(crate) mod selection_translation;
+mod theme_switch;
+pub(crate) mod upload;
 use event_loop::run_overlay;
+mod frame_backdrop;
+#[cfg(all(test, target_os = "linux"))]
+mod frame_lifecycle_overlay;
+#[cfg(all(test, target_os = "linux"))]
+mod frame_lifecycle_tests;
 mod frame_render;
 use frame_render::Pacing;
 use frame_render::{clear_frame_state, render_dirty_monitors};
@@ -18,10 +33,15 @@ mod image_setup;
 mod init;
 mod input;
 mod instant;
+mod layers;
 mod ocr;
 mod panels;
+mod pointer_history;
+#[cfg(test)]
+pub(crate) mod region_rendering_test_support;
 mod save_as;
 mod scroll;
+mod startup_tool;
 pub(crate) mod text_caret;
 pub(crate) mod text_context_menu;
 pub(crate) mod text_input;
@@ -75,6 +95,7 @@ pub struct Launch {
     pub include_cursor: bool,
     pub default_tool: Option<Tool>,
     pub fullscreen_default_tool: Option<Tool>,
+    pub file_default_tool: Option<Tool>,
     pub default_color: Option<crate::theme::Rgba>,
 }
 
@@ -92,7 +113,7 @@ impl Launch {
 
     /// 【截图】【任务检查】编辑与 OCR 可以仅显示交互结果；其他快捷模式必须具有导出输出
     fn has_work(&self) -> bool {
-        matches!(self.mode, Mode::Editor | Mode::Ocr) || !self.outputs().is_empty()
+        matches!(self.mode, Mode::Editor | Mode::Ocr | Mode::Scroll) || !self.outputs().is_empty()
     }
 
     fn outputs(&self) -> Outputs {
@@ -125,7 +146,7 @@ impl Launch {
 }
 
 pub async fn run(
-    conn: wayland_client::Connection,
+    conn: crate::backend::session::Session,
     launch: Launch,
 ) -> Result<(), Box<dyn std::error::Error>> {
     launch.warn_ignored();
@@ -141,9 +162,10 @@ pub async fn run(
     }
 }
 
+/// 【截图会话】【完整编辑】按 conn 与 launch 运行截图、滚动和结果交接，返回会话完成状态或具体错误
 async fn make_screenshot(
-    conn: wayland_client::Connection,
-    launch: Launch,
+    conn: crate::backend::session::Session,
+    mut launch: Launch,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut prof = Profiler::new(launch.speed);
 
@@ -152,7 +174,7 @@ async fn make_screenshot(
     let (mut editor_state, mut overlay) = if launch.image.is_some() {
         image_setup::start(conn, &launch, &mut prof)?
     } else {
-        start_capture(conn, &launch, &mut prof).await?
+        start_capture(conn, &mut launch, &mut prof).await?
     };
     editor_state.to = launch.outputs();
     editor_state.toolbar.to = editor_state.to;
@@ -171,10 +193,7 @@ async fn make_screenshot(
         if editor_state.selection.zone.is_none() {
             editor_state.selection.zone = get_full_workspace_rect(&editor_state.placements);
         }
-        let initial_tool = launch
-            .fullscreen_default_tool
-            .or(launch.default_tool)
-            .unwrap_or(Tool::Selection);
+        let initial_tool = startup_tool::initial(&launch);
         select_tool(&mut editor_state, initial_tool, &mut 0);
     }
     if launch.mode == Mode::Ocr && editor_state.mode == Mode::Editor {
@@ -200,24 +219,70 @@ async fn make_screenshot(
 
     input::refresh_panels(&mut editor_state, &mut 0);
     init::initial_paint(&mut editor_state, &mut overlay, &mut prof)?;
+    if let Some(controller) = crate::features::single_instance::context::current() {
+        controller.active();
+    }
     prof.dump();
 
-    let scroll_mode = run_overlay(&mut editor_state, &mut overlay)?;
-    // (saving what user chose)
-    crate::editor::saved::save(
-        &editor_state.tool_settings,
-        &editor_state.color_popover.history,
-        &editor_state.color_popover.initial_history,
-        !editor_state.magnifier.hidden,
-    );
+    loop {
+        let scroll_mode = run_overlay(&mut editor_state, &mut overlay)?;
+        // (saving what user chose)
+        crate::editor::saved::save(
+            &editor_state.tool_settings,
+            &editor_state.color_popover.history,
+            &editor_state.color_popover.initial_history,
+            !editor_state.magnifier.hidden,
+        );
 
-    editor_state.ocr.models.shutdown();
-    if editor_state.mode == Mode::Ocr {
-        ocr::finish(&mut editor_state).await
-    } else if scroll_mode {
-        finish::finish_scroll(&scroll_conn, &mut editor_state, &mut overlay, &launch).await
-    } else {
-        finish::finish_capture(&mut editor_state).await
+        if scroll_mode {
+            if let Some((image, display)) =
+                finish::finish_scroll(&scroll_conn, &mut editor_state, &mut overlay).await?
+            {
+                // 1. 【滚动截图】【编辑入口】释放滚动浮层后映射原图编辑器，保留完整像素和当前导出策略
+                overlay.suspend()?;
+                editor_state.ocr.models.shutdown();
+                // 2. 【滚动截图】【替换峰值】创建结果编辑器前释放旧画布和原生缓冲
+                drop(editor_state);
+                drop(overlay);
+                crate::utils::memory::release_unused();
+                let image_launch = Launch {
+                    mode: Mode::Editor,
+                    fullscreen: true,
+                    display_names: vec![display],
+                    ..launch.clone()
+                };
+                let (mut next, mut next_overlay) = image_setup::start_pixmap(
+                    scroll_conn.clone(),
+                    &image_launch,
+                    &mut prof,
+                    image,
+                )?;
+                next.to = launch.outputs();
+                next.toolbar.to = next.to;
+                next.output = launch.output.clone();
+                next.fullscreen_scope = true;
+                next.after_selection_tool = Tool::Selection;
+                input::refresh_panels(&mut next, &mut 0);
+                init::initial_paint(&mut next, &mut next_overlay, &mut prof)?;
+                crate::utils::memory::release_unused();
+                editor_state = next;
+                overlay = next_overlay;
+                continue;
+            }
+            editor_state.ocr.models.shutdown();
+            return Ok(());
+        }
+        editor_state.ocr.models.shutdown();
+        if editor_state.upload.copied {
+            drop(overlay);
+            crate::backend::notify::send(crate::backend::notify::Notice::ImageUrlCopied).await;
+            return Ok(());
+        }
+        if editor_state.mode == Mode::Ocr {
+            return ocr::finish(&mut editor_state).await;
+        } else {
+            return finish::finish_capture(&mut editor_state).await;
+        }
     }
 }
 
@@ -275,7 +340,10 @@ mod launch_tests {
                 to: Some(Outputs::default()),
                 ..Launch::default()
             };
-            assert_eq!(launch.has_work(), matches!(mode, Mode::Editor | Mode::Ocr));
+            assert_eq!(
+                launch.has_work(),
+                matches!(mode, Mode::Editor | Mode::Ocr | Mode::Scroll)
+            );
         }
     }
 }

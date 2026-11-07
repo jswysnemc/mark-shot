@@ -15,14 +15,23 @@ use crate::backend::wayland::overlay::state::OverlayState;
 use crate::keys::Key;
 use crate::types::OverlayEvent;
 impl KeyboardHandler for OverlayState {
+    /// 【截图弹层】【按键授权】按 keyboard、serial 和 event 保存真实座席序列，再分派按键；其他参数来自协议，无返回值
     fn press_key(
         &mut self,
         _: &Connection,
         _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
-        _: u32,
+        keyboard: &wl_keyboard::WlKeyboard,
+        serial: u32,
         event: KeyEvent,
     ) {
+        // 1. 【截图弹层】【按键授权】键盘打开的菜单使用本次按键，不能复用先前鼠标菜单的抓取
+        if let Some(data) = wayland_client::Proxy::data::<
+            smithay_client_toolkit::seat::keyboard::KeyboardData<Self, ()>,
+        >(keyboard)
+        {
+            self.popup_grabs.push_back((serial, data.seat().clone()));
+            self.events.push_back(OverlayEvent::PopupSerial(serial));
+        }
         self.process_key(&event);
     }
     fn repeat_key(

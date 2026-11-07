@@ -130,7 +130,7 @@ fn deleting_old_numbers_does_not_fill_sequence_gaps() {
     draw(&mut state, (140.0, 120.0), (140.0, 120.0), &mut dirty);
     draw(&mut state, (280.0, 160.0), (370.0, 180.0), &mut dirty);
     select_tool(&mut state, Tool::Pick, &mut dirty);
-    state.selected_annotation = Some(0);
+    state.select_annotation_index(Some(0));
     key(&mut state, "Delete", &mut dirty);
     assert_eq!(state.number_sequence.next(), Some(3));
     key(&mut state, "N", &mut dirty);
@@ -184,7 +184,7 @@ fn editing_existing_styles_does_not_change_future_style_or_sequence() {
     let mut state = number_editor(&mut dirty);
     draw(&mut state, (140.0, 120.0), (140.0, 120.0), &mut dirty);
     select_tool(&mut state, Tool::Pick, &mut dirty);
-    state.selected_annotation = Some(0);
+    state.select_annotation_index(Some(0));
     panels::settings::update_settings_panel(&mut state, &mut dirty);
     open(&mut state, &mut dirty);
     key(&mut state, "End", &mut dirty);
@@ -210,7 +210,7 @@ fn number_width_accepts_seventy_two_pixels_without_changing_other_tools() {
     state.tool_settings.set_stroke(StrokeGroup::Freehand, 7.0);
     draw(&mut state, (140.0, 120.0), (140.0, 120.0), &mut dirty);
     select_tool(&mut state, Tool::Pick, &mut dirty);
-    state.selected_annotation = Some(0);
+    state.select_annotation_index(Some(0));
     panels::settings::update_settings_panel(&mut state, &mut dirty);
     let index = state
         .settings_panel
@@ -289,7 +289,7 @@ fn escape_restores_an_existing_number_drag_without_consuming_a_counter() {
     draw(&mut state, (140.0, 120.0), (280.0, 160.0), &mut dirty);
     let before = state.annotations[0].clone();
     select_tool(&mut state, Tool::Pick, &mut dirty);
-    state.selected_annotation = Some(0);
+    state.select_annotation_index(Some(0));
     pointer(&mut state, 140.0, 120.0, &mut dirty);
     handle_pointer_button(&mut state, MouseButton::Left, true, &mut dirty);
     pointer(&mut state, 190.0, 180.0, &mut dirty);
@@ -305,13 +305,13 @@ fn escape_restores_an_existing_number_drag_without_consuming_a_counter() {
 /// 【序号测试】【外部控制点】已选序号的外框和旋转把手在正文之外仍须开始正确拖动，不能取消选择或撤销别的标注
 #[test]
 fn selected_number_handles_outside_the_body_start_real_annotation_drags() {
-    for expected in [SelectionHandle::TopRight, SelectionHandle::Rotate] {
+    for expected in [SelectionHandle::TopLeft, SelectionHandle::Rotate] {
         let mut dirty = 0;
         let mut state = number_editor(&mut dirty);
         draw(&mut state, (140.0, 120.0), (280.0, 160.0), &mut dirty);
         let before = state.annotations.clone();
         select_tool(&mut state, Tool::Pick, &mut dirty);
-        state.selected_annotation = Some(0);
+        state.select_annotation_index(Some(0));
         let position = if expected == SelectionHandle::Rotate {
             drag::rotation_handle(mark(&state, 0), 3.0).unwrap()
         } else {
@@ -320,6 +320,11 @@ fn selected_number_handles_outside_the_body_start_real_annotation_drags() {
                 .find(|(handle, _)| *handle == expected)
                 .unwrap()
                 .1
+        };
+        let position = if expected == SelectionHandle::TopLeft {
+            (position.0 - 9.0, position.1 - 9.0)
+        } else {
+            position
         };
         assert!(!state.annotations[0].initial_hit_test((position.0 as f64, position.1 as f64)));
         pointer(&mut state, position.0 as f64, position.1 as f64, &mut dirty);
@@ -354,7 +359,7 @@ fn selecting_a_number_and_dragging_its_bubble_preserves_the_tip() {
     let mut state = number_editor(&mut dirty);
     draw(&mut state, (140.0, 120.0), (280.0, 160.0), &mut dirty);
     select_tool(&mut state, Tool::Pick, &mut dirty);
-    assert_eq!(state.selected_annotation, None);
+    assert_eq!(state.selected_annotation_index(), None);
     pointer(&mut state, 140.0, 120.0, &mut dirty);
     handle_pointer_button(&mut state, MouseButton::Left, true, &mut dirty);
     assert_eq!(

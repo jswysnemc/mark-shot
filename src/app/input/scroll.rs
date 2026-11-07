@@ -23,7 +23,42 @@ pub fn handle_axis_scroll(
     event: crate::types::ScrollEvent,
     dirty_mask: &mut u32,
 ) {
+    let before = super::wheel_preview::capture(editor_state);
+    dispatch_axis_scroll(editor_state, event, dirty_mask);
+    if let Some(after) = super::wheel_preview::capture(editor_state)
+        && before.is_some_and(|before| before != after)
+    {
+        super::super::canvas_navigation::preview::show_sample(
+            editor_state,
+            after,
+            Instant::now(),
+            dirty_mask,
+        );
+        apply_damage_rects(editor_state, dirty_mask);
+    }
+}
+
+/// 【界面】【轴事件处理】按event调整实际属性或导航，dirty_mask返回原有业务损坏范围，无返回值
+fn dispatch_axis_scroll(
+    editor_state: &mut EditorState,
+    event: crate::types::ScrollEvent,
+    dirty_mask: &mut u32,
+) {
+    if super::super::external_actions::scroll(editor_state, event, dirty_mask) {
+        return;
+    }
     if editor_state.text_context_menu.is_some() {
+        return;
+    }
+    if super::super::selection_size::input::scroll(editor_state, event, dirty_mask) {
+        apply_damage_rects(editor_state, dirty_mask);
+        return;
+    }
+    if matches!(
+        hit_test_ui(editor_state, editor_state.input.pointer.local),
+        UiHit::None
+    ) && super::super::region_detection::input::scroll(editor_state, event, dirty_mask)
+    {
         return;
     }
     let local = editor_state.input.pointer.local;
@@ -32,6 +67,11 @@ pub fn handle_axis_scroll(
         || (matches!(hit_test_ui(editor_state, local), UiHit::SettingsItem(_))
             && super::super::panels::text::size_wheel::properties(editor_state, event, dirty_mask))
     {
+        apply_damage_rects(editor_state, dirty_mask);
+        return;
+    }
+
+    if super::super::canvas_navigation::input::scroll(editor_state, event, dirty_mask) {
         apply_damage_rects(editor_state, dirty_mask);
         return;
     }

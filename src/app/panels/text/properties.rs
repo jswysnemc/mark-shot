@@ -24,6 +24,18 @@ pub fn hit(state: &EditorState) -> Option<Control> {
 
 /// 【文字属性栏】【数值范围】返回 control 对应的当前整数值和有效范围，非滑条控件使用零范围
 pub(super) fn value(state: &EditorState, control: Control) -> (i32, (i32, i32)) {
+    if control == Control::Size && crate::editor::annotation_collection::properties::active(state) {
+        return (
+            crate::editor::annotation_collection::properties::first(state).map_or(
+                1,
+                |annotation| {
+                    crate::editor::annotation_collection::properties::width(annotation).round()
+                        as i32
+                },
+            ),
+            (1, 24),
+        );
+    }
     match control {
         Control::Size => (
             text_edits::current_points(state).round() as i32 - 19,
@@ -40,7 +52,13 @@ pub(super) fn value(state: &EditorState, control: Control) -> (i32, (i32, i32)) 
 /// 【文字属性栏】【数值应用】把 control 的 new_value 写入 state；dirty 返回新旧标注与控件范围，每次实际变化记录历史
 pub(super) fn apply(state: &mut EditorState, control: Control, new_value: i32, dirty: &mut u32) {
     if control == Control::Size {
-        text_edits::set_control_points(state, (new_value + 19) as f32, dirty);
+        if crate::editor::annotation_collection::properties::active(state) {
+            crate::editor::annotation_collection::properties::set_width(
+                state, new_value, true, dirty,
+            );
+        } else {
+            text_edits::set_control_points(state, (new_value + 19) as f32, dirty);
+        }
     } else if control == Control::Opacity {
         let mut color = super::super::settings::current_color(state);
         let alpha = (new_value.clamp(0, 100) as f32 * 255.0 / 100.0).round() / 255.0;
@@ -160,7 +178,7 @@ pub fn finish(state: &mut EditorState, activate: bool, dirty: &mut u32) -> bool 
         match press.control {
             Control::Font => super::font_popup::toggle(state, dirty),
             Control::Edit => {
-                if let Some(index) = state.selected_annotation {
+                if let Some(index) = state.selected_annotation_index() {
                     let id = state.annotations[index].id;
                     crate::editor::text_session::begin_existing(state, id, dirty);
                 }
@@ -173,6 +191,16 @@ pub fn finish(state: &mut EditorState, activate: bool, dirty: &mut u32) -> bool 
 
 /// 【文字属性栏】【字号快捷调整】将 steps 点增量用于 state 当前文字，dirty 返回变化，无返回值，不依赖旧步进控件索引
 pub fn adjust_points(state: &mut EditorState, steps: f32, dirty: &mut u32) {
+    if crate::editor::annotation_collection::properties::active(state) {
+        let (width, _) = value(state, Control::Size);
+        apply(
+            state,
+            Control::Size,
+            (width + steps.round() as i32).clamp(1, 24),
+            dirty,
+        );
+        return;
+    }
     let points = text_edits::current_points(state) + steps;
     text_edits::set_control_points(state, points, dirty);
     super::super::settings::update_settings_panel(state, dirty);

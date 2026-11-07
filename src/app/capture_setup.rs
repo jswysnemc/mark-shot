@@ -2,17 +2,17 @@
 
 use super::*;
 
-/// Shows the overlay and builds the editor at the same time. The overlay renders
-/// on its own thread while screens are captured, running both slow setup steps in parallel.
+/// 【截图】【初始化顺序】用 conn 和 launch 先捕获桌面再显示覆盖层，prof 记录耗时，返回编辑器和覆盖层
 pub(super) async fn start_capture(
-    conn: wayland_client::Connection,
-    launch: &Launch,
+    conn: crate::backend::session::Session,
+    launch: &mut Launch,
     prof: &mut Profiler,
 ) -> Result<(EditorState, Box<dyn ScreenOverlay>), Box<dyn std::error::Error>> {
     let icons_handle = std::thread::spawn(init::load_icons_cache);
     let system_fonts = std::thread::spawn(crate::fonts::system);
 
     let mut overlay = initialize_overlay(conn.clone())?;
+    let preferred = overlay.set_composited_background(true);
     prof.mark("overlay init");
 
     let all = overlay.discovered_outputs().to_vec();
@@ -21,7 +21,7 @@ pub(super) async fn start_capture(
     // with a delay the shot can't happen before the deadline anyway, so the backend is
     // created and prepared in advance (on KDE that's connecting to the session bus).
     // that time is part of the delay, not added to it.
-    // without a delay it stays after the present spawn, so present starts sooner
+    // 1. 【截图】【延迟准备】仅预先连接捕获后端和准备内存，读取桌面像素前不映射覆盖层
     let mut early = None;
     if delayed {
         let capture = early.insert(crate::backend::initialize_capture_with_cursor(
@@ -30,7 +30,9 @@ pub(super) async fn start_capture(
         ));
         overlay.prefault();
         prof.mark("pool prefaulted");
-        delay::wait(launch.shot_at, &**capture, prof).await?;
+        delay::wait_launch(launch, &**capture, prof).await?;
+    } else {
+        delay::begin_launch(launch)?;
     }
 
     let one = launch.one_monitor;
@@ -50,29 +52,19 @@ pub(super) async fn start_capture(
     if one {
         prof.mark("active output probed");
     }
-    let layers_handle = {
-        let placements = init::build_placements(&outputs, hidpi);
-        std::thread::spawn(move || init::build_layers(&placements))
-    };
-    // with delay window is created only after the shot, since at least
-    // kwin puts a new window into the taskbar and pins it to the current
-    // virtual desktop right at creation, while doing it before capturing
-    // doesn't really gain anything, less than 1ms, and might be unstable
-    let (shot_tx, shot_rx) = std::sync::mpsc::channel::<()>();
-    let present_handle = std::thread::spawn(move || {
-        if delayed {
-            let _ = shot_rx.recv();
-        }
-        let t = std::time::Instant::now();
-        let res = overlay.present(&targets).map_err(|e| e.to_string());
-        (overlay, res, t.elapsed())
-    });
-
     let capture = early.unwrap_or_else(|| {
         crate::backend::initialize_capture_with_cursor(&conn, launch.include_cursor)
     });
-    let screenshots = capture.capture_frame(&outputs).await?;
-    drop(shot_tx);
+    let window_work = async {
+        if !launch.fullscreen && crate::config::get().window_detection.enabled {
+            crate::backend::window_detection::snapshot(&conn).await
+        } else {
+            Vec::new()
+        }
+    };
+    // 2. 【截图】【窗口快照】窗口信息与像素都在覆盖层映射前获取，不把本程序收入候选
+    let (screenshots, windows) = tokio::join!(capture.capture_frame(&outputs), window_work);
+    let screenshots = screenshots?;
     prof.mark("capture");
 
     let kept: Vec<usize> = screenshots.frames.iter().map(|f| f.output).collect();
@@ -84,17 +76,21 @@ pub(super) async fn start_capture(
 
     let captures = init::build_captures(screenshots.frames)?;
     let placements = init::build_placements(&outputs, hidpi);
-    let layers = layers_handle.join().expect("Failed to join layers thread");
-    let (canvas, dimmed, annotations) = if kept.iter().copied().eq(0..kept.len()) && !shrunk {
-        layers
-    } else {
-        init::build_layers(&placements)
-    };
+    let compatible = super::frame_backdrop::compatible(&captures, &placements);
+    if !compatible {
+        overlay.set_composited_background(false);
+    }
+    // 3. 【截图】【覆盖层显示】原始帧已经进入私有来源后才分配绘制与原生表面，避免两份整屏缓冲叠加缓存写入峰值
+    let present_at = std::time::Instant::now();
+    overlay.present(&targets)?;
+    let present_dt = present_at.elapsed();
+    let (canvas, dimmed, annotations) =
+        init::build_layers_with_transparency(&placements, launch.fullscreen);
     prof.mark("base_pixmaps + layers + placements");
 
     let icons_cache = icons_handle.join().expect("Failed to join icons thread");
 
-    let editor_state = EditorState::new(
+    let mut editor_state = EditorState::new(
         Layers {
             captures,
             canvas,
@@ -112,22 +108,24 @@ pub(super) async fn start_capture(
         },
         build_ocr_state(),
     );
+    editor_state.enable_region_rendering();
     prof.mark("editor_state built");
 
-    let (mut overlay, present_res, present_dt) = present_handle
-        .join()
-        .map_err(|_| "present thread panicked")?;
-    present_res.map_err(|msg| -> Box<dyn std::error::Error> { msg.into() })?;
+    super::frame_backdrop::configure(&mut editor_state, overlay.as_mut(), preferred && compatible);
     if shrunk {
         overlay.retain_outputs(&kept)?;
     }
     for (i, capture) in editor_state.captures.iter().enumerate() {
         let pixmap = &capture.pixmap;
-        overlay.set_background(i, pixmap.data(), pixmap.width(), pixmap.height())?;
+        overlay.set_background_source(i, pixmap)?;
     }
     prof.mark("backgrounds uploaded");
-    prof.mark("present() joined");
-    prof.mark_external("  ^ present_dt (thread-internal duration)", present_dt);
+    prof.mark("native surfaces prepared");
+    prof.mark_external("  ^ native surface preparation", present_dt);
+
+    if !launch.fullscreen {
+        super::region_detection::task::start(&mut editor_state, overlay.as_mut(), &windows);
+    }
 
     Ok((editor_state, overlay))
 }

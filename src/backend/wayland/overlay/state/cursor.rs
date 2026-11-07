@@ -10,6 +10,7 @@ fn map_cursor_icon(icon: CursorIcon) -> Shape {
         CursorIcon::Default => Shape::Default,
         CursorIcon::Crosshair => Shape::Crosshair,
         CursorIcon::Pointer => Shape::Pointer,
+        CursorIcon::Progress => Shape::Progress,
         CursorIcon::Text => Shape::Text,
         CursorIcon::Grab => Shape::Grab,
         CursorIcon::Grabbing => Shape::Grabbing,

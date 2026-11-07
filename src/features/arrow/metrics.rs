@@ -13,12 +13,26 @@ pub struct HeadMetrics {
 
 /// 【箭头】【头部尺寸】用 total_length、width、scale、style 计算头部；返回有限尺寸，绝对长度随原图比例变化
 pub fn metrics(total_length: f32, width: f32, scale: f32, style: ArrowStyle) -> HeadMetrics {
+    rendered_metrics(
+        total_length,
+        crate::features::line::clamped_width(width, scale),
+        scale,
+        style,
+    )
+}
+
+/// 【箭头】【窗口头部】按total_length、width、scale与style返回头部尺寸，不把窗口最小笔宽再次转换为原图上限
+pub(crate) fn rendered_metrics(
+    total_length: f32,
+    width: f32,
+    scale: f32,
+    style: ArrowStyle,
+) -> HeadMetrics {
     let scale = if scale.is_finite() && scale > 0.0 {
         scale.min(1_000_000.0)
     } else {
         1.0
     };
-    let width = crate::features::line::clamped_width(width, scale);
     let total_length = if total_length.is_finite() && total_length > 0.0 {
         total_length
     } else {

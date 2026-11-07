@@ -1,3 +1,4 @@
+#[path = "protocol/codec.rs"]
 mod codec;
 use codec::{Body, Cursor};
 
@@ -7,9 +8,11 @@ use codec::{Body, Cursor};
 // The initial `Hello` and `Welcome` handshakes (carrying `proto` and `build` identifiers) must retain their layout:
 // they allow cross-version process recognition, triggering out-of-date daemons to step down.
 
+#[cfg(target_os = "linux")]
 use std::ffi::OsStr;
 use std::fmt;
 use std::io::{self, Read, Write};
+#[cfg(target_os = "linux")]
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
@@ -345,4 +348,5 @@ fn invalid(message: &'static str) -> io::Error {
 }
 
 #[cfg(test)]
+#[path = "protocol/tests.rs"]
 mod tests;

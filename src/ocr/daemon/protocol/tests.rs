@@ -71,6 +71,7 @@ fn requests_roundtrip() {
 }
 
 #[test]
+#[cfg(target_os = "linux")]
 fn non_utf8_paths_survive() {
     let files = ModelFiles {
         detector: PathBuf::from(OsStr::from_bytes(b"/m/\xff\xfe.onnx")),

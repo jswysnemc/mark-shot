@@ -20,6 +20,7 @@ pub(super) struct Flat {
 
 pub(super) struct InputState {
     pub id: u64,
+    pub document_id: u64,
     pub single_line: bool,
     pub revision: u64,
     pub separator: bool,
@@ -31,8 +32,10 @@ pub(super) struct InputState {
 impl Default for InputState {
     /// 【窗口输入法】【初始状态】返回独立身份和空候选、空缓存，不扫描字体或创建协议对象，无参数
     fn default() -> Self {
+        let id = identity();
         Self {
-            id: identity(),
+            id,
+            document_id: id,
             single_line: false,
             revision: 0,
             separator: true,
@@ -52,6 +55,16 @@ impl TextEditor {
     /// 【窗口输入法】【字段身份】返回当前编辑器的稳定身份，无参数；协议目标由窗口另行分配
     pub fn input_identity(&self) -> u64 {
         self.input.id
+    }
+
+    /// 【窗口输入法】【确认版本】返回当前确认正文的版本，无参数；候选、选择及滚动不改变版本，窗口可据此避免重复复制正文
+    pub fn text_revision(&self) -> u64 {
+        self.input.revision
+    }
+
+    /// 【窗口输入法】【正文身份】返回正文身份与确认版本，无参数；候选取消可更换协议身份，但不能伪装成正文变更
+    pub fn text_version(&self) -> (u64, u64) {
+        (self.input.document_id, self.input.revision)
     }
 
     /// 【窗口输入法】【候选读取】返回未确认候选，不把它包含在 text、复制或表格导出中，无参数

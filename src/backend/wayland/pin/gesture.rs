@@ -90,7 +90,9 @@ impl Pin {
                 _ => None,
             })
             .or_else(|| self.edge(position));
-        let shape = if self
+        let shape = if self.translation_task.is_some() {
+            Shape::Wait
+        } else if self
             .drag
             .is_some_and(|drag| matches!(drag.kind, Kind::Move))
         {
@@ -109,8 +111,8 @@ impl Pin {
         }
     }
 
-    /// 【贴图】【左键开始】按 position、serial 分流边缘缩放、文字选择、双击关闭和移动；qh 用于无输入预览
-    pub fn begin_gesture(&mut self, position: (f64, f64), serial: u32, qh: &QueueHandle<Self>) {
+    /// 【贴图】【左键开始】按 position、serial 分流边缘缩放、文字选择、双击关闭和移动；只记录手势，不提前创建预览，无返回值
+    pub fn begin_gesture(&mut self, position: (f64, f64), serial: u32) {
         if self.popup.take().is_some() {
             return;
         }
@@ -128,7 +130,7 @@ impl Pin {
                     .register(true, (pointer.0 as f32, pointer.1 as f32))
                 {
                     if let Some(line) = self.text.line_at(point) {
-                        self.text.select_block(line);
+                        self.text.select_line(line);
                     }
                 } else {
                     self.text.begin_drag(point);
@@ -162,16 +164,14 @@ impl Pin {
             origin,
         });
         self.native_resizing = false;
-        if let Shell::Window(window) = &self.shell {
-            if let Some(seat) = &self.pointer_seat {
-                if let Some(edge) = edge {
-                    window.resize(seat, serial, native_edge(edge));
-                } else {
-                    window.move_(seat, serial);
-                }
+        if let Shell::Window(window) = &self.shell
+            && let Some(seat) = &self.pointer_seat
+        {
+            if let Some(edge) = edge {
+                window.resize(seat, serial, native_edge(edge));
+            } else {
+                window.move_(seat, serial);
             }
-        } else {
-            self.resize(false, qh);
         }
         self.cursor(position);
     }
@@ -206,9 +206,11 @@ impl Pin {
                     .geometry(pointer),
                     Kind::NativeResize(_) => return,
                 };
-                self.position = (geometry.left, geometry.top);
-                self.image.set_size((geometry.width, geometry.height));
-                self.resize(false, qh);
+                if geometry != self.geometry() {
+                    self.position = (geometry.left, geometry.top);
+                    self.image.set_size((geometry.width, geometry.height));
+                    self.resize(false, qh);
+                }
             }
         }
         self.cursor(position);
@@ -218,7 +220,8 @@ impl Pin {
     pub fn finish_gesture(&mut self, qh: &QueueHandle<Self>) {
         let dragged = self.drag.take().is_some();
         self.selecting = false;
-        if dragged {
+        // 1. 【贴图】【无位移点击】没有实际预览的点击只结束抓取，不重配 layer 或撤销键盘焦点
+        if dragged && (matches!(self.shell, Shell::Window(_)) || self.preview.is_some()) {
             self.resize(false, qh);
         }
     }

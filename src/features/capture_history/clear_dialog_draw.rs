@@ -46,7 +46,7 @@ impl Layout {
 
 /// 【截图历史】【确认画面】将 state 的原版正文和按钮绘制到 canvas，scale 为设备比例，不加入额外标题或图标
 pub(super) fn draw(state: &mut ClearDialog, canvas: &mut Pixmap, scale: f32) {
-    canvas.fill(chrome::BACKGROUND.color());
+    canvas.fill(chrome::background().color());
     let label = state.layout.label;
     let mut buffer = Buffer::new(&mut state.fonts, Metrics::new(16.0, 19.0));
     buffer.set_size(Some(label.width()), Some(label.height()));
@@ -55,7 +55,11 @@ pub(super) fn draw(state: &mut ClearDialog, canvas: &mut Pixmap, scale: f32) {
     let mut painter = Painter::new(canvas)
         .with_scale(scale)
         .with_text(&mut state.fonts, &mut state.cache);
-    painter.text_buffer(&buffer, (label.x(), label.y()), chrome::FOREGROUND.color());
+    painter.text_buffer(
+        &buffer,
+        (label.x(), label.y()),
+        chrome::foreground().color(),
+    );
     for (button, bounds) in state.layout.buttons {
         controls::icon_button(
             &mut painter,
@@ -63,12 +67,12 @@ pub(super) fn draw(state: &mut ClearDialog, canvas: &mut Pixmap, scale: f32) {
             button.label(),
             None,
             ButtonStyle {
-                fill: chrome::HOVER,
-                foreground: chrome::FOREGROUND,
+                fill: chrome::hover(),
+                foreground: chrome::foreground(),
                 border: if state.hover == Some(button) || (state.focused && state.focus == button) {
-                    chrome::ACCENT
+                    chrome::accent()
                 } else {
-                    chrome::BORDER
+                    chrome::border()
                 },
                 font_size: 16.0,
                 weight: Weight(500),

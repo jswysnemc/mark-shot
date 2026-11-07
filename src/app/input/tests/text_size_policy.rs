@@ -21,7 +21,7 @@ fn prepared(wrapped: bool) -> EditorState {
     if let AnnotationShape::Text {
         content,
         bold,
-        appearance,
+        frame,
         ..
     } = &mut state.annotations[0].shape
     {
@@ -32,7 +32,7 @@ fn prepared(wrapped: bool) -> EditorState {
             "Mark Shot"
         }
         .into();
-        appearance.wrap_width = wrapped.then_some(90.0);
+        frame.width = wrapped.then_some(90.0);
     }
     rebuild_annotation(&mut state, 0);
     super::super::refresh_panels(&mut state, &mut 0);
@@ -48,7 +48,7 @@ fn point_input_syncs_default_size_and_proportional_wrap_width() {
         text_edits::set(&mut state, Property::Points(points), true, &mut dirty);
         assert_eq!(state.tool_settings.font_size, points);
         assert!(
-            matches!(&state.annotations[0].shape,AnnotationShape::Text { appearance,.. } if appearance.wrap_width==Some(width))
+            matches!(&state.annotations[0].shape,AnnotationShape::Text { frame,.. } if frame.width==Some(width))
         );
         assert_eq!(state.annotations[0].bbox.width(), width);
     }
@@ -197,7 +197,7 @@ fn wheel_target_switch_and_limit_match_real_qt() {
     }
     state.annotations.push(second);
     for index in [0, 1] {
-        state.selected_annotation = Some(index);
+        state.select_annotation_index(Some(index));
         crate::app::panels::text::size_wheel::canvas(
             &mut state,
             crate::types::ScrollEvent::wheel(60),
@@ -256,7 +256,7 @@ fn default_wheel_has_no_history_and_active_gestures_ignore_it() {
     let mut state = prepared(false);
     let mut dirty = 0;
     state.selected_tool = Tool::Text;
-    state.selected_annotation = None;
+    state.select_annotation_index(None);
     let before = state.annotations.clone();
     crate::app::panels::text::size_wheel::canvas(
         &mut state,
@@ -285,7 +285,7 @@ fn another_tool_wheel_invalidates_the_old_text_context() {
     let mut state = prepared(false);
     let mut dirty = 0;
     state.selected_tool = Tool::Text;
-    state.selected_annotation = None;
+    state.select_annotation_index(None);
     super::super::refresh_panels(&mut state, &mut dirty);
     pointer(&mut state, 300.0, 300.0, &mut dirty);
     super::super::handle_axis_scroll(&mut state, crate::types::ScrollEvent::wheel(60), &mut dirty);

@@ -70,6 +70,7 @@ impl Annotation {
                 flat_ends: *flat_ends,
             },
             AnnotationShape::Text {
+                frame,
                 start,
                 content,
                 font_size,
@@ -78,6 +79,7 @@ impl Annotation {
                 outline,
                 appearance,
             } => AnnotationShape::Text {
+                frame: frame.scaled(s),
                 start: p(*start),
                 content: content.clone(),
                 font_size: *font_size,
@@ -97,6 +99,16 @@ impl Annotation {
         .unwrap_or(self.bbox);
 
         Annotation {
+            style_scale: self.style_scale * s,
+            rotation_degrees: self.rotation_degrees,
+            frozen_bounds: self.frozen_bounds.and_then(|bounds| {
+                Rect::from_ltrb(
+                    bounds.left() * s,
+                    bounds.top() * s,
+                    bounds.right() * s,
+                    bounds.bottom() * s,
+                )
+            }),
             id: self.id,
             shape,
             color: self.color,
@@ -138,9 +150,10 @@ impl Annotation {
                     p.1 += dy;
                 }
             }
-            AnnotationShape::Text { start, .. } => {
+            AnnotationShape::Text { start, frame, .. } => {
                 start.0 += dx;
                 start.1 += dy;
+                *frame = frame.translated((dx, dy));
             }
         }
         // 1. 【标注】【位置移动】文字只移动现有边界，避免依赖字体系统
@@ -245,6 +258,7 @@ impl Annotation {
                 flat_ends: *flat_ends,
             },
             AnnotationShape::Text {
+                frame,
                 start,
                 content,
                 font_size,
@@ -255,6 +269,7 @@ impl Annotation {
             } => {
                 let scale = sx.abs().max(sy.abs());
                 AnnotationShape::Text {
+                    frame: frame.clone(),
                     start: remap(*start),
                     content: content.clone(),
                     font_size: crate::features::text::geometry::points(*font_size * scale),

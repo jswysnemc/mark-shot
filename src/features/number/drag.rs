@@ -8,10 +8,7 @@ use crate::utils::apply_handle_drag;
 
 /// 【序号】【控制点列表】按 mark、width 返回八个外框控制点及圆心、实际尖端；无效几何返回空列表
 pub fn controls(mark: NumberMark, width: f32) -> Vec<(SelectionHandle, (f32, f32))> {
-    let Some(frame) = mark
-        .unrotated_bounds(width)
-        .and_then(|frame| frame.outset(6.0 * mark.style_scale, 6.0 * mark.style_scale))
-    else {
+    let Some(frame) = mark.unrotated_bounds(width) else {
         return Vec::new();
     };
     let (left, top, right, bottom) = (frame.left(), frame.top(), frame.right(), frame.bottom());
@@ -33,12 +30,12 @@ pub fn controls(mark: NumberMark, width: f32) -> Vec<(SelectionHandle, (f32, f32
     controls
 }
 
-/// 【序号】【旋转把手】按 mark、width 返回外框上方二十八像素的旋转把手；无效几何返回空值
+/// 【序号】【旋转把手】按mark、width返回圆框上方二十六样式单位的旋转把手；无效几何返回空值
 pub fn rotation_handle(mark: NumberMark, width: f32) -> Option<(f32, f32)> {
     let frame = mark.unrotated_bounds(width)?;
     Some(mark.to_visual((
         (frame.left() + frame.right()) / 2.0,
-        frame.top() - 28.0 * mark.style_scale,
+        frame.top() - 26.0 * mark.style_scale,
     )))
 }
 
@@ -180,10 +177,7 @@ fn resized(
     bounds: Rect,
     ctrl: bool,
 ) -> (NumberMark, f32) {
-    let Some(frame) = before
-        .unrotated_bounds(width)
-        .and_then(|frame| frame.outset(6.0 * before.style_scale, 6.0 * before.style_scale))
-    else {
+    let Some(frame) = before.unrotated_bounds(width) else {
         return (before, width);
     };
     let start = before.to_local(start);

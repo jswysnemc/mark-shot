@@ -12,6 +12,32 @@ use smithay_client_toolkit::{
 use wayland_client::QueueHandle;
 
 impl Pin {
+    /// 【贴图】【首次模型引导】临时交还输入和置顶层级，返回明确选择的模型文件，取消后恢复当前贴图
+    pub fn model_guide(&mut self) -> AppResult<Option<crate::ocr::models::ModelFiles>> {
+        let region = Region::new(&self.compositor)?;
+        self.shell
+            .surface()
+            .set_input_region(Some(region.wl_region()));
+        if let Shell::Layer(layer) = &self.shell {
+            layer.set_layer(Layer::Bottom);
+            layer.set_keyboard_interactivity(KeyboardInteractivity::None);
+        }
+        self.shell.surface().commit();
+        let result = (|| {
+            self.connection.flush()?;
+            crate::features::ocr_model_guide::run()
+        })();
+        self.shell.surface().set_input_region(None);
+        if let Shell::Layer(layer) = &self.shell {
+            layer.set_layer(Layer::Top);
+            layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
+        }
+        self.shell.surface().commit();
+        let restored = self.connection.flush();
+        let selected = result?;
+        restored?;
+        Ok(selected)
+    }
     /// 【贴图】【模态保存】另存为期间降低置顶层级并关闭输入；返回保存结果，取消或失败后恢复原角色
     fn save_as(&mut self) -> AppResult {
         let png = self.image.png()?;
@@ -91,26 +117,38 @@ impl Pin {
                 PinAction::Copy => crate::backend::initialize_clipboard()
                     .copy_image_to_clipboard(&self.image.png()?)?,
                 PinAction::CopySelectedText => {
-                    crate::utils::copy_to_clipboard(&self.text.text_to_copy())?
+                    crate::utils::copy_to_clipboard(&self.text.line_text(true))?
                 }
                 PinAction::CopyImageText => {
                     if self.text.is_active() {
-                        crate::utils::copy_to_clipboard(&self.text.all_text())?;
+                        crate::utils::copy_to_clipboard(&self.text.line_text(false))?;
                     } else {
-                        actions::copy_text(&self.image.png()?)?;
+                        self.copy_after_ocr = true;
+                        if !self.start_ocr()? {
+                            self.copy_after_ocr = false;
+                        }
                     }
                 }
                 PinAction::TextSelection => {
                     self.text_selection = !self.text_selection;
                     if self.text_selection {
-                        self.text_selection = self.start_ocr()?;
+                        self.text_selection = if self.text.is_active() {
+                            true
+                        } else {
+                            self.start_ocr()?
+                        };
                     } else {
-                        self.clear_ocr();
+                        self.text.deselect();
+                        self.selecting = false;
                     }
                     self.dirty = true;
                 }
                 PinAction::SaveAs => self.save_as()?,
                 PinAction::Close => self.exit = true,
+                PinAction::Translate => self.request_translation()?,
+                PinAction::ToggleTranslation => {
+                    self.set_translation_active(!self.translation.active)
+                }
                 _ => {}
             }
             Ok(())

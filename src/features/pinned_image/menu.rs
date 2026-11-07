@@ -1,4 +1,4 @@
-//! 【贴图】【菜单定义】原版菜单顺序与可用状态，未配置翻译入口不执行空动作
+//! 【贴图】【菜单定义】原版菜单顺序与任务可用状态，翻译入口主动检查配置并报告实际错误
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PinAction {
@@ -157,12 +157,34 @@ pub fn enabled(
     top_supported: bool,
     has_selection: bool,
     _has_text: bool,
+    translation_busy: bool,
+    has_translation: bool,
 ) -> bool {
     match action {
         A::AlwaysOnTop => top_supported,
         A::CopySelectedText => has_selection,
         A::TextSelection => true,
-        A::Translate | A::TargetLanguage | A::ToggleTranslation => false,
+        A::Translate => !translation_busy,
+        A::TargetLanguage => true,
+        A::ToggleTranslation => has_translation && !translation_busy,
         _ => true,
     }
+}
+
+/// 【贴图】【菜单行顶边】按 index 返回菜单行的逻辑顶边，非法索引返回空值，用于原生语言子菜单定位
+pub fn row_top(index: usize) -> Option<u32> {
+    ITEMS.get(index)?;
+    Some(
+        PADDING
+            + ITEMS[..index]
+                .iter()
+                .map(|item| {
+                    if item.action.is_some() {
+                        ROW
+                    } else {
+                        SEPARATOR
+                    }
+                })
+                .sum::<u32>(),
+    )
 }

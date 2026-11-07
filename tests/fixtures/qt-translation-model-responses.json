@@ -1,0 +1,208 @@
+{
+  "cases": [
+    {
+      "body": "{}",
+      "error": "gemini response missing candidates",
+      "ok": false,
+      "provider": "gemini",
+      "translations": {}
+    },
+    {
+      "body": "{\"error\":{\"type\":\"authentication_error\",\"message\":\"denied\"}}",
+      "error": "gemini error: denied",
+      "ok": false,
+      "provider": "gemini",
+      "translations": {}
+    },
+    {
+      "body": "{\"error\":null}",
+      "error": "gemini error: ",
+      "ok": false,
+      "provider": "gemini",
+      "translations": {}
+    },
+    {
+      "body": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"{\\\"translations\\\":[{\\\"id\\\":2,\\\"text\\\":\\\" translated \\\"},{\\\"id\\\":2,\\\"text\\\":\\\"last\\\"}]}\",\"type\":\"text\"}]}}]}",
+      "error": "",
+      "ok": true,
+      "provider": "gemini",
+      "translations": {
+        "2": "last"
+      }
+    },
+    {
+      "body": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"```json\\n{\\\"translations\\\":[{\\\"id\\\":2,\\\"text\\\":\\\" translated \\\"},{\\\"id\\\":2,\\\"text\\\":\\\"last\\\"}]}\\n```\",\"type\":\"text\"}]}}]}",
+      "error": "",
+      "ok": true,
+      "provider": "gemini",
+      "translations": {
+        "2": "last"
+      }
+    },
+    {
+      "body": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"not JSON\",\"type\":\"text\"}]}}]}",
+      "error": "gemini text response is not valid JSON: not JSON",
+      "ok": false,
+      "provider": "gemini",
+      "translations": {}
+    },
+    {
+      "body": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"{}\",\"type\":\"text\"}]}}]}",
+      "error": "gemini response missing translations array",
+      "ok": false,
+      "provider": "gemini",
+      "translations": {}
+    },
+    {
+      "body": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"{\\\"translations\\\":[]}\",\"type\":\"text\"}]}}]}",
+      "error": "",
+      "ok": true,
+      "provider": "gemini",
+      "translations": {}
+    },
+    {
+      "body": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\" \",\"type\":\"text\"}]}}]}",
+      "error": "gemini candidate part text is empty",
+      "ok": false,
+      "provider": "gemini",
+      "translations": {}
+    },
+    {
+      "body": "{}",
+      "error": "anthropic response missing content",
+      "ok": false,
+      "provider": "anthropic",
+      "translations": {}
+    },
+    {
+      "body": "{\"error\":{\"type\":\"authentication_error\",\"message\":\"denied\"}}",
+      "error": "anthropic error (authentication_error): denied",
+      "ok": false,
+      "provider": "anthropic",
+      "translations": {}
+    },
+    {
+      "body": "{\"error\":null}",
+      "error": "anthropic error (): ",
+      "ok": false,
+      "provider": "anthropic",
+      "translations": {}
+    },
+    {
+      "body": "{\"content\":[{\"text\":\"{\\\"translations\\\":[{\\\"id\\\":2,\\\"text\\\":\\\" translated \\\"},{\\\"id\\\":2,\\\"text\\\":\\\"last\\\"}]}\",\"type\":\"text\"}]}",
+      "error": "",
+      "ok": true,
+      "provider": "anthropic",
+      "translations": {
+        "2": "last"
+      }
+    },
+    {
+      "body": "{\"content\":[{\"text\":\"```json\\n{\\\"translations\\\":[{\\\"id\\\":2,\\\"text\\\":\\\" translated \\\"},{\\\"id\\\":2,\\\"text\\\":\\\"last\\\"}]}\\n```\",\"type\":\"text\"}]}",
+      "error": "",
+      "ok": true,
+      "provider": "anthropic",
+      "translations": {
+        "2": "last"
+      }
+    },
+    {
+      "body": "{\"content\":[{\"text\":\"not JSON\",\"type\":\"text\"}]}",
+      "error": "anthropic text response is not valid JSON: not JSON",
+      "ok": false,
+      "provider": "anthropic",
+      "translations": {}
+    },
+    {
+      "body": "{\"content\":[{\"text\":\"{}\",\"type\":\"text\"}]}",
+      "error": "anthropic response missing translations array",
+      "ok": false,
+      "provider": "anthropic",
+      "translations": {}
+    },
+    {
+      "body": "{\"content\":[{\"text\":\"{\\\"translations\\\":[]}\",\"type\":\"text\"}]}",
+      "error": "",
+      "ok": true,
+      "provider": "anthropic",
+      "translations": {}
+    },
+    {
+      "body": "{\"content\":[{\"text\":\" \",\"type\":\"text\"}]}",
+      "error": "anthropic response text content is empty",
+      "ok": false,
+      "provider": "anthropic",
+      "translations": {}
+    },
+    {
+      "body": "{\"candidates\":[]}",
+      "error": "gemini response missing candidates",
+      "ok": false,
+      "provider": "gemini",
+      "translations": {}
+    },
+    {
+      "body": "{\"candidates\":[{}]}",
+      "error": "gemini response candidate missing content parts",
+      "ok": false,
+      "provider": "gemini",
+      "translations": {}
+    },
+    {
+      "body": "{\"candidates\":[{\"content\":{\"parts\":[]}}]}",
+      "error": "gemini response candidate missing content parts",
+      "ok": false,
+      "provider": "gemini",
+      "translations": {}
+    },
+    {
+      "body": "{\"candidates\":[{\"content\":{\"parts\":[{}, {\"text\":\"ignored\"}]}}]}",
+      "error": "gemini candidate part text is empty",
+      "ok": false,
+      "provider": "gemini",
+      "translations": {}
+    },
+    {
+      "body": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"{\\\"translations\\\":[]}\"}]}},{\"content\":{\"parts\":[{\"text\":\"ignored\"}]}}]}",
+      "error": "",
+      "ok": true,
+      "provider": "gemini",
+      "translations": {}
+    },
+    {
+      "body": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"{\\\"translations\\\":[]}\"},{\"text\":\"ignored\"}]}}]}",
+      "error": "",
+      "ok": true,
+      "provider": "gemini",
+      "translations": {}
+    },
+    {
+      "body": "{\"content\":[]}",
+      "error": "anthropic response missing content",
+      "ok": false,
+      "provider": "anthropic",
+      "translations": {}
+    },
+    {
+      "body": "{\"content\":[{\"type\":\"thinking\",\"text\":\"ignored\"}]}",
+      "error": "anthropic response text content is empty",
+      "ok": false,
+      "provider": "anthropic",
+      "translations": {}
+    },
+    {
+      "body": "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"translations\\\":\"},{\"type\":\"thinking\",\"text\":\"ignored\"},{\"type\":\"text\",\"text\":\"[]}\"}]}",
+      "error": "",
+      "ok": true,
+      "provider": "anthropic",
+      "translations": {}
+    },
+    {
+      "body": "{\"content\":[{\"text\":\"ignored\"}]}",
+      "error": "anthropic response text content is empty",
+      "ok": false,
+      "provider": "anthropic",
+      "translations": {}
+    }
+  ]
+}

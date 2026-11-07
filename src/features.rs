@@ -1,15 +1,34 @@
 //! 【功能模块】【入口】按业务组织独立窗口与应用功能
 
+pub mod annotation_collection;
+pub mod annotation_rotation;
+pub mod annotation_selection;
+pub mod annotation_style;
 pub mod arrow;
+pub mod canvas_navigation;
 pub mod capture_history;
+pub mod export_image;
+pub mod external_actions;
 pub mod filter;
+pub mod image_translation;
 pub mod laser_trace;
 pub mod line;
 pub mod magnifier;
 pub mod marker;
 pub mod number;
+pub mod ocr_model_guide;
 pub mod ocr_result;
 pub mod pinned_image;
+pub mod region_detection;
 pub mod ruler;
 pub mod save_as;
+pub mod selection_size;
+pub mod selection_translation;
+#[cfg(target_os = "linux")]
+pub(crate) mod single_instance;
+#[cfg(target_os = "windows")]
+#[path = "features/single_instance/windows.rs"]
+pub(crate) mod single_instance;
 pub mod text;
+pub mod text_storage;
+pub mod wheel_preview;

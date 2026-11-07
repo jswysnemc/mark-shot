@@ -24,6 +24,9 @@ fn annotation(mode: RulerMode, rotation: f32) -> Annotation {
     };
     let color = Color::from_rgba8(240, 55, 35, 180);
     let mut result = Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id: 9,
         shape: AnnotationShape::Ruler { measurement },
         color,

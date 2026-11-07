@@ -211,6 +211,11 @@ impl OcrModels {
         self.status.iter().copied().any(in_flight)
     }
 
+    /// 【识别模型】【取消排空】返回下载器是否仍需消费进度或完成消息，无参数，取消不以界面状态代替实际队列结束
+    pub fn needs_poll(&self) -> bool {
+        self.downloader.has_pending()
+    }
+
     pub fn recommended(&self) -> usize {
         self.recommended
     }

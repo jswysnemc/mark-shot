@@ -1,7 +1,7 @@
 //! 【上下文菜单】【缓存绘制】沿用原版深色玻璃、细边和圆角行，局部重绘不重复叠加透明背景
 
 use super::ContextMenu;
-use crate::{renderer::Painter, theme::Rgba, ui::text_properties::draw::border};
+use crate::{renderer::Painter, ui::text_properties::draw::border};
 use tiny_skia::{Color, IntRect, Pixmap, Rect};
 
 /// 【上下文菜单】【菜单绘制】将 menu 按 p 比例绘入 dirty 指定区域；缓存只在布局、比例或高亮变化时重建，无返回值
@@ -48,10 +48,11 @@ pub fn prepare(p: &mut Painter, menu: &mut ContextMenu) {
     let Some(mut pixmap) = menu.pixmap.take() else {
         return;
     };
-    if fresh || menu.dirty {
+    if fresh || menu.dirty || menu.drawn_theme != Some(crate::theme::Mode::current()) {
         pixmap.fill(Color::TRANSPARENT);
         content(&mut p.sub(&mut pixmap), menu);
         menu.dirty = false;
+        menu.drawn_theme = Some(crate::theme::Mode::current());
     }
     menu.pixmap = Some(pixmap);
 }
@@ -60,8 +61,18 @@ pub fn prepare(p: &mut Painter, menu: &mut ContextMenu) {
 fn content(p: &mut Painter, menu: &ContextMenu) {
     let frame =
         Rect::from_xywh(0.5, 0.5, menu.layout.size.0 - 1.0, menu.layout.size.1 - 1.0).unwrap();
-    p.fill_rounded(frame, 8.0, Rgba(24, 27, 35, 246));
-    border(p, frame, 8.0, 1.0, Rgba(255, 255, 255, 30));
+    p.fill_rounded(
+        frame,
+        8.0,
+        crate::theme::context_menu::Palette::current().background,
+    );
+    border(
+        p,
+        frame,
+        8.0,
+        1.0,
+        crate::theme::context_menu::Palette::current().border,
+    );
     for (index, ((row, rect), text)) in menu
         .rows
         .iter()
@@ -79,23 +90,27 @@ fn content(p: &mut Painter, menu: &ContextMenu) {
                 )
                 .unwrap(),
                 0.0,
-                Rgba(255, 255, 255, 22),
+                crate::theme::context_menu::Palette::current().separator,
             );
             continue;
         }
         let active = row.enabled && menu.active == Some(index);
         if active {
-            p.fill_rounded(*rect, 5.0, Rgba(45, 212, 191, 46));
+            p.fill_rounded(
+                *rect,
+                5.0,
+                crate::theme::context_menu::Palette::current().hover_background,
+            );
         }
         let color = if !row.enabled {
-            Rgba(100, 116, 139, 255)
+            crate::theme::context_menu::Palette::current().disabled_text
         } else if active {
-            Rgba(248, 250, 252, 255)
+            crate::theme::context_menu::Palette::current().hover_text
         } else {
-            Rgba(229, 231, 235, 255)
+            crate::theme::context_menu::Palette::current().text
         };
         let secondary = if row.enabled {
-            Rgba(148, 163, 184, 255)
+            crate::theme::context_menu::Palette::current().secondary_text
         } else {
             color
         };
@@ -103,9 +118,35 @@ fn content(p: &mut Painter, menu: &ContextMenu) {
         p.text_buffer(&text.label, (rect.left() + 8.0, top), color.into());
         p.text_buffer(
             &text.shortcut,
-            (rect.right() - 8.0 - text.shortcut_width, top),
+            (
+                rect.right()
+                    - 8.0
+                    - text.shortcut_width
+                    - if menu.layout.arrow_column { 16.0 } else { 0.0 },
+                top,
+            ),
             secondary.into(),
         );
+        if menu.submenu_rows.contains(&index) {
+            let center = (rect.right() - 14.0, rect.top() + rect.height() * 0.5);
+            let mut path = tiny_skia::PathBuilder::new();
+            let height = 12.0 * 0.28;
+            path.move_to(center.0 - height * 0.5, center.1 - height);
+            path.line_to(center.0 + height * 0.5, center.1);
+            path.line_to(center.0 - height * 0.5, center.1 + height);
+            if let Some(path) = path.finish() {
+                p.stroke_path(
+                    &path,
+                    secondary,
+                    &tiny_skia::Stroke {
+                        width: 1.5,
+                        line_cap: tiny_skia::LineCap::Round,
+                        line_join: tiny_skia::LineJoin::Round,
+                        ..Default::default()
+                    },
+                );
+            }
+        }
     }
 }
 

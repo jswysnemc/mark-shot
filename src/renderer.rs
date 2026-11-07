@@ -1,10 +1,17 @@
 mod capture_composite;
 mod clipped;
+pub(crate) use capture_composite::composite_precise;
 pub use capture_composite::{capture_scale, composite};
+pub(crate) mod pixel_bounds;
 
+mod annotation_tiles;
+mod background_restore;
+mod canvas_navigation;
 mod dimming;
 pub(crate) mod editor_text;
+mod frame_scene;
 pub mod frozen_image;
+pub(crate) mod opaque_backdrop;
 pub use dimming::init_dimming;
 use dimming::{blit_rect, draw_selection_border, update_dimming_delta};
 
@@ -12,10 +19,14 @@ use dimming::{blit_rect, draw_selection_border, update_dimming_delta};
 // UI component rendering lives in ui/<component>/draw.rs
 // OCR overlay rendering lives in ocr/draw.rs alongside its state
 
+mod annotation_rotation;
 pub mod annotation_stack;
+mod annotation_style;
 mod annotations;
+mod collection_stack;
 mod filter_handles;
 pub mod fixed_path;
+mod glyph_run;
 pub(crate) mod line_edit;
 mod line_handles;
 mod magnifier_handles;
@@ -23,6 +34,12 @@ mod number_handles;
 pub(crate) mod number_text;
 mod painter;
 pub mod paths;
+mod rotated_text;
+mod rotation_tiles;
+pub(crate) mod ruler_chrome;
+mod ruler_hover_label;
+mod ruler_hover_tiles;
+mod ruler_labels;
 pub mod ruler_overlay;
 pub(crate) mod ruler_text;
 pub mod stroke_path;
@@ -62,9 +79,13 @@ pub struct RenderRequest<'a> {
     pub dimmed: &'a mut Pixmap,
     // selection + magnifier + toolbar
     pub selection: Option<&'a Rect>,
+    /// 【截图区域识别】【独立候选】全局逻辑矩形，不参与正式选区、工具栏与导出
+    pub hovered_region: Option<&'a Rect>,
     pub prev_selection: Option<&'a Rect>,
     pub dirty_rect: Option<&'a Rect>,
     pub selection_edges: Option<&'a SelectionEdges>,
+    /// 【截图选框】【绘制半径】截图范围使用零，图片预览使用其独立配置，不影响标注组件选框
+    pub selection_radius: f32,
     pub selection_dirty: bool,
     pub magnifier: Option<&'a MagnifierState>,
     pub is_mag_monitor: bool,
@@ -74,6 +95,7 @@ pub struct RenderRequest<'a> {
     pub action_toolbar: Option<&'a mut Toolbar>,
     pub settings_panel: Option<&'a mut SettingsPanel>,
     pub font_panel: Option<&'a mut crate::ui::font_panel::FontPanel>,
+    pub external_panel: Option<&'a mut crate::ui::external_panel::ExternalPanel>,
     pub current_color: Color,
     pub outline_color: Color,
     pub color_picker: Option<&'a mut ColorPickerPopover>,
@@ -123,105 +145,80 @@ pub struct RenderRequest<'a> {
 }
 
 pub fn render_frame(req: &mut RenderRequest) {
-    let s = req.scale;
-    if req.selection_dirty {
-        update_dimming_delta(
-            req.dimmed,
-            req.prev_selection,
-            req.selection,
-            req.selection_edges,
-            s,
-        );
-    }
-    let dirty_rect = req.dirty_rect;
+    render_frame_with_selection_size(req, None, None);
+}
 
-    if let Some(dirty) = dirty_rect {
-        blit_rect(req.dimmed, req.canvas, dirty, s);
-    } else {
-        req.canvas.data_mut().copy_from_slice(req.dimmed.data());
-    }
+/// 【截图绘制】【尺寸叠层】按 req 和 selection_size 合成屏幕，尺寸面板按原版位于工具栏上方或下方，无返回值
+pub(crate) fn render_frame_with_selection_size(
+    req: &mut RenderRequest,
+    selection_size: Option<crate::ui::selection_size::cache::Overlay<'_>>,
+    annotation_delete: Option<&crate::ui::annotation_selection::delete_cache::Cache>,
+) {
+    render_frame_with_collection(req, selection_size, annotation_delete, None);
+}
 
-    annotation_stack::draw_layers(req);
-
-    ruler_overlay::draw_clipped(
-        req.canvas,
-        req.ruler_labels,
-        req.ruler_hover,
-        req.offset,
-        s,
-        dirty_rect,
-        req.text.font_system,
-        req.text.swash_cache,
+/// 【标注多选】【场景合成】按req、尺寸叠层、删除按钮与collection合成动态场景，共同拖动绕过缓存正文，无返回值
+pub(crate) fn render_frame_with_collection(
+    req: &mut RenderRequest,
+    selection_size: Option<crate::ui::selection_size::cache::Overlay<'_>>,
+    annotation_delete: Option<&crate::ui::annotation_selection::delete_cache::Cache>,
+    collection: Option<crate::app::annotation_collection::chrome::Overlay<'_>>,
+) {
+    render_frame_with_navigation(
+        req,
+        selection_size,
+        annotation_delete,
+        collection,
+        Default::default(),
+        false,
+        None,
+        None,
     );
+}
 
-    if let Some(laser) = req.laser {
-        crate::features::laser_trace::draw(
-            req.canvas,
-            laser,
-            req.offset,
-            dirty_rect,
-            s,
-            std::time::Instant::now(),
-        );
-    }
-
-    if let Some(sel) = req.selection {
-        Painter::new(req.canvas)
-            .with_scale(s)
-            .clipped(dirty_rect.copied(), |painter| {
-                draw_selection_border(painter, sel, req.selection_edges);
-            });
-    }
-
-    if let Some(pending) = req.pending
-        && req.is_pending_selected
-    {
-        Painter::new(req.canvas)
-            .with_scale(s)
-            .with_origin(req.offset)
-            .clipped(dirty_rect.copied(), |painter| {
-                annotations::draw_annotation_handles_only(painter, pending);
-                if let Some((id, index)) = req.line_point
-                    && pending.id == id
-                {
-                    line_handles::highlight(painter, pending, index);
-                }
-            });
-    }
-
-    // Dynamic selection chrome: handles for the currently selected annotation
-    if let Some(idx) = req.selected_annotation
-        && let Some(ann) = req.annotations.get(idx)
-    {
-        Painter::new(req.canvas)
-            .with_scale(s)
-            .with_origin(req.offset)
-            .clipped(dirty_rect.copied(), |painter| {
-                annotations::draw_annotation_handles_only(painter, ann);
-                if let Some((id, index)) = req.line_point
-                    && ann.id == id
-                {
-                    line_handles::highlight(painter, ann, index);
-                }
-            });
-    }
-
-    // Clipped to the dirty rect: everything the overlay paints is translucent,
-    // so anything drawn outside the area just restored from `dimmed` would
-    // stack a second layer on top of last frame's.
-    if let Some(view) = req.ocr_view {
-        crate::ocr::draw::draw_ocr_overlay(req.canvas, view, req.offset, dirty_rect, s);
-    }
-
-    if let Some((region, phase)) = req.ocr_scan {
-        crate::ocr::draw::draw_ocr_scan(
-            req.canvas,
+/// 【画布导航】【帧合成】按req与view绘制画布，叠层参数提供控件；background_changed重采样背景，original_text_id排除编辑原件，无返回值
+pub(crate) fn render_frame_with_navigation(
+    req: &mut RenderRequest,
+    selection_size: Option<crate::ui::selection_size::cache::Overlay<'_>>,
+    annotation_delete: Option<&crate::ui::annotation_selection::delete_cache::Cache>,
+    collection: Option<crate::app::annotation_collection::chrome::Overlay<'_>>,
+    view: crate::editor::canvas_navigation::transform::ViewTransform,
+    background_changed: bool,
+    original_text_id: Option<u64>,
+    region: Option<&crate::editor::region_rendering::State>,
+) {
+    let s = req.scale;
+    let dirty_rect = req.dirty_rect;
+    if view.is_identity() {
+        if region.is_none() && background_changed {
+            init_dimming(req.dimmed, req.selection, req.selection_edges, s);
+            if let Some(selection) = req.selection {
+                dimming::dim_hole_corners(
+                    req.dimmed,
+                    selection,
+                    req.selection_edges,
+                    s,
+                    req.selection_radius,
+                );
+            }
+            req.selection_dirty = false;
+        }
+        frame_scene::draw(
+            req,
+            annotation_delete,
+            collection.as_ref(),
+            original_text_id,
             region,
-            phase,
-            req.offset,
-            req.icons_cache,
-            dirty_rect,
-            s,
+        );
+    } else {
+        canvas_navigation::draw(
+            req,
+            view,
+            background_changed,
+            original_text_id,
+            annotation_delete,
+            collection.as_ref(),
+            region,
         );
     }
 
@@ -229,6 +226,13 @@ pub fn render_frame(req: &mut RenderRequest) {
         .with_scale(s)
         .with_icons(req.icons_cache)
         .with_text(req.text.font_system, req.text.swash_cache);
+
+    if let Some(overlay) = selection_size
+        .as_ref()
+        .filter(|overlay| overlay.under_toolbars)
+    {
+        crate::ui::selection_size::cache::composite(&mut p, overlay, dirty_rect.copied());
+    }
 
     if req.is_mag_monitor
         && let Some(mag) = req.magnifier
@@ -263,6 +267,12 @@ pub fn render_frame(req: &mut RenderRequest) {
             req.outline_color,
         );
     }
+    if let Some(overlay) = selection_size
+        .as_ref()
+        .filter(|overlay| !overlay.under_toolbars)
+    {
+        crate::ui::selection_size::cache::composite(&mut p, overlay, dirty_rect.copied());
+    }
     if let Some(color_picker) = req.color_picker.as_deref_mut()
         && color_picker.dirty
     {
@@ -272,6 +282,11 @@ pub fn render_frame(req: &mut RenderRequest) {
         && panel.dirty
     {
         crate::ui::font_panel::draw::draw(&mut p, panel);
+    }
+    if let Some(panel) = req.external_panel.as_deref_mut() {
+        p.clipped_scene(dirty_rect.copied(), |p| {
+            crate::ui::external_panel::draw::draw(p, panel)
+        });
     }
     if let Some(model_popover) = req.model_popover.as_deref_mut()
         && model_popover.dirty
@@ -431,7 +446,7 @@ pub fn rebuild_annotations_layer(
     };
 
     if dirty_rect.is_none() {
-        clear_rect_transparent(p.canvas, &px_rect);
+        crate::utils::transparent_pixmap::clear(p.canvas);
         for ann in annotations {
             if active_text_id == Some(ann.id) {
                 continue;
@@ -467,11 +482,16 @@ pub fn rebuild_annotations_layer(
         if active_text_id == Some(ann.id) {
             continue;
         }
-        let pad = ann.visual_pad();
-        let l = ann.bbox.left() - offset.0 - pad;
-        let t = ann.bbox.top() - offset.1 - pad;
-        let r = ann.bbox.right() - offset.0 + pad;
-        let b = ann.bbox.bottom() - offset.1 + pad;
+        let bounds = annotation_style::damage(
+            ann,
+            tmp_painter.window_units(),
+            tmp_painter.drawing_bounds(),
+            tmp_painter.ruler_projection(),
+        );
+        let l = bounds.left() - offset.0;
+        let t = bounds.top() - offset.1;
+        let r = bounds.right() - offset.0;
+        let b = bounds.bottom() - offset.1;
 
         if l < base_rect.right()
             && r > base_rect.left()

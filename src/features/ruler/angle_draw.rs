@@ -16,7 +16,7 @@ pub fn draw(painter: &mut Painter<'_>, measurement: Measurement, width: f32, col
     }
     let unit = measurement.unit(width);
     let pen = Stroke {
-        width: (2.0 * unit).max(measurement.style_scale),
+        width: (2.0 * unit).max(measurement.style_scale as f32),
         line_cap: LineCap::Round,
         line_join: LineJoin::Round,
         ..Stroke::default()
@@ -51,7 +51,7 @@ pub fn draw(painter: &mut Painter<'_>, measurement: Measurement, width: f32, col
                 &path,
                 color,
                 &Stroke {
-                    width: (1.5 * unit).max(measurement.style_scale),
+                    width: (1.5 * unit).max(measurement.style_scale as f32),
                     ..pen.clone()
                 },
             );

@@ -179,9 +179,9 @@ fn fractional_scale_clips_match_the_full_render_exactly() {
     }
 }
 
-/// 【箭头测试】【原图比例】几何和样式缩放两倍与绘制器缩放两倍生成相同像素，头部绝对尺寸同步
+/// 【箭头测试】【窗口比例】几何换坐标与设备换比例在相同窗口单位下生成相同像素，头部限制随窗口单位独立换算
 #[test]
-fn original_image_scaling_matches_viewport_scaling() {
+fn coordinate_and_device_scaling_match_with_equivalent_window_units() {
     let line = skeleton(true);
     for style in ArrowStyle::ALL {
         for pattern in LineStyle::ALL {
@@ -196,7 +196,9 @@ fn original_image_scaling_matches_viewport_scaling() {
                 Color::BLACK,
             );
             draw::draw(
-                &mut Painter::new(&mut original),
+                &mut Painter::new(&mut original).with_window_units(
+                    mark_shot::features::annotation_style::window::WindowUnits::new(2.0),
+                ),
                 &line.scaled(2.0),
                 style,
                 pattern,

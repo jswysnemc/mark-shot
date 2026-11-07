@@ -2,8 +2,9 @@
 
 ## 范围
 
-- Linux / Wayland 优先，不维护 Qt、X11 或 Windows 分支
-- 截图后端优先使用 ext-image-copy-capture、wlr-screencopy；KDE 使用 ScreenShot2
+- Wayland 与 Windows 均为正式平台目标，共享业务与渲染逻辑，隔离原生后端；Windows 主应用已接入，完整交互仍未完成
+- 产品完全移除 Qt 依赖，Qt 目录仅作为只读行为与性能对照；不维护产品 X11 后端
+- Linux 截图后端优先使用 ext-image-copy-capture、wlr-screencopy；KDE 使用 ScreenShot2，Windows 使用原生显示器与 GDI 捕获
 - 不具备原生捕获协议时回退到桌面 portal，滚动截图使用持续捕获和图像拼接
 - 软件绘制界面，无 GPU 界面运行时；静态截图和动态标注分层，按损坏区域提交帧
 - OCR 使用 oar-ocr / PP-OCRv5，默认按需加载；模型下载必须经过明确用户操作
@@ -14,7 +15,11 @@
 ```text
 src/
   app/                 截图会话、输入调度、帧节奏、导出流程
+  backend/session.rs  平台会话入口，业务不直接依赖 Wayland 连接
+  backend/platform/   Linux 与 Windows 的后端工厂
+  backend/window.rs   共用窗口、菜单、输入、滚轮与模态契约
   backend/wayland/     捕获协议、覆盖层、普通窗口、贴图窗口、剪贴板
+  backend/windows/    原生显示器、位图、窗口、输入、剪贴板与贴图
   config/             配置值、界面参数、读取校验、迁移
   editor/             编辑状态、撤销、损坏区域、原图滤镜缓存
   renderer/           标注、文字、像素合成、输出图像
@@ -30,17 +35,35 @@ src/
   features/arrow/      四种头部、尺寸、弧长取点及统一闭合轮廓
   features/filter/     五种原图滤镜、像素网格、旋转控制点与按需区域合成
   features/text/       文字样式、布局几何、字符选区与光标周期
+  features/annotation_selection/ 共用选框颜色、几何及删除按钮位置
+  features/annotation_rotation/ 独立角度、原版缩放和原始手势计算
+  renderer/rotation_tiles.rs 普通旋转正文的固定物理网格合成
+  renderer/rotated_text.rs 可见原始字形与单次旋转采样
+  ui/annotation_selection/ 虚线、定点栅格、缩放与旋转控制点和短期删除缓存
+  app/annotation_selection.rs 删除按钮位置、鼠标归属及局部损坏同步
+  features/selection_size/ 图像几何、比例联动、整数验证与面板避让
+  app/selection_size/  尺寸应用、字段输入、按钮持有、点击序列、光标调度与原生比例列表
+  app/selection_size/field_clipboard.rs  释放复制、有界粘贴请求与编辑身份校验
+  backend/wayland/overlay/state/primary_selection/  会话内主选择来源与非阻塞管道
+  backend/wayland/overlay/state/pointer_coalescing.rs  保留每个输出极值的移动合并
+  types/pointer_motion.rs  合并轨迹范围，不保存逐点列表
+  ui/selection_size/   固定布局、词语边界、字体度量、整数视口、矢量路径与物理缓存
+  fonts/fixed_layout.rs  选区字段与图片翻译共用的定点字形前进量
+  renderer/glyph_run.rs  普通缓冲与指定布局共用的字形缓存绘制
   features/ocr_result/ 独立 OCR 结果、原图、表格与格式导出
   features/capture_history/ PNG 历史、存储预算、预览、搜索及独立窗口
   features/pinned_image/ 原始贴图像素、旋转、菜单动作和独立任务交接
-  features/           翻译、上传、扩展、桌面集成的后续模块
+  features/external_actions/ 桌面应用、扩展配置、参数与私有图片交付
+  upload/             HTTP 上传、命令执行、有限结果与任务生命周期
+  features/           其余桌面集成模块
   ui/                 工具栏、属性面板、输入框、提示、文字编辑器与共用文件选择器
+  ui/external_panel/  打开方式和扩展的侧边列表、滚动与有限图标缓存
   utils/              文件锁与辅助进程生命周期
 crates/
   shot-image/         纯 Rust 图像缓冲、盒式模糊、像素化和颜色滤镜
   shot-stitch/        纯 Rust 长截图拼接
 tests/                命令行与跨模块回归测试
-scripts/              安装、性能与隔离 Wayland 验证
+scripts/              安装、性能、私有 Wayland 与 Wine/Xvfb 验证
 ```
 
 单个源文件保持在 750 行以内，超过阈值前按职责拆分。应用流程、帧绘制、文字编辑与
@@ -48,16 +71,16 @@ scripts/              安装、性能与隔离 Wayland 验证
 
 ## 资源生命周期
 
-1. 普通截图仅初始化 Wayland、图像缓冲与界面字体，不初始化 OCR
+1. 普通截图仅初始化平台后端、图像缓冲与界面字体，不初始化 OCR
 2. 系统字体与图标缓存在后台准备，不阻塞第一帧
 3. 静态截图使用独立背景表面，动态界面只提交局部损坏区域
 4. 无输入或后台工作时事件循环阻塞等待，不进行定时空转
-5. 图片剪贴板通过独立数据提供进程维持，关闭编辑器不会丢失内容
+5. Linux 图片剪贴板通过独立数据提供进程维持；Windows 将 PNG、DIBV5 与 Unicode 数据交给系统，关闭编辑器不会丢失内容
 6. 贴图为独立进程，关闭截图覆盖层即释放编辑器缓冲
-7. OCR 默认仅保留当前会话模型；可选后台模式有空闲退出期限
+7. OCR 默认仅保留当前会话模型；Linux 可选后台模式有空闲退出期限，Windows 当前使用按需 CPU 引擎
 8. 结果窗口使用独立进程，不加载 OCR 模型；首帧确认后退出截图进程，释放识别资源
 9. 结果文档通过有长度上限的二进制帧传递；PNG 使用原始字节，不转为 JSON 像素数组
-10. 普通窗口使用共享内存缓冲、视区与分数缩放协议；事件循环空闲时阻塞，按键重复交给 calloop
+10. Linux 普通窗口使用共享内存缓冲、视区与分数缩放协议，Windows 使用原生消息循环与 DIB；两者空闲时阻塞
 11. 激光只保存有容量限制的逻辑采样和缓存路径；完成笔迹期间轮询，过期后恢复阻塞等待
 12. 捕获使用单线程异步调度，最多四个按需阻塞线程；工作线程空闲 250 ms 后退出，不保留默认十秒空闲线程
 13. 放大镜标注只保存几何与比例，读取冻结原图的零复制视图；绘制和导出均不再次捕获桌面或初始化 OCR
@@ -66,9 +89,17 @@ scripts/              安装、性能与隔离 Wayland 验证
 16. 滤镜按冻结原图区域处理，单项像素缓存最多 4 MiB、总量最多 16 MiB；取消、删除和历史替换立即释放无效项
 17. 历史窗口直接进入普通窗口运行时，不创建捕获异步运行时或识别模型；临时工作线程通过 eventfd 唤醒窗口，任务结束后退出
 18. 历史预览逐行缩小，原图预览缓存最多 8 MiB、缩略图最多 4 MiB；不持久保存缩略图或 JSON 索引
-19. 辅助进程通过短期启动进程和独立会话交接，父进程只回收启动进程，不为长期剪贴板或 OCR 服务保留等待线程
+19. Linux 辅助进程通过短期启动进程和独立会话交接，Windows 使用无控制台独立进程，不为长期剪贴板或 OCR 服务保留等待线程
 20. 正文光标仅在实际键盘焦点属于编辑会话时保留半周期截止；失活、字段或菜单焦点和事务结束取消周期唤醒
 21. 输入法候选只占独立显示预览，不进入正文或导出；隐藏候选光标取消周期唤醒，原生 leave 清理候选和目标身份
+22. 上传只在主动请求时创建工作线程和通知管道；HTTP 直接交付 PNG，命令输入使用私有临时文件，任务结束回收线程、所属进程组与文件
+23. 限时提示把稳定停留与淡入淡出分开；稳定画面只等待到期期限，不保留每帧计时器
+24. 尺寸面板与字库在首次可用选区后创建；结束字段编辑后取消光标期限，静止面板不重新排版或提交帧
+24. 读取桌面像素成功后才映射截图覆盖层，避免合成器把空白窗口收入截图；字体、图标和图层准备仍与捕获并行
+25. 截图位置翻译复用一次性识别子进程，完成和取消时实际回收模型与全局并行线程池；区域像素和语言缓存属于当前截图会话
+
+Windows 窗口和覆盖层在创建它们的界面线程消费事件，不跨线程移动 HWND。原生资源、
+共享契约、同构建回归和未接入动作见 [Windows 工作流](windows-platform-workflow.md)。
 
 ## 文字预览与局部历史
 
@@ -76,6 +107,13 @@ scripts/              安装、性能与隔离 Wayland 验证
 `editor/text_session_format.rs` 分开保存当前文档字体和实际属性来源；后者来自工具默认值
 或已有持久对象，普通刷新不覆盖已经局部撤销的文档字体。提交按原版元数据策略使用
 最后实际属性来源，不把局部撤销写回工具偏好。
+
+`features/text/frame.rs` 保存原始存储宽高、首个定点和当前预览字形缓存。
+`features/text_storage/transform.rs` 按可见选框比例映射已有存储矩形，隐藏高度的真实变化
+仍进入拖动历史。`tools/text/source_layout.rs` 按原图字号与定点字体度量计算选择边界，
+当前字形缓存只决定绘制损坏范围。旋转绘制重新读取本次字形范围，避免缩放后裁切旧缓存。
+`editor/text_session_layout.rs` 在重新编辑时采用可见宽度，提交时按实际段内换行收紧存储框；
+`types/annotations/text_frame.rs` 排除缓存和等价缺省表示造成的历史变化。
 
 `editor/text_session_history.rs` 用正文增量与前后字体两种操作组合局部历史。正文记录
 保留输入时的字体；格式记录不复制正文。字符选区与光标属于局部编辑，格式动作清除选区，
@@ -161,6 +199,38 @@ OCR 交接线程只在用户启用文字选择后创建，匿名文件通过已�
 `renderer/annotation_stack.rs` 管理已有标注的暂存绘制。拖动标注离开持久缓存后，
 在损坏范围内按原始顺序插入草稿，只重绘相交标注，并把透明临时层合成一次。较新的
 半透明标注和放大镜不会因拖动改变层序，也不会重复覆盖已经绘制的内容。
+
+`features/annotation_selection/chrome.rs` 保存共用颜色、正文选框边界和删除按钮几何；
+各工具继续提供独立控制点。`ui/annotation_selection/control_raster.rs` 在固定像素原点
+绘制单个小型控制点，父缓冲只裁切最终合成范围，避免分数比例下重复圆角采样出现差异。
+`delete_cache.rs` 保留约 24×24 逻辑像素的按钮缓存，位置或输出比例改变才重新生成。
+`app/annotation_selection.rs` 同步旧新损坏范围并管理左键按下与释放；缓存不进入
+持久标注、撤销或导出。删除先保存选中身份，红色按钮与键盘线条定点删除保持不同职责。
+该状态管理单项删除；普通旋转角度和冻结画布边界由标注保存，旋转手势通过
+`features/annotation_rotation/` 与 `editor/annotation_drag/generic.rs` 组合。
+`renderer/rotation_tiles.rs` 固定物理像素网格，文字保留实际字体缓存并仅分配可见区域。
+多选采用 `features/annotation_collection/selection.rs` 保存有序有效编号，单项索引由持久数组
+投影。`geometry.rs` 组合生产可见边界，`transform.rs` 从手势初始快照映射各类成员。
+`editor/annotation_collection/` 分离状态、手势和批量属性，`app/annotation_collection/`
+负责按钮、焦点、修饰键和删除位置，`ui/annotation_collection/` 负责数量标题及通用属性布局。
+`transform.rs` 在共同变换或批量改宽后同步放大镜轴心，再刷新派生正文边界；轴心按照
+加宽并裁切后的未旋转联合框计算，损坏登记与缓存裁切必须使用同步后的模型。
+
+共同拖动保留持久数组顺序，`renderer/collection_stack.rs` 在损坏区域合成全部相交对象，
+结束时恢复缓存。单项与群组历史保存编号集合，颜色属性区分首次输入立即捕获与已提交
+事务，面板关闭不重复提交。旋转和未旋转线条统一通过 `renderer/line_handles.rs` 绘制骨架点；
+端点状态不额外改变样式，内部控制点选中时按原版扩大半径。完整原生状态及发布边界见
+[annotation-collection-compatibility.md](annotation-collection-compatibility.md)。
+
+`features/canvas_navigation/` 分离双精度视图状态、原图投影、滚轮职责及滚动条几何。
+`editor/file_canvas.rs` 使用同一模型生成完整窗口初始适配，并继续独立保存原图像素。
+`editor/canvas_navigation/` 保存共享工作区视图、输入反解、屏幕控制点容差与每输出背景身份。
+`app/canvas_navigation/` 处理中键、滚轮、Ctrl 边沿、九百毫秒提示和损坏映射。
+`renderer/canvas_navigation.rs` 从冻结原图重采样背景，并直接合成当前矢量标注及完整草稿；
+现有背景缓冲缓存当前视图，局部重绘复用相同像素，不放大低分辨率预览或持久标注缓存。
+UI 指针保留窗口坐标，工具读取稳定画布坐标；视图变化不改写标注、裁切或撤销记录。
+删除按钮、尺寸 HUD、工具栏、输入法候选及翻译浮条按视图重新定位。当前依据和边界见
+[canvas-navigation-compatibility.md](canvas-navigation-compatibility.md)。
 
 ## 测量模块
 
@@ -381,6 +451,32 @@ utils/fs_lock.rs             有期限的文件锁等待
 
 历史入口检查旧忙碌标志、未提交草稿和已有标注拖动。画笔等旧工具仅保存草稿，因此不能
 只依赖按下标志。首帧确认后取消原截图会话，不记录取消图片。
+
+## 持续画布导航模块
+
+```text
+features/canvas_navigation/  原图投影、中心约束、滚轮职责与整数滚动条模型
+editor/canvas_navigation/    工作区共享视图、稳定坐标映射、控制点命中与输出背景身份
+app/canvas_navigation/       滚轮、中键、Ctrl 边沿、滚动条输入、损坏通知与倍率提示期限
+renderer/frame_scene.rs     恒等视图缓存场景
+renderer/canvas_navigation.rs  冻结原图重采样、完整标注及草稿合成
+ui/canvas_navigation/        屏幕滚动条与限时倍率气泡
+```
+
+持久标注、原图裁切与撤销使用稳定画布坐标；视图变化只改变输入映射及渲染投影。
+屏幕指针继续服务界面控件，各输出共用工作区视图，再组合自己的原点与设备比例。
+非恒等视图按原始图层顺序绘制完整矢量正文和草稿，冻结原图采样到已有背景缓冲。
+局部重绘恢复相同像素网格，避免反复叠加透明像素。
+
+已有文字的独立编辑预览替代其持久原件。R4 将原件编号显式传入导航合成入口并过滤
+正文迭代，不修改标注数组或历史；否则原件和预览会在非恒等视图中重复绘制。
+倍率提示到期清除旧区域，随后不保留定时唤醒。候选指纹及验证范围见
+[canvas-navigation-compatibility.md](canvas-navigation-compatibility.md)。
+
+`features/annotation_selection/rotation.rs` 读取通用及专用旋转连接点。界面绘制和导航
+命中共用反向倍率，连接起点随正文投影，外移向量保持窗口单位。普通标注与群组为
+26 逻辑像素；专用连接点暂时保留既有间隔。选择工具的专用回归和原生旋转流程限于
+各自记录的范围，完整原版样式单位、尺子独立入口及属性栏避让继续对照。
 
 ## 兼容策略
 

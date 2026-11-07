@@ -9,6 +9,9 @@ pub enum Rule {
         max: i32,
         suffix: &'static str,
     },
+    SelectionSize {
+        maximum: i32,
+    },
     Number,
 }
 
@@ -50,6 +53,10 @@ impl Rule {
                         .parse::<i32>()
                         .is_ok_and(|value| value <= max && value >= min.min(0))
             }
+            Self::SelectionSize { maximum } => {
+                crate::features::selection_size::number::validate(text, maximum)
+                    != crate::features::selection_size::number::Validation::Invalid
+            }
             Self::Number => {
                 if matches!(text, "" | "-" | "." | "-.") {
                     return true;
@@ -71,6 +78,10 @@ impl Rule {
             Self::Integer { min, max, .. } => text
                 .parse::<i32>()
                 .is_ok_and(|value| (min..=max).contains(&value)),
+            Self::SelectionSize { maximum } => {
+                crate::features::selection_size::number::validate(text, maximum)
+                    == crate::features::selection_size::number::Validation::Acceptable
+            }
             Self::Number => text.parse::<f32>().is_ok_and(f32::is_finite),
             _ => self.accepts(text),
         }
@@ -87,7 +98,7 @@ impl Rule {
     }
 
     /// 【字段编辑】【确认裁切】按 allowance 返回 text 的合法 UTF-8 前缀，长度按 UTF-16 计；不会截断码点
-    pub(super) fn clipped(text: &str, allowance: usize) -> &str {
+    pub(crate) fn clipped(text: &str, allowance: usize) -> &str {
         let mut used = 0;
         for (byte, character) in text.char_indices() {
             if used + character.len_utf16() > allowance {

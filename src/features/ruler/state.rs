@@ -25,5 +25,7 @@ pub struct RulerState {
     pub hover: Option<RulerHover>,
     pub labels: Vec<InfoLabel>,
     pub label_bounds: Option<Rect>,
+    pub label_window: crate::features::annotation_style::window::WindowUnits,
+    pub label_projection: crate::editor::canvas_navigation::transform::ViewTransform,
     pub label_sources: Vec<LabelSource>,
 }

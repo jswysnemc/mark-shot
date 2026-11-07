@@ -38,6 +38,7 @@ impl SeatHandler for OverlayState {
             }
             _ => {}
         }
+        self.primary_selection.seat(&seat, qh);
         // 1. 【Wayland输入】【绑定交付】能力通知本身不产生画布事件，不能等待下一次重绘才提交设备请求
         self.pending_flush = true;
     }
@@ -61,6 +62,7 @@ impl SeatHandler for OverlayState {
     }
     /// 【输入法】【设备释放】移除 seat 的输入法对象并交付失焦，其他参数来自协议，无返回值
     fn remove_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, seat: wl_seat::WlSeat) {
+        self.primary_selection.remove(&seat);
         if let Some(focus) = self.text_input.remove(&seat) {
             self.events
                 .push_back(crate::types::OverlayEvent::TextInputLeave { focus_id: focus.id });

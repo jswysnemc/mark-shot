@@ -2,8 +2,11 @@ pub mod annotations;
 pub mod capture;
 pub mod cursor;
 pub mod events;
+pub mod frozen_pixmap;
 pub mod marker_shape;
+pub mod pointer_motion;
 pub mod popup;
+pub mod popup_tree;
 pub mod scroll;
 pub mod selection;
 pub mod text;
@@ -46,3 +49,6 @@ impl SignedRect {
         )
     }
 }
+pub mod scroll_panel;
+#[cfg(target_os = "windows")]
+mod windows_output;

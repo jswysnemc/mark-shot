@@ -1,0 +1,29 @@
+{
+  "sources": {
+    "ocr_result.cpp": "16a7c82c9d7631f92c90d92f323e7a0f2060f1dc07d85592086dbdfd942343c2",
+    "ocr_result.h": "1ca6e7df269d0075d31ca4d02bcd98f97edb8e1fe68d830ee879da5c3f56440d",
+    "translation_layout/paragraph_blocks.cpp": "e1e5e8f9bfd3d1392d6bd8fb1aa230775829d22ffe38c52c5fec69dd7f8e185e",
+    "translation_layout/paragraph_blocks.h": "24bfdd61ae97130fc21b665fa66ed0821a0445229f7dbb35ef9badc3d9fa2e80",
+    "translation_layout/block_layout.cpp": "68f12587ff7a2013fa6591936d351db496579c69035876e172d3de8e500f876e",
+    "translation_layout/block_layout.h": "1eea877988e1af851c1564e4f9e6fc53bca84fec50159da5b7c5d0b458ca864a",
+    "translation_layout/block_colors.cpp": "d8a96fd39f4a2c45000638c8d08459147fb30c9359b90a2f79cbd4629f835b51",
+    "translation_layout/block_colors.h": "3e692e3d2dc4ebf4a51361cba9de9b63144894105aa08aa066a8c0e464d606ea",
+    "translation_layout/translated_block.cpp": "d8b2ea6303c438437a958023a4d3fedc381490900fd11df413e32756588bde9b",
+    "translation_layout/translated_block.h": "169eeb2a01a78595624dbfa51b076554064e1bb6fd305602a1b8e3e01c971a60",
+    "translation_layout/translation_exchange.cpp": "f8695d1d1a6c6307f4e1fa94fb5e623fd15c097afd75d0e58fa1bdfbdb6a67ac",
+    "translation_layout/translation_exchange.h": "8113fb38b9f9927b9d99ceebdfabe02cc9ab1647d6be0d8581da0630e53e689c"
+  },
+  "harness": "41d8fc5ad4f8d7c744fd1b6df83acb452241ddca0244d6b7a6918d0f67482b6d",
+  "cases": "44c2d0f52af30034d4b794b5c72d0bb3b91d0fc0a442bf83efb01509401305bd",
+  "binary": "c0058ed145392a186923f38a7d35f357f41b671f46814558bcd204c836c21537",
+  "reference": "cd1ff9e8530ae3db8ec67d541031960271faacbbc2d5a0c3d8782ea845c244e4",
+  "qt": "6.12.0",
+  "font": "Noto Sans",
+  "counts": {
+    "groups": 56,
+    "joins": 13,
+    "colors": 9,
+    "layouts": 10,
+    "exchanges": 4
+  }
+}

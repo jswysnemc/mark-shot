@@ -138,6 +138,8 @@ pub fn button(
         color::muted()
     } else if active {
         color::on_active()
+    } else if hovered {
+        crate::theme::toolbar::Palette::current().hover_text
     } else {
         color::foreground()
     };

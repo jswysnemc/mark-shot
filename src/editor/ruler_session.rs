@@ -77,7 +77,7 @@ pub fn cancel_or_leave(state: &mut EditorState, dirty_mask: &mut u32) -> CancelR
     state.annotations.clear();
     state.undo_stack.clear();
     state.redo_stack.clear();
-    state.selected_annotation = None;
+    state.select_annotation_index(None);
     state.ann_drag = None;
     state.pending = None;
     state.prev_pending = None;

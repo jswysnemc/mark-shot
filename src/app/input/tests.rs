@@ -1,6 +1,17 @@
 //! 【输入测试】【环境构造】提供不连接显示服务器、不加载识别模型的编辑器与输入辅助方法
 
+mod annotation_collection;
+mod annotation_collection_lifecycle;
+mod annotation_collection_magnifier;
+mod annotation_collection_reference;
+mod annotation_collection_render;
+mod annotation_rotation;
+mod annotation_selection;
+mod annotation_style;
+mod canvas_navigation;
 mod color;
+mod cursor_magnifier;
+mod external_actions;
 mod filter;
 mod filter_output;
 mod filter_properties;
@@ -19,6 +30,11 @@ mod number;
 mod pen_cache;
 mod pointer_buttons;
 mod ruler;
+mod selection_size;
+mod selection_size_clicks;
+mod selection_size_navigation;
+mod selection_size_pointer;
+mod selection_translation;
 mod text;
 mod text_caret;
 mod text_composition;
@@ -27,6 +43,9 @@ mod text_format_history;
 mod text_properties;
 mod text_session;
 mod text_size_policy;
+mod text_storage;
+mod upload;
+mod wheel_preview;
 
 use std::collections::HashMap;
 
@@ -36,7 +55,7 @@ use crate::ui::panel::{PanelItem, UiPanel};
 use tiny_skia::{Color, Pixmap};
 
 /// 【输入测试】【编辑器构造】返回单显示器编辑器；只加载内置字体，识别运行时保持未初始化
-fn editor() -> EditorState {
+pub(in crate::app) fn editor() -> EditorState {
     let placement = Placement {
         position: (0, 0),
         size: (640, 480),
@@ -47,7 +66,7 @@ fn editor() -> EditorState {
     let mut editor = EditorState::new(
         Layers {
             captures: vec![Capture {
-                pixmap: image.clone(),
+                pixmap: image.clone().into(),
                 scale: 1.0,
             }],
             canvas: vec![image.clone()],

@@ -1,6 +1,6 @@
 use cosmic_text::FontSystem;
 use mark_shot::{
-    backend::wayland::window::KeyInput,
+    backend::window::KeyInput,
     keys::{Key, Mods},
     types::text_input::{Edit, Preedit, Replacement},
     ui::text_editor::TextEditor,

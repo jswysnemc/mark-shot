@@ -38,5 +38,34 @@ class WindowPresentationTests(unittest.TestCase):
                 session.presented_candidate(Path("private"), "candidate", before, {"x": 0, "y": 0}, (10, 0, 1, 20), Path("private/log"))
 
 
+    def test_menu_cancellation_compares_matching_inactive_focus(self):
+        """【窗口输入法测试】【相同焦点】基准与待测图片均为菜单焦点时，完全一致的候选区域通过，无参数、无返回值"""
+        before = Image.new("RGB", (760, 460))
+        self.assertEqual(session.canceled_candidate_pixels(before, before.copy(), {"x": 0, "y": 0}, (68, 88, 1, 19), (153, 88, 1, 19)), 0)
+
+    def test_menu_cancellation_rejects_glyph_underline_and_new_cursor_residue(self):
+        """【窗口输入法测试】【取消残留】原光标、候选字形、下划线和新光标的任意像素残留必须失败，无参数、无返回值"""
+        before = Image.new("RGB", (760, 460))
+        for point in ((68, 93), (110, 93), (110, 106), (153, 93)):
+            with self.subTest(point=point):
+                after = before.copy()
+                after.putpixel(point, (255, 255, 255))
+                self.assertEqual(session.canceled_candidate_pixels(before, after, {"x": 0, "y": 0}, (68, 88, 1, 19), (153, 88, 1, 19)), 1)
+
+
+    def test_menu_cancellation_uses_the_real_translated_candidate_range(self):
+        """【窗口输入法测试】【长候选范围】窗口偏移与长候选必须按真实光标定位，不使用固定截断区域，无参数、无返回值"""
+        before = Image.new("RGB", (760, 460))
+        after = before.copy()
+        after.putpixel((240, 118), (255, 255, 255))
+        self.assertEqual(session.canceled_candidate_pixels(before, after, {"x": 30, "y": 25}, (68, 88, 1, 19), (230, 88, 1, 19)), 1)
+
+    def test_menu_cancellation_rejects_a_nonadvancing_candidate_cursor(self):
+        """【窗口输入法测试】【无效候选】没有候选光标范围时拒绝空比较，不能以零像素差异认定取消成功，无参数、无返回值"""
+        image = Image.new("RGB", (760, 460))
+        with self.assertRaisesRegex(AssertionError, "real candidate range"):
+            session.canceled_candidate_pixels(image, image, {"x": 0, "y": 0}, (68, 88, 1, 19), (68, 88, 1, 19))
+
+
 if __name__ == "__main__":
     unittest.main()

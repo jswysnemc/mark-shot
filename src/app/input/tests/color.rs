@@ -45,7 +45,7 @@ fn selected(dirty: &mut u32) -> EditorState {
     handle_pointer_button(&mut state, MouseButton::Left, false, dirty);
     assert_eq!(state.annotations.len(), 1);
     select_tool(&mut state, Tool::Pick, dirty);
-    state.selected_annotation = Some(0);
+    state.select_annotation_index(Some(0));
     refresh_panels(&mut state, dirty);
     state.undo_stack.clear();
     state

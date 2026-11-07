@@ -6,3 +6,6 @@ pub mod model;
 pub mod placement;
 pub mod recognition;
 pub mod resize;
+pub mod translation;
+
+pub(crate) mod menu_draw;

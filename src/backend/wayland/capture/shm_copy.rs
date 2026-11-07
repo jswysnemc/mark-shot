@@ -11,8 +11,42 @@ use wayland_client::globals::{GlobalList, GlobalListContents, registry_queue_ini
 use wayland_client::protocol::{wl_buffer, wl_output, wl_registry, wl_shm};
 use wayland_client::{Connection, Dispatch, EventQueue, QueueHandle};
 
+use crate::backend::task_wake::{Source as CancelSource, Wake};
 use crate::types::{CaptureResult, MonitorFrame, Output, StreamInfo};
 use crate::utils::to_rgba;
+
+struct CancelOnDrop(Wake);
+
+impl Drop for CancelOnDrop {
+    /// 【原生捕获】【等待取消】异步请求结束或被丢弃时唤醒捕获线程，无参数、无返回值
+    fn drop(&mut self) {
+        self.0.notify();
+    }
+}
+
+struct ProtocolOwner<P: Protocol>(Option<P>);
+
+impl<P: Protocol> Drop for ProtocolOwner<P> {
+    /// 【原生捕获】【协议回收】失败、取消和成功路径均销毁捕获协议对象，无参数、无返回值
+    fn drop(&mut self) {
+        if let Some(protocol) = self.0.take() {
+            protocol.destroy();
+        }
+    }
+}
+
+struct FrameBuffer {
+    pool: RawPool,
+    buffer: wl_buffer::WlBuffer,
+    bgr: bool,
+}
+
+impl Drop for FrameBuffer {
+    /// 【原生捕获】【缓冲回收】解除服务端缓冲后由共享池释放映射，无参数、无返回值
+    fn drop(&mut self) {
+        self.buffer.destroy();
+    }
+}
 
 const FRAME_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -86,9 +120,12 @@ pub(super) async fn capture<P: Protocol>(
         })
         .collect();
 
-    let frames =
-        tokio::task::spawn_blocking(move || capture_all::<P>(&conn, &targets, include_cursor))
-            .await??;
+    let cancel = CancelSource::new()?;
+    let _cancel_on_drop = CancelOnDrop(cancel.wake());
+    let frames = tokio::task::spawn_blocking(move || {
+        capture_all::<P>(&conn, &targets, include_cursor, &cancel)
+    })
+    .await??;
     Ok(CaptureResult { frames })
 }
 
@@ -96,13 +133,15 @@ fn capture_all<P: Protocol>(
     conn: &Connection,
     targets: &[Target],
     include_cursor: bool,
+    cancel: &CancelSource,
 ) -> Result<Vec<MonitorFrame>, String> {
     // separate registry queue from overlay backend, but still the same connection
     let (globals, mut queue) =
         registry_queue_init::<State>(conn).map_err(|e| format!("wayland registry: {e}"))?;
     let qh = queue.handle();
 
-    let mut protocol = P::bind(&globals, &qh)?;
+    let mut owner = ProtocolOwner(Some(P::bind(&globals, &qh)?));
+    let protocol = owner.0.as_mut().unwrap();
     let shm = Shm::bind(&globals, &qh).map_err(|e| format!("wl_shm: {e}"))?;
 
     let mut state = State {
@@ -115,14 +154,14 @@ fn capture_all<P: Protocol>(
         protocol.request(&t.wl_output, i, &qh, include_cursor);
     }
 
-    dispatch_until(&mut queue, &mut state, deadline, |s| {
+    dispatch_until(&mut queue, &mut state, deadline, cancel, |s| {
         s.slots
             .iter()
             .all(|slot| slot.constraints_done || slot.result.is_some())
     })?;
     check_failed(&state)?;
 
-    let mut pending: Vec<(RawPool, wl_buffer::WlBuffer, bool)> = Vec::with_capacity(targets.len());
+    let mut pending = Vec::with_capacity(targets.len());
     for (i, slot) in state.slots.iter().enumerate() {
         let (w, h) = slot
             .size
@@ -135,22 +174,21 @@ fn capture_all<P: Protocol>(
         let buffer = pool.create_buffer(0, w as i32, h as i32, slot.stride as i32, format, (), &qh);
 
         protocol.copy(i, &buffer, (w, h), &qh);
-        pending.push((pool, buffer, bgr));
+        pending.push(FrameBuffer { pool, buffer, bgr });
     }
 
-    dispatch_until(&mut queue, &mut state, deadline, |s| {
+    dispatch_until(&mut queue, &mut state, deadline, cancel, |s| {
         s.slots.iter().all(|slot| slot.result.is_some())
     })?;
     check_failed(&state)?;
 
     let mut frames = Vec::with_capacity(targets.len());
-    for (i, ((mut pool, buffer, bgr), target)) in pending.into_iter().zip(targets).enumerate() {
+    for (i, (mut mapped, target)) in pending.into_iter().zip(targets).enumerate() {
         let slot = &state.slots[i];
         let (w, h) = slot.size.unwrap_or_default();
 
-        let mut pixels = read_rows(pool.mmap(), w, h, slot.stride, slot.y_invert);
-        buffer.destroy();
-        to_rgba(&mut pixels, bgr, false);
+        let mut pixels = read_rows(mapped.pool.mmap(), w, h, slot.stride, slot.y_invert);
+        to_rgba(&mut pixels, mapped.bgr, false);
         let transform = slot.transform.unwrap_or(target.transform);
         let (pixels, w, h) = untransform(pixels, w, h, transform);
 
@@ -168,7 +206,7 @@ fn capture_all<P: Protocol>(
         });
     }
 
-    protocol.destroy();
+    drop(owner);
     let _ = queue.flush();
 
     Ok(frames)
@@ -254,6 +292,7 @@ fn dispatch_until(
     queue: &mut EventQueue<State>,
     state: &mut State,
     deadline: Instant,
+    cancel: &CancelSource,
     done: impl Fn(&State) -> bool,
 ) -> Result<(), String> {
     queue.flush().map_err(|e| e.to_string())?;
@@ -275,8 +314,14 @@ fn dispatch_until(
             tv_nsec: left.subsec_nanos() as i64,
         };
         let fd = guard.connection_fd();
-        let mut fds = [PollFd::new(&fd, PollFlags::IN)];
+        let mut fds = [
+            PollFd::new(&fd, PollFlags::IN),
+            PollFd::new(cancel, PollFlags::IN),
+        ];
         poll(&mut fds, Some(&timeout)).map_err(|e| e.to_string())?;
+        if fds[1].revents().contains(PollFlags::IN) {
+            return Err("native capture cancelled".into());
+        }
         if fds[0].revents().contains(PollFlags::IN) {
             match guard.read() {
                 Ok(_) => {}

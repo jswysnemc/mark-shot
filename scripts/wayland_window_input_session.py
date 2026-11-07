@@ -100,6 +100,20 @@ def candidate_pixels(before, after, window, old, new):
     return sum(pixel != (0, 0, 0) for pixel in difference.getdata())
 
 
+def canceled_candidate_pixels(before, after, window, old, new):
+    """【窗口输入法测试】【候选取消】比较同为菜单焦点的 before、after，window、old、new 定位原文与光标，返回残留像素数"""
+    # 1. 【窗口输入法测试】【取消范围】包含原光标、完整候选、新光标与下划线；基准也须处于菜单焦点，不屏蔽光标像素
+    left = round(window["x"] + old[0] - 1)
+    right = round(window["x"] + new[0] + new[2] + 1)
+    top = round(window["y"] + new[1])
+    bottom = top + new[3]
+    if new[0] <= old[0]:
+        raise AssertionError("canceled preedit did not have a real candidate range")
+    region = (left, top, right, bottom)
+    difference = ImageChops.difference(before.crop(region), after.crop(region))
+    return sum(pixel != (0, 0, 0) for pixel in difference.getdata())
+
+
 def presented_candidate(root, name, before, window, old, log):
     """【窗口输入法测试】【候选等待】等待 root 的 name 画面出现相对 before 的真实候选字形，window、old、log 定位区域，返回截图和像素数"""
     deadline = time.monotonic() + 3

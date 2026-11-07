@@ -1,0 +1,38 @@
+{
+  "sources": {
+    "ui/theme.cpp": "2d4aa9e3c2c37a912a687f10b9d8028dfe6b44b686c07f1644705fb74ba05c69",
+    "text_annotation_layout.cpp": "576e009f1f31a8bf24787bc825169e70a6bf20d66e00e9580031f912919da54a",
+    "shot_window_annotation_editing.cpp": "598a863a3f157b2d6a8e284938a2411598ef07e6e80924df29a98dc3456734ca",
+    "shot_window_selection_frame.cpp": "bb7c5f02e3dbe2481d0212ee553f1e8ae11baf73887adad8c36308d2674fb2c1"
+  },
+  "functions": {
+    "makeFont": "c41af75f5e82830b97be37f51be40bb04b3a981fe55f39859367ceccb2ed071a",
+    "uiFontFamily": "a93cdd481694ecc620b398375b38aec7c9b6e8d0da20c617ecd2aa892415cc43",
+    "textFontFamily": "913a2da08fd84cbb1a1c2af81f5db1822fc0ad611880e00bf5ec49b89e87c934",
+    "textFont": "931edc3dd0bcfd92a70edbf4df5f56b4c9caa7c266e656937a1257a669d8927b",
+    "prepareTextDocument": "73915737b95cb20d52cfaf50f6aa4a5074d46f2bcfce30f6c14f3d07d29a82b8",
+    "textWrapWidth": "8ed9820fd4f187cf28eddce28bd10e430e9eeea4e089a509a6c50fc55deeabe4",
+    "textAnnotationBaseRect": "23f0b622c4d8287134b09ba027d0dea225f4cc30d257cac688610d26534ca98b",
+    "textAnnotationWraps": "df2dab3865d369ffd9c8a2b3348f384f470eadc86046dcaebb2468877d03e43c",
+    "textAnnotationBoxSize": "3750b55ac59173f97cd6311f9dbf80a245cbdfcc8318a7a35de8dfe8510c19a3",
+    "fitTextAnnotationRect": "864671a3035179fa1d4da64f7348b4490ac89baa1b9ff2eef36d6e562dd292a8",
+    "ShotWindow::clampImagePoint": "d48479badf8cbaec858ab0ccff45f390b24242e15b73152cb15dcef6813afcc6",
+    "ShotWindow::moveAnnotation": "0880cb665c603752f180d971e1c7fe75cb73916331aebc3b7faa4973ed6931ae",
+    "ShotWindow::transformAnnotation": "0b510c82fdcc5e228dca0f2383eda568a752ad2fd4fa13b04506cef8fd63b740",
+    "ShotWindow::resizedBounds": "9cf7995ed9ffd21d2b4d8b389a0437132fd6990efa2513dd8315bcd9aa7c4439"
+  },
+  "harness": {
+    "probe.h": "7902ab73543ebdfbf57a0b99b68c8df519b087cce680fe225142d2a105312680",
+    "reference.cpp": "bd71b3d003eabf453ea2758f9546ebc6aaed215368b9b83d5cf6e46aa37cd51a"
+  },
+  "reference": "ffa857f55b2dfa3f80d91c95e6c081759e7d4b565d713ee46dd965dce3aebda4",
+  "binary": "ba496aad1bafbb859577bb6510f206fe43a4a9fbb23511675b1bd456dced4a53",
+  "counts": {
+    "sequences": 6,
+    "single": 144,
+    "scales": 6,
+    "fallbacks": 9
+  },
+  "qt": "6.12.0",
+  "dpi": 96
+}

@@ -29,7 +29,8 @@ fn length_metrics_use_original_pixels_and_survive_export_mapping() {
     let export = ruler.scaled(2.0);
     assert_eq!(export.length_metrics(), ruler.length_metrics());
     assert_eq!(export.info_text(), ruler.info_text());
-    assert_eq!(export.unit(6.0), 2.0);
+    assert_eq!(export.unit(3.0), 2.0);
+    assert_eq!(export.unit(6.0), 8.0 / 3.0);
     assert_eq!(export.unit(24.0), ruler.unit(12.0) * 2.0);
 }
 

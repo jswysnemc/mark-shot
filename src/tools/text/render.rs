@@ -74,6 +74,8 @@ pub fn render_text_annotation_with_caret(
         );
     }
     let padding = crate::features::text::geometry::padding(appearance.size_scale);
+    let base = ann.text_stored_bounds();
+    let start = base.map_or(*start, |bounds| (bounds.left(), bounds.top()));
     let ann_x = (f64::from(start.0 + padding.0) * f64::from(scale) - origin.0) as f32;
     let ann_y = (f64::from(start.1 + padding.1) * f64::from(scale) - origin.1) as f32;
     let text_x = (ann_x + 0.5).floor();

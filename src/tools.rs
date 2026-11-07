@@ -6,6 +6,7 @@ pub mod laser;
 pub mod line;
 pub mod magnifier;
 pub mod marker;
+pub(crate) mod names;
 pub mod number;
 pub mod numerated_arrow;
 pub mod ocr;
@@ -13,6 +14,7 @@ pub mod pen;
 pub mod pick;
 pub mod ruler;
 pub mod selection;
+mod selection_constraints;
 pub mod simple_shapes;
 pub mod text;
 
@@ -134,6 +136,7 @@ pub fn dispatch_move(
     global: (f64, f64),
     dirty_mask: &mut u32,
 ) {
+    let global = state.canvas_transform().to_canvas(global);
     match tool {
         Tool::Selection => SelectionTool.on_move(state, global, dirty_mask),
         Tool::Pick => PickTool.on_move(state, global, dirty_mask),

@@ -17,7 +17,7 @@ pub fn active_annotation_idx(editor_state: &EditorState) -> Option<usize> {
         Tool::Pick | Tool::Text | Tool::Ruler | Tool::Magnifier
     ) {
         editor_state
-            .selected_annotation
+            .selected_annotation_index()
             .filter(|index| *index < editor_state.annotations.len())
     } else {
         None

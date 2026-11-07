@@ -8,5 +8,6 @@ pub struct HistorySnapshot {
     pub annotations: Vec<Annotation>,
     pub number_sequence: NumberSequence,
     pub selected_id: Option<u64>,
+    pub selected_ids: Vec<u64>,
     pub next_id: u64,
 }

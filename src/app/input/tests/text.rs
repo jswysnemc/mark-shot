@@ -18,8 +18,12 @@ use tiny_skia::Rect;
 pub(super) fn add_text(state: &mut EditorState) -> usize {
     let index = state.annotations.len();
     state.annotations.push(Annotation {
+        style_scale: 1.0,
+        rotation_degrees: 0.0,
+        frozen_bounds: None,
         id: 7,
         shape: AnnotationShape::Text {
+            frame: Default::default(),
             start: (80.0, 100.0),
             content: "original".into(),
             font_size: 20.0,
@@ -36,7 +40,7 @@ pub(super) fn add_text(state: &mut EditorState) -> usize {
         stroke_width: 0.0,
         bbox: Rect::from_xywh(80.0, 100.0, 1.0, 1.0).unwrap(),
     });
-    state.selected_annotation = Some(index);
+    state.select_annotation_index(Some(index));
     state.selected_tool = Tool::Text;
     rebuild_annotation(state, index);
     index
@@ -80,7 +84,7 @@ fn no_op_properties_preserve_redo_and_unselected_edits_only_change_defaults() {
     text_edits::set(&mut state, Property::Family(" ".into()), true, &mut dirty);
     assert!(state.undo_stack.is_empty());
     assert_eq!(state.redo_stack.len(), 1);
-    state.selected_annotation = None;
+    state.select_annotation_index(None);
     let before = state.annotations.clone();
     text_edits::set(&mut state, Property::Points(301.0), true, &mut dirty);
     text_edits::set(
@@ -156,8 +160,8 @@ fn undo_restores_editor_metrics_and_text_bounds() {
 fn property_changes_keep_unwrapped_text_on_one_line() {
     let mut state = editor();
     add_text(&mut state);
-    if let AnnotationShape::Text { appearance, .. } = &mut state.annotations[0].shape {
-        appearance.wrap_width = Some(200.0);
+    if let AnnotationShape::Text { frame, .. } = &mut state.annotations[0].shape {
+        frame.width = Some(200.0);
     }
     rebuild_annotation(&mut state, 0);
     let mut dirty = 0;
@@ -167,16 +171,16 @@ fn property_changes_keep_unwrapped_text_on_one_line() {
         1
     );
     assert!(
-        matches!(&state.annotations[0].shape, AnnotationShape::Text { appearance, .. } if appearance.wrap_width.is_none())
+        matches!(&state.annotations[0].shape, AnnotationShape::Text { frame, .. } if frame.width.is_none())
     );
     state.undo(&mut dirty);
-    if let AnnotationShape::Text { appearance, .. } = &mut state.annotations[0].shape {
-        appearance.wrap_width = Some(70.0);
+    if let AnnotationShape::Text { frame, .. } = &mut state.annotations[0].shape {
+        frame.width = Some(70.0);
     }
     rebuild_annotation(&mut state, 0);
     text_edits::set(&mut state, Property::Points(40.0), true, &mut dirty);
     assert!(
-        matches!(&state.annotations[0].shape, AnnotationShape::Text { appearance, .. } if appearance.wrap_width == Some(140.0))
+        matches!(&state.annotations[0].shape, AnnotationShape::Text { frame, .. } if frame.width == Some(140.0))
     );
     assert!(state.text.editors[&7].with_buffer(|buffer| buffer.layout_runs().count()) > 1);
 }

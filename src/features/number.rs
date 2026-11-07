@@ -5,5 +5,6 @@ pub mod draw;
 mod format;
 mod geometry;
 mod model;
+pub mod window_geometry;
 
 pub use model::{NumberMark, NumberSequence, NumberStyle, WIDTH, clamped_width};

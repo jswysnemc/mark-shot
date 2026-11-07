@@ -31,15 +31,26 @@ pub fn draw(p: &mut Painter, panel: &SettingsPanel, current_color: Color) {
         return;
     };
     let rect = Rect::from_xywh(0.5, 0.5, layout.size.0 - 1.0, layout.size.1 - 1.0).unwrap();
-    p.fill_rounded(rect, 11.0, Rgba(15, 17, 23, 230));
-    border(p, rect, 11.0, 1.0, Rgba(255, 255, 255, 28));
+    p.fill_rounded(
+        rect,
+        11.0,
+        crate::theme::toolbar::Palette::current().panel_fill,
+    );
+    border(
+        p,
+        rect,
+        11.0,
+        1.0,
+        crate::theme::toolbar::Palette::current().panel_border,
+    );
+    crate::ui::annotation_collection::draw::title(p, panel);
     for (index, svg) in [icons::SIZE, icons::OPACITY].into_iter().enumerate() {
         icon(
             p,
             layout.glyphs[index],
             svg,
             layout.glyphs[index].width(),
-            Rgba(229, 231, 235, 255),
+            crate::theme::toolbar::Palette::current().text,
         );
         let control = if index == 0 {
             Control::Size
@@ -51,7 +62,18 @@ pub fn draw(p: &mut Painter, panel: &SettingsPanel, current_color: Color) {
         } else {
             panel.text_alpha
         };
-        let (min, max) = if index == 0 { (-11, 281) } else { (0, 100) };
+        let (min, max) = if index == 0 {
+            if matches!(
+                panel.active_source,
+                Some(crate::ui::settings_panel::SettingsSource::Collection { .. })
+            ) {
+                (1, 24)
+            } else {
+                (-11, 281)
+            }
+        } else {
+            (0, 100)
+        };
         slider(
             p,
             layout.controls[index].unwrap(),
@@ -64,8 +86,11 @@ pub fn draw(p: &mut Painter, panel: &SettingsPanel, current_color: Color) {
         } else {
             format!("{value}%")
         };
-        let mut style = TextStyle::new(layout.value_font_size, Rgba(248, 250, 252, 255))
-            .weight(cosmic_text::Weight::BOLD);
+        let mut style = TextStyle::new(
+            layout.value_font_size,
+            crate::theme::toolbar::Palette::current().strong_text,
+        )
+        .weight(cosmic_text::Weight::BOLD);
         style.align = crate::renderer::text::HAlign::Right;
         p.text(layout.values[index], &text, style);
     }
@@ -80,7 +105,7 @@ pub fn draw(p: &mut Painter, panel: &SettingsPanel, current_color: Color) {
         };
         let hovered = panel.hovered == Some(control.index());
         let selected = panel.selected == Some(control.index());
-        let mut ink = Rgba(229, 231, 235, 255);
+        let mut ink = crate::theme::toolbar::Palette::current().text;
         if matches!(control, Control::Color | Control::Background) {
             let color = if control == Control::Color {
                 current_color
@@ -106,7 +131,7 @@ pub fn draw(p: &mut Painter, panel: &SettingsPanel, current_color: Color) {
                 8.0,
                 2.0,
                 if hovered {
-                    Rgba(94, 234, 212, 255)
+                    crate::theme::toolbar::Palette::current().hover_border
                 } else {
                     Rgba(255, 255, 255, 100)
                 },
@@ -132,9 +157,9 @@ pub fn draw(p: &mut Painter, panel: &SettingsPanel, current_color: Color) {
                 inset,
                 7.0,
                 if hovered {
-                    Rgba(45, 212, 191, 255)
+                    crate::theme::toolbar::Palette::current().hover_fill
                 } else {
-                    Rgba(153, 246, 228, 78)
+                    crate::theme::toolbar::Palette::current().active_fill
                 },
             );
             border(
@@ -143,13 +168,13 @@ pub fn draw(p: &mut Painter, panel: &SettingsPanel, current_color: Color) {
                 7.0,
                 1.0,
                 if hovered {
-                    Rgba(94, 234, 212, 255)
+                    crate::theme::toolbar::Palette::current().hover_border
                 } else {
-                    Rgba(153, 246, 228, 150)
+                    crate::theme::toolbar::Palette::current().active_border
                 },
             );
             if hovered {
-                ink = Rgba(26, 24, 20, 255);
+                ink = crate::theme::toolbar::Palette::current().hover_icon;
             }
         }
         icon(p, cell, svg, layout.icon_size, ink);
@@ -169,8 +194,18 @@ fn icon(p: &mut Painter, cell: Rect, svg: &'static str, size: f32, ink: Rgba) {
 
 /// 【文字属性栏】【滑条绘制】按 value、range 与 hovered 绘入 p 的 cell，保留实际四像素轨道和十四像素手柄宽度
 fn slider(p: &mut Painter, cell: Rect, value: i32, range: (i32, i32), hovered: bool) {
-    let groove = Rect::from_xywh(cell.left(), cell.top() + 5.0, cell.width(), 4.0).unwrap();
-    p.fill_rounded(groove, 2.0, Rgba(255, 255, 255, 22));
+    let groove = Rect::from_xywh(
+        cell.left(),
+        cell.top() + ((cell.height() - 4.0) / 2.0).floor(),
+        cell.width(),
+        4.0,
+    )
+    .unwrap();
+    p.fill_rounded(
+        groove,
+        2.0,
+        crate::theme::toolbar::Palette::current().slider_groove,
+    );
     let handle = TextLayout::slider_handle(cell, value, range);
     if let Some(filled) = Rect::from_xywh(
         groove.left(),
@@ -184,8 +219,16 @@ fn slider(p: &mut Painter, cell: Rect, value: i32, range: (i32, i32), hovered: b
             tiny_skia::Point::from_xy(filled.left(), filled.top()),
             tiny_skia::Point::from_xy(filled.right(), filled.top()),
             vec![
-                tiny_skia::GradientStop::new(0.0, Rgba(13, 148, 136, 255).color()),
-                tiny_skia::GradientStop::new(1.0, Rgba(45, 212, 191, 255).color()),
+                tiny_skia::GradientStop::new(
+                    0.0,
+                    crate::theme::toolbar::Palette::current()
+                        .slider_start
+                        .color(),
+                ),
+                tiny_skia::GradientStop::new(
+                    1.0,
+                    crate::theme::toolbar::Palette::current().slider_end.color(),
+                ),
             ],
             tiny_skia::SpreadMode::Pad,
             tiny_skia::Transform::identity(),
@@ -212,9 +255,9 @@ fn slider(p: &mut Painter, cell: Rect, value: i32, range: (i32, i32), hovered: b
         6.0,
         1.0,
         if hovered {
-            Rgba(94, 234, 212, 255)
+            crate::theme::toolbar::Palette::current().hover_border
         } else {
-            Rgba(15, 17, 23, 100)
+            crate::theme::toolbar::Palette::current().slider_handle_border
         },
     );
 }

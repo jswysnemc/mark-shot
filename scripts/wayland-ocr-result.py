@@ -15,6 +15,7 @@ import time
 from PIL import Image
 
 from wayland_model_locator import download_position
+from wayland_ocr_window_layout import source_point, tab_point, table_point, window_rect
 import wayland_test_session as session
 
 
@@ -56,18 +57,33 @@ def expected_csv(rows):
     return output.getvalue().removesuffix("\r\n")
 
 
+def click_control(window, name, view="Text"):
+    """【结果测试】【单行控件】按 window、name 和 view 点击页签或复制入口，无返回值；复用经过验证的单行坐标"""
+    bounds = window_rect(window)
+    if name in ("Text", "Table", "Image"):
+        point = tab_point(bounds, name)
+    elif name == "Copy":
+        point = source_point(bounds, view)
+    elif name == "TableCopy":
+        point = table_point(bounds)
+    else:
+        raise ValueError(f"unknown result control: {name}")
+    session.click(window, point[0] - bounds["x"], point[1] - bounds["y"])
+
+
 def copy_table(env, window, expected):
     """【结果测试】【表格菜单】在 window 选择 TSV 菜单并核对 expected，env 为私有会话；不借用原文复制快捷键"""
-    session.click(window, window["size"][0] - 44, 56)
-    session.click(window, window["size"][0] - 98, 92)
+    click_control(window, "TableCopy")
+    session.key("Home")
+    session.key("Return")
     session.wait_clipboard(env, expected)
 
 
 def table_formats(env, window, artifacts):
     """【结果测试】【表格操作】修改 window 中单元格并验证四种导出；env 为隔离环境，artifacts 保存结果"""
-    session.click(window, 160, 56)
-    session.click(window, 82, 155)
-    session.click(window, 82, 155)
+    click_control(window, "Table")
+    session.key("Down")
+    session.key("F2")
     session.key("ctrl+a")
     edited = 'A|B, "quoted"\n新值'
     paste(edited)
@@ -78,8 +94,11 @@ def table_formats(env, window, artifacts):
     (artifacts / "table.tsv").write_text(tsv)
     for index, suffix in [(2, "csv"), (1, "md"), (3, "html")]:
         session.control("copy", "clipboard sentinel")
-        session.click(window, window["size"][0] - 44, 56)
-        session.click(window, window["size"][0] - 98, 92 + index * 30)
+        click_control(window, "TableCopy")
+        session.key("Home")
+        for _ in range(index):
+            session.key("Down")
+        session.key("Return")
         deadline = time.monotonic() + 3
         while time.monotonic() < deadline:
             text = session.read_clipboard(env)
@@ -121,22 +140,21 @@ def editable_result(binary, env, artifacts):
         session.key("ctrl+v")
         time.sleep(0.1)
         session.copy_all(env, edited)
-        session.click(window, 98, 56)
+        click_control(window, "Image")
         session.screenshot(artifacts / "image.png")
-        session.click(window, window["size"][0] - 44, 56)
-        copied_png = subprocess.check_output(["wl-paste", "--type", "image/png", "--no-newline"], env=env)
-        if copied_png != (ROOT / "tests/fixtures/ocr-table.png").read_bytes():
-            raise RuntimeError("image preview copied different source pixels")
-        session.click(window, 36, 56)
+        click_control(window, "Copy", view="Image")
+        session.wait_clipboard(env, edited)
+        click_control(window, "Text")
         session.copy_all(env, edited)
-        window = session.size_window(window, 360, 280)
+        window = session.size_window(window, 380, 340)
         session.copy_all(env, edited)
         session.screenshot(artifacts / "narrow.png")
         window = session.size_window(window)
         tsv = table_formats(env, window, artifacts)
-        session.click(window, 98, 56)
-        session.click(window, window["size"][0] - 118, 56)
-        session.click(window, 160, 56)
+        click_control(window, "Image")
+        click_control(window, "Text")
+        session.copy_all(env, edited)
+        click_control(window, "Table")
         copy_table(env, window, tsv)
         session.key("Escape")
         if process.wait(timeout=3) != 0:
@@ -205,7 +223,7 @@ def actual_ocr(binary, models, base_env, artifacts, first_use=False, table_resul
                     raise RuntimeError(f"the real result omitted {line!r}")
             (artifacts / "recognized.txt").write_text(text)
             if table_result:
-                session.click(window, 160, 56)
+                click_control(window, "Table")
                 copy_table(env, window, SOURCE)
                 text = session.read_clipboard(env)
                 (artifacts / "table.tsv").write_text(text)

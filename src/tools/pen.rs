@@ -20,15 +20,16 @@ impl ToolBehavior for PenTool {
         if !matches!(button, MouseButton::Left) {
             return;
         }
-        let pos = (
-            state.input.pointer.global.0 as f32,
-            state.input.pointer.global.1 as f32,
-        );
+        let pos = (state.canvas_point().0 as f32, state.canvas_point().1 as f32);
 
         if pressed {
             state.pending_pen_baked = 0;
             state.input.straight = false;
             let mut ann = Annotation {
+                style_scale: 1.0,
+                rotation_degrees: 0.0,
+                frozen_bounds: crate::tools::drawing_space::DrawingSpace::from_editor(state)
+                    .map(|space| space.bounds),
                 id: state.next_id,
                 shape: AnnotationShape::Pen { points: vec![pos] },
                 color: state.tool_settings.color,
@@ -36,6 +37,7 @@ impl ToolBehavior for PenTool {
                 stroke_width: state.tool_settings.stroke(StrokeGroup::Freehand),
                 bbox: Rect::from_xywh(pos.0, pos.1, 1.0, 1.0).unwrap(),
             };
+            state.adopt_annotation_style(&mut ann);
             ann.update_bbox();
             let tail_bbox = ann.pen_active_tail_bbox();
             state.damage_rects.push(DamageZone::Global(tail_bbox));
@@ -50,10 +52,6 @@ impl ToolBehavior for PenTool {
 
             let damage = ann.damage_bbox(false);
 
-            // final halo will be drawn in renderer.
-            // simplifies mouse‑up handling and avoids costly redraws every frame
-
-            // bake the full annotation with pristine single pass drop shadow
             state.bake_annotation(&ann);
             state.damage_rects.push(DamageZone::Global(damage));
             *dirty_mask |= crate::utils::get_overlapping_monitors(&damage, &state.placements);
@@ -64,16 +62,14 @@ impl ToolBehavior for PenTool {
         }
     }
 
+    /// 【画布导航】【工具移动】按state稳定画布指针更新草稿，_global提供已转换位置，dirty_mask返回重绘范围，无返回值
     fn on_move(&self, state: &mut EditorState, _global: (f64, f64), dirty_mask: &mut u32) {
         if state.input.shift {
             straighten(state);
             return;
         }
 
-        let raw_pos = (
-            state.input.pointer.global.0 as f32,
-            state.input.pointer.global.1 as f32,
-        );
+        let raw_pos = (state.canvas_point().0 as f32, state.canvas_point().1 as f32);
 
         let Some(ann) = state.pending.as_ref() else {
             return;
@@ -161,14 +157,12 @@ impl ToolBehavior for PenTool {
 }
 
 pub fn straighten(state: &mut EditorState) {
+    let canvas_point = state.canvas_point();
     let Some(ann) = state.pending.as_mut() else {
         return;
     };
     let pad = crate::renderer::visual_pad(ann.stroke_width);
-    let pos = (
-        state.input.pointer.global.0 as f32,
-        state.input.pointer.global.1 as f32,
-    );
+    let pos = (canvas_point.0 as f32, canvas_point.1 as f32);
 
     let (points, flat_ends) = match &mut ann.shape {
         AnnotationShape::Pen { points } => (points, None),

@@ -16,10 +16,13 @@ pub fn draw(painter: &mut Painter<'_>, measurement: Measurement, width: f32, col
     if !scale.is_finite() || scale <= 0.0 {
         return;
     }
-    let Some(body) = measurement
-        .visual_bounds(measurement.unit(width))
-        .and_then(|body| body.outset(2.0 * measurement.style_scale, 2.0 * measurement.style_scale))
-    else {
+    let Some(body) = crate::renderer::ruler_chrome::bounds(
+        measurement,
+        width,
+        painter.drawing_bounds(),
+        painter.window_units(),
+        painter.ruler_projection(),
+    ) else {
         return;
     };
     let Some(pixels) = Rect::from_ltrb(

@@ -109,6 +109,8 @@ pub enum ContentType {
     #[default]
     Multiline,
     Text,
+    /// 【输入法】【默认单行】原版 ImhNone 允许补全、检查与自动首字母大写，协议用途保持普通文本
+    Normal,
     Digits,
     Number,
 }

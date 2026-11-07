@@ -42,9 +42,9 @@ fn selected_control_points_are_hit_outside_the_curve_body() {
     );
 }
 
-/// 【线条测试】【外框空间】细直线的端点不遮挡外框缩放，旋转把手在正文之外优先命中
+/// 【线条测试】【端点优先】细线角点附近优先命中端点，框外九像素仍可缩放，旋转把手保留独立命中
 #[test]
-fn thin_lines_have_independent_frame_and_rotation_handles() {
+fn thin_lines_prioritize_endpoints_and_keep_outer_resize_and_rotation_hits() {
     let line = LineSkeleton::new((100.0, 120.0), (300.0, 120.0)).unwrap();
     let bounds = draw::outline(&line, LineStyle::Solid, 3.0)
         .unwrap()
@@ -52,6 +52,16 @@ fn thin_lines_have_independent_frame_and_rotation_handles() {
     let frame = drag::frame(bounds).unwrap();
     assert_eq!(
         drag::hit_test(&line, bounds, 3.0, (frame.right(), frame.top()), true),
+        SelectionHandle::LinePoint(1)
+    );
+    assert_eq!(
+        drag::hit_test(
+            &line,
+            bounds,
+            3.0,
+            (frame.right() + 9.0, frame.top() - 9.0),
+            true
+        ),
         SelectionHandle::TopRight
     );
     assert_eq!(

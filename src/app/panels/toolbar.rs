@@ -2,7 +2,6 @@
 
 use crate::{
     editor::{EditorState, dirty::mark_all_dirty},
-    tools::selection::global_selection_to_local,
     ui::{
         panel::{UiPanel, sync_panel_hover, sync_panel_rect},
         toolbar::{Toolbar, ToolbarButton, ToolbarItem},
@@ -43,10 +42,11 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
     }
     let main_layout = state.toolbar.arrange(available);
     let side_layout = state.action_toolbar.arrange(available);
-    let selection = state
-        .selection
-        .zone
-        .and_then(|rect| global_selection_to_local(&rect, &state.placements[monitor]));
+    let selection = state.selection.zone.and_then(|rect| {
+        state
+            .canvas_local_rect(rect, monitor)
+            .and_then(|rect| rect.intersect(&state.placements[monitor].rect()?))
+    });
     let main_position = state.toolbar.user_position.unwrap_or_else(|| {
         if state.fullscreen_scope && state.file_canvas.is_some() {
             return ((bounds.0 as f32 - state.toolbar.size.0) / 2.0, 12.0);
@@ -93,7 +93,18 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
     let undo = !state.undo_stack.is_empty();
     let redo = !state.redo_stack.is_empty();
     let clear = !state.annotations.is_empty();
-    let busy = state.ann_drag.is_some() || state.input.mouse_down;
+    let busy = state.ann_drag.is_some()
+        || state.input.mouse_down
+        || state.upload.busy()
+        || state.selection_translation.busy();
+    let translating = state.selection_translation.session.is_some()
+        || state.selection_translation.popup.is_some();
+    for toolbar in [&mut state.toolbar, &mut state.action_toolbar] {
+        if toolbar.translating != translating {
+            toolbar.translating = translating;
+            toolbar.dirty = true;
+        }
+    }
     disable(
         &mut state.toolbar,
         undo || state.pending.is_some(),
@@ -139,7 +150,7 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
     }
 }
 
-/// 【截图工具栏】【可用状态】按 undo、redo、clear 和 busy 更新 toolbar 按钮，不可用集成入口保持禁用
+/// 【截图工具栏】【可用状态】按 undo、redo、clear 和 busy 更新 toolbar 按钮，仅未实现集成入口保持禁用
 fn disable(toolbar: &mut Toolbar, undo: bool, redo: bool, clear: bool, busy: bool) {
     let disabled = toolbar
         .items
@@ -147,7 +158,15 @@ fn disable(toolbar: &mut Toolbar, undo: bool, redo: bool, clear: bool, busy: boo
         .enumerate()
         .filter_map(|(index, item)| {
             let disabled = match item {
-                ToolbarItem::Button(ToolbarButton::Integration(_)) => true,
+                ToolbarItem::Button(ToolbarButton::Integration(integration)) => {
+                    busy || !matches!(
+                        integration,
+                        crate::ui::toolbar::Integration::OpenWith
+                            | crate::ui::toolbar::Integration::Extensions
+                            | crate::ui::toolbar::Integration::Upload
+                            | crate::ui::toolbar::Integration::Translate
+                    )
+                }
                 ToolbarItem::Button(ToolbarButton::Undo) => !undo || busy,
                 ToolbarItem::Button(ToolbarButton::Redo) => !redo || busy,
                 ToolbarItem::Button(ToolbarButton::Clear) => !clear || busy,

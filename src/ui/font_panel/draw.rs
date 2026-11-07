@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     renderer::{Painter, text::TextStyle},
-    theme::Rgba,
+    theme::{Rgba, toolbar::Palette},
     ui::{panel::UiPanel, text_properties::draw::border},
 };
 use tiny_skia::{Pixmap, Rect};
@@ -21,27 +21,27 @@ pub fn draw(p: &mut Painter, panel: &mut FontPanel) {
         panel.layout.size,
         1.0,
         true,
-        |p| content(p, panel),
+        |p| content(p, panel, Palette::current()),
     );
     panel.pixmap = cache;
 }
 
-/// 【字体弹层】【内容绘制】把 panel 的本地控件与字体预览绘入 p，无返回值
-fn content(p: &mut Painter, panel: &mut FontPanel) {
+/// 【字体弹层】【内容绘制】按 palette 把 panel 的本地控件与字体预览绘入 p，无返回值
+pub(super) fn content(p: &mut Painter, panel: &mut FontPanel, palette: Palette) {
     let layout = panel.layout;
     let frame = Rect::from_xywh(0.5, 0.5, layout.size.0 - 1.0, layout.size.1 - 1.0).unwrap();
-    p.fill_rounded(frame, 11.0, Rgba(15, 17, 23, 240));
-    border(p, frame, 11.0, 1.0, Rgba(255, 255, 255, 14));
-    p.fill_rounded(layout.search, 7.0, Rgba(255, 255, 255, 16));
+    p.fill_rounded(frame, 11.0, palette.popup_fill);
+    border(p, frame, 11.0, 1.0, palette.popup_border);
+    p.fill_rounded(layout.search, 7.0, palette.control_fill);
     border(
         p,
         inset(layout.search, 0.5),
         7.0,
         1.0,
         if panel.fields.is_editing_key(Field::Search) {
-            Rgba(45, 212, 191, 255)
+            palette.focus_border
         } else {
-            Rgba(255, 255, 255, 24)
+            palette.control_border
         },
     );
     let query = panel.query().to_owned();
@@ -71,9 +71,9 @@ fn content(p: &mut Painter, panel: &mut FontPanel) {
         editing,
         16.0,
         if !has_text {
-            Rgba(156, 163, 175, 255)
+            palette.muted_text
         } else {
-            Rgba(229, 231, 235, 255)
+            palette.text
         }
         .color(),
         cosmic_text::Weight::NORMAL,
@@ -84,7 +84,7 @@ fn content(p: &mut Painter, panel: &mut FontPanel) {
             14.0,
             layout.search.right() - 21.0,
             layout.search.top() + 7.0,
-            Rgba(156, 163, 175, 255),
+            palette.muted_text,
         );
     }
     // 1. 【字体弹层】【列表裁切】背景与字形均在独立列表缓冲中绘制，部分行不会覆盖搜索框或字号输入
@@ -113,9 +113,9 @@ fn content(p: &mut Painter, panel: &mut FontPanel) {
                     cell,
                     7.0,
                     if selected {
-                        Rgba(45, 212, 191, 255)
+                        palette.hover_fill
                     } else {
-                        Rgba(45, 212, 191, 28)
+                        palette.soft_hover_fill
                     },
                 );
                 border(
@@ -124,9 +124,9 @@ fn content(p: &mut Painter, panel: &mut FontPanel) {
                     7.0,
                     1.0,
                     if selected {
-                        Rgba(94, 234, 212, 255)
+                        palette.hover_border
                     } else {
-                        Rgba(45, 212, 191, 80)
+                        palette.soft_hover_border
                     },
                 );
             }
@@ -135,7 +135,7 @@ fn content(p: &mut Painter, panel: &mut FontPanel) {
             && let Some(text) =
                 panel
                     .preview
-                    .render(catalog, &rows, layout.list, scale, &panel.family)
+                    .render(catalog, &rows, layout.list, scale, &panel.family, palette)
         {
             image.draw_pixmap(
                 0,
@@ -152,39 +152,7 @@ fn content(p: &mut Painter, panel: &mut FontPanel) {
             &image,
         );
     }
-    if let Some(thumb) = panel.thumb() {
-        p.fill_rounded(
-            Rect::from_xywh(
-                layout.list.right() - 14.0,
-                layout.list.top(),
-                14.0,
-                layout.list.height(),
-            )
-            .unwrap(),
-            0.0,
-            Rgba(0, 0, 0, 255),
-        );
-        p.fill_rounded(thumb, 0.0, Rgba(246, 246, 246, 255));
-        border(p, inset(thumb, 0.5), 0.0, 1.0, Rgba(153, 153, 153, 255));
-        for (y, up) in [
-            (layout.list.top(), true),
-            (layout.list.bottom() - 14.0, false),
-        ] {
-            let cell = Rect::from_xywh(layout.list.right() - 14.0, y, 14.0, 14.0).unwrap();
-            p.fill_rounded(cell, 0.0, Rgba(247, 247, 247, 255));
-            border(p, inset(cell, 0.5), 0.0, 1.0, Rgba(153, 153, 153, 255));
-            let cx = cell.left() + 7.0;
-            let cy = cell.top() + 7.0;
-            let mut path = tiny_skia::PathBuilder::new();
-            path.move_to(cx - 4.0, cy + if up { 2.0 } else { -2.0 });
-            path.line_to(cx + 4.0, cy + if up { 2.0 } else { -2.0 });
-            path.line_to(cx, cy + if up { -3.0 } else { 3.0 });
-            path.close();
-            if let Some(path) = path.finish() {
-                p.fill_path(&path, Rgba(92, 92, 92, 255));
-            }
-        }
-    }
+    super::scrollbar::draw(p, panel, palette);
     for (index, row) in &rows {
         if panel
             .catalog
@@ -198,14 +166,19 @@ fn content(p: &mut Painter, panel: &mut FontPanel) {
                 14.0,
                 row.left() + 10.0,
                 row.top() + 7.0,
-                Rgba(229, 231, 235, 255),
+                palette.hover_text,
             );
         }
     }
     // 2. 【字体弹层】【字号样式】底部使用原版二十六像素控件行，不挤占字体列表高度
-    for cell in [layout.size_field, layout.bold, layout.italic] {
-        p.fill_rounded(cell, 2.0, Rgba(255, 255, 255, 255));
-        border(p, inset(cell, 0.5), 2.0, 1.0, Rgba(153, 153, 153, 255));
+    for (cell, hit, selected) in [
+        (layout.size_field, Hit::Size, false),
+        (layout.bold, Hit::Bold, panel.bold),
+        (layout.italic, Hit::Italic, panel.italic),
+    ] {
+        let (fill, outline, _) = control(panel, hit, selected, palette);
+        p.fill_rounded(cell, 2.0, fill);
+        border(p, inset(cell, 0.5), 2.0, 1.0, outline);
     }
     let value = panel
         .fields
@@ -229,46 +202,60 @@ fn content(p: &mut Painter, panel: &mut FontPanel) {
         &number,
         value,
         16.0,
-        Rgba(0, 0, 0, 255).color(),
+        palette.text.color(),
         cosmic_text::Weight::NORMAL,
     );
     p.text(
         layout.bold,
         "B",
-        TextStyle::new(14.0, Rgba(0, 0, 0, 255))
+        TextStyle::new(14.0, control(panel, Hit::Bold, panel.bold, palette).2)
             .center()
             .weight(cosmic_text::Weight::BOLD),
     );
     p.text(
         layout.italic,
         "I",
-        TextStyle::new(14.0, Rgba(0, 0, 0, 255))
+        TextStyle::new(14.0, control(panel, Hit::Italic, panel.italic, palette).2)
             .center()
             .style(cosmic_text::Style::Italic),
     );
-    for (cell, selected) in [(layout.bold, panel.bold), (layout.italic, panel.italic)] {
-        if selected {
-            border(p, inset(cell, 1.5), 2.0, 1.0, Rgba(100, 100, 100, 255));
-        }
-    }
     let arrow_x = layout.size_field.right() - 12.0;
     for (y, up) in [
         (layout.size_field.top() + 8.0, true),
         (layout.size_field.top() + 18.0, false),
     ] {
-        let mut path = tiny_skia::PathBuilder::new();
-        path.move_to(arrow_x - 3.0, y + if up { 2.0 } else { -2.0 });
-        path.line_to(arrow_x + 3.0, y + if up { 2.0 } else { -2.0 });
-        path.line_to(arrow_x, y + if up { -2.0 } else { 2.0 });
-        path.close();
-        if let Some(path) = path.finish() {
-            p.fill_path(&path, Rgba(110, 110, 110, 255));
-        }
+        super::scrollbar::arrow(p, (arrow_x, y), 3.0, up, palette.muted_text);
+    }
+}
+
+/// 【字体弹层】【控件配色】按 panel、hit、selected 与 palette 返回底板、边框和文字色，保留鼠标与字段状态
+fn control(panel: &FontPanel, hit: Hit, selected: bool, palette: Palette) -> (Rgba, Rgba, Rgba) {
+    if panel.pressed == Some(hit) {
+        (
+            palette.pressed_fill,
+            palette.pressed_border,
+            palette.hover_text,
+        )
+    } else if panel.hovered == Some(hit) {
+        (palette.hover_fill, palette.hover_border, palette.hover_text)
+    } else if selected {
+        (palette.active_fill, palette.active_border, palette.text)
+    } else {
+        let focused = hit == Hit::Size && panel.fields.is_editing_key(Field::Size);
+        (
+            palette.control_fill,
+            if focused {
+                palette.focus_border
+            } else {
+                palette.control_border
+            },
+            palette.text,
+        )
     }
 }
 
 /// 【字体弹层】【边框内缩】按 amount 返回 rect 的内缩矩形，调用方保证尺寸有效
-fn inset(rect: Rect, amount: f32) -> Rect {
+pub(super) fn inset(rect: Rect, amount: f32) -> Rect {
     Rect::from_xywh(
         rect.left() + amount,
         rect.top() + amount,

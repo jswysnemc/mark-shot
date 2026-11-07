@@ -3,7 +3,7 @@
 use cosmic_text::{Action, Edit, FontSystem, Motion, Selection};
 
 use super::TextEditor;
-use crate::{backend::wayland::window::KeyInput, keys::Key};
+use crate::{backend::window::KeyInput, keys::Key};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum EditEvent {
@@ -57,6 +57,9 @@ fn motion(key: Key, ctrl: bool) -> Option<Motion> {
 impl TextEditor {
     /// 【界面控件】【键盘编辑】处理 input 并使用 fonts 排版；返回修改、重绘或剪贴板请求
     pub fn key(&mut self, fonts: &mut FontSystem, input: &KeyInput) -> EditEvent {
+        if input.key.is_none() && input.text.is_empty() {
+            return EditEvent::None;
+        }
         let cancelled = if self.preedit().is_some() {
             self.interrupt_input()
         } else {

@@ -1,6 +1,12 @@
 pub(crate) mod fs_lock;
 pub(crate) mod helper_process;
+pub(crate) mod memory;
+pub(crate) mod platform;
+pub(crate) mod process_group;
 pub(crate) mod screenshot_path;
+#[cfg(test)]
+pub(crate) mod test_files;
+pub(crate) mod transparent_pixmap;
 
 use crate::types::{CursorIcon, Placement, SelectionHandle, SignedRect};
 use std::path::PathBuf;
@@ -68,7 +74,7 @@ pub fn encode_png_with_alpha(mut pixmap: Pixmap) -> Vec<u8> {
     encode_rgba(pixmap.data(), pixmap.width(), pixmap.height())
 }
 
-fn encode_rgba(rgba: &[u8], width: u32, height: u32) -> Vec<u8> {
+pub(crate) fn encode_rgba(rgba: &[u8], width: u32, height: u32) -> Vec<u8> {
     use image::ImageEncoder;
     use image::codecs::png::{CompressionType, FilterType, PngEncoder};
 
@@ -121,6 +127,7 @@ pub fn write_unique(
     data: &[u8],
     mode: u32,
 ) -> std::io::Result<PathBuf> {
+    #[cfg(target_os = "linux")]
     use std::os::unix::fs::OpenOptionsExt;
 
     let mut n = 0;
@@ -130,11 +137,13 @@ pub fn write_unique(
             n => format!("{stem}_{n}.png"),
         };
         let path = dir.join(filename);
-        let file = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(mode)
-            .open(&path);
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(target_os = "linux")]
+        options.mode(mode);
+        #[cfg(target_os = "windows")]
+        let _ = mode;
+        let file = options.open(&path);
         match file {
             Ok(mut file) => {
                 std::io::Write::write_all(&mut file, data)?;
@@ -462,14 +471,16 @@ fn spawn_self_with(
     Ok(pipes.stdout.take())
 }
 
+#[cfg(target_os = "linux")]
 pub fn copy_to_clipboard(text: &str) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::backend::wayland::clipboard::{DAEMON_ARG, READY_TIMEOUT, TEXT_ARG};
+    use crate::backend::clipboard::{DAEMON_ARG, READY_TIMEOUT, TEXT_ARG};
 
     spawn_self_ready(&[DAEMON_ARG, TEXT_ARG], text.as_bytes(), READY_TIMEOUT)
 }
 
+#[cfg(target_os = "linux")]
 pub fn copy_to_primary(text: &str) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::backend::wayland::clipboard::{DAEMON_ARG, PRIMARY_ARG, READY_TIMEOUT, TEXT_ARG};
+    use crate::backend::clipboard::{DAEMON_ARG, PRIMARY_ARG, READY_TIMEOUT, TEXT_ARG};
 
     spawn_self_ready(
         &[DAEMON_ARG, TEXT_ARG, PRIMARY_ARG],
@@ -478,6 +489,7 @@ pub fn copy_to_primary(text: &str) -> Result<(), Box<dyn std::error::Error>> {
     )
 }
 
+#[cfg(target_os = "linux")]
 pub fn paste_from_clipboard() -> Option<String> {
     use std::io::Read;
     use wl_clipboard_rs::paste::{ClipboardType, MimeType, Seat, get_contents};
@@ -487,6 +499,22 @@ pub fn paste_from_clipboard() -> Option<String> {
     let mut text = String::new();
     pipe.read_to_string(&mut text).ok()?;
     Some(text)
+}
+
+#[cfg(target_os = "windows")]
+/// 【Windows剪贴板】【文字输出】按text直接交付系统Unicode剪贴板，返回结果，不启动后台进程
+pub fn copy_to_clipboard(text: &str) -> crate::AppResult {
+    crate::backend::clipboard::copy_text(text)
+}
+#[cfg(target_os = "windows")]
+/// 【Windows剪贴板】【主选择兼容】按text交付系统剪贴板，返回结果，Windows没有独立主选择区
+pub fn copy_to_primary(text: &str) -> crate::AppResult {
+    copy_to_clipboard(text)
+}
+#[cfg(target_os = "windows")]
+/// 【Windows剪贴板】【文字粘贴】无参数，返回系统Unicode正文或不可用状态
+pub fn paste_from_clipboard() -> Option<String> {
+    crate::backend::clipboard::read_text().ok()
 }
 
 #[cfg(test)]
@@ -508,6 +536,7 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn written_file_gets_the_given_mode() {
         use std::os::unix::fs::PermissionsExt;

@@ -3,5 +3,9 @@
 pub mod draw;
 pub mod layout;
 pub mod preview;
+mod scrollbar;
 pub mod state;
 pub use state::FontPanel;
+
+#[cfg(test)]
+mod draw_tests;

@@ -7,7 +7,7 @@ use super::{
 };
 use crate::ui::fonts::UiFonts;
 use crate::{
-    backend::wayland::window::{KeyInput, LEFT_BUTTON, WindowEvent},
+    backend::window::{KeyInput, LEFT_BUTTON, WindowEvent},
     keys::Key,
 };
 use std::{io, path::PathBuf};

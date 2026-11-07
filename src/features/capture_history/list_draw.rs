@@ -34,9 +34,9 @@ pub(super) fn draw(state: &mut HistoryWindow, canvas: &mut Pixmap, scale: f32) {
             let entry = &state.model.entries[*index];
             let bounds = chrome::row_rect(row, width);
             if state.model.selected.as_deref() == Some(&entry.name) {
-                painter.fill_rounded(bounds, 6.0, chrome::SELECTED);
+                painter.fill_rounded(bounds, 6.0, chrome::selected());
             } else if state.hovered_row == Some(state.model.scroll + row) {
-                painter.fill_rounded(bounds, 6.0, chrome::HOVER);
+                painter.fill_rounded(bounds, 6.0, chrome::hover());
             }
             let title = entry
                 .created
@@ -55,7 +55,7 @@ pub(super) fn draw(state: &mut HistoryWindow, canvas: &mut Pixmap, scale: f32) {
                         18.0,
                     ),
                     &text,
-                    TextStyle::new(12.0, chrome::FOREGROUND),
+                    TextStyle::new(12.0, chrome::foreground()),
                 );
             }
         }
@@ -68,7 +68,7 @@ pub(super) fn draw(state: &mut HistoryWindow, canvas: &mut Pixmap, scale: f32) {
                     bar.handle.height(),
                 ),
                 3.0,
-                chrome::BORDER,
+                chrome::border(),
             );
         }
     }

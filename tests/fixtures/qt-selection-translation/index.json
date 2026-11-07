@@ -1,0 +1,34 @@
+{
+  "sources": {
+    "selection_translate/selection_translate_placement.cpp": "20b0afad78f7fd7e7843f47bf54d053e04cb094a0ae1802b1f8f456dc388ae5f",
+    "selection_translate/selection_translate_placement.h": "7526a71ca48b3d2102cddbef40a84575881b050bbdf2cae64c1974d9889d9dd4",
+    "selection_translate/translate_language_popup.cpp": "52bcb197dd6ef229c7095f5f7b42d3be93da7e87441161fdd8d540cc59fde035",
+    "selection_translate/translate_language_popup.h": "d49fe38c7e5fce29b9c3ce289d792068786f93bdc6280e06f4d5f39926e4ad23",
+    "selection_translate/translate_result_bar.cpp": "be6adf26824c66d93d6d1e34ae5b6f8243c3b3b8d59a3aa2007476e0a3d473e8",
+    "selection_translate/translate_result_bar.h": "95e35bbb384bcc5f6310cbb1f50d92af5a6703f0ff6c49ecc39115d62e0901fc",
+    "ui/theme.cpp": "2d4aa9e3c2c37a912a687f10b9d8028dfe6b44b686c07f1644705fb74ba05c69",
+    "ui/theme.h": "0c70dcc15a811cac820acdfef8a8552c146aed866418b0b657561dc6beab02e9",
+    "ui/svg_icon.cpp": "0246ee2d521a066afe88e5959f3b4af1af51997c9d6ab951a20ee3a9ab32bbcb",
+    "ui/svg_icon.h": "9c6fad66533cf684d0690d3977eae2cedfb812efe1e04e4b6ae26fc57a58d6cb",
+    "ui/toolbar_palette.cpp": "376228794625827faf5cdf0749cd05bbacf65bada3b72fae2807c1485d3efa5b",
+    "ui/toolbar_palette.h": "7dfd04f2db7ac2301fa05ea3ea864d3c1fdd49b33f25cfeba34824ccc7b26547"
+  },
+  "harness": "6294da0128b459acd89b76f350a7c55f21fdbaf2b9c8342335f258ba6ca44b7d",
+  "binary": "18e30a399cb2eff3936a0d0c3b006d8403d8bf9418dea227faefead07658f1eb",
+  "reference": "b4b141172b558f9da03557c18a8730ba12bfc7d4db8fbf6867fdacdb7af9d53b",
+  "qt": "6.12.0",
+  "font": "Noto Sans",
+  "language": "English",
+  "style": "Fusion",
+  "position_samples": 20,
+  "language_samples": 8,
+  "fixture_reference_sha256": "4d7897864add77e1bddf72614cea463d68860bbe4214826ea25dfd4320aa26d6",
+  "resources": {
+    "resources.qrc": "e3124ccc8302045499af216fc2576c0448a9356e2131961b80add1973e257a41",
+    "data/icons/ui/translate.svg": "c7ad0d7aa0070d277d5764d0650396286bd555ad4981cd3f5b4555d1c5f8e2a6",
+    "data/icons/ui/chevron-down.svg": "366a23fa0a33886df8a6a2c709e0522e0ca1c8d4932928bfaa7dd3cb50fade48",
+    "data/icons/ui/copy.svg": "ccab2c0ee3b9ca3fa6af7287137d98feab70d077c6a092ab7a5d48f04375c0b9",
+    "data/icons/ui/cancel.svg": "41d3ec8fe06b42a24fbb4848f1903a3e53a1aee56359f7666f1bc62f4f14b169",
+    "data/icons/ui/check.svg": "3a156f8dff1e46af88d4a9776b36af32c8f47e223d39edf05df4c107f294bd6b"
+  }
+}

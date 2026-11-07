@@ -2,8 +2,11 @@
 
 use super::Store;
 use crate::{AppResult, app::Launch, config::history};
+#[cfg(target_os = "linux")]
+use std::fs::File;
 use std::io::{self, Write};
-use std::{fs::File, os::fd::AsRawFd};
+#[cfg(target_os = "linux")]
+use std::os::fd::AsRawFd;
 
 pub const READY_ARG: &str = "--history-ready";
 
@@ -13,7 +16,7 @@ pub fn spawn() -> AppResult {
     if !crate::config::get().notifications.enabled {
         args.push("--nonotify");
     }
-    crate::utils::spawn_self_ready(&args, &[], std::time::Duration::from_secs(3))
+    crate::utils::spawn_self_ready(&args, &[], crate::backend::window::READY_TIMEOUT)
 }
 
 /// 【截图历史】【重编辑启动】读取 store 中合法 name 并交接 PNG 快照；子进程不会重新打开可能变化的历史路径
@@ -30,7 +33,7 @@ pub(super) fn spawn_edit(store: &Store, name: &str) -> io::Result<()> {
 }
 
 /// 【截图历史】【编辑快照】读取合法 name 到私有临时文件；返回保持文件生命周期的句柄与图片编辑参数
-pub fn edit_snapshot(name: &str) -> io::Result<(File, Launch)> {
+pub fn edit_snapshot(name: &str) -> io::Result<(Snapshot, Launch)> {
     let settings = history::current();
     let store = Store::new(settings.path()?, settings.byte_limit());
     let (png, _) = store.read(name)?;
@@ -38,7 +41,7 @@ pub fn edit_snapshot(name: &str) -> io::Result<(File, Launch)> {
 }
 
 /// 【截图历史】【编辑快照接收】从标准输入读取有界 PNG 并校验；返回私有临时文件与编辑参数
-pub fn edit_from_stdin() -> io::Result<(File, Launch)> {
+pub fn edit_from_stdin() -> io::Result<(Snapshot, Launch)> {
     use std::io::Read;
     let limit = crate::config::history::current()
         .byte_limit()
@@ -57,7 +60,8 @@ pub fn edit_from_stdin() -> io::Result<(File, Launch)> {
 }
 
 /// 【截图历史】【快照落地】把已验证 png 写入私有临时文件；返回保持文件生命周期的句柄和图片编辑参数
-fn materialize(png: &[u8]) -> io::Result<(File, Launch)> {
+#[cfg(target_os = "linux")]
+fn materialize(png: &[u8]) -> io::Result<(Snapshot, Launch)> {
     use std::os::unix::fs::PermissionsExt;
     // 1. 【截图历史】【匿名快照】文件没有目录名称，即使进程异常退出也不留下额外截图文件
     let mut file = tempfile::tempfile()?;
@@ -75,7 +79,7 @@ fn materialize(png: &[u8]) -> io::Result<(File, Launch)> {
     Ok((file, launch))
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     /// 【截图历史测试】【匿名交接】快照只有文件描述符，保持私有权限且可通过编辑参数读取原始 PNG
@@ -88,4 +92,22 @@ mod tests {
         assert_eq!(file.metadata().unwrap().mode() & 0o777, 0o600);
         assert_eq!(std::fs::read(launch.image.unwrap()).unwrap(), png);
     }
+}
+
+#[cfg(target_os = "linux")]
+pub type Snapshot = File;
+#[cfg(target_os = "windows")]
+pub type Snapshot = tempfile::NamedTempFile;
+#[cfg(target_os = "windows")]
+/// 【Windows截图历史】【快照落地】按png创建有自动清理责任的私有临时文件，返回拥有句柄与编辑路径
+fn materialize(png: &[u8]) -> io::Result<(Snapshot, Launch)> {
+    let mut file = tempfile::NamedTempFile::new()?;
+    file.write_all(png)?;
+    file.flush()?;
+    let launch = Launch {
+        image: Some(file.path().to_owned()),
+        one_monitor: true,
+        ..Launch::default()
+    };
+    Ok((file, launch))
 }

@@ -270,7 +270,7 @@ pub fn close_color_popover(editor_state: &mut EditorState, dirty_mask: &mut u32)
     if editor_state.color_popover.fields.is_editing() {
         commit_color_field_edit(editor_state, dirty_mask);
     }
-    let snapshot = editor_state.color_popover.pre_edit_snapshot.take();
+    let snapshot = editor_state.color_popover.take_edit_snapshot();
     editor_state.commit_snapshot(snapshot);
     editor_state.color_popover.open = false;
     editor_state.settings_panel.selected = None;

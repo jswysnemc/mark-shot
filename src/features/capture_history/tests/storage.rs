@@ -1,9 +1,11 @@
 //! 【截图历史测试】【安全存储】原版保留规则、链接拒绝、权限与并发
 
 use super::super::Store;
+use crate::utils::test_files::{link_directory, link_file};
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::MetadataExt;
 use std::{
     fs,
-    os::unix::fs::{MetadataExt, symlink},
     sync::{Arc, Barrier},
 };
 
@@ -26,17 +28,20 @@ fn no_directory_until_successful_append_and_private_permissions() {
         .unwrap();
     assert!(!store.directory().exists());
     let entry = store.append(&png, 1.2, "transparent", 50).unwrap();
-    assert_eq!(
-        fs::metadata(store.directory()).unwrap().mode() & 0o777,
-        0o700
-    );
-    assert_eq!(
-        fs::metadata(store.directory().join(&entry.name))
-            .unwrap()
-            .mode()
-            & 0o777,
-        0o600
-    );
+    #[cfg(target_os = "linux")]
+    {
+        assert_eq!(
+            fs::metadata(store.directory()).unwrap().mode() & 0o777,
+            0o700
+        );
+        assert_eq!(
+            fs::metadata(store.directory().join(&entry.name))
+                .unwrap()
+                .mode()
+                & 0o777,
+            0o600
+        );
+    }
     assert_eq!(
         store.entries().unwrap().as_slice(),
         std::slice::from_ref(&entry)
@@ -115,7 +120,7 @@ fn links_paths_and_unrelated_files_are_never_owned() {
     let linked = "capture-20261103123456123-11111111111111111111111111111111.png";
     let hard = "capture-20261103123456124-22222222222222222222222222222222.png";
     let broken = "capture-20261103123456125-33333333333333333333333333333333.png";
-    symlink(&target, store.directory().join(linked)).unwrap();
+    link_file(&target, store.directory().join(linked)).unwrap();
     fs::hard_link(&target, store.directory().join(hard)).unwrap();
     fs::write(store.directory().join(broken), b"broken").unwrap();
     fs::write(store.directory().join("notes.txt"), b"keep").unwrap();
@@ -179,7 +184,7 @@ fn linked_directory_and_lock_do_not_redirect_writes() {
     let actual = directory.path().join("actual");
     let alias = directory.path().join("alias");
     fs::create_dir(&actual).unwrap();
-    symlink(&actual, &alias).unwrap();
+    link_directory(&actual, &alias).unwrap();
     let png = super::png(1, 1);
     assert!(
         Store::new(&alias, 1024 * 1024)
@@ -189,7 +194,7 @@ fn linked_directory_and_lock_do_not_redirect_writes() {
     assert_eq!(fs::read_dir(&actual).unwrap().count(), 0);
     let target = directory.path().join("private");
     fs::write(&target, b"keep").unwrap();
-    symlink(&target, actual.join(".history.lock")).unwrap();
+    link_file(&target, actual.join(".history.lock")).unwrap();
     assert!(
         Store::new(&actual, 1024 * 1024)
             .append(&png, 1.0, "", 50)
@@ -208,7 +213,7 @@ fn contended_lock_has_a_one_second_deadline() {
         .write(true)
         .open(store.directory().join(".history.lock"))
         .unwrap();
-    let _held = nix::fcntl::Flock::lock(file, nix::fcntl::FlockArg::LockExclusive).unwrap();
+    let _held = crate::utils::fs_lock::acquire(file, std::time::Duration::ZERO).unwrap();
     let before = std::time::Instant::now();
     assert_eq!(
         store.remove(&entry.name).unwrap_err().kind(),

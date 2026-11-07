@@ -1,16 +1,20 @@
+#[cfg(target_os = "linux")]
 use std::io::Read;
 
 use cosmic_text::SwashCache;
 use tiny_skia::{Pixmap, Rect};
+#[cfg(target_os = "linux")]
 use wl_clipboard_rs::paste::{ClipboardType, MimeType, Seat, get_contents};
 
 use crate::AppResult;
 use crate::renderer::{Painter, text::TextStyle};
 
 const IMAGE_LIMIT: u64 = 128 * 1024 * 1024;
+#[cfg(target_os = "linux")]
 const TEXT_LIMIT: u64 = 64 * 1024;
 
 /// 【贴图】【剪贴板读取】读取指定 MIME 数据；超过上限时返回错误，不无界增长缓冲
+#[cfg(target_os = "linux")]
 fn read(mime: MimeType<'_>, limit: u64) -> AppResult<Vec<u8>> {
     let (reader, _) = get_contents(ClipboardType::Regular, Seat::Unspecified, mime)?;
     let mut bytes = Vec::new();
@@ -77,10 +81,19 @@ fn text_image(text: &str) -> AppResult<Vec<u8>> {
 }
 
 /// 【贴图】【剪贴板入口】优先贴图 PNG 图片，否则绘制纯文字；不依赖外部程序
+#[cfg(target_os = "linux")]
 pub(super) fn run() -> AppResult {
     let image = match read(MimeType::Specific("image/png"), IMAGE_LIMIT) {
         Ok(image) => image,
         Err(_) => text_image(&String::from_utf8(read(MimeType::Text, TEXT_LIMIT)?)?)?,
     };
-    crate::backend::wayland::pin::run(&image, 1.0)
+    crate::backend::pin::run(&image, 1.0)
+}
+
+#[cfg(target_os = "windows")]
+/// 【Windows贴图】【剪贴板入口】无参数，优先读取原生PNG或DIB，否则绘制Unicode正文，返回独立贴图结果
+pub(super) fn run() -> AppResult {
+    let image = crate::backend::clipboard::read_image_png()
+        .or_else(|_| crate::backend::clipboard::read_text().and_then(|text| text_image(&text)))?;
+    crate::backend::pin::run(&image, 1.0)
 }

@@ -1,0 +1,54 @@
+//! 【界面语言】【OCR 文案】原版结果窗口、表格导出和翻译分区中文
+
+/// 【界面语言】【OCR 查询】按 source 返回原版结果窗口中文，未知键返回空值
+pub(super) fn lookup(source: &str) -> Option<&'static str> {
+    Some(match source {
+        "OCR Result" => "OCR 结果",
+        "Text" => "文字",
+        "Table" => "表格",
+        "Source image" => "原图",
+        "Text Recognition" => "文字识别",
+        "Copy all text" => "复制全部文字",
+        "Copy table" => "复制表格",
+        "Keyboard shortcuts" => "键盘快捷键",
+        "Undo edit" => "撤销编辑",
+        "More actions" => "更多操作",
+        "Target Language" => "目标语言",
+        "Simplified Chinese" => "简体中文",
+        "Traditional Chinese" => "繁体中文",
+        "English" => "英语",
+        "Japanese" => "日语",
+        "Korean" => "韩语",
+        "French" => "法语",
+        "German" => "德语",
+        "Spanish" => "西班牙语",
+        "Russian" => "俄语",
+        "Translated text" => "译文",
+        "Recognized" => "原文",
+        "OCR text appears here" => "OCR 文字会显示在这里",
+        "Translation appears here" => "翻译结果会显示在这里",
+        "Translating..." => "翻译中...",
+        "Translation canceled" => "翻译已取消",
+        "Cancel translation" => "取消翻译",
+        "Hide translation" => "收起译文",
+        "No text to translate" => "没有可翻译的文字",
+        "Translation failed" => "翻译失败",
+        "Source or language changed. Translate again to update." => {
+            "原文或目标语言已更改，请重新翻译。"
+        }
+        "Resize window" => "调整窗口大小",
+        "%1 rows × %2 columns" => "%1 行 × %2 列",
+        "%1 characters" => "%1 字符",
+        "Copy as spreadsheet (TSV)" => "复制为电子表格（TSV）",
+        "Copy as Markdown" => "复制为 Markdown",
+        "Copy as CSV" => "复制为 CSV",
+        "Copy as HTML" => "复制为 HTML",
+        "Translation failed (%1): %2" => "翻译失败（%1）：%2",
+        "timed out" => "超时",
+        "provider failed to start" => "Provider 启动失败",
+        "provider failed" => "Provider 执行失败",
+        "no translation result" => "没有翻译结果",
+        "unknown provider" => "未知 Provider",
+        _ => return None,
+    })
+}

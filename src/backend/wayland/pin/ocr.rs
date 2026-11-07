@@ -3,7 +3,6 @@
 use super::runtime::Pin;
 use crate::{
     AppResult,
-    features::pinned_image::actions,
     ocr::{OcrImage, OcrText, models::OcrModels},
 };
 use std::sync::{
@@ -20,9 +19,16 @@ impl Pin {
         let models = OcrModels::load();
         let files = models.active().and_then(|index| models.files(index));
         let Some(files) = files else {
-            actions::open(&self.image.png()?, true)?;
-            return Ok(false);
+            let Some(files) = self.model_guide()? else {
+                return Ok(false);
+            };
+            return self.start_ocr_with(files);
         };
+        self.start_ocr_with(files)
+    }
+
+    /// 【贴图】【识别模型】按 files 启动当前原图一次识别，返回启动状态，不切换显示或目标语言
+    fn start_ocr_with(&mut self, files: crate::ocr::models::ModelFiles) -> AppResult<bool> {
         let image = OcrImage {
             rgb: self
                 .image
@@ -68,10 +74,24 @@ impl Pin {
         self.ocr_cancel = None;
         match result {
             Ok(text) => {
-                self.text.set_lines(text.lines);
+                self.translation.source = text;
+                self.sync_translation_text();
+                if std::mem::take(&mut self.copy_after_ocr) {
+                    let text = self.text.line_text(false);
+                    if !text.is_empty() {
+                        let result = crate::utils::copy_to_clipboard(&text);
+                        self.report(result);
+                    }
+                }
+                if self.translation.after_ocr {
+                    let result = self.start_translation();
+                    self.report(result);
+                }
                 self.dirty = true;
             }
             Err(error) => {
+                self.copy_after_ocr = false;
+                self.translation.after_ocr = false;
                 log::error!("【贴图】【文字识别】识别失败: {error}");
                 crate::backend::notify::send_blocking(crate::backend::notify::Notice::TextFailed(
                     error,
@@ -82,6 +102,9 @@ impl Pin {
 
     /// 【贴图】【识别坐标失效】旋转或关闭文字选择时取消旧任务，清除识别坐标，不等待线程
     pub fn clear_ocr(&mut self) {
+        self.copy_after_ocr = false;
+        self.cancel_translation();
+        self.translation.clear();
         self.generation = self.generation.wrapping_add(1);
         if let Some(cancel) = self.ocr_cancel.take() {
             cancel.store(true, Ordering::Relaxed);

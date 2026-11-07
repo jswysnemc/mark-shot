@@ -102,6 +102,12 @@ impl TextInput {
                                 ContentHint::Completion | ContentHint::Spellcheck,
                                 ContentPurpose::Normal,
                             ),
+                            ContentType::Normal => (
+                                ContentHint::Completion
+                                    | ContentHint::Spellcheck
+                                    | ContentHint::AutoCapitalization,
+                                ContentPurpose::Normal,
+                            ),
                             ContentType::Digits => (ContentHint::None, ContentPurpose::Digits),
                             ContentType::Number => (ContentHint::None, ContentPurpose::Number),
                         };

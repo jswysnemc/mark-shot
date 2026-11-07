@@ -27,7 +27,7 @@ impl ToolBehavior for LineTool {
             state.input.mouse_down = false;
             state.tool_active = false;
             let Some(point) = DrawingSpace::from_editor(state)
-                .and_then(|space| space.start_point(state.input.pointer.global))
+                .and_then(|space| space.start_point(state.canvas_point()))
             else {
                 return;
             };
@@ -52,6 +52,9 @@ impl ToolBehavior for LineTool {
                 }
             };
             let mut annotation = Annotation {
+                style_scale: 1.0,
+                rotation_degrees: 0.0,
+                frozen_bounds: None,
                 id: state.next_id,
                 shape,
                 color: state.tool_settings.color,
@@ -59,6 +62,7 @@ impl ToolBehavior for LineTool {
                 stroke_width: clamped_width(state.tool_settings.stroke(group), 1.0),
                 bbox: Rect::from_xywh(point.0, point.1, 1.0, 1.0).unwrap(),
             };
+            state.adopt_annotation_style(&mut annotation);
             annotation.update_bbox();
             state
                 .damage_rects

@@ -367,7 +367,7 @@ fn fractional_composition_blinks_keep_exact_pixels_and_reuse_the_preview() {
         let size = ((640.0 * scale) as u32, (480.0 * scale) as u32);
         let mut source = Pixmap::new(size.0, size.1).unwrap();
         source.fill(Color::from_rgba8(30, 34, 38, 255));
-        state.captures[0].pixmap = source.clone();
+        state.captures[0].pixmap = source.clone().into();
         state.captures[0].scale = scale;
         state.canvas[0] = source.clone();
         state.dimmed[0] = source;

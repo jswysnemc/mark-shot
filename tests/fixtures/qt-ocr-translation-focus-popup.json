@@ -1,0 +1,538 @@
+{
+  "cases": [
+    {
+      "width": 380,
+      "hidden_on_image": true,
+      "language_popup": {
+        "font_family": "DejaVu Sans",
+        "font_height": 19,
+        "font_pixels": 16,
+        "max_visible": 8,
+        "rows": [
+          [
+            0,
+            0,
+            248,
+            30
+          ],
+          [
+            0,
+            30,
+            248,
+            30
+          ],
+          [
+            0,
+            60,
+            248,
+            30
+          ],
+          [
+            0,
+            90,
+            248,
+            30
+          ],
+          [
+            0,
+            120,
+            248,
+            30
+          ],
+          [
+            0,
+            150,
+            248,
+            30
+          ],
+          [
+            0,
+            180,
+            248,
+            30
+          ],
+          [
+            0,
+            210,
+            248,
+            30
+          ],
+          [
+            0,
+            240,
+            248,
+            30
+          ]
+        ],
+        "scroll_max": 1,
+        "scroll_page": 8,
+        "scrollbar": [
+          253,
+          5,
+          6,
+          240
+        ],
+        "size": [
+          264,
+          250
+        ],
+        "view_size": [
+          264,
+          250
+        ],
+        "viewport": [
+          5,
+          5,
+          248,
+          240
+        ]
+      },
+      "restored_focus": "ocrTranslationEditor"
+    },
+    {
+      "width": 480,
+      "hidden_on_image": true,
+      "language_popup": {
+        "font_family": "DejaVu Sans",
+        "font_height": 19,
+        "font_pixels": 16,
+        "max_visible": 8,
+        "rows": [
+          [
+            0,
+            0,
+            245,
+            30
+          ],
+          [
+            0,
+            30,
+            245,
+            30
+          ],
+          [
+            0,
+            60,
+            245,
+            30
+          ],
+          [
+            0,
+            90,
+            245,
+            30
+          ],
+          [
+            0,
+            120,
+            245,
+            30
+          ],
+          [
+            0,
+            150,
+            245,
+            30
+          ],
+          [
+            0,
+            180,
+            245,
+            30
+          ],
+          [
+            0,
+            210,
+            245,
+            30
+          ],
+          [
+            0,
+            240,
+            245,
+            30
+          ]
+        ],
+        "scroll_max": 1,
+        "scroll_page": 8,
+        "scrollbar": [
+          250,
+          5,
+          6,
+          240
+        ],
+        "size": [
+          261,
+          250
+        ],
+        "view_size": [
+          261,
+          250
+        ],
+        "viewport": [
+          5,
+          5,
+          245,
+          240
+        ]
+      },
+      "restored_focus": "ocrTranslationEditor"
+    },
+    {
+      "width": 500,
+      "hidden_on_image": true,
+      "language_popup": {
+        "font_family": "DejaVu Sans",
+        "font_height": 19,
+        "font_pixels": 16,
+        "max_visible": 8,
+        "rows": [
+          [
+            0,
+            0,
+            265,
+            30
+          ],
+          [
+            0,
+            30,
+            265,
+            30
+          ],
+          [
+            0,
+            60,
+            265,
+            30
+          ],
+          [
+            0,
+            90,
+            265,
+            30
+          ],
+          [
+            0,
+            120,
+            265,
+            30
+          ],
+          [
+            0,
+            150,
+            265,
+            30
+          ],
+          [
+            0,
+            180,
+            265,
+            30
+          ],
+          [
+            0,
+            210,
+            265,
+            30
+          ],
+          [
+            0,
+            240,
+            265,
+            30
+          ]
+        ],
+        "scroll_max": 1,
+        "scroll_page": 8,
+        "scrollbar": [
+          270,
+          5,
+          6,
+          240
+        ],
+        "size": [
+          281,
+          250
+        ],
+        "view_size": [
+          281,
+          250
+        ],
+        "viewport": [
+          5,
+          5,
+          265,
+          240
+        ]
+      },
+      "restored_focus": "ocrTranslationEditor"
+    },
+    {
+      "width": 619,
+      "hidden_on_image": true,
+      "language_popup": {
+        "font_family": "DejaVu Sans",
+        "font_height": 19,
+        "font_pixels": 16,
+        "max_visible": 8,
+        "rows": [
+          [
+            0,
+            0,
+            384,
+            30
+          ],
+          [
+            0,
+            30,
+            384,
+            30
+          ],
+          [
+            0,
+            60,
+            384,
+            30
+          ],
+          [
+            0,
+            90,
+            384,
+            30
+          ],
+          [
+            0,
+            120,
+            384,
+            30
+          ],
+          [
+            0,
+            150,
+            384,
+            30
+          ],
+          [
+            0,
+            180,
+            384,
+            30
+          ],
+          [
+            0,
+            210,
+            384,
+            30
+          ],
+          [
+            0,
+            240,
+            384,
+            30
+          ]
+        ],
+        "scroll_max": 1,
+        "scroll_page": 8,
+        "scrollbar": [
+          389,
+          5,
+          6,
+          240
+        ],
+        "size": [
+          400,
+          250
+        ],
+        "view_size": [
+          400,
+          250
+        ],
+        "viewport": [
+          5,
+          5,
+          384,
+          240
+        ]
+      },
+      "restored_focus": "ocrTranslationEditor"
+    },
+    {
+      "width": 620,
+      "hidden_on_image": true,
+      "language_popup": {
+        "font_family": "DejaVu Sans",
+        "font_height": 19,
+        "font_pixels": 16,
+        "max_visible": 8,
+        "rows": [
+          [
+            0,
+            0,
+            385,
+            30
+          ],
+          [
+            0,
+            30,
+            385,
+            30
+          ],
+          [
+            0,
+            60,
+            385,
+            30
+          ],
+          [
+            0,
+            90,
+            385,
+            30
+          ],
+          [
+            0,
+            120,
+            385,
+            30
+          ],
+          [
+            0,
+            150,
+            385,
+            30
+          ],
+          [
+            0,
+            180,
+            385,
+            30
+          ],
+          [
+            0,
+            210,
+            385,
+            30
+          ],
+          [
+            0,
+            240,
+            385,
+            30
+          ]
+        ],
+        "scroll_max": 1,
+        "scroll_page": 8,
+        "scrollbar": [
+          390,
+          5,
+          6,
+          240
+        ],
+        "size": [
+          401,
+          250
+        ],
+        "view_size": [
+          401,
+          250
+        ],
+        "viewport": [
+          5,
+          5,
+          385,
+          240
+        ]
+      },
+      "restored_focus": "ocrTranslationEditor"
+    },
+    {
+      "width": 760,
+      "hidden_on_image": true,
+      "language_popup": {
+        "font_family": "DejaVu Sans",
+        "font_height": 19,
+        "font_pixels": 16,
+        "max_visible": 8,
+        "rows": [
+          [
+            0,
+            0,
+            525,
+            30
+          ],
+          [
+            0,
+            30,
+            525,
+            30
+          ],
+          [
+            0,
+            60,
+            525,
+            30
+          ],
+          [
+            0,
+            90,
+            525,
+            30
+          ],
+          [
+            0,
+            120,
+            525,
+            30
+          ],
+          [
+            0,
+            150,
+            525,
+            30
+          ],
+          [
+            0,
+            180,
+            525,
+            30
+          ],
+          [
+            0,
+            210,
+            525,
+            30
+          ],
+          [
+            0,
+            240,
+            525,
+            30
+          ]
+        ],
+        "scroll_max": 1,
+        "scroll_page": 8,
+        "scrollbar": [
+          530,
+          5,
+          6,
+          240
+        ],
+        "size": [
+          541,
+          250
+        ],
+        "view_size": [
+          541,
+          250
+        ],
+        "viewport": [
+          5,
+          5,
+          525,
+          240
+        ]
+      },
+      "restored_focus": "ocrTranslationEditor"
+    }
+  ]
+}

@@ -10,7 +10,7 @@ use super::{
     jobs::{Completion, Jobs, Response, Task},
 };
 use crate::{
-    backend::wayland::window::{
+    backend::window::{
         self, WindowAction, WindowContent, WindowCursor, WindowEvent, WindowSpec, WindowWake,
     },
     ui::{

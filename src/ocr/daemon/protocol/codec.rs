@@ -36,7 +36,10 @@ impl Body {
     }
 
     pub(super) fn path(&mut self, v: &Path) {
+        #[cfg(target_os = "linux")]
         self.bytes(v.as_os_str().as_bytes());
+        #[cfg(target_os = "windows")]
+        self.str(&v.to_string_lossy());
     }
 
     pub(super) fn state(&mut self, state: &EngineState) {
@@ -128,7 +131,14 @@ impl<'a> Cursor<'a> {
     }
 
     pub(super) fn path(&mut self) -> Result<PathBuf, ProtoError> {
-        Ok(PathBuf::from(OsStr::from_bytes(self.bytes()?)))
+        #[cfg(target_os = "linux")]
+        {
+            Ok(PathBuf::from(OsStr::from_bytes(self.bytes()?)))
+        }
+        #[cfg(target_os = "windows")]
+        {
+            Ok(PathBuf::from(self.string()?))
+        }
     }
 
     pub(super) fn state(&mut self) -> Result<EngineState, ProtoError> {

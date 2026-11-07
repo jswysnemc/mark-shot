@@ -14,10 +14,10 @@ impl Format {
     /// 【文字识别】【格式名称】返回当前导出格式的界面名称
     pub fn label(self) -> &'static str {
         match self {
-            Self::Tsv => "Spreadsheet (TSV)",
-            Self::Csv => "CSV",
-            Self::Markdown => "Markdown",
-            Self::Html => "HTML",
+            Self::Tsv => "Copy as spreadsheet (TSV)",
+            Self::Csv => "Copy as CSV",
+            Self::Markdown => "Copy as Markdown",
+            Self::Html => "Copy as HTML",
         }
     }
 }

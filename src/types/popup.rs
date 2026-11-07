@@ -23,6 +23,9 @@ pub enum PopupEvent {
         y: f64,
     },
     Leave,
+    Scroll {
+        delta: (f64, f64),
+    },
     Button {
         x: f64,
         y: f64,

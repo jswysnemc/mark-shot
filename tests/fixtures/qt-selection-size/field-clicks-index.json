@@ -1,0 +1,43 @@
+{
+  "sources": {
+    "selection_aspect/selection_size_panel.cpp": "1911a2f156b1ec3839594168dfcae43f68d2e8ce61923c888ddc4c64eb4fbce5",
+    "selection_aspect/selection_size_panel.h": "e733ac06631297c94608c41ad168a078f5f51c604772316d1cefde0560fa9e84",
+    "selection_aspect/selection_size_field.cpp": "3994009041a0debcca7e0a64ba41137fe3a6a663c4943eb2f0240f2587f215fc",
+    "selection_aspect/selection_size_field.h": "e23d02e6a86c29f94ab08bb9a11a756c8be462d8cdf99e9b231b29f1dc8deb1b",
+    "selection_aspect/selection_ratio_popup.cpp": "342ff138fd1183cc825c70dc7f407b16c8d64e185a2aab1b6841448d3b2a670a",
+    "selection_aspect/selection_ratio_popup.h": "79d6b0018051ff2362ea63036f58f3977ef6f6e2a096323baac52900a64cef86",
+    "selection_aspect/selection_hud_layout.cpp": "d67bfa4a10dc043eacbdce7c3b8acfb4112d35ad363e59e11b42062f9b41c5e6",
+    "selection_aspect/selection_hud_layout.h": "d3494006faeef1fd1ae1bdff5c7d981a08869a764073ef36e52ae07e8d146ccd",
+    "selection_aspect/selection_hud_painter.cpp": "7d88741c2fc7b098120482358c015cdeda58b0d86fa487515c7758402524453d",
+    "selection_aspect/selection_hud_painter.h": "8a72751e52524910595bf0826ad3b38561f9cecc926fa4b77870db156e97f422",
+    "selection_aspect/selection_hud_colors.cpp": "b0af2c8898f38295d7e50878020a74526ded14a9e9f44e346d91a7528f6c3750",
+    "selection_aspect/selection_hud_colors.h": "83437efee29b7a4dfec01439f564651feb4d3a92207b3c6a399d0d684bfded49",
+    "selection_aspect/selection_aspect_ratio.cpp": "d2c54e3fe2cc7fbf22820ef8ad7c536f2477e1e7b11d35b320dc2d194709af09",
+    "selection_aspect/selection_aspect_ratio.h": "5674198b62d44338dc4a1cefd4245050ac0a4746c35236e42fbcca8a5bf23498",
+    "ui/theme.cpp": "2d4aa9e3c2c37a912a687f10b9d8028dfe6b44b686c07f1644705fb74ba05c69",
+    "ui/theme.h": "0c70dcc15a811cac820acdfef8a8552c146aed866418b0b657561dc6beab02e9",
+    "ui/toolbar_palette.cpp": "376228794625827faf5cdf0749cd05bbacf65bada3b72fae2807c1485d3efa5b",
+    "ui/toolbar_palette.h": "7dfd04f2db7ac2301fa05ea3ea864d3c1fdd49b33f25cfeba34824ccc7b26547",
+    "crates/shot-geometry/src/types.rs": "29ea13bc9fbdc657b66f805746b9735b99b92908493bf80999e31b69ddcd1ee1",
+    "crates/shot-geometry/src/selection.rs": "1a3f0b92a759b2cc1dd93751fed5dc0fd33a87042db6c2ee91b36173eeb740bb",
+    "qt/bridge/geometry_bridge.h": "367236b418adcaeec663d9463553e2763ef44ef84eaeab5c4c662c32fbbb890e"
+  },
+  "harness": "d95dfa8e6ea33d2b31dd5d505e904875d599381a2688b9232431f5debcf0f05b",
+  "harness_sources": {
+    "field_navigation.cpp": "d95dfa8e6ea33d2b31dd5d505e904875d599381a2688b9232431f5debcf0f05b",
+    "field_probe.cpp": "bc78c5d5e91fb61e17f53fe0e73655e67396c18b6bdd94369080e6a16ae61077",
+    "field_click_sequences.cpp": "1e8be54770acb7b74d6434426c2759268b0f4ff2d6bf81c00a9a4c90140468ca",
+    "field_probe.h": "4eb9c568bca12989348ca20bba61c391a81f7799d2560d799aeffcc3bd34b264"
+  },
+  "binary": "79dd1002c766a8c3bc61fa06e1ee418fa3adae949f7c6f7c8bb88c1549ff9be4",
+  "reference": "80bcc74cfb3dfa8bd026b94bc767956346d6458cd71a61ae5714b5183ec3e8da",
+  "rust_reference_library": "2bc8c0fddcaa7b65a2dcdc37b127c4d9e0c061fe9834a7120326c9451b67f174",
+  "qt": "6.12.0",
+  "font": "Noto Sans",
+  "dpi": 96,
+  "counts": {
+    "sequences": 200
+  },
+  "renders": {},
+  "field-clicks.json": "1b47c3e1da5dfb5a5eb3d296c9ae487d1553c95b612c747e4dac3f375c9ba795"
+}

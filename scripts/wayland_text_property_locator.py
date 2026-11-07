@@ -44,10 +44,10 @@ def font_button(image):
 
 def font_popup(image):
     """【文字属性测试】【弹层边框】由 image 的搜索边框或真实字号输入底板返回弹层矩形，拒绝填充色块和其他面板"""
-    found = [rect for rect, count in components(image, lambda pixel: pixel[1] > 165 and pixel[1] - pixel[0] > 95 and pixel[2] - pixel[0] > 75)
+    found = [rect for rect, count in components(image, lambda pixel: pixel[1] > 120 and pixel[1] - pixel[0] > 30 and pixel[2] - pixel[0] > 25)
              if 342 <= rect[2] - rect[0] <= 350 and 24 <= rect[3] - rect[1] <= 30 and 500 <= count <= 1400]
     if not found:
-        fields = [rect for rect, count in components(image, lambda pixel: min(pixel) >= 245 and max(pixel) - min(pixel) <= 2)
+        fields = [rect for rect, count in components(image, lambda pixel: (232 <= min(pixel) <= 245 and max(pixel) - min(pixel) <= 7) or (25 <= min(pixel) <= 65 and max(pixel) - min(pixel) <= 16))
                   if 282 <= rect[2] - rect[0] <= 288 and 21 <= rect[3] - rect[1] <= 26 and 4500 <= count <= 7800]
         if len(fields) == 1:
             left, top, _right, _bottom = fields[0]

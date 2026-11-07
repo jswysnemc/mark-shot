@@ -7,6 +7,7 @@ pub enum CursorIcon {
     Default,
     Crosshair,
     Pointer,
+    Progress,
     Text,
     Grab,
     Grabbing,

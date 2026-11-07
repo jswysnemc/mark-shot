@@ -1,10 +1,12 @@
 pub mod capture;
 pub mod clipboard;
 pub mod keysym;
+pub(crate) mod niri;
 pub mod overlay;
 pub mod overlay_popup;
 mod overlay_popup_input;
 pub mod pin;
 pub mod text_input;
+mod theme_notifications;
 pub mod utils;
 pub mod window;

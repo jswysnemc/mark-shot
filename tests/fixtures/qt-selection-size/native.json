@@ -1,0 +1,12 @@
+{
+  "field": {
+    "serial": 1,
+    "active": true,
+    "cursor": 3,
+    "anchor": 0,
+    "text": "640",
+    "hint": 7,
+    "purpose": 0
+  },
+  "qt_binary_sha256": "122815db06478be81a3cb59eceb49801161ecfb5275ae4468a2094791cc656e7"
+}

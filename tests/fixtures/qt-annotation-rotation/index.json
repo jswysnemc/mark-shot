@@ -1,0 +1,28 @@
+{
+  "sources": {
+    "shot_window_internal.cpp": "7dfb3071a6f507a919496b23bf78dd2fd1bcf80321f714c8883fe362ab381dce",
+    "annotation/rotation_drag.cpp": "086325bfe30fc9380e56e6ac5e561a6d880063e0ec4140cbb28b859dd58d08ae",
+    "shot_window_annotation_editing.cpp": "598a863a3f157b2d6a8e284938a2411598ef07e6e80924df29a98dc3456734ca",
+    "shot_window_selection_frame.cpp": "bb7c5f02e3dbe2481d0212ee553f1e8ae11baf73887adad8c36308d2674fb2c1"
+  },
+  "functions": {
+    "normalizedRotationDegrees": "b50d7a7840928e05ab36edcf39cabf1299558beacdbd8eab9c8197711048b6c7",
+    "rotationDragDegrees": "b551e7fd096856fc2fc279b6590fd29b0e863dcf0565fc2f37d2848af324f639",
+    "snappedRotationDegrees": "203e7c0456354387c56db756d71739791a132f0e8b8e8f1d6c70273d6a912ea1",
+    "ShotWindow::clampImagePoint": "d48479badf8cbaec858ab0ccff45f390b24242e15b73152cb15dcef6813afcc6",
+    "ShotWindow::resizedBounds": "9cf7995ed9ffd21d2b4d8b389a0437132fd6990efa2513dd8315bcd9aa7c4439"
+  },
+  "harness": {
+    "probe.h": "971c2e317a52e9e3be99ea99524ef82070cc36299a47729681ca8c1fffddd3f7",
+    "reference.cpp": "5b149c47d2a1368a303809137e8020a2a394634d3bfdd14f4f82bd577cc7fcab"
+  },
+  "binary": "d17ba3d96541d4a58588465f172502156fb98a08c5865f20f446672a84e235b3",
+  "reference": "c1b2cb9f5e72b8b9dc8843a617f9e04a53845c558403bef167f231549d5c052e",
+  "counts": {
+    "angles": 18,
+    "drags": 72,
+    "resize": 384
+  },
+  "qt": "6.12.0",
+  "fixture_sha256": "f42a2ff4091a8aed1c11778b247e7e49331ee5edb14b0fcfb03733cafd858102"
+}

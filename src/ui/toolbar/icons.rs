@@ -1,7 +1,7 @@
 //! 【截图工具栏】【图标映射】使用原版 SVG 路径，不另造工具图标
 
 use super::{Integration, ToolbarButton};
-use crate::{theme::Rgba, ui::icons};
+use crate::ui::icons;
 
 pub const CLEAR: &str = include_str!("../../../assets/icons/mark-shot/clear.svg");
 pub const UNDO: &str = include_str!("../../../assets/icons/mark-shot/undo.svg");
@@ -39,9 +39,3 @@ pub fn icon(button: ToolbarButton) -> &'static str {
         },
     }
 }
-
-pub const ACTIVE_FILL: Rgba = Rgba(153, 246, 228, 78);
-pub const ACTIVE_BORDER: Rgba = Rgba(153, 246, 228, 150);
-pub const HOVER_FILL: Rgba = Rgba(45, 212, 191, 255);
-pub const HOVER_INK: Rgba = Rgba(26, 24, 20, 255);
-pub const SEPARATOR: Rgba = Rgba(148, 163, 184, 70);
