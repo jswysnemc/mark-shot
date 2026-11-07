@@ -60,11 +60,11 @@ def emphasis(image):
     return sum(pixel[0] < 70 and pixel[1] > 100 and pixel[2] > 70 and pixel[1] - pixel[0] > 60 for pixel in image.get_flattened_data())
 
 
-def verify(binary, environment, root, explicit):
-    """【组件主题回归】【旧配置矩阵】以binary检查explicit指定的主题模式、首帧与真实模型面板，返回恢复和导出证据"""
+def verify(binary, environment, root, explicit, legacy=LEGACY):
+    """【组件主题回归】【旧配置矩阵】以binary检查explicit指定主题及legacy配色的首帧与模型面板，返回恢复证据"""
     root.mkdir()
     config = root / "config.toml"
-    config.write_text('[general]\noverlay="window"\nto=""\n[notifications]\nenabled=false\n[history]\nenabled=false\n' + ('[ui]\ntheme="light"\n' if explicit else '') + LEGACY)
+    config.write_text('[general]\noverlay="window"\nto=""\n[notifications]\nenabled=false\n[history]\nenabled=false\n' + ('[ui]\ntheme="light"\n' if explicit else '') + legacy)
     source = root / "source.png"
     Image.new("RGBA", (500, 320), (205, 205, 205, 255)).save(source)
     with INPUT.launch(binary, environment, config, source, root, "editor") as (process, log):
@@ -79,7 +79,11 @@ def verify(binary, environment, root, explicit):
         model = snapshot(root, "model-guide-light")
         changed = ImageChops.difference(properties, model).getbbox()
         assert changed and bright(model, changed) > 12000, "the OCR model download guide still uses its old dark background"
-        assert emphasis(model) > emphasis(properties) + 50, "model guide emphasis text still uses transparent background colors"
+        # 1. 【组件主题回归】【新增字形】窄屏弹层会覆盖原有绿色工具按钮，只统计新出现的强调像素，不比较整屏总量
+        accent = lambda pixel: pixel[0] < 70 and pixel[1] > 100 and pixel[2] > 70 and pixel[1] - pixel[0] > 60
+        new_emphasis = sum(accent(after) and not accent(before)
+                           for before, after in zip(properties.get_flattened_data(), model.get_flattened_data()))
+        assert new_emphasis > 50, "model guide emphasis text still uses transparent background colors"
         before = model.copy()
         toggle(config, "dark", session.key, session.screenshot)
         dark = snapshot(root, "model-guide-dark")
@@ -104,6 +108,9 @@ def run(binary, root):
         with session.input_context(), FLOW.NAV.SIZE.pointer_context():
             session.sway.keyboard_ready()
             report = {"binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(), "cases": [verify(binary, environment, root / name, explicit) for name, explicit in [("explicit", True), ("default", False)]]}
+            earlier = LEGACY.replace("#0F1117E6", "#1E2124FA").replace("#E5E7EB", "#E5EDEF")
+            for name, explicit in [("earlier-explicit", True), ("earlier-default", False)]:
+                report["cases"].append(verify(binary, environment, root / name, explicit, earlier))
     finally:
         os.environ.clear()
         os.environ.update(previous)

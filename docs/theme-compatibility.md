@@ -36,6 +36,34 @@ release 同构建的七组私有流程和 1,363 项工作区测试通过，候�
 原版角色样本为 `tests/fixtures/qt-theme.json`，配置、继承与旧模板迁移回归位于
 `src/config/tests/interface_theme.rs`。这些数值与状态对照不能证明整个界面逐像素一致。
 
+## 更早全局默认色兼容
+
+后续发现组件级旧背景 `#1E2124FA` 可以继承主题，但全局 `[theme]` 的相同值却保留为
+自定义深色。`src/config/legacy_theme.rs` 现在提供共用历史色表，全局与组件采用同一规则。
+TOML和JSON单测覆盖明暗启动、保存重开、只差一个通道的自定义颜色及标注色保留。
+按颜色值识别历史默认值无法区分用户刻意设置的相同颜色，这与已有组件迁移策略一致；
+其他显式颜色仍然保留，不迁移正文与导出颜色。
+
+旧文件在 `target/legacy-role-red-r1/earlier-explicit` 实际首帧仍深色而失败。
+候选 `target/legacy-role-candidate-r1/mark-shot`，SHA-256
+`c2d9b53ffb785bc148cd08dc5df294690caadf4dfb84d7c925e1a46871816936`，
+通过 `target/legacy-role-green-r1/result.json` 与 `target/legacy-role-scale-r2/result.json`：
+一倍和一点五倍下，两代旧配色、显式浅色及默认浅色四组均验证首帧、属性、模型面板和完整主题恢复。
+同文件的字体滚动、搜索、外部主题刷新、正文保持和原图导出通过
+`target/legacy-role-font-r2/result.json`。
+字体测试现先等待实际主题变更，再分离光标相位；窄屏模型标题检测使用新增强调字形，
+避免把被弹层遮挡的绿色工具按钮总量减少误报为文字透明，仍保留可见字形断言。
+工作区1,376项通过、19项忽略，Python227项通过，两平台严格Clippy及格式检查通过。
+
+Windows后续同构建像素矩阵为 `target/windows-legacy-theme-r1/workflow.json`，EXE摘要
+`47e4365eb737f1815b6ab2cb883e40234c76e1f0b3a61c29cecba2948a865452`。
+五次独立启动比较当前浅/深默认、旧全局及组件配色的浅/深模式，以及未指定模式的旧配置；
+旧配置完整窗口帧与对应默认帧逐像素相同，未指定模式精确匹配浅色。
+每次复制的透明原图RGBA不变，启动没有修改配置文本。
+旧候选在 `target/windows-legacy-theme-red-r1` 明确因旧浅色帧不同失败。
+验证只使用私有Wine/Xvfb，脚本为 `windows-legacy-theme.py` 与 `windows_legacy_checks.py`，
+不能替代真实Windows主题、字体和混合DPI矩阵。
+
 2026-11-05 的实际主窗口验证使用本地二进制
 `bb53a056a8e0d57795eb0e5b82fbb4be441eaf1fb4c7bb2789ba8c24e951d356`。
 私有 Sway 与隔离 niri 都执行默认浅色、切换深色、恢复浅色，并独立读取保存后的

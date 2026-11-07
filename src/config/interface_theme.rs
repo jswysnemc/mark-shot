@@ -150,7 +150,10 @@ pub(super) fn is_builtin(name: &str, color: crate::theme::Rgba) -> bool {
         ),
         _ => return false,
     };
-    color == first || color == second || color == legacy
+    color == first
+        || color == second
+        || color == legacy
+        || super::legacy_theme::contains(name, color)
 }
 
 /// 【主题配置】【单项更新】按 path 原子保存 mode，保留未知配置、注释和其他业务字段，返回写入结果

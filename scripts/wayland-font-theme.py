@@ -61,6 +61,22 @@ def stable(process, root, name):
     raise AssertionError(f"font popup did not reach identical full frames: {name}")
 
 
+def external_frame(process, root, name, before, mode):
+    """【字体主题回归】【外部呈现】按before与mode等待真实主题变更后检查process稳定帧，root/name保存证据，不重发配置或输入"""
+    deadline = time.monotonic() + 6
+    path = root / (name + "-transition.png")
+    while time.monotonic() < deadline:
+        session.screenshot(path)
+        with Image.open(path) as frame:
+            current = frame.convert("RGB")
+        changed = sum((sum(a) - sum(b) if mode == "dark" else sum(b) - sum(a)) > 300
+                      for a, b in zip(before.get_flattened_data(), current.get_flattened_data()))
+        if changed >= 500:
+            return stable(process, root, name)
+        time.sleep(0.03)
+    raise AssertionError(f"external {mode} theme did not reach the visible font window")
+
+
 def equal(first, second, name):
     """【字体主题回归】【完整恢复】逐像素比较first、second，name标识动作，差异立即失败，无返回值"""
     difference = ImageChops.difference(first, second).getbbox()
@@ -159,10 +175,10 @@ def run(binary, root):
                 equal(searched, stable(process, root, "search-restored"), "font search and document")
                 # 3. 【字体主题回归】【外部更新】另一进程保存后保持当前搜索和正文，没有输入事件协助刷新
                 external_save(config, "dark")
-                external_dark = stable(process, root, "external-search-dark")
+                external_dark = external_frame(process, root, "external-search-dark", searched, "dark")
                 assert ImageChops.difference(searched, external_dark).getbbox() is not None
                 external_save(config, "light")
-                equal(searched, stable(process, root, "external-search-restored"), "external font theme and search")
+                equal(searched, external_frame(process, root, "external-search-restored", external_dark, "light"), "external font theme and search")
                 click(button)
                 session.key("ctrl+a")
                 session.key("ctrl+c")

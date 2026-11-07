@@ -30,6 +30,7 @@ macro_rules! section {
 }
 
 mod component_theme;
+mod legacy_theme;
 mod values;
 pub use values::*;
 mod sections;
