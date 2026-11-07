@@ -343,9 +343,11 @@ fn old_accept_and_save_always_become_to() {
             \n\
             [keys]\n\
             accept = \"Space\"\n";
-    let config = read(&migrate(old).unwrap());
-    assert_eq!(config.general.to, Outputs::parse("ps").unwrap());
-    assert_eq!(config.keys.0["accept"].chords(), ["Space"]);
+    for old in [old.to_owned(), old.replace('\n', "\r\n")] {
+        let config = read(&migrate(&old).unwrap());
+        assert_eq!(config.general.to, Outputs::parse("ps").unwrap());
+        assert_eq!(config.keys.0["accept"].chords(), ["Space"]);
+    }
 }
 
 #[test]

@@ -243,8 +243,7 @@ pub(super) const OLD_GENERAL_COMMENTS: &[&str] = &[
     "# c (copy), p (pin), s(save), in any order",
 ];
 
-// honestly more of a temp solution
-// i want to make a better migration system, but i guess it will be implemented later
+/// 【配置迁移】【旧输出选项】按text合并accept与save_always，返回迁移文本；已有to或无需迁移时返回空值
 pub(super) fn migrate(text: &str) -> Option<String> {
     let mut section = "";
     let mut drop = Vec::new();
@@ -284,7 +283,9 @@ pub(super) fn migrate(text: &str) -> Option<String> {
     });
     to.save |= save_always.unwrap_or(true);
 
-    let comments = TEMPLATE
+    // 1. 【配置迁移】【平台换行】Windows检出的内置模板可能含CRLF，提取注释前统一换行，不依赖构建宿主
+    let template = TEMPLATE.replace("\r\n", "\n");
+    let comments = template
         .split_once("[general]\n")?
         .1
         .split_once("\nto = ")?
