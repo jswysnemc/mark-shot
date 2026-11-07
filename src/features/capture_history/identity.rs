@@ -1,9 +1,6 @@
 //! 【截图历史】【文件身份】严格文件标识、UTC 时间与唯一名称
 
-use std::{
-    fs::File,
-    io::{self, Read},
-};
+use std::io;
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 
@@ -44,7 +41,7 @@ pub(crate) fn next(now: DateTime<Utc>, previous: Option<DateTime<Utc>>) -> io::R
         return Err(io::Error::other("history timestamp is out of range"));
     }
     let mut random = [0_u8; 16];
-    File::open("/dev/urandom")?.read_exact(&mut random)?;
+    getrandom::fill(&mut random).map_err(|error| io::Error::other(error.to_string()))?;
     random[6] = random[6] & 0x0f | 0x40;
     random[8] = random[8] & 0x3f | 0x80;
     let id: String = random.iter().map(|byte| format!("{byte:02x}")).collect();

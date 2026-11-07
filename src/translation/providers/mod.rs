@@ -66,16 +66,13 @@ fn batches(segments: &[Segment], limit: usize) -> Vec<&[Segment]> {
 
 /// 【翻译服务】【请求随机数】返回十六个系统随机字节，无参数；失败不以时间或进程编号代替随机数
 fn random() -> Result<[u8; 16]> {
-    use std::io::Read;
     let mut value = [0; 16];
-    std::fs::File::open("/dev/urandom")
-        .and_then(|mut file| file.read_exact(&mut value))
-        .map_err(|_| {
-            super::Error::new(
-                super::ErrorKind::StartFailed,
-                "cannot generate translation request salt",
-            )
-        })?;
+    getrandom::fill(&mut value).map_err(|_| {
+        super::Error::new(
+            super::ErrorKind::StartFailed,
+            "cannot generate translation request salt",
+        )
+    })?;
     Ok(value)
 }
 

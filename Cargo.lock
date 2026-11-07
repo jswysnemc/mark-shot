@@ -2221,6 +2221,7 @@ dependencies = [
  "crc32fast",
  "dirs",
  "futures",
+ "getrandom 0.3.4",
  "hmac-sha256",
  "i_overlay",
  "image",
