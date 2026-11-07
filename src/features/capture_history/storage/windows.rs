@@ -4,16 +4,18 @@ use super::identity;
 use std::{
     fs::{self, File, OpenOptions},
     io,
-    os::windows::{ffi::OsStringExt, fs::OpenOptionsExt, io::AsRawHandle},
+    os::windows::fs::OpenOptionsExt,
     path::{Path, PathBuf},
     time::Duration,
 };
 use windows_sys::Win32::Storage::FileSystem::{
     FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ, FILE_SHARE_WRITE,
-    GetFinalPathNameByHandleW,
 };
+#[path = "windows_path.rs"]
+mod windows_path;
 pub(super) struct Directory {
-    file: File,
+    _file: File,
+    path: PathBuf,
 }
 impl Directory {
     /// 【Windows截图历史】【目录打开】按create创建path并固定原生目录身份，返回可选范围，拒绝末级重解析点
@@ -35,23 +37,12 @@ impl Directory {
         if !file.metadata()?.is_dir() || file.metadata()?.file_attributes() & 0x400 != 0 {
             return Err(io::Error::other("invalid history directory"));
         }
-        Ok(Some(Self { file }))
+        let path = windows_path::resolve(&file)?;
+        Ok(Some(Self { _file: file, path }))
     }
     /// 【Windows截图历史】【句柄路径】无参数，返回系统确认的当前目录路径，目录存活期间禁止重命名或删除
     pub fn path(&self) -> PathBuf {
-        let mut buffer = vec![0_u16; 32768];
-        let count = unsafe {
-            GetFinalPathNameByHandleW(
-                self.file.as_raw_handle(),
-                buffer.as_mut_ptr(),
-                buffer.len() as u32,
-                0,
-            )
-        } as usize;
-        if count == 0 || count >= buffer.len() {
-            return PathBuf::new();
-        }
-        PathBuf::from(std::ffi::OsString::from_wide(&buffer[..count]))
+        self.path.clone()
     }
     /// 【Windows截图历史】【串行锁】无参数，返回固定目录内普通文件锁，等待最多一秒，不接受重解析目标
     pub fn lock(&self) -> io::Result<crate::utils::fs_lock::Lock> {
