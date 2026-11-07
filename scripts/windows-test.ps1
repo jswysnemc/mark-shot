@@ -44,6 +44,7 @@ try {
     Invoke-UnitTests 'image-stitch' @('-p', 'shot-image', '-p', 'shot-stitch')
     $groups = @(
         'backend::windows::native::',
+        'backend::windows::clipboard::image_tests::',
         'config::tests::',
         'features::capture_history::tests::storage::',
         'ui::file_picker::save::tests::',

@@ -35,15 +35,19 @@ ZIP 为 26,900,191 字节。解压位置为
 
 ## 同一远端产物的实际回归
 
-直接运行下载的 EXE，没有用本地构建替代。私有 Wine/Xvfb 两组流程通过：
+直接运行下载的 EXE，没有用本地构建替代。私有 Wine/Xvfb 三类流程通过：
 
 - `target/windows-ci-final-basic-r1/workflow.json`：显示器发现、区域捕获精确像素、
   编辑器明暗恢复、首次 OCR 引导、画笔、保存与剪贴板一致、基本贴图复制
 - `target/windows-ci-final-pin-r1/workflow.json`：菜单按下和释放事务、无损旋转、
   缩放保留原件、外部配置刷新、另存为取消与保存、编辑交接和窗口回收
+- `target/windows-ci-final-ocr-r2/workflow.json`：空模型目录首次引导、正式地址下载三项模型并验证
+  完整 SHA-256、下载后自动推理与独立结果交接、Unicode 剪贴板、撤销重做、原图页签、
+  最小窗口及二次模型复用；独立结果窗口在外部原子保存主题后自动刷新，浅色标题栏精确恢复，正文不变
 
-这两组实际 GUI 证据仍属于 Wine，不代表真实 Windows 11 多显示器、输入法、帧率或内存验收。
-完整真实 OCR 下载与推理证据仍绑定早先 R3，见 `windows-platform-workflow.md`，未移记到本次产物。
+这些实际 GUI 证据仍属于 Wine，不代表真实 Windows 11 多显示器、输入法、帧率或内存验收。
+OCR 首轮完整流程为同目录 `windows-ci-final-ocr-r1`；第二轮增加独立主题断言后重新下载、推理和编辑，
+没有复用旧 R3 证据。MiSans VF 与 MiSans L3 仅安装在测试前缀，摘要记录于报告，未加入产品包。
 
 ## CI 中实际发现并修复的问题
 

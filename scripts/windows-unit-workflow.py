@@ -14,6 +14,7 @@ from windows_test_runtime import run
 
 GROUPS = [
     "backend::windows::native::",
+    "backend::windows::clipboard::",
     "config::tests::",
     "features::capture_history::tests::storage::",
     "ui::file_picker::save::tests::",

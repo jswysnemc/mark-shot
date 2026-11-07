@@ -4,6 +4,7 @@ import time
 
 from wayland_ocr_window_layout import tab_point
 from windows_ocr_actions import click, copy_all, key, rectangle, set_clipboard, snapshot, xdo
+from windows_ocr_theme_checks import check as check_theme
 
 
 def result_checks(binary, probe, environment, root, identity, recognized, has_table=False):
@@ -38,6 +39,7 @@ def result_checks(binary, probe, environment, root, identity, recognized, has_ta
     snapshot(environment, root, "narrow-result")
     xdo(environment, "windowsize", "--sync", identity, bounds["width"], bounds["height"])
     copy_all(probe, environment, root, identity, "restored-text", edited)
+    theme = check_theme(probe, environment, root, identity, edited)
     return {"unicode_clipboard": True, "clipboard_provider_seconds": provider_seconds,
             "undo_redo": True, "source_tab_preserves_text": True,
-            "minimum_client_size": narrow, "edited_text": edited}
+            "minimum_client_size": narrow, "edited_text": edited, "theme": theme}

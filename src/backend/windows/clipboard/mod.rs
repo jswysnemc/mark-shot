@@ -1,7 +1,11 @@
 //! 【Windows剪贴板】【系统拥有】图片同时提供PNG与DIBV5，文本使用Unicode，进程退出后系统继续持有数据
 
 mod image;
+#[cfg(test)]
+mod image_tests;
 mod memory;
+#[cfg(test)]
+mod system_tests;
 use memory::{Buffer, Opened};
 use windows_sys::Win32::System::DataExchange::RegisterClipboardFormatW;
 
