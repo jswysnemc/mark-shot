@@ -2,6 +2,16 @@
 
 use super::*;
 
+/// 【共享前景测试】【原生介质】创建与Wayland槽位相同的匿名共享内存，返回文件，不依赖临时目录文件系统的打洞支持
+fn shared_file() -> std::fs::File {
+    nix::sys::memfd::memfd_create(
+        c"mark-shot-shm-test",
+        nix::sys::memfd::MFdFlags::MFD_CLOEXEC,
+    )
+    .unwrap()
+    .into()
+}
+
 /// 【共享前景测试】【原生驻留】按bytes读取当前共享映射驻留页，返回页数，不改动映射像素
 #[cfg(target_os = "linux")]
 fn resident(bytes: &[u8]) -> usize {
@@ -20,7 +30,7 @@ fn resident(bytes: &[u8]) -> usize {
 /// 【共享前景测试】【整页与边缘】无参数，真实共享文件写入稀疏前景后保留所有像素及相邻区域，并减少物理驻留，无返回值
 #[test]
 fn sparse_shared_copy_preserves_pixels_and_releases_only_complete_zero_pages() {
-    let file = tempfile::tempfile().unwrap();
+    let file = shared_file();
     let length = 4 * 1024 * 1024;
     file.set_len(length as u64).unwrap();
     let mut map = unsafe {
@@ -48,7 +58,7 @@ fn sparse_shared_copy_preserves_pixels_and_releases_only_complete_zero_pages() {
 /// 【共享前景测试】【通道与损坏】无参数，跨页损坏只修改请求字节，RGBA到BGRA结果与既有复制逐字节相同，无返回值
 #[test]
 fn swizzled_sparse_copy_matches_dense_copy_and_preserves_outside_damage() {
-    let file = tempfile::tempfile().unwrap();
+    let file = shared_file();
     let length = 256 * 1024;
     file.set_len(length as u64).unwrap();
     let mut map = unsafe {
