@@ -197,8 +197,10 @@ pub(super) unsafe extern "system" fn procedure(
         }
         WM_GETMINMAXINFO => {
             let info = unsafe { &mut *(lparam as *mut MINMAXINFO) };
-            info.ptMinTrackSize.x = context.minimum.0 as i32;
-            info.ptMinTrackSize.y = context.minimum.1 as i32;
+            let dpi = unsafe { windows_sys::Win32::UI::HiDpi::GetDpiForWindow(hwnd) };
+            let minimum = super::window_limits::physical(context.minimum, dpi);
+            info.ptMinTrackSize.x = minimum.0;
+            info.ptMinTrackSize.y = minimum.1;
             return 0;
         }
         WM_PAINT => {

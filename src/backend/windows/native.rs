@@ -16,6 +16,8 @@ mod monitors;
 mod wake;
 #[path = "native/window.rs"]
 mod window;
+#[path = "native/window_limits.rs"]
+mod window_limits;
 #[path = "native/window_state.rs"]
 mod window_state;
 

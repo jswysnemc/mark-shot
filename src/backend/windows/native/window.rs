@@ -19,6 +19,7 @@ use windows_sys::Win32::{
 pub struct Options {
     pub title: String,
     pub bounds: Bounds,
+    /// 以96DPI逻辑像素表示的最小客户区尺寸，原生回调按窗口当前DPI换算
     pub minimum: (u32, u32),
     pub topmost: bool,
     pub activate: bool,
