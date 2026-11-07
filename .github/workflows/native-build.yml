@@ -65,6 +65,9 @@ jobs:
       - name: Prepare private test directories
         run: mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
 
+      - name: Pin Qt reference fonts in private fontconfig
+        run: python3 scripts/ci-reference-fonts.py --github-env "$GITHUB_ENV"
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
