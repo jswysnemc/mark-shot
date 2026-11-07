@@ -27,6 +27,7 @@ pub use export::selection_render_info;
 
 mod actions;
 mod delay;
+mod file_canvas_theme;
 mod finish;
 mod image_export;
 mod image_setup;

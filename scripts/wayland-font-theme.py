@@ -114,7 +114,7 @@ def run(binary, root):
     os.environ.update(environment)
     try:
         with session.input_context(), pointer_context(), (root / "process.log").open("w") as log:
-            process = subprocess.Popen([str(binary), "--fullscreen", "--fullscreen-default-tool", "text",
+            process = subprocess.Popen([str(binary), "--fullscreen", "--file-default-tool", "text",
                 "--default-color", "#FF4D4D", "--output", str(root / "export"), str(source)], env=environment, stderr=log)
             try:
                 initial = capture(process, root, "initial")

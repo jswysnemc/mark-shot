@@ -1,4 +1,4 @@
-//! 【截图界面】【主题切换】刷新面板缓存，不修改标注、选择和历史事务
+//! 【截图界面】【主题切换】刷新显示背景和面板缓存，不修改标注、选择和历史事务
 
 use crate::{
     editor::{EditorState, dirty::mark_all_dirty},
@@ -16,6 +16,7 @@ pub(super) fn toggle(state: &mut EditorState, dirty_mask: &mut u32) {
 
 /// 【截图界面】【主题刷新】清理 state 的界面缓存，dirty_mask 返回重绘输出，不修改正文或配置
 pub(super) fn refresh(state: &mut EditorState, dirty_mask: &mut u32) {
+    super::file_canvas_theme::refresh(state, crate::theme::Mode::current());
     // 1. 【截图界面】【缓存失效】图形与原图缓存保留，所有面板重新使用当前主题绘制
     state.toolbar.drawn_look = None;
     state.action_toolbar.drawn_look = None;

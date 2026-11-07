@@ -2,7 +2,7 @@
 
 use super::{Painter, RenderRequest, annotation_stack, annotations};
 use crate::editor::canvas_navigation::transform::ViewTransform;
-use tiny_skia::{Color, Rect};
+use tiny_skia::Rect;
 
 /// 【画布导航】【背景遮罩】按req与view从冻结原图恢复dirty范围并绘制选区外遮罩，无返回值
 fn background(req: &mut RenderRequest<'_>, view: ViewTransform) {
@@ -11,7 +11,7 @@ fn background(req: &mut RenderRequest<'_>, view: ViewTransform) {
     let scale = native * view.scale as f32;
     let transform =
         tiny_skia::Transform::from_translate(-origin.0, -origin.1).post_scale(scale, scale);
-    req.dimmed.fill(Color::from_rgba8(28, 31, 34, 255));
+    req.dimmed.fill(crate::theme::canvas::current().color());
     // 1. 【画布导航】【原图采样】完整输出只在视图或选择变化时重采样，局部重绘复用同一像素网格
     req.frozen_image.draw_transformed(req.dimmed, transform);
     super::background_restore::shade(

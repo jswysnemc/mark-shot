@@ -1,4 +1,4 @@
-use tiny_skia::{Color, Pixmap, PixmapPaint, Rect, Transform};
+use tiny_skia::{Pixmap, Rect};
 
 use super::{Launch, Profiler, init};
 use crate::AppResult;
@@ -71,24 +71,9 @@ fn setup(
 
     // 1. 【图片编辑】【原件预览】原图与预览分开，低分辨率显示器不会降低保存后的图像分辨率
     let file = source(bounds)?;
-    let (width, height) = placement.px_size();
-    let mut preview = Pixmap::new(width, height).ok_or("cannot allocate image preview")?;
-    preview.fill(Color::from_rgba8(28, 31, 34, 255));
-    let factor = file.viewport.width() / file.original.width() as f32 * placement.scale;
-    let transform = Transform::from_scale(factor, factor).post_translate(
-        (file.viewport.left() - bounds.left()) * placement.scale,
-        (file.viewport.top() - bounds.top()) * placement.scale,
-    );
-    file.original.draw_preview(
-        &mut preview,
-        &PixmapPaint {
-            quality: tiny_skia::FilterQuality::Bilinear,
-            ..PixmapPaint::default()
-        },
-        transform,
-    );
-    file.original.release_pages();
-    let preview = crate::types::frozen_pixmap::FrozenPixmap::cached(preview);
+    let preview =
+        super::file_canvas_theme::preview(&file, placement, crate::theme::Mode::current())
+            .ok_or("cannot allocate image preview")?;
     let (canvas, dimmed, annotations) = init::build_layers_with_transparency(&placements, true);
     let image_region = file.viewport;
     let mut editor = EditorState::new(

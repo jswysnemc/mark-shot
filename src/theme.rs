@@ -1,3 +1,4 @@
+pub mod canvas;
 pub(crate) mod config_watch;
 pub mod context_menu;
 mod mode;

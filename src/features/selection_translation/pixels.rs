@@ -105,11 +105,11 @@ impl Region {
         let mut file = file;
         for patch in &self.patches {
             if patch.index.is_some()
-                && image.is_some()
                 && let Some(file) = file.as_ref()
             {
                 let mut preview = patch.original.clone();
-                preview.fill(tiny_skia::Color::from_rgba8(28, 31, 34, 255));
+                // 文件原件已先写回或恢复；显示片段使用当前主题，不能恢复旧主题底色。
+                preview.fill(crate::theme::canvas::current().color());
                 let scale = file.viewport.width() / file.original.width() as f32;
                 let transform = Transform::from_scale(scale * patch.scale.0, scale * patch.scale.1)
                     .post_translate(

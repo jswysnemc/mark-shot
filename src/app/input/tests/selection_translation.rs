@@ -198,7 +198,7 @@ fn translucent_file_preview_matches_fresh_render_and_restores_exact_original() {
     .post_translate(file.viewport.left(), file.viewport.top());
     state.captures[0]
         .pixmap
-        .fill(Color::from_rgba8(28, 31, 34, 255));
+        .fill(crate::theme::canvas::current().color());
     state.captures[0].pixmap.pixmap_mut().draw_pixmap(
         0,
         0,
@@ -214,7 +214,7 @@ fn translucent_file_preview_matches_fresh_render_and_restores_exact_original() {
     let preview = state.captures[0].pixmap.data().to_vec();
     translated(&mut state);
     let mut expected = Pixmap::new(640, 480).unwrap();
-    expected.fill(Color::from_rgba8(28, 31, 34, 255));
+    expected.fill(crate::theme::canvas::current().color());
     expected.draw_pixmap(
         0,
         0,
