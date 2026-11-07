@@ -1,16 +1,57 @@
 # Windows 主应用与原生工作流
 
-Windows 主应用已接入共享截图、编辑与渲染流程。当前 R3 候选在私有 Wine 和不可见 Xvfb
+Windows 主应用已接入共享截图、编辑与渲染流程。此前 R3 候选在私有 Wine 和不可见 Xvfb
 中完成区域截图、明暗主题恢复、画笔标注、保存、系统剪贴板、基本贴图、真实模型下载、
 OCR 推理与独立结果编辑回归。
 这些证据来自 Windows 可执行文件实际运行，不代表真实 Windows 11 的兼容性或性能验证。
 完整 Windows 交互目标仍未完成。
 
+## 当前源码同构建复验
+
+完整三组流程候选为 `target/current-windows-candidate-r1/mark-shot.exe`，44,253,696字节，SHA-256：
+`05bd9e34ddd8c02e644ac132ae077bbe7e1cdb660bad352632dbf28f5f83a829`。
+同目录保存 `DirectML.dll`、`build.json`、`source-manifest.json` 与 `source-inputs.tar.gz`。
+1,198项代码和资产在构建期间记录摘要，构建后再次核对一致；文件清单不包含本地配置和运行模型。
+这份候选包含旧全局主题继承、删除悬停、滚轮锚点及菜单主题快捷键等后续修改。
+
+同一EXE依次通过三个新建私有Wine会话，全部结果绑定上述摘要：
+- `target/current-windows-basic-r1/workflow.json`：区域捕获、编辑明暗恢复、画笔、保存/剪贴板和基本贴图
+- `target/current-windows-pin-r1/workflow.json`：键盘菜单、滚轮位置尺寸恢复、原图像素、外部主题、菜单内快捷键、另存为及编辑交接
+- `target/current-windows-ocr-r1/workflow.json`：正式模型首次下载、真实推理、结果Unicode编辑与撤销、最小窗口、外部主题及模型复用
+
+没有以早期候选的结果替代本次回归。共享删除悬停和旧配置矩阵仍主要来自Linux实测，
+此三组Windows流程不能扩展为全部工具、混合DPI或真实Windows桌面交互已通过。
+
+后续补齐贴图Ctrl+V：与原版及Wayland相同，从剪贴板启动另一张独立贴图，不替换当前图像。
+复用 `--pin-clipboard` 入口，菜单打开时不传递给底层窗口。
+旧候选在 `target/windows-pin-paste-red-r1` 实测无法创建新窗口；修复候选
+`target/windows-pin-paste-candidate-r1/mark-shot.exe`，SHA-256
+`47e4365eb737f1815b6ab2cb883e40234c76e1f0b3a61c29cecba2948a865452`，
+在同构建 `target/windows-pin-paste-green-r1/workflow.json` 验证两个窗口独立、原件逐像素相同、
+关闭新窗口后保留原窗口，以及菜单期间屏蔽粘贴。完整贴图与
+`target/windows-pin-paste-basic-r1/workflow.json` 基础流程通过，Windows严格Clippy与格式检查通过。
+同一文件后续完成 `target/windows-pin-text-r2/workflow.json` 文本贴图验证：英文三行含空行
+生成152×104图像，中文标点及补充平面字符生成192×104图像，实际导出可见字形已检查；
+深浅快捷键确认配置变化后再次复制，原件RGBA逐字节不变，关闭文本子窗后原窗口和原件保持不变。
+私有测试前缀使用MiSans VF及MiSans L3，摘要保存在报告，没有加入产品包。
+空白文本直接执行同一剪贴板入口返回1并明确报告无图像或文本，没有新增窗口。
+这不代表从存活贴图按Ctrl+V遇到空剪贴板时已有可见错误提示；该交互仍未完成。
+
+Windows窗口最小尺寸此前把逻辑值直接交给 `WM_GETMINMAXINFO`，高DPI下未维持布局下限。
+`native/window_limits.rs` 现在按 `GetDpiForWindow` 向上取整转换，零DPI回退96并限制整数边界。
+私有Wine真实窗口消息在120、144、192 DPI分别返回逻辑380×340对应的475×425、570×510、760×680；
+测试明确断言实际DPI，记录位于 `target/windows-dpi-{120,144,192}-r1/program.log`。
+七组73项测试通过、零忽略，Windows严格Clippy通过。
+同一发布构建 `target/windows-dpi-candidate-r1/mark-shot.exe`（SHA-256
+`3adbc364f60e5523dbbf6d561aff8b60d8377d0015d6dca9fea4f1a0cb32c396`）
+通过 `target/windows-dpi-ocr-r1/workflow.json` 和 `target/windows-dpi-pin-r1/workflow.json`。
+这两组应用流程仍使用默认DPI；高DPI证据仅覆盖真实窗口的最小尺寸消息，不代表跨显示器DPI切换矩阵。
+
 ## 候选与源码
 
 | 产物 | 字节数 | SHA-256 |
 | --- | ---: | --- |
-| 当前 `target/windows-platform-candidate-r3/mark-shot.exe` | 44,239,872 | `2f04db4e6cf1bbc0849577541d3c92462a2ba9fb087e4936ff15b0c7a5328cd5` |
+| 此前 `target/windows-platform-candidate-r3/mark-shot.exe` | 44,239,872 | `2f04db4e6cf1bbc0849577541d3c92462a2ba9fb087e4936ff15b0c7a5328cd5` |
 | `target/windows-platform-candidate-r2/mark-shot.exe` | 44,239,872 | `87377e831660db009ac9e1f2bcda15cbdc64ad1dda5c0670933650fd6d2a15e4` |
 | `target/windows-platform-candidate-r1/mark-shot.exe` | 44,239,872 | `dedad983fb30390e0e074c61af84c8529db0fccfee041de6f9557b7a1ce13d0e` |
 | 同目录 `DirectML.dll` | 18,527,776 | `9c9e6d822561c6c41b90e6994b3e8857cf1d66dbfb1e0c4c799c7c89b4e92da1` |
@@ -137,10 +178,52 @@ R5 在本次私有 Windows 字体目录安装 MiSans VF 与 MiSans L3 测试字�
 首轮失败来自测试把完整路径填入只允许文件名的字段；第二轮按产品契约分别填写目录与文件名，
 没有放宽产品校验。验证保存目录限定在本轮工作目录。以上仍是私有 Wine/Xvfb 实测。
 
+后续贴图键盘候选补齐 Up/Down 循环、Home/End 定位、Enter/Space 确认和 Escape 取消，
+跳过分隔线及未接入动作；键盘接管清除未完成鼠标按下，避免重复执行。
+共享导航逻辑为 `src/features/pinned_image/menu_navigation.rs`，Windows 运行时只负责事件交付。
+旧 CI 文件在 `target/windows-pin-keyboard-red-r1` 实测 Enter 不关闭菜单；修复候选
+`target/windows-pin-navigation-candidate-r1/mark-shot.exe`（SHA-256
+`be0a09c90dcf4832423650056e810c988f46702df3c10c8798a812bf085f48cc`）
+在同一构建完成贴图键盘及原有菜单、截图保存、完整首次 OCR 与独立主题流程：
+`target/windows-pin-keyboard-green-r2/workflow.json`、`target/windows-pin-keyboard-basic-r1/workflow.json`、
+`target/windows-pin-keyboard-ocr-r1/workflow.json` 均通过。初次修复验证遇到测试工具对同位置
+鼠标移动等待事件超时，改为读取实际指针坐标确认后再次验证；没有重放不确定点击。
+工作区 1,369 项通过、19 项忽略，Python 225 项通过，两平台严格 Clippy、格式及 Ruff 检查通过。
+候选仍是本地独立构建，不把此前 CI 成功记录移用到本次修改。
+
+菜单存活时主题快捷键此前绕过主窗口处理，已在 `target/windows-menu-theme-red-r1` 实测失败。
+新增 `src/backend/windows/window/theme_input.rs` 后，主窗口和两条菜单事件路径共用主题入口，
+切换不会关闭或替换菜单，也不会交付菜单动作。同一候选
+`target/windows-menu-theme-candidate-r1/mark-shot.exe`，SHA-256 为
+`62538b5cbeab7f44300c9e5555a1db8daaeb6434099c15fb48123f3407fc8cc1`，
+通过完整贴图流程与含真实模型下载、独立主题刷新的 OCR 流程：
+`target/windows-menu-theme-green-r1/workflow.json` 和 `target/windows-menu-theme-ocr-r1/workflow.json`。
+Windows 全目标严格 Clippy 与格式检查通过；实际界面证据仍限定私有 Wine。
+
+滚轮后续候选按照原版 `PinnedImageWindow::wheelEvent` 的角度每格1.08倍、像素八十单位一格
+补齐 Windows 缩放，并通过一次性逻辑位移保持鼠标原图锚点。当前DPI换算只在原生窗口进行，
+同帧多个输入累计位移；横向滚轮和菜单期间输入不改变底层图像。
+旧菜单主题候选在 `target/windows-pin-wheel-red-r1` 实测保持320×200不缩放；新候选
+`target/windows-pin-wheel-candidate-r1/mark-shot.exe` 的 SHA-256 为
+`02ffcf5578b071760177f77eadea3cae0ae1ab31433b2fb7cf06017bbf12cca0`。
+同一文件通过 `target/windows-pin-wheel-green-r1/workflow.json` 和
+`target/windows-pin-wheel-ocr-r1/workflow.json`。实际窗口从(180,180,320,200)变成
+(173,176,346,216)，反向滚轮精确恢复原位置和尺寸，复制原图逐字节一致；完整贴图和OCR回归通过。
+工作区1,371项通过、19项忽略，两平台严格Clippy及格式检查通过；混合DPI、连续原生输入
+与真实Windows桌面矩阵尚未验证，不能从单比例Wine结果外推。
+
+透明剪贴板补充五项Windows测试：全部256种透明度与未预乘颜色、顶向/底向DIBV5、
+二十四位DIB行填充、不完整头部/溢出调色板/截断像素拒绝，以及真实系统PNG与DIBV5所有权。
+系统测试销毁隐藏拥有窗口后再次读取，再只交付DIBV5验证回退，最后用Unicode替换并确认旧图像消失。
+测试只在显式私有会话中执行，不改动用户剪贴板；四项纯格式测试加入Windows CI分组。
+`target/windows-alpha-unit-r2/tests.json`五项通过，随后同一测试程序在
+`target/windows-alpha-full-r1/tests.json`完成七组71项、零忽略。Windows严格Clippy通过。
+本轮没有更改产品编码逻辑，结果是新增实际覆盖，仍不等于与真实Windows第三方应用的互操作矩阵。
+
 - 中文输入法候选、确认、焦点转移和字符输入消息的真实 Windows 完整矩阵；当前已验证中文粘贴、编辑与系统剪贴板。
 - 贴图右键菜单、旋转、缩放、另存为和编辑交接已完成上述基础回归；显示边框、文字选择及部分
   翻译动作仍未接入，相关动作明确禁用，真实 Windows 和完整输入矩阵仍需验证。
-- 独立窗口的系统交互缩放、菜单抓取与多级菜单、模态行为、混合 DPI 和透明剪贴板实测。
+- 独立窗口的系统交互缩放、菜单抓取与多级菜单、模态行为、混合 DPI，以及透明剪贴板与真实Windows第三方应用互操作。
 - Windows 滚动截图控制入口；原生持续捕获会话已有实现，覆盖层入口目前明确不支持。
 - DWM 精确窗口边界、遮挡独立捕获及圆角透明度；活动窗口当前使用可见窗口的
   `GetWindowRect` 与 `BitBlt`。
