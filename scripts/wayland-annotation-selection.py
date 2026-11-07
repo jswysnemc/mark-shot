@@ -10,8 +10,10 @@ from pathlib import Path
 import re
 import subprocess
 import time
+from types import SimpleNamespace
 
 from PIL import Image, ImageChops
+from wayland_delete_hover_checks import check as check_hover
 
 PROJECT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("annotation_selection_support", PROJECT / "scripts/wayland-selection-field-navigation.py")
@@ -111,6 +113,7 @@ def run(binary, root, baseline_export):
                 button_pixels = pixels(selected, (282, 92, 327, 127), red)
                 assert len(button_pixels) > 80, f"selected annotation has no red delete button: {len(button_pixels)}"
                 point = (sum(x for x, _ in button_pixels) / len(button_pixels), sum(y for _, y in button_pixels) / len(button_pixels))
+                report["hover"] = check_hover(SimpleNamespace(INPUT=INPUT, snapshot=snapshot, pixels=pixels), root, selected, point, region)
                 INPUT.move(point)
                 before = snapshot(root, "before-right")
                 NAV.button("right", True)
@@ -133,7 +136,7 @@ def run(binary, root, baseline_export):
                 session.key("ctrl+z")
                 session.key("ctrl+shift+l")
                 dark = snapshot(root, "dark-selection")
-                assert len(pixels(dark, region, orange)) > 150 and len(pixels(dark, (282, 92, 327, 127), red)) > 80
+                assert len(pixels(dark, region, orange)) > 150 and len(pixels(dark, (280, 90, 330, 130), (248, 113, 113))) > 80
                 session.key("ctrl+shift+l")
                 # 1. 【标注选框回归】【静止资源】隐藏界面后不继续更新按钮或图像，普通截图保持单线程
                 session.key("Space")

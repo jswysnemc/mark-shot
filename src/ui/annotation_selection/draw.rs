@@ -127,14 +127,27 @@ pub fn rectangle(painter: &mut Painter<'_>, rect: Rect, unit: f32) {
 
 /// 【标注选框】【删除按钮】按 rect 绘制原版红色圆按钮与白色叉号，无返回值，按钮不属于图像导出内容
 pub fn delete(painter: &mut Painter<'_>, rect: Rect) {
+    delete_with_hover(painter, rect, false);
+}
+
+/// 【标注选框】【悬停删除】按rect与hovered绘制原版按钮；悬停扩大半径并提亮边框，叉号保持原尺寸和中心
+pub fn delete_with_hover(painter: &mut Painter<'_>, rect: Rect, hovered: bool) {
     let center = chrome::center(rect);
     circle(
         painter,
         center,
-        10.0,
+        if hovered { 12.5 } else { 10.0 },
         1.0,
-        Color::from_rgba8(239, 68, 68, 255),
-        Color::WHITE,
+        if hovered {
+            Color::from_rgba8(248, 113, 113, 255)
+        } else {
+            Color::from_rgba8(239, 68, 68, 255)
+        },
+        if hovered {
+            Color::from_rgba8(254, 202, 202, 210)
+        } else {
+            Color::WHITE
+        },
         2.0,
     );
     let mut path = PathBuilder::new();

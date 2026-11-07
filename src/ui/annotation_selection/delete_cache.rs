@@ -6,32 +6,35 @@ use tiny_skia::{IntRect, Pixmap, PixmapPaint, Rect, Transform};
 pub(crate) struct Cache {
     rect: Rect,
     scale: f32,
+    hovered: bool,
     bounds: IntRect,
     pixels: Pixmap,
 }
 
 impl Cache {
-    /// 【标注选框】【缓存构造】按 rect 和 scale 返回含两像素逻辑留白的小块像素，不分配整屏缓冲
-    pub fn new(rect: Rect, scale: f32) -> Option<Self> {
-        let bounds = scale_rect(&rect.outset(2.0, 2.0)?, scale)?.round_out()?;
+    /// 【标注选框】【缓存构造】按rect、scale和hovered返回含五像素逻辑留白的小块像素，容纳扩大边框，不分配整屏缓冲
+    pub fn new(rect: Rect, scale: f32, hovered: bool) -> Option<Self> {
+        let bounds = scale_rect(&rect.outset(5.0, 5.0)?, scale)?.round_out()?;
         let mut pixels = Pixmap::new(bounds.width(), bounds.height())?;
-        super::draw::delete(
+        super::draw::delete_with_hover(
             &mut Painter::new(&mut pixels)
                 .with_scale(scale)
                 .with_origin((bounds.x() as f32 / scale, bounds.y() as f32 / scale)),
             rect,
+            hovered,
         );
         Some(Self {
             rect,
             scale,
+            hovered,
             bounds,
             pixels,
         })
     }
 
-    /// 【标注选框】【缓存身份】按 rect 与 scale 返回缓存是否仍适用于当前按钮，无分配
-    pub fn matches(&self, rect: Rect, scale: f32) -> bool {
-        self.rect == rect && self.scale == scale
+    /// 【标注选框】【缓存身份】按rect、scale与hovered返回缓存是否仍适用于当前按钮，无分配
+    pub fn matches(&self, rect: Rect, scale: f32, hovered: bool) -> bool {
+        self.rect == rect && self.scale == scale && self.hovered == hovered
     }
 
     /// 【标注选框】【像素合成】把缓存绘入 canvas 的 dirty 物理交集，无返回值，未恢复的像素不参与重复混合
@@ -82,10 +85,14 @@ mod tests {
     /// 【按钮缓存测试】【局部一致】分数比例与非整数位置下，逐块恢复的按钮必须与整块合成逐字节一致
     #[test]
     fn fractional_button_cache_is_identical_when_composited_in_dirty_slices() {
-        for scale in [1.0, 1.5, 1280.0 / 853.0, 2.0] {
+        for (scale, hovered) in [1.0, 1.5, 1280.0 / 853.0, 2.0]
+            .into_iter()
+            .flat_map(|scale| [false, true].map(|hovered| (scale, hovered)))
+        {
             let cache = Cache::new(
                 Rect::from_xywh(88.740_85, 64.007324, 20.0, 20.0).unwrap(),
                 scale,
+                hovered,
             )
             .unwrap();
             let mut whole = Pixmap::new((160.0 * scale) as u32, (140.0 * scale) as u32).unwrap();

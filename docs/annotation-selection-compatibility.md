@@ -41,7 +41,7 @@
 已经选中的标注优先检查控制点，粗画笔位于正文初始命中区域之外的缩放点也能启动拖动。
 普通缩放按可见几何映射，避免阴影留量造成第一次缩放偏移。
 
-删除按钮采用约 24×24 逻辑像素的短期缓存，位置或输出比例变化时更新；它不进入历史或导出。
+删除按钮采用约 30×30 逻辑像素的短期缓存，位置、输出比例或悬停状态变化时更新；它不进入历史或导出。
 圆角方块与圆形控制点按原始像素相位绘入固定小块，再向本次损坏缓冲合成。完全位于损坏
 范围之外的控制点不分配缓冲；父缓冲裁切不会重新改变圆角采样。静止状态不创建周期唤醒。
 
@@ -101,3 +101,33 @@
 此前a1发布文件与清单继续保留在 `target/selection-primary-candidate-r1/mark-shot` 和
 `target/verification-selection-primary-r1/result.json`。本轮没有修改用户配置或原版 Qt 源文件，
 完整 Rust 重写目标保持未完成状态。
+
+## 删除按钮悬停补齐
+
+原版 `shot_window_selection_frame.cpp:539` 的悬停分支此前没有接入Rust缓存。本次按原版
+将半径10扩大至12.5，填充使用RGB(248,113,113)，边框RGBA(254,202,202,210)、宽2，
+白色叉号中心与尺寸保持不变。缓存包含悬停身份，五逻辑像素留白容纳边缘，进入/离开均登记
+旧新损坏区域；实际删除命中范围不扩大，静止指针不重复失效。
+
+候选 `target/delete-hover-candidate-r1/mark-shot` 的SHA-256为
+`85e1ac98d3348d55164d5d0d8da3cc6df3d04dfe9992c96e05034029a6815e38`。
+同一文件在私有Sway一倍与一点五倍通过
+`target/delete-hover-green-r3/result.json` 和 `target/delete-hover-scale-r1/result.json`：
+红色实心区域宽度17变22，粉色边框出现；离开后选框区域逐像素恢复，重复进入不叠加透明边缘，
+右键不删除、左键删除、撤销重做及深浅主题保持正常。初次检测把邻近同色标注混入按钮宽度，
+修正为悬停前后实际变化的按钮像素；旧候选在 `target/delete-hover-red-r1` 仍明确失败。
+
+一倍导出与旧候选 `target/delete-hover-baseline-r1/export.png` 逐字节相同，PNG摘要为
+`206710dafbdf6cb31a72393d1c28dba74b4ef6e8d72c006777e36db4840af32e`。
+同构建长截图双框及原图导出、尺子悬停/滚轮气泡/中文贴图菜单回归分别为
+`target/delete-hover-scroll-r1/result.json` 和 `target/delete-hover-priority-r1/result.json`。
+工作区1,374项通过、19项忽略，两平台严格Clippy通过。缓存单测另外覆盖两种悬停状态及四种比例，
+分块合成与整体合成完全一致。本轮没有真实Windows悬停输入实测，不能据跨平台编译替代该项。
+
+后续使用Windows可执行文件补充私有Wine实际输入验证，未修改产品代码：
+`scripts/windows-delete-hover.py`复用相同颜色与扩大判据，候选摘要为
+`47e4365eb737f1815b6ab2cb883e40234c76e1f0b3a61c29cecba2948a865452`。
+`target/windows-delete-hover-r2/workflow.json`确认实心宽17变22、粉边131像素、离开精确恢复、
+重复进入无残影、右键不删除、左键删除和撤销精确恢复；相同EXE第二次直接导出的RGBA完全一致。
+旧CI候选在`target/windows-delete-hover-red-r2`明确因缺少提亮失败，检测器空候选现在报告明确断言，
+而不是在求宽度时出现空集合异常。该证据补齐Windows后端路径，但仍不是原生Windows桌面或混合DPI验收。

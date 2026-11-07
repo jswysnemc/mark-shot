@@ -90,22 +90,23 @@ pub(super) fn sync(state: &mut EditorState, dirty: &mut u32) {
     let monitor = state.input.pointer.monitor_idx;
     let current = rect(state, monitor).map(|rect| (monitor, rect));
     let scale = state.placements[monitor].scale;
+    let hovered = hovered(state);
     let unchanged_cache = current.is_none()
         || current.is_some_and(|(_, rect)| {
             state
                 .annotation_selection
                 .cache
                 .as_ref()
-                .is_some_and(|cache| cache.matches(rect, scale))
+                .is_some_and(|cache| cache.matches(rect, scale, hovered))
         });
     if current != state.annotation_selection.frame || !unchanged_cache {
         for (monitor, rect) in state.annotation_selection.frame.into_iter().chain(current) {
-            state.damage_local(monitor, rect.outset(2.0, 2.0).unwrap_or(rect));
+            state.damage_local(monitor, rect.outset(5.0, 5.0).unwrap_or(rect));
             mark_dirty(dirty, monitor);
         }
         state.annotation_selection.frame = current;
         state.annotation_selection.cache = current.and_then(|(_, rect)| {
-            crate::ui::annotation_selection::delete_cache::Cache::new(rect, scale)
+            crate::ui::annotation_selection::delete_cache::Cache::new(rect, scale, hovered)
         });
     }
 }

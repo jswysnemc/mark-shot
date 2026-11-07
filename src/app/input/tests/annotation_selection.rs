@@ -155,3 +155,52 @@ fn wide_pen_control_outside_initial_hit_bounds_starts_resize() {
     super::super::handle_pointer_button(&mut state, crate::types::MouseButton::Left, false, &mut 0);
     assert_eq!(state.selected_annotation_index(), Some(0));
 }
+
+/// 【标注删除测试】【悬停缓存】无参数，进入退出重新绘制且不扩大命中，稳定指针不失效缓存或改动标注，无返回值
+#[test]
+fn delete_hover_refreshes_cache_without_changing_hit_target_or_document() {
+    let mut state = selected();
+    crate::app::annotation_selection::sync(&mut state, &mut 0);
+    let rect = state.annotation_selection.frame.unwrap().1;
+    let scale = state.placements[0].scale;
+    let original = state.annotations.clone();
+    pointer(
+        &mut state,
+        f64::from(rect.x() + 10.0),
+        f64::from(rect.y() + 10.0),
+        &mut 0,
+    );
+    let mut dirty = 0;
+    crate::app::annotation_selection::sync(&mut state, &mut dirty);
+    assert_ne!(dirty, 0);
+    assert!(
+        state
+            .annotation_selection
+            .cache
+            .as_ref()
+            .unwrap()
+            .matches(rect, scale, true)
+    );
+    dirty = 0;
+    crate::app::annotation_selection::sync(&mut state, &mut dirty);
+    assert_eq!(dirty, 0);
+    pointer(
+        &mut state,
+        f64::from(rect.right() + 1.0),
+        f64::from(rect.y() + 10.0),
+        &mut 0,
+    );
+    assert!(!crate::app::annotation_selection::hovered(&state));
+    crate::app::annotation_selection::sync(&mut state, &mut dirty);
+    assert_ne!(dirty, 0);
+    assert!(
+        state
+            .annotation_selection
+            .cache
+            .as_ref()
+            .unwrap()
+            .matches(rect, scale, false)
+    );
+    assert_eq!(state.annotations, original);
+    assert!(state.undo_stack.is_empty());
+}
