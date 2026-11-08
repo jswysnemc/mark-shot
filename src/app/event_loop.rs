@@ -16,6 +16,9 @@ pub(super) fn run_overlay(
 
     loop {
         let mut timeout = poll_timeout(editor_state);
+        if let Some(left) = pacing.source_residency.timeout(Instant::now()) {
+            timeout = Some(timeout.map_or(left, |timeout| timeout.min(left)));
+        }
         if let Some(deadline) = pointer_wait {
             let left = deadline.saturating_duration_since(Instant::now());
             timeout = Some(timeout.map_or(left, |t| t.min(left)));
@@ -28,7 +31,17 @@ pub(super) fn run_overlay(
         }
         poll_background_work(editor_state, &mut dirty_mask);
 
-        match overlay.next_event(timeout)? {
+        let event = overlay.next_event(timeout)?;
+        if let Some(size) = overlay.image_window_size()
+            && editor_state.placements[0].size != (size.0 as i32, size.1 as i32)
+        {
+            super::image_window::resize(editor_state, size, &mut dirty_mask);
+            pacing = Pacing::new(editor_state.captures.len());
+        }
+        match event {
+            OverlayEvent::EscapePressed if editor_state.color_inspector.panel.is_some() => {
+                crate::features::color_sample::inspector::close(editor_state, &mut dirty_mask);
+            }
             OverlayEvent::EscapePressed if editor_state.selection_size.interacting() => {
                 super::selection_size::keyboard::key(
                     editor_state,
@@ -85,6 +98,33 @@ pub(super) fn run_overlay(
             pointer_wait = None;
             panels::toolbar::update_toolbar(editor_state, &mut dirty_mask);
             apply_damage_rects(editor_state, &mut dirty_mask);
+        }
+
+        if editor_state.preferences_requested {
+            editor_state.preferences_requested = false;
+            crate::editor::text_session::commit(editor_state, &mut dirty_mask);
+            overlay.suspend()?;
+            let before = crate::config::preferences::current();
+            let result = crate::features::preferences::run(false);
+            overlay.resume()?;
+            crate::features::preferences::runtime::apply(
+                editor_state,
+                &before,
+                &crate::config::preferences::current(),
+                &mut dirty_mask,
+            );
+            if let Err(error) = result {
+                log::error!("【设置窗口】【编辑器返回】{error}");
+                editor_state.toasts.show_text(
+                    crate::ui::toast::ToastKind::SettingsFailed,
+                    error.to_string(),
+                    &mut editor_state.text.font_system,
+                );
+            }
+            super::theme_switch::refresh(editor_state, &mut dirty_mask);
+            pacing = Pacing::new(editor_state.captures.len());
+            editor_state.annotations_dirty = true;
+            pointer_wait = None;
         }
 
         if editor_state.save_as_requested {
@@ -161,6 +201,10 @@ pub(super) fn run_overlay(
             )?;
             clear_frame_state(editor_state, &mut dirty_mask, &pacing);
         }
+        pacing.source_residency.reclaim_due(
+            editor_state.file_canvas.as_ref().map(|file| &file.original),
+            Instant::now(),
+        );
     }
 
     Ok(false)
@@ -269,6 +313,7 @@ pub(super) fn handle_event(editor_state: &mut EditorState, ev: OverlayEvent, dir
             super::text_input::event(editor_state, ev, dirty_mask);
         }
         OverlayEvent::Tick
+        | OverlayEvent::CanvasResized { .. }
         | OverlayEvent::EscapePressed
         | OverlayEvent::FrameDone { .. }
         | OverlayEvent::ScrollPanelConfigured { .. }

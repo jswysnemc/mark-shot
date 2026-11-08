@@ -108,8 +108,12 @@ impl Region {
                 && let Some(file) = file.as_ref()
             {
                 let mut preview = patch.original.clone();
-                // 文件原件已先写回或恢复；显示片段使用当前主题，不能恢复旧主题底色。
-                preview.fill(crate::theme::canvas::current().color());
+                // 1. 【框选翻译】【底纹恢复】窗口原点固定棋盘格，不能把局部片段当成新起点
+                crate::theme::canvas::checkerboard_region(
+                    &mut preview,
+                    patch.scale,
+                    (patch.rect.x(), patch.rect.y()),
+                );
                 let scale = file.viewport.width() / file.original.width() as f32;
                 let transform = Transform::from_scale(scale * patch.scale.0, scale * patch.scale.1)
                     .post_translate(

@@ -257,7 +257,11 @@ def verify(binary, environment, root, trace, horizontal):
             before = origin(trace)
             session.key("Down")
             wait(lambda: origin(trace)[1] == before[1] + 48, "the page lost keyboard focus during scroll capture")
-            time.sleep(0.2)
+            capture_offset = log.stat().st_size
+            # 1. 【长截图回归】【异步捕获】确认页面移动后等待两个实际捕获完成，避免固定延时在降频阶段提前暂停
+            wait(lambda: len(re.findall(r'(?:ext_image_copy_capture_frame_v1|zwlr_screencopy_frame_v1)@\d+\.ready',
+                                        log.read_bytes()[capture_offset:].decode(errors="replace"))) >= 2,
+                 "the moved page did not reach the capture session before pause")
             current = crop(frame(environment, root, "source-keyboard", True))
             parts.append(current.crop((0, current.height - step, current.width, current.height)))
         INPUT.click(buttons["pause"])
@@ -297,7 +301,7 @@ def verify(binary, environment, root, trace, horizontal):
             assert ImageChops.difference(original, light).getbbox() is None, "scroll panel theme roundtrip changed its pixels"
             INPUT.click(buttons["pause"], "right")
             session.key("Return")
-            wait(lambda: "image loaded + preview mapped" in log.read_text() or 'set_title(Some("mark-shot"))' in log.read_text()[log.read_text().find("【滚动截图】【标注交接】"):], "Enter did not open the stitched image editor")
+            wait(lambda: "image loaded + preview mapped" in log.read_text() or 'set_app_id(Some("mark-shot-editor"))' in log.read_text()[log.read_text().find("【滚动截图】【标注交接】"):], "Enter did not open the stitched image editor")
             time.sleep(0.4)
             frame(environment, root, "annotated-editor")
             session.key("ctrl+c")

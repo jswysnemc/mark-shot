@@ -23,20 +23,10 @@ pub(crate) fn halo_number(
     center: (f32, f32),
     style: Style,
 ) {
-    let Some(fonts) = painter.fonts.as_mut() else {
-        return;
-    };
-    let (buffer, mut layout) = crate::fonts::ruler::shape(fonts.system, text, style.pixels);
     let factor = style.window.canvas(1.0);
     let metrics = crate::fonts::ruler::measure(text, style.pixels);
     let width = metrics.width * factor;
     let height = metrics.height * factor;
-    for glyph in &mut layout.glyphs {
-        glyph.x *= factor;
-        glyph.y *= factor;
-        glyph.w *= factor;
-        glyph.font_size *= factor;
-    }
     let position = (
         match style.align {
             HAlign::Left => rect.left(),
@@ -49,6 +39,29 @@ pub(crate) fn halo_number(
     let scale = painter.scale();
     let left = position.0 - padding;
     let top = position.1 - padding;
+    // 1. 【尺子】【可见排版】先按完整数字和描边计算旋转范围，远离本块的刻度不重复排版及分配像素
+    let origin = painter.origin();
+    let size = painter.size();
+    let visible = Rect::from_xywh(origin.0, origin.1, size.0, size.1);
+    let bounds = Rect::from_xywh(left, top, width + padding * 2.0, height + padding * 2.0)
+        .and_then(|rect| rect.outset(2.0 / scale, 2.0 / scale))
+        .and_then(|rect| crate::features::ruler::tick_layout::rotated_rect(rect, center, rotation));
+    if bounds
+        .zip(visible)
+        .is_some_and(|(bounds, visible)| bounds.intersect(&visible).is_none())
+    {
+        return;
+    }
+    let Some(fonts) = painter.fonts.as_mut() else {
+        return;
+    };
+    let (buffer, mut layout) = crate::fonts::ruler::shape(fonts.system, text, style.pixels);
+    for glyph in &mut layout.glyphs {
+        glyph.x *= factor;
+        glyph.y *= factor;
+        glyph.w *= factor;
+        glyph.font_size *= factor;
+    }
     let Some(mut pixels) = Pixmap::new(
         ((width + padding * 2.0) * scale).ceil().max(1.0) as u32,
         ((height + padding * 2.0) * scale).ceil().max(1.0) as u32,
@@ -61,7 +74,7 @@ pub(crate) fn halo_number(
     } else {
         Color::from_rgba8(255, 255, 255, 220)
     };
-    // 1. 【尺子】【数字绘制】复用同一排版结果绘制八方向描边与正文，缓冲仅覆盖数字范围
+    // 2. 【尺子】【数字绘制】复用同一排版结果绘制八方向描边与正文，缓冲仅覆盖数字范围
     {
         let mut text_painter = painter.sub(&mut pixels).with_origin((left, top));
         let Some(raw) = buffer.layout_runs().next() else {
@@ -93,7 +106,7 @@ pub(crate) fn halo_number(
         }
         text_painter.text_layout_run(&run, position, color);
     }
-    // 2. 【尺子】【数字绘制】在物理像素空间旋转小缓冲，角度与长度尺刻度保持一致
+    // 3. 【尺子】【数字绘制】在物理像素空间旋转小缓冲，角度与长度尺刻度保持一致
     let (sin, cos) = rotation.to_radians().sin_cos();
     let base = painter.to_px(left, top);
     let center = painter.to_px(center.0, center.1);

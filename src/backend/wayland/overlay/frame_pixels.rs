@@ -5,14 +5,42 @@ use tiny_skia::Pixmap;
 
 pub(crate) enum FramePixels<'a> {
     Borrowed(&'a [u8]),
+    Opaque(&'a [u8]),
     Consumed(&'a mut Pixmap),
 }
 
 impl FramePixels<'_> {
+    /// 【原生前景】【直接合成】按size和damage把前景与background一次写入native，返回校验结果；消费仅清零已交付范围，不回收下一帧仍需使用的页
+    pub(crate) fn write_composited_to(
+        &mut self,
+        native: &mut [u8],
+        background: &crate::image_source::ImageSource,
+        size: (u32, u32),
+        damage: Option<DamageRect>,
+    ) -> AppResult {
+        let source = match self {
+            Self::Borrowed(source) | Self::Opaque(source) => *source,
+            Self::Consumed(pixmap) => pixmap.data(),
+        };
+        crate::backend::composited_pixels::write(source, background, native, size, damage)?;
+        if let Self::Consumed(pixmap) = self {
+            let (left, top, width, height) = damage.unwrap_or((0, 0, size.0, size.1));
+            let width = width.min(size.0.saturating_sub(left)) as usize * 4;
+            let stride = size.0 as usize * 4;
+            for row in top..top.saturating_add(height).min(size.1) {
+                let first = row as usize * stride + left as usize * 4;
+                if first + width <= pixmap.data().len() {
+                    pixmap.data_mut()[first..first + width].fill(0);
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// 【原生前景】【字节长度】无参数，返回完整源网格字节数，不读取像素或改变所有权
     pub(crate) fn len(&self) -> usize {
         match self {
-            Self::Borrowed(pixels) => pixels.len(),
+            Self::Borrowed(pixels) | Self::Opaque(pixels) => pixels.len(),
             Self::Consumed(pixmap) => pixmap.data().len(),
         }
     }
@@ -64,6 +92,9 @@ impl FramePixels<'_> {
     /// 【原生前景】【字节批次】按range写入native，返回值为空；借用路径不改源，消费路径在复制结束后才清空相同源区间
     fn write_range(&mut self, native: &mut [u8], range: std::ops::Range<usize>) {
         match self {
+            Self::Opaque(source) => {
+                crate::utils::copy_swizzled(&mut native[range.clone()], &source[range]);
+            }
             Self::Borrowed(source) => crate::backend::wayland::utils::shm_sparse::copy(
                 &mut native[range.clone()],
                 &source[range],

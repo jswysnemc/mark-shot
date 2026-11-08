@@ -9,6 +9,9 @@ impl Annotation {
     pub fn scaled(&self, s: f32) -> Annotation {
         let p = |(x, y): (f32, f32)| (x * s, y * s);
         let shape = match &self.shape {
+            AnnotationShape::ColorSample { sample } => AnnotationShape::ColorSample {
+                sample: sample.scaled(s),
+            },
             AnnotationShape::Number { mark } => AnnotationShape::Number {
                 mark: mark.scaled(s),
             },
@@ -120,6 +123,9 @@ impl Annotation {
     /// 【标注】【位置移动】按逻辑增量 dx、dy 原地移动标注并更新边界；无返回值
     pub fn translate_mut(&mut self, dx: f32, dy: f32) {
         match &mut self.shape {
+            AnnotationShape::ColorSample { sample } => {
+                *sample = sample.mapped(|point| (point.0 + dx, point.1 + dy))
+            }
             AnnotationShape::Number { mark } => {
                 *mark = mark.translated((dx, dy));
             }
@@ -193,6 +199,12 @@ impl Annotation {
         };
 
         let shape = match &self.shape {
+            AnnotationShape::ColorSample { sample } => AnnotationShape::ColorSample {
+                sample: crate::features::color_sample::ColorSample {
+                    size: sample.size * sx.abs().max(sy.abs()),
+                    ..sample.mapped(remap)
+                },
+            },
             AnnotationShape::Number { mark } => AnnotationShape::Number {
                 mark: mark.mapped(remap),
             },

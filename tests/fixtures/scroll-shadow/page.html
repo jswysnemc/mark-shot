@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>滚动截图阴影回归页面</title>
+<style>
+  :root { font-size: 16px; --page: #f7f8fa; --card: #fff; --text: #253248; --muted: #64748b; --border: #d6dce5; --bar: #fff; }
+  * { box-sizing: border-box; }
+  html { scrollbar-width: none; }
+  body { margin: 0; background: var(--page); color: var(--text); font: .875rem/1.5 sans-serif; }
+  body.dark { --page: #161e2d; --card: #202d40; --text: #e3e9f2; --muted: #a4b2c7; --border: #3d4a5d; --bar: #1b2738; }
+  main { max-width: 40rem; margin: auto; padding: 1rem; }
+  h1 { font-size: 1.125rem; margin: 0 0 1rem; }
+  article { height: 6rem; padding: .625rem .875rem; margin-bottom: .75rem; background: var(--card); border: 1px solid var(--border); border-radius: .375rem; box-shadow: 0 .125rem .375rem #0002; }
+  h2 { font-size: .875rem; margin: 0 0 .25rem; }
+  p { margin: .125rem 0; }
+  small { color: var(--muted); font-size: .75rem; }
+  footer, header { position: fixed; left: 0; right: 0; height: 2.5rem; padding: .5rem 1rem; background: var(--bar); border-block: 1px solid var(--border); }
+  footer { bottom: 0; box-shadow: 0 -1rem 1.5rem #0005; }
+  header { top: 0; box-shadow: 0 1rem 1.5rem #0005; display: none; }
+  .both header { display: block; }
+  .translucent footer { background: #f0f4f8a8; backdrop-filter: blur(.5rem); }
+  .clean footer, .clean header { visibility: hidden; }
+  @media (max-width: 30rem) { main { padding: .75rem; } }
+</style>
+<body>
+<main><h1>截图内容与阴影覆盖测试</h1><section id="posts"></section></main>
+<header>固定顶部区域</header>
+<footer>回复内容 · 保存草稿 · 查看更多</footer>
+<script>
+  document.body.className = new URLSearchParams(location.search).get('case') || 'light';
+  /** 【滚动截图回归】【正文生成】按 index 创建不同长度的文字卡片，返回 DOM 元素 */
+  function post(index) {
+    const article = document.createElement('article');
+    const heading = document.createElement('h2');
+    heading.textContent = `讨论记录 ${index + 1}：核对文字、边框与图片颜色`;
+    const paragraph = document.createElement('p');
+    paragraph.textContent = ['滚动后仍须保持正文完整，不能遗漏任何一行。', 'This paragraph has distinct text and numbers: 4079.', '页面卡片自身的阴影应保留，悬浮区域不能重复。'][index % 3];
+    const detail = document.createElement('small');
+    detail.textContent = `条目编号 ${103 + index * 37} · 校验值 ${index * index + 17}`;
+    article.append(heading, paragraph, detail);
+    return article;
+  }
+  document.getElementById('posts').append(...Array.from({length: 18}, (_, index) => post(index)));
+</script>
+</body>
+</html>

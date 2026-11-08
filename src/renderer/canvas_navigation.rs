@@ -11,7 +11,7 @@ fn background(req: &mut RenderRequest<'_>, view: ViewTransform) {
     let scale = native * view.scale as f32;
     let transform =
         tiny_skia::Transform::from_translate(-origin.0, -origin.1).post_scale(scale, scale);
-    req.dimmed.fill(crate::theme::canvas::current().color());
+    crate::theme::canvas::checkerboard(req.dimmed, native);
     // 1. 【画布导航】【原图采样】完整输出只在视图或选择变化时重采样，局部重绘复用同一像素网格
     req.frozen_image.draw_transformed(req.dimmed, transform);
     super::background_restore::shade(
@@ -117,19 +117,23 @@ pub(super) fn draw(
         );
     }
     if let Some(selection) = req.selection {
-        Painter::new(req.canvas).with_scale(req.scale).clipped(
+        super::selection_border_damage::draw(
+            req.canvas,
+            req.scale,
             req.dirty_rect.copied(),
-            |painter| {
-                super::dimming::draw_selection_border(
-                    painter,
-                    selection,
-                    req.selection_edges,
-                    req.selection_radius,
-                );
-            },
+            selection,
+            req.selection_edges,
+            req.selection_radius,
+        );
+        super::selection_handles::draw(
+            req.canvas,
+            req.scale,
+            req.dirty_rect.copied(),
+            selection,
+            req.selection_edges,
         );
     }
-    {
+    if req.selected_annotation.is_some() || req.is_pending_selected {
         let mut painter = Painter::new(req.canvas)
             .with_scale(scale)
             .with_origin(origin)

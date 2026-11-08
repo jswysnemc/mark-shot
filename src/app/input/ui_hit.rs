@@ -151,6 +151,20 @@ pub(in crate::app) fn hit_test_ui(editor_state: &EditorState, local: (f64, f64))
 
 /// 【界面】【光标选择】依据 editor_state 的弹层、按钮和工具状态返回光标类型
 pub fn compute_cursor(editor_state: &EditorState) -> CursorIcon {
+    if editor_state.color_inspector.panel.is_some() {
+        return if editor_state
+            .color_inspector
+            .hit(
+                editor_state.input.pointer.monitor_idx,
+                editor_state.input.pointer.local,
+            )
+            .is_some()
+        {
+            CursorIcon::Pointer
+        } else {
+            CursorIcon::Default
+        };
+    }
     if editor_state.upload.busy() || editor_state.selection_translation.busy() {
         return CursorIcon::Progress;
     }
@@ -320,7 +334,13 @@ pub fn compute_cursor(editor_state: &EditorState) -> CursorIcon {
         | UiHit::NumberPopoverOutside
         | UiHit::LinePopoverOutside(_)
         | UiHit::None => {
-            if editor_state.pick_once {
+            if let Some(cursor) = super::selection_handles::cursor(editor_state) {
+                cursor
+            } else if !editor_state.input.mouse_down
+                && super::selection_handles::outside(editor_state)
+            {
+                CursorIcon::Default
+            } else if editor_state.pick_once {
                 CursorIcon::Crosshair
             } else if crate::tools::text::session_input::inside(editor_state) {
                 CursorIcon::Text

@@ -23,7 +23,36 @@ pub fn handle_axis_scroll(
     event: crate::types::ScrollEvent,
     dirty_mask: &mut u32,
 ) {
+    if editor_state
+        .color_inspector
+        .panel
+        .is_some_and(|(monitor, rect)| {
+            monitor == editor_state.input.pointer.monitor_idx
+                && crate::features::color_sample::inspector::contains(
+                    rect,
+                    editor_state.input.pointer.local,
+                )
+        })
+    {
+        return;
+    }
+    if event.canvas_steps() != 0.0
+        && matches!(
+            hit_test_ui(editor_state, editor_state.input.pointer.local),
+            UiHit::None
+        )
+    {
+        super::recent_annotation::select(editor_state, dirty_mask);
+    }
     let before = super::wheel_preview::capture(editor_state);
+    if matches!(
+        hit_test_ui(editor_state, editor_state.input.pointer.local),
+        UiHit::None
+    ) && crate::features::color_sample::edit::wheel(editor_state, event, dirty_mask)
+    {
+        apply_damage_rects(editor_state, dirty_mask);
+        return;
+    }
     dispatch_axis_scroll(editor_state, event, dirty_mask);
     if let Some(after) = super::wheel_preview::capture(editor_state)
         && before.is_some_and(|before| before != after)
@@ -77,7 +106,8 @@ fn dispatch_axis_scroll(
     }
 
     if matches!(hit_test_ui(editor_state, local), UiHit::None)
-        && editor_state.settings_panel.text_layout.is_some()
+        && (editor_state.text_session.is_some()
+            || editor_state.settings_panel.text_layout.is_some())
     {
         super::super::panels::text::size_wheel::canvas(
             editor_state,

@@ -78,6 +78,7 @@ pub enum Command {
     Capture(CaptureOptions),
     ListDisplays,
     History,
+    Settings,
     HistoryEdit(String),
     HistorySnapshot,
     PinOcrSnapshot { copy: bool },
@@ -153,6 +154,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
         crate::ocr::daemon::DAEMON_ARG,
         crate::features::ocr_result::transport::RESULT_ARG,
         crate::features::capture_history::transport::READY_ARG,
+        crate::features::preferences::READY_ARG,
         crate::features::pinned_image::recognition::WORKER_ARG,
     ] {
         if args.contains(kind) {
@@ -183,6 +185,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
     let capture_to = path(&mut args, "--capture-to")?;
     let list_displays = args.contains("--list-displays");
     let history = args.contains("--history");
+    let settings = args.contains("--settings");
     let history_edit: Option<String> = args.opt_value_from_str("--history-edit")?;
     let history_snapshot = args.contains("--history-edit-snapshot");
     let pin_ocr_copy = args.contains(crate::features::pinned_image::actions::OCR_COPY_ARG);
@@ -272,6 +275,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
         capture_to.is_some(),
         list_displays,
         history,
+        settings,
         history_edit.is_some(),
         history_snapshot,
         pin_ocr_snapshot,
@@ -296,7 +300,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
     if monitor && all_outputs {
         return Err("--monitor and --all-outputs are mutually exclusive".into());
     }
-    if history
+    if (history || settings)
         && (output.is_some()
             || to.is_some()
             || default_tool.is_some()
@@ -339,6 +343,8 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
         })
     } else if list_displays {
         Command::ListDisplays
+    } else if settings {
+        Command::Settings
     } else if history {
         Command::History
     } else if let Some(name) = history_edit {

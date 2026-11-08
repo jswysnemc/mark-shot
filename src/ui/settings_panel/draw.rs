@@ -336,12 +336,15 @@ fn draw_stepper_arrows(
     hovered: Option<StepperArrow>,
 ) {
     let cfg = &crate::config::get().settings_panel;
-    let (arrow_w, arrow_h) = (cfg.stepper_arrow_width, cfg.stepper_arrow_height);
+    let (arrow_w, arrow_h) = (
+        cfg.stepper_arrow_width.min(7.0),
+        cfg.stepper_arrow_height.min(3.5),
+    );
     let cx = x + w - cfg.stepper_arrow_zone / 2.0;
     let mid_y = y + h / 2.0;
 
-    let up_cy = mid_y - cfg.stepper_arrow_gap / 2.0 - arrow_h / 2.0;
-    let down_cy = mid_y + cfg.stepper_arrow_gap / 2.0 + arrow_h / 2.0;
+    let up_cy = mid_y - cfg.stepper_arrow_gap.min(5.0) / 2.0 - arrow_h / 2.0;
+    let down_cy = mid_y + cfg.stepper_arrow_gap.min(5.0) / 2.0 + arrow_h / 2.0;
 
     let arrow_color = |arrow| {
         if hovered == Some(arrow) {
@@ -354,7 +357,7 @@ fn draw_stepper_arrows(
     let down_color = arrow_color(StepperArrow::Down);
 
     let mut stroke = Stroke::default();
-    stroke.width = cfg.stepper_arrow_stroke;
+    stroke.width = cfg.stepper_arrow_stroke.min(1.25);
     stroke.line_cap = tiny_skia::LineCap::Round;
     stroke.line_join = tiny_skia::LineJoin::Round;
 

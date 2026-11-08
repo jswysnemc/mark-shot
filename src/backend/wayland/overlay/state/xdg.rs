@@ -51,6 +51,20 @@ impl WindowHandler for OverlayState {
             }
         }
         self.configure_surface(window.wl_surface(), size);
+        if self.image_window.is_some()
+            && let Some(surface) = self
+                .surfaces
+                .values()
+                .find(|surface| &surface.surface == window.wl_surface())
+        {
+            let actual = (surface.width, surface.height);
+            self.image_window = Some(actual);
+            window.set_window_geometry(0, 0, actual.0, actual.1);
+            self.events
+                .retain(|event| !matches!(event, OverlayEvent::CanvasResized { .. }));
+            self.events
+                .push_back(OverlayEvent::CanvasResized { size: actual });
+        }
     }
 
     fn request_close(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &Window) {

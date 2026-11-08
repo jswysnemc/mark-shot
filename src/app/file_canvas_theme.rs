@@ -11,11 +11,11 @@ use tiny_skia::{Pixmap, PixmapPaint, Transform};
 pub(super) fn preview(
     file: &FileCanvas,
     placement: &Placement,
-    mode: Mode,
+    _mode: Mode,
 ) -> Option<FrozenPixmap> {
     let (width, height) = placement.px_size();
     let mut pixels = Pixmap::new(width, height)?;
-    pixels.fill(crate::theme::canvas::background(mode).color());
+    crate::theme::canvas::checkerboard(&mut pixels, placement.scale);
     let factor = file.viewport.width() / file.original.width() as f32 * placement.scale;
     let transform = Transform::from_scale(factor, factor).post_translate(
         (file.viewport.left() - placement.position.0 as f32) * placement.scale,

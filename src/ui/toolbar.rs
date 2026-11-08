@@ -1,3 +1,4 @@
+pub mod catalog;
 mod draw;
 pub mod icons;
 mod items;

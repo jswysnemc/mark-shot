@@ -45,12 +45,26 @@ fn offsets(maximum: i32, prediction: i32) -> impl Iterator<Item = i32> {
 }
 
 impl Stitcher {
+    /// 【滚动截图】【相邻位移】按 cols 与上一帧签名估计位移，返回候选位移和平均差异
     pub(crate) fn find_offset(&self, cols: &Signature) -> (i32, f32) {
+        self.offset_in(cols, self.window())
+    }
+
+    /// 【滚动截图】【正文位移】按 cols 排除视口两端后重试匹配，返回待原始像素校验的候选
+    pub(crate) fn find_inner_offset(&self, cols: &Signature) -> (i32, f32) {
+        let mut window = self.window();
+        let margin = cols.len() as i32 / 4;
+        window.top = window.top.max(margin);
+        window.bottom = window.bottom.max(margin);
+        self.offset_in(cols, window)
+    }
+
+    /// 【滚动截图】【限定匹配】按 cols 和 window 搜索相邻帧位移，返回最佳位置及差异
+    fn offset_in(&self, cols: &Signature, window: Window) -> (i32, f32) {
         if self.last_cols.is_empty() || cols.is_empty() {
             return (0, NO_MATCH);
         }
         let maximum = (self.last_cols.len() as i32 - self.config.min_overlap).max(0);
-        let window = self.window();
         let zero = frame_diff(&self.last_cols, cols, 0, window, &self.motion.weights);
         let threshold = self.config.approx_diff.min(zero * 0.03);
         let mut search = Search {

@@ -60,6 +60,29 @@ pub fn handle_key(
     text: Option<String>,
     dirty_mask: &mut u32,
 ) {
+    if editor_state.color_inspector.panel.is_some()
+        && chord.is_some_and(|chord| chord.key == keys::Key::Escape)
+    {
+        crate::features::color_sample::inspector::close(editor_state, dirty_mask);
+        return;
+    }
+    if editor_state.selected_tool == Tool::Eyedropper
+        && chord.is_some_and(|chord| {
+            chord.mods.ctrl
+                && !chord.mods.alt
+                && !chord.mods.shift
+                && chord.key == keys::Key::Char('c')
+        })
+        && let Some(color) = editor_state.color_inspector.live
+    {
+        crate::tools::eyedropper::copy_value(
+            editor_state,
+            crate::ui::settings_panel::ValueField::Hex,
+            color,
+        );
+        mark_all_dirty(dirty_mask, editor_state.placements.len());
+        return;
+    }
     // 1. 【截图界面】【主题快捷键】主题切换不提交文字或改变拖动事务，所有弹层与字段共用入口
     if chord.is_some_and(crate::theme::is_toggle) {
         super::super::theme_switch::toggle(editor_state, dirty_mask);

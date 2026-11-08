@@ -30,16 +30,8 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
         state.toolbar.marker_filled = state.tool_settings.marker_filled;
         state.toolbar.dirty = true;
     }
-    let items = if state.fullscreen_scope {
-        crate::ui::toolbar::FULLSCREEN_ITEMS
-    } else {
-        crate::ui::toolbar::ITEMS
-    };
-    if state.toolbar.items != items {
-        state.toolbar.items = items;
-        state.toolbar.selected = items.iter().position(|item| matches!(item, ToolbarItem::Button(ToolbarButton::Tool(tool)) if *tool == state.selected_tool));
-        state.toolbar.dirty = true;
-    }
+    let config = crate::config::preferences::current();
+    configure(state, &config.toolbar_layout, false);
     let main_layout = state.toolbar.arrange(available);
     let side_layout = state.action_toolbar.arrange(available);
     let selection = state.selection.zone.and_then(|rect| {
@@ -92,7 +84,8 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
     );
     let undo = !state.undo_stack.is_empty();
     let redo = !state.redo_stack.is_empty();
-    let clear = !state.annotations.is_empty();
+    let clear =
+        !state.annotations.is_empty() || state.text_session.is_some() || state.pending.is_some();
     let busy = state.ann_drag.is_some()
         || state.input.mouse_down
         || state.upload.busy()
@@ -150,6 +143,41 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
     }
 }
 
+/// 【工具栏配置】【会话同步】按 config 应用 state 当前场景按钮，reset 清除旧位置并应用方向，不修改标注
+pub(crate) fn configure(
+    state: &mut EditorState,
+    config: &crate::config::toolbar_layout::ToolbarLayout,
+    reset: bool,
+) {
+    use crate::config::toolbar_layout::Profile;
+    let profile = if state.fullscreen_scope {
+        Profile::Fullscreen
+    } else {
+        Profile::Main
+    };
+    for (toolbar, profile) in [
+        (&mut state.toolbar, profile),
+        (&mut state.action_toolbar, Profile::Actions),
+    ] {
+        let items = profile.items(config);
+        if toolbar.items != items || toolbar.profile != profile || reset {
+            toolbar.items = items.to_vec();
+            toolbar.profile = profile;
+            toolbar.orientation = if profile.vertical(config) {
+                crate::ui::toolbar::Orientation::Vertical
+            } else {
+                crate::ui::toolbar::Orientation::Horizontal
+            };
+            toolbar.selected = items.iter().position(|item| matches!(item, ToolbarItem::Button(ToolbarButton::Tool(tool)) if *tool == state.selected_tool));
+            toolbar.hovered = None;
+            toolbar.disabled.clear();
+            toolbar.user_position = None;
+            toolbar.drawn_look = None;
+            toolbar.dirty = true;
+        }
+    }
+}
+
 /// 【截图工具栏】【可用状态】按 undo、redo、clear 和 busy 更新 toolbar 按钮，仅未实现集成入口保持禁用
 fn disable(toolbar: &mut Toolbar, undo: bool, redo: bool, clear: bool, busy: bool) {
     let disabled = toolbar
@@ -165,6 +193,7 @@ fn disable(toolbar: &mut Toolbar, undo: bool, redo: bool, clear: bool, busy: boo
                             | crate::ui::toolbar::Integration::Extensions
                             | crate::ui::toolbar::Integration::Upload
                             | crate::ui::toolbar::Integration::Translate
+                            | crate::ui::toolbar::Integration::Settings
                     )
                 }
                 ToolbarItem::Button(ToolbarButton::Undo) => !undo || busy,

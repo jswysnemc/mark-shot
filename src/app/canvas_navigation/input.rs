@@ -313,10 +313,7 @@ pub(crate) fn scroll(state: &mut EditorState, event: ScrollEvent, dirty: &mut u3
     let target = state.navigation_policy().wheel_target(
         state.selected_tool,
         state.selected_annotation_ids().len(),
-        state
-            .text_session
-            .as_ref()
-            .is_some_and(|session| session.original_id.is_some()),
+        state.text_session.is_some(),
         blocked,
         event,
     );

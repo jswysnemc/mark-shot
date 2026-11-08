@@ -4,10 +4,7 @@ use super::frame_pixels::FramePixels;
 use super::{WaylandOverlay, state::OverlayState};
 use crate::{
     AppResult,
-    backend::{
-        native_backdrop,
-        wayland::utils::{shm::create_shm_buffer, surface::SurfaceData},
-    },
+    backend::wayland::utils::{shm::create_shm_buffer, surface::SurfaceData},
     image_source::ImageSource,
     types::{DamageRect, OverlayEvent},
 };
@@ -26,10 +23,10 @@ pub(crate) fn has_writable_buffer(surface: &SurfaceData) -> bool {
             .is_none_or(|buffer| !buffer.active())
 }
 
-/// 【截图覆盖层】【释放进度】按state处理服务端释放的备用页，并唤醒此前等待槽位的输出，无返回值
-pub(super) fn released(state: &mut OverlayState) {
+/// 【截图覆盖层】【释放进度】按state处理服务端释放；reclaim仅允许透明模式回收备用页，唤醒等待槽位的输出，无返回值
+pub(super) fn released(state: &mut OverlayState, reclaim: bool) {
     for (&monitor, surface) in &mut state.surfaces {
-        if let Some(spare) = &mut surface.spare_buffer {
+        if reclaim && let Some(spare) = &mut surface.spare_buffer {
             spare.reclaim(&mut state.pool)
         }
         if surface.waiting_release && surface.frame_sent.is_none() && has_writable_buffer(surface) {
@@ -58,7 +55,7 @@ impl WaylandOverlay {
         )
     }
 
-    /// 【截图覆盖层】【统一像素交付】按monitor_idx、pixels、background和damage写入可用槽位，返回协议结果；消费路径在背景合成前归还已复制CPU页
+    /// 【截图覆盖层】【统一像素交付】按monitor_idx、pixels、background和damage写入可用槽位，返回协议结果；不透明模式直接合成，透明模式保留稀疏页处理
     pub(super) fn stage_with_pixels(
         &mut self,
         monitor_idx: usize,
@@ -105,9 +102,10 @@ impl WaylandOverlay {
         }
         let buffer = surface.shm_buffer.as_mut().unwrap();
         buffer.write(pool, |native| {
-            pixels.write_to(native, size, damage)?;
             if let Some(background) = background {
-                native_backdrop::compose_bgra(background, native, size, damage)?
+                pixels.write_composited_to(native, background, size, damage)?;
+            } else {
+                pixels.write_to(native, size, damage)?;
             }
             Ok(())
         })?;

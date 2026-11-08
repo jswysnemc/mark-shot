@@ -26,6 +26,10 @@ impl PointerState {
 
 #[derive(Debug, Clone)]
 pub enum OverlayEvent {
+    /// 【图片编辑】【窗口调整】普通编辑窗口的合成器确认尺寸，原图与标注保持原坐标
+    CanvasResized {
+        size: (u32, u32),
+    },
     /// 【主选择区】【接收完成】id 绑定本次粘贴，空正文表示来源不可用或传输失败
     PrimaryText {
         id: u64,

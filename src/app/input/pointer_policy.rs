@@ -110,7 +110,7 @@ fn right_double_click(state: &mut EditorState) -> bool {
 }
 
 /// 【截图工具栏】【范围切换】在 state 中切换全图和原选区；dirty 返回重绘显示器，不删除标注
-pub(super) fn toggle_scope(state: &mut EditorState, dirty: &mut u32) {
+pub(crate) fn toggle_scope(state: &mut EditorState, dirty: &mut u32) {
     if state.tool_active || state.pending.is_some() || state.ann_drag.is_some() {
         return;
     }
@@ -151,17 +151,31 @@ pub(super) fn toolbar_click(
     if state.pending.is_some()
         && !matches!(
             button,
-            ToolbarButton::Tool(_) | ToolbarButton::Undo | ToolbarButton::Cancel
+            ToolbarButton::Tool(_)
+                | ToolbarButton::Undo
+                | ToolbarButton::Cancel
+                | ToolbarButton::Clear
         )
     {
         return;
     }
     if let Some(action) = button.action() {
         super::super::actions::run(state, action, dirty);
+    }
+}
+
+/// 【工具栏动作】【共用执行】按 button 更新 state 的清除或排列状态，dirty 返回重绘；按钮与快捷键共用此入口
+pub(crate) fn command(state: &mut EditorState, button: ToolbarButton, dirty: &mut u32) {
+    if state.input.mouse_down || state.ann_drag.is_some() {
         return;
     }
     match button {
         ToolbarButton::Clear => {
+            crate::editor::text_session::commit(state, dirty);
+            crate::editor::drawing_gesture::cancel(state, dirty);
+            state.laser = Default::default();
+            state.end_collection_interaction();
+            state.line_session.clear();
             if !state.annotations.is_empty() {
                 state.push_undo();
                 state.annotations.clear();

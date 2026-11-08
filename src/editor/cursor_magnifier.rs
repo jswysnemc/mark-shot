@@ -24,6 +24,7 @@ pub fn visible(state: &EditorState) -> bool {
         || state.arrow_popover.open
         || state.line_popover.open
         || state.filter_popover.open
+        || state.color_inspector.panel.is_some()
     {
         return false;
     }

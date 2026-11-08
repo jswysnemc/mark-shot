@@ -13,7 +13,7 @@ mod list_draw;
 mod model;
 pub mod png_metadata;
 mod preview;
-mod scrollbar;
+use crate::ui::scrollbar;
 mod splitter;
 pub mod transport;
 mod window;

@@ -35,7 +35,7 @@ pub(super) fn capture(state: &EditorState) -> Option<Sample> {
             None
         }
     });
-    let text = state.settings_panel.text_layout.is_some();
+    let text = state.text_session.is_some() || state.settings_panel.text_layout.is_some();
     let range = if text { StepperRange::Font } else { range? };
     let selected = active_annotation_idx(state).and_then(|index| state.annotations.get(index));
     let number = selected.map_or(

@@ -10,6 +10,7 @@ use std::time::Instant;
 pub enum ValueField {
     Hex,
     Rgb,
+    Hsl,
 }
 
 impl ValueField {
@@ -19,6 +20,35 @@ impl ValueField {
         match self {
             ValueField::Hex => format!("#{}", crate::ui::color_popover::color_to_hex_string(color)),
             ValueField::Rgb => format!("{}, {}, {}", c.red(), c.green(), c.blue()),
+            ValueField::Hsl => {
+                let red = color.red();
+                let green = color.green();
+                let blue = color.blue();
+                let maximum = red.max(green).max(blue);
+                let minimum = red.min(green).min(blue);
+                let delta = maximum - minimum;
+                let lightness = (maximum + minimum) / 2.0;
+                let saturation = if delta == 0.0 {
+                    0.0
+                } else {
+                    delta / (1.0 - (2.0 * lightness - 1.0).abs())
+                };
+                let hue = if delta == 0.0 {
+                    0.0
+                } else if maximum == red {
+                    ((green - blue) / delta).rem_euclid(6.0)
+                } else if maximum == green {
+                    (blue - red) / delta + 2.0
+                } else {
+                    (red - green) / delta + 4.0
+                } * 60.0;
+                format!(
+                    "hsl({:.0}, {:.0}%, {:.0}%)",
+                    hue,
+                    saturation * 100.0,
+                    lightness * 100.0
+                )
+            }
         }
     }
 
@@ -27,7 +57,7 @@ impl ValueField {
         let cfg = &crate::config::get().settings_panel;
         match self {
             ValueField::Hex => cfg.hex_width,
-            ValueField::Rgb => cfg.rgb_width,
+            ValueField::Rgb | ValueField::Hsl => cfg.rgb_width.max(165.0),
         }
     }
 }
@@ -52,6 +82,7 @@ pub enum SettingsAction {
     ArrowStyles,
     LineStyles,
     FilterModes,
+    ColorFormats,
 }
 
 impl SettingsAction {
@@ -352,11 +383,10 @@ pub const EYEDROPPER_WIDGETS: &[SettingsWidget] = &[
     SettingsWidget::Value {
         field: ValueField::Hex,
     },
-    SettingsWidget::Value {
-        field: ValueField::Rgb,
+    SettingsWidget::Action {
+        action: SettingsAction::ColorFormats,
+        svg: crate::ui::icons::COPY,
     },
-    SettingsWidget::Separator,
-    SettingsWidget::Label("Click anywhere to pick a color"),
 ];
 
 /// What the panel offers once text has been read. The hint is the answer to
@@ -425,6 +455,7 @@ const OCR_OPEN_RESULT: SettingsWidget = SettingsWidget::Action {
 /// 【属性面板】【标注控件】依据 ann 的形状返回可编辑属性控件
 pub fn widgets_for_annotation(ann: &Annotation) -> &'static [SettingsWidget] {
     match &ann.shape {
+        AnnotationShape::ColorSample { .. } => widgets_for_tool(Tool::Eyedropper),
         AnnotationShape::Number { .. } => widgets_for_tool(Tool::Number),
         AnnotationShape::Magnifier { .. } => widgets_for_tool(Tool::Magnifier),
         AnnotationShape::Ruler { .. } => widgets_for_tool(Tool::Ruler),

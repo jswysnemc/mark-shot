@@ -389,7 +389,7 @@ fn image_markers_require_an_inside_start_and_use_native_pixel_sizes() {
     pointer(
         &mut state,
         f64::from(viewport.width()) / 2.0 + f64::from(viewport.left()),
-        f64::from(viewport.top()) - 1.0,
+        f64::from(viewport.top()) - 12.0,
         &mut dirty,
     );
     handle_pointer_button(&mut state, MouseButton::Left, true, &mut dirty);

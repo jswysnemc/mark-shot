@@ -77,11 +77,21 @@ pub(super) fn draw(
     }
 
     if let Some(sel) = req.selection {
-        Painter::new(req.canvas)
-            .with_scale(s)
-            .clipped(dirty_rect.copied(), |painter| {
-                draw_selection_border(painter, sel, req.selection_edges, req.selection_radius);
-            });
+        selection_border_damage::draw(
+            req.canvas,
+            s,
+            dirty_rect.copied(),
+            sel,
+            req.selection_edges,
+            req.selection_radius,
+        );
+        super::selection_handles::draw(
+            req.canvas,
+            s,
+            dirty_rect.copied(),
+            sel,
+            req.selection_edges,
+        );
     }
 
     if let Some(rect) = req.hovered_region {

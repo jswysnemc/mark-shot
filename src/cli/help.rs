@@ -34,6 +34,7 @@ Pinning:
   --pin-clipboard               Pin a clipboard image or plain text
 
 Screenshot history:
+  --settings                    Open preferences and configure capture tools
   --history                     Browse, search and manage completed captures
                                 Ctrl+H opens history from the editor
 

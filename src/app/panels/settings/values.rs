@@ -9,6 +9,11 @@ use crate::ui::settings_panel::{StepperRange, ToggleField};
 
 /// 【属性面板】【数值读写】根据 editor_state 返回选中标注或工具颜色
 pub fn current_color(editor_state: &EditorState) -> tiny_skia::Color {
+    if editor_state.picking()
+        && let Some(color) = editor_state.color_inspector.live
+    {
+        return color;
+    }
     if crate::editor::annotation_collection::properties::active(editor_state) {
         return crate::editor::annotation_collection::properties::first(editor_state)
             .map_or(editor_state.tool_settings.color, |annotation| {

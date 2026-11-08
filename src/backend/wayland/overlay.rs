@@ -16,6 +16,7 @@ mod frame_mode;
 pub(crate) mod frame_pixels;
 pub(super) mod frame_staging;
 mod frozen_background;
+mod image_window;
 mod poll_sources;
 mod presentation;
 mod scroll;
@@ -81,6 +82,16 @@ impl WaylandOverlay {
 }
 
 impl ScreenOverlay for WaylandOverlay {
+    /// 【图片编辑】【窗口启用】按 size 设置初始逻辑尺寸并使用普通窗口，返回是否成功
+    fn configure_image_window(&mut self, size: (u32, u32)) -> bool {
+        self.layer = false;
+        self.runtime.state.image_window = Some(size);
+        true
+    }
+    /// 【图片编辑】【窗口尺寸】返回最后一次合成器配置的尺寸，无额外参数
+    fn image_window_size(&self) -> Option<(u32, u32)> {
+        self.runtime.state.image_window
+    }
     /// 【截图覆盖层】【原生背景能力】无参数，单表面模式允许在原生缓冲中合成同网格冻结背景
     fn supports_native_frame_background(&self) -> bool {
         self.composited_background
@@ -274,6 +285,21 @@ impl ScreenOverlay for WaylandOverlay {
         self.stage_pixels(monitor_idx, pixels, None, damage)
     }
 
+    /// 【原生帧】【不透明交付】按 monitor_idx、pixels 和 damage 直接转换已合成场景，跳过透明页检测和背景重读，返回协议结果
+    fn stage_opaque_frame(
+        &mut self,
+        monitor_idx: usize,
+        pixels: &[u8],
+        damage: Option<DamageRect>,
+    ) -> crate::AppResult {
+        self.stage_with_pixels(
+            monitor_idx,
+            frame_pixels::FramePixels::Opaque(pixels),
+            None,
+            damage,
+        )
+    }
+
     /// 【滚动截图】【局部提交】按monitor_idx和frame交付面板，浮层边线使用独立子表面，返回协议结果
     fn stage_scroll_panel(
         &mut self,
@@ -336,7 +362,7 @@ impl ScreenOverlay for WaylandOverlay {
                 }
             }
             rt.event_queue.dispatch_pending(&mut rt.state)?;
-            frame_staging::released(&mut rt.state);
+            frame_staging::released(&mut rt.state, !self.composited_background);
             rt.state.primary_selection.progress(&mut rt.state.events);
 
             if rt.state.pending_flush {

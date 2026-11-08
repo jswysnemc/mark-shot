@@ -3,6 +3,50 @@
 use crate::app::region_rendering_test_support::{editor, equal, render};
 use tiny_skia::Rect;
 
+/// 【区域背景测试】【矩形遮罩】对照通用路径验证快速填充，整数内部与分数边缘保持相同像素
+#[test]
+fn rectangular_shade_matches_path_raster() {
+    for scale in [1.0, 1.25, 2.0] {
+        for selection in [
+            None,
+            Rect::from_xywh(19.375, 43.625, 459.25, 233.875),
+            Rect::from_xywh(-20.0, -10.0, 900.0, 700.0),
+        ] {
+            let mut actual =
+                tiny_skia::Pixmap::new((640.0 * scale) as u32, (480.0 * scale) as u32).unwrap();
+            actual.fill(tiny_skia::Color::from_rgba8(74, 111, 183, 255));
+            let mut expected = actual.clone();
+            let mut painter = super::Painter::new(&mut expected).with_scale(scale);
+            let color = crate::config::get().selection.dim;
+            if let Some(selection) = selection {
+                for (left, top, right, bottom) in [
+                    (0.0, 0.0, 640.0, selection.top()),
+                    (0.0, selection.bottom(), 640.0, 480.0),
+                    (0.0, selection.top(), selection.left(), selection.bottom()),
+                    (
+                        selection.right(),
+                        selection.top(),
+                        640.0,
+                        selection.bottom(),
+                    ),
+                ] {
+                    if let Some(rect) = Rect::from_ltrb(left, top, right, bottom) {
+                        painter.fill_rounded(rect, 0.0, color);
+                    }
+                }
+            } else {
+                painter.fill_rounded(Rect::from_xywh(0.0, 0.0, 640.0, 480.0).unwrap(), 0.0, color);
+            }
+            super::shade(
+                &mut super::Painter::new(&mut actual).with_scale(scale),
+                selection.as_ref(),
+                (640.0, 480.0),
+            );
+            equal(&actual, &expected, "rectangular shade");
+        }
+    }
+}
+
 /// 【区域背景测试】【选择损坏】无参数，比较多种设备比例的选区变化及反复局部恢复，无返回值
 #[test]
 fn identity_background_matches_cached_selection_changes() {

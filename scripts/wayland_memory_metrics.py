@@ -14,6 +14,8 @@ def source_kind(path):
     """【内存对照】【来源身份】按path区分图片原件、冻结快照和两版原生共享文件，返回身份或空值，未知文件不纳入物理统计"""
     if "/mark-shot/image-source/" in path:
         return "original"
+    if "/mark-shot/clipboard/" in path:
+        return "clipboard"
     if "/mark-shot/frozen-source/" in path:
         return "frozen"
     if path.startswith(("/memfd:smithay-client-toolkit", "/memfd:wayland-shm")):
@@ -114,9 +116,10 @@ def original_source_files(pid):
 class MemorySampler:
     """【内存对照】【采样生命周期】测试进程使用独立采样线程，产品进程不增加线程"""
 
-    def __init__(self, process, destination, interval=0.025):
+    def __init__(self, process, destination, interval=0.025, related_processes=None):
         """【内存对照】【构造】保存 process、JSONL destination 和秒间隔；返回初始化实例"""
         self.process, self.destination, self.interval = process, destination, interval
+        self.related_processes = related_processes or (lambda: set())
         self.samples, self.identities = [], {}
         self.source_files = {}
         self.error = None
@@ -127,7 +130,7 @@ class MemorySampler:
     def _sample(self):
         """【内存对照】【完整样本】无参数，返回进程树RSS和额外来源及原生文件页；同一物理页跨父子进程不重复计入"""
         records, files = [], {}
-        for pid in descendants(self.process.pid) | self.identities.keys():
+        for pid in descendants(self.process.pid) | self.identities.keys() | self.related_processes():
             sample = process_sample(pid)
             if sample is None:
                 continue

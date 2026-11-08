@@ -18,6 +18,7 @@ mod frame_lifecycle_overlay;
 #[cfg(all(test, target_os = "linux"))]
 mod frame_lifecycle_tests;
 mod frame_render;
+mod source_residency;
 use frame_render::Pacing;
 use frame_render::{clear_frame_state, render_dirty_monitors};
 mod export;
@@ -31,12 +32,21 @@ mod file_canvas_theme;
 mod finish;
 mod image_export;
 mod image_setup;
+mod image_window;
 mod init;
-mod input;
+pub(crate) mod input;
 mod instant;
 mod layers;
 mod ocr;
 mod panels;
+
+/// 【工具栏配置】【设置返回】按 config 重置 state 工具栏位置与缓存，后续面板刷新负责实际排版
+pub(crate) fn configure_toolbar(
+    state: &mut EditorState,
+    config: &crate::config::toolbar_layout::ToolbarLayout,
+) {
+    panels::toolbar::configure(state, config, true);
+}
 mod pointer_history;
 #[cfg(test)]
 pub(crate) mod region_rendering_test_support;
@@ -50,6 +60,7 @@ pub(crate) mod text_menu_surface;
 
 pub(crate) use init::{build_captures, build_placements, load_icons_cache};
 pub(crate) use input::select_tool;
+pub(crate) use input::text_reedit;
 
 use crate::backend::ScreenOverlay;
 use crate::backend::{FRAME_FALLBACK, initialize_overlay};

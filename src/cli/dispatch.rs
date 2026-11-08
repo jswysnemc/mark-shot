@@ -44,6 +44,13 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
     });
     if let Command::Internal { kind, args } = options.command {
         return match kind.as_str() {
+            crate::features::preferences::READY_ARG => {
+                if !args.is_empty() {
+                    return Err("settings window accepts no internal arguments".into());
+                }
+                crate::logging::init(Process::Overlay);
+                crate::features::preferences::run(true)
+            }
             clipboard::DAEMON_ARG => {
                 crate::logging::init(Process::Clipboard);
                 clipboard::daemon::cli(args.into_iter());
@@ -75,6 +82,10 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
             }
             _ => Err("unknown internal command".into()),
         };
+    }
+    if matches!(options.command, Command::Settings) {
+        crate::logging::init(Process::Overlay);
+        return crate::features::preferences::run(false);
     }
     if matches!(options.command, Command::History) {
         crate::logging::init(Process::History);

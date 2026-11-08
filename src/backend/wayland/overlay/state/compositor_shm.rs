@@ -125,7 +125,8 @@ impl OverlayState {
                 return;
             }
         };
-        if transparent_parent {
+        let defer_image_frame = self.image_window.is_some() && sd.mapped && !transparent_parent;
+        if transparent_parent || self.image_window.is_some() && !defer_image_frame {
             shm_buffer.clear(pool);
         }
 
@@ -136,7 +137,11 @@ impl OverlayState {
         if let Some(viewport) = &sd.viewport {
             viewport.set_destination(w as i32, h as i32);
         }
-        if transparent_parent {
+        if defer_image_frame {
+            // 1. 【图片窗口】【完整交付】调整尺寸后的槽位必须先由画布完整绘制，不能提交池中残留像素
+            sd.waiting_release = false;
+            sd.frame_sent = None;
+        } else if transparent_parent {
             shm_buffer
                 .buffer
                 .attach_to(&sd.surface)
@@ -148,8 +153,10 @@ impl OverlayState {
                 .expect("newly created buffer is inactive");
             sd.waiting_release = true;
         }
-        sd.surface.damage_buffer(0, 0, bw as i32, bh as i32);
-        sd.surface.commit();
+        if !defer_image_frame {
+            sd.surface.damage_buffer(0, 0, bw as i32, bh as i32);
+            sd.surface.commit();
+        }
 
         sd.shm_buffer = Some(shm_buffer);
         sd.spare_buffer = None;

@@ -286,6 +286,17 @@ fn consumed_foreground_keeps_file_navigation_and_hidden_annotation_pixels() {
         }
         equal(&actual, &expected);
     }
+    for harness in [&mut actual, &mut expected] {
+        harness.state.navigation.view.as_mut().unwrap().reset(true);
+        let mut dirty = 0;
+        super::canvas_navigation::damage::changed(&mut harness.state, &mut dirty);
+        harness.render(dirty, false);
+        harness
+            .state
+            .damage_local(0, Rect::from_xywh(30.0, 40.0, 120.0, 90.0).unwrap());
+        harness.render(1, false);
+    }
+    equal(&actual, &expected);
 }
 
 /// 【帧生命周期测试】【混合输出】无参数，独立比例及全局坐标输出的局部更新保持未提交输出的完整原生帧，无返回值

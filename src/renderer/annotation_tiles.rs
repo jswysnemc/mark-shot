@@ -144,6 +144,10 @@ fn ordered(
 /// 【标注渲染】【实时草稿】按req将当前草稿直接绘入恢复后的局部底图，保持旧正文与草稿的两次合成顺序，无返回值
 fn pending(req: &mut RenderRequest<'_>) {
     let Some(pending) = req.pending else { return };
+    if matches!(pending.shape, crate::types::AnnotationShape::Ruler { .. }) {
+        super::pending_ruler::draw(req, pending);
+        return;
+    }
     let filters = req.filters;
     let active_text_id = req.active_text_id;
     let tail = !req.is_pending_selected && pending.rotation_degrees == 0.0;

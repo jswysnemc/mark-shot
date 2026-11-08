@@ -38,6 +38,9 @@ impl<'a> FrozenImage<'a> {
                 viewport.top() * self.factor + self.offset.1,
             )
             .post_concat(transform);
+            if super::navigation_pixels::draw(canvas, pixels, source) {
+                return;
+            }
             canvas.draw_pixmap(
                 0,
                 0,
@@ -175,6 +178,28 @@ impl<'a> FrozenImage<'a> {
 
     /// 【图像采样】【平滑像素】返回 point 对应的双线性预乘 RGBA；点在原图外或非有限时返回空值，不转换透明像素为白色
     pub fn sample(self, point: (f32, f32)) -> Option<[u8; 4]> {
+        self.sample_with(point, bilinear)
+    }
+
+    /// 【图像采样】【精确取色】返回 point 覆盖的原始像素，不混合相邻像素，适用于取色与像素检查
+    pub fn sample_nearest(self, point: (f32, f32)) -> Option<[u8; 4]> {
+        self.sample_with(point, |pixels, point| {
+            let horizontal = point.0.floor() as u32;
+            let vertical = point.1.floor() as u32;
+            if horizontal >= pixels.width() || vertical >= pixels.height() {
+                return None;
+            }
+            let offset = (vertical as usize * pixels.width() as usize + horizontal as usize) * 4;
+            Some(pixels.data()[offset..offset + 4].try_into().unwrap())
+        })
+    }
+
+    /// 【图像采样】【坐标共用】按 point 反解原图坐标并调用 sample，返回像素，边界与多显示器优先级保持一致
+    fn sample_with(
+        self,
+        point: (f32, f32),
+        sample: impl Fn(PixmapRef<'_>, (f64, f64)) -> Option<[u8; 4]>,
+    ) -> Option<[u8; 4]> {
         if !point.0.is_finite() || !point.1.is_finite() {
             return None;
         }
@@ -187,7 +212,7 @@ impl<'a> FrozenImage<'a> {
                 if !contains(viewport, point) {
                     return None;
                 }
-                bilinear(
+                sample(
                     pixels,
                     (
                         f64::from(point.0 - viewport.left()) * f64::from(pixels.width())
@@ -218,7 +243,7 @@ impl<'a> FrozenImage<'a> {
                         f64::from(point.0 - bounds.left()),
                         f64::from(point.1 - bounds.top()),
                     );
-                    bilinear(capture.pixmap.as_ref(), capture.to_native(local))
+                    sample(capture.pixmap.as_ref(), capture.to_native(local))
                 }),
         }
     }

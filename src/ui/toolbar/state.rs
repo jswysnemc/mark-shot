@@ -23,7 +23,8 @@ pub struct Toolbar {
     pub cells: Vec<Rect>,
     pub disabled: Vec<usize>,
     pub user_position: Option<(f32, f32)>,
-    pub items: &'static [ToolbarItem],
+    pub items: Vec<ToolbarItem>,
+    pub profile: crate::config::toolbar_layout::Profile,
     pub position: (f32, f32),
     pub size: (f32, f32),
     pub opacity: f32,
@@ -58,6 +59,7 @@ pub struct ToolbarLook {
     marker_filled: bool,
     disabled: Vec<usize>,
     orientation: Orientation,
+    items: Vec<ToolbarItem>,
 }
 
 impl Default for Toolbar {
@@ -76,7 +78,7 @@ impl UiPanel for Toolbar {
         self.size
     }
     fn items(&self) -> &[Self::Item] {
-        self.items
+        &self.items
     }
     fn padding(&self) -> f32 {
         self.margin()
@@ -175,7 +177,8 @@ impl Toolbar {
             cells: Vec::new(),
             disabled: Vec::new(),
             user_position: None,
-            items: ITEMS,
+            items: ITEMS.to_vec(),
+            profile: crate::config::toolbar_layout::Profile::Main,
             size: (0.0, size::panel_height()),
             opacity: 1.0,
             monitor_idx: 0,
@@ -205,7 +208,8 @@ impl Toolbar {
         let mut toolbar = Self::new();
         toolbar.secondary = true;
         toolbar.orientation = Orientation::Vertical;
-        toolbar.items = ACTION_ITEMS;
+        toolbar.items = ACTION_ITEMS.to_vec();
+        toolbar.profile = crate::config::toolbar_layout::Profile::Actions;
         toolbar.selected = None;
         toolbar.arrange((4096.0, 4096.0));
         toolbar.start_hidden();
@@ -224,6 +228,7 @@ impl Toolbar {
             marker_filled: self.marker_filled,
             disabled: self.disabled.clone(),
             orientation: self.orientation,
+            items: self.items.clone(),
         }
     }
 

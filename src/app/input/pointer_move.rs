@@ -23,6 +23,10 @@ pub(crate) fn handle_canvas_pointer_move(
         global,
     );
     editor_state.selection_size.clicks.moved(global);
+    if selection_handles::motion(editor_state, dirty_mask) {
+        apply_damage_rects(editor_state, dirty_mask);
+        return;
+    }
     if crate::app::selection_translation::input::pointer(editor_state, dirty_mask) {
         apply_damage_rects(editor_state, dirty_mask);
         return;
@@ -39,6 +43,10 @@ pub(crate) fn handle_canvas_pointer_move(
         return;
     }
     update_magnifier(editor_state, dirty_mask);
+    if crate::features::color_sample::inspector::pointer(editor_state, dirty_mask) {
+        apply_damage_rects(editor_state, dirty_mask);
+        return;
+    }
     if editor_state.toolbar_drag.is_some() {
         pointer_policy::move_toolbar(editor_state, dirty_mask);
         apply_damage_rects(editor_state, dirty_mask);

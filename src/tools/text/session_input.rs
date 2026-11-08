@@ -211,9 +211,12 @@ fn point(state: &EditorState, global: (f64, f64)) -> Option<(i32, i32)> {
         return None;
     };
     let padding = crate::features::text::geometry::padding(appearance.size_scale);
+    let global = session
+        .working
+        .to_unrotated((global.0 as f32, global.1 as f32));
     Some((
-        (global.0 as f32 - start.0 - padding.0).round() as i32,
-        (global.1 as f32 - start.1 - padding.1).round() as i32,
+        (global.0 - start.0 - padding.0).round() as i32,
+        (global.1 - start.1 - padding.1).round() as i32,
     ))
 }
 
@@ -221,11 +224,14 @@ fn point(state: &EditorState, global: (f64, f64)) -> Option<(i32, i32)> {
 pub fn inside(state: &EditorState) -> bool {
     state.text_session.as_ref().is_some_and(|session| {
         let rect = session.presented().bbox;
-        let (x, y) = state.canvas_point();
-        x >= rect.left() as f64
-            && x < rect.right() as f64
-            && y >= rect.top() as f64
-            && y < rect.bottom() as f64
+        let point = state.canvas_point();
+        let point = session
+            .presented()
+            .to_unrotated((point.0 as f32, point.1 as f32));
+        point.0 >= rect.left()
+            && point.0 < rect.right()
+            && point.1 >= rect.top()
+            && point.1 < rect.bottom()
     })
 }
 

@@ -42,7 +42,9 @@ pub use loading::*;
 mod document;
 mod legacy;
 mod paths;
+pub mod preferences;
 pub(crate) mod startup;
+pub mod toolbar_layout;
 pub use startup::Startup;
 pub mod history;
 mod persistence;
@@ -98,6 +100,7 @@ pub struct Config {
     #[serde(skip)]
     pub(crate) theme_custom: u16,
     pub toolbar: Toolbar,
+    pub toolbar_layout: toolbar_layout::ToolbarLayout,
     pub settings_panel: SettingsPanel,
     pub color_picker: ColorPicker,
     pub model_picker: ModelPicker,
@@ -136,6 +139,7 @@ impl Default for Config {
             theme: Theme::default(),
             theme_custom: 0,
             toolbar: Toolbar::default(),
+            toolbar_layout: toolbar_layout::ToolbarLayout::default(),
             settings_panel: SettingsPanel::default(),
             color_picker: ColorPicker::default(),
             model_picker: ModelPicker::default(),

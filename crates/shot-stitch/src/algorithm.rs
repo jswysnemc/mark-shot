@@ -47,7 +47,14 @@ impl Stitcher {
         })
     }
 
+    /// 【滚动截图】【重访接收】用 frame、cols 验证 position 位置，成功后记录 offset，返回未增长或拒绝结果
     fn adopt(&mut self, frame: Image, cols: Signature, position: i32, offset: i32) -> StitchResult {
+        // 1. 【滚动截图】【重访校验】正文没有连续匹配时不替换位移锚点，便于用户返回原位置补采
+        if crate::seam::find(self, &frame, position, Edge::None)
+            .is_none_or(|seam| seam.matching_rows < self.config.min_overlap)
+        {
+            return StitchResult::default();
+        }
         let height = frame.height();
         self.anchor = position;
         self.last_offset = offset;
@@ -87,6 +94,7 @@ impl Stitcher {
         (amount, edge, diff, length)
     }
 
+    /// 【滚动截图】【帧合并】按 raw 匹配正文并替换重叠边缘，返回增长状态或分配错误
     fn push_inner(&mut self, raw: Image) -> Result<StitchResult, ImageError> {
         let frame = if self.axis == Axis::Horizontal {
             raw.transpose()?
@@ -114,6 +122,7 @@ impl Stitcher {
         }
         self.motion.observe(&self.last_cols, &cols);
         let (offset, confidence) = self.find_offset(&cols);
+        let (offset, confidence) = crate::seam::refine(self, &frame, &cols, offset, confidence);
         let predicted = self.anchor + offset;
         let mut placement = Placement {
             position: predicted,
@@ -190,6 +199,15 @@ impl Stitcher {
         }
         let (mut amount, mut edge, mut edge_diff, mut overlap) =
             self.score_edge(&cols, placement, (top_trim, bottom_trim));
+        let mut replacement = crate::seam::find(self, &frame, placement.position, edge);
+        // 1. 【滚动截图】【遮挡校验】连续正文匹配足够时，以原始像素证据排除透明底栏对整段评分的影响
+        if placement.confidence <= self.config.accept_diff
+            && let Some(seam) = &replacement
+            && seam.matching_rows >= self.config.min_overlap
+        {
+            edge_diff = 0.0;
+            overlap = seam.matching_rows;
+        }
         let switching =
             self.growth_edge != Edge::None && edge != Edge::None && edge != self.growth_edge;
         let boundary = (edge == Edge::Start
@@ -216,6 +234,7 @@ impl Stitcher {
                 top_trim = 0;
                 bottom_trim = 0;
                 (amount, edge) = overhang(placement.position, height, full);
+                replacement = crate::seam::find(self, &frame, placement.position, edge);
                 edge_diff = 0.0;
                 overlap = height;
             }
@@ -245,14 +264,18 @@ impl Stitcher {
             {
                 return Ok(StitchResult::default());
             }
+            let Some(replacement) = replacement else {
+                return Ok(StitchResult::default());
+            };
             if edge == Edge::End {
-                self.long.append(&frame, &cols, amount, bottom_trim)?;
+                self.long
+                    .append(&frame, &cols, replacement.rows, replacement.trim)?;
                 self.anchor = placement.position;
                 self.best_bottom_trim = self.best_bottom_trim.max(bottom_trim);
             } else {
                 top_trim = top_trim.clamp(0, (height - amount).min(full - 1).max(0));
                 self.long
-                    .prepend(&frame, &cols, amount + top_trim, top_trim)?;
+                    .prepend(&frame, &cols, replacement.rows, replacement.trim)?;
                 self.anchor = placement.position + amount;
                 self.best_top_trim = self.best_top_trim.max(top_trim);
             }
@@ -276,6 +299,9 @@ impl Stitcher {
         }
         if amount == 0 {
             return Ok(self.adopt(frame, cols, placement.position, placement.offset));
+        }
+        if replacement.is_none() {
+            return Ok(StitchResult::default());
         }
         self.pending_edge = edge;
         Ok(StitchResult {

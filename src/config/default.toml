@@ -150,6 +150,10 @@ toggle_magnifier = "Shift+M"
 toggle_theme = "Ctrl+Shift+L"
 scroll_capture = "Ctrl+Shift+S"
 history = "Ctrl+H"
+settings = "Ctrl+,"
+clear_annotations = []
+toggle_scope = []
+toggle_toolbar_layout = []
 size_up = "]"
 size_down = "["
 tool_selection = "S"
@@ -186,6 +190,29 @@ resize_left_fast = "Alt+Shift+Left"
 resize_right_fast = "Alt+Shift+Right"
 resize_up_fast = "Alt+Shift+Up"
 resize_down_fast = "Alt+Shift+Down"
+
+[toolbar_layout]
+# 【工具栏配置】【按钮顺序】设置窗口可编辑三组布局；按钮身份唯一，separator 可重复
+main = [
+    "selection", "pick", "separator", "pen", "line", "highlighter", "separator",
+    "rectangle", "circle", "marker", "arrow", "separator", "text", "number", "redact",
+    "magnifier", "ruler", "laser", "eyedropper", "separator", "clear", "undo", "redo",
+]
+actions = [
+    "scope", "separator", "open_with", "extensions", "scroll", "pin", "ocr", "translate",
+    "separator", "copy", "save_as", "upload", "separator", "settings", "separator", "cancel",
+]
+fullscreen = [
+    "selection", "pick", "separator", "pen", "line", "highlighter", "separator",
+    "rectangle", "circle", "marker", "arrow", "separator", "text", "number", "redact",
+    "magnifier", "ruler", "laser", "eyedropper", "separator", "clear", "undo", "redo",
+    "separator", "scope", "layout", "separator", "open_with", "extensions", "scroll",
+    "pin", "ocr", "translate", "copy", "save_as", "upload", "separator", "settings",
+    "separator", "cancel",
+]
+main_vertical = false
+actions_vertical = true
+fullscreen_vertical = false
 
 [toolbar]
 button_size = 30.0
@@ -248,10 +275,10 @@ copy_icon_size = 15.0
 stepper_width = 84.0
 stepper_bold = true
 stepper_arrow_zone = 30.0
-stepper_arrow_width = 15.0
-stepper_arrow_height = 6.0
-stepper_arrow_gap = 9.0
-stepper_arrow_stroke = 1.6
+stepper_arrow_width = 7.0
+stepper_arrow_height = 3.5
+stepper_arrow_gap = 5.0
+stepper_arrow_stroke = 1.25
 hex_width = 84.0
 rgb_width = 120.0
 download_width = 196.0

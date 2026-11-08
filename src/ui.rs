@@ -19,6 +19,7 @@ pub mod magnifier;
 pub mod model_popover;
 pub mod panel;
 pub mod radial_palette;
+pub(crate) mod scrollbar;
 pub mod selection_size;
 pub mod selection_translation;
 pub mod settings_panel;

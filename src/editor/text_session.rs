@@ -144,7 +144,13 @@ pub fn begin_existing(state: &mut EditorState, id: u64, dirty: &mut u32) -> bool
         return false;
     };
     let mut annotation = state.annotations[index].clone();
-    super::text_session_layout::begin_existing(&mut annotation);
+    let editor = crate::tools::text::ensure_text_editor(
+        &annotation,
+        &mut state.text.editors,
+        &mut state.text.font_system,
+    );
+    let wrapped = super::text_session_layout::wrapped_width(&annotation, editor);
+    super::text_session_layout::begin_existing(&mut annotation, wrapped);
     state.select_annotation_index(Some(index));
     begin(state, annotation, Some(id), dirty);
     true

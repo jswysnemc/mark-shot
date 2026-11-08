@@ -12,6 +12,9 @@ use tiny_skia::{Color, Rect};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum AnnotationShape {
+    ColorSample {
+        sample: crate::features::color_sample::ColorSample,
+    },
     Number {
         mark: crate::features::number::NumberMark,
     },
@@ -86,6 +89,7 @@ impl AnnotationShape {
     /// 【标注】【起点读取】返回形状的首个逻辑坐标；空笔迹返回原点
     pub fn start_point(&self) -> (f32, f32) {
         match self {
+            AnnotationShape::ColorSample { sample } => sample.source,
             AnnotationShape::Number { mark } => mark.bubble,
             AnnotationShape::NumeratedArrow { start, .. } => *start,
             AnnotationShape::Arrow { line, .. } => line.start,

@@ -79,6 +79,7 @@ impl WaylandOverlay {
             let (w, h) = panel_rect.map_or((w as u32, h as u32), |rect| {
                 (rect.width().ceil() as u32, rect.height().ceil() as u32)
             });
+            let (w, h) = rt.state.image_window.unwrap_or((w, h));
 
             let surface = rt.state.compositor_state.create_surface(&qh);
 
@@ -197,6 +198,8 @@ impl WaylandOverlay {
                             &rt.state.xdg_shell,
                             &qh,
                         )?))
+                    } else if rt.state.image_window.is_some() {
+                        super::image_window::create(&rt.state, &qh, surface.clone(), (w, h))
                     } else {
                         // ── creating a forced full screen window, with screenshot itself and etc ────────────────────
                         let window = rt.state.xdg_shell.create_window(

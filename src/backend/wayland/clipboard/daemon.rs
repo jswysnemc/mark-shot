@@ -10,10 +10,20 @@ use wl_clipboard_rs::copy::{ClipboardType, MimeSource, MimeType, Options, Source
 
 use super::{PRIMARY_ARG, TEXT_ARG};
 
+/// 【剪贴板】【辅助入口】按 args 选择图片或文本服务，图片逐块接收并存储；无返回值，启动失败以非零状态结束
 pub fn cli(args: impl Iterator<Item = String>) {
     let args: Vec<String> = args.collect();
     let text = args.iter().any(|a| a == TEXT_ARG);
     let primary = args.iter().any(|a| a == PRIMARY_ARG);
+
+    if !text {
+        if let Err(error) = super::image_service::serve(primary) {
+            println!("{}", error.to_string().replace('\n', " "));
+            error!("【图片剪贴板】【服务失败】{error}");
+            std::process::exit(1);
+        }
+        return;
+    }
 
     let mut buf = Vec::new();
     if let Err(e) = std::io::stdin().read_to_end(&mut buf) {

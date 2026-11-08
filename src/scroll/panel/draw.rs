@@ -23,7 +23,7 @@ pub fn status_text(status: &str) -> &str {
         "Paused" => "已暂停",
         "Capture paused" => "捕获已暂停",
         "Capture error" => "捕获错误",
-        "No overlap match" => "未找到重叠区域",
+        "No overlap; scroll back slowly" => "重叠不足，请缓慢回退",
         "Dragging region" => "正在移动区域",
         "Region adjusted" => "区域已调整",
         _ => status,

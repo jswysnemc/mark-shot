@@ -35,10 +35,10 @@ fn identity(req: &mut RenderRequest<'_>, area: IntRect) {
         .and_then(|rect| rect_bounds(&rect, req.canvas.width(), req.canvas.height()))
         .and_then(|(x, y, width, height)| IntRect::from_xywh(x as i32, y as i32, width, height))
         .and_then(|hole| hole.intersect(&area));
-    // 1. 【截图绘制】【透明恢复】损坏范围完全位于选区时不写入无用遮罩，完整画布直接归还透明页，保留原有零值
+    // 1. 【截图绘制】【透明恢复】交互帧复用已分配像素，避免整帧回收后在提交时重新缺页分配
     if hole == Some(area) {
         if area == IntRect::from_xywh(0, 0, req.canvas.width(), req.canvas.height()).unwrap() {
-            crate::utils::transparent_pixmap::clear(req.canvas);
+            req.canvas.data_mut().fill(0);
         } else {
             fill(req.canvas, area, [0; 4]);
         }
@@ -146,11 +146,87 @@ pub(super) fn shade(painter: &mut Painter<'_>, selection: Option<&Rect>, size: (
             ),
         ] {
             if let Some(rect) = Rect::from_ltrb(left, top, right, bottom) {
-                painter.fill_rounded(rect, 0.0, color);
+                shade_rectangle(painter, rect, color);
             }
         }
     } else if let Some(rect) = Rect::from_xywh(0.0, 0.0, size.0, size.1) {
-        painter.fill_rounded(rect, 0.0, color);
+        shade_rectangle(painter, rect, color);
+    }
+}
+
+/// 【画布导航】【遮罩矩形】将 rect 以 color 绘入 painter；整数内部快速填充，边缘保留原路径抗锯齿，无返回值
+fn shade_rectangle(painter: &mut Painter<'_>, rect: Rect, color: crate::theme::Rgba) {
+    let scale = painter.scale();
+    let Some(pixels) = rect.transform(painter.transform()) else {
+        return;
+    };
+    let canvas = painter.canvas();
+    let bounds = IntRect::from_xywh(0, 0, canvas.width(), canvas.height()).unwrap();
+    let Some(outer) = pixels.round_out().and_then(|rect| rect.intersect(&bounds)) else {
+        return;
+    };
+    let inner = IntRect::from_ltrb(
+        pixels.left().ceil() as i32,
+        pixels.top().ceil() as i32,
+        pixels.right().floor() as i32,
+        pixels.bottom().floor() as i32,
+    )
+    .and_then(|rect| rect.intersect(&bounds));
+    let mut bands = Vec::with_capacity(4);
+    if let Some(inner) = inner {
+        let mut paint = tiny_skia::Paint::default();
+        paint.set_color(color.color());
+        paint.anti_alias = false;
+        let width = canvas.width();
+        let stride = width as usize * 4;
+        let first = inner.top() as usize * stride;
+        let last = inner.bottom() as usize * stride;
+        super::parallel_rows::for_each(
+            &mut canvas.data_mut()[first..last],
+            stride,
+            64,
+            |_, bytes| {
+                let height = (bytes.len() / stride) as u32;
+                let mut band = tiny_skia::PixmapMut::from_bytes(bytes, width, height).unwrap();
+                band.fill_rect(
+                    Rect::from_xywh(
+                        inner.left() as f32,
+                        0.0,
+                        inner.width() as f32,
+                        height as f32,
+                    )
+                    .unwrap(),
+                    &paint,
+                    tiny_skia::Transform::identity(),
+                    None,
+                );
+            },
+        );
+        bands.extend(
+            [
+                (outer.left(), outer.top(), outer.right(), inner.top()),
+                (outer.left(), inner.bottom(), outer.right(), outer.bottom()),
+                (outer.left(), inner.top(), inner.left(), inner.bottom()),
+                (inner.right(), inner.top(), outer.right(), inner.bottom()),
+            ]
+            .into_iter()
+            .filter_map(|(left, top, right, bottom)| IntRect::from_ltrb(left, top, right, bottom)),
+        );
+    } else {
+        bands.push(outer);
+    }
+    // 1. 【画布导航】【边缘保真】最多四条单像素边，裁切沿整数物理网格，半透明边角不改用另一种覆盖算法
+    for band in bands {
+        let logical = Rect::from_xywh(
+            band.x() as f32 / scale,
+            band.y() as f32 / scale,
+            band.width() as f32 / scale,
+            band.height() as f32 / scale,
+        )
+        .unwrap();
+        painter.clipped(Some(logical), |painter| {
+            painter.fill_rounded(rect, 0.0, color)
+        });
     }
 }
 

@@ -1,7 +1,7 @@
 //! 【滚动截图】【真实捕获】按选区所属表面绑定输出，将逻辑区域映射到原始像素
 
 use super::ScrollRun;
-use crate::{backend::ScreenOverlay, scroll::frame, types::MonitorFrame};
+use crate::{backend::ScreenOverlay, types::MonitorFrame};
 use tiny_skia::Rect;
 
 /// 【滚动截图】【帧接收】将 result 送入 run 的拼接器，overlay 验证输出仍然存活，返回界面是否变化
@@ -15,23 +15,24 @@ pub(super) fn apply(
         .ok_or("the scroll capture output is gone")?;
     let data = result
         .frames
-        .first()
+        .into_iter()
+        .next()
         .ok_or("the scroll capture backend returned an empty frame")?;
-    if !overlay.allow_scroll_frame(data, run.session.region)? {
+    if !overlay.allow_scroll_frame(&data, run.session.region)? {
         run.needs_clean_frame = true;
         return Ok(true);
     }
     run.needs_clean_frame = false;
-    let scale = frame_scale(data)?;
+    let scale = frame_scale(&data)?;
     let before = (
         run.session.stitcher.revision(),
         run.session.status.clone(),
         run.session.paused,
         run.session.capture_range,
     );
-    let image = frame::crop(data, pixel_rect(run.session.region, scale))?;
     run.scale = scale;
-    run.session.push(image);
+    run.session
+        .push_capture(data, pixel_rect(run.session.region, scale))?;
     // 1. 【滚动截图】【暂停状态】收尾帧可以更新原图，但不能把已暂停界面改回正在捕获
     if run.session.paused && run.session.status != "Capture error" {
         run.session.status = "Paused".into();

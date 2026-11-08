@@ -154,6 +154,16 @@ pub fn run(editor_state: &mut EditorState, action: Action, dirty_mask: &mut u32)
         Action::ToggleMagnifier => toggle_magnifier(editor_state, dirty_mask),
         Action::ToggleTheme => super::theme_switch::toggle(editor_state, dirty_mask),
         Action::ScrollCapture => begin_scroll_capture(editor_state, dirty_mask),
+        Action::Settings => editor_state.preferences_requested = true,
+        Action::ClearAnnotations | Action::ToggleScope | Action::ToggleToolbarLayout => {
+            use crate::ui::toolbar::ToolbarButton;
+            let button = match action {
+                Action::ClearAnnotations => ToolbarButton::Clear,
+                Action::ToggleScope => ToolbarButton::Scope,
+                _ => ToolbarButton::Layout,
+            };
+            super::input::pointer_policy::command(editor_state, button, dirty_mask);
+        }
         // 1. 【截图历史】【手势保护】旧画笔与选择拖动未设置忙碌标志，草稿和拖动快照也必须阻止交接
         Action::History
             if !busy && editor_state.pending.is_none() && editor_state.ann_drag.is_none() =>

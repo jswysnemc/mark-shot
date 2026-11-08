@@ -37,7 +37,7 @@ fn focus_loss_finishes_group_drag_and_discards_an_uncommitted_marquee() {
     assert_eq!(state.input.keyboard_focus, None);
     left(&mut state, false);
     assert_eq!(state.undo_stack.len(), 1);
-    pointer(&mut state, 20.0, 20.0, &mut 0);
+    pointer(&mut state, 60.0, 60.0, &mut 0);
     left(&mut state, true);
     pointer(&mut state, 400.0, 350.0, &mut 0);
     crate::app::event_loop::handle_event(
@@ -106,7 +106,7 @@ fn rotated_line_group() -> EditorState {
     pointer(&mut state, f64::from(end.0), f64::from(end.1), &mut 0);
     left(&mut state, false);
     assert_eq!(state.annotations[0].rotation_degrees, 90.0);
-    pointer(&mut state, 20.0, 20.0, &mut 0);
+    pointer(&mut state, 60.0, 60.0, &mut 0);
     left(&mut state, true);
     left(&mut state, false);
     assert!(state.selected_annotation_ids().is_empty());

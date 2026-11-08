@@ -1,4 +1,4 @@
-//! 【尺子悬停】【局部缓冲】十字线与提示保留透明合成顺序，每个临时缓冲限定为固定像素块
+//! 【尺子悬停】【局部交付】仅绘制线条与标签的非重叠区域，不创建整幅窗口叠层
 
 use super::{Painter, rect_bounds, scale_rect};
 use crate::features::{
@@ -7,26 +7,6 @@ use crate::features::{
 };
 use cosmic_text::{FontSystem, SwashCache};
 use tiny_skia::{IntRect, Pixmap, Rect};
-
-const SIDE: u32 = 512;
-const PAD: u32 = 8;
-
-/// 【尺子悬停】【可见内容】按area、hover和labels返回当前块是否含十字线或说明，padding保留抗锯齿边缘，不改变绘制顺序
-fn contributes(area: Rect, hover: &RulerHover, labels: &[InfoLabel], padding: f32) -> bool {
-    let line = hover.bounds.intersect(&area).is_some()
-        && ((area.left() - padding <= hover.point.0 && hover.point.0 <= area.right() + padding)
-            || (area.top() - padding <= hover.point.1 && hover.point.1 <= area.bottom() + padding));
-    line || labels
-        .iter()
-        .chain(std::iter::once(&hover.label))
-        .any(|label| {
-            label
-                .rect
-                .outset(padding, padding)
-                .and_then(|rect| rect.intersect(&area))
-                .is_some()
-        })
-}
 
 /// 【尺子悬停】【区域合成】按canvas、labels和hover绘制透明叠层，origin与scale映射窗口，dirty限制交付，fonts和cache提供字体，window提供逻辑单位，无返回值
 pub(super) fn draw(
@@ -49,61 +29,27 @@ pub(super) fn draw(
         return;
     };
     let damage = IntRect::from_xywh(x as i32, y as i32, width, height).unwrap();
-    let viewport = IntRect::from_xywh(0, 0, canvas.width(), canvas.height()).unwrap();
     let mut parent = Painter::new(canvas)
         .with_scale(scale)
         .with_origin(origin)
         .with_window_units(window)
         .with_text(fonts, cache);
-    // 1. 【尺子悬停】【固定块】像素原点取自完整窗口，局部损坏不改变十字线和提示的采样位置
-    for top in (y / SIDE..=(y + height - 1) / SIDE).map(|row| row * SIDE) {
-        for left in (x / SIDE..=(x + width - 1) / SIDE).map(|column| column * SIDE) {
-            let bounds = IntRect::from_xywh(left as i32, top as i32, SIDE, SIDE).unwrap();
-            let clipped = bounds.intersect(&damage).unwrap();
-            let raster = IntRect::from_xywh(
-                left as i32 - PAD as i32,
-                top as i32 - PAD as i32,
-                SIDE + PAD * 2,
-                SIDE + PAD * 2,
-            )
-            .unwrap()
-            .intersect(&viewport)
-            .unwrap();
-            let mut tile = Pixmap::new(raster.width(), raster.height()).unwrap();
-            let local_origin = (
-                origin.0 + raster.x() as f32 / scale,
-                origin.1 + raster.y() as f32 / scale,
-            );
-            let global = Rect::from_xywh(
-                local_origin.0,
-                local_origin.1,
-                raster.width() as f32 / scale,
-                raster.height() as f32 / scale,
-            )
-            .unwrap();
-            if !contributes(global, hover, labels, 2.0 / scale) {
-                continue;
-            }
-            {
-                let mut local = parent.sub(&mut tile).with_origin(local_origin);
-                super::ruler_labels::draw(&mut local, labels);
-                super::ruler_overlay::draw_hover(&mut local, hover);
-            }
-            // 2. 【尺子悬停】【单次交付】只合成已经恢复的损坏交集，外部像素不重复叠加半透明十字线或提示
-            if clipped == raster {
-                parent.draw_pixmap(raster.x(), raster.y(), &tile);
-            } else if let Some(crop) = tile.clone_rect(
-                IntRect::from_xywh(
-                    clipped.x() - raster.x(),
-                    clipped.y() - raster.y(),
-                    clipped.width(),
-                    clipped.height(),
-                )
-                .unwrap(),
-            ) {
-                parent.draw_pixmap(clipped.x(), clipped.y(), &crop);
-            }
+    // 1. 【尺子悬停】【内容裁切】线条和标签交集先合并为互不重叠的范围，十字线交点只混合一次
+    for clipped in super::ruler_hover_damage::regions(hover, labels, origin, scale, damage) {
+        let local_origin = (
+            origin.0 + clipped.x() as f32 / scale,
+            origin.1 + clipped.y() as f32 / scale,
+        );
+        let Some(mut temporary) = Pixmap::new(clipped.width(), clipped.height()) else {
+            continue;
+        };
+        {
+            let mut painter = parent.sub(&mut temporary).with_origin(local_origin);
+            super::ruler_labels::draw(&mut painter, labels);
+            super::ruler_overlay::draw_hover(&mut painter, hover);
         }
+        // 2. 【尺子悬停】【单次交付】只合成已经恢复的损坏交集，外部像素不重复叠加半透明十字线或提示
+        parent.draw_pixmap(clipped.x(), clipped.y(), &temporary);
     }
 }
 

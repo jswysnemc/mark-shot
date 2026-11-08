@@ -3,7 +3,7 @@
 use super::Launch;
 use crate::tools::Tool;
 
-/// 【编辑启动】【初始工具】按 launch 返回全屏或图片编辑的初始工具；文件选项只影响图片，未设置时使用范围选择
+/// 【编辑启动】【初始工具】按 launch 返回全屏或图片编辑工具；显式配置优先，图片默认选择标注，截图默认选择范围
 pub(super) fn initial(launch: &Launch) -> Tool {
     let file = if launch.image.is_some() {
         launch.file_default_tool
@@ -12,7 +12,11 @@ pub(super) fn initial(launch: &Launch) -> Tool {
     };
     file.or(launch.fullscreen_default_tool)
         .or(launch.default_tool)
-        .unwrap_or(Tool::Selection)
+        .unwrap_or(if launch.image.is_some() {
+            Tool::Pick
+        } else {
+            Tool::Selection
+        })
 }
 
 #[cfg(test)]
@@ -27,7 +31,7 @@ mod tests {
             image: Some(PathBuf::from("picture.png")),
             ..Launch::default()
         };
-        assert_eq!(initial(&launch), Tool::Selection);
+        assert_eq!(initial(&launch), Tool::Pick);
         launch.default_tool = Some(Tool::Pen);
         assert_eq!(initial(&launch), Tool::Pen);
         launch.fullscreen_default_tool = Some(Tool::Ruler);

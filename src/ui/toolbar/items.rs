@@ -37,11 +37,14 @@ impl ToolbarButton {
             Self::Integration(Integration::Extensions) => Some(Action::Extensions),
             Self::Integration(Integration::Upload) => Some(Action::Upload),
             Self::Integration(Integration::Translate) => Some(Action::Translate),
+            Self::Integration(Integration::Settings) => Some(Action::Settings),
             Self::Scroll => Some(Action::ScrollCapture),
             Self::Undo => Some(Action::Undo),
             Self::Redo => Some(Action::Redo),
             Self::Cancel => Some(Action::Cancel),
-            _ => None,
+            Self::Clear => Some(Action::ClearAnnotations),
+            Self::Scope => Some(Action::ToggleScope),
+            Self::Layout => Some(Action::ToggleToolbarLayout),
         }
     }
 }
@@ -94,6 +97,7 @@ pub const ITEMS: &[ToolbarItem] = &[
     I(B::Tool(Tool::Magnifier)),
     I(B::Tool(Tool::Ruler)),
     I(B::Tool(Tool::Laser)),
+    I(B::Tool(Tool::Eyedropper)),
     S,
     I(B::Clear),
     I(B::Undo),
@@ -139,6 +143,7 @@ pub const FULLSCREEN_ITEMS: &[ToolbarItem] = &[
     I(B::Tool(Tool::Magnifier)),
     I(B::Tool(Tool::Ruler)),
     I(B::Tool(Tool::Laser)),
+    I(B::Tool(Tool::Eyedropper)),
     S,
     I(B::Clear),
     I(B::Undo),

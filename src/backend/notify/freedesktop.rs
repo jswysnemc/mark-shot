@@ -1,10 +1,12 @@
 // Sends notifications through org.freedesktop.Notifications via D-Bus
 use std::collections::HashMap;
 use std::error::Error;
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
 
 use async_trait::async_trait;
-use image::{DynamicImage, RgbaImage};
+use image::RgbaImage;
 use log::info;
 use zbus::zvariant::Value;
 use zbus::{Connection, proxy};
@@ -97,7 +99,9 @@ impl Notifier for FreedesktopNotifier {
 
         let mut hints: HashMap<&str, Value> = HashMap::new();
         hints.insert("urgency", Value::U8(1));
-        if crate::config::get().notifications.preview && (n.file.is_some() || n.png.is_some()) {
+        if crate::config::preferences::current().notifications.preview
+            && (n.file.is_some() || n.png.is_some())
+        {
             let daemon = proxy
                 .get_server_information()
                 .await
@@ -147,25 +151,27 @@ fn shot_file(n: &Notification<'_>) -> Option<PathBuf> {
     }
 }
 
+/// 【桌面通知】【图像提示】按 png 和 square 创建有界通知图像，返回 D-Bus 元组，不分配整幅长图
 fn image_data(png: &[u8], square: bool) -> Option<Value<'static>> {
-    let shot = image::load_from_memory(png)
-        .inspect_err(|e| info!("can't decode the preview: {e}"))
-        .ok()?;
-    let thumb = thumbnail(shot, square);
+    let thumb = thumbnail(png, square)?;
     let (w, h) = (thumb.width() as i32, thumb.height() as i32);
     // (width, height, rowstride, has_alpha, bits_per_sample, channels, data)
     Some(Value::from((w, h, w * 4, true, 8, 4, thumb.into_raw())))
 }
 
-fn thumbnail(shot: DynamicImage, square: bool) -> RgbaImage {
-    let shot = if shot.width() > THUMB || shot.height() > THUMB {
-        shot.thumbnail(THUMB, THUMB)
-    } else {
-        shot
+/// 【桌面通知】【缩略解码】将 png 逐行缩小，square 决定是否透明补齐正方形；返回非预乘 RGBA 或解码失败
+fn thumbnail(png: &[u8], square: bool) -> Option<RgbaImage> {
+    let preview =
+        crate::utils::png_preview::load(Cursor::new(png), (THUMB, THUMB), &AtomicBool::new(false))
+            .inspect_err(|error| info!("【桌面通知】【缩略解码】{error}"))
+            .ok()?;
+    let mut shot = RgbaImage::new(preview.width(), preview.height());
+    for (target, source) in shot.pixels_mut().zip(preview.pixels()) {
+        let color = source.demultiply();
+        target.0 = [color.red(), color.green(), color.blue(), color.alpha()];
     }
-    .into_rgba8();
     if !square {
-        return shot;
+        return Some(shot);
     }
     let (w, h) = shot.dimensions();
     let side = w.max(h);
@@ -176,8 +182,12 @@ fn thumbnail(shot: DynamicImage, square: bool) -> RgbaImage {
         ((side - w) / 2).into(),
         ((side - h) / 2).into(),
     );
-    square
+    Some(square)
 }
+
+#[cfg(test)]
+#[path = "preview_tests.rs"]
+mod preview_tests;
 
 fn escape_markup(text: &str) -> String {
     text.replace('&', "&amp;")

@@ -49,7 +49,7 @@ fn light_dark_round_trip_preserves_original_alpha_annotations_and_export() {
             assert_eq!(&pixels[..4], &[color.0, color.1, color.2, 255]);
             match (&first, mode) {
                 (None, _) => first = Some(pixels.to_vec()),
-                (Some(first), Mode::Light) => assert_ne!(pixels, first),
+                (Some(first), Mode::Light) => assert_eq!(pixels, first),
                 (Some(first), Mode::Dark) => assert_eq!(pixels, first),
             }
             assert_eq!(

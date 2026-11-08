@@ -13,6 +13,7 @@ impl Annotation {
         matches!(
             self.shape,
             AnnotationShape::Rectangle { .. }
+                | AnnotationShape::ColorSample { .. }
                 | AnnotationShape::Circle { .. }
                 | AnnotationShape::Marker { .. }
                 | AnnotationShape::Pen { .. }

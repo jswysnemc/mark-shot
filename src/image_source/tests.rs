@@ -241,3 +241,15 @@ fn bounded_preview_preserves_full_raster_pixels() {
         );
     }
 }
+/// 【冻结截图测试】【热路径所有权】无参数，四千像素背景复用原分配且不进入文件缓存，读取与归还后像素不变，无返回值
+#[test]
+fn frozen_screen_reuses_memory_without_disk_roundtrips() {
+    let mut pixels = tiny_skia::Pixmap::new(3840, 2160).unwrap();
+    pixels.fill(tiny_skia::Color::from_rgba8(91, 127, 23, 255));
+    let address = pixels.data().as_ptr();
+    let source = super::ImageSource::store_snapshot(pixels);
+    assert_eq!(source.cached_bytes(), 0);
+    assert_eq!(source.data().as_ptr(), address);
+    source.release_pages();
+    assert_eq!(source.pixel(3839, 2159).unwrap().red(), 91);
+}

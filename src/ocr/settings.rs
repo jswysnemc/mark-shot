@@ -45,7 +45,7 @@ impl Default for EngineSettings {
 
 impl EngineSettings {
     pub fn load() -> Self {
-        let ocr = &crate::config::get().ocr;
+        let ocr = &crate::config::preferences::current().ocr;
         Self {
             mode: ocr.mode,
             device: ocr.device,

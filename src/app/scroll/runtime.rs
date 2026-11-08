@@ -89,7 +89,7 @@ pub(super) async fn run(
             monitor_idx,
         },
         PendingOutcome::Copy { image, scale } => Outcome::Copy {
-            png: crate::scroll::png::encode(image.view())?,
+            png: crate::scroll::png::consume(image)?,
             scale,
         },
         PendingOutcome::Saved(path) => Outcome::Saved(path),

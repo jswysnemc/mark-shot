@@ -30,6 +30,7 @@ impl Redraw {
 pub(super) struct Pacing {
     pub(super) owed: Vec<Option<Redraw>>,
     pub(super) dimmed_for: Vec<Option<Rect>>,
+    pub(super) source_residency: super::source_residency::Residency,
 }
 
 impl Pacing {
@@ -37,6 +38,7 @@ impl Pacing {
         Self {
             owed: vec![None; monitors],
             dimmed_for: vec![None; monitors],
+            source_residency: Default::default(),
         }
     }
 
@@ -80,6 +82,7 @@ pub(super) fn render_dirty_monitors(
     editor_state.refresh_filters();
     super::selection_size::panels::prepare(editor_state);
 
+    let mut rendered_any = false;
     for i in 0..editor_state.captures.len() {
         if is_dirty(dirty_mask, i) {
             rebuild_layer(editor_state, i, &frame);
@@ -114,11 +117,15 @@ pub(super) fn render_dirty_monitors(
             &mut pacing.dimmed_for[i],
         );
         super::frame_backdrop::stage(editor_state, overlay, i, damage)?;
+        rendered_any = true;
     }
     overlay.flush()?;
-    // 3. 【图像原件】【帧读取结束】全部输出完成本次借用后归还可重读页，提交像素继续由原生缓冲持有
-    if let Some(file) = &editor_state.file_canvas {
-        file.original.release_pages();
+    // 3. 【图像原件】【连续读取】文件原件沿用唯一映射，空闲回收由事件循环唤醒，避免缩放时逐帧重新读取长图
+    if rendered_any
+        && let Some(file) = &editor_state.file_canvas
+        && file.original.cached_bytes() != 0
+    {
+        pacing.source_residency.touched(Instant::now());
     }
     for capture in &editor_state.captures {
         capture.pixmap.release_pages();
@@ -405,6 +412,7 @@ pub(super) fn render_monitor(
     crate::ui::canvas_navigation::zoom::draw(editor_state, i, dirty_rect);
     super::selection_translation::panels::draw(editor_state, i, dirty_rect);
     super::selection_size::panels::draw_popup(editor_state, i, dirty_rect);
+    crate::features::color_sample::inspector_draw::draw(editor_state, i, dirty_rect);
 
     damage
 }

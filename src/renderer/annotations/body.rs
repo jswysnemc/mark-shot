@@ -12,6 +12,9 @@ pub(super) fn draw(
 ) {
     let width = p.window_units().stroke(ann.stroke_width, 1.5, None);
     match &ann.shape {
+        AnnotationShape::ColorSample { sample } => {
+            crate::features::color_sample::draw::draw(p, *sample)
+        }
         AnnotationShape::Number { mark } => {
             crate::features::number::draw::draw(p, *mark, ann.stroke_width, ann.color);
         }

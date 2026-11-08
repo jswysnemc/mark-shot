@@ -1,9 +1,8 @@
-//! 【截图历史】【列表滚动】统一滚动条绘制和命中，拖动不改变活动记录
+//! 【列表控件】【滚动几何】历史与设置共用滚动条命中、端点和抓取偏移
 
-use super::layout::rect;
 use tiny_skia::Rect;
 
-pub(super) struct Geometry {
+pub(crate) struct Geometry {
     pub track: Rect,
     pub handle: Rect,
     pub maximum: usize,
@@ -11,12 +10,12 @@ pub(super) struct Geometry {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct Drag {
+pub(crate) struct Drag {
     offset: f32,
 }
 
 /// 【截图历史】【滚动几何】按 viewport、count、rows 和 scroll 返回原版窄滚动条，记录不足一屏时返回空值
-pub(super) fn geometry(
+pub(crate) fn geometry(
     viewport: Rect,
     count: usize,
     rows: usize,
@@ -39,6 +38,11 @@ pub(super) fn geometry(
         maximum,
         page: rows,
     })
+}
+
+/// 【列表控件】【矩形构造】按位置和尺寸构造滚动条矩形，返回非空逻辑范围
+fn rect(left: f32, top: f32, width: f32, height: f32) -> Rect {
+    Rect::from_xywh(left, top, width.max(1.0), height.max(1.0)).unwrap()
 }
 
 impl Drag {

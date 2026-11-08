@@ -2,6 +2,32 @@
 
 use super::*;
 
+/// 【原生前景测试】【不透明直传】无参数，对照普通提交验证整帧、跨页局部和越界裁切，保留未更新字节，无返回值
+#[test]
+fn opaque_frames_match_borrowed_staging_with_partial_damage() {
+    let mut source = foreground(513, 257);
+    for pixel in source.data_mut().as_chunks_mut::<4>().0 {
+        pixel[3] = 255;
+    }
+    for damage in [None, Some((19, 7, 371, 239)), Some((500, 250, 40, 20))] {
+        let mut expected = vec![93; source.data().len()];
+        let mut actual = expected.clone();
+        FramePixels::Borrowed(source.data())
+            .write_to(&mut expected, (513, 257), damage)
+            .unwrap();
+        FramePixels::Opaque(source.data())
+            .write_to(&mut actual, (513, 257), damage)
+            .unwrap();
+        assert_eq!(
+            actual
+                .iter()
+                .zip(&expected)
+                .position(|(actual, expected)| actual != expected),
+            None
+        );
+    }
+}
+
 /// 【原生前景测试】【像素构造】按width和height返回跨通道、跨页且非透明的真实预乘源图
 fn foreground(width: u32, height: u32) -> Pixmap {
     let mut pixmap = Pixmap::new(width, height).unwrap();

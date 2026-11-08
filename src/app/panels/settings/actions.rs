@@ -11,6 +11,9 @@ pub fn run_settings_action(
     dirty_mask: &mut u32,
 ) {
     match action {
+        SettingsAction::ColorFormats => {
+            crate::features::color_sample::inspector::open(editor_state, dirty_mask)
+        }
         SettingsAction::FilterModes => super::super::filter::toggle(editor_state, dirty_mask),
         SettingsAction::OcrRescan => crate::tools::ocr::restart_ocr(editor_state, dirty_mask),
         SettingsAction::OcrCopyAll => crate::tools::ocr::copy_all(editor_state, dirty_mask),

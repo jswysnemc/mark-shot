@@ -8,7 +8,7 @@ use std::{
 /// 【截图保存】【默认目标】按 directory 覆盖或保存配置规划 PNG 路径；返回路径，不创建目录或文件
 pub fn planned(directory: Option<&Path>) -> io::Result<PathBuf> {
     let now = chrono::Local::now();
-    let save = &crate::config::get().save;
+    let save = &crate::config::preferences::current().save;
     let root = match directory {
         Some(directory) => directory.to_path_buf(),
         None => dirs::picture_dir()

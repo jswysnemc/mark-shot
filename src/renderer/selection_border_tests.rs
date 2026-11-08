@@ -80,3 +80,97 @@ fn capture_selection_keeps_square_corners_while_image_preview_can_be_rounded() {
     );
     assert_eq!(rounded.data(), square.data());
 }
+
+/// 【选框测试】【旧栅格对照】无参数，对比完整路径旧分块与空心边框，覆盖分数比例、负坐标和圆角，全部像素必须相同
+#[test]
+fn hollow_border_tiles_preserve_the_previous_full_path_raster() {
+    let edges = SelectionEdges {
+        top: true,
+        right: true,
+        bottom: true,
+        left: true,
+    };
+    let config = &crate::config::get().selection;
+    let stroke = tiny_skia::Stroke {
+        width: config.border_width,
+        ..Default::default()
+    };
+    for scale in [1.0, 1.2, 1.25, 1.5, 2.0] {
+        for (left, top, radius) in [(83.5, 53.5, 0.0), (83.5, 53.5, 8.0), (-61.25, -13.5, 8.0)] {
+            let selection = Rect::from_xywh(left, top, 900.0, 560.0).unwrap();
+            let mut expected =
+                Pixmap::new((1067.0 * scale) as u32, (667.0 * scale) as u32).unwrap();
+            expected.fill(Color::from_rgba8(81, 113, 149, 213));
+            let mut actual = expected.clone();
+            let outer = selection
+                .outset(stroke.width / 2.0, stroke.width / 2.0)
+                .unwrap();
+            let path =
+                crate::renderer::paths::rounded_rect_path(&outer, radius, true, true, true, true)
+                    .unwrap();
+            let outline = path.stroke(&stroke, scale).unwrap();
+            crate::renderer::fixed_path::fill(
+                &mut Painter::new(&mut expected).with_scale(scale),
+                &outline,
+                config.border.get().color(),
+            );
+            draw_selection_border(
+                &mut Painter::new(&mut actual).with_scale(scale),
+                &selection,
+                Some(&edges),
+                radius,
+            );
+            assert!(
+                actual.data() == expected.data(),
+                "scale={scale}, position={left},{top}, radius={radius}"
+            );
+        }
+    }
+}
+
+/// 【选框测试】【边缘裁切】无参数，比较四边单独裁切与原有完整损坏缓冲，覆盖窄选区、负坐标和分数比例，无返回值
+#[test]
+fn edge_only_damage_preserves_full_damage_pixels() {
+    let edges = SelectionEdges {
+        top: true,
+        right: true,
+        bottom: true,
+        left: true,
+    };
+    for scale in [1.0, 1.2, 1.25, 1.5, 2.0] {
+        for (left, top, width, height) in [
+            (23.5, 13.5, 320.0, 200.0),
+            (-61.25, -13.5, 320.0, 200.0),
+            (70.0, 45.0, 4.0, 8.0),
+        ] {
+            let selection = Rect::from_xywh(left, top, width, height).unwrap();
+            for dirty in [
+                None,
+                Rect::from_xywh(32.1, 22.2, 120.7, 110.0),
+                Rect::from_xywh(10.2, 10.2, 335.0, 100.0),
+            ] {
+                let mut expected =
+                    Pixmap::new((400.0 * scale) as u32, (240.0 * scale) as u32).unwrap();
+                expected.fill(Color::from_rgba8(81, 113, 149, 213));
+                let mut actual = expected.clone();
+                Painter::new(&mut expected)
+                    .with_scale(scale)
+                    .clipped(dirty, |painter| {
+                        draw_selection_border(painter, &selection, Some(&edges), 8.0);
+                    });
+                crate::renderer::selection_border_damage::draw(
+                    &mut actual,
+                    scale,
+                    dirty,
+                    &selection,
+                    Some(&edges),
+                    8.0,
+                );
+                assert!(
+                    actual.data() == expected.data(),
+                    "scale={scale}, selection={selection:?}, dirty={dirty:?}"
+                );
+            }
+        }
+    }
+}

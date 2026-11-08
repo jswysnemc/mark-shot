@@ -42,6 +42,9 @@ fn clamp(point: geometry::Point, canvas: Rect, pixel: f32) -> geometry::Point {
 /// 【标注多选】【定点约束】限制annotation中生产points对应的定点到canvas，pixel为源图像素大小，无返回值
 fn clamp_points(annotation: &mut Annotation, canvas: Rect, pixel: f32) {
     match &mut annotation.shape {
+        AnnotationShape::ColorSample { sample } => {
+            *sample = sample.mapped(|point| clamp(point, canvas, pixel))
+        }
         AnnotationShape::Pen { points } | AnnotationShape::Highlighter { points, .. } => {
             for point in points {
                 *point = clamp(*point, canvas, pixel);
@@ -211,6 +214,10 @@ fn resized(
         AnnotationShape::Redact { filter } => {
             filter.start = map(filter.start);
             filter.end = map(filter.end);
+        }
+        AnnotationShape::ColorSample { sample } => {
+            *sample = sample.mapped(map);
+            sample.size *= ratio.0.abs().max(ratio.1.abs()) as f32;
         }
         AnnotationShape::Ruler { measurement } => *measurement = measurement.mapped(map),
         AnnotationShape::Magnifier { magnifier } => *magnifier = magnifier.mapped_storage(map),

@@ -53,9 +53,20 @@ pub trait ClipboardProvider {
     fn copy_image_to_clipboard(&self, png_data: &[u8]) -> Result<(), Box<dyn std::error::Error>>;
 }
 
+#[cfg(target_os = "linux")]
+pub(crate) mod composited_pixels;
+#[cfg(any(target_os = "windows", test))]
 pub(crate) mod native_backdrop;
 
 pub trait ScreenOverlay {
+    /// 【图片编辑】【窗口角色】按 size 请求普通可调整窗口，返回后端是否支持；必须在 present 前调用
+    fn configure_image_window(&mut self, _size: (u32, u32)) -> bool {
+        false
+    }
+    /// 【图片编辑】【实际窗口】返回合成器确认的逻辑尺寸，非图片窗口返回空值
+    fn image_window_size(&self) -> Option<(u32, u32)> {
+        None
+    }
     /// 【截图绘制】【原生背景能力】无参数，返回后端是否能够在原生缓冲中合成同网格冻结背景
     fn supports_native_frame_background(&self) -> bool {
         false
@@ -170,6 +181,15 @@ pub trait ScreenOverlay {
         pixels: &[u8],
         damage: Option<DamageRect>,
     ) -> Result<(), Box<dyn std::error::Error>>;
+    /// 【原生帧】【不透明提交】按 monitor_idx、pixels 和 damage 提交已包含背景的完整像素；默认沿用普通交付，返回协议结果
+    fn stage_opaque_frame(
+        &mut self,
+        monitor_idx: usize,
+        pixels: &[u8],
+        damage: Option<DamageRect>,
+    ) -> crate::AppResult {
+        self.stage_frame(monitor_idx, pixels, damage)
+    }
     /// 【滚动截图】【局部面板】按monitor_idx和frame提交控制像素与独立边线，返回协议结果，不要求调用方保留整屏画布
     fn stage_scroll_panel(
         &mut self,

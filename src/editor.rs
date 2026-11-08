@@ -222,9 +222,12 @@ pub struct EditorState {
 
     /// Set to true when the user is about to pick a color from the palette, since the action is a one-time thing
     pub pick_once: bool,
+    pub color_inspector: crate::features::color_sample::inspector::Inspector,
     pub finish: Option<crate::types::Outputs>,
     /// 【截图另存为】【请求状态】一次性打开对话框的请求，不属于标注或撤销历史
     pub save_as_requested: bool,
+    /// 【设置窗口】【请求状态】临时隐藏覆盖层打开设置，返回时保留截图、选区和历史
+    pub preferences_requested: bool,
     /// 【截图另存为】【完成事实】已成功保存的独立目标路径，不触发常规预设输出
     pub saved_as: Option<std::path::PathBuf>,
     /// What to do with the screenshot
@@ -362,8 +365,10 @@ impl EditorState {
 
             tool_settings: ToolSettings::default(),
             pick_once: false,
+            color_inspector: Default::default(),
             finish: None,
             save_as_requested: false,
+            preferences_requested: false,
             saved_as: None,
             to: crate::config::get().general.to,
             cancel: false,

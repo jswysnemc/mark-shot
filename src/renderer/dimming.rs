@@ -79,7 +79,12 @@ pub(super) fn draw_selection_border(
         ) {
             // 2. 【截图选框】【固定栅格】先生成完整描边，再按固定像素原点填充，局部裁切不会重新采样圆角
             if let Some(outline) = path.stroke(&stroke, p.scale()) {
-                super::fixed_path::fill(p, &outline, cfg.border.get().color());
+                super::fixed_path::fill_border(
+                    p,
+                    &outline,
+                    cfg.border.get().color(),
+                    sel.inset(inset, inset),
+                );
             }
         }
     }

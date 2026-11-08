@@ -25,8 +25,8 @@ SPEC.loader.exec_module(SCROLL)
 
 
 @contextmanager
-def launch(binary, implementation, root, flags):
-    """【内存对照】【启动】按 binary、implementation、root 和 flags 创建隔离进程；返回进程与日志，退出只回收本次进程"""
+def launch(binary, implementation, root, flags, input_bytes=None):
+    """【内存对照】【启动】按 binary、implementation、root 和 flags 创建隔离进程，可选 input_bytes 提供快照；返回进程与日志"""
     root.mkdir(mode=0o700)
     environment = dict(session.environment(), XDG_CONFIG_HOME=str(root / "config"),
                        XDG_DATA_HOME=str(root / "data"), XDG_STATE_HOME=str(root / "state"),
@@ -48,8 +48,12 @@ def launch(binary, implementation, root, flags):
         command = [str(binary), "--capture", "--no-debug", *flags]
     path = root / "client.log"
     with path.open("w") as log, (root / "output.png").open("wb") as output:
-        process = subprocess.Popen(command, env=environment, stdout=output, stderr=log)
+        process = subprocess.Popen(command, env=environment, stdout=output, stderr=log,
+                                   stdin=subprocess.PIPE if input_bytes is not None else subprocess.DEVNULL)
         try:
+            if input_bytes is not None:
+                process.stdin.write(input_bytes)
+                process.stdin.close()
             yield process, path
         finally:
             if process.poll() is None:
@@ -61,15 +65,15 @@ def launch(binary, implementation, root, flags):
                     process.wait(timeout=3)
 
 
-def presented(process, log, implementation="rust"):
-    """【内存对照】【首帧】等待process对应implementation的真实主窗口和键盘焦点，log保留协议，返回实际首帧秒数，排除探测表面"""
+def presented(process, log, implementation="rust", size=(3840, 2160)):
+    """【内存对照】【首帧】等待process对应implementation及size的真实主窗口和键盘焦点，log保留协议，返回实际首帧秒数，排除探测表面"""
     started = time.monotonic()
 
     def ready():
         """【内存对照】【协议条件】检查本次进程完整表面附着与键盘进入，无参数，返回是否满足"""
         assert process.poll() is None, log.read_text()[-2000:]
         text = log.read_text()
-        return initial_frame_ready(text, implementation)
+        return initial_frame_ready(text, implementation, size)
 
     while not ready():
         assert time.monotonic() - started < 30, "the measured application did not present its actual main frame"
@@ -87,7 +91,9 @@ def stable(sampler, phase, seconds=1.2):
 
 
 def result_frame_ready(text):
-    """【内存对照】【结果首帧】按本次交接后的text确认新的4K编辑父表面已提交真实前景，返回是否完成，不依赖固定文件读取时长"""
+    """【内存对照】【结果首帧】按 text 确认普通编辑窗口或旧版全屏编辑表面提交真实前景，返回是否完成"""
+    if image_editor_ready(text):
+        return True
     parents = re.findall(r'get_layer_surface\([^\n]*wl_surface@(\d+)[^\n]*Some\("(?:mark-shot|utility)"\)', text)
     buffers = set(re.findall(r'create_buffer\(wl_buffer@(\d+),\s*\d+,\s*3840,\s*2160,\s*15360,', text))
     for parent in parents:
@@ -98,9 +104,28 @@ def result_frame_ready(text):
     return False
 
 
-def initial_frame_ready(text, implementation):
-    """【内存对照】【主表面条件】按text和implementation要求真实4K前景、提交及同表面键盘焦点，返回是否满足，探测表面不参与"""
-    buffers = set(re.findall(r'create_buffer\((?:new id )?wl_buffer([@#]\d+),\s*\d+,\s*3840,\s*2160,\s*15360,', text))
+def image_editor_ready(text):
+    """【内存对照】【图片窗口】按 text 追踪编辑窗口角色与表面，返回是否已提交内容并取得键盘焦点"""
+    for role in re.findall(r'xdg_toplevel@(\d+)\.set_app_id\(Some\("mark-shot-editor"\)\)', text):
+        shell = re.search(rf'xdg_surface@(\d+)\.get_toplevel\(xdg_toplevel@{role}\)', text)
+        if not shell:
+            continue
+        surface = re.search(rf'get_xdg_surface\(xdg_surface@{shell.group(1)}, wl_surface@(\d+)\)', text)
+        if not surface:
+            continue
+        parent = surface.group(1)
+        attached = list(re.finditer(rf'wl_surface@{parent}\.attach\(wl_buffer@\d+,', text))
+        entered = re.search(rf'wl_keyboard@\d+\.enter(?:,\s*|)\([^\n]*wl_surface@{parent},', text)
+        if len(attached) >= 2 and entered and f'wl_surface@{parent}.commit()' in text[attached[-1].end():]:
+            return True
+    return False
+
+
+def initial_frame_ready(text, implementation, size=(3840, 2160)):
+    """【内存对照】【主表面条件】按text、implementation和size要求真实前景、提交及同表面键盘焦点，返回是否满足，探测表面不参与"""
+    if implementation == "rust" and image_editor_ready(text):
+        return True
+    buffers = set(re.findall(rf'create_buffer\((?:new id )?wl_buffer([@#]\d+),\s*\d+,\s*{size[0]},\s*{size[1]},\s*{size[0] * 4},', text))
     parents = set(re.findall(r'wl_surface([@#]\d+)\.attach\(wl_buffer[@#]\d+,', text))
     if implementation == "rust":
         roles = set("@" + parent for parent in re.findall(r'get_layer_surface\([^\n]*wl_surface@(\d+)[^\n]*Some\("(?:mark-shot|utility)"\)', text))

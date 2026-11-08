@@ -51,9 +51,10 @@ pub(super) fn stage(
     monitor: usize,
     damage: Option<DamageRect>,
 ) -> crate::AppResult {
+    if !editor.canvas_transform().is_identity() {
+        return overlay.stage_opaque_frame(monitor, editor.canvas[monitor].data(), damage);
+    }
     if editor.region_rendering.native_background {
-        // 1. 【截图绘制】【复制前归还】损坏恢复可能写入大面积零值，先归还这些页，再让原生备用缓冲继承完整当前帧
-        crate::utils::transparent_pixmap::reclaim_blank(&mut editor.canvas[monitor]);
         if overlay.supports_consumed_frame_background() {
             return overlay.stage_consumed_frame_with_background(
                 monitor,

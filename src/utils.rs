@@ -2,6 +2,7 @@ pub(crate) mod fs_lock;
 pub(crate) mod helper_process;
 pub(crate) mod memory;
 pub(crate) mod platform;
+pub(crate) mod png_preview;
 pub(crate) mod process_group;
 pub(crate) mod screenshot_path;
 #[cfg(test)]

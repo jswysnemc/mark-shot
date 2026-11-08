@@ -61,6 +61,7 @@ pub struct OverlayState {
     pub cursor_applied_since_enter: bool,
     // ── ui & input state ─────────────────────────────────────────────────────────
     pub surfaces: HashMap<usize, SurfaceData>,
+    pub image_window: Option<(u32, u32)>,
     pub events: VecDeque<OverlayEvent>,
     pub scale: f64,
     pub pending_flush: bool,
@@ -186,6 +187,7 @@ impl OverlayState {
             cursor_applied_since_enter: false,
             outputs: Vec::new(),
             surfaces: HashMap::new(),
+            image_window: None,
             events: VecDeque::new(),
             frac_scale: None,
             pointer_surface_idx: None,

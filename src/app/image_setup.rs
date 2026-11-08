@@ -59,7 +59,7 @@ fn setup(
     }
     let index = chosen[0];
     let selected = vec![outputs[index].clone()];
-    let placements = init::build_placements(&selected, overlay.hidpi());
+    let mut placements = init::build_placements(&selected, overlay.hidpi());
     let placement = &placements[0];
     let bounds = Rect::from_xywh(
         placement.position.0 as f32,
@@ -70,7 +70,9 @@ fn setup(
     .ok_or("invalid display bounds")?;
 
     // 1. 【图片编辑】【原件预览】原图与预览分开，低分辨率显示器不会降低保存后的图像分辨率
-    let file = source(bounds)?;
+    let mut file = source(bounds)?;
+    super::image_window::prepare(overlay.as_mut(), &mut file, &mut placements[0], index)?;
+    let placement = &placements[0];
     let preview =
         super::file_canvas_theme::preview(&file, placement, crate::theme::Mode::current())
             .ok_or("cannot allocate image preview")?;
@@ -103,7 +105,6 @@ fn setup(
     editor.selection.zone = Some(image_region);
 
     // 2. 【图片编辑】【目标表面】仅映射目标显示器，背景仍使用共享内存表面，输入不影响其他显示器
-    overlay.present(&[index])?;
     let preview = &editor.captures[0].pixmap;
     overlay.set_background_source(0, preview)?;
     profiler.mark("image loaded + preview mapped");

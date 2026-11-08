@@ -42,9 +42,9 @@ impl ImageSource {
         Self::store_kind(pixels, "image-source")
     }
 
-    /// 【冻结截图】【缓存选择】按pixels返回共享冻结来源，使用独立缓存目录区分屏幕快照与图片原件
+    /// 【冻结截图】【交互原件】按pixels返回共享内存来源，复用唯一截图缓冲，避免每次重绘重新读取磁盘；滚动开始时由会话释放
     pub fn store_snapshot(pixels: Pixmap) -> Self {
-        Self::store_kind(pixels, "frozen-source")
+        Self::memory(pixels)
     }
 
     /// 【图像原件】【来源目录】按pixels和kind选择私有磁盘目录，返回完整来源，失败保留原始像素

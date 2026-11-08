@@ -4,11 +4,22 @@ pub(crate) use modifiers::handle_canvas_modifiers;
 pub(crate) use pointer_move::handle_canvas_pointer_move;
 mod color_button;
 mod keyboard;
-mod pointer_policy;
+pub(crate) mod pointer_policy;
+mod recent_annotation;
+pub(crate) mod selection_handles;
 mod text_context_menu;
+pub(crate) mod text_reedit;
 pub(in crate::app) mod ui_hit;
 pub(crate) mod wheel_preview;
 pub use ui_hit::compute_cursor;
+
+/// 【画布输入】【界面避让】按 state 返回当前指针是否处于无控件覆盖的画布，供实时采样使用
+pub(crate) fn canvas_ui_free(state: &crate::editor::EditorState) -> bool {
+    matches!(
+        ui_hit::hit_test_ui(state, state.input.pointer.local),
+        ui_hit::UiHit::None
+    )
+}
 use ui_hit::{UiHit, hit_test_ui};
 #[cfg(test)]
 pub(in crate::app) mod tests;
@@ -61,6 +72,14 @@ pub(crate) fn handle_canvas_pointer_button(
     pressed: bool,
     dirty_mask: &mut u32,
 ) {
+    if crate::features::color_sample::inspector::button(editor_state, button, pressed, dirty_mask) {
+        apply_damage_rects(editor_state, dirty_mask);
+        return;
+    }
+    if !pressed && selection_handles::button(editor_state, button, pressed, dirty_mask) {
+        apply_damage_rects(editor_state, dirty_mask);
+        return;
+    }
     if super::annotation_selection::release(editor_state, button, pressed) {
         return;
     }
@@ -427,6 +446,11 @@ pub(crate) fn handle_canvas_pointer_button(
 
     // ── 2. dispatch event to active tool ─────────────────────────────────────
 
+    if is_left_click_pressed && selection_handles::button(editor_state, button, pressed, dirty_mask)
+    {
+        apply_damage_rects(editor_state, dirty_mask);
+        return;
+    }
     if is_left_click_pressed && super::annotation_selection::press(editor_state, dirty_mask) {
         return;
     }

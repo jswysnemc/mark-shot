@@ -13,7 +13,7 @@ mod frame_scene;
 pub mod frozen_image;
 pub(crate) mod opaque_backdrop;
 pub use dimming::init_dimming;
-use dimming::{blit_rect, draw_selection_border, update_dimming_delta};
+use dimming::{blit_rect, update_dimming_delta};
 
 // Frame building and shared drawing stuff: paths, text, and annotations.
 // UI component rendering lives in ui/<component>/draw.rs
@@ -30,18 +30,24 @@ mod glyph_run;
 pub(crate) mod line_edit;
 mod line_handles;
 mod magnifier_handles;
+mod navigation_pixels;
 mod number_handles;
 pub(crate) mod number_text;
 mod painter;
+mod parallel_rows;
 pub mod paths;
+mod pending_ruler;
 mod rotated_text;
 mod rotation_tiles;
 pub(crate) mod ruler_chrome;
+mod ruler_hover_damage;
 mod ruler_hover_label;
 mod ruler_hover_tiles;
 mod ruler_labels;
 pub mod ruler_overlay;
 pub(crate) mod ruler_text;
+mod selection_border_damage;
+mod selection_handles;
 pub mod stroke_path;
 pub mod text;
 mod text_preedit;

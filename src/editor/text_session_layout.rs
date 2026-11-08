@@ -3,11 +3,11 @@
 use crate::types::{Annotation, AnnotationShape};
 use cosmic_text::{Editor, FontSystem};
 
-/// 【文字事务】【已有编辑宽度】按annotation设置可见原图选框宽度，隐藏存储高度不限制编辑排版，无返回值
-pub(super) fn begin_existing(annotation: &mut Annotation) {
+/// 【文字事务】【已有编辑宽度】按 annotation 和 wrapped 保留实际软换行；普通文字随输入自动扩展和收缩，无返回值
+pub(super) fn begin_existing(annotation: &mut Annotation, wrapped: Option<f32>) {
     if let AnnotationShape::Text { frame, .. } = &mut annotation.shape {
-        frame.width = Some(annotation.bbox.width());
-        frame.height = Some(annotation.bbox.height());
+        frame.width = wrapped;
+        frame.height = None;
         frame.painted = None;
     }
 }

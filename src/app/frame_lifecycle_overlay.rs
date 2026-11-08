@@ -43,13 +43,22 @@ impl Overlay {
         source: &ImageSource,
         damage: Option<DamageRect>,
     ) -> AppResult {
-        pixels.write_to(&mut self.frames[monitor], self.sizes[monitor], damage)?;
-        native_backdrop::compose_bgra(
-            source,
-            &mut self.frames[monitor],
-            self.sizes[monitor],
-            damage,
-        )?;
+        if self.consumed {
+            pixels.write_composited_to(
+                &mut self.frames[monitor],
+                source,
+                self.sizes[monitor],
+                damage,
+            )?;
+        } else {
+            pixels.write_to(&mut self.frames[monitor], self.sizes[monitor], damage)?;
+            native_backdrop::compose_bgra(
+                source,
+                &mut self.frames[monitor],
+                self.sizes[monitor],
+                damage,
+            )?;
+        }
         self.sent += 1;
         Ok(())
     }
@@ -87,6 +96,34 @@ impl ScreenOverlay for Overlay {
         damage: Option<DamageRect>,
     ) -> AppResult {
         self.submit(monitor, FramePixels::Consumed(pixels), source, damage)
+    }
+    /// 【帧生命周期测试】【不透明交付】校验 pixels 已包含完整背景，按 monitor 与 damage 交付真实通道转换，返回结果
+    fn stage_opaque_frame(
+        &mut self,
+        monitor: usize,
+        pixels: &[u8],
+        damage: Option<DamageRect>,
+    ) -> AppResult {
+        let (left, top, width, height) =
+            damage.unwrap_or((0, 0, self.sizes[monitor].0, self.sizes[monitor].1));
+        let stride = self.sizes[monitor].0 as usize * 4;
+        for row in top..top + height {
+            let first = row as usize * stride + left as usize * 4;
+            assert!(
+                pixels[first..first + width as usize * 4]
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .all(|pixel| pixel[3] == 255)
+            );
+        }
+        FramePixels::Opaque(pixels).write_to(
+            &mut self.frames[monitor],
+            self.sizes[monitor],
+            damage,
+        )?;
+        self.sent += 1;
+        Ok(())
     }
     /// 【帧生命周期测试】【预分配】无参数，不需要测试桌面，无返回值
     fn prefault(&mut self) {}

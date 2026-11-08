@@ -17,6 +17,7 @@ impl Annotation {
     /// 【标注】【边界更新】重算当前形状的逻辑边界；文字边界由字体排版更新，无返回值
     pub fn update_bbox(&mut self) {
         match &self.shape {
+            AnnotationShape::ColorSample { sample } => self.bbox = sample.bounds(),
             AnnotationShape::Number { mark } => {
                 if let Some(bounds) = mark.body_bounds(self.stroke_width) {
                     self.bbox = bounds;

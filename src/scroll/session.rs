@@ -105,7 +105,25 @@ impl ScrollSession {
             && now.duration_since(self.last_progress).as_millis() >= IDLE_AFTER_MS
     }
 
-    /// Feeds a new frame into the stitcher, returning whether content was appended.
+    /// 【滚动截图】【捕获消费】按rect消费完整capture，重复帧不创建裁切图；释放捕获缓冲后再拼接，返回是否增长或裁切错误
+    pub(crate) fn push_capture(
+        &mut self,
+        capture: crate::types::MonitorFrame,
+        rect: (u32, u32, u32, u32),
+    ) -> Result<bool, String> {
+        self.last_capture = Instant::now();
+        let signature = frame::capture_signature(&capture, rect, SIGNATURE_COLS, SIGNATURE_ROWS)?;
+        if frame::is_duplicate(&self.last_signature, &signature) {
+            self.status = "Waiting for scroll".into();
+            return Ok(false);
+        }
+        let image = frame::crop(&capture, rect)?;
+        // 1. 【滚动截图】【峰值边界】拼接增长阶段不再持有完整输出帧
+        drop(capture);
+        Ok(self.push_signed(image, signature))
+    }
+
+    /// 【滚动截图】【图像接收】将image交给拼接器，返回是否增长；已有图像调用者共用相同签名规则
     pub fn push(&mut self, image: Image) -> bool {
         self.last_capture = std::time::Instant::now();
 
@@ -115,6 +133,11 @@ impl ScrollSession {
             self.status = "Waiting for scroll".into();
             return false;
         }
+        self.push_signed(image, signature)
+    }
+
+    /// 【滚动截图】【有效帧拼接】按signature记忆image并更新会话，返回是否增长，拼接失败时暂停
+    fn push_signed(&mut self, image: Image, signature: Vec<u8>) -> bool {
         self.last_signature = signature;
 
         let outcome = match self.stitcher.push(image) {
@@ -129,6 +152,7 @@ impl ScrollSession {
         self.apply(outcome)
     }
 
+    /// 【滚动截图】【结果接收】按 outcome 更新预览范围、统计与补采提示，返回界面是否需要刷新
     fn apply(&mut self, outcome: StitchResult) -> bool {
         let previous_range = self.capture_range;
         if outcome.status != Status::NoMatch && outcome.frame_length > 0 {
@@ -142,7 +166,7 @@ impl ScrollSession {
             Status::FirstFrame => "Capturing".into(),
             Status::Appended => "Capturing".into(),
             Status::NoProgress => "Waiting for scroll".into(),
-            Status::NoMatch => "No overlap match".into(),
+            Status::NoMatch => "No overlap; scroll back slowly".into(),
         };
         if matches!(outcome.status, Status::FirstFrame | Status::Appended) {
             self.last_progress = Instant::now();

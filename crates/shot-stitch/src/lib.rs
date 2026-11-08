@@ -5,6 +5,7 @@
 mod adjacent;
 mod algorithm;
 mod comparison;
+mod edge_occlusion;
 pub mod fixed_regions;
 mod image_view;
 mod line_matching;
@@ -15,6 +16,7 @@ mod motion_mask;
 mod owned_image;
 mod pixel_block;
 pub mod profile;
+mod seam;
 mod session;
 mod types;
 

@@ -91,7 +91,9 @@ impl ToolBehavior for PickTool {
                 }
                 state.select_annotation_index(selected_annotation);
                 let idx = selected_annotation.unwrap();
-                if register_line_click(state, idx, _dirty_mask) {
+                if crate::app::text_reedit::begin(state, idx, _dirty_mask)
+                    || register_line_click(state, idx, _dirty_mask)
+                {
                     return;
                 }
                 let ann = &state.annotations[idx];
@@ -125,7 +127,9 @@ impl ToolBehavior for PickTool {
 
             // click the same annotation > handle hit test (Move or resize), push undo before drag
             if let Some(idx) = state.selected_annotation_index() {
-                if register_line_click(state, idx, _dirty_mask) {
+                if crate::app::text_reedit::begin(state, idx, _dirty_mask)
+                    || register_line_click(state, idx, _dirty_mask)
+                {
                     return;
                 }
                 begin_drag_for_annotation(state, idx);

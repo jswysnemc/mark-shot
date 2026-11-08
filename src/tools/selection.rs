@@ -3,7 +3,7 @@ use crate::editor::{DamageZone, EditorState};
 use crate::interaction::ClickTarget;
 use crate::tools::ToolBehavior;
 use crate::types::{CursorIcon, MouseButton, Placement, SelectionEdges, SelectionHandle};
-use crate::utils::{apply_handle_drag, cursor_for_handle, hit_test_rect_handle};
+use crate::utils::{apply_handle_drag, cursor_for_handle};
 use tiny_skia::Rect;
 
 pub struct SelectionTool;
@@ -67,12 +67,7 @@ impl ToolBehavior for SelectionTool {
         state.input.mouse_down = pressed;
         if pressed {
             state.tool_active = true;
-            let handle = state
-                .selection
-                .zone
-                .as_ref()
-                .map(|sel| hit_test_rect_handle(sel, state.canvas_point()))
-                .unwrap_or(SelectionHandle::None);
+            let handle = selection_handle(state);
 
             let pos = (state.canvas_point().0 as f32, state.canvas_point().1 as f32);
             state.selection.creating = handle == SelectionHandle::None;
@@ -184,12 +179,20 @@ impl ToolBehavior for SelectionTool {
             return cursor_for_handle(state.selection.active_handle, true)
                 .unwrap_or(CursorIcon::Crosshair);
         }
-        if let Some(sel) = state.selection.zone
-            && let Some(icon) =
-                cursor_for_handle(hit_test_rect_handle(&sel, state.canvas_point()), false)
-        {
+        if let Some(icon) = cursor_for_handle(selection_handle(state), false) {
             return icon;
         }
         CursorIcon::Crosshair
     }
+}
+
+/// 【选区工具】【统一命中】按 state 返回八点缩放或内部移动，普通边缘不再扩展为整条缩放热区
+fn selection_handle(state: &EditorState) -> SelectionHandle {
+    crate::app::input::selection_handles::hit(state).unwrap_or_else(|| {
+        if state.selection.zone.is_some() && !crate::app::input::selection_handles::outside(state) {
+            SelectionHandle::Move
+        } else {
+            SelectionHandle::None
+        }
+    })
 }

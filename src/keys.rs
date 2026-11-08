@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock, RwLock};
 
 use log::info;
 
@@ -69,6 +69,10 @@ pub enum Action {
     ToggleTheme,
     ScrollCapture,
     History,
+    Settings,
+    ClearAnnotations,
+    ToggleScope,
+    ToggleToolbarLayout,
     SizeUp,
     SizeDown,
     Tool(Tool),
@@ -96,6 +100,10 @@ pub const ACTIONS: &[(&str, Action, &[&str])] = &[
     ("toggle_theme", Action::ToggleTheme, &["Ctrl+Shift+L"]),
     ("scroll_capture", Action::ScrollCapture, &["Ctrl+Shift+S"]),
     ("history", Action::History, &["Ctrl+H"]),
+    ("settings", Action::Settings, &["Ctrl+,"]),
+    ("clear_annotations", Action::ClearAnnotations, &[]),
+    ("toggle_scope", Action::ToggleScope, &[]),
+    ("toggle_toolbar_layout", Action::ToggleToolbarLayout, &[]),
     ("size_up", Action::SizeUp, &["]"]),
     ("size_down", Action::SizeDown, &["["]),
     ("tool_selection", Action::Tool(Tool::Selection), &["S"]),
@@ -384,9 +392,21 @@ fn parse_all(chords: &[&str]) -> Vec<Chord> {
         .collect()
 }
 
-pub fn map() -> &'static Keymap {
-    static MAP: OnceLock<Keymap> = OnceLock::new();
-    MAP.get_or_init(|| Keymap::build(&crate::config::get().keys.0))
+static MAP: OnceLock<RwLock<Arc<Keymap>>> = OnceLock::new();
+
+/// 【快捷键】【有效映射】无参数，返回当前绑定快照；同一输入事件不读取配置文件
+pub fn map() -> Arc<Keymap> {
+    MAP.get_or_init(|| RwLock::new(Arc::new(Keymap::build(&crate::config::get().keys.0))))
+        .read()
+        .unwrap_or_else(|error| error.into_inner())
+        .clone()
+}
+
+/// 【快捷键】【设置生效】按 overrides 替换完整映射，移除旧绑定，保留构建时冲突检查
+pub fn reload(overrides: &BTreeMap<String, Binding>) {
+    let value = Arc::new(Keymap::build(overrides));
+    let map = MAP.get_or_init(|| RwLock::new(value.clone()));
+    *map.write().unwrap_or_else(|error| error.into_inner()) = value;
 }
 
 #[cfg(test)]
