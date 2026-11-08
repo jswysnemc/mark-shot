@@ -36,6 +36,22 @@ fn render(source: &Pixmap, filter: RegionFilter, scale: f32, opacity: f32, cache
     output
 }
 
+/// 【滤镜测试】【圆角导出】圆角遮罩裁去四角且保留中心像素，缓存和直接绘制完全一致
+#[test]
+fn rounded_filter_clips_corners_in_cached_and_direct_output() {
+    let source = pixels::image(100, 100);
+    let mut filter =
+        RegionFilter::new((10.0, 10.0), (90.0, 90.0), 14.0, FilterMode::Invert).unwrap();
+    filter.radius = 24.0;
+    let result = render(&source, filter, 1.0, 1.0, false);
+    assert_eq!(result.pixel(10, 10).unwrap().alpha(), 0);
+    assert_eq!(
+        result.pixel(50, 50).unwrap().alpha(),
+        source.pixel(50, 50).unwrap().alpha()
+    );
+    pixels::same(&result, &render(&source, filter, 1.0, 1.0, true));
+}
+
 /// 【滤镜测试】【缓存与分块】五模式在旋转和分数缩放下，缓存与按需分块结果逐像素一致
 #[test]
 fn cached_and_uncached_draws_match_at_rotated_fractional_scales() {
@@ -197,6 +213,8 @@ fn filters_sample_frozen_pixels_and_keep_annotation_order() {
         frozen_bounds: None,
         id: 1,
         shape: AnnotationShape::Rectangle {
+            radius: 0.0,
+            fixed_ratio: false,
             start: (20.0, 20.0),
             end: (140.0, 80.0),
             filled: true,

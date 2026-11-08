@@ -13,7 +13,7 @@ use wayland_client::QueueHandle;
 
 impl Pin {
     /// 【贴图】【首次模型引导】临时交还输入和置顶层级，返回明确选择的模型文件，取消后恢复当前贴图
-    pub fn model_guide(&mut self) -> AppResult<Option<crate::ocr::models::ModelFiles>> {
+    pub fn model_guide(&mut self) -> AppResult<Option<crate::ocr::engine_choice::Source>> {
         let region = Region::new(&self.compositor)?;
         self.shell
             .surface()

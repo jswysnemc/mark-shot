@@ -28,6 +28,19 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
     // 1. 【内存生命周期】【启动顺序】创建字体和捕获线程前设置大对象策略，辅助进程也使用同一分配规则
     crate::utils::memory::configure();
     // 2. 【命令行】【运行配置】初始化配置后再启动日志，命令行覆盖只影响当前进程
+    crate::config::runtime_overrides::record(
+        options.no_notify.then_some(false),
+        options
+            .debug
+            .map(|enabled| if enabled { "info" } else { "off" }.into()),
+        options
+            .debug_log
+            .as_ref()
+            .map(|path| path.to_string_lossy().into_owned()),
+        options
+            .xdg_window
+            .then_some(crate::backend::OverlayShell::Window),
+    );
     crate::config::init(options.config.clone(), |config| {
         if options.no_notify {
             config.notifications.enabled = false;

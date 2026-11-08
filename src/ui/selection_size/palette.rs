@@ -24,9 +24,10 @@ impl Colors {
     }
 
     /// 【选区尺寸】【配色映射】按 mode 返回原版颜色，暗色使用独立底板，亮色复用统一工具栏
-    pub const fn new(mode: Mode) -> Self {
+    pub fn new(mode: Mode) -> Self {
         let palette = Palette::new(mode);
         match mode {
+            Mode::System => Self::new(mode.resolved()),
             Mode::Dark => Self {
                 text: Rgba(229, 231, 235, 255),
                 muted: Rgba(156, 163, 175, 255),

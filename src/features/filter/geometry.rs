@@ -1,6 +1,6 @@
 //! 【滤镜】【坐标几何】统一原图网格、旋转路径和正文边界
 
-use tiny_skia::{IntRect, Path, PathBuilder, Rect};
+use tiny_skia::{IntRect, Path, Rect};
 
 use super::RegionFilter;
 use super::model::Point;
@@ -122,14 +122,12 @@ impl RegionFilter {
 
     /// 【滤镜】【矩形路径】按 rect 和当前旋转创建闭合路径；返回正文或控制框路径
     pub fn path(self, rect: Rect) -> Option<Path> {
-        let points = corners(rect).map(|point| self.to_visual(point));
-        let mut builder = PathBuilder::new();
-        builder.move_to(points[0].0, points[0].1);
-        for point in &points[1..] {
-            builder.line_to(point.0, point.1);
-        }
-        builder.close();
-        builder.finish()
+        crate::features::shape::path(
+            rect,
+            self.radius * self.style_scale,
+            self.rotation,
+            self.center(),
+        )
     }
 }
 

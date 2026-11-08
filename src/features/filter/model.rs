@@ -89,6 +89,7 @@ impl<'de> Deserialize<'de> for FilterMode {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RegionFilter {
+    pub radius: f32,
     pub start: Point,
     pub end: Point,
     pub strength: f32,
@@ -109,6 +110,7 @@ impl RegionFilter {
             return None;
         }
         Some(Self {
+            radius: 0.0,
             start,
             end,
             strength: clamped_strength(strength),

@@ -47,6 +47,7 @@ fn annotation(sample: &Sample) -> Annotation {
             line_style: Default::default(),
         },
         "ellipse" => AnnotationShape::Circle {
+            fixed_ratio: false,
             start: (260.0, 200.0),
             end: (380.0, 280.0),
             filled: false,

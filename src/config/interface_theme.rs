@@ -92,9 +92,15 @@ pub(super) fn apply_root(config: &mut Config, root: &serde_json::Value) {
 }
 
 /// 【主题配置】【替代配色】按 config 生成另一主题，保留显式自定义角色与全部几何，返回新配色
+#[cfg(test)]
 pub(crate) fn alternate(config: &Config) -> Theme {
+    with_mode(config, config.ui.theme.opposite())
+}
+
+/// 【主题配置】【指定配色】按 config 和 mode 返回主题，保留自定义角色及几何，系统切换使用同一规则
+pub(crate) fn with_mode(config: &Config, mode: Mode) -> Theme {
     let mut theme = config.theme.clone();
-    theme.copy_colors(&Theme::for_mode(config.ui.theme.opposite()));
+    theme.copy_colors(&Theme::for_mode(mode));
     macro_rules! restore {
         ($($field:ident),* $(,)?) => {
             let mut index = 0;
@@ -158,57 +164,7 @@ pub(super) fn is_builtin(name: &str, color: crate::theme::Rgba) -> bool {
 
 /// 【主题配置】【单项更新】按 path 原子保存 mode，保留未知配置、注释和其他业务字段，返回写入结果
 pub fn save_at(path: &Path, mode: Mode) -> io::Result<()> {
-    super::persistence::update(path, |text| {
-        if super::document::is_json(path, text) {
-            let updated = super::document::update_json(text, |root| {
-                super::document::section(root, &["ui"], "ui")?
-                    .insert("theme".into(), mode.name().into());
-                if let Some(theme) = root
-                    .get_mut("theme")
-                    .and_then(serde_json::Value::as_object_mut)
-                {
-                    theme.retain(|name, value| {
-                        !value
-                            .as_str()
-                            .and_then(crate::theme::Rgba::parse_hex)
-                            .is_some_and(|color| is_builtin(name, color))
-                    });
-                }
-                Ok(())
-            })?;
-            return Ok((updated, ()));
-        }
-        let mut document = text
-            .parse::<toml_edit::DocumentMut>()
-            .map_err(io::Error::other)?;
-        if document.get("ui").is_none() {
-            document["ui"] = toml_edit::Item::Table(toml_edit::Table::new());
-        }
-        let ui = document["ui"]
-            .as_table_like_mut()
-            .ok_or_else(|| io::Error::other("ui must be a table"))?;
-        ui.insert("theme", toml_edit::value(mode.name()));
-        // 1. 【主题配置】【旧模板迁移】旧模板把内置颜色写为显式值；删除这些覆盖后，重开才继续继承新主题
-        if let Some(theme) = document
-            .get_mut("theme")
-            .and_then(toml_edit::Item::as_table_like_mut)
-        {
-            let inherited: Vec<_> = theme
-                .iter()
-                .filter_map(|(name, value)| {
-                    value
-                        .as_str()
-                        .and_then(crate::theme::Rgba::parse_hex)
-                        .filter(|color| is_builtin(name, *color))
-                        .map(|_| name.to_owned())
-                })
-                .collect();
-            for name in inherited {
-                theme.remove(&name);
-            }
-        }
-        Ok((document.to_string(), ()))
-    })
+    super::settings_store::write(path, &[("ui.theme".into(), mode.name().into())])
 }
 
 /// 【主题配置】【当前保存】在命令行指定配置或默认配置内保存 mode，返回结果；没有配置目录时返回错误

@@ -61,6 +61,7 @@ pub(super) unsafe extern "system" fn procedure(
     debug_assert_eq!(context.owner, std::thread::current().id());
     let id = context.id;
     let event = match message {
+        WM_SETTINGCHANGE | WM_THEMECHANGED => Some(Event::Theme { id }),
         WM_CLOSE => Some(Event::Close { id }),
         WM_SETFOCUS | WM_KILLFOCUS => Some(Event::Focus {
             id,

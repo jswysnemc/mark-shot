@@ -17,6 +17,8 @@ pub(super) fn selected() -> EditorState {
         frozen_bounds: None,
         id: 7,
         shape: AnnotationShape::Rectangle {
+            radius: 0.0,
+            fixed_ratio: false,
             start: (180.0, 130.0),
             end: (280.0, 210.0),
             filled: false,

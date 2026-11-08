@@ -9,6 +9,7 @@ use std::{
 
 mod decode;
 mod encode;
+pub(crate) mod preferences;
 
 #[derive(Clone, PartialEq)]
 pub struct Translation {
@@ -123,53 +124,11 @@ pub(crate) fn save_target_at(path: &Path, target: &str) -> io::Result<String> {
     if target.is_empty() {
         return Err(io::Error::other("Target language is empty"));
     }
-    super::persistence::update(path, |text| {
-        if super::document::is_json(path, text) {
-            #[derive(Deserialize, Default)]
-            #[serde(default)]
-            struct Section {
-                translation: Translation,
-            }
-            super::document::decode::<Section>(path, text)?;
-            let updated = super::document::update_json(text, |root| {
-                let table = super::document::section(root, &["translation"], "translation")?;
-                let key = if table.contains_key("target_language") {
-                    "target_language"
-                } else {
-                    "targetLanguage"
-                };
-                table.insert(key.into(), target.clone().into());
-                Ok(())
-            })?;
-            return Ok((updated, target.clone()));
-        }
-        let mut document = text
-            .parse::<toml_edit::DocumentMut>()
-            .map_err(io::Error::other)?;
-        let translation = document
-            .entry("translation")
-            .or_insert(toml_edit::Item::Table(toml_edit::Table::new()))
-            .as_table_like_mut()
-            .ok_or_else(|| io::Error::other("translation must be a table"))?;
-        let key = if translation.contains_key("targetLanguage") {
-            "targetLanguage"
-        } else {
-            "target_language"
-        };
-        let mut value = toml_edit::Value::from(target.as_str());
-        if let Some(previous) = translation.get(key).and_then(toml_edit::Item::as_value) {
-            *value.decor_mut() = previous.decor().clone();
-        }
-        translation.insert(key, toml_edit::Item::Value(value));
-        let text = document.to_string();
-        #[derive(Deserialize, Default)]
-        #[serde(default)]
-        struct Section {
-            translation: Translation,
-        }
-        toml::from_str::<Section>(&text).map_err(io::Error::other)?;
-        Ok((text, target.clone()))
-    })
+    super::settings_store::write(
+        path,
+        &[("translation.target_language".into(), target.clone().into())],
+    )?;
+    Ok(target)
 }
 
 #[cfg(test)]

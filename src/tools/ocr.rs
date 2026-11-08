@@ -32,7 +32,7 @@ impl ToolBehavior for OcrTool {
         }
         state.ocr.view.clear();
 
-        if state.ocr.models.installed_count() == 0 {
+        if ocr::engine_choice::source(&state.ocr.models).is_none() {
             ask_for_model(state);
             return;
         }
@@ -276,7 +276,7 @@ fn start_ocr(state: &mut EditorState) {
     };
     dismiss_scan_toasts(state);
 
-    if !state.ocr.models.active_installed() {
+    if ocr::engine_choice::source(&state.ocr.models).is_none() {
         ask_for_model(state);
         return;
     }
@@ -296,15 +296,29 @@ fn start_ocr(state: &mut EditorState) {
         StartOutcome::Busy => info!("ocr: still working on the previous region"),
         StartOutcome::Unavailable(e) => {
             error!("ocr: engine unavailable: {e}");
-            if e.starts_with(ocr::model_integrity::IntegrityError::PREFIX)
-                && state.ocr.models.repair_active()
-            {
-                ask_for_model(state);
-            }
+            resource_failure(state, &e);
             state
                 .toasts
                 .show(ToastKind::OcrFailed, &mut state.text.font_system);
         }
+    }
+}
+
+/// 【识别安装】【失败引导】按 error 标记可修复资源或系统语言问题，并在 state 中重新显示选择面板，无返回值
+fn resource_failure(state: &mut EditorState, error: &str) {
+    if error.starts_with(ocr::model_integrity::IntegrityError::PREFIX)
+        && state.ocr.models.repair_active()
+    {
+        ask_for_model(state);
+    }
+    if error.contains("Install or repair the OCR runtime") {
+        state.ocr.models.library.status = ocr::models::ModelStatus::Failed;
+        state.ocr.models.library.error = Some(error.into());
+        ask_for_model(state);
+    }
+    if ocr::engine_choice::current() == ocr::engine_choice::Engine::System {
+        state.model_popover.setup.message = error.into();
+        ask_for_model(state);
     }
 }
 
@@ -367,11 +381,7 @@ pub fn finish_ocr(
         Ok(text) => text,
         Err(e) => {
             error!("ocr: recognition failed: {e}");
-            if e.starts_with(ocr::model_integrity::IntegrityError::PREFIX)
-                && state.ocr.models.repair_active()
-            {
-                ask_for_model(state);
-            }
+            resource_failure(state, &e);
             state
                 .toasts
                 .show(ToastKind::OcrFailed, &mut state.text.font_system);
@@ -425,14 +435,21 @@ pub fn open_result(state: &mut EditorState) {
 
 /// after downloading starts reading immediately
 pub fn use_model(state: &mut EditorState, idx: usize, dirty_mask: &mut u32) {
-    if state.ocr.models.active() == Some(idx) {
-        return;
-    }
-    let Some(files) = state.ocr.models.files(idx) else {
+    let Some(_) = state.ocr.models.files(idx) else {
         return;
     };
     state.ocr.models.set_active(Some(idx));
-    state.ocr.runtime.load(files);
+    resources_changed(state, dirty_mask);
+}
+
+/// 【识别安装】【资源生效】在 state 明确选择或安装完成后重建所选后端；dirty 接收重绘，缺少任一资源时继续显示安装面板
+pub fn resources_changed(state: &mut EditorState, dirty_mask: &mut u32) {
+    cancel_scan(state);
+    let Some(source) = ocr::engine_choice::source(&state.ocr.models) else {
+        state.model_popover.open = true;
+        return;
+    };
+    state.ocr.runtime.load_source(source);
 
     if state.selected_tool != Tool::Ocr {
         state.ocr.view.clear();
@@ -448,27 +465,15 @@ pub fn use_model(state: &mut EditorState, idx: usize, dirty_mask: &mut u32) {
     }
 }
 
+/// 【识别安装】【模型完成】记录已安装 idx，仅在当前选择本地引擎时重建 state；dirty 接收重绘标记
 pub fn model_ready(state: &mut EditorState, idx: usize, dirty_mask: &mut u32) {
-    if state.ocr.models.active() == Some(idx) {
-        if let Some(files) = state.ocr.models.files(idx) {
-            state.ocr.runtime.load(files);
-            if state.selected_tool == Tool::Ocr {
-                state.ocr.runtime.prepare();
-            }
-        }
-    } else if !state.ocr.models.active_installed() {
-        use_model(state, idx, dirty_mask);
+    if !state.ocr.models.active_installed() {
+        state.ocr.models.set_active(Some(idx));
     }
-
-    if state.ocr.models.installed_count() != 1 || state.selected_tool != Tool::Ocr {
-        return;
-    }
-    state.model_popover.open = false;
-    state.toasts.dismiss(ToastKind::OcrNoModel);
-    if state.selection.zone.is_some() {
-        start_ocr(state);
-    } else {
-        await_region(state);
+    if ocr::engine_choice::current() == ocr::engine_choice::Engine::Paddle
+        && state.ocr.models.active() == Some(idx)
+    {
+        resources_changed(state, dirty_mask);
     }
 }
 

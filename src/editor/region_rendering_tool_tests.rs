@@ -20,6 +20,8 @@ fn compare(shape: AnnotationShape, cached_pixels: bool) {
                     1,
                     13.0,
                     AnnotationShape::Rectangle {
+                        radius: 0.0,
+                        fixed_ratio: false,
                         start: (90.375, 60.625),
                         end: (561.125, 401.875),
                         filled: true,

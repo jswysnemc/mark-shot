@@ -38,6 +38,7 @@ mod selection_size_clicks;
 mod selection_size_navigation;
 mod selection_size_pointer;
 mod selection_translation;
+mod shape_properties;
 mod text;
 mod text_caret;
 mod text_composition;

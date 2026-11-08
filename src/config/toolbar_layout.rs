@@ -1,7 +1,11 @@
-//! 【工具栏配置】【布局持久化】三种工作场景分别保存按钮顺序，缺省配置保持现有工具栏
+//! 【工具栏配置】【布局持久化】只保存主栏和侧栏，全屏按两栏顺序合并
 
-use crate::ui::toolbar::{ACTION_ITEMS, FULLSCREEN_ITEMS, ITEMS, ToolbarItem, catalog};
+use crate::ui::toolbar::{ACTION_ITEMS, ITEMS, ToolbarItem, catalog};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
+
+#[cfg(test)]
+mod tests;
 
 pub const MAX_ITEMS: usize = 64;
 
@@ -12,37 +16,32 @@ pub struct ToolbarLayout {
     pub main: Vec<ToolbarItem>,
     #[serde(with = "items")]
     pub actions: Vec<ToolbarItem>,
-    #[serde(with = "items")]
-    pub fullscreen: Vec<ToolbarItem>,
     pub main_vertical: bool,
     pub actions_vertical: bool,
-    pub fullscreen_vertical: bool,
 }
 
 impl Default for ToolbarLayout {
-    /// 【工具栏配置】【默认布局】无参数，返回现有主栏、副栏和全屏栏，不改变首次启动行为
+    /// 【工具栏配置】【默认布局】无参数，返回横向主栏和纵向侧栏，全屏不另存配置
     fn default() -> Self {
         Self {
             main: ITEMS.to_vec(),
             actions: ACTION_ITEMS.to_vec(),
-            fullscreen: FULLSCREEN_ITEMS.to_vec(),
             main_vertical: false,
             actions_vertical: true,
-            fullscreen_vertical: false,
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Profile {
+    #[default]
     Main,
     Actions,
-    #[default]
     Fullscreen,
 }
 
 impl Profile {
-    pub const ALL: [Self; 3] = [Self::Main, Self::Actions, Self::Fullscreen];
+    pub const ALL: [Self; 2] = [Self::Main, Self::Actions];
 
     /// 【工具栏配置】【场景标识】无参数，返回当前场景的配置字段
     pub fn key(self) -> &'static str {
@@ -53,33 +52,24 @@ impl Profile {
         }
     }
 
-    /// 【工具栏配置】【方向字段】无参数，返回当前场景的排列方向配置字段
-    pub fn direction_key(self) -> &'static str {
-        match self {
-            Self::Main => "main_vertical",
-            Self::Actions => "actions_vertical",
-            Self::Fullscreen => "fullscreen_vertical",
-        }
-    }
-
     /// 【工具栏配置】【场景名称】按 chinese 返回对应工作场景的名称
     pub fn label(self, chinese: bool) -> &'static str {
         match (self, chinese) {
-            (Self::Main, true) => "截图主栏",
-            (Self::Actions, true) => "截图操作栏",
+            (Self::Main, true) => "主工具栏",
+            (Self::Actions, true) => "侧工具栏",
             (Self::Fullscreen, true) => "图片 / 全屏",
             (Self::Main, false) => "Main",
-            (Self::Actions, false) => "Actions",
+            (Self::Actions, false) => "Side toolbar",
             (Self::Fullscreen, false) => "Image / full",
         }
     }
 
-    /// 【工具栏配置】【场景读取】从 config 返回当前场景按钮切片，不复制或重新解析配置
-    pub fn items(self, config: &ToolbarLayout) -> &[ToolbarItem] {
+    /// 【工具栏配置】【场景读取】从 config 借用主侧栏；全屏返回去重且整理分隔线后的合并列表
+    pub fn items(self, config: &ToolbarLayout) -> Cow<'_, [ToolbarItem]> {
         match self {
-            Self::Main => &config.main,
-            Self::Actions => &config.actions,
-            Self::Fullscreen => &config.fullscreen,
+            Self::Main => Cow::Borrowed(&config.main),
+            Self::Actions => Cow::Borrowed(&config.actions),
+            Self::Fullscreen => Cow::Owned(config.merged()),
         }
     }
 
@@ -88,8 +78,33 @@ impl Profile {
         match self {
             Self::Main => config.main_vertical,
             Self::Actions => config.actions_vertical,
-            Self::Fullscreen => config.fullscreen_vertical,
+            Self::Fullscreen => config.main_vertical,
         }
+    }
+}
+
+impl ToolbarLayout {
+    /// 【工具栏配置】【全屏合并】无参数，返回主栏在前侧栏在后的唯一按钮列表，去除首尾与连续分隔线
+    pub fn merged(&self) -> Vec<ToolbarItem> {
+        let mut merged = Vec::with_capacity(self.main.len() + self.actions.len() + 1);
+        let mut separator = false;
+        for item in self
+            .main
+            .iter()
+            .chain(std::iter::once(&ToolbarItem::Seperator))
+            .chain(&self.actions)
+        {
+            if matches!(item, ToolbarItem::Seperator) {
+                separator = !merged.is_empty();
+            } else if !merged.contains(item) {
+                if separator {
+                    merged.push(ToolbarItem::Seperator);
+                }
+                merged.push(*item);
+                separator = false;
+            }
+        }
+        merged
     }
 }
 

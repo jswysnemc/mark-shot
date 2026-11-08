@@ -44,7 +44,7 @@ pub(crate) fn update<T>(
             if super::document::is_json(path, "") {
                 "{}".to_owned()
             } else {
-                super::TEMPLATE.to_owned()
+                super::INITIAL.to_owned()
             }
         }
         Err(error) => return Err(error),

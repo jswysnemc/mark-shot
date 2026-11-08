@@ -32,12 +32,15 @@ pub enum AnnotationShape {
         start: (f32, f32),
         end: (f32, f32),
         filled: bool,
+        radius: f32,
+        fixed_ratio: bool,
     },
     Marker {
         start: (f32, f32),
         end: (f32, f32),
         kind: MarkerShape,
         filled: bool,
+        radius: f32,
     },
     Ruler {
         measurement: crate::features::ruler::Measurement,
@@ -49,6 +52,7 @@ pub enum AnnotationShape {
         start: (f32, f32),
         end: (f32, f32),
         filled: bool,
+        fixed_ratio: bool,
     },
     Line {
         line: crate::features::line::LineSkeleton,

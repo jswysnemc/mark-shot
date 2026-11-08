@@ -37,16 +37,20 @@ fn annotation(scene: &Scene) -> crate::types::Annotation {
     let end = (x + width, y + height);
     let shape = match scene.index {
         0 => AnnotationShape::Rectangle {
+            radius: 0.0,
+            fixed_ratio: false,
             start,
             end,
             filled: false,
         },
         1 => AnnotationShape::Circle {
+            fixed_ratio: false,
             start,
             end,
             filled: false,
         },
         2 => AnnotationShape::Marker {
+            radius: 0.0,
             start,
             end,
             kind: Default::default(),

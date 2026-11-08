@@ -117,7 +117,7 @@ impl ToastKind {
                 fade_out,
             },
             ToastKind::OcrNoModel => ToastSpec {
-                text: "Choose a language model to use OCR",
+                text: "Choose an OCR engine and install required resources",
                 anchor: ToastAnchor::SelectionCenter,
                 life: timed(cfg.lifetime),
                 fade_in,

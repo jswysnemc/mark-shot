@@ -82,8 +82,18 @@ pub(crate) fn dragged(
     handle: SelectionHandle,
     start: (f64, f64),
     current: (f64, f64),
-    options: Options,
+    mut options: Options,
 ) -> Option<Change> {
+    options.keep_aspect |= matches!(
+        before.shape,
+        AnnotationShape::Rectangle {
+            fixed_ratio: true,
+            ..
+        } | AnnotationShape::Circle {
+            fixed_ratio: true,
+            ..
+        }
+    );
     if !before.uses_generic_rotation() || !current.0.is_finite() || !current.1.is_finite() {
         return None;
     }

@@ -221,7 +221,7 @@ fn size_input_applies_valid_values_immediately_and_keeps_intermediate_text() {
 }
 
 #[test]
-fn selected_family_requires_release_on_same_row_and_closes_panel() {
+fn selected_family_requires_release_on_same_row_and_keeps_panel() {
     let mut state = prepared();
     let mut dirty = 0;
     open(&mut state, &mut dirty);
@@ -239,7 +239,7 @@ fn selected_family_requires_release_on_same_row_and_closes_panel() {
         Some(Hit::Family(2))
     );
     click(&mut state, &mut dirty);
-    assert!(!state.font_panel.open);
+    assert!(state.font_panel.open);
     assert_eq!(state.tool_settings, defaults);
     assert!(
         matches!(&state.annotations[0].shape,crate::types::AnnotationShape::Text { appearance,.. } if appearance.family=="Sample")
@@ -283,4 +283,68 @@ fn canvas_scroll_still_adjusts_text_after_stepper_removal() {
     assert!(state.text_size_history.pending.is_some());
     state.undo(&mut dirty);
     assert_eq!(state.annotations[0], original);
+}
+
+/// 【文字属性测试】【草稿焦点】无参数，编辑文字时打开字体控件并调整字号，草稿目标和输入会话持续有效
+#[test]
+fn font_controls_keep_the_active_text_session() {
+    let mut state = prepared();
+    let mut dirty = 0;
+    let id = state.annotations[0].id;
+    crate::editor::text_session::begin_existing(&mut state, id, &mut dirty);
+    state.text_session.as_mut().unwrap().properties_hidden = false;
+    super::super::refresh_panels(&mut state, &mut dirty);
+    open(&mut state, &mut dirty);
+    assert!(
+        state.text_session.is_some(),
+        "font button ended text editing"
+    );
+    key(&mut state, Key::Tab, false, None, &mut dirty);
+    key(&mut state, Key::Char('4'), false, Some("42"), &mut dirty);
+    let session = state
+        .text_session
+        .as_ref()
+        .expect("font input lost the text target");
+    assert!(matches!(
+        session.working.shape,
+        crate::types::AnnotationShape::Text {
+            font_size: 42.0,
+            ..
+        }
+    ));
+    assert!(state.font_panel.open);
+    key(&mut state, Key::Enter, false, None, &mut dirty);
+    assert!(
+        state.text_session.is_some(),
+        "confirming size must keep the text target"
+    );
+}
+
+/// 【文字属性测试】【新建焦点】无参数，新建文字尚未提交时选择字体，保留草稿且把新字体应用到正文
+#[test]
+fn choosing_family_keeps_new_text_editable() {
+    let mut state = prepared();
+    let mut dirty = 0;
+    state.select_annotation_index(None);
+    state.selected_tool = Tool::Text;
+    crate::editor::text_session::begin_new(&mut state, (280.0, 240.0), 1.0, &mut dirty);
+    key(&mut state, Key::Char('t'), false, Some("Text"), &mut dirty);
+    super::super::refresh_panels(&mut state, &mut dirty);
+    open(&mut state, &mut dirty);
+    let row = state.font_panel.layout.row(2, 0.0, false);
+    let position = state.font_panel.render_pos;
+    pointer(
+        &mut state,
+        f64::from(position.0 + row.left() + 30.0),
+        f64::from(position.1 + row.top() + 10.0),
+        &mut dirty,
+    );
+    click(&mut state, &mut dirty);
+    let session = state
+        .text_session
+        .as_ref()
+        .expect("family selection ended text editing");
+    assert!(
+        matches!(&session.working.shape, crate::types::AnnotationShape::Text { appearance, .. } if appearance.family == "Sample")
+    );
 }

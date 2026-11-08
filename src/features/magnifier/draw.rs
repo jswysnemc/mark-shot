@@ -4,7 +4,6 @@ use tiny_skia::{
     Color, FillRule, LineCap, LineJoin, Mask, Paint, Path, PathBuilder, Pixmap, Rect, Stroke,
 };
 
-use super::geometry::corners;
 use super::{Magnifier, MagnifierShape};
 use crate::renderer::Painter;
 
@@ -26,12 +25,14 @@ fn append_frame(path: &mut PathBuilder, magnifier: Magnifier, rect: Rect) {
         ));
         path.push_circle(center.0, center.1, rect.width().min(rect.height()) / 2.0);
     } else {
-        let points = corners(rect).map(|point| magnifier.to_visual(point));
-        path.move_to(points[0].0, points[0].1);
-        for point in &points[1..] {
-            path.line_to(point.0, point.1);
+        if let Some(rounded) = crate::features::shape::path(
+            rect,
+            magnifier.radius / magnifier.pixel_scale,
+            magnifier.rotation,
+            magnifier.pivot,
+        ) {
+            path.push_path(&rounded);
         }
-        path.close();
     }
 }
 
@@ -50,7 +51,13 @@ fn border(painter: &mut Painter<'_>, magnifier: Magnifier, rect: Rect, width: f3
     )
     .filter(|rect| !rect.is_empty())
     {
-        append_frame(&mut path, magnifier, inner);
+        let outer_radius =
+            (magnifier.radius / magnifier.pixel_scale).min(rect.width().min(rect.height()) / 2.0);
+        let inner_frame = Magnifier {
+            radius: (outer_radius - width).max(0.0) * magnifier.pixel_scale,
+            ..magnifier
+        };
+        append_frame(&mut path, inner_frame, inner);
     }
     let Some(path) = path.finish() else { return };
     let mut paint = Paint::default();

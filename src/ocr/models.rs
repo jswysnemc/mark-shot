@@ -30,6 +30,25 @@ pub struct Model {
     pub dict: Asset,
 }
 
+impl Model {
+    /// 【识别模型】【语言名称】按 chinese 返回本地化的语言组名称，无文件或网络访问
+    pub fn label(&self, chinese: bool) -> &'static str {
+        if !chinese {
+            return self.name;
+        }
+        match self.id {
+            "latin" => "英文与拉丁语系",
+            "cyrillic" => "西里尔语系",
+            "arabic" => "阿拉伯语系",
+            "greek" => "希腊语",
+            "chinese" => "中文与日文",
+            "korean" => "韩语",
+            "thai" => "泰语",
+            _ => self.name,
+        }
+    }
+}
+
 pub const DETECTOR: Asset = Asset {
     file: "pp-ocrv5_mobile_det.onnx",
     size: 4_826_518,
@@ -167,6 +186,7 @@ pub enum ModelEvent {
 }
 
 pub struct OcrModels {
+    pub library: super::runtime_library::Installer,
     dir: Option<PathBuf>,
     status: Vec<ModelStatus>,
     active: Option<usize>,
@@ -181,6 +201,7 @@ pub struct OcrModels {
 impl OcrModels {
     pub fn load() -> Self {
         let mut models = Self {
+            library: super::runtime_library::Installer::default(),
             dir: models_dir(),
             status: vec![ModelStatus::Missing; MODELS.len()],
             active: None,
@@ -213,7 +234,7 @@ impl OcrModels {
 
     /// 【识别模型】【取消排空】返回下载器是否仍需消费进度或完成消息，无参数，取消不以界面状态代替实际队列结束
     pub fn needs_poll(&self) -> bool {
-        self.downloader.has_pending()
+        self.downloader.has_pending() || self.library.needs_poll()
     }
 
     pub fn recommended(&self) -> usize {
@@ -323,6 +344,7 @@ impl OcrModels {
 
     pub fn shutdown(&mut self) {
         self.downloader.stop();
+        self.library.cancel();
     }
 
     pub fn cancel(&mut self, idx: usize) {
@@ -356,6 +378,9 @@ impl OcrModels {
 
     pub fn poll(&mut self) -> Vec<ModelEvent> {
         let mut events = Vec::new();
+        if self.library.poll() {
+            events.push(ModelEvent::Progress);
+        }
         while let Some(update) = self.downloader.try_recv() {
             let (id, idx) = update.job();
             if self.jobs[idx]

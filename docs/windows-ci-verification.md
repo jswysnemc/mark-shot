@@ -1,5 +1,9 @@
 # Windows 原生构建工作流验证
 
+本页记录的是下列历史提交的静态 OCR 产物。2026-11-08 后续源码改为默认动态运行库、
+手动安装和系统 OCR 选择，当前行为见 [OCR 引擎与资源](ocr-runtime-installation.md)。
+历史 Wine 验证不代表新系统 OCR 已在真实 Windows 验收。
+
 2026-11-07 按用户授权提交并推送到 `rewrite/native-wayland`。没有创建标签或发布 Release。
 
 ## 已通过的远端构建

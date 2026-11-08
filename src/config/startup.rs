@@ -43,57 +43,33 @@ impl Startup {
 
 /// 【启动配置】【放大区保存】把 enabled 保存到当前格式对应的选区放大区字段，返回保存结果，不影响取色开关
 pub(crate) fn save_loupe(enabled: bool) -> io::Result<()> {
-    let path = super::OVERRIDE_PATH
-        .get()
-        .cloned()
-        .or_else(super::loading::config_path)
-        .ok_or_else(|| io::Error::other("configuration directory is unavailable"))?;
-    super::persistence::update(&path, |text| {
-        if super::document::is_json(&path, text) {
-            let updated = super::document::update_json(text, |root| {
-                let capture = super::document::section(
-                    root,
-                    &["capture", "screenshot", "screenCapture"],
-                    "capture",
-                )?;
-                let key = if capture.contains_key("selectionLoupe") {
-                    "selectionLoupe"
-                } else if capture.contains_key("loupe") {
-                    "loupe"
-                } else {
-                    "selectionLoupe"
-                };
-                let value = capture.entry(key).or_insert_with(|| serde_json::json!({}));
-                if let Some(table) = value.as_object_mut() {
-                    let key = if table.contains_key("enable") {
-                        "enable"
-                    } else {
-                        "enabled"
-                    };
-                    table.insert(key.into(), enabled.into());
-                } else {
-                    *value = enabled.into();
-                }
-                Ok(())
-            })?;
-            return Ok((updated, ()));
-        }
-        let mut document = text
-            .parse::<toml_edit::DocumentMut>()
-            .map_err(io::Error::other)?;
-        let startup = document
-            .entry("startup")
-            .or_insert(toml_edit::Item::Table(toml_edit::Table::new()))
-            .as_table_like_mut()
-            .ok_or_else(|| io::Error::other("startup must be a table"))?;
-        let mut value = toml_edit::Value::from(enabled);
-        if let Some(previous) = startup
-            .get("selection_loupe")
-            .and_then(toml_edit::Item::as_value)
+    if cfg!(test) {
+        return Ok(());
+    }
+    let path = super::preferences::path()?;
+    super::settings_store::write(&path, &[("startup.selection_loupe".into(), enabled.into())])?;
+    super::preferences::reload(&path)
+}
+
+/// 【启动配置】【放大区迁移】按 config、path 将旧工具状态迁移为统一偏好，成功后返回空值，失败保留旧文件
+pub(super) fn migrate_loupe(config: &mut super::Config, path: &std::path::Path) -> io::Result<()> {
+    if config.startup.selection_loupe.is_none()
+        && let Some(enabled) = crate::editor::saved::get().magnifier
+    {
+        super::settings_store::write(path, &[("startup.selection_loupe".into(), enabled.into())])?;
+        config.startup.selection_loupe = Some(enabled);
+        if let Some(state) =
+            dirs::state_dir().map(|directory| directory.join("mark-shot/tools.toml"))
+            && state.exists()
         {
-            *value.decor_mut() = previous.decor().clone();
+            super::persistence::update(&state, |text| {
+                let mut document = text
+                    .parse::<toml_edit::DocumentMut>()
+                    .map_err(io::Error::other)?;
+                document.remove("magnifier");
+                Ok((document.to_string(), ()))
+            })?;
         }
-        startup.insert("selection_loupe", toml_edit::Item::Value(value));
-        Ok((document.to_string(), ()))
-    })
+    }
+    Ok(())
 }

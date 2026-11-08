@@ -37,26 +37,42 @@ impl Annotation {
                 style: *style,
                 line_style: *line_style,
             },
-            AnnotationShape::Rectangle { start, end, filled } => AnnotationShape::Rectangle {
+            AnnotationShape::Rectangle {
+                start,
+                end,
+                filled,
+                radius,
+                fixed_ratio,
+            } => AnnotationShape::Rectangle {
                 start: p(*start),
                 end: p(*end),
                 filled: *filled,
+                radius: *radius,
+                fixed_ratio: *fixed_ratio,
             },
             AnnotationShape::Marker {
                 start,
                 end,
                 kind,
                 filled,
+                radius,
             } => AnnotationShape::Marker {
                 start: p(*start),
                 end: p(*end),
                 kind: *kind,
                 filled: *filled,
+                radius: *radius,
             },
-            AnnotationShape::Circle { start, end, filled } => AnnotationShape::Circle {
+            AnnotationShape::Circle {
+                start,
+                end,
+                filled,
+                fixed_ratio,
+            } => AnnotationShape::Circle {
                 start: p(*start),
                 end: p(*end),
                 filled: *filled,
+                fixed_ratio: *fixed_ratio,
             },
             AnnotationShape::Line { line, style } => AnnotationShape::Line {
                 line: line.scaled(s),
@@ -230,26 +246,42 @@ impl Annotation {
                 style: *style,
                 line_style: *line_style,
             },
-            AnnotationShape::Rectangle { start, end, filled } => AnnotationShape::Rectangle {
+            AnnotationShape::Rectangle {
+                start,
+                end,
+                filled,
+                radius,
+                fixed_ratio,
+            } => AnnotationShape::Rectangle {
                 start: remap(*start),
                 end: remap(*end),
                 filled: *filled,
+                radius: *radius,
+                fixed_ratio: *fixed_ratio,
             },
             AnnotationShape::Marker {
                 start,
                 end,
                 kind,
                 filled,
+                radius,
             } => AnnotationShape::Marker {
                 start: remap(*start),
                 end: remap(*end),
                 kind: *kind,
                 filled: *filled,
+                radius: *radius,
             },
-            AnnotationShape::Circle { start, end, filled } => AnnotationShape::Circle {
+            AnnotationShape::Circle {
+                start,
+                end,
+                filled,
+                fixed_ratio,
+            } => AnnotationShape::Circle {
                 start: remap(*start),
                 end: remap(*end),
                 filled: *filled,
+                fixed_ratio: *fixed_ratio,
             },
             AnnotationShape::Line { line, style } => AnnotationShape::Line {
                 line: line.mapped(remap),

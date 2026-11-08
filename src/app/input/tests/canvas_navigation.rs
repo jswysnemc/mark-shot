@@ -267,6 +267,8 @@ fn selected_controls_and_delete_button_follow_the_screen_view() {
         style_scale: 1.0,
         id: 42,
         shape: AnnotationShape::Rectangle {
+            radius: 0.0,
+            fixed_ratio: false,
             start: (300.0, 220.0),
             end: (340.0, 260.0),
             filled: false,

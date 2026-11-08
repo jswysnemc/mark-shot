@@ -250,7 +250,7 @@ pub fn release(state: &mut EditorState, dirty: &mut u32) -> bool {
             if let Some(family) = family {
                 text_edits::set(state, Property::Family(family), true, dirty);
             }
-            close(state, dirty);
+            focus(state, Field::Size, CursorInit::SelectAll);
         }
         Hit::Bold => text_edits::set(state, Property::Bold(!state.font_panel.bold), true, dirty),
         Hit::Italic => text_edits::set(

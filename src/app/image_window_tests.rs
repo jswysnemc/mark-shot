@@ -17,6 +17,8 @@ fn resize_preserves_source_annotations_and_export() {
             41,
             0.0,
             crate::types::AnnotationShape::Rectangle {
+                radius: 0.0,
+                fixed_ratio: false,
                 start: (80.0, 120.0),
                 end: (150.0, 160.0),
                 filled: true,

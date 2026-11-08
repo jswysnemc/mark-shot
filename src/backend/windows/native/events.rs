@@ -12,6 +12,9 @@ pub struct Modifiers {
 
 #[derive(Clone, Debug)]
 pub enum Event {
+    Theme {
+        id: u64,
+    },
     Close {
         id: u64,
     },
@@ -73,7 +76,8 @@ impl Event {
     /// 【Windows输入】【窗口身份】无参数，返回事件创建时绑定的窗口编号，过期消息不会匹配新建窗口
     pub fn id(&self) -> u64 {
         match self {
-            Self::Close { id }
+            Self::Theme { id }
+            | Self::Close { id }
             | Self::Resize { id, .. }
             | Self::Dpi { id, .. }
             | Self::Focus { id, .. }

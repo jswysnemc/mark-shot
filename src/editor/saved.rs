@@ -32,6 +32,8 @@ struct File {
     outline: Option<bool>,
     outline_color: Option<String>,
     fill: Option<bool>,
+    corner_radius: Option<f32>,
+    fixed_ratio: Option<bool>,
     marker_shape: Option<String>,
     marker_filled: Option<bool>,
     ruler_mode: Option<String>,
@@ -88,6 +90,8 @@ pub struct Saved {
     pub outline: Option<bool>,
     pub outline_color: Option<Rgba>,
     pub fill: Option<bool>,
+    pub corner_radius: Option<f32>,
+    pub fixed_ratio: Option<bool>,
     pub marker_shape: Option<crate::types::MarkerShape>,
     pub marker_filled: Option<bool>,
     pub ruler_mode: Option<crate::features::ruler::RulerMode>,
@@ -160,6 +164,8 @@ fn load() -> Saved {
         outline: file.outline,
         outline_color: file.outline_color.as_deref().and_then(parse_color),
         fill: file.fill,
+        corner_radius: file.corner_radius,
+        fixed_ratio: file.fixed_ratio,
         marker_shape: file.marker_shape.as_deref().and_then(parse_marker_shape),
         marker_filled: file.marker_filled,
         ruler_mode: file.ruler_mode.as_deref().and_then(parse_ruler_mode),
@@ -196,7 +202,7 @@ impl Saved {
 
 pub fn get() -> &'static Saved {
     static SAVED: OnceLock<Saved> = OnceLock::new();
-    SAVED.get_or_init(load)
+    SAVED.get_or_init(|| if cfg!(test) { Saved::default() } else { load() })
 }
 
 /// 【标注】【形状设置】将 value 转为稳定形状类型；未知名称单独忽略，不丢弃其他工具设置
@@ -269,15 +275,9 @@ pub fn save(
     settings: &ToolSettings,
     history: &[Color],
     initial_history: &[Color],
-    magnifier: bool,
+    _magnifier: bool,
 ) {
-    let magnifier_unchanged = crate::config::get()
-        .startup
-        .selection_loupe
-        .or(get().magnifier)
-        .unwrap_or(true)
-        == magnifier;
-    if *settings == ToolSettings::default() && history == initial_history && magnifier_unchanged {
+    if *settings == ToolSettings::default() && history == initial_history {
         return;
     }
     let Some(path) = path() else {
@@ -303,6 +303,8 @@ pub fn save(
         outline: Some(settings.outline),
         outline_color: Some(hex(settings.outline_color)),
         fill: Some(settings.fill),
+        corner_radius: Some(settings.corner_radius),
+        fixed_ratio: Some(settings.fixed_ratio),
         marker_shape: Some(settings.marker_shape.key().to_string()),
         marker_filled: Some(settings.marker_filled),
         ruler_mode: Some(settings.ruler_mode.key().to_string()),
@@ -312,7 +314,7 @@ pub fn save(
         arrow_style: Some(settings.arrow_style.key().to_string()),
         arrow_line_style: Some(settings.arrow_line_style.key().to_string()),
         line_style: Some(settings.line_style.key().to_string()),
-        magnifier: Some(magnifier),
+        magnifier: None,
         recent_colors: history.iter().map(|&c| hex(c)).collect(),
     };
     let text = match toml::to_string(&file) {

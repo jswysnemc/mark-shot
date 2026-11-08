@@ -3,7 +3,7 @@
 use serde_json::Value;
 use std::{io, path::Path};
 
-mod capture;
+pub(crate) mod capture;
 pub(super) mod history;
 mod pinned;
 mod shortcuts;

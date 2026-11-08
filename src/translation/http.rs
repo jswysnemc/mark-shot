@@ -34,6 +34,7 @@ impl Http {
             .redirect(reqwest::redirect::Policy::none())
             .pool_max_idle_per_host(0)
             .http1_only()
+            .user_agent(concat!("Mark-Shot/", env!("CARGO_PKG_VERSION")))
             .build()
             .map(|client| Self { client })
             .map_err(|_| {
@@ -43,12 +44,13 @@ impl Http {
                 )
             })
     }
-}
+    /// 【翻译服务】【模型查询】用 request 发起有界 GET，返回 JSON，复用安全验证和响应限制
+    pub(crate) async fn get(&self, request: Request) -> Result<Value> {
+        self.execute(request, reqwest::Method::GET).await
+    }
 
-#[async_trait]
-impl Transport for Http {
     /// 【翻译服务】【网络响应】发送 request 并逐块读取，返回 JSON；限制响应内存，不在错误中包含带凭据的 URL
-    async fn send(&self, request: Request) -> Result<Value> {
+    async fn execute(&self, request: Request, method: reqwest::Method) -> Result<Value> {
         let endpoint = url::Url::parse(&request.endpoint)
             .map_err(|_| Error::new(ErrorKind::Configuration, "invalid translation endpoint"))?;
         if !matches!(endpoint.scheme(), "http" | "https")
@@ -63,7 +65,7 @@ impl Transport for Http {
         // 1. 【翻译服务】【请求组装】请求头不参与调试格式，服务签名覆盖的正文保持原始字节
         let mut builder = self
             .client
-            .post(endpoint)
+            .request(method, endpoint)
             .timeout(request.timeout)
             .header(reqwest::header::CONTENT_TYPE, request.content_type)
             .body(request.body);
@@ -138,6 +140,14 @@ impl Transport for Http {
                 },
             )
         })
+    }
+}
+
+#[async_trait]
+impl Transport for Http {
+    /// 【翻译服务】【翻译请求】按 request 发起 POST，返回经过限额验证的 JSON 响应
+    async fn send(&self, request: Request) -> Result<Value> {
+        self.execute(request, reqwest::Method::POST).await
     }
 }
 

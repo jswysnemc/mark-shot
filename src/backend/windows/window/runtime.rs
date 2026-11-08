@@ -156,12 +156,25 @@ impl Surface {
         match action {
             WindowAction::Close => return true,
             WindowAction::Redraw => self.dirty = true,
-            WindowAction::Move | WindowAction::Resize => {
+            WindowAction::Move | WindowAction::Resize | WindowAction::ResizeEdge(_) => {
+                use crate::backend::window::WindowEdge;
                 use windows_sys::Win32::UI::{
                     Input::KeyboardAndMouse::ReleaseCapture,
                     WindowsAndMessaging::{
-                        HTCAPTION, SC_MOVE, SC_SIZE, SendMessageW, WM_SYSCOMMAND, WMSZ_BOTTOMRIGHT,
+                        HTCAPTION, SC_MOVE, SC_SIZE, SendMessageW, WM_SYSCOMMAND, WMSZ_BOTTOM,
+                        WMSZ_BOTTOMLEFT, WMSZ_BOTTOMRIGHT, WMSZ_LEFT, WMSZ_RIGHT, WMSZ_TOP,
+                        WMSZ_TOPLEFT, WMSZ_TOPRIGHT,
                     },
+                };
+                let edge = match action {
+                    WindowAction::ResizeEdge(WindowEdge::Top) => WMSZ_TOP,
+                    WindowAction::ResizeEdge(WindowEdge::Bottom) => WMSZ_BOTTOM,
+                    WindowAction::ResizeEdge(WindowEdge::Left) => WMSZ_LEFT,
+                    WindowAction::ResizeEdge(WindowEdge::Right) => WMSZ_RIGHT,
+                    WindowAction::ResizeEdge(WindowEdge::TopLeft) => WMSZ_TOPLEFT,
+                    WindowAction::ResizeEdge(WindowEdge::TopRight) => WMSZ_TOPRIGHT,
+                    WindowAction::ResizeEdge(WindowEdge::BottomLeft) => WMSZ_BOTTOMLEFT,
+                    _ => WMSZ_BOTTOMRIGHT,
                 };
                 unsafe {
                     ReleaseCapture();
@@ -171,7 +184,7 @@ impl Surface {
                         (if action == WindowAction::Move {
                             SC_MOVE | HTCAPTION
                         } else {
-                            SC_SIZE | WMSZ_BOTTOMRIGHT
+                            SC_SIZE | edge
                         }) as usize,
                         0,
                     );
@@ -184,7 +197,9 @@ impl Surface {
     /// 【Windows独立窗口】【消息转换】按event更新DPI、内容与光标，返回是否关闭，过期窗口编号由运行时过滤
     fn event(&mut self, event: native::Event) -> crate::AppResult<bool> {
         if matches!(event, native::Event::Close { .. }) {
-            return Ok(true);
+            let close = self.content.close_requested();
+            self.dirty |= !close;
+            return Ok(close);
         }
         if let native::Event::Composition { target, .. } = &event
             && (self.text.is_none() || *target != self.focus_id)

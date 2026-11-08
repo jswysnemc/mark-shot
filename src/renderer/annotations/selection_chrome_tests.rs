@@ -10,6 +10,8 @@ fn rectangle() -> Annotation {
         frozen_bounds: None,
         id: 7,
         shape: AnnotationShape::Rectangle {
+            radius: 0.0,
+            fixed_ratio: false,
             start: (80.0, 80.0),
             end: (180.0, 160.0),
             filled: false,

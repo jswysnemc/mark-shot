@@ -138,6 +138,10 @@ impl Decoder {
                     WindowEvent::KeyRelease(input)
                 }
             }
+            Event::Theme { .. } => {
+                crate::theme::refresh_system();
+                WindowEvent::Wake
+            }
             Event::Composition {
                 preedit,
                 cursor,

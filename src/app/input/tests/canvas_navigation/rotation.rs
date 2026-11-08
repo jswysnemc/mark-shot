@@ -14,6 +14,8 @@ fn rectangle(degrees: f64) -> Annotation {
         style_scale: 1.0,
         id: 42,
         shape: AnnotationShape::Rectangle {
+            radius: 0.0,
+            fixed_ratio: false,
             start: (312.0, 235.0),
             end: (328.0, 245.0),
             filled: false,

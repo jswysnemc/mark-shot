@@ -12,33 +12,38 @@ use crate::{
     ocr::{
         OcrImage, OcrText,
         daemon::protocol::{self, Outgoing, Reply, Request},
-        models::ModelFiles,
+        engine_choice::{self, Source},
     },
 };
 
 pub const WORKER_ARG: &str = "--pin-recognition-worker";
 
-/// 【识别任务】【识别调用】用 files 识别 image；cancel 为真或超过九十秒时终止并回收子进程，返回文字或错误
+/// 【识别任务】【识别调用】用 source 识别 image；cancel 为真或超过九十秒时终止并回收子进程，返回文字或错误
 pub fn recognize(
     image: OcrImage,
-    files: ModelFiles,
+    source: impl Into<Source>,
     cancel: &AtomicBool,
 ) -> Result<OcrText, String> {
-    request(image, files, cancel).map_err(|error| error.to_string())
+    request(image, source.into(), cancel).map_err(|error| error.to_string())
 }
 
-/// 【识别任务】【任务交接】将 image、files 写入匿名文件并启动单次任务；cancel 控制等待，返回完整原图坐标结果
-fn request(image: OcrImage, files: ModelFiles, cancel: &AtomicBool) -> AppResult<OcrText> {
+/// 【识别任务】【任务交接】将 image、source 写入匿名文件并启动单次任务；cancel 控制等待，返回完整原图坐标结果
+fn request(image: OcrImage, source: Source, cancel: &AtomicBool) -> AppResult<OcrText> {
     if cancel.load(Ordering::Relaxed) {
         return Err("recognition cancelled".into());
     }
     let mut input = tempfile::tempfile()?;
-    protocol::write_request(&mut input, Outgoing::Load(&files))?;
+    if let Source::Paddle(files) = &source {
+        protocol::write_request(&mut input, Outgoing::Load(files))?;
+    }
     protocol::write_request(&mut input, Outgoing::Recognize(&image))?;
     input.seek(SeekFrom::Start(0))?;
     let mut output = tempfile::tempfile()?;
     let mut command = Command::new(std::env::current_exe()?);
     command.arg(WORKER_ARG);
+    if matches!(source, Source::System) {
+        command.arg("--system-ocr");
+    }
     crate::config::pass_to(&mut command);
     command
         .stdin(Stdio::from(input))
@@ -91,20 +96,26 @@ fn request(image: OcrImage, files: ModelFiles, cancel: &AtomicBool) -> AppResult
     result
 }
 
-/// 【识别任务】【识别进程入口】args 必须为空；读取一次模型和图像任务，返回有界结果帧，不创建 Wayland 窗口
+/// 【识别任务】【识别进程入口】args 为空或指定系统引擎；读取一次任务并返回有界结果帧，不创建窗口
 pub fn cli(args: &[String]) -> AppResult {
-    if !args.is_empty() {
-        return Err("recognition worker accepts no arguments".into());
+    let system = args.len() == 1 && args[0] == "--system-ocr";
+    if !args.is_empty() && !system {
+        return Err("recognition worker accepts only --system-ocr".into());
     }
     let result = (|| {
         let mut input = std::io::stdin().lock();
-        let Request::Load(files) = protocol::read_request(&mut input)? else {
-            return Err("recognition worker expected model files".into());
+        let source = if system {
+            Source::System
+        } else {
+            let Request::Load(files) = protocol::read_request(&mut input)? else {
+                return Err("recognition worker expected model files".into());
+            };
+            Source::Paddle(files)
         };
         let Request::Recognize(image) = protocol::read_request(&mut input)? else {
             return Err("recognition worker expected an image".into());
         };
-        crate::ocr::default_backend(&files)
+        engine_choice::build(&source, crate::ocr::settings::Mode::OnDemand)
             .map_err(|error| -> Box<dyn std::error::Error> { error })?
             .recognize(image, &|| false)
             .map_err(|error| -> Box<dyn std::error::Error> { error })

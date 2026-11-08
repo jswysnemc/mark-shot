@@ -41,6 +41,8 @@ fn prepared(scale: f32) -> EditorState {
     let mut overlap = state.annotations[0].clone();
     overlap.id = 91;
     overlap.shape = AnnotationShape::Rectangle {
+        radius: 0.0,
+        fixed_ratio: false,
         start: (220.0, 190.0),
         end: (380.0, 280.0),
         filled: true,

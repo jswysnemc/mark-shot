@@ -63,12 +63,18 @@ impl ToolBehavior for SimpleShapeTool {
     /// 【画布导航】【工具移动】按state稳定画布指针更新草稿，_global提供已转换位置，_dirty_mask返回重绘范围，无返回值
     fn on_move(&self, state: &mut EditorState, _global: (f64, f64), _dirty_mask: &mut u32) {
         let canvas_point = state.canvas_point();
+        let space = crate::tools::drawing_space::DrawingSpace::from_editor(state);
         if let Some(ann) = state.pending.as_mut() {
             state.damage_rects.push(DamageZone::Global(ann.bbox));
 
             let pos = (canvas_point.0 as f32, canvas_point.1 as f32);
             let start = ann.shape.start_point();
-            let end = if self.snap && state.input.shift {
+            let end = if self.settings.fixed_ratio || state.input.shift && !self.snap {
+                space.map_or_else(
+                    || crate::features::shape::square_end(start, pos),
+                    |space| space.rectangle_end(start, pos, true),
+                )
+            } else if self.snap && state.input.shift {
                 snap_line(start, pos)
             } else {
                 pos

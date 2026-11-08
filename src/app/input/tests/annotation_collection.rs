@@ -12,6 +12,8 @@ pub(super) fn group() -> EditorState {
     let mut second = state.annotations[0].clone();
     second.id = 17;
     second.shape = AnnotationShape::Rectangle {
+        radius: 0.0,
+        fixed_ratio: false,
         start: (340.0, 250.0),
         end: (420.0, 310.0),
         filled: false,

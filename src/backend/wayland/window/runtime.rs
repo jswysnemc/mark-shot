@@ -144,7 +144,7 @@ impl NativeWindow {
                     self.finish_dialog(id, accepted);
                 }
             },
-            WindowAction::Move | WindowAction::Resize => {
+            WindowAction::Move | WindowAction::Resize | WindowAction::ResizeEdge(_) => {
                 if id == SurfaceId::Main && self.begin_layer_gesture(action) {
                     return;
                 }
@@ -157,7 +157,32 @@ impl NativeWindow {
                         }
                     } else {
                         if let Some(window) = surface.role.as_window() {
-                            window.resize(seat, serial, xdg_toplevel::ResizeEdge::BottomRight);
+                            use crate::backend::window::WindowEdge;
+                            let edge = match action {
+                                WindowAction::ResizeEdge(WindowEdge::Top) => {
+                                    xdg_toplevel::ResizeEdge::Top
+                                }
+                                WindowAction::ResizeEdge(WindowEdge::Bottom) => {
+                                    xdg_toplevel::ResizeEdge::Bottom
+                                }
+                                WindowAction::ResizeEdge(WindowEdge::Left) => {
+                                    xdg_toplevel::ResizeEdge::Left
+                                }
+                                WindowAction::ResizeEdge(WindowEdge::Right) => {
+                                    xdg_toplevel::ResizeEdge::Right
+                                }
+                                WindowAction::ResizeEdge(WindowEdge::TopLeft) => {
+                                    xdg_toplevel::ResizeEdge::TopLeft
+                                }
+                                WindowAction::ResizeEdge(WindowEdge::TopRight) => {
+                                    xdg_toplevel::ResizeEdge::TopRight
+                                }
+                                WindowAction::ResizeEdge(WindowEdge::BottomLeft) => {
+                                    xdg_toplevel::ResizeEdge::BottomLeft
+                                }
+                                _ => xdg_toplevel::ResizeEdge::BottomRight,
+                            };
+                            window.resize(seat, serial, edge);
                         }
                     }
                 }

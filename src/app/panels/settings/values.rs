@@ -67,6 +67,10 @@ pub(super) fn apply_stepper_field(
     record_undo: bool,
     dirty_mask: &mut u32,
 ) {
+    if range == StepperRange::CornerRadius {
+        crate::editor::shape_edits::set_radius(editor_state, new_value, record_undo, dirty_mask);
+        return;
+    }
     if range == StepperRange::Font {
         crate::editor::text_edits::set(
             editor_state,
@@ -98,7 +102,7 @@ pub(super) fn apply_stepper_field(
             }
             StepperRange::Font => ts.font_size = new_value,
             StepperRange::Strength => ts.strength = new_value,
-            StepperRange::Magnification => {}
+            StepperRange::Magnification | StepperRange::CornerRadius => {}
         },
         move |ann| match &mut ann.shape {
             AnnotationShape::Text { font_size, .. } => *font_size = new_value,
@@ -116,6 +120,11 @@ pub fn apply_toggle_field(
     new_value: bool,
     dirty_mask: &mut u32,
 ) {
+    if field == ToggleField::FixedRatio {
+        crate::editor::shape_edits::set_ratio(editor_state, new_value, dirty_mask);
+        update_settings_panel(editor_state, dirty_mask);
+        return;
+    }
     if matches!(field, ToggleField::Bold | ToggleField::Italic) {
         let property = if field == ToggleField::Bold {
             crate::editor::text_edits::Property::Bold(new_value)
@@ -147,7 +156,7 @@ pub fn apply_toggle_field(
             ToggleField::Outline => ts.outline = new_value,
             ToggleField::Fill => ts.fill = new_value,
             ToggleField::MarkerFill => ts.marker_filled = new_value,
-            ToggleField::MagnifierRectangle => {}
+            ToggleField::MagnifierRectangle | ToggleField::FixedRatio => {}
         },
         move |ann| match (&mut ann.shape, field) {
             (AnnotationShape::Text { bold, .. }, ToggleField::Bold) => *bold = new_value,
@@ -175,6 +184,9 @@ pub fn apply_toggle_field(
 
 /// 【属性面板】【数值读写】根据 editor_state 与 range 返回当前标注或工具数值
 pub(crate) fn stepper_value(editor_state: &EditorState, range: StepperRange) -> f32 {
+    if range == StepperRange::CornerRadius {
+        return crate::editor::shape_edits::radius(editor_state);
+    }
     if range == StepperRange::Magnification {
         return crate::editor::magnifier_edits::current_zoom(editor_state);
     }
@@ -192,6 +204,7 @@ pub(crate) fn stepper_value(editor_state: &EditorState, range: StepperRange) -> 
             StepperRange::Font => ts.font_size,
             StepperRange::Strength => ts.strength,
             StepperRange::Magnification => ts.magnifier_zoom,
+            StepperRange::CornerRadius => ts.corner_radius,
         },
     }
 }

@@ -38,6 +38,10 @@ pub struct TextEditor {
 }
 
 impl TextEditor {
+    /// 【文本编辑】【光标字节位置】无参数，返回当前行光标的 UTF-8 字节偏移，供密码遮蔽显示定位
+    pub fn cursor_offset(&self) -> usize {
+        self.editor.cursor().index
+    }
     /// 【界面控件】【单行模式】禁止软换行，fonts 用于重新排版；原有文字和编辑历史保持不变
     pub fn single_line(&mut self, fonts: &mut FontSystem) {
         self.input.single_line = true;

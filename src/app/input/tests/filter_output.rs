@@ -35,6 +35,7 @@ fn native_file_exports_preserve_resolution_alpha_and_mode_pixels() {
         let scale = file.original.width() as f32 / viewport.width();
         state.selection.zone = Some(viewport);
         state.file_canvas = Some(file);
+        state.ui_hidden = true;
         state.tool_settings.filter_mode = mode;
         draw(
             &mut state,

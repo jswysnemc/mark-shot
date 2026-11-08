@@ -313,10 +313,8 @@ fn begin_scroll_capture(editor_state: &mut EditorState, dirty_mask: &mut u32) {
 
 /// 【光标放大区】【开关更新】为 editor_state 保存明确配置后更新显示，dirty_mask 接收损坏范围，保存失败保留当前开关，无返回值
 fn toggle_magnifier(editor_state: &mut EditorState, dirty_mask: &mut u32) {
-    // 1. 【光标放大区】【配置保存】原版配置和明确原生开关随操作保存，旧工具偏好继续使用原有存储
-    if crate::config::get().startup.selection_loupe.is_some()
-        && let Err(error) = crate::config::startup::save_loupe(editor_state.magnifier.hidden)
-    {
+    // 1. 【光标放大区】【配置保存】每次切换写入统一偏好，缺失字段也保存，不再写入工具状态文件
+    if let Err(error) = crate::config::startup::save_loupe(editor_state.magnifier.hidden) {
         log::error!("【光标放大区】【配置保存】保存失败：{error}");
         editor_state.toasts.show_text(
             crate::ui::toast::ToastKind::SettingsFailed,

@@ -1,6 +1,8 @@
 use crate::tools::Tool;
 use crate::types::Finish;
 
+pub const APPLICATION: &str = include_str!("../../assets/hicolor/scalable/apps/mark-shot.svg");
+
 pub const SELECTION: &str = include_str!("../../assets/icons/mark-shot/tool-move.svg");
 pub const ARROW: &str = include_str!("../../assets/icons/mark-shot/tool-arrow.svg");
 pub const RECTANGLE: &str = include_str!("../../assets/icons/mark-shot/tool-rectangle.svg");
@@ -15,8 +17,9 @@ pub const RULER_ANGLE: &str = include_str!("../../assets/icons/ruler-angle.svg")
 pub const MAGNIFIER: &str = include_str!("../../assets/icons/mark-shot/tool-magnifier.svg");
 pub const LINE: &str = include_str!("../../assets/icons/mark-shot/tool-line.svg");
 pub const PICK: &str = include_str!("../../assets/icons/mark-shot/tool-select.svg");
-pub const EYEDROPPER: &str = include_str!("../../assets/icons/eyedropper.svg");
-pub const NUMERATED_ARROW: &str = include_str!("../../assets/icons/numerated_arrow.svg");
+pub const EYEDROPPER: &str = include_str!("../../assets/icons/mark-shot/tool-eyedropper.svg");
+pub const NUMERATED_ARROW: &str =
+    include_str!("../../assets/icons/mark-shot/tool-numerated-arrow.svg");
 pub const NUMBER: &str = include_str!("../../assets/icons/mark-shot/tool-number.svg");
 pub const RESET_NUMBER: &str = include_str!("../../assets/icons/reset-number.svg");
 pub const REDACT: &str = include_str!("../../assets/icons/mark-shot/tool-mosaic.svg");

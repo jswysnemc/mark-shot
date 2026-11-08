@@ -3,7 +3,7 @@
 use crate::{
     AppResult,
     backend::task_wake::Wake,
-    ocr::{OcrImage, OcrText, models::ModelFiles},
+    ocr::{OcrImage, OcrText, engine_choice::Source},
 };
 use std::{
     sync::{
@@ -22,7 +22,7 @@ pub(crate) struct Task {
 
 impl Task {
     /// 【框选翻译】【识别启动】按 image、files 和 wake 启动可取消工作，返回所属任务，不在截图进程初始化推理线程池
-    pub fn start(image: OcrImage, files: ModelFiles, wake: Wake) -> AppResult<Self> {
+    pub fn start(image: OcrImage, files: Source, wake: Wake) -> AppResult<Self> {
         let cancel = Arc::new(AtomicBool::new(false));
         let flag = cancel.clone();
         let (sender, result) = mpsc::channel();

@@ -134,8 +134,8 @@ pub(super) fn build_ocr_state() -> OcrState {
     let models = crate::ocr::models::OcrModels::load();
     let settings = crate::ocr::settings::EngineSettings::load();
     let mut runtime = crate::ocr::OcrRuntime::new(crate::ocr::daemon::resolve_mode(&settings));
-    if let Some(files) = models.active().and_then(|idx| models.files(idx)) {
-        runtime.load(files);
+    if let Some(source) = crate::ocr::engine_choice::source(&models) {
+        runtime.load_source(source);
     }
 
     OcrState {

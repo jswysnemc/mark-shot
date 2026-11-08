@@ -109,6 +109,14 @@ impl Task {
         env: &dyn Fn(&str) -> Option<String>,
     ) -> Result<Self> {
         request.validate(target)?;
+        if config.provider.trim().eq_ignore_ascii_case("command")
+            && config.command.trim().is_empty()
+        {
+            return Err(Error::new(
+                ErrorKind::Configuration,
+                "请先填写翻译命令 / Translation command is required",
+            ));
+        }
         let segments = request.segments();
         // 1. 【翻译任务】【稳定选择】命令优先于服务偏好，已经选择的服务不会因运行失败把原文交给其他厂商
         let service = if config.command.trim().is_empty()
@@ -128,7 +136,12 @@ impl Task {
         );
         let (cancel, cancellation) = oneshot::channel();
         let (send, result) = mpsc::channel();
-        let timeout = Duration::from_millis(config.timeout_ms.clamp(1000, 300000));
+        let timeout = match &service {
+            Some(resolve::Service::Llm(service)) => service.timeout,
+            Some(resolve::Service::Tencent(service)) => service.timeout,
+            Some(resolve::Service::Form(service)) => service.timeout,
+            None => Duration::from_millis(config.timeout_ms.clamp(1000, 300000)),
+        };
         let target = target.to_owned();
         let template = config.command.clone();
         let config_path: PathBuf = config_path.to_owned();

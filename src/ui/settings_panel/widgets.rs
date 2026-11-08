@@ -111,6 +111,7 @@ pub enum StepperRange {
     Magnification,
     NumberWidth,
     LineWidth,
+    CornerRadius,
 }
 
 impl StepperRange {
@@ -118,6 +119,7 @@ impl StepperRange {
     pub fn get(self) -> (f32, f32, f32) {
         let tools = &crate::config::get().tools;
         match self {
+            StepperRange::CornerRadius => (0.0, 256.0, 1.0),
             StepperRange::Stroke => (tools.stroke.min, tools.stroke.max, tools.stroke.step),
             StepperRange::Font => (tools.font.min, tools.font.max, tools.font.step),
             StepperRange::Strength => {
@@ -196,6 +198,7 @@ pub enum ToggleField {
     Fill,
     MarkerFill,
     MagnifierRectangle,
+    FixedRatio,
 }
 
 impl ToggleField {
@@ -244,6 +247,7 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
                 },
                 field: ToggleField::MagnifierRectangle,
             },
+            CORNER_RADIUS,
         ],
         Tool::Ruler => &[
             SettingsWidget::ColorSwatch(ColorTarget::Main),
@@ -275,6 +279,7 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
                 visual: ToggleVisual::Checkbox { label: "Fill" },
                 field: ToggleField::MarkerFill,
             },
+            CORNER_RADIUS,
         ],
         Tool::Arrow => &[
             SettingsWidget::ColorSwatch(ColorTarget::Main),
@@ -316,7 +321,22 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
             },
         ],
         Tool::Text => TEXT_WIDGETS,
-        Tool::Rectangle | Tool::Circle => &[
+        Tool::Rectangle => &[
+            SettingsWidget::ColorSwatch(ColorTarget::Main),
+            SettingsWidget::Stepper {
+                label: "",
+                range: StepperRange::Stroke,
+                unit: "px",
+            },
+            SettingsWidget::Toggle {
+                visual: ToggleVisual::Checkbox { label: "Fill" },
+                field: ToggleField::Fill,
+            },
+            FIXED_RATIO,
+            CORNER_RADIUS,
+        ],
+        Tool::Circle => &[
+            FIXED_RATIO,
             SettingsWidget::ColorSwatch(ColorTarget::Main),
             SettingsWidget::Separator,
             SettingsWidget::Stepper {
@@ -343,12 +363,23 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
                 action: SettingsAction::FilterModes,
                 svg: crate::ui::icons::REDACT,
             },
+            CORNER_RADIUS,
         ],
         Tool::Eyedropper => EYEDROPPER_WIDGETS,
         Tool::Ocr => OCR_WIDGETS,
         _ => &[],
     }
 }
+
+const CORNER_RADIUS: SettingsWidget = SettingsWidget::Stepper {
+    label: "R",
+    range: StepperRange::CornerRadius,
+    unit: "px",
+};
+const FIXED_RATIO: SettingsWidget = SettingsWidget::Toggle {
+    visual: ToggleVisual::Checkbox { label: "1:1" },
+    field: ToggleField::FixedRatio,
+};
 
 pub const TEXT_WIDGETS: &[SettingsWidget] = &[
     SettingsWidget::TextControl(crate::ui::text_properties::layout::Control::Size),
@@ -423,7 +454,7 @@ pub const OCR_AWAITING_WIDGETS: &[SettingsWidget] = &[OCR_LANGUAGES];
 pub const OCR_NO_MODEL_WIDGETS: &[SettingsWidget] = &[
     OCR_LANGUAGES,
     SettingsWidget::Separator,
-    SettingsWidget::Label("Choose a language model to use OCR"),
+    SettingsWidget::Label("Choose an OCR engine and resources"),
 ];
 
 pub const OCR_DOWNLOADING_WIDGETS: &[SettingsWidget] = &[
@@ -464,9 +495,8 @@ pub fn widgets_for_annotation(ann: &Annotation) -> &'static [SettingsWidget] {
         AnnotationShape::Arrow { .. } => widgets_for_tool(Tool::Arrow),
         AnnotationShape::Text { .. } => widgets_for_tool(Tool::Text),
         AnnotationShape::Redact { .. } => widgets_for_tool(Tool::Redact),
-        AnnotationShape::Rectangle { .. } | AnnotationShape::Circle { .. } => {
-            widgets_for_tool(Tool::Rectangle)
-        }
+        AnnotationShape::Rectangle { .. } => widgets_for_tool(Tool::Rectangle),
+        AnnotationShape::Circle { .. } => widgets_for_tool(Tool::Circle),
         AnnotationShape::Pen { .. }
         | AnnotationShape::Highlighter { .. }
         | AnnotationShape::NumeratedArrow { .. } => widgets_for_tool(Tool::Pen),

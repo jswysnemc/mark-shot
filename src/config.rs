@@ -43,6 +43,10 @@ mod document;
 mod legacy;
 mod paths;
 pub mod preferences;
+pub mod recovery;
+pub(crate) mod runtime_overrides;
+pub mod settings;
+pub mod settings_store;
 pub(crate) mod startup;
 pub mod toolbar_layout;
 pub use startup::Startup;
@@ -257,6 +261,7 @@ impl Config {
 
 // ==========================================
 pub const TEMPLATE: &str = include_str!("config/default.toml");
+pub const INITIAL: &str = "# 仅保存用户修改的偏好，未设置的字段继承当前版本默认值\n# 使用 mark-shot --default-config 查看完整配置参考\n";
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 static OVERRIDE_PATH: OnceLock<PathBuf> = OnceLock::new();

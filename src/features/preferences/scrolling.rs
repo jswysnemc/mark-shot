@@ -2,22 +2,16 @@
 
 use super::window::Preferences;
 use crate::{keys::Key, ui::scrollbar};
-use tiny_skia::Rect;
 
 impl Preferences {
     /// 【设置窗口】【滚动几何】无参数，返回溢出内容的可见轨道，短列表不占用滚动条
     pub fn scrollbar(&self) -> Option<scrollbar::Geometry> {
-        if self.toolbar_page() {
+        if self.toolbar_page() || self.translation_page() {
             return None;
         }
-        let viewport = Rect::from_xywh(
-            self.size.0 as f32 - 20.0,
-            146.0,
-            12.0,
-            (self.capacity() as f32 * 68.0 - 2.0).max(24.0),
-        )
-        .unwrap();
-        scrollbar::geometry(viewport, self.visible().len(), self.capacity(), self.scroll)
+        let layout = super::layout::Layout::new(self);
+        let page = layout.viewport.height() as usize;
+        scrollbar::geometry(layout.viewport, layout.maximum + page, page, self.scroll)
     }
 
     /// 【设置窗口】【滚动条按下】按 point 开始滑块拖动或轨道翻页，返回是否消费；不激活被滚动条覆盖的字段
@@ -35,32 +29,50 @@ impl Preferences {
         } else {
             self.scroll = (self.scroll + bar.page).min(bar.maximum);
         }
-        self.choices = None;
+        self.dropdown = None;
         true
     }
 
-    /// 【设置窗口】【列表滚动】按 delta 调整行数并限制首尾，保留尚未提交的编辑值，返回是否改变位置
+    /// 【设置窗口】【列表滚动】按 delta 调整滚轮步数并限制首尾，保留未提交值，返回是否改变位置
     pub fn scroll_rows(&mut self, delta: isize) -> bool {
         let next = self
             .scroll
-            .saturating_add_signed(delta)
-            .min(self.visible().len().saturating_sub(self.capacity()));
+            .saturating_add_signed(delta * 64)
+            .min(super::layout::Layout::new(self).maximum);
         let changed = next != self.scroll;
         self.scroll = next;
-        self.choices = None;
+        self.dropdown = None;
         changed
     }
 
     /// 【设置窗口】【键盘翻页】按 key 滚动内容，返回是否识别该键；文字字段由调用方优先消费
     pub fn scroll_key(&mut self, key: Option<Key>) -> bool {
-        let delta = match key {
-            Some(Key::PageDown) => self.capacity() as isize,
-            Some(Key::PageUp) => -(self.capacity() as isize),
-            Some(Key::Home) => -(self.visible().len() as isize),
-            Some(Key::End) => self.visible().len() as isize,
+        let layout = super::layout::Layout::new(self);
+        let page = layout.viewport.height() as usize;
+        self.scroll = match key {
+            Some(Key::PageDown) => (self.scroll + page).min(layout.maximum),
+            Some(Key::PageUp) => self.scroll.saturating_sub(page),
+            Some(Key::Home) => 0,
+            Some(Key::End) => layout.maximum,
             _ => return false,
         };
-        self.scroll_rows(delta);
+        self.dropdown = None;
         true
+    }
+
+    /// 【设置窗口】【焦点可见】按 index 将键盘焦点所在字段完整移入视口，无返回值
+    pub fn reveal_row(&mut self, index: usize) {
+        let layout = super::layout::Layout::new(self);
+        if let Some(row) = layout.rows.iter().find(|row| row.index == index) {
+            let delta = if row.bounds.top() < layout.viewport.top() {
+                row.bounds.top() - layout.viewport.top()
+            } else {
+                (row.bounds.bottom() - layout.viewport.bottom()).max(0.0)
+            };
+            self.scroll = self
+                .scroll
+                .saturating_add_signed(delta.ceil() as isize)
+                .min(layout.maximum);
+        }
     }
 }

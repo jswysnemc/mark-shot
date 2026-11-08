@@ -9,6 +9,9 @@ use crate::{
 };
 use tiny_skia::Rect;
 
+#[cfg(test)]
+mod tests;
+
 /// 【截图工具栏】【状态刷新】按 state 的选区、手势和显示器更新双工具栏；dirty 返回重绘显示器
 pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
     let monitor = if state.toolbar.user_position.is_some() {
@@ -160,7 +163,7 @@ pub(crate) fn configure(
         (&mut state.action_toolbar, Profile::Actions),
     ] {
         let items = profile.items(config);
-        if toolbar.items != items || toolbar.profile != profile || reset {
+        if toolbar.items != *items || toolbar.profile != profile || reset {
             toolbar.items = items.to_vec();
             toolbar.profile = profile;
             toolbar.orientation = if profile.vertical(config) {

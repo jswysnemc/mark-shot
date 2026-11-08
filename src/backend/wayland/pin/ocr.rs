@@ -17,7 +17,7 @@ impl Pin {
             return Ok(true);
         }
         let models = OcrModels::load();
-        let files = models.active().and_then(|index| models.files(index));
+        let files = crate::ocr::engine_choice::source(&models);
         let Some(files) = files else {
             let Some(files) = self.model_guide()? else {
                 return Ok(false);
@@ -28,7 +28,7 @@ impl Pin {
     }
 
     /// 【贴图】【识别模型】按 files 启动当前原图一次识别，返回启动状态，不切换显示或目标语言
-    fn start_ocr_with(&mut self, files: crate::ocr::models::ModelFiles) -> AppResult<bool> {
+    fn start_ocr_with(&mut self, files: crate::ocr::engine_choice::Source) -> AppResult<bool> {
         let image = OcrImage {
             rgb: self
                 .image

@@ -218,7 +218,7 @@ pub(super) fn write_template(path: &PathBuf) -> std::io::Result<String> {
     let text = if super::document::is_json(path, "") {
         "{}\n"
     } else {
-        TEMPLATE
+        INITIAL
     };
     let parent = path
         .parent()
@@ -308,18 +308,23 @@ pub fn init(override_path: Option<PathBuf>, overrides: impl FnOnce(&mut Config))
     let mut config = match &path {
         Some(path) => match super::persistence::read(path) {
             Ok(mut text) => {
-                if let Some(migrated) = migrate(&text) {
-                    match std::fs::write(path, &migrated) {
-                        Ok(()) => complain(format!(
-                            "config: {}: general.accept and general.save_always were replaced with general.to",
-                            path.display()
-                        )),
+                if migrate(&text).is_some() {
+                    match super::persistence::update(path, |latest| {
+                        let migrated = migrate(latest).unwrap_or_else(|| latest.into());
+                        Ok((migrated.clone(), migrated))
+                    }) {
+                        Ok(migrated) => {
+                            text = migrated;
+                            complain(format!(
+                                "config: {}: general.accept and general.save_always were replaced with general.to",
+                                path.display()
+                            ));
+                        }
                         Err(e) => complain(format!(
                             "config: cannot update {}: {e}, replace general.accept and general.save_always with general.to there",
                             path.display()
                         )),
                     }
-                    text = migrated;
                 }
                 parse(&text, &path.display().to_string())
             }
@@ -345,6 +350,11 @@ pub fn init(override_path: Option<PathBuf>, overrides: impl FnOnce(&mut Config))
         },
         None => Config::default(),
     };
+    if let Some(path) = config_path()
+        && let Err(error) = super::startup::migrate_loupe(&mut config, &path)
+    {
+        complain(format!("【启动配置】【放大区迁移】未能迁移旧偏好：{error}"));
+    }
     overrides(&mut config);
     let _ = CONFIG.set(config);
 }

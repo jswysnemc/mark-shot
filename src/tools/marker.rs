@@ -41,6 +41,7 @@ impl ToolBehavior for MarkerTool {
                     end: position,
                     kind: state.tool_settings.marker_shape,
                     filled: state.tool_settings.marker_filled,
+                    radius: state.tool_settings.corner_radius,
                 },
                 color: state.tool_settings.color,
                 shadow_color: crate::renderer::shadow_color_for(state.tool_settings.color),
@@ -103,6 +104,7 @@ impl ToolBehavior for MarkerTool {
             end,
             kind,
             filled,
+            ..
         } = &mut annotation.shape
         else {
             return;

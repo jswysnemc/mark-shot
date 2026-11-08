@@ -17,6 +17,7 @@ fn annotation(kind: MarkerShape, filled: bool) -> Annotation {
         frozen_bounds: None,
         id: 23,
         shape: AnnotationShape::Marker {
+            radius: 0.0,
             start: (80.0, 40.0),
             end: (20.0, 100.0),
             kind,
@@ -50,7 +51,8 @@ fn scaling_and_translation_preserve_marker_properties() {
             start: (130.0, 105.0),
             end: (10.0, 225.0),
             kind: MarkerShape::Spade,
-            filled: false
+            filled: false,
+            ..
         }
     ));
     assert!(scaled.bbox.left() < 10.0 && scaled.bbox.right() > 130.0);
@@ -80,6 +82,7 @@ fn reversed_resize_preserves_kind_and_normalizes_bounds() {
         end,
         kind,
         filled,
+        ..
     } = resized.shape
     else {
         panic!("resizing changed the annotation type")

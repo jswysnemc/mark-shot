@@ -36,6 +36,8 @@ fn rectangle(id: u64, rect: Rect, color: Color) -> Annotation {
         frozen_bounds: None,
         id,
         shape: AnnotationShape::Rectangle {
+            radius: 0.0,
+            fixed_ratio: false,
             start: (rect.left(), rect.top()),
             end: (rect.right(), rect.bottom()),
             filled: true,

@@ -4,14 +4,19 @@ use super::values;
 use serde_json::{Value, json};
 
 /// 【原版配置】【捕获对象】按 root 返回首个非空捕获对象，缺失时返回空值引用
-fn capture(root: &Value) -> &Value {
+pub(crate) fn capture_key(root: &Value) -> &'static str {
     ["capture", "screenshot", "screenCapture"]
-        .iter()
-        .find_map(|key| {
+        .into_iter()
+        .find(|key| {
             root.get(*key)
-                .filter(|value| value.as_object().is_some_and(|object| !object.is_empty()))
+                .is_some_and(|value| value.as_object().is_some_and(|object| !object.is_empty()))
         })
-        .unwrap_or(&Value::Null)
+        .unwrap_or("capture")
+}
+
+/// 【原版配置】【捕获对象】按 root 返回读写共用路径中的对象，缺失时返回空值
+fn capture(root: &Value) -> &Value {
+    &root[capture_key(root)]
 }
 
 /// 【原版配置】【识别开关】按 root 与 image 返回独立识别对象，错误值使用原版开启默认，不创建任务

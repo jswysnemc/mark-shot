@@ -49,8 +49,7 @@ pub fn handle(
         if chord.key == Key::Enter && state.font_panel.fields.is_editing_key(Field::Size) {
             super::font_popup::set_size_text(state);
             apply(state, dirty);
-            // 1. 【字体弹层】【字号确认】原版 Return 结束文字事务，但仍保留字段面板与截图会话
-            crate::editor::text_session::commit(state, dirty);
+            // 1. 【字体弹层】【字号确认】字段提交保留正文会话，后续字体调整仍作用于同一对象
             if let Some(edit) = state.font_panel.fields.editing.as_mut() {
                 edit.field.cursor = 0;
             }

@@ -393,7 +393,7 @@ fn a_flipped_range_falls_back_to_the_default() {
 
 #[test]
 fn magnifier_size_matches_cells_times_zoom() {
-    assert_eq!(Magnifier::default().size(), 210);
+    assert_eq!(Magnifier::default().size(), 126);
 }
 
 /// 【贴图配置测试】【边框约束】原版默认边框保留两像素；超界与非有限宽度不产生异常绘制区域

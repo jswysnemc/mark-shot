@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 fn guide(
     state: &mut EditorState,
     overlay: &mut dyn ScreenOverlay,
-) -> AppResult<Option<crate::ocr::models::ModelFiles>> {
+) -> AppResult<Option<crate::ocr::engine_choice::Source>> {
     overlay.set_text_input(None)?;
     overlay.set_popup(None)?;
     overlay.suspend()?;
@@ -65,11 +65,7 @@ pub(in crate::app) fn start(
         super::panels::update(state, dirty);
         return Ok(false);
     }
-    let files = state
-        .ocr
-        .models
-        .active()
-        .and_then(|index| state.ocr.models.files(index));
+    let files = crate::ocr::engine_choice::source(&state.ocr.models);
     let rebuilt = files.is_none();
     let files = match files {
         Some(files) => Some(files),

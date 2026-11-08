@@ -51,6 +51,7 @@ impl MagnifierShape {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Magnifier {
+    pub radius: f32,
     pub source: Point,
     pub center: Point,
     pub size: Point,
@@ -87,6 +88,7 @@ impl Magnifier {
             return None;
         }
         Some(Self {
+            radius: 0.0,
             source,
             center: source,
             size: (0.0, 0.0),

@@ -1,18 +1,9 @@
-# mark-shot config.
-
-# Commented or empty color follows the [theme] role written next to it
-# Uncomment to deliberately set a specific color separate from theme
-
-# Deleting a line or the whole file will rollback to default.
-# A line with a mistake is skipped with a warning in ~/.local/state/mark-shot/mark-shot.log,
-# the rest of the file still applies.
-
-# The config file may be excessive, yet I decided to make the absolute majority of constants in the
-# project configurable. Some of the customized options aren't guaranteed to even apply correctly. F
-
-# First come  traditionally customizable sections that will work perfectly, and then stuff you can
-# tinker with if you want but it's not really recommended and can result in breaking the application.
-# Useful, important options will be moved to the GUI later on.
+# Mark Shot 完整配置参考（--default-config 输出）
+# 首次启动只创建最小偏好文件；未写入的字段自动继承当前版本默认值
+# 删除单项可以恢复继承。设置窗口保留注释和未知字段，按项原子保存
+# [ui].theme 控制明暗模式；[theme] 以及各组件尺寸属于高级外观参数
+# settings_panel 指截图中的工具属性面板，不是应用设置窗口
+# 颜色留空或注释后跟随主题；只有需要覆盖默认值时才写入用户配置
 
 [ui]
 # 【界面主题】【明暗选择】默认浅色；Ctrl+Shift+L 切换并保存，设置窗口无需打开
@@ -192,7 +183,7 @@ resize_up_fast = "Alt+Shift+Up"
 resize_down_fast = "Alt+Shift+Down"
 
 [toolbar_layout]
-# 【工具栏配置】【按钮顺序】设置窗口可编辑三组布局；按钮身份唯一，separator 可重复
+# 【工具栏配置】【按钮顺序】只配置主栏与侧栏，全屏按两栏顺序合并并去重
 main = [
     "selection", "pick", "separator", "pen", "line", "highlighter", "separator",
     "rectangle", "circle", "marker", "arrow", "separator", "text", "number", "redact",
@@ -202,17 +193,8 @@ actions = [
     "scope", "separator", "open_with", "extensions", "scroll", "pin", "ocr", "translate",
     "separator", "copy", "save_as", "upload", "separator", "settings", "separator", "cancel",
 ]
-fullscreen = [
-    "selection", "pick", "separator", "pen", "line", "highlighter", "separator",
-    "rectangle", "circle", "marker", "arrow", "separator", "text", "number", "redact",
-    "magnifier", "ruler", "laser", "eyedropper", "separator", "clear", "undo", "redo",
-    "separator", "scope", "layout", "separator", "open_with", "extensions", "scroll",
-    "pin", "ocr", "translate", "copy", "save_as", "upload", "separator", "settings",
-    "separator", "cancel",
-]
 main_vertical = false
 actions_vertical = true
-fullscreen_vertical = false
 
 [toolbar]
 button_size = 30.0
@@ -359,7 +341,7 @@ title_height = 26.0
 label_height = 20.0
 
 [magnifier]
-zoom = 10.0
+zoom = 6.0
 # pixels across, must be odd
 cells = 21
 # distance from the pointer
@@ -563,14 +545,17 @@ toast_fade_out = 0.14
 always_on_top = false
 
 [translation]
-# 【翻译配置】【默认选择】只在用户主动翻译时启动任务，凭据可放在环境变量或对应厂商子节
+# 【翻译配置】【默认选择】未配置其他服务时使用哔哩哔哩，仅在用户主动翻译时发送文本
 target_language = "Simplified Chinese"
 provider = "auto"
 command = ""
 # 【翻译配置】【超时存在性】缺省使用厂商超时；如需统一覆盖，可显式添加 timeout_ms
-# 【翻译配置】【厂商子节】支持 openai、gemini、anthropic、tencent、baidu、youdao，不在模板中保存凭据
+# 【翻译配置】【厂商子节】支持 bilibili、openai、responses、gemini、anthropic、tencent、baidu、youdao
 
 [ocr]
+# 【识别引擎】【手动选择】Windows 默认为 ask，其他平台默认为 paddle；system 仅 Windows 支持
+# engine = "ask"
+# 【识别资源】【手动安装】模型与推理库均需在 OCR 面板明确点击下载
 threads = 4
 # 【文字识别】【结果窗口】主 OCR 命令识别后打开可编辑窗口；关闭后保留截图内逐字选择
 result_panel = true

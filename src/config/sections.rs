@@ -223,7 +223,7 @@ section!(ChoicePicker {
 });
 
 section!(Magnifier {
-    zoom: f32 = 10.0,
+    zoom: f32 = 6.0,
     cells: u32 = 21,
     offset: f32 = 24.0,
     outline_width: f32 = 2.0,
@@ -472,6 +472,7 @@ section!(OcrFilter {
 });
 
 section!(Ocr {
+    engine: crate::ocr::engine_choice::Engine = crate::ocr::engine_choice::Engine::default(),
     mode: Mode = Mode::OnDemand,
     result_panel: bool = true,
     threads: usize = 4,

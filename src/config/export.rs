@@ -83,6 +83,18 @@ fn first<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a Value> {
 }
 
 impl ImageFrame {
+    /// 【图像导出】【字段别名】按 key 返回读写共用的字段名称，未知字段返回空列表
+    pub(crate) fn aliases(key: &str) -> &'static [&'static str] {
+        match key {
+            "enabled" => &["enabled", "show", "visible"],
+            "padding" => &["padding", "margin"],
+            "corner_radius" => &["corner_radius", "cornerRadius", "radius"],
+            "shadow_radius" => &["shadow_radius", "shadowRadius", "shadowBlur"],
+            "shadow_offset_y" => &["shadow_offset_y", "shadowOffsetY", "shadowYOffset"],
+            "shadow_opacity" => &["shadow_opacity", "shadowOpacity", "shadowAlpha"],
+            _ => &[],
+        }
+    }
     /// 【图像导出】【兼容解析】从 value 解析原版 imageFrame 布尔或对象，返回夹紧范围的参数
     pub fn from_value(value: &Value) -> Self {
         let mut frame = Self::default();
@@ -93,20 +105,20 @@ impl ImageFrame {
         if !value.is_object() {
             return frame;
         }
-        frame.enabled = first(value, &["enabled", "show", "visible"])
+        frame.enabled = first(value, Self::aliases("enabled"))
             .and_then(boolean)
             .unwrap_or(frame.enabled);
         // 1. 【图像导出】【整数范围】原生蛇形键优先，原版键和旧别名使用相同转换与范围
         for (target, keys, maximum) in [
-            (&mut frame.padding, &["padding", "margin"][..], 256),
+            (&mut frame.padding, Self::aliases("padding"), 256),
             (
                 &mut frame.shadow_radius,
-                &["shadow_radius", "shadowRadius", "shadowBlur"][..],
+                Self::aliases("shadow_radius"),
                 128,
             ),
             (
                 &mut frame.shadow_offset_y,
-                &["shadow_offset_y", "shadowOffsetY", "shadowYOffset"][..],
+                Self::aliases("shadow_offset_y"),
                 128,
             ),
         ] {
@@ -118,12 +130,12 @@ impl ImageFrame {
         for (target, keys, maximum) in [
             (
                 &mut frame.corner_radius,
-                &["corner_radius", "cornerRadius", "radius"][..],
+                Self::aliases("corner_radius"),
                 128.0,
             ),
             (
                 &mut frame.shadow_opacity,
-                &["shadow_opacity", "shadowOpacity", "shadowAlpha"][..],
+                Self::aliases("shadow_opacity"),
                 1.0,
             ),
         ] {

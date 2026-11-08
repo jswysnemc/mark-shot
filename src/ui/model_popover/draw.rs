@@ -10,10 +10,6 @@ use crate::ui::model_popover::{
 };
 use crate::ui::panel::UiPanel;
 
-const TITLE: &str = "Languages ·";
-const TITLE_ENGLISH: &str = "each includes English";
-const TITLE_NO_MODEL: &str = "Download a model for OCR";
-const FIRST_USE_NOTE: &str = "Download once; recognize text offline";
 const RECOMMENDED: &str = "Recommended for your system";
 
 pub fn draw_model_popover(p: &mut Painter, popover: &mut ModelPopover) {
@@ -42,48 +38,108 @@ fn draw_content(p: &mut Painter, popover: &ModelPopover) {
 
     let title_x = cfg.padding + cfg.row_padding;
     let title_w = cfg.width - title_x * 2.0;
-    let no_model = popover
-        .rows
-        .iter()
-        .all(|row| row.status != ModelStatus::Installed);
-    let parts: &[(&str, Rgba, f32)] = if no_model {
-        &[(TITLE_NO_MODEL, emphasis(), font::label())]
+    let chinese =
+        crate::ui::language::Language::current() == crate::ui::language::Language::Chinese;
+    let title = if chinese {
+        "OCR · 引擎与资源"
     } else {
-        &[
-            (TITLE, color::muted(), note_font_size()),
-            (TITLE_ENGLISH, emphasis(), note_font_size()),
-        ]
+        "OCR · Engine and resources"
     };
+    let parts: &[(&str, Rgba, f32)] = &[(title, emphasis(), font::label())];
     let mut x = title_x;
     for &(text, text_color, size) in parts {
-        if let Some(rect) = Rect::from_xywh(
-            x,
-            cfg.padding,
-            (title_x + title_w - x).max(1.0),
-            if no_model { 20.0 } else { cfg.title_height },
-        ) {
+        if let Some(rect) = Rect::from_xywh(x, cfg.padding, (title_x + title_w - x).max(1.0), 20.0)
+        {
             p.text(rect, text, TextStyle::new(size, text_color.color()));
         }
         // title_gap: between the title's dot and its highlighted part
         x += p.measure(text, size) + cfg.title_gap;
     }
-    if no_model && let Some(rect) = Rect::from_xywh(title_x, cfg.padding + 22.0, title_w, 18.0) {
+    if let Some(rect) = Rect::from_xywh(title_x, cfg.padding + 22.0, title_w, 18.0) {
         p.text(
             rect,
-            FIRST_USE_NOTE,
+            if popover.setup.message.is_empty() {
+                if chinese {
+                    "自行选择下载资源；不会自动下载"
+                } else {
+                    "Choose downloads manually"
+                }
+            } else {
+                &popover.setup.message
+            },
             TextStyle::new(note_font_size(), color::muted().color()),
         );
     }
 
+    for resources in [true, false] {
+        if !resources && !popover.setup.show_models() {
+            continue;
+        }
+        let area = super::layout::heading(popover, (0.0, 0.0), resources);
+        let expanded = if resources {
+            popover.resources_expanded
+        } else {
+            popover.languages_expanded
+        };
+        let title = if resources {
+            if chinese {
+                if popover.setup.runtime == ModelStatus::Installed {
+                    "引擎与资源 · 已安装"
+                } else {
+                    "引擎与资源 · 安装管理"
+                }
+            } else {
+                "Engine and resources"
+            }
+        } else if chinese {
+            "其他语言模型"
+        } else {
+            "Other language models"
+        };
+        p.text(
+            Rect::from_xywh(
+                area.left() + 10.0,
+                area.top(),
+                area.width() - 76.0,
+                area.height(),
+            )
+            .unwrap(),
+            title,
+            TextStyle::new(font::small(), color::foreground()),
+        );
+        let action = match (chinese, expanded) {
+            (true, true) => "收起",
+            (true, false) => "展开",
+            (false, true) => "Less",
+            (false, false) => "More",
+        };
+        p.text(
+            Rect::from_xywh(area.right() - 64.0, area.top(), 54.0, area.height()).unwrap(),
+            action,
+            TextStyle::new(font::small(), emphasis()).center(),
+        );
+    }
+    if popover.resources_expanded {
+        super::setup::draw(p, popover);
+    }
+    if !popover.setup.show_models() {
+        return;
+    }
     for (idx, row) in popover.rows.iter().enumerate() {
-        draw_row(p, idx, *row, popover.hovered);
+        draw_row(p, popover, idx, *row, popover.hovered);
     }
 }
 
-fn draw_row(p: &mut Painter, idx: usize, row: ModelRow, hovered: Option<ModelPopoverElement>) {
+fn draw_row(
+    p: &mut Painter,
+    panel: &ModelPopover,
+    idx: usize,
+    row: ModelRow,
+    hovered: Option<ModelPopoverElement>,
+) {
     let (Some(rect), Some(button), Some(model)) = (
-        row_geom((0.0, 0.0), idx),
-        button_geom((0.0, 0.0), idx),
+        row_geom(panel, (0.0, 0.0), idx),
+        button_geom(panel, (0.0, 0.0), idx),
         MODELS.get(idx),
     ) else {
         return;
@@ -119,7 +175,9 @@ fn draw_row(p: &mut Painter, idx: usize, row: ModelRow, hovered: Option<ModelPop
     {
         p.text(
             name_rect,
-            model.name,
+            model.label(
+                crate::ui::language::Language::current() == crate::ui::language::Language::Chinese,
+            ),
             TextStyle::new(font::label(), name_color.color()),
         );
     }

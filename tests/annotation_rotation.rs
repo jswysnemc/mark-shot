@@ -32,6 +32,8 @@ fn annotation(shape: AnnotationShape) -> Annotation {
 /// 【普通标注旋转验证】【矩形构造】按 bounds 返回对应原版参考的矩形，选框不依赖描边留量
 fn rectangle(bounds: Rect) -> Annotation {
     annotation(AnnotationShape::Rectangle {
+        radius: 0.0,
+        fixed_ratio: false,
         start: (bounds.left(), bounds.top()),
         end: (bounds.right(), bounds.bottom()),
         filled: false,

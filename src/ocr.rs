@@ -41,6 +41,7 @@ pub mod daemon;
 pub mod dawn;
 pub mod download;
 pub mod draw;
+pub mod engine_choice;
 pub mod layout;
 pub mod lookalikes;
 pub mod model_integrity;
@@ -49,10 +50,13 @@ pub mod paddle_backend;
 mod parallelism;
 pub mod preprocess;
 pub mod runtime;
+pub mod runtime_library;
 pub mod settings;
 #[cfg(test)]
 pub mod testing;
 pub mod view;
+#[cfg(target_os = "windows")]
+pub mod windows_backend;
 pub mod worker;
 
 use tiny_skia::Rect;

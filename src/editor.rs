@@ -23,6 +23,7 @@ pub mod ruler_labels;
 pub mod ruler_session;
 pub mod saved;
 pub mod selection_geometry;
+pub mod shape_edits;
 pub mod text_composition;
 pub mod text_edits;
 pub mod text_session;
@@ -292,10 +293,10 @@ impl EditorState {
             region_detection: Default::default(),
             input: InputState::default(),
             magnifier: Magnifier {
-                hidden: crate::config::get().startup.selection_loupe.map_or_else(
-                    || crate::editor::saved::get().magnifier == Some(false),
-                    |enabled| !enabled,
-                ),
+                hidden: crate::config::preferences::current()
+                    .startup
+                    .selection_loupe
+                    == Some(false),
                 ..Magnifier::default()
             },
 

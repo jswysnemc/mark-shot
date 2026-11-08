@@ -32,14 +32,20 @@ function Resolve-WindowsRuntime {
         [string]$BuildDirectory,
         [switch]$VerifyOnly
     )
-    if (-not (Test-Path (Join-Path $PackageDirectory 'DirectML.dll') -PathType Leaf)) {
-        throw 'CPU OCR still requires the DirectML.dll shipped by ort-sys.'
-    }
     $crtDirectories = @()
     if (-not $VerifyOnly) {
         if (-not $env:VCToolsRedistDir) { throw 'VCToolsRedistDir is missing; configure MSVC first.' }
         $crtDirectories = @(Get-ChildItem (Join-Path $env:VCToolsRedistDir 'x64') -Directory -Filter 'Microsoft.VC*.CRT')
         if ($crtDirectories.Count -ne 1) { throw 'Expected exactly one x64 MSVC CRT directory.' }
+        # 【Windows打包】【按需推理】预置后续下载的 ONNX Runtime 所需 CRT，推理库本身不随默认包发布
+        foreach ($name in @('msvcp140.dll', 'msvcp140_1.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {
+            Copy-RuntimeFile (Join-Path $crtDirectories[0].FullName $name) (Join-Path $PackageDirectory $name)
+        }
+    }
+    foreach ($name in @('msvcp140.dll', 'msvcp140_1.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {
+        if (-not (Test-Path (Join-Path $PackageDirectory $name) -PathType Leaf)) {
+            throw "Missing runtime prerequisite for optional OCR: $name"
+        }
     }
     $queue = [System.Collections.Generic.Queue[string]]::new()
     Get-ChildItem $PackageDirectory -File | Where-Object { $_.Extension -in '.exe', '.dll' } |

@@ -81,6 +81,12 @@ impl OcrRuntime {
         self.set_build(Arc::new(move || build_backend(mode, &files)));
     }
 
+    /// 【识别引擎】【来源切换】按 source 替换后端构造器，保留现有任务取消与旧结果隔离规则，无返回值
+    pub fn load_source(&mut self, source: super::engine_choice::Source) {
+        let mode = self.mode;
+        self.set_build(Arc::new(move || super::engine_choice::build(&source, mode)));
+    }
+
     fn set_build(&mut self, build: Build) {
         self.build = Some(build);
         self.backend = None;

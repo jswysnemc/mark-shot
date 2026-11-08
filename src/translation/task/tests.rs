@@ -8,6 +8,7 @@ use std::{
     time::Instant,
 };
 
+mod catalog_tests;
 mod image_tests;
 mod process_tests;
 mod provider_tests;

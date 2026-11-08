@@ -202,6 +202,15 @@ fn production_format_history_matches_actual_qt_states() {
     let mut results = Vec::new();
     for case in &cases {
         let name = case["name"].as_str().unwrap();
+        // 1. 【文字属性】【确认规则】字号确认现在保留正文会话，采用字段导航的连续编辑参考记录
+        let case = if name == "field-submit" {
+            cases
+                .iter()
+                .find(|case| case["name"] == "field-navigation")
+                .unwrap()
+        } else {
+            case
+        };
         let existing = name.starts_with("existing-") || name == "initial-existing";
         let mut state = prepared(existing);
         let mut dirty = 0;

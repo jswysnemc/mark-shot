@@ -70,8 +70,9 @@ impl Palette {
     }
 
     /// 【界面主题】【原版配色】按 mode 返回完整配色，尺寸与主题无关
-    pub const fn new(mode: Mode) -> Self {
+    pub fn new(mode: Mode) -> Self {
         match mode {
+            Mode::System => Self::new(mode.resolved()),
             Mode::Light => Self {
                 panel_fill: Rgba(248, 250, 252, 242),
                 panel_border: Rgba(15, 23, 42, 30),

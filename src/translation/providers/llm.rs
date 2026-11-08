@@ -3,18 +3,24 @@
 use super::super::{
     Output, Provider, Result, Segment,
     http::{Request, Transport},
+    request_options,
     resolve::Llm,
     response,
 };
 use serde_json::{Value, json};
 
 /// 【模型翻译】【目标地址】按 config 返回原版版本路径，用户指定的完整 OpenAI 或 Anthropic 路径不重复追加
-fn endpoint(config: &Llm) -> String {
+pub(crate) fn endpoint(config: &Llm) -> String {
     let mut base = config.endpoint.trim_end_matches('/').to_owned();
     match config.provider {
-        Provider::OpenAi => {
+        Provider::OpenAi | Provider::Bilibili => {
             if !base.ends_with("/chat/completions") {
                 base.push_str("/chat/completions");
+            }
+        }
+        Provider::Responses => {
+            if !base.ends_with("/responses") {
+                base.push_str("/responses");
             }
         }
         Provider::Gemini => {
@@ -39,11 +45,11 @@ fn endpoint(config: &Llm) -> String {
 }
 
 /// 【模型翻译】【服务正文】按 config、segments 和 target 构造 JSON，必需字段覆盖 OpenAI extraBody，不给其他服务添加默认温度
-fn payload(config: &Llm, segments: &[Segment], target: &str) -> Value {
+pub(crate) fn payload(config: &Llm, segments: &[Segment], target: &str) -> Value {
     let prompt = response::prompt(segments, target).to_string();
-    match config.provider {
-        Provider::OpenAi => {
-            let mut body = config.extra_body.clone();
+    let mut body = match config.provider {
+        Provider::OpenAi | Provider::Bilibili => {
+            let mut body = serde_json::Map::new();
             body.insert("model".into(), json!(config.model));
             body.insert(
                 "temperature".into(),
@@ -53,6 +59,8 @@ fn payload(config: &Llm, segments: &[Segment], target: &str) -> Value {
                 {"role":"system","content":config.system_prompt}, {"role":"user","content":prompt}]));
             Value::Object(body)
         }
+        Provider::Responses => json!({"model":config.model,"instructions":config.system_prompt,
+            "input":[{"role":"user","content":prompt}], "store":false}),
         Provider::Gemini => {
             let mut body = json!({"contents":[{"role":"user","parts":[{"text":prompt}]}],
                 "generationConfig":{"responseMimeType":"application/json"}});
@@ -78,6 +86,37 @@ fn payload(config: &Llm, segments: &[Segment], target: &str) -> Value {
             }
             body
         }
+    };
+    request_options::thinking(config, &mut body);
+    let required = body.clone();
+    request_options::merge(&mut body, &Value::Object(config.extra_body.clone()));
+    // 1. 【模型翻译】【身份保护】扩展可以覆盖生成选项，不能替换待翻译文本、模型和同步响应模式
+    for field in ["model", "messages", "contents", "input"] {
+        if let Some(value) = required.get(field) {
+            body[field] = value.clone();
+        } else {
+            body.as_object_mut().unwrap().remove(field);
+        }
+    }
+    if config.provider != Provider::Gemini {
+        body["stream"] = json!(false);
+    } else {
+        body.as_object_mut().unwrap().remove("stream");
+    }
+    body
+}
+
+/// 【模型翻译】【请求鉴权】按 config 返回对应协议的请求头，不附加浏览器来源信息
+pub(crate) fn headers(config: &Llm) -> Vec<(String, String)> {
+    match config.provider {
+        Provider::OpenAi | Provider::Bilibili | Provider::Responses => {
+            vec![("Authorization".into(), format!("Bearer {}", config.key.0))]
+        }
+        Provider::Gemini => vec![("x-goog-api-key".into(), config.key.0.clone())],
+        _ => vec![
+            ("x-api-key".into(), config.key.0.clone()),
+            ("anthropic-version".into(), "2023-06-01".into()),
+        ],
     }
 }
 
@@ -88,14 +127,7 @@ pub(super) async fn translate(
     target: &str,
     http: &dyn Transport,
 ) -> Result<Output> {
-    let headers = match config.provider {
-        Provider::OpenAi => vec![("Authorization".into(), format!("Bearer {}", config.key.0))],
-        Provider::Gemini => vec![("x-goog-api-key".into(), config.key.0.clone())],
-        _ => vec![
-            ("x-api-key".into(), config.key.0.clone()),
-            ("anthropic-version".into(), "2023-06-01".into()),
-        ],
-    };
+    let headers = headers(config);
     let body = http
         .send(Request {
             provider: config.provider,
@@ -109,6 +141,6 @@ pub(super) async fn translate(
     Ok(response::mapped(
         config.provider,
         segments,
-        &super::model_response::parse(config.provider, &body)?,
+        &super::model_response::parse_options(config.provider, &body, config.filter_thinking)?,
     ))
 }

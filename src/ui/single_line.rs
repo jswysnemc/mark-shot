@@ -34,6 +34,19 @@ impl SingleLine {
         self.editor.text()
     }
 
+    /// 【界面控件】【密码反馈】无参数，返回遮蔽字符、当前光标和总长度，不泄露原始文字
+    pub fn masked_text(&self) -> String {
+        let text = self.text();
+        let cursor = self.editor.cursor_offset().min(text.len());
+        let before = text[..cursor].chars().count();
+        let total = text.chars().count();
+        format!(
+            "{}│{} · {total}",
+            "•".repeat(before.min(12)),
+            "•".repeat(total.saturating_sub(before).min(8))
+        )
+    }
+
     /// 【界面控件】【字段替换】用 text 替换内容，fonts 用于排版；select_all 决定是否选中全部文字
     pub fn set(&mut self, text: &str, fonts: &mut UiFonts, select_all: bool) {
         let text = normalized(text, self.limit);

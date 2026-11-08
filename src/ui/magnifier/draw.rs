@@ -11,7 +11,7 @@ fn cfg() -> &'static Magnifier {
     &crate::config::get().magnifier
 }
 
-/// Loupe plus, for the eyedropper, the colour plate under it.
+/// 【光标放大区】【完整范围】按 cursor、屏幕尺寸和 with_label 返回放大图、坐标及可选颜色标签的整体范围
 pub fn magnifier_rect(
     cursor: (f32, f32),
     monitor_w: f32,
@@ -23,15 +23,19 @@ pub fn magnifier_rect(
     Rect::from_xywh(mag_x, mag_y, size() as f32, height).unwrap()
 }
 
+/// 【光标放大区】【整体高度】按 with_label 返回始终包含坐标条的高度，取色模式额外包含颜色条
 fn box_height(with_label: bool) -> f32 {
-    if with_label {
-        size() as f32 + cfg().label_gap + cfg().label_height
-    } else {
-        size() as f32
-    }
+    size() as f32
+        + cfg().label_gap
+        + cfg().label_height
+        + if with_label {
+            cfg().label_gap + cfg().label_height
+        } else {
+            0.0
+        }
 }
 
-/// `label` is the colour plate the eyedropper needs; without it only the loupe is drawn.
+/// 【光标放大区】【实时绘制】按 capture、cursor 和屏幕尺寸绘制局部像素与截图坐标，label 控制额外颜色条
 pub fn draw_magnifier(
     p: &mut Painter,
     capture: &Capture,
@@ -105,8 +109,26 @@ pub fn draw_magnifier(
         p.stroke_path(&circle_path, cfg().outline.get(), &stroke);
     }
 
+    let position_y = mag_y + size() as f32 + cfg().label_gap;
+    let plate = Rect::from_xywh(mag_x, position_y, size() as f32, cfg().label_height).unwrap();
+    p.fill_rounded(plate, radius::panel(), cfg().label_background.get());
+    stroke_outline(p, plate, radius::panel());
+    p.text(
+        plate,
+        &format!(
+            "X: {}  Y: {}",
+            native.0.floor() as i32,
+            native.1.floor() as i32
+        ),
+        TextStyle::new(font::small(), cfg().label_text.get().color()).center(),
+    );
     if label && let Some(color) = sample_pixel(source, native) {
-        draw_color_label(p, mag_x, mag_y + size() as f32 + cfg().label_gap, color);
+        draw_color_label(
+            p,
+            mag_x,
+            position_y + cfg().label_height + cfg().label_gap,
+            color,
+        );
     }
 }
 
@@ -171,6 +193,7 @@ fn stroke_outline(p: &mut Painter, rect: Rect, radius: f32) {
     p.stroke_path(&path, cfg().outline.get(), &stroke);
 }
 
+/// 【光标放大区】【边缘避让】按 cursor、monitor 和完整 height 返回不越过屏幕边缘的左上角
 fn magnifier_position(
     cursor: (f32, f32),
     monitor: (f32, f32, f32, f32),
@@ -192,7 +215,10 @@ fn magnifier_position(
         cy - height - offset()
     };
 
-    (x, y)
+    (
+        x.clamp(mx, (mx + mw - mag).max(mx)),
+        y.clamp(my, (my + mh - height).max(my)),
+    )
 }
 
 fn overlay_crosshair(zoomed: &mut Pixmap, scale: f32) {

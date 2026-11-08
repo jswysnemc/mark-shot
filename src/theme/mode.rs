@@ -14,12 +14,15 @@ pub enum Mode {
     #[default]
     Light,
     Dark,
+    System,
 }
 
 impl Mode {
-    /// 【界面主题】【名称解析】按 value 解析主题，未知值和 system 均使用默认浅色，返回有效模式
+    /// 【界面主题】【名称解析】按 value 解析明暗或系统偏好，未知名称使用浅色，返回配置模式
     pub fn parse(value: &str) -> Self {
-        if value.trim().eq_ignore_ascii_case("dark") {
+        if value.trim().eq_ignore_ascii_case("system") {
+            Self::System
+        } else if value.trim().eq_ignore_ascii_case("dark") {
             Self::Dark
         } else {
             Self::Light
@@ -42,7 +45,18 @@ impl Mode {
         match OVERRIDE.load(Ordering::Relaxed) {
             1 => Self::Light,
             2 => Self::Dark,
+            3 => Self::System,
             _ => crate::config::get().ui.theme,
+        }
+        .resolved()
+    }
+
+    /// 【界面主题】【系统解析】无参数，返回明确的明暗模式，系统模式使用平台偏好
+    pub fn resolved(self) -> Self {
+        if self == Self::System {
+            super::system::current()
+        } else {
+            self
         }
     }
 
@@ -51,6 +65,7 @@ impl Mode {
         match self {
             Self::Light => Self::Dark,
             Self::Dark => Self::Light,
+            Self::System => self.resolved().opposite(),
         }
     }
 
@@ -59,6 +74,7 @@ impl Mode {
         match self {
             Self::Light => "light",
             Self::Dark => "dark",
+            Self::System => "system",
         }
     }
 }
@@ -71,16 +87,15 @@ impl<'de> Deserialize<'de> for Mode {
 }
 
 static OVERRIDE: AtomicU8 = AtomicU8::new(0);
-static ALTERNATE: OnceLock<Theme> = OnceLock::new();
+static LIGHT: OnceLock<Theme> = OnceLock::new();
+static DARK: OnceLock<Theme> = OnceLock::new();
 
 /// 【界面主题】【当前令牌】返回当前主题，首次切换只准备一套替代颜色并保留原版尺寸，无参数
 pub(super) fn theme() -> &'static Theme {
     let config = crate::config::get();
-    if Mode::current() == config.ui.theme {
-        &config.theme
-    } else {
-        ALTERNATE.get_or_init(|| crate::config::interface_theme::alternate(config))
-    }
+    let mode = Mode::current();
+    let cache = if mode == Mode::Dark { &DARK } else { &LIGHT };
+    cache.get_or_init(|| crate::config::interface_theme::with_mode(config, mode))
 }
 
 /// 【界面主题】【继承切换】返回启动后是否执行过切换，无参数；配置测试仍使用各自解析得到的继承值
@@ -99,8 +114,15 @@ pub fn toggle() -> std::io::Result<Mode> {
 
 /// 【界面主题】【外部更新】将 mode 用于本进程，返回是否改变可见主题，不重新保存文件或初始化后台线程
 pub(crate) fn apply_saved(mode: Mode) -> bool {
-    let changed = Mode::current() != mode;
-    OVERRIDE.store(if mode == Mode::Light { 1 } else { 2 }, Ordering::Relaxed);
+    let changed = Mode::current() != mode.resolved();
+    OVERRIDE.store(
+        match mode {
+            Mode::Light => 1,
+            Mode::Dark => 2,
+            Mode::System => 3,
+        },
+        Ordering::Relaxed,
+    );
     changed
 }
 

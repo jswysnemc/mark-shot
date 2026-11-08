@@ -138,7 +138,7 @@ fn begin_draft(state: &mut EditorState, dirty_mask: &mut u32) {
     let Some(start) = space.start_point(state.canvas_point()) else {
         return;
     };
-    let Some(magnifier) = Magnifier::new(
+    let Some(mut magnifier) = Magnifier::new(
         state.tool_settings.magnifier_shape,
         start,
         state.tool_settings.magnifier_zoom,
@@ -147,6 +147,7 @@ fn begin_draft(state: &mut EditorState, dirty_mask: &mut u32) {
     ) else {
         return;
     };
+    magnifier.radius = state.tool_settings.corner_radius;
     if let Some(previous) = state
         .selected_annotation_index()
         .and_then(|index| state.annotations.get(index))

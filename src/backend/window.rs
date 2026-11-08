@@ -93,6 +93,19 @@ pub enum WindowAction {
     Close,
     Move,
     Resize,
+    ResizeEdge(WindowEdge),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowEdge {
+    Top,
+    Bottom,
+    Left,
+    Right,
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -119,6 +132,10 @@ pub enum WindowPopupAction {
 }
 
 pub trait WindowContent {
+    /// 【原生窗口】【关闭确认】无参数，默认允许关闭；有编辑草稿的内容可提交失败后保留窗口
+    fn close_requested(&mut self) -> bool {
+        true
+    }
     /// 【原生窗口】【初始位置】无参数，返回内容要求的全局位置，默认由平台居中布置
     fn initial_position(&self) -> Option<(i32, i32)> {
         None

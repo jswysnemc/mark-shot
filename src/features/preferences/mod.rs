@@ -2,12 +2,23 @@
 
 mod catalog;
 mod draw;
+mod dropdown;
+mod editing;
+mod frame_preview;
+mod layout;
+mod menus;
+mod navigation;
+mod recovery;
 pub(crate) mod runtime;
 mod scrolling;
+mod sections;
+mod shell;
 mod shortcuts;
 #[cfg(test)]
 mod tests;
 mod toolbar;
+mod translation;
+mod widgets;
 mod window;
 
 pub const READY_ARG: &str = "--settings-ready";

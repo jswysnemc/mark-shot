@@ -23,7 +23,13 @@ impl WindowHandler for NativeWindow {
     /// 【原生窗口】【关闭请求】响应合成器对 window 的关闭请求；设置退出状态
     fn request_close(&mut self, _: &Connection, _: &QueueHandle<Self>, window: &Window) {
         match self.surface_id(window.wl_surface()) {
-            Some(super::surface::SurfaceId::Main) => self.exit = true,
+            Some(super::surface::SurfaceId::Main) => {
+                if self.content.close_requested() {
+                    self.exit = true;
+                } else {
+                    self.main.dirty = true;
+                }
+            }
             Some(super::surface::SurfaceId::Dialog(id)) => self.finish_dialog(id, false),
             None => {}
         }

@@ -54,15 +54,11 @@ impl EngineSettings {
         }
     }
 
-    /// Resolves the actual execution mode.
-    ///
-    /// daemon is only beneficial with GPU acceleration. Therefore, if GPU access
-    /// is unavailable, `daemon` mode silently falls back to `on-demand`. Explicitly setting
-    /// `device = cpu` bypasses this fallback to allow daemon debugging.
+    /// 【文字识别】【运行方式】按 daemon_possible、gpu_possible 返回实际方式，自动设备允许常驻 CPU，仅显式 GPU 不可用时降级
     pub fn resolve(&self, daemon_possible: bool, gpu_possible: bool) -> Mode {
         match self.mode {
             Mode::Daemon if !daemon_possible => Mode::OnDemand,
-            Mode::Daemon if self.device == Device::Cpu || gpu_possible => Mode::Daemon,
+            Mode::Daemon if self.device != Device::Gpu || gpu_possible => Mode::Daemon,
             Mode::Daemon => Mode::OnDemand,
             mode => mode,
         }
@@ -74,13 +70,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn daemon_needs_a_gpu_unless_cpu_is_forced() {
+    fn daemon_supports_automatic_cpu_and_requires_explicit_gpu() {
         let daemon = EngineSettings {
             mode: Mode::Daemon,
             ..EngineSettings::default()
         };
         assert_eq!(daemon.resolve(true, true), Mode::Daemon);
-        assert_eq!(daemon.resolve(true, false), Mode::OnDemand);
+        assert_eq!(daemon.resolve(true, false), Mode::Daemon);
         assert_eq!(daemon.resolve(false, true), Mode::OnDemand);
 
         let gpu = EngineSettings {

@@ -85,6 +85,7 @@ fn cancellation_preserves_existing_partial_rasters_at_fractional_scale() {
         frozen_bounds: None,
         id: 0,
         shape: AnnotationShape::Marker {
+            radius: 0.0,
             start: (120.3, 128.7),
             end: (245.9, 238.4),
             kind: MarkerShape::Circle,

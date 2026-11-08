@@ -3,6 +3,11 @@ pub(crate) mod config_watch;
 pub mod context_menu;
 mod mode;
 mod roles;
+mod system;
+mod system_watch;
+#[cfg(target_os = "windows")]
+pub(crate) use system::refresh as refresh_system;
+pub(crate) use system_watch::{SystemWatch, watch as watch_system};
 pub mod toolbar;
 pub mod window;
 pub use mode::Mode;

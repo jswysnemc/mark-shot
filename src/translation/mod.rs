@@ -2,9 +2,11 @@
 
 mod http;
 pub mod language;
+pub(crate) mod models;
 mod process;
 mod providers;
 pub mod request;
+pub(crate) mod request_options;
 pub mod resolve;
 mod response;
 pub mod task;
@@ -14,6 +16,8 @@ use std::fmt;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Provider {
+    Bilibili,
+    Responses,
     OpenAi,
     Gemini,
     Anthropic,
@@ -28,6 +32,8 @@ impl Provider {
     /// 【翻译服务】【服务标识】返回当前服务的稳定配置标识，无参数，不包含凭据或界面文案
     pub fn id(self) -> &'static str {
         match self {
+            Self::Bilibili => "bilibili",
+            Self::Responses => "openai-responses",
             Self::OpenAi => "openai-compatible",
             Self::Gemini => "gemini",
             Self::Anthropic => "anthropic",

@@ -49,16 +49,20 @@ pub(super) fn decode(value: &Value) -> Annotation {
     let tool = value["tool"].as_u64().unwrap();
     let shape = match tool {
         3 => AnnotationShape::Rectangle {
+            radius: 0.0,
+            fixed_ratio: false,
             start,
             end,
             filled: false,
         },
         4 => AnnotationShape::Circle {
+            fixed_ratio: false,
             start,
             end,
             filled: false,
         },
         5 => AnnotationShape::Marker {
+            radius: 0.0,
             start,
             end,
             kind: Default::default(),
@@ -66,6 +70,7 @@ pub(super) fn decode(value: &Value) -> Annotation {
         },
         6 => AnnotationShape::Redact {
             filter: RegionFilter {
+                radius: 0.0,
                 start,
                 end,
                 strength: width,
@@ -78,6 +83,7 @@ pub(super) fn decode(value: &Value) -> Annotation {
             let source = points[0];
             AnnotationShape::Magnifier {
                 magnifier: Magnifier {
+                    radius: 0.0,
                     source,
                     center: crate::features::annotation_selection::chrome::center(bounds),
                     size: (bounds.width(), bounds.height()),

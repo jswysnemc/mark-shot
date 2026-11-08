@@ -31,7 +31,8 @@ def capture(process, root, name):
 
 def click(point, button="left"):
     """【文字属性回归】【按钮点击】向私有会话 point 发送 button 完整点击，无返回值"""
-    session.control("click", "--logical", *map(round, point), "--button", button)
+    subprocess.run(["wtype", "-m", "ctrl", "-m", "alt", "-m", "shift", "-m", "logo"], env=session.environment(), check=True)
+    session.control("click", "--logical", *map(round, point), "--button", button, "--hold", "0.1")
     time.sleep(0.04)
 
 
@@ -39,7 +40,20 @@ def copied_size(environment, expected):
     """【文字属性回归】【字号复制】从当前真实字号字段复制并验证 expected，environment 指向私有会话，无返回值"""
     session.key("ctrl+a")
     session.key("ctrl+c")
-    session.wait_clipboard(environment, expected)
+    session.wait_clipboard(environment, expected + " pt")
+
+
+def wait_idle(pid):
+    """【文字属性回归】【空闲等待】等待 pid 的线程数和 CPU 时钟稳定；返回资源快照，允许按需创建的渲染线程池"""
+    previous = session.resources(pid)
+    deadline = time.monotonic() + 8
+    while time.monotonic() < deadline:
+        time.sleep(0.3)
+        current = session.resources(pid)
+        if current["threads"] == previous["threads"] and current["cpu_ticks"] == previous["cpu_ticks"]:
+            return current
+        previous = current
+    raise AssertionError(f"the editor did not become idle: {previous}")
 
 
 def scenario(binary, root):
@@ -59,8 +73,19 @@ def scenario(binary, root):
         with (root / "process.log").open("w") as log:
             process = subprocess.Popen([str(binary), "--fullscreen", "--fullscreen-default-tool", "text", "--default-color", "#FF4D4D", "--to", "s", "--output", str(private / "export"), str(source)], env=environment, stderr=log)
             try:
+                wait_idle(process.pid)
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline:
+                    window = next((item for item in session.windows() if item["pid"] == process.pid), None)
+                    if window:
+                        session.control("action", "fullscreen-window", "--id", window["id"])
+                        break
+                    time.sleep(0.05)
+                else:
+                    raise AssertionError("the image editor window did not appear")
+                time.sleep(1)
                 initial = capture(process, root, "initial")
-                session.wait_single_thread(process.pid)
+                wait_idle(process.pid)
                 button = font_button(initial)
                 click(button, "right")
                 protected = capture(process, root, "right-button")
@@ -73,10 +98,10 @@ def scenario(binary, root):
                 click(button)
                 opened = capture(process, root, "font-open")
                 left, top, _right, _bottom = font_popup(opened)
-                font_idle_before = session.wait_single_thread(process.pid)
+                font_idle_before = wait_idle(process.pid)
                 time.sleep(1)
                 font_idle_after = session.resources(process.pid)
-                if font_idle_before["cpu_ticks"] != font_idle_after["cpu_ticks"] or font_idle_after["threads"] != 1:
+                if font_idle_before["cpu_ticks"] != font_idle_after["cpu_ticks"] or font_idle_after["threads"] != font_idle_before["threads"]:
                     raise AssertionError(f"the open font panel was not event driven: {font_idle_before}, {font_idle_after}")
                 session.paste_text("Liberation Sans")
                 capture(process, root, "font-search")
@@ -96,14 +121,9 @@ def scenario(binary, root):
                 left, top, _right, _bottom = font_popup(filtered)
                 click((left + 55, top + 54))
                 chosen = capture(process, root, "family-chosen")
-                button = font_button(chosen)
-                session.key("bracketright")
-                click(button)
-                capture(process, root, "shortcut-font-open")
-                session.key("Tab")
-                copied_size(environment, "43")
+                font_popup(chosen)
+                copied_size(environment, "42")
                 session.key("Escape")
-                session.key("bracketleft")
                 # 2. 【文字属性回归】【默认与对象】新文字先使用四十二点，已有文字改为二十点时同步默认字号
                 point = (round(initial.width * 0.58), round(initial.height * 0.6))
                 click(point)
@@ -121,7 +141,7 @@ def scenario(binary, root):
                 capture(process, root, "object-font-closed")
                 click((point[0] - 100, point[1] + 140))
                 capture(process, root, "committed")
-                before = session.wait_single_thread(process.pid)
+                before = wait_idle(process.pid)
                 time.sleep(1)
                 after = session.resources(process.pid)
                 session.key("Return")
@@ -141,11 +161,11 @@ def scenario(binary, root):
                 bounds = ImageChops.difference(output, Image.new("RGB", output.size, SOURCE)).getbbox()
                 if output.size != (1600, 900) or not bounds or not 15 <= bounds[3] - bounds[1] <= 32:
                     raise AssertionError(f"the text did not use the object font size or original image: {output.size}, {bounds}")
-                if before["cpu_ticks"] != after["cpu_ticks"] or after["threads"] != 1:
+                if before["cpu_ticks"] != after["cpu_ticks"] or after["threads"] != before["threads"]:
                     raise AssertionError(f"idle editing was not event driven: {before}, {after}")
                 if (private / "data/mark-shot/models").exists():
                     raise AssertionError("font selection initialized OCR models")
-                return {"right_button_protected": True, "size_enter_preserves_panel": True, "size_shortcuts_verified": True, "default_points": 20, "object_points": 20, "family": saved["text_family"], "bold": saved["bold"], "export_size": list(output.size), "pixel_bounds": bounds, "font_idle_before": font_idle_before, "font_idle_after": font_idle_after, "idle_before": before, "idle_after": after}
+                return {"right_button_protected": True, "size_enter_preserves_panel": True, "family_keeps_focus": True, "default_points": 20, "object_points": 20, "family": saved["text_family"], "bold": saved["bold"], "export_size": list(output.size), "pixel_bounds": bounds, "font_idle_before": font_idle_before, "font_idle_after": font_idle_after, "idle_before": before, "idle_after": after}
             finally:
                 if process.poll() is None:
                     process.terminate()

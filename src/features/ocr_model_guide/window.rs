@@ -3,7 +3,10 @@
 use crate::{
     backend::window::{self, WindowAction, WindowContent, WindowEvent, WindowSpec},
     keys::Key,
-    ocr::models::{MODELS, ModelEvent, ModelFiles, ModelStatus, OcrModels},
+    ocr::{
+        engine_choice::{self, Source},
+        models::{MODELS, ModelEvent, ModelStatus, OcrModels},
+    },
     renderer::{Painter, text::TextStyle},
     ui::model_popover::{self, ModelPopover, ModelPopoverElement, ModelRow},
 };
@@ -19,7 +22,7 @@ struct Guide {
     fonts: cosmic_text::FontSystem,
     cache: cosmic_text::SwashCache,
     icons: crate::renderer::Icons,
-    completion: Arc<OnceLock<ModelFiles>>,
+    completion: Arc<OnceLock<Source>>,
     pressed: Option<ModelPopoverElement>,
     size: (u32, u32),
     deadline: Option<Instant>,
@@ -39,16 +42,13 @@ impl Guide {
         (position.0 / fit, position.1 / fit)
     }
     /// 【识别模型】【界面状态】按 models 和 completion 创建复用模型面板，返回静止状态，不自动下载
-    fn new(models: OcrModels, completion: Arc<OnceLock<ModelFiles>>) -> Self {
+    fn new(models: OcrModels, completion: Arc<OnceLock<Source>>) -> Self {
         let mut panel = ModelPopover::new();
         panel.open = true;
         panel.opacity = 1.0;
         panel.render_pos = (0.0, 28.0);
         panel.position = panel.render_pos;
-        let size = (
-            panel.size.0.ceil() as u32,
-            (panel.size.1 + 28.0).ceil() as u32,
-        );
+        let size = (360, 540);
         let mut result = Self {
             models,
             panel,
@@ -66,6 +66,10 @@ impl Guide {
 
     /// 【识别模型】【模型状态】同步当前已安装状态及进度到 panel，无参数，不创建后台任务
     fn sync(&mut self) {
+        let changed = model_popover::setup::sync(&mut self.panel, &self.models);
+        if changed || self.panel.pixmap.is_none() {
+            model_popover::setup::prepare_text(&mut self.fonts, &self.panel);
+        }
         self.panel
             .sync_rows((0..MODELS.len()).map(|index| ModelRow {
                 status: self.models.status(index),
@@ -82,22 +86,38 @@ impl Guide {
 
     /// 【识别模型】【明确选择】按 element 下载、取消或选择已安装模型，返回是否关闭，选择完成才继续原动作
     fn activate(&mut self, element: ModelPopoverElement) -> WindowAction {
+        if model_popover::setup::activate(&mut self.panel, &mut self.models, element) {
+            self.sync();
+            if !self.panel.setup.message.is_empty() {
+                return WindowAction::Redraw;
+            }
+            return self.complete();
+        }
         let index = match element {
             ModelPopoverElement::Row(index) | ModelPopoverElement::Button(index) => index,
+            _ => return WindowAction::None,
         };
         match self.models.status(index) {
             ModelStatus::Installed => {
-                if let Some(files) = self.models.files(index) {
-                    self.models.set_active(Some(index));
-                    let _ = self.completion.set(files);
-                    return WindowAction::Close;
-                }
+                self.models.set_active(Some(index));
+                return self.complete();
             }
             ModelStatus::Queued | ModelStatus::Downloading(_) => self.models.cancel(index),
             ModelStatus::Missing | ModelStatus::Failed => self.models.download(index),
         }
         self.sync();
         WindowAction::Redraw
+    }
+
+    /// 【识别安装】【完整准备】无参数，仅当所选引擎全部资源就绪时完成引导，不隐式安装缺少的资源
+    fn complete(&mut self) -> WindowAction {
+        if let Some(source) = engine_choice::source(&self.models) {
+            let _ = self.completion.set(source);
+            WindowAction::Close
+        } else {
+            self.sync();
+            WindowAction::Redraw
+        }
     }
 }
 
@@ -146,7 +166,7 @@ impl WindowContent for Guide {
                 for event in self.models.poll() {
                     match event {
                         ModelEvent::Ready(index) => {
-                            return self.activate(ModelPopoverElement::Row(index));
+                            self.models.set_active(Some(index));
                         }
                         ModelEvent::Failed(_, error) => {
                             log::error!("【识别模型】【引导下载】下载失败: {error}")
@@ -155,7 +175,7 @@ impl WindowContent for Guide {
                     }
                 }
                 self.sync();
-                WindowAction::Redraw
+                self.complete()
             }
             WindowEvent::Resize { size } => {
                 self.size = size;
@@ -168,18 +188,28 @@ impl WindowContent for Guide {
                     .hovered
                     .map_or(WindowAction::None, |item| self.activate(item)),
                 Some(Key::Up | Key::Down) => {
-                    let old = match self.panel.hovered {
-                        Some(
-                            ModelPopoverElement::Row(index) | ModelPopoverElement::Button(index),
-                        ) => index,
-                        None => self.models.recommended(),
-                    };
+                    let mut items = Vec::new();
+                    if cfg!(target_os = "windows") {
+                        items.extend([
+                            ModelPopoverElement::SystemEngine,
+                            ModelPopoverElement::PaddleEngine,
+                        ]);
+                    }
+                    if self.panel.setup.show_models() {
+                        items.push(ModelPopoverElement::Runtime);
+                        items.extend((0..MODELS.len()).map(ModelPopoverElement::Row));
+                    }
+                    let old = items
+                        .iter()
+                        .position(|item| Some(*item) == self.panel.hovered);
                     let index = if input.key == Some(Key::Down) {
-                        (old + 1) % MODELS.len()
+                        old.map_or(0, |index| (index + 1) % items.len())
                     } else {
-                        (old + MODELS.len() - 1) % MODELS.len()
+                        old.map_or(items.len() - 1, |index| {
+                            (index + items.len() - 1) % items.len()
+                        })
                     };
-                    self.panel.hovered = Some(ModelPopoverElement::Row(index));
+                    self.panel.hovered = Some(items[index]);
                     WindowAction::Redraw
                 }
                 _ => WindowAction::None,
@@ -219,7 +249,7 @@ impl WindowContent for Guide {
 }
 
 /// 【识别模型】【原生执行】按 models 打开独立窗口，返回明确选择的模型文件，窗口管理器关闭视为取消
-pub(super) fn run(models: OcrModels) -> crate::AppResult<Option<ModelFiles>> {
+pub(super) fn run(models: OcrModels) -> crate::AppResult<Option<Source>> {
     let completion = Arc::new(OnceLock::new());
     let content = Guide::new(models, completion.clone());
     let size = content.size;
@@ -233,4 +263,19 @@ pub(super) fn run(models: OcrModels) -> crate::AppResult<Option<ModelFiles>> {
         content,
     )?;
     Ok(completion.get().cloned())
+}
+
+/// 【识别模型】【设置入口】无参数，创建资源管理模态窗口，允许查看已安装模型和下载其他语言
+pub(crate) fn dialog() -> window::WindowDialog {
+    let content = Guide::new(OcrModels::load(), Arc::new(OnceLock::new()));
+    window::WindowDialog {
+        id: 0x4f4352,
+        spec: WindowSpec {
+            title: "Mark Shot / OCR".into(),
+            app_id: "mark-shot-ocr-resources".into(),
+            size: content.size,
+            minimum: (320, 260),
+        },
+        content: Box::new(content),
+    }
 }

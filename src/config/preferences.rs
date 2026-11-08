@@ -20,7 +20,8 @@ pub fn current() -> Arc<super::Config> {
 
 /// 【应用设置】【保存发布】从 path 读取已保存配置并发布给输出与识别流程，返回错误；界面几何仍沿用启动配置
 pub fn reload(path: &Path) -> io::Result<()> {
-    let config = load(path)?;
+    let mut config = load(path)?;
+    super::runtime_overrides::apply(&mut config);
     crate::keys::reload(&config.keys.0);
     *CURRENT
         .get_or_init(|| RwLock::new(Arc::new(super::get().clone())))
@@ -45,6 +46,10 @@ pub fn load(path: &Path) -> io::Result<super::Config> {
     let config = match super::persistence::read(path) {
         Ok(text) => {
             super::document::root(path, &text)?;
+            if super::document::is_json(path, &text) {
+                return super::legacy::decode(&text);
+            }
+            toml::from_str::<super::Config>(&text).map_err(io::Error::other)?;
             super::loading::parse(&text, &path.to_string_lossy())
         }
         Err(error) if error.kind() == io::ErrorKind::NotFound => super::Config::default(),
@@ -55,52 +60,34 @@ pub fn load(path: &Path) -> io::Result<super::Config> {
 
 /// 【设置窗口】【字段保存】将 value 写入 path 的 section/key，返回保存结果；锁内读取最新版本，其他字段和格式保持原样
 pub fn write(path: &Path, section: &str, key: &str, value: Value) -> io::Result<()> {
-    validate(section, key, &value)?;
-    super::persistence::update(path, |text| {
-        if super::document::is_json(path, text) {
-            let updated = super::document::update_json(text, |root| {
-                super::document::section(root, &[section], section)?
-                    .insert(key.into(), value.clone());
-                Ok(())
-            })?;
-            return Ok((updated, ()));
+    write_fields(path, section, &[(key, value)])
+}
+
+/// 【设置窗口】【联合保存】将 section 下的 fields 一次校验并原子写入 path，返回结果，跨栏移动不会出现半次提交
+pub fn write_fields(path: &Path, section: &str, fields: &[(&str, Value)]) -> io::Result<()> {
+    for (key, value) in fields {
+        if !value.is_null() {
+            validate(section, key, value)?;
         }
-        let mut document = text
-            .parse::<toml_edit::DocumentMut>()
-            .map_err(io::Error::other)?;
-        let replacement = match &value {
-            Value::Bool(value) => toml_edit::Value::from(*value),
-            Value::String(value) => toml_edit::Value::from(value.as_str()),
-            Value::Array(values) if values.iter().all(Value::is_string) => {
-                let values = values
-                    .iter()
-                    .map(|value| value.as_str().unwrap())
-                    .collect::<toml_edit::Array>();
-                toml_edit::Value::Array(values)
-            }
-            Value::Number(value) if value.is_i64() => {
-                toml_edit::Value::from(value.as_i64().unwrap())
-            }
-            _ => return Err(io::Error::other("unsupported preference value")),
-        };
-        let section = document
-            .entry(section)
-            .or_insert(toml_edit::Item::Table(toml_edit::Table::new()));
-        let table = section
-            .as_table_mut()
-            .ok_or_else(|| io::Error::other("configuration section must be a table"))?;
-        let mut replacement = replacement;
-        if let Some(previous) = table.get(key).and_then(toml_edit::Item::as_value) {
-            *replacement.decor_mut() = previous.decor().clone();
-        }
-        table.insert(key, toml_edit::Item::Value(replacement));
-        Ok((document.to_string(), ()))
-    })
+    }
+    super::settings_store::write(
+        path,
+        &fields
+            .iter()
+            .map(|(key, value)| (format!("{section}.{key}"), value.clone()))
+            .collect::<Vec<_>>(),
+    )
 }
 
 /// 【设置窗口】【输入校验】校验 section、key 对应的 value，拒绝会导致保存路径错误的日期格式及非法快捷键
-fn validate(section: &str, key: &str, value: &Value) -> io::Result<()> {
-    if section == "toolbar_layout" && matches!(key, "main" | "actions" | "fullscreen") {
+pub(super) fn validate(section: &str, key: &str, value: &Value) -> io::Result<()> {
+    if let Some(entry) = super::settings::ENTRIES
+        .iter()
+        .find(|entry| entry.section == section && entry.key == key)
+    {
+        entry.validate(value)?;
+    }
+    if section == "toolbar_layout" && matches!(key, "main" | "actions") {
         let mut root = serde_json::Map::new();
         root.insert(key.into(), value.clone());
         serde_json::from_value::<super::toolbar_layout::ToolbarLayout>(root.into())

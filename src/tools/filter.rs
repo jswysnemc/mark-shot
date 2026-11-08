@@ -37,6 +37,7 @@ impl ToolBehavior for FilterTool {
             )
             .unwrap();
             filter.style_scale = 1.0 / space.pixel_scale;
+            filter.radius = state.tool_settings.corner_radius;
             let color = state.tool_settings.color;
             let mut annotation = Annotation {
                 style_scale: 1.0,

@@ -162,7 +162,7 @@ fn content(p: &mut Painter, toolbar: &Toolbar) {
         } else {
             cfg.icon.get()
         };
-        let size = if toolbar.secondary { 20.0 } else { 22.0 };
+        let size = 22.0;
         let icon_rect = Rect::from_xywh(
             cell.left() + (cell.width() - size) / 2.0,
             cell.top() + (cell.height() - size) / 2.0,
@@ -170,22 +170,12 @@ fn content(p: &mut Painter, toolbar: &Toolbar) {
             size,
         )
         .unwrap();
-        if matches!(button, ToolbarButton::Tool(crate::tools::Tool::Marker)) {
-            crate::features::marker::draw_icon(
-                p,
-                toolbar.marker_shape,
-                icon_rect,
-                ink.color(),
-                toolbar.marker_filled,
-            );
-        } else {
-            p.icon(
-                icons::icon(*button),
-                size,
-                icon_rect.left(),
-                icon_rect.top(),
-                ink,
-            );
-        }
+        p.icon(
+            icons::icon(*button),
+            size,
+            icon_rect.left(),
+            icon_rect.top(),
+            ink,
+        );
     }
 }

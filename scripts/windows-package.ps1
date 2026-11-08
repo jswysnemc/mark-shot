@@ -30,10 +30,6 @@ try {
     $dirty = @(& git status --porcelain --untracked-files=no)
     if ($LASTEXITCODE -ne 0 -or $dirty.Count -ne 0) { throw 'Tracked source files changed after checkout.' }
     Copy-Item (Join-Path $build 'mark-shot.exe') $package
-    # ort-sys 将选定分发包的动态库放到 release 根目录；不扫描其他配置或缓存版本。
-    foreach ($dll in (Get-ChildItem $build -File -Filter '*.dll')) {
-        Copy-RuntimeFile $dll.FullName (Join-Path $package $dll.Name)
-    }
     $linkage = Join-Path $package 'windows-linkage.txt'
     Resolve-WindowsRuntime -PackageDirectory $package -BuildDirectory $build -LogPath $linkage
     Copy-Item LICENSE-MIT, LICENSE-APACHE, README.md $package
@@ -45,8 +41,9 @@ try {
     @'
 Windows x86_64 MSVC / default features / CPU OCR
 Keep mark-shot.exe and every DLL in this directory together.
-DirectML.dll is an ONNX Runtime linkage dependency, not GPU OCR enablement.
-OCR models are downloaded on demand by the application; this archive does not bundle models.
+Choose Windows system OCR or local model OCR on first use.
+The default package contains neither ONNX Runtime nor DirectML.
+Local OCR requires separate manual downloads of its runtime and language models.
 Windows system DLLs are supplied by the OS; required MSVC CRT DLLs are app-local.
 This is a CI build artifact, not a release or proof of full Windows desktop compatibility.
 '@ | Set-Content (Join-Path $package 'BUILD-NOTES.txt') -Encoding utf8NoBOM

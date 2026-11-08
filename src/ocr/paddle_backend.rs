@@ -51,6 +51,7 @@ impl PaddleBackend {
 
     fn build(files: &ModelFiles, gpu: bool) -> Result<Self, OcrError> {
         let total = Instant::now();
+        super::runtime_library::load()?;
         super::model_integrity::verify(files)?;
         let threads = std::thread::available_parallelism()
             .map(|n| n.get())

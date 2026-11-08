@@ -26,6 +26,7 @@ pub mod ruler;
 pub mod save_as;
 pub mod selection_size;
 pub mod selection_translation;
+pub mod shape;
 #[cfg(target_os = "linux")]
 pub(crate) mod single_instance;
 #[cfg(target_os = "windows")]

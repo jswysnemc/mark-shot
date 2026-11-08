@@ -26,6 +26,8 @@ fn light_dark_round_trip_preserves_original_alpha_annotations_and_export() {
                 91,
                 0.0,
                 crate::types::AnnotationShape::Rectangle {
+                    radius: 0.0,
+                    fixed_ratio: false,
                     start: (250.0, 180.0),
                     end: (350.0, 240.0),
                     filled: true,
@@ -51,6 +53,7 @@ fn light_dark_round_trip_preserves_original_alpha_annotations_and_export() {
                 (None, _) => first = Some(pixels.to_vec()),
                 (Some(first), Mode::Light) => assert_eq!(pixels, first),
                 (Some(first), Mode::Dark) => assert_eq!(pixels, first),
+                (Some(_), Mode::System) => unreachable!("test iterates explicit themes"),
             }
             assert_eq!(
                 state.file_canvas.as_ref().unwrap().original.data(),

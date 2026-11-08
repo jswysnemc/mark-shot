@@ -18,7 +18,7 @@ pub fn note_font_size() -> f32 {
 
 pub fn height() -> f32 {
     let c = cfg();
-    c.padding * 2.0 + c.title_height + c.row_height * MODELS.len() as f32
+    c.padding * 2.0 + c.title_height + c.row_height * (MODELS.len() + super::setup::rows()) as f32
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -38,6 +38,11 @@ impl PanelItem for ModelPopoverItem {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModelPopoverElement {
+    Resources,
+    Languages,
+    SystemEngine,
+    PaddleEngine,
+    Runtime,
     Row(usize),
     Button(usize),
 }
@@ -50,19 +55,29 @@ pub struct ModelRow {
     pub recommended: bool,
 }
 
-pub fn row_geom(origin: (f32, f32), idx: usize) -> Option<Rect> {
+pub fn row_geom(panel: &ModelPopover, origin: (f32, f32), idx: usize) -> Option<Rect> {
     let c = cfg();
+    let slot = super::layout::models(panel)
+        .iter()
+        .position(|index| *index == idx)?;
     Rect::from_xywh(
         origin.0 + c.padding,
-        origin.1 + c.padding + c.title_height + idx as f32 * c.row_height,
+        origin.1
+            + c.padding
+            + c.title_height
+            + if slot == 0 {
+                0.0
+            } else {
+                64.0 + (slot + super::layout::setup_rows(panel)) as f32 * c.row_height
+            },
         c.width - c.padding * 2.0,
         c.row_height,
     )
 }
 
-pub fn button_geom(origin: (f32, f32), idx: usize) -> Option<Rect> {
+pub fn button_geom(panel: &ModelPopover, origin: (f32, f32), idx: usize) -> Option<Rect> {
     let c = cfg();
-    let row = row_geom(origin, idx)?;
+    let row = row_geom(panel, origin, idx)?;
     Rect::from_xywh(
         row.right() - c.row_padding / 2.0 - c.button_size,
         row.top() + (c.row_height - c.button_size) / 2.0,
@@ -71,13 +86,16 @@ pub fn button_geom(origin: (f32, f32), idx: usize) -> Option<Rect> {
     )
 }
 
-fn point_in_rect(local: (f64, f64), rect: Rect) -> bool {
+pub(super) fn point_in_rect(local: (f64, f64), rect: Rect) -> bool {
     let px = local.0 as f32;
     let py = local.1 as f32;
     px >= rect.left() && px <= rect.right() && py >= rect.top() && py <= rect.bottom()
 }
 
 pub struct ModelPopover {
+    pub resources_expanded: bool,
+    pub languages_expanded: bool,
+    pub setup: super::setup::State,
     pub pixmap: Option<Pixmap>,
 
     pub position: (f32, f32),
@@ -104,6 +122,9 @@ impl Default for ModelPopover {
 impl ModelPopover {
     pub fn new() -> Self {
         Self {
+            resources_expanded: false,
+            languages_expanded: false,
+            setup: super::setup::State::default(),
             pixmap: None,
             position: (0.0, 0.0),
             render_pos: (0.0, 0.0),
@@ -125,12 +146,31 @@ impl ModelPopover {
     pub fn element_at(&self, local: (f64, f64)) -> Option<ModelPopoverElement> {
         let rect = self.rect()?;
         let origin = (rect.left(), rect.top());
+        if !point_in_rect(local, rect) {
+            return None;
+        }
+        if point_in_rect(local, super::layout::heading(self, origin, true)) {
+            return Some(ModelPopoverElement::Resources);
+        }
+        if self.setup.show_models()
+            && point_in_rect(local, super::layout::heading(self, origin, false))
+        {
+            return Some(ModelPopoverElement::Languages);
+        }
+        if self.resources_expanded
+            && let Some(element) = super::setup::hit(self, origin, local)
+        {
+            return Some(element);
+        }
+        if !self.setup.show_models() {
+            return None;
+        }
         (0..MODELS.len()).find_map(|idx| {
-            let row = row_geom(origin, idx)?;
+            let row = row_geom(self, origin, idx)?;
             if !point_in_rect(local, row) {
                 return None;
             }
-            let on_button = button_geom(origin, idx).is_some_and(|b| point_in_rect(local, b));
+            let on_button = button_geom(self, origin, idx).is_some_and(|b| point_in_rect(local, b));
             Some(if on_button {
                 ModelPopoverElement::Button(idx)
             } else {

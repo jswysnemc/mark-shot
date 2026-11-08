@@ -36,7 +36,7 @@ pub(crate) fn handle_canvas_modifiers(
     }
     let constrained = matches!(
         editor_state.selected_tool,
-        Tool::Ruler | Tool::Magnifier | Tool::Line | Tool::Arrow
+        Tool::Ruler | Tool::Magnifier | Tool::Line | Tool::Arrow | Tool::Rectangle | Tool::Circle
     ) || (editor_state.selected_tool == Tool::Pick
         && editor_state.ann_drag.as_ref().is_some_and(|drag| {
             matches!(

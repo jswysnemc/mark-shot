@@ -115,7 +115,7 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
     let ocr = editor_state.selected_tool == Tool::Ocr;
     let scanning = ocr && editor_state.ocr.runtime.is_busy();
     let awaiting = ocr && editor_state.ocr.await_region;
-    let no_model = ocr && editor_state.ocr.models.installed_count() == 0;
+    let no_model = ocr && crate::ocr::engine_choice::source(&editor_state.ocr.models).is_none();
     let downloading = editor_state.ocr.models.is_downloading();
 
     let new_source = match selected_ann {
@@ -149,6 +149,31 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
         selected_ann.map(|ann| &ann.shape),
         Some(AnnotationShape::Text { .. })
     ) || (selected_ann.is_none() && editor_state.selected_tool == Tool::Text);
+    let hide_radius = match selected_ann.map(|annotation| &annotation.shape) {
+        Some(AnnotationShape::Marker { kind, .. }) => *kind != crate::types::MarkerShape::Square,
+        Some(AnnotationShape::Magnifier { magnifier }) => {
+            magnifier.shape != crate::features::magnifier::MagnifierShape::Rectangle
+        }
+        None if editor_state.selected_tool == Tool::Marker => {
+            editor_state.tool_settings.marker_shape != crate::types::MarkerShape::Square
+        }
+        None if editor_state.selected_tool == Tool::Magnifier => {
+            editor_state.tool_settings.magnifier_shape
+                != crate::features::magnifier::MagnifierShape::Rectangle
+        }
+        _ => false,
+    };
+    if hide_radius
+        && matches!(
+            new_widgets.last(),
+            Some(SettingsWidget::Stepper {
+                range: crate::ui::settings_panel::StepperRange::CornerRadius,
+                ..
+            })
+        )
+    {
+        new_widgets = &new_widgets[..new_widgets.len() - 1];
+    }
     let text_layout = if let SettingsSource::Collection { .. } = new_source {
         Some(crate::ui::annotation_collection::layout::new(
             editor_state
@@ -170,7 +195,8 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
     if text_layout.is_some_and(|layout| layout.controls[5].is_some()) {
         new_widgets = crate::ui::settings_panel::TEXT_EDIT_WIDGETS;
     }
-    let layout_changed = editor_state.settings_panel.text_layout != text_layout;
+    let layout_changed = editor_state.settings_panel.text_layout != text_layout
+        || editor_state.settings_panel.widgets.len() != new_widgets.len();
     editor_state.settings_panel.text_layout = text_layout;
     editor_state.settings_panel.text_points = selected_ann
         .and_then(|ann| match &ann.shape {
@@ -228,6 +254,11 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
             SettingsWidget::Toggle { field, .. } => {
                 let value = match selected_ann {
                     Some(ann) => match (&ann.shape, field) {
+                        (
+                            AnnotationShape::Rectangle { fixed_ratio, .. }
+                            | AnnotationShape::Circle { fixed_ratio, .. },
+                            ToggleField::FixedRatio,
+                        ) => *fixed_ratio,
                         (AnnotationShape::Text { bold, .. }, ToggleField::Bold) => *bold,
                         (AnnotationShape::Text { italic, .. }, ToggleField::Italic) => *italic,
                         (AnnotationShape::Text { outline, .. }, ToggleField::Outline) => {
@@ -250,6 +281,7 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
                         _ => false,
                     },
                     None => match field {
+                        ToggleField::FixedRatio => editor_state.tool_settings.fixed_ratio,
                         ToggleField::Bold => editor_state.tool_settings.bold,
                         ToggleField::Italic => editor_state.tool_settings.italic,
                         ToggleField::Outline => editor_state.tool_settings.outline,

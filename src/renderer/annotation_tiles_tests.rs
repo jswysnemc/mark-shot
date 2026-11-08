@@ -13,6 +13,8 @@ fn bodies() -> Vec<crate::types::Annotation> {
             1,
             0.0,
             AnnotationShape::Rectangle {
+                radius: 0.0,
+                fixed_ratio: false,
                 start: (120.375, 97.625),
                 end: (521.125, 301.875),
                 filled: true,
@@ -22,6 +24,7 @@ fn bodies() -> Vec<crate::types::Annotation> {
             2,
             13.0,
             AnnotationShape::Circle {
+                fixed_ratio: false,
                 start: (160.375, 177.625),
                 end: (551.125, 398.875),
                 filled: true,
@@ -95,6 +98,8 @@ fn pending_shapes_and_highlighter_keep_the_existing_blend_order() {
                         }
                     } else {
                         AnnotationShape::Rectangle {
+                            radius: 0.0,
+                            fixed_ratio: false,
                             start: (130.375, 180.625),
                             end: (490.75, 310.875),
                             filled: true,
@@ -149,6 +154,7 @@ fn fixed_shapes_use_tiles_and_keep_the_cached_pixels() {
                 index as u64 + 20,
                 index as f64 * 13.25,
                 AnnotationShape::Marker {
+                    radius: 0.0,
                     start: (x, y),
                     end: (x + 61.375, y + 63.875),
                     kind,

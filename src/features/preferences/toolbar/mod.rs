@@ -1,8 +1,11 @@
 //! 【工具栏设置】【页面状态】只保存页面交互状态，业务配置通过统一设置事务写入
 
+pub(super) mod animation;
+pub(super) mod drag;
 pub(super) mod draw;
 pub(super) mod input;
 pub(super) mod layout;
+mod shortcuts;
 #[cfg(test)]
 mod tests;
 
@@ -16,19 +19,14 @@ pub(super) struct Editor {
     pub profile: Profile,
     pub config: ToolbarLayout,
     pub selected: Option<usize>,
-    pub drag: Option<Drag>,
+    pub drag: Option<drag::Drag>,
+    pub animation: animation::Animation,
+    pub recording: Option<&'static str>,
+    pub keyboard: Option<layout::Hit>,
     pub pressed: Option<layout::Hit>,
-    pub recording: bool,
     pub scroll: usize,
     pub scrollbar_drag: Option<crate::ui::scrollbar::Drag>,
     pub icons: Icons,
-}
-
-pub(super) struct Drag {
-    pub source: usize,
-    pub start: (f64, f64),
-    pub target: usize,
-    pub active: bool,
 }
 
 impl Editor {
@@ -52,11 +50,12 @@ impl Editor {
         }
     }
 
-    /// 【工具栏设置】【取消手势】无参数，清除拖动和录入，不改变已保存按钮顺序
+    /// 【工具栏设置】【取消手势】无参数，清除拖动与按下状态，不改变已保存按钮顺序
     pub fn cancel(&mut self) {
         self.drag = None;
         self.pressed = None;
-        self.recording = false;
         self.scrollbar_drag = None;
+        self.recording = None;
+        self.animation = animation::Animation::default();
     }
 }

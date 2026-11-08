@@ -1,6 +1,7 @@
 # 翻译服务与任务层对照
 
 本文记录服务层阶段的实现和证据，后续已将任务接入 OCR 翻译按钮、目标语言、译文编辑器及分栏。
+当前已新增哔哩哔哩、OpenAI Responses、图形配置和模型目录；最新使用方式见 [翻译配置](translation-next-round.md)。
 窗口阶段的当前验证与剩余差距见 `docs/ocr-translation-compatibility.md`，不把服务测试视为完整翻译功能。
 没有执行 Git 提交、推送、发布或修改远程工作流，没有调用付费服务或使用用户翻译凭据。
 
@@ -23,7 +24,7 @@ src/config/
 
 ## 已核对行为
 
-- 自动选择顺序为 OpenAI、Gemini、Anthropic、腾讯、百度、有道；命令配置优先
+- 自动选择顺序为 OpenAI Chat、OpenAI Responses、Gemini、Anthropic、腾讯、百度、有道；均未配置时使用哔哩哔哩，命令配置优先
 - 显式服务请求失败不切换厂商，不向另一家服务发送原文
 - `builtin` 不继承 `translation.openai` 子节；Gemini、Anthropic 不继承公共 OpenAI 凭据
 - 原文按行生成身份，空行仍计入行号；任务使用确认文本快照，不修改调用方原文
@@ -36,7 +37,8 @@ src/config/
 
 服务记录位于 `tests/fixtures/qt-translation-services.json`，覆盖 102 个语言别名、
 9 个中文标签、签名和模型内部 JSON。Gemini、Anthropic 的 28 条实际解析记录位于
-`tests/fixtures/qt-translation-model-responses.json`，成功映射及失败文案均逐项核对。
+`tests/fixtures/qt-translation-model-responses.json`，单块响应的成功映射及失败文案逐项核对。
+Gemini 多块响应已调整为拼接非思考正文，使用独立回归测试覆盖，不再沿用原版只读首块的行为。
 两个探针重复执行结果一致；探针只读链接原版对象，输出写入本地 `target`。
 
 ## 资源与保存边界

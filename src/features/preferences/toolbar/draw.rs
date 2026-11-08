@@ -1,10 +1,7 @@
-//! 【工具栏设置】【页面绘制】复用实际 SVG 图标，紧凑预览支持换行，全部输入区域与排版共用
+//! 【工具栏设置】【内容绘制】同时展示主栏与侧栏，仅为选中项目显示移除操作
 
-use super::super::{shortcuts, window::Preferences};
-use super::{
-    input::shortcut_key,
-    layout::{Hit, Layout, rect},
-};
+use super::super::{shortcuts, widgets, window::Preferences};
+use super::layout::{Bar, Hit, Layout, rect};
 use crate::{
     renderer::{Painter, text::TextStyle},
     theme::window::Palette,
@@ -15,70 +12,7 @@ use crate::{
 };
 use tiny_skia::{Pixmap, Rect};
 
-/// 【工具栏设置】【按钮文案】按 hit、chinese 和 vertical 返回操作文字，图标项目由目录提供
-fn label(hit: Hit, chinese: bool, vertical: bool) -> &'static str {
-    match hit {
-        Hit::Profile(profile) => profile.label(chinese),
-        Hit::Reset => {
-            if chinese {
-                "恢复默认按钮"
-            } else {
-                "Reset buttons"
-            }
-        }
-        Hit::Left => {
-            if chinese {
-                "向前移动"
-            } else {
-                "Move earlier"
-            }
-        }
-        Hit::Right => {
-            if chinese {
-                "向后移动"
-            } else {
-                "Move later"
-            }
-        }
-        Hit::Remove => {
-            if chinese {
-                "移除按钮"
-            } else {
-                "Remove"
-            }
-        }
-        Hit::Shortcut => {
-            if chinese {
-                "录入快捷键"
-            } else {
-                "Record shortcut"
-            }
-        }
-        Hit::ClearShortcut => {
-            if chinese {
-                "清除快捷键"
-            } else {
-                "Clear shortcut"
-            }
-        }
-        Hit::ResetShortcut => {
-            if chinese {
-                "默认快捷键"
-            } else {
-                "Default shortcut"
-            }
-        }
-        Hit::Direction => match (chinese, vertical) {
-            (true, true) => "纵向排列",
-            (true, false) => "横向排列",
-            (false, true) => "Vertical",
-            (false, false) => "Horizontal",
-        },
-        _ => "",
-    }
-}
-
-/// 【工具栏设置】【项目图标】把 item 绘入 painter 的 area，palette 决定图标与分隔线颜色
+/// 【工具栏设置】【项目图标】把 item 绘入 painter 的 area，palette 决定图标与分隔线颜色，无返回值
 fn icon(painter: &mut Painter<'_>, item: ToolbarItem, area: Rect, palette: Palette) {
     match item {
         ToolbarItem::Button(button) => painter.icon(
@@ -101,7 +35,90 @@ fn icon(painter: &mut Painter<'_>, item: ToolbarItem, area: Rect, palette: Palet
     }
 }
 
-/// 【工具栏设置】【内容绘制】按 scale 绘制 state 页面到 canvas，仅裁切内容区域，滚动条保持常驻
+/// 【工具栏设置】【工具说明】按 state 和 bar 的选择或悬停项目返回名称及快捷键，否则返回操作提示
+fn caption(state: &Preferences, bar: &Bar, hover: Option<Hit>) -> String {
+    let chinese = state.chinese();
+    let selected = if state.toolbar.profile == bar.profile && state.toolbar.selected.is_some() {
+        state.toolbar.selected
+    } else if let Some(Hit::Item(profile, index)) = hover
+        && profile == bar.profile
+    {
+        Some(index)
+    } else if state.toolbar.profile == bar.profile {
+        state.toolbar.selected
+    } else {
+        None
+    };
+    let items = bar.profile.items(&state.toolbar.config);
+    if let Some(item) = selected.and_then(|index| items.get(index)) {
+        let entry = catalog::entry(*item);
+        let name = entry.map_or(if chinese { "分隔线" } else { "Separator" }, |entry| {
+            entry.label(chinese)
+        });
+        let shortcut = entry
+            .and_then(|entry| entry.shortcut())
+            .map(|key| shortcuts::text(&state.values, key))
+            .filter(|text| !text.is_empty());
+        return shortcut.map_or_else(
+            || name.to_owned(),
+            |shortcut| format!("{name} · {shortcut}"),
+        );
+    }
+    match (chinese, state.toolbar.profile == bar.profile) {
+        (true, true) => "拖动排序 · Alt+方向键移动 · Delete 移除",
+        (true, false) => "点击此栏，选择要添加的工具",
+        (false, true) => "Drag to reorder · Alt+arrows · Delete to remove",
+        (false, false) => "Select this toolbar to add tools",
+    }
+    .into()
+}
+
+/// 【工具栏设置】【预览绘制】按 bar、items、selected 和 hover 绘制 painter 中的按钮，palette 提供颜色，无返回值
+fn preview(
+    painter: &mut Painter<'_>,
+    bar: &Bar,
+    items: &[ToolbarItem],
+    selected: Option<usize>,
+    hover: Option<Hit>,
+    palette: Palette,
+    editor: &super::Editor,
+    positions: &[(crate::config::toolbar_layout::Profile, usize, Rect)],
+) {
+    controls::frame(painter, bar.preview, palette.base, palette.border, 8.0);
+    for (index, item) in items.iter().enumerate() {
+        if editor.drag.as_ref().is_some_and(|drag| {
+            drag.active && drag.source == super::drag::Source::Bar(bar.profile, index)
+        }) {
+            continue;
+        }
+        let target = positions
+            .iter()
+            .find(|entry| entry.0 == bar.profile && entry.1 == index)
+            .map_or(bar.cells[index], |entry| entry.2);
+        let area = editor.animation.position(bar.profile, index, target);
+        let active = selected == Some(index);
+        if active || hover == Some(Hit::Item(bar.profile, index)) {
+            controls::frame(
+                painter,
+                area,
+                if active {
+                    palette.pressed
+                } else {
+                    palette.alternate
+                },
+                if active {
+                    palette.accent
+                } else {
+                    palette.border
+                },
+                5.0,
+            );
+        }
+        icon(painter, *item, area, palette);
+    }
+}
+
+/// 【工具栏设置】【内容绘制】按 scale 绘制 state 页面到 canvas，仅裁切内容区域，滚动条保持常驻，无返回值
 pub(in crate::features::preferences) fn draw(
     state: &mut Preferences,
     canvas: &mut Pixmap,
@@ -111,48 +128,19 @@ pub(in crate::features::preferences) fn draw(
     let layout = Layout::new(state);
     let chinese = state.chinese();
     let palette = Palette::current();
-    let hover = layout.hit(state.pointer);
+    let hover = state.toolbar.keyboard.or_else(|| layout.hit(state.pointer));
+    let positions = super::drag::positions(state, &layout);
+    let shortcut_label = super::shortcuts::label(state);
     let profile = state.toolbar.profile;
-    let items = profile.items(&state.toolbar.config);
-    let selected = state.toolbar.selected.filter(|index| *index < items.len());
-    let key = shortcut_key(state);
-    let focused = selected.or({
-        if let Some(Hit::Item(index)) = hover {
-            Some(index)
-        } else {
-            None
-        }
-    });
-    let name = focused
-        .and_then(|index| catalog::entry(items[index]))
-        .map_or(if chinese { "分隔线" } else { "Separator" }, |entry| {
-            entry.label(chinese)
-        });
-    let caption = if state.toolbar.recording {
-        if chinese {
-            "按下新的快捷键，Esc 取消".to_owned()
-        } else {
-            "Press a shortcut; Esc to cancel".to_owned()
-        }
-    } else if focused.is_some() {
-        let shortcut = focused
-            .and_then(|index| catalog::entry(items[index]))
-            .and_then(|entry| entry.shortcut())
-            .map(|key| shortcuts::text(&state.values, key))
-            .filter(|text| !text.is_empty());
-        format!(
-            "{} · {}",
-            name,
-            shortcut.as_deref().unwrap_or(if chinese {
-                "未设置快捷键"
-            } else {
-                "No shortcut"
-            })
-        )
-    } else if chinese {
-        "单击选中；拖动调整顺序，也可使用 Alt+方向键".into()
+    let captions: Vec<_> = layout
+        .bars
+        .iter()
+        .map(|bar| caption(state, bar, hover))
+        .collect();
+    let pool_title = if chinese {
+        format!("工具池 · 拖入任意栏，点击添加到{}", profile.label(true))
     } else {
-        "Select a button; drag or use Alt+arrows to reorder".into()
+        format!("Add to {}", profile.label(false))
     };
     let labels = catalog::ENTRIES
         .iter()
@@ -162,7 +150,8 @@ pub(in crate::features::preferences) fn draw(
     crate::fonts::ui_fallback::ensure_text(
         &mut state.fonts,
         &format!(
-            "{labels} {caption} 当前工具栏 添加按钮 恢复默认按钮 向前移动 向后移动 移除按钮 横向排列 纵向排列 录入快捷键 清除快捷键 默认快捷键 截图主栏 截图操作栏 图片 全屏 分隔线"
+            "{labels} {} {pool_title} {shortcut_label} 主工具栏 侧工具栏 恢复默认 移除 分隔线",
+            captions.join(" ")
         ),
     );
     let mut painter = Painter::new(canvas)
@@ -170,107 +159,106 @@ pub(in crate::features::preferences) fn draw(
         .with_icons(&state.toolbar.icons)
         .with_text(&mut state.fonts, &mut state.cache);
     painter.clipped(Some(layout.viewport), |painter| {
-        let title_top = layout.controls[0].1.top() + 44.0;
-        painter.text(
-            rect(layout.preview.left(), title_top, 200.0, 26.0),
-            if chinese {
-                "当前工具栏"
-            } else {
-                "Current toolbar"
-            },
-            TextStyle::new(13.0, palette.text).weight(cosmic_text::Weight::SEMIBOLD),
-        );
-        controls::frame(painter, layout.preview, palette.base, palette.border, 8.0);
-        for (index, item) in items.iter().enumerate() {
-            let area = layout.cells[index];
-            let active = selected == Some(index);
-            if active || hover == Some(Hit::Item(index)) {
+        for (bar, caption) in layout.bars.iter().zip(&captions) {
+            let active = profile == bar.profile;
+            controls::frame(
+                painter,
+                bar.panel,
+                palette.base,
+                if active {
+                    palette.accent
+                } else {
+                    palette.border
+                },
+                8.0,
+            );
+            let items = bar.profile.items(&state.toolbar.config);
+            preview(
+                painter,
+                bar,
+                &items,
+                if active { state.toolbar.selected } else { None },
+                hover,
+                palette,
+                &state.toolbar,
+                &positions,
+            );
+            if let Some(drag) = &state.toolbar.drag
+                && drag.active
+                && let Some(super::drag::Target::Bar(target_profile, index)) = drag.target
+                && target_profile == bar.profile
+            {
                 controls::frame(
                     painter,
-                    area,
-                    if active {
-                        palette.pressed
-                    } else {
-                        palette.alternate
-                    },
-                    if active {
-                        palette.accent
-                    } else {
-                        palette.border
-                    },
+                    bar.slot(index),
+                    palette.pressed,
+                    palette.accent,
                     5.0,
                 );
             }
-            icon(painter, *item, area, palette);
+            let caption = controls::fit_label(painter, caption, 12.0, bar.caption.width());
+            painter.text(bar.caption, &caption, TextStyle::new(12.0, palette.muted));
         }
-        if let Some(drag) = &state.toolbar.drag
-            && drag.active
-        {
-            let target = drag.target.min(layout.cells.len());
-            let cell = if target < layout.cells.len() {
-                layout.cells[target]
-            } else {
-                *layout.cells.last().unwrap()
-            };
-            let horizontal = if target == layout.cells.len() {
-                cell.right()
-            } else {
-                cell.left() - 2.0
-            };
-            painter.fill_rounded(
-                rect(horizontal, cell.top(), 2.0, cell.height()),
-                1.0,
-                palette.accent,
-            );
-        }
-        let caption = controls::fit_label(painter, &caption, 12.0, layout.selected.width());
-        painter.text(
-            layout.selected,
-            &caption,
-            TextStyle::new(
-                12.0,
-                if state.toolbar.recording {
-                    palette.accent
-                } else {
-                    palette.muted
-                },
-            ),
-        );
         for (hit, area) in &layout.controls {
-            let enabled = match hit {
-                Hit::Left => selected.is_some_and(|index| index > 0),
-                Hit::Right => selected.is_some_and(|index| index + 1 < items.len()),
-                Hit::Remove => {
-                    selected.is_some()
-                        && items
-                            .iter()
-                            .filter(|item| matches!(item, ToolbarItem::Button(_)))
-                            .count()
-                            > usize::from(selected.is_some_and(|index| {
-                                matches!(items[index], ToolbarItem::Button(_))
-                            }))
+            if let Hit::Profile(profile) = hit {
+                painter.text(
+                    *area,
+                    profile.label(chinese),
+                    TextStyle::new(12.0, palette.text).weight(cosmic_text::Weight::SEMIBOLD),
+                );
+                continue;
+            }
+            let label = match hit {
+                Hit::Orientation(profile) => {
+                    match (chinese, profile.vertical(&state.toolbar.config)) {
+                        (true, true) => "纵向排列",
+                        (true, false) => "横向排列",
+                        (false, true) => "Vertical",
+                        (false, false) => "Horizontal",
+                    }
                 }
-                Hit::Shortcut | Hit::ClearShortcut | Hit::ResetShortcut => key.is_some(),
-                _ => true,
+                Hit::Profile(profile) => profile.label(chinese),
+                Hit::Reset(_) => {
+                    if chinese {
+                        "恢复默认"
+                    } else {
+                        "Reset"
+                    }
+                }
+                Hit::Remove => {
+                    if chinese {
+                        "移除"
+                    } else {
+                        "Remove"
+                    }
+                }
+                Hit::Shortcut => &shortcut_label,
+                _ => "",
             };
-            controls::button(
+            let items = profile.items(&state.toolbar.config);
+            let enabled = *hit != Hit::Remove
+                || state
+                    .toolbar
+                    .selected
+                    .and_then(|index| items.get(index))
+                    .is_some_and(|selected| {
+                        *selected == ToolbarItem::Seperator
+                            || items
+                                .iter()
+                                .filter(|item| matches!(item, ToolbarItem::Button(_)))
+                                .count()
+                                > 1
+                    });
+            widgets::button(
                 painter,
                 *area,
-                label(*hit, chinese, profile.vertical(&state.toolbar.config)),
-                *hit == Hit::Profile(profile) || (*hit == Hit::Shortcut && state.toolbar.recording),
+                label,
+                *hit == Hit::Shortcut && state.toolbar.recording.is_some(),
                 hover == Some(*hit),
                 enabled,
             );
         }
-        painter.text(
-            layout.add_title,
-            if chinese {
-                "添加按钮"
-            } else {
-                "Add buttons"
-            },
-            TextStyle::new(13.0, palette.text).weight(cosmic_text::Weight::SEMIBOLD),
-        );
+        widgets::panel(painter, layout.pool, &pool_title);
         for (item, area) in &layout.available {
             controls::frame(
                 painter,
@@ -278,9 +266,9 @@ pub(in crate::features::preferences) fn draw(
                 if hover == Some(Hit::Add(*item)) {
                     palette.pressed
                 } else {
-                    palette.alternate
+                    palette.base
                 },
-                palette.window,
+                palette.border,
                 6.0,
             );
             icon(
@@ -304,6 +292,18 @@ pub(in crate::features::preferences) fn draw(
                 &title,
                 TextStyle::new(12.0, palette.text),
             );
+        }
+        if let Some(drag) = &state.toolbar.drag
+            && drag.active
+        {
+            let area = rect(
+                state.pointer.0 as f32 - 16.0,
+                state.pointer.1 as f32 - 16.0,
+                32.0,
+                32.0,
+            );
+            controls::frame(painter, area, palette.base, palette.accent, 5.0);
+            icon(painter, drag.item(&state.toolbar.config), area, palette);
         }
     });
     if let Some(bar) = layout.scrollbar {

@@ -30,7 +30,7 @@ fn api_error(provider: Provider, error: &Value) -> Error {
     Error::new(ErrorKind::Api, detail)
 }
 
-/// 【模型翻译】【首个候选】按 body 提取 Gemini 首候选的首个内容块文本，返回原版分类错误，不拼接其他候选或后续块
+/// 【模型翻译】【首个候选】按 body 拼接首个 Gemini 候选的非思考文本，返回译文或协议错误
 fn gemini(body: &Value) -> Result<String> {
     let candidates = body
         .get("candidates")
@@ -42,10 +42,11 @@ fn gemini(body: &Value) -> Result<String> {
         .and_then(Value::as_array)
         .filter(|rows| !rows.is_empty())
         .ok_or_else(|| protocol("gemini response candidate missing content parts"))?;
-    let text = parts[0]
-        .get("text")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
+    let text: String = parts
+        .iter()
+        .filter(|part| part.get("thought").and_then(Value::as_bool) != Some(true))
+        .filter_map(|part| part.get("text").and_then(Value::as_str))
+        .collect();
     if text.trim().is_empty() {
         return Err(protocol("gemini candidate part text is empty"));
     }
@@ -71,7 +72,17 @@ fn anthropic(body: &Value) -> Result<String> {
 }
 
 /// 【模型翻译】【完整解析】按 provider 和 body 返回身份映射，外层对象、厂商内容和内部翻译数组分别校验
+#[cfg(test)]
 pub(super) fn parse(provider: Provider, body: &Value) -> Result<BTreeMap<i32, String>> {
+    parse_options(provider, body, true)
+}
+
+/// 【模型翻译】【正文选项】按 provider、body 和 filter 提取译文映射，思考协议块不参与译文解析
+pub(super) fn parse_options(
+    provider: Provider,
+    body: &Value,
+    filter: bool,
+) -> Result<BTreeMap<i32, String>> {
     if !body.is_object() && matches!(provider, Provider::Gemini | Provider::Anthropic) {
         return Err(protocol(if provider == Provider::Gemini {
             "invalid JSON response from Gemini"
@@ -85,6 +96,31 @@ pub(super) fn parse(provider: Provider, body: &Value) -> Result<BTreeMap<i32, St
     let content = match provider {
         Provider::Gemini => gemini(body)?,
         Provider::Anthropic => anthropic(body)?,
+        Provider::Responses => {
+            if body
+                .get("status")
+                .and_then(Value::as_str)
+                .is_some_and(|status| status != "completed")
+            {
+                return Err(protocol("responses generation did not complete"));
+            }
+            let output = body
+                .get("output")
+                .and_then(Value::as_array)
+                .ok_or_else(|| protocol("responses missing output"))?;
+            let text: String = output
+                .iter()
+                .filter(|item| item["type"] == "message")
+                .filter_map(|item| item["content"].as_array())
+                .flatten()
+                .filter(|part| part["type"] == "output_text")
+                .filter_map(|part| part["text"].as_str())
+                .collect();
+            if text.trim().is_empty() {
+                return Err(protocol("responses output text is empty"));
+            }
+            text
+        }
         _ => {
             let choices = body
                 .get("choices")
@@ -101,5 +137,12 @@ pub(super) fn parse(provider: Provider, body: &Value) -> Result<BTreeMap<i32, St
             text.to_owned()
         }
     };
-    response::content_for(provider, &content)
+    response::content_for(
+        provider,
+        &if filter {
+            super::super::request_options::filter(&content)
+        } else {
+            content
+        },
+    )
 }

@@ -74,8 +74,10 @@ jobs:
       - name: Test Rust workspace
         run: cargo test --workspace --locked -j 2
 
-      - name: Check all Rust targets and features
-        run: cargo clippy --workspace --all-targets --all-features --locked -j 2 -- -D warnings
+      - name: Check dynamic and bundled OCR targets
+        run: |
+          cargo clippy --workspace --all-targets --locked -j 2 -- -D warnings
+          cargo clippy --workspace --all-targets --no-default-features --features ocr-gpu --locked -j 2 -- -D warnings
 
       - name: Test Python verification tools
         run: uv run --python 3.14 --with pillow --with numpy python -m unittest discover -s scripts -p 'test_*.py'
@@ -91,7 +93,7 @@ jobs:
           ./target/release/mark-shot --help > target/native-help.txt
           ldd target/release/mark-shot > target/native-linkage.txt
           cat target/native-linkage.txt
-          if grep -Ei 'not found|libQt|libgtk|webkit|webview|webgpu_dawn' target/native-linkage.txt; then
+          if grep -Ei 'not found|libQt|libgtk|webkit|webview|webgpu_dawn|onnxruntime' target/native-linkage.txt; then
             exit 1
           fi
 

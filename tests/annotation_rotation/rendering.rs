@@ -38,16 +38,20 @@ pub(super) fn vectors() -> Vec<Annotation> {
     let (start, end) = ((70.0, 85.0), (186.0, 171.0));
     vec![
         annotation(AnnotationShape::Rectangle {
+            radius: 0.0,
+            fixed_ratio: false,
             start,
             end,
             filled: true,
         }),
         annotation(AnnotationShape::Circle {
+            fixed_ratio: false,
             start,
             end,
             filled: true,
         }),
         annotation(AnnotationShape::Marker {
+            radius: 0.0,
             start,
             end,
             kind: MarkerShape::Triangle,

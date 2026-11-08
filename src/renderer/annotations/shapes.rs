@@ -8,8 +8,11 @@ pub(super) fn draw_rect(
     color: Color,
     stroke_width: f32,
     shadow_color: Color,
+    radius: f32,
 ) {
-    let path = PathBuilder::from_rect(*rect);
+    let Some(path) = crate::features::shape::path(*rect, radius, 0.0, (0.0, 0.0)) else {
+        return;
+    };
     stroke_with_shadow(
         p,
         &path,
@@ -52,6 +55,7 @@ pub(super) fn fill_rect(
     color: Color,
     stroke_width: f32,
     shadow_color: Color,
+    radius: f32,
 ) {
     let half = stroke_width / 2.0;
     let Some(outer) = Rect::from_ltrb(
@@ -62,7 +66,15 @@ pub(super) fn fill_rect(
     ) else {
         return;
     };
-    fill_with_shadow(p, &PathBuilder::from_rect(outer), color, shadow_color);
+    let Some(path) = crate::features::shape::path(
+        outer,
+        if radius > 0.0 { radius + half } else { 0.0 },
+        0.0,
+        (0.0, 0.0),
+    ) else {
+        return;
+    };
+    fill_with_shadow(p, &path, color, shadow_color);
 }
 
 pub(super) fn fill_circle(

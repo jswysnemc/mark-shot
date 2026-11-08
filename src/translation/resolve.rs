@@ -27,6 +27,8 @@ pub(crate) struct Llm {
     pub thinking_level: String,
     pub max_tokens: u64,
     pub extra_body: Map<String, Value>,
+    pub filter_thinking: bool,
+    pub disable_thinking: bool,
     pub timeout: Duration,
 }
 
@@ -151,7 +153,46 @@ fn required(value: &str, name: &str) -> Result<()> {
 
 /// 【翻译服务】【单一配置】按 root、provider 和 env 解析服务，返回完整配置，显式选择不因缺少凭据而回退
 fn one(root: &Value, provider: Provider, env: &dyn Fn(&str) -> Option<String>) -> Result<Service> {
+    build(root, provider, env, true)
+}
+
+/// 【翻译服务】【表单预览】按 root、vendor 和 env 解析实际默认值及环境值，不要求凭据完整，返回服务参数
+pub(crate) fn preview(
+    root: &Value,
+    vendor: &str,
+    env: &dyn Fn(&str) -> Option<String>,
+) -> Result<Service> {
+    let provider = match vendor {
+        "bilibili" => Provider::Bilibili,
+        "openai" => Provider::OpenAi,
+        "responses" => Provider::Responses,
+        "anthropic" => Provider::Anthropic,
+        "gemini" => Provider::Gemini,
+        "tencent" => Provider::Tencent,
+        "baidu" => Provider::Baidu,
+        "youdao" => Provider::Youdao,
+        _ => return Err(Error::new(ErrorKind::Configuration, "external provider")),
+    };
+    build(root, provider, env, false)
+}
+
+/// 【翻译服务】【参数组装】按 root、provider、env 解析参数，validate 控制必填凭据校验，返回服务或错误
+fn build(
+    root: &Value,
+    provider: Provider,
+    env: &dyn Fn(&str) -> Option<String>,
+    validate: bool,
+) -> Result<Service> {
+    let required = |value: &str, name: &str| {
+        if validate {
+            required(value, name)
+        } else {
+            Ok(())
+        }
+    };
     let vendor_key = match provider {
+        Provider::Bilibili => "bilibili",
+        Provider::Responses => "responses",
         Provider::OpenAi => "openai",
         Provider::Gemini => "gemini",
         Provider::Anthropic => "anthropic",
@@ -167,7 +208,10 @@ fn one(root: &Value, provider: Provider, env: &dyn Fn(&str) -> Option<String>) -
     };
     let vendor = root.get(vendor_key).unwrap_or(&Value::Null);
     // 1. 【翻译服务】【厂商隔离】Gemini 与 Anthropic 不继承公共 OpenAI 密钥、模型和提示词
-    let shared = if matches!(provider, Provider::Gemini | Provider::Anthropic) {
+    let shared = if matches!(
+        provider,
+        Provider::Gemini | Provider::Anthropic | Provider::Bilibili | Provider::Responses
+    ) {
         &Value::Null
     } else {
         root
@@ -175,14 +219,27 @@ fn one(root: &Value, provider: Provider, env: &dyn Fn(&str) -> Option<String>) -
     let get = |key: &str, names: &[&str], fallback: &str| {
         string(vendor, shared, key, env, names, fallback)
     };
-    let timeout = |default| {
-        Duration::from_millis(integer(vendor, shared, "timeoutMs", default, 1000, 300000))
-    };
+    let timeout =
+        |default| Duration::from_millis(integer(vendor, root, "timeoutMs", default, 1000, 300000));
     if matches!(
         provider,
-        Provider::OpenAi | Provider::Gemini | Provider::Anthropic
+        Provider::OpenAi
+            | Provider::Gemini
+            | Provider::Anthropic
+            | Provider::Bilibili
+            | Provider::Responses
     ) {
         let (endpoint, key, model) = match provider {
+            Provider::Bilibili => (
+                get("baseUrl", &[], "https://index-translate.bilibili.com/v1"),
+                get("apiKey", &[], "empty"),
+                get("model", &[], "Index-Translate-9B"),
+            ),
+            Provider::Responses => (
+                get("baseUrl", &["OPENAI_BASE_URL"], "https://api.openai.com/v1"),
+                get("apiKey", &["OPENAI_API_KEY"], ""),
+                get("model", &["OPENAI_MODEL"], "gpt-5-mini"),
+            ),
             Provider::OpenAi => {
                 let key_env = get("apiKeyEnv", &[], "OPENAI_API_KEY");
                 let base = get("apiBase", &[], "");
@@ -246,15 +303,14 @@ fn one(root: &Value, provider: Provider, env: &dyn Fn(&str) -> Option<String>) -
         required(&endpoint, "translation endpoint")?;
         required(&model, "translation model")?;
         required(&key, &format!("{} api key", provider.id()))?;
-        let extra_body = match field(root, "extraBody") {
-            Some(Value::Object(body)) if provider == Provider::OpenAi => body.clone(),
-            Some(_) if provider == Provider::OpenAi => {
-                return Err(Error::new(
-                    ErrorKind::Configuration,
-                    "translation.extraBody must be a JSON object",
-                ));
-            }
-            _ => Map::new(),
+        let extra_body = super::request_options::parse_extra(
+            field(vendor, "extraBody").or_else(|| field(shared, "extraBody")),
+        )?;
+        let flag = |key, default| {
+            field(vendor, key)
+                .or_else(|| field(shared, key))
+                .and_then(Value::as_bool)
+                .unwrap_or(default)
         };
         let temperature = field(vendor, "temperature")
             .and_then(Value::as_f64)
@@ -270,6 +326,8 @@ fn one(root: &Value, provider: Provider, env: &dyn Fn(&str) -> Option<String>) -
             thinking_level: get("thinkingLevel", &[], ""),
             max_tokens: integer(vendor, shared, "maxTokens", 4096, 256, 8192),
             extra_body,
+            filter_thinking: flag("filterThinking", true),
+            disable_thinking: flag("disableThinking", provider == Provider::Bilibili),
             timeout: timeout(60000),
         }));
     }
@@ -370,6 +428,8 @@ pub(crate) fn service(
         .unwrap_or_default()
         .trim();
     let selected = match id {
+        "bilibili" => Some(Provider::Bilibili),
+        "openai-responses" => Some(Provider::Responses),
         "openai-compatible" => Some(Provider::OpenAi),
         "gemini" => Some(Provider::Gemini),
         "anthropic" => Some(Provider::Anthropic),
@@ -393,6 +453,7 @@ pub(crate) fn service(
     // 2. 【翻译服务】【可用配置】仅在选择阶段跳过缺失配置，服务确定后保持原文只交给这一服务
     for provider in [
         Provider::OpenAi,
+        Provider::Responses,
         Provider::Gemini,
         Provider::Anthropic,
         Provider::Tencent,
@@ -403,5 +464,5 @@ pub(crate) fn service(
             return Ok(config);
         }
     }
-    builtin()
+    one(root, Provider::Bilibili, env)
 }

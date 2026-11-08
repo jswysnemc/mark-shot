@@ -26,8 +26,9 @@ impl Palette {
     }
 
     /// 【界面主题】【菜单令牌】按 mode 返回原版配色，不修改菜单几何
-    pub const fn new(mode: Mode) -> Self {
+    pub fn new(mode: Mode) -> Self {
         match mode {
+            Mode::System => Self::new(mode.resolved()),
             Mode::Light => Self {
                 accent: Rgba(13, 148, 136, 255),
                 background: Rgba(255, 255, 255, 250),

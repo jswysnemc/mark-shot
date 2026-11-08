@@ -1,4 +1,4 @@
-//! 【工具栏回归】【交互验证】通过真实窗口事件验证布局保存、拖放边界和快捷键冲突
+//! 【工具栏回归】【交互验证】通过真实窗口事件验证两栏保存、拖放边界和键盘排序
 
 use super::{
     Editor,
@@ -12,8 +12,8 @@ use crate::{
         toolbar_layout::{Profile, ToolbarLayout},
     },
     features::preferences::{catalog::Page, window::Preferences},
-    keys::{Key, Mods},
-    ui::toolbar::{ToolbarItem, catalog},
+    keys::Key,
+    ui::toolbar::ToolbarItem,
 };
 use serde_json::json;
 
@@ -62,27 +62,30 @@ fn click(state: &mut Preferences, hit: Hit) {
     pointer(state, position, false);
 }
 
-/// 【工具栏回归】【增删持久化】无参数，增删、排序与方向按场景隔离，重新读取后仍保持用户配置
+/// 【工具栏回归】【增删持久化】无参数，增删与排序按主侧栏隔离，重新读取后仍保持用户配置
 #[test]
 fn layout_changes_survive_reload_and_preserve_other_profiles() {
     let (_directory, mut state) = fixture();
     let original = state.toolbar.config.clone();
     click(&mut state, Hit::Profile(Profile::Actions));
-    let item = catalog::parse("magnifier").unwrap();
+    let item = Layout::new(&state)
+        .available
+        .iter()
+        .map(|(item, _)| *item)
+        .find(|item| *item != ToolbarItem::Seperator)
+        .unwrap();
     assert!(!state.toolbar.config.actions.contains(&item));
     activate(&mut state, Hit::Add(item));
     activate(&mut state, Hit::Left);
     let selected = state.toolbar.selected.unwrap();
     assert_eq!(state.toolbar.config.actions[selected], item);
-    click(&mut state, Hit::Direction);
     let restored = preferences::load(&state.path).unwrap().toolbar_layout;
     assert_eq!(restored, state.toolbar.config);
     assert_eq!(restored.main, original.main);
-    assert_eq!(restored.fullscreen, original.fullscreen);
-    assert!(!restored.actions_vertical);
+    assert!(restored.actions_vertical);
     click(&mut state, Hit::Remove);
     assert!(!state.toolbar.config.actions.contains(&item));
-    click(&mut state, Hit::Reset);
+    click(&mut state, Hit::Reset(Profile::Actions));
     assert_eq!(state.toolbar.config.actions, original.actions);
     let saved = std::fs::read_to_string(&state.path).unwrap();
     assert!(saved.contains("# preserve") && saved.contains("keep = 17"));
@@ -92,15 +95,15 @@ fn layout_changes_survive_reload_and_preserve_other_profiles() {
 #[test]
 fn drag_commits_on_release_and_cancels_outside_preview() {
     let (_directory, mut state) = fixture();
-    let original = state.toolbar.config.fullscreen.clone();
+    let original = state.toolbar.config.main.clone();
     let layout = Layout::new(&state);
-    let start = center(layout.cells[0]);
-    let target = center(layout.cells[2]);
+    let start = center(layout.bars[0].cells[0]);
+    let target = center(layout.bars[0].cells[2]);
     pointer(&mut state, start, true);
     state.event(WindowEvent::PointerMove { position: target });
-    assert_eq!(state.toolbar.config.fullscreen, original);
+    assert_eq!(state.toolbar.config.main, original);
     pointer(&mut state, target, false);
-    assert_eq!(state.toolbar.config.fullscreen[2], original[0]);
+    assert_eq!(state.toolbar.config.main[2], original[0]);
     assert_eq!(state.toolbar.selected, Some(2));
     assert!(state.toolbar.pressed.is_none());
     let saved = std::fs::read_to_string(&state.path).unwrap();
@@ -113,76 +116,59 @@ fn drag_commits_on_release_and_cancels_outside_preview() {
     assert!(state.toolbar.drag.is_none() && state.toolbar.pressed.is_none());
 }
 
-/// 【工具栏回归】【快捷键冲突】无参数，普通录入和恢复默认数组均拒绝冲突，并保留现有绑定
+/// 【工具栏回归】【两栏选择】无参数，点击侧栏项目切换添加目标，移除和重置不会改写主栏与快捷键
 #[test]
-fn shortcuts_record_clear_and_reject_conflicting_defaults() {
+fn selecting_side_item_targets_side_and_preserves_shortcuts() {
     let (_directory, mut state) = fixture();
-    let copy = catalog::parse("copy").unwrap();
-    state.toolbar.selected = state
-        .toolbar
-        .config
-        .fullscreen
-        .iter()
-        .position(|item| *item == copy);
-    assert!(state.toolbar.selected.is_some());
-    click(&mut state, Hit::Shortcut);
+    let original = state.toolbar.config.clone();
+    let keys = state.values["keys"].clone();
+    let layout = Layout::new(&state);
+    assert_eq!(layout.bars.len(), 2);
+    assert!(!layout.controls.iter().any(|(hit, _)| *hit == Hit::Remove));
+    let position = center(layout.bars[1].cells[0]);
+    pointer(&mut state, position, true);
+    pointer(&mut state, position, false);
+    assert_eq!(state.toolbar.profile, Profile::Actions);
+    assert_eq!(state.toolbar.selected, Some(0));
+    let item = original.actions[0];
     state.event(WindowEvent::Key(KeyInput {
-        key: Some(Key::Char('s')),
+        key: Some(Key::Right),
         text: String::new(),
-        mods: Mods {
-            ctrl: true,
-            ..Default::default()
-        },
-    }));
-    assert!(state.toolbar.recording);
-    assert_eq!(
-        crate::features::preferences::shortcuts::text(&state.values, "copy"),
-        "Ctrl+C"
-    );
-    state.event(WindowEvent::Key(KeyInput {
-        key: Some(Key::Char('c')),
-        text: String::new(),
-        mods: Mods {
-            ctrl: true,
+        mods: crate::keys::Mods {
             alt: true,
             ..Default::default()
         },
     }));
-    assert!(!state.toolbar.recording);
-    assert_eq!(
-        preferences::read(&state.path).unwrap()["keys"]["copy"],
-        "Ctrl+Alt+C"
-    );
-    click(&mut state, Hit::ClearShortcut);
-    assert_eq!(state.values["keys"]["copy"], "");
-    assert!(state.save_field("keys", "save", "Ctrl+C".into()));
-    let before = std::fs::read_to_string(&state.path).unwrap();
-    click(&mut state, Hit::ResetShortcut);
-    assert_eq!(std::fs::read_to_string(&state.path).unwrap(), before);
-    assert_eq!(state.values["keys"]["copy"], "");
-    assert!(state.save_field("keys", "save", "Ctrl+S".into()));
-    click(&mut state, Hit::ResetShortcut);
-    assert_eq!(state.values["keys"]["copy"], json!(["Ctrl+C"]));
+    assert_eq!(state.toolbar.config.actions[1], item);
+    state.event(WindowEvent::Key(KeyInput {
+        key: Some(Key::Delete),
+        text: String::new(),
+        mods: Default::default(),
+    }));
+    assert!(!state.toolbar.config.actions.contains(&item));
+    assert_eq!(state.toolbar.config.main, original.main);
+    assert_eq!(state.values["keys"], keys);
+    click(&mut state, Hit::Reset(Profile::Actions));
+    assert_eq!(state.toolbar.config, original);
 }
 
-/// 【工具栏回归】【录入焦点】无参数，点击工具栏离开搜索焦点，Esc 取消录入而不关闭设置窗口
+/// 【工具栏回归】【拖动焦点】无参数，点击工具栏离开搜索焦点，Esc 取消拖动而不保存布局
 #[test]
-fn toolbar_click_leaves_search_and_escape_cancels_recording() {
+fn toolbar_click_leaves_search_and_escape_cancels_drag() {
     let (_directory, mut state) = fixture();
     state.search_focus = true;
-    let position = center(Layout::new(&state).cells[0]);
+    let position = center(Layout::new(&state).bars[0].cells[0]);
     pointer(&mut state, position, true);
-    pointer(&mut state, position, false);
     assert!(!state.search_focus);
-    click(&mut state, Hit::Shortcut);
-    assert!(state.toolbar.recording);
+    assert!(state.toolbar.drag.is_some());
     let before = std::fs::read_to_string(&state.path).unwrap();
     state.event(WindowEvent::Key(KeyInput {
         key: Some(Key::Escape),
         text: String::new(),
         mods: Default::default(),
     }));
-    assert!(!state.toolbar.recording);
+    assert!(state.toolbar.drag.is_none());
+    pointer(&mut state, position, false);
     assert_eq!(std::fs::read_to_string(&state.path).unwrap(), before);
 }
 
@@ -192,14 +178,14 @@ fn narrow_window_wraps_and_scrolls_to_the_last_candidate() {
     let (_directory, mut state) = fixture();
     state.event(WindowEvent::Resize { size: (580, 420) });
     let layout = Layout::new(&state);
-    assert!(layout.cells.last().unwrap().top() > layout.cells[0].top());
-    assert!(
-        layout
-            .cells
-            .iter()
-            .all(|cell| cell.left() >= layout.preview.left()
-                && cell.right() <= layout.preview.right())
-    );
+    for bar in &layout.bars {
+        assert!(bar.cells.last().unwrap().top() > bar.cells[0].top());
+        assert!(
+            bar.cells.iter().all(
+                |cell| cell.left() >= bar.preview.left() && cell.right() <= bar.preview.right()
+            )
+        );
+    }
     assert!(layout.scrollbar.is_some());
     state.event(WindowEvent::Key(KeyInput {
         key: Some(Key::End),
@@ -249,4 +235,50 @@ fn invalid_layouts_and_shortcut_arrays_leave_configuration_untouched() {
     .unwrap();
     let saved: ToolbarLayout = preferences::load(&state.path).unwrap().toolbar_layout;
     assert_eq!(saved.main.len(), 3);
+}
+
+/// 【工具栏回归】【跨栏移动】无参数，真实拖放一次保存两栏，工具池始终排除两栏已有工具
+#[test]
+fn cross_bar_drag_moves_without_pool_duplicates() {
+    let (_directory, mut state) = fixture();
+    let layout = Layout::new(&state);
+    let item = state.toolbar.config.main[0];
+    let start = center(layout.bars[0].cells[0]);
+    let target = center(layout.bars[1].cells[0]);
+    pointer(&mut state, start, true);
+    state.event(WindowEvent::PointerMove { position: target });
+    assert!(state.toolbar.animation.deadline().is_some());
+    pointer(&mut state, target, false);
+    assert!(!state.toolbar.config.main.contains(&item));
+    assert!(state.toolbar.config.actions.contains(&item));
+    assert_eq!(
+        preferences::load(&state.path).unwrap().toolbar_layout,
+        state.toolbar.config
+    );
+    let layout = Layout::new(&state);
+    for (item, _) in layout.available {
+        if item != ToolbarItem::Seperator {
+            assert!(!state.toolbar.config.main.contains(&item));
+            assert!(!state.toolbar.config.actions.contains(&item));
+        }
+    }
+}
+
+/// 【工具栏回归】【空栏回滚】无参数，移走某栏最后一项失败时，两栏、当前目标和配置文件都保持原样
+#[test]
+fn moving_last_item_rolls_back_both_bars() {
+    let (_directory, mut state) = fixture();
+    state.toolbar.config.main.truncate(1);
+    state.toolbar.profile = Profile::Main;
+    let original = state.toolbar.config.clone();
+    let text = std::fs::read_to_string(&state.path).unwrap();
+    let layout = Layout::new(&state);
+    let start = center(layout.bars[0].cells[0]);
+    let target = center(layout.bars[1].cells[0]);
+    pointer(&mut state, start, true);
+    state.event(WindowEvent::PointerMove { position: target });
+    pointer(&mut state, target, false);
+    assert_eq!(state.toolbar.config, original);
+    assert_eq!(state.toolbar.profile, Profile::Main);
+    assert_eq!(std::fs::read_to_string(&state.path).unwrap(), text);
 }

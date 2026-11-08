@@ -117,51 +117,12 @@ pub fn update(update: Update) -> io::Result<History> {
 
 /// 【截图历史】【配置更新】在 path 上串行化 update，保留未知字段与注释；失败不改变原文件
 pub(crate) fn update_at(path: &Path, update: Update) -> io::Result<History> {
-    super::persistence::update(path, |text| {
-        if super::document::is_json(path, text) {
-            parse_at(path, text)?;
-            let updated = super::document::update_json(text, |root| {
-                let table = super::document::section(
-                    root,
-                    &["history", "captureHistory"],
-                    "captureHistory",
-                )?;
-                let (key, value) = match update {
-                    Update::Enabled(enabled) => ("enabled", serde_json::Value::Bool(enabled)),
-                    Update::Limit(limit) => ("limit", (limit.clamp(1, 200) as u64).into()),
-                };
-                table.insert(key.into(), value);
-                Ok(())
-            })?;
-            let settings = parse_at(path, &updated)?;
-            return Ok((updated, settings));
-        }
-        let mut document = text
-            .parse::<toml_edit::DocumentMut>()
-            .map_err(io::Error::other)?;
-        parse_at(path, text)?;
-        // 1. 【截图历史】【字段更新】在共享配置锁内只改变用户操作的字段，保留其他窗口的设置
-        let history = document
-            .entry("history")
-            .or_insert(toml_edit::Item::Table(toml_edit::Table::new()));
-        let history = history
-            .as_table_like_mut()
-            .ok_or_else(|| io::Error::other("history must be a table"))?;
-        let (key, value) = match update {
-            Update::Enabled(enabled) => ("enabled", toml_edit::Value::from(enabled)),
-            Update::Limit(limit) => ("limit", toml_edit::Value::from(limit.clamp(1, 200) as i64)),
-        };
-        if let Some(previous) = history.get(key).and_then(toml_edit::Item::as_value) {
-            let mut value = value;
-            *value.decor_mut() = previous.decor().clone();
-            history.insert(key, toml_edit::Item::Value(value));
-        } else {
-            history.insert(key, toml_edit::Item::Value(value));
-        }
-        let updated = document.to_string();
-        let result = parse_at(path, &updated)?;
-        Ok((updated, result))
-    })
+    let (key, value) = match update {
+        Update::Enabled(enabled) => ("history.enabled", serde_json::Value::Bool(enabled)),
+        Update::Limit(limit) => ("history.limit", (limit.clamp(1, 200) as u64).into()),
+    };
+    super::settings_store::write(path, &[(key.into(), value)])?;
+    parse_at(path, &super::persistence::read(path)?)
 }
 
 #[cfg(test)]

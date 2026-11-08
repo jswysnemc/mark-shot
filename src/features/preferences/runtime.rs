@@ -13,11 +13,14 @@ pub fn apply(state: &mut EditorState, before: &Config, after: &Config, dirty: &m
     if before.startup.selection_loupe != after.startup.selection_loupe {
         state.magnifier.hidden = after.startup.selection_loupe == Some(false);
     }
-    if before.startup.normal_tool != after.startup.normal_tool {
+    if before.startup.normal_tool != after.startup.normal_tool
+        || before.startup.default_tool != after.startup.default_tool
+    {
         state.after_selection_tool = after
             .startup
             .normal_tool
             .as_deref()
+            .or(after.startup.default_tool.as_deref())
             .and_then(|name| crate::tools::names::parse(name).ok())
             .unwrap_or(crate::tools::Tool::Selection);
     }

@@ -38,12 +38,19 @@ pub(super) fn draw(
                 ann.color,
             );
         }
-        AnnotationShape::Rectangle { start, end, filled } => {
+        AnnotationShape::Rectangle {
+            start,
+            end,
+            filled,
+            radius,
+            ..
+        } => {
             if let Some(rect) = normalized_rect(*start, *end) {
+                let radius = ann.style_units().canvas(*radius);
                 if *filled {
-                    fill_rect(p, &rect, ann.color, width, ann.shadow_color);
+                    fill_rect(p, &rect, ann.color, width, ann.shadow_color, radius);
                 } else {
-                    draw_rect(p, &rect, ann.color, width, ann.shadow_color);
+                    draw_rect(p, &rect, ann.color, width, ann.shadow_color, radius);
                 }
             }
         }
@@ -52,12 +59,24 @@ pub(super) fn draw(
             end,
             kind,
             filled,
+            radius,
         } => {
             if let Some(rect) = normalized_rect(*start, *end) {
-                crate::features::marker::draw_marker(p, *kind, rect, ann.color, width, *filled);
+                if *kind == crate::types::MarkerShape::Square {
+                    let radius = ann.style_units().canvas(*radius);
+                    if *filled {
+                        fill_rect(p, &rect, ann.color, width, ann.shadow_color, radius);
+                    } else {
+                        draw_rect(p, &rect, ann.color, width, ann.shadow_color, radius);
+                    }
+                } else {
+                    crate::features::marker::draw_marker(p, *kind, rect, ann.color, width, *filled);
+                }
             }
         }
-        AnnotationShape::Circle { start, end, filled } => {
+        AnnotationShape::Circle {
+            start, end, filled, ..
+        } => {
             if let Some(rect) = normalized_rect(*start, *end) {
                 if *filled {
                     fill_circle(p, &rect, ann.color, width, ann.shadow_color);
