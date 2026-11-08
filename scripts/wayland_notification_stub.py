@@ -8,6 +8,13 @@ import subprocess
 import sys
 import time
 
+DBUS_STRING = "s"
+DBUS_UINT32 = "u"
+DBUS_INT32 = "i"
+DBUS_STRING_ARRAY = "as"
+DBUS_HINTS = "a{sv}"
+DBUS_SERVER_INFO = "ssss"
+
 
 @contextmanager
 def notification_service(root):
@@ -46,18 +53,18 @@ async def serve(address, root):
             super().__init__("org.freedesktop.Notifications")
 
         @method()
-        def GetCapabilities(self) -> "as":
+        def GetCapabilities(self) -> DBUS_STRING_ARRAY:
             """【通知测试】【能力查询】无参数，返回正文标记能力"""
             return ["body", "body-markup"]
 
         @method()
-        def GetServerInformation(self) -> "ssss":
+        def GetServerInformation(self) -> DBUS_SERVER_INFO:
             """【通知测试】【服务查询】无参数，返回与 mako 一致的预览选择条件"""
             return ["mako", "test", "1", "1.2"]
 
         @method()
-        def Notify(self, app_name: "s", replaces_id: "u", app_icon: "s", summary: "s",
-                   body: "s", actions: "as", hints: "a{sv}", expire_timeout: "i") -> "u":
+        def Notify(self, app_name: DBUS_STRING, replaces_id: DBUS_UINT32, app_icon: DBUS_STRING, summary: DBUS_STRING,
+                   body: DBUS_STRING, actions: DBUS_STRING_ARRAY, hints: DBUS_HINTS, expire_timeout: DBUS_INT32) -> DBUS_UINT32:
             """【通知测试】【通知接收】接收标准通知参数及 hints，记录图像尺寸与字节数，返回通知编号"""
             image = hints.get("image-data")
             record = {"app": app_name, "summary": summary, "hints": list(hints)}
