@@ -391,9 +391,10 @@ fn a_flipped_range_falls_back_to_the_default() {
     assert_eq!(config.tools.stroke, Stroke::default());
 }
 
+/// 【放大预览测试】【默认尺寸】无参数，验证紧凑圆镜默认直径为九十个逻辑像素
 #[test]
 fn magnifier_size_matches_cells_times_zoom() {
-    assert_eq!(Magnifier::default().size(), 126);
+    assert_eq!(Magnifier::default().size(), 90);
 }
 
 /// 【贴图配置测试】【边框约束】原版默认边框保留两像素；超界与非有限宽度不产生异常绘制区域
