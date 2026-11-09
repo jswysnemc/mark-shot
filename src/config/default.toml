@@ -350,15 +350,15 @@ label_height = 20.0
 [magnifier]
 zoom = 6.0
 # pixels across, must be odd
-cells = 21
+cells = 15
 # distance from the pointer
 offset = 24.0
 outline_width = 2.0
 grid_width = 1.0
-label_height = 26.0
-label_gap = 6.0
-swatch_size = 14.0
-swatch_gap = 8.0
+label_height = 20.0
+label_gap = 4.0
+swatch_size = 12.0
+swatch_gap = 6.0
 swatch_radius = 3.0
 grid = "#E5EDEF28"
 crosshair = "#9399B250"

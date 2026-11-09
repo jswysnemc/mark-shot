@@ -120,8 +120,8 @@ impl Entry {
                 "Embeds the system pointer in the next capture",
             ),
             ("startup", "selection_loupe") => (
-                "选择或调整选区时显示像素放大预览",
-                "Pixel magnifier while selecting or resizing a region",
+                "开始框选时显示像素、颜色值和坐标，完成后隐藏",
+                "Pixels, color and coordinates while creating a region; hidden after selection",
             ),
             ("startup", "normal_tool") => (
                 "完成框选后自动进入所选标注工具",

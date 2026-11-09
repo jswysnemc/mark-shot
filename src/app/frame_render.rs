@@ -197,7 +197,6 @@ pub(super) fn render_monitor(
     editor_state.prepare_region_layers();
     // No loupe while reading text: it sits right where the
     // pointer is selecting and hides the line under it.
-    let picking = editor_state.picking();
     let is_mag_monitor = editor_state.selected_tool != Tool::Ocr
         && editor_state.magnifier_shown()
         && editor_state
@@ -295,7 +294,6 @@ pub(super) fn render_monitor(
                 0.0
             },
             magnifier: editor_state.magnifier.current.as_ref(),
-            mag_label: picking,
             is_mag_monitor,
             toolbar,
             action_toolbar,

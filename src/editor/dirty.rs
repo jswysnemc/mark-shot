@@ -62,8 +62,6 @@ impl EditorState {
             return dirty;
         }
         let (mw, mh) = (placement.size.0 as f32, placement.size.1 as f32);
-        // color label, when picking a color
-        let with_label = self.picking();
         if mw > 0.0 && mh > 0.0 {
             let mag_pad = crate::config::get().magnifier.outline_width / 2.0 + 1.0;
 
@@ -73,7 +71,6 @@ impl EditorState {
                         (mag.pos.0 as f32, mag.pos.1 as f32),
                         mw,
                         mh,
-                        with_label,
                     );
                     if let Some(r) = expand_rect(&rect, mag_pad) {
                         dirty = union_rect(dirty, Some(r));

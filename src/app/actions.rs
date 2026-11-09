@@ -339,7 +339,6 @@ fn toggle_magnifier(editor_state: &mut EditorState, dirty_mask: &mut u32) {
         (mag.pos.0 as f32, mag.pos.1 as f32),
         placement.size.0 as f32,
         placement.size.1 as f32,
-        editor_state.picking(),
     );
     editor_state.damage_local(monitor_idx, rect);
     mark_dirty(dirty_mask, monitor_idx);

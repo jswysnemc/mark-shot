@@ -105,7 +105,6 @@ pub struct Magnifier {
     pub prev: Option<MagnifierState>,
     pub hidden: bool,
     pub visible: bool,
-    pub with_label: bool,
 }
 
 /// Text shaping and the live editors, one per text annotation.

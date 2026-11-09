@@ -209,7 +209,7 @@ fn damage_loupe(state: &mut EditorState, dirty_mask: &mut u32) {
         state.input.pointer.local.0 as f32,
         state.input.pointer.local.1 as f32,
     );
-    let rect = magnifier_rect(cursor, mw, mh, true);
+    let rect = magnifier_rect(cursor, mw, mh);
     state
         .damage_rects
         .push(DamageZone::Local { monitor_idx, rect });

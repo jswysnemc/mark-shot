@@ -1,47 +1,32 @@
 use crate::config::Magnifier;
 use crate::renderer::Painter;
-use crate::renderer::paths::rounded_rect_path;
-use crate::renderer::text::TextStyle;
-use crate::theme::{font, radius};
 use crate::types::Capture;
 use crate::ui::magnifier::{cells, offset, sample_pixel, size, zoom};
-use tiny_skia::{Color, Paint, PathBuilder, Pixmap, PixmapPaint, Rect, Stroke, Transform};
+use tiny_skia::{Paint, PathBuilder, Pixmap, PixmapPaint, Rect, Stroke, Transform};
 
+/// 【光标放大区】【样式读取】无参数，返回当前放大预览配置引用
 fn cfg() -> &'static Magnifier {
     &crate::config::get().magnifier
 }
 
-/// 【光标放大区】【完整范围】按 cursor、屏幕尺寸和 with_label 返回放大图、坐标及可选颜色标签的整体范围
-pub fn magnifier_rect(
-    cursor: (f32, f32),
-    monitor_w: f32,
-    monitor_h: f32,
-    with_label: bool,
-) -> Rect {
-    let height = box_height(with_label);
+/// 【光标放大区】【完整范围】按 cursor 和屏幕尺寸返回放大图、颜色与坐标的整体范围
+pub fn magnifier_rect(cursor: (f32, f32), monitor_w: f32, monitor_h: f32) -> Rect {
+    let height = box_height();
     let (mag_x, mag_y) = magnifier_position(cursor, (0.0, 0.0, monitor_w, monitor_h), height);
-    Rect::from_xywh(mag_x, mag_y, size() as f32, height).unwrap()
+    Rect::from_xywh(mag_x, mag_y, super::readout::width(), height).unwrap()
 }
 
-/// 【光标放大区】【整体高度】按 with_label 返回始终包含坐标条的高度，取色模式额外包含颜色条
-fn box_height(with_label: bool) -> f32 {
-    size() as f32
-        + cfg().label_gap
-        + cfg().label_height
-        + if with_label {
-            cfg().label_gap + cfg().label_height
-        } else {
-            0.0
-        }
+/// 【光标放大区】【整体高度】无参数，返回圆镜与双行读数的整体高度
+fn box_height() -> f32 {
+    size() as f32 + cfg().label_gap + cfg().label_height * 2.0
 }
 
-/// 【光标放大区】【实时绘制】按 capture、cursor 和屏幕尺寸绘制局部像素与截图坐标，label 控制额外颜色条
+/// 【光标放大区】【实时绘制】按 capture、cursor 和屏幕尺寸向 p 绘制局部像素、原图颜色与坐标，无返回值
 pub fn draw_magnifier(
     p: &mut Painter,
     capture: &Capture,
     cursor: (f32, f32),
     (screen_w, screen_h): (f32, f32),
-    label: bool,
 ) {
     let scale = p.scale();
     let source = &capture.pixmap;
@@ -50,25 +35,24 @@ pub fn draw_magnifier(
     let sample_size = cells() as i32;
 
     let half = (cells() / 2) as i32;
-    let src_x = (native.0 as i32 - half)
-        .max(0)
-        .min(source.width() as i32 - sample_size) as u32;
-    let src_y = (native.1 as i32 - half)
-        .max(0)
-        .min(source.height() as i32 - sample_size) as u32;
+    let src_x = native.0.floor() as i32 - half;
+    let src_y = native.1.floor() as i32 - half;
 
+    // 1. 【光标放大区】【像素对齐】边缘保持指针像素居中，超出原图的部分使用底色填充
     let mut cropped = Pixmap::new(sample_size as u32, sample_size as u32).unwrap();
+    cropped.fill(cfg().label_background.get().color());
     cropped.draw_pixmap(
-        -(src_x as i32),
-        -(src_y as i32),
+        -src_x,
+        -src_y,
         source.as_ref(),
         &PixmapPaint::default(),
         Transform::identity(),
         None,
     );
 
-    let (mag_x, mag_y) =
-        magnifier_position(cursor, (0.0, 0.0, screen_w, screen_h), box_height(label));
+    let bounds = magnifier_rect(cursor, screen_w, screen_h);
+    let mag_x = bounds.left() + (bounds.width() - size() as f32) / 2.0;
+    let mag_y = bounds.top();
     let radius = size() as f32 / 2.0;
     let cx = mag_x + radius;
     let cy = mag_y + radius;
@@ -109,88 +93,7 @@ pub fn draw_magnifier(
         p.stroke_path(&circle_path, cfg().outline.get(), &stroke);
     }
 
-    let position_y = mag_y + size() as f32 + cfg().label_gap;
-    let plate = Rect::from_xywh(mag_x, position_y, size() as f32, cfg().label_height).unwrap();
-    p.fill_rounded(plate, radius::panel(), cfg().label_background.get());
-    stroke_outline(p, plate, radius::panel());
-    p.text(
-        plate,
-        &format!(
-            "X: {}  Y: {}",
-            native.0.floor() as i32,
-            native.1.floor() as i32
-        ),
-        TextStyle::new(font::small(), cfg().label_text.get().color()).center(),
-    );
-    if label && let Some(color) = sample_pixel(source, native) {
-        draw_color_label(
-            p,
-            mag_x,
-            position_y + cfg().label_height + cfg().label_gap,
-            color,
-        );
-    }
-}
-
-fn draw_color_label(p: &mut Painter, x: f32, y: f32, color: Color) {
-    let cfg = cfg();
-    let width = size() as f32;
-    let Some(plate) = Rect::from_xywh(x, y, width, cfg.label_height) else {
-        return;
-    };
-    p.fill_rounded(plate, radius::panel(), cfg.label_background.get());
-    stroke_outline(p, plate, radius::panel());
-
-    let text = crate::ui::settings_panel::ValueField::Hex.text(color);
-    let text_width = p.measure(&text, font::label());
-    let (swatch_size, swatch_gap) = (cfg.swatch_size, cfg.swatch_gap);
-    let group = swatch_size + swatch_gap + text_width;
-    let swatch_x = x + ((width - group) / 2.0).max(swatch_gap);
-
-    if let Some(swatch) = Rect::from_xywh(
-        swatch_x,
-        y + (cfg.label_height - swatch_size) / 2.0,
-        swatch_size,
-        swatch_size,
-    ) {
-        p.fill_rounded(swatch, cfg.swatch_radius, color);
-        stroke_outline(p, swatch, cfg.swatch_radius);
-    }
-
-    if let Some(text_rect) = Rect::from_xywh(
-        swatch_x + swatch_size + swatch_gap,
-        y,
-        (width - (swatch_x - x) - swatch_size - swatch_gap).max(0.0),
-        cfg.label_height,
-    ) {
-        p.text(
-            text_rect,
-            &text,
-            TextStyle::new(font::label(), cfg.label_text.get().color()),
-        );
-    }
-}
-
-fn stroke_outline(p: &mut Painter, rect: Rect, radius: f32) {
-    let outline = cfg().outline_width;
-    let inset = outline / 2.0;
-    let Some(inner) = Rect::from_xywh(
-        rect.left() + inset,
-        rect.top() + inset,
-        (rect.width() - outline).max(0.1),
-        (rect.height() - outline).max(0.1),
-    ) else {
-        return;
-    };
-    let Some(path) = rounded_rect_path(&inner, (radius - inset).max(0.0), true, true, true, true)
-    else {
-        return;
-    };
-    let stroke = Stroke {
-        width: outline,
-        ..Stroke::default()
-    };
-    p.stroke_path(&path, cfg().outline.get(), &stroke);
+    super::readout::draw(p, bounds, native, sample_pixel(source, native));
 }
 
 /// 【光标放大区】【边缘避让】按 cursor、monitor 和完整 height 返回不越过屏幕边缘的左上角
@@ -199,7 +102,7 @@ fn magnifier_position(
     monitor: (f32, f32, f32, f32),
     height: f32,
 ) -> (f32, f32) {
-    let mag = size() as f32;
+    let mag = super::readout::width();
     let (cx, cy) = cursor;
     let (mx, my, mw, mh) = monitor;
 
@@ -221,6 +124,7 @@ fn magnifier_position(
     )
 }
 
+/// 【光标放大区】【像素网格】按 scale 向 zoomed 绘制网格与中心像素十字，无返回值
 fn overlay_crosshair(zoomed: &mut Pixmap, scale: f32) {
     let cfg = cfg();
     let line = cfg.grid_width * scale;

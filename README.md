@@ -174,7 +174,8 @@ R4 修复了导航下重新编辑已有文字时的重复合成；后续旋转�
 
 默认贴图使用两像素青色边框，相关选项位于 `[pinned]`。截图打开方式和扩展已接入原版
 侧边列表，支持桌面应用、`extensions.json`、区域参数与实际进程交付，详见
-`docs/external-actions-compatibility.md`。光标圆形放大区按选择、调整与取色阶段显示。
+`docs/external-actions-compatibility.md`。光标圆形放大区仅在初始或重新框选时显示，完成后移动、缩放选区均隐藏；取色工具保留独立预览。
+默认圆镜直径为 90 个逻辑像素，下方显示原图色块、HEX 颜色值与像素坐标。
 其他交互差异见 `docs/interface-compatibility.md`。
 
 ## 截图历史

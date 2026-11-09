@@ -46,6 +46,7 @@ try {
         'features::desktop::hotkeys::windows::tests::',
         'backend::window_detection::',
         'app::region_detection::',
+        'app::input::tests::cursor_magnifier::',
         'backend::windows::native::',
         'backend::windows::clipboard::image_tests::',
         'config::tests::',
@@ -59,6 +60,7 @@ try {
         Invoke-UnitTests $name @('-p', 'mark-shot', '--lib', $group, '--', '--test-threads=1')
     }
     Invoke-UnitTests 'windows-ui-automation' @('-p', 'mark-shot', '--lib', 'backend::window_detection::windows::tests::', '--', '--ignored', '--test-threads=1', '--nocapture')
+    Invoke-UnitTests 'cursor-magnifier-render' @('-p', 'mark-shot', '--test', 'cursor_magnifier_render')
 }
 finally {
     $env:PATH = $oldPath

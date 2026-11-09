@@ -1,10 +1,7 @@
-//! 【光标放大区】【阶段判断】沿用原版初始选择、区域调整和取色职责，静止编辑不常驻圆形放大区
+//! 【光标放大区】【阶段判断】初始框选显示像素预览，编辑与调整选区时隐藏，取色保持独立职责
 
 use super::EditorState;
-use crate::{
-    tools::Tool,
-    types::{Mode, SelectionHandle},
-};
+use crate::{tools::Tool, types::Mode};
 
 /// 【光标放大区】【显示判断】按 state 的工具、选区手势及弹层返回是否显示；开关只控制支持的阶段，取色保留独立开关优先级
 pub fn visible(state: &EditorState) -> bool {
@@ -34,8 +31,5 @@ pub fn visible(state: &EditorState) -> bool {
     !state.magnifier.hidden
         && !state.fullscreen_scope
         && state.selected_tool == Tool::Selection
-        && (state.selection.zone.is_none()
-            || state.input.mouse_down
-                && (state.input.drag_start.is_some()
-                    || state.selection.active_handle != SelectionHandle::None))
+        && (state.selection.zone.is_none() || state.input.mouse_down && state.selection.creating)
 }

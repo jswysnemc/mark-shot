@@ -2,7 +2,7 @@
 
 use super::*;
 
-/// 【光标放大区测试】【编辑阶段】完成区域选择后即使启用放大开关也不常驻圆形放大区，初始选择和拖动调整仍显示
+/// 【光标放大区测试】【编辑阶段】无参数，验证初始框选显示，完成后移动或缩放选区均隐藏，重新框选时恢复预览
 #[test]
 fn cursor_magnifier_follows_selection_phase_instead_of_only_enabled_flag() {
     let mut state = editor();
@@ -28,7 +28,30 @@ fn cursor_magnifier_follows_selection_phase_instead_of_only_enabled_flag() {
         !state.magnifier_shown(),
         "completed selection must hide the cursor magnifier"
     );
-    pointer(&mut state, 300.0, 230.0, &mut dirty);
+    for (point, handle) in [
+        ((300.0, 230.0), crate::types::SelectionHandle::TopLeft),
+        ((375.0, 285.0), crate::types::SelectionHandle::Move),
+    ] {
+        pointer(&mut state, point.0, point.1, &mut dirty);
+        super::super::handle_pointer_button(
+            &mut state,
+            crate::types::MouseButton::Left,
+            true,
+            &mut dirty,
+        );
+        assert_eq!(state.selection.active_handle, handle);
+        pointer(&mut state, point.0 + 10.0, point.1 + 10.0, &mut dirty);
+        assert!(!state.magnifier_shown());
+        super::super::handle_pointer_button(
+            &mut state,
+            crate::types::MouseButton::Left,
+            false,
+            &mut dirty,
+        );
+        assert!(!state.magnifier_shown());
+    }
+    pointer(&mut state, 70.0, 50.0, &mut dirty);
+    assert!(!state.magnifier_shown());
     super::super::handle_pointer_button(
         &mut state,
         crate::types::MouseButton::Left,
@@ -36,6 +59,8 @@ fn cursor_magnifier_follows_selection_phase_instead_of_only_enabled_flag() {
         &mut dirty,
     );
     assert!(state.magnifier_shown());
+    pointer(&mut state, 250.0, 180.0, &mut dirty);
+    assert!(state.selection.creating && state.magnifier_shown());
     super::super::handle_pointer_button(
         &mut state,
         crate::types::MouseButton::Left,
@@ -76,7 +101,6 @@ fn hiding_the_loupe_damages_previous_pixels_once() {
         (point.pos.0 as f32, point.pos.1 as f32),
         640.0,
         480.0,
-        false,
     );
     state.damage_rects.clear();
     dirty = 0;

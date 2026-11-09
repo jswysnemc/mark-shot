@@ -95,8 +95,6 @@ pub struct RenderRequest<'a> {
     pub selection_dirty: bool,
     pub magnifier: Option<&'a MagnifierState>,
     pub is_mag_monitor: bool,
-    /// Eyedropper only: the loupe also carries the colour plate under it.
-    pub mag_label: bool,
     pub toolbar: Option<&'a mut Toolbar>,
     pub action_toolbar: Option<&'a mut Toolbar>,
     pub settings_panel: Option<&'a mut SettingsPanel>,
@@ -248,7 +246,6 @@ pub(crate) fn render_frame_with_navigation(
             req.capture,
             (mag.pos.0 as f32, mag.pos.1 as f32),
             req.size,
-            req.mag_label,
         );
     }
 
