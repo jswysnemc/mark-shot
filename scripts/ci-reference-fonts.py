@@ -17,6 +17,7 @@ import hashlib
 import os
 from pathlib import Path
 import subprocess
+import sys
 import zipfile
 from xml.sax.saxutils import escape
 
@@ -54,10 +55,8 @@ def prepare(root):
     archive = root / "NotoSans-v2.015.zip"
     if not archive.exists():
         temporary = root / "download.zip.part"
-        subprocess.run(
-            ["curl", "--fail", "--location", "--retry", "3", "--connect-timeout", "30",
-             "--max-time", "300", "--output", str(temporary), URL], check=True,
-        )
+        subprocess.run([sys.executable, str(Path(__file__).with_name("ci-download.py")),
+                        URL, str(temporary), ARCHIVE_SHA256], check=True)
         checked(temporary.read_bytes(), ARCHIVE_SHA256, URL)
         temporary.replace(archive)
     checked(archive.read_bytes(), ARCHIVE_SHA256, str(archive))

@@ -99,7 +99,7 @@ jobs:
 
       - name: Collect dependency licenses
         run: |
-          curl -fsSLo target/cargo-about.tar.gz https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.3/cargo-about-0.9.3-x86_64-unknown-linux-musl.tar.gz
+          python3 scripts/ci-download.py https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.3/cargo-about-0.9.3-x86_64-unknown-linux-musl.tar.gz target/cargo-about.tar.gz 3ad1e94ea1e63d69d1961f4fb15ccbbe9575d906111f96d2cb4dce6df48f71b4
           printf '%s  %s\n' '3ad1e94ea1e63d69d1961f4fb15ccbbe9575d906111f96d2cb4dce6df48f71b4' 'target/cargo-about.tar.gz' | sha256sum --check
           mkdir -p target/cargo-about
           tar -xzf target/cargo-about.tar.gz --strip-components=1 -C target/cargo-about
@@ -122,8 +122,8 @@ jobs:
           assert rows[0]["sha256_hash"] == "e454f710f8a49f53aa5b4ff51e3454ae1835777e431c6c35c5255ce6f205fd68", "runtime distribution changed"
           PY
           mkdir -p target/native-runtime-notices
-          curl -fsSLo target/native-runtime-notices/LICENSE-ONNXRUNTIME.txt https://raw.githubusercontent.com/microsoft/onnxruntime/da9b5e364c465de65c49d91e696cd6485270757f/LICENSE
-          curl -fsSLo target/native-runtime-notices/NOTICES-ONNXRUNTIME.txt https://raw.githubusercontent.com/microsoft/onnxruntime/da9b5e364c465de65c49d91e696cd6485270757f/ThirdPartyNotices.txt
+          curl --retry 4 --connect-timeout 20 --max-time 180 -fsSLo target/native-runtime-notices/LICENSE-ONNXRUNTIME.txt https://raw.githubusercontent.com/microsoft/onnxruntime/da9b5e364c465de65c49d91e696cd6485270757f/LICENSE
+          curl --retry 4 --connect-timeout 20 --max-time 180 -fsSLo target/native-runtime-notices/NOTICES-ONNXRUNTIME.txt https://raw.githubusercontent.com/microsoft/onnxruntime/da9b5e364c465de65c49d91e696cd6485270757f/ThirdPartyNotices.txt
           printf '%s  %s\n' '2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c' 'target/native-runtime-notices/LICENSE-ONNXRUNTIME.txt' '0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2' 'target/native-runtime-notices/NOTICES-ONNXRUNTIME.txt' | sha256sum --check
 
       - name: Package native build
