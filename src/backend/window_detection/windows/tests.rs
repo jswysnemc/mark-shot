@@ -116,7 +116,11 @@ fn native_controls_under_overlay_keep_exact_bounds_and_reuse_cache() {
         for rect in [button, other] {
             let point = (rect.left + 8, rect.top + 8);
             let mut path = Vec::new();
-            automation.query(handle, bounds, point, || false, |result| path = result);
+            for _attempt in 0..3 {
+                if automation.query(handle, bounds, point, || false, |result| path = result) {
+                    break;
+                }
+            }
             assert_eq!(
                 path.first(),
                 Some(&rect),

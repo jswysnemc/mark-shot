@@ -4,7 +4,7 @@ use crate::features::region_detection::PixelRect;
 use std::time::{Duration, Instant};
 use windows::{
     Win32::{Foundation::HWND, System::Com::*, UI::Accessibility::*},
-    core::{Interface, Result},
+    core::{Error, Interface, Result},
 };
 
 struct Apartment;
@@ -36,18 +36,37 @@ impl Automation {
     /// 【Windows控件识别】【线程初始化】无参数，建立有超时限制的UIA缓存请求，返回独立线程资源或系统错误
     pub fn new() -> Result<Self> {
         unsafe {
-            CoInitializeEx(None, COINIT_MULTITHREADED).ok()?;
+            CoInitializeEx(None, COINIT_MULTITHREADED)
+                .ok()
+                .map_err(|error| context("initialize COM", error))?;
             let apartment = Apartment;
             let automation: IUIAutomation2 =
-                CoCreateInstance(&CUIAutomation8, None, CLSCTX_INPROC_SERVER)?;
-            automation.SetConnectionTimeout(40)?;
-            automation.SetTransactionTimeout(40)?;
-            let request = automation.CreateCacheRequest()?;
-            request.SetTreeScope(TreeScope(TreeScope_Element.0 | TreeScope_Children.0))?;
-            request.SetTreeFilter(&automation.ControlViewCondition()?)?;
-            request.SetAutomationElementMode(AutomationElementMode_Full)?;
-            request.AddProperty(UIA_BoundingRectanglePropertyId)?;
-            request.AddProperty(UIA_IsOffscreenPropertyId)?;
+                CoCreateInstance(&CUIAutomation8, None, CLSCTX_INPROC_SERVER)
+                    .map_err(|error| context("create UI Automation", error))?;
+            timeout("connection timeout", |milliseconds| {
+                automation.SetConnectionTimeout(milliseconds)
+            })?;
+            timeout("transaction timeout", |milliseconds| {
+                automation.SetTransactionTimeout(milliseconds)
+            })?;
+            let request = automation
+                .CreateCacheRequest()
+                .map_err(|error| context("create cache", error))?;
+            request
+                .SetTreeScope(TreeScope(TreeScope_Element.0 | TreeScope_Children.0))
+                .map_err(|error| context("cache tree scope", error))?;
+            request
+                .SetTreeFilter(&automation.ControlViewCondition()?)
+                .map_err(|error| context("control view filter", error))?;
+            request
+                .SetAutomationElementMode(AutomationElementMode_Full)
+                .map_err(|error| context("full element references", error))?;
+            request
+                .AddProperty(UIA_BoundingRectanglePropertyId)
+                .map_err(|error| context("bounding rectangle property", error))?;
+            request
+                .AddProperty(UIA_IsOffscreenPropertyId)
+                .map_err(|error| context("offscreen property", error))?;
             Ok(Self {
                 roots: Default::default(),
                 request,
@@ -127,6 +146,29 @@ impl Automation {
         }
         false
     }
+}
+
+/// 【Windows控件识别】【系统错误】按stage与error保留HRESULT并补充失败操作，返回可定位系统调用的错误
+fn context(stage: &str, error: Error) -> Error {
+    Error::new(error.code(), format!("{stage}: {error}"))
+}
+
+/// 【Windows控件识别】【超时兼容】按stage与apply选择系统接受的最短超时，参数不兼容才尝试更大值，返回最终设置结果
+fn timeout(stage: &str, apply: impl Fn(u32) -> Result<()>) -> Result<()> {
+    let mut failure = None;
+    for milliseconds in [40, 100, 250, 500, 1000, 2000] {
+        match apply(milliseconds) {
+            Ok(()) => {
+                log::info!("【Windows控件识别】【超时设置】{stage}: {milliseconds}ms");
+                #[cfg(test)]
+                println!("【Windows控件测试】【系统超时】{stage}: {milliseconds}ms");
+                return Ok(());
+            }
+            Err(error) if error.code().0 as u32 == 0x80070057 => failure = Some(error),
+            Err(error) => return Err(context(stage, error)),
+        }
+    }
+    Err(context(stage, failure.unwrap()))
 }
 
 /// 【Windows控件识别】【完整批次】按element读取本地缓存子节点，bounds裁切窗口，取消或超时不发布不完整兄弟顺序
