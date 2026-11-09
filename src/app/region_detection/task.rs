@@ -22,11 +22,17 @@ pub(super) struct Worker {
     cancelled: Arc<AtomicBool>,
 }
 
+#[cfg(test)]
+#[path = "worker_tests.rs"]
+mod tests;
+
 impl Drop for Worker {
-    /// 【截图区域识别】【任务回收】无参数、无返回值，取消未开始分析并回收唯一线程，不保留后台线程池
+    /// 【截图区域识别】【任务回收】无参数，取消未开始分析，已完成线程立即回收，慢分析自行释放原图而不阻塞输入
     fn drop(&mut self) {
         self.cancelled.store(true, Ordering::Relaxed);
-        if let Some(thread) = self.thread.take() {
+        if let Some(thread) = self.thread.take()
+            && thread.is_finished()
+        {
             let _ = thread.join();
         }
     }
@@ -100,6 +106,13 @@ pub(crate) fn start(
             return;
         }
     };
+    #[cfg(target_os = "windows")]
+    if config.window_detection.enabled {
+        match super::native::Native::new(windows, wake.clone(), space.bounds) {
+            Ok(native) => state.region_detection.native = Some(native),
+            Err(error) => log::error!("【截图控件识别】【启动失败】{error}"),
+        }
+    }
     let captures = state.captures.clone();
     let placements = state.placements.clone();
     let (sender, result) = mpsc::channel();
@@ -113,8 +126,9 @@ pub(crate) fn start(
             std::panic::catch_unwind(|| detect(&captures, &placements, space))
                 .unwrap_or_else(|_| Err("region detection worker panicked".into()))
         };
-        let _ = sender.send(result);
-        wake.notify();
+        if !flag.load(Ordering::Relaxed) && sender.send(result).is_ok() {
+            wake.notify();
+        }
     });
     state.region_detection.worker = Some(Worker {
         result,
@@ -125,6 +139,8 @@ pub(crate) fn start(
 
 /// 【截图区域识别】【完成接入】按 state 接收唯一后台结果并恢复当前悬停，dirty 返回需要重绘的显示器，无持续轮询
 pub(crate) fn poll(state: &mut EditorState, dirty: &mut u32) {
+    #[cfg(target_os = "windows")]
+    super::native::poll(state, dirty);
     let Some(worker) = state.region_detection.worker.take() else {
         return;
     };

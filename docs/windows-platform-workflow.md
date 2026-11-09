@@ -8,6 +8,16 @@ OCR 推理与独立结果编辑回归。
 
 ## 当前源码同构建复验
 
+Windows 智能选择现在使用截图前冻结的窗口层级、DWM 可见边框和后台 UI Automation 控件树。
+隐藏、最小化、DWM 隐藏及穿透分层窗口不参与候选；控件边界裁切到捕获范围，统一使用物理
+桌面坐标。鼠标移动只替换最新请求，过期结果不能更新选框；完整子节点批次按需缓存，滚轮
+沿真实父子范围切换。系统控件不可用时保留窗口与图像分析回退，取消不等待外部控件响应。
+
+全局 `PrintScreen` 被占用时使用专用低级键盘监听回退，仅处理配置组合并抑制长按重复；
+其他按键冲突继续明确报告。符号键保留当前键盘布局所需修饰键。监听随设置变更和后台退出
+释放，快捷键录入期间仍暂停。Windows 工作流加入实际截图键触发、控件边界和缓存回归；
+Wine 不支持本次 UI Automation 接口，因此 Wine 结果不作为控件识别性能证据。
+
 完整三组流程候选为 `target/current-windows-candidate-r1/mark-shot.exe`，44,253,696字节，SHA-256：
 `05bd9e34ddd8c02e644ac132ae077bbe7e1cdb660bad352632dbf28f5f83a829`。
 同目录保存 `DirectML.dll`、`build.json`、`source-manifest.json` 与 `source-inputs.tar.gz`。

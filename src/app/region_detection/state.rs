@@ -12,6 +12,8 @@ pub(super) struct Press {
 
 #[derive(Default)]
 pub(crate) struct State {
+    #[cfg(target_os = "windows")]
+    pub(super) native: Option<super::native::Native>,
     pub(super) space: Option<Space>,
     pub(super) windows: Vec<Window>,
     pub(super) detector: Option<Detector>,

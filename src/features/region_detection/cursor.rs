@@ -7,11 +7,26 @@ pub struct Cursor {
     current: Option<PixelRect>,
     anchor: Option<(i32, i32)>,
     manual_level: bool,
+    window: Option<PixelRect>,
 }
 
 impl Cursor {
     /// 【区域识别】【悬停更新】按 detector 与 point 更新候选，返回矩形，普通移动三像素与手动层级六像素内保留原框
     pub fn hover(&mut self, detector: &Detector, point: (i32, i32)) -> PixelRect {
+        self.hover_within(detector, point, None)
+    }
+
+    /// 【区域识别】【前窗悬停】按detector、point与window更新候选，切换最前窗口时立即清除旧层级
+    pub fn hover_within(
+        &mut self,
+        detector: &Detector,
+        point: (i32, i32),
+        window: Option<PixelRect>,
+    ) -> PixelRect {
+        if self.window != window {
+            self.reset();
+            self.window = window;
+        }
         let tolerance = if self.manual_level { 6.0 } else { 3.0 };
         if let (Some(current), Some(anchor)) = (self.current, self.anchor)
             && current.contains(point)
@@ -20,7 +35,10 @@ impl Cursor {
         {
             return current;
         }
-        let rect = detector.region_at(point);
+        let rect = window.map_or_else(
+            || detector.region_at(point),
+            |window| detector.region_within(point, window),
+        );
         self.current = Some(rect);
         self.anchor = Some(point);
         self.manual_level = false;
@@ -29,13 +47,26 @@ impl Cursor {
 
     /// 【区域识别】【层级切换】按 detector、point 与 direction 切换一层，正值扩大负值缩小，返回矩形并保存手动身份
     pub fn step(&mut self, detector: &Detector, point: (i32, i32), direction: i32) -> PixelRect {
-        let current = self.hover(detector, point);
+        self.step_within(detector, point, direction, None)
+    }
+
+    /// 【区域识别】【前窗滚轮】按detector、point、direction与window切换可见层级，返回候选并保存手动身份
+    pub fn step_within(
+        &mut self,
+        detector: &Detector,
+        point: (i32, i32),
+        direction: i32,
+        window: Option<PixelRect>,
+    ) -> PixelRect {
+        let current = self.hover_within(detector, point, window);
         let rect = if direction > 0 {
             detector
-                .adjacent(point, current, true)
+                .adjacent_within(point, current, true, window)
                 .unwrap_or(detector.bounds())
         } else if direction < 0 {
-            detector.adjacent(point, current, false).unwrap_or(current)
+            detector
+                .adjacent_within(point, current, false, window)
+                .unwrap_or(current)
         } else {
             current
         };

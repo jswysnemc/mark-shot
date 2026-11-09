@@ -24,17 +24,28 @@ pub(crate) fn refresh(state: &mut EditorState, dirty: &mut u32) {
         return;
     }
     let region = &mut state.region_detection;
+    #[cfg(target_os = "windows")]
+    if let Some(rect) = region
+        .native
+        .as_mut()
+        .and_then(|native| native.hover(state.input.pointer.global))
+    {
+        draw::apply(state, Some(rect));
+        apply_damage_rects(state, dirty);
+        return;
+    }
     let space = region.space.unwrap();
     let point = space.point(state.input.pointer.global);
     let rect = point
         .and_then(|point| {
+            let window = topmost(&region.windows, point);
             if let Some(detector) = &region.detector {
-                let rect = region.cursor.hover(detector, point);
+                let rect = region.cursor.hover_within(detector, point, window);
                 if rect != detector.bounds() || region.cursor.manual_level() {
                     return Some(rect);
                 }
             }
-            topmost(&region.windows, point)
+            window
         })
         .and_then(|rect| space.global(rect));
     draw::apply(state, rect);
@@ -51,6 +62,10 @@ pub(crate) fn sync(state: &mut EditorState, dirty: &mut u32) {
     state.region_detection.pressed = None;
     state.region_detection.cursor.reset();
     state.region_detection.worker = None;
+    #[cfg(target_os = "windows")]
+    {
+        state.region_detection.native = None;
+    }
     draw::apply(state, None);
     apply_damage_rects(state, dirty);
 }
@@ -102,6 +117,16 @@ pub(crate) fn scroll(state: &mut EditorState, event: ScrollEvent, dirty: &mut u3
         return false;
     }
     let region = &mut state.region_detection;
+    #[cfg(target_os = "windows")]
+    if let Some(rect) = region
+        .native
+        .as_mut()
+        .and_then(|native| native.step(event.angle_y()))
+    {
+        draw::apply(state, Some(rect));
+        apply_damage_rects(state, dirty);
+        return true;
+    }
     let Some(detector) = &region.detector else {
         return false;
     };
@@ -113,9 +138,12 @@ pub(crate) fn scroll(state: &mut EditorState, event: ScrollEvent, dirty: &mut u3
     if direction == 0.0 {
         return true;
     }
-    let rect = region
-        .cursor
-        .step(detector, point, if direction > 0.0 { 1 } else { -1 });
+    let rect = region.cursor.step_within(
+        detector,
+        point,
+        if direction > 0.0 { 1 } else { -1 },
+        topmost(&region.windows, point),
+    );
     draw::apply(state, space.global(rect));
     apply_damage_rects(state, dirty);
     true

@@ -106,6 +106,14 @@ impl Detector {
             .map_or(self.bounds(), |candidate| candidate.rect)
     }
 
+    /// 【区域识别】【前窗约束】按point与window只查找最前窗口内的图像控件，返回控件或真实前窗边界
+    pub fn region_within(&self, point: (i32, i32), window: PixelRect) -> PixelRect {
+        self.best(point, |candidate| {
+            !candidate.is_window() && window.contains_rect(candidate.rect)
+        })
+        .map_or(window, |candidate| candidate.rect)
+    }
+
     /// 【区域识别】【最优候选】按 point 与 eligible 筛选候选，返回排名最小者，相同排名保持已有顺序
     fn best(&self, point: (i32, i32), eligible: impl Fn(&Candidate) -> bool) -> Option<&Candidate> {
         let mut best: Option<&Candidate> = None;
@@ -127,9 +135,25 @@ impl Detector {
         current: PixelRect,
         parent: bool,
     ) -> Option<PixelRect> {
+        self.adjacent_within(point, current, parent, None)
+    }
+
+    /// 【区域识别】【前窗层级】按point、current与parent查询window内包含层级，排除被遮挡窗口，返回相邻候选
+    pub(super) fn adjacent_within(
+        &self,
+        point: (i32, i32),
+        current: PixelRect,
+        parent: bool,
+        window: Option<PixelRect>,
+    ) -> Option<PixelRect> {
         let mut best: Option<PixelRect> = None;
         for candidate in &self.candidates {
             let rect = candidate.rect;
+            if window.is_some_and(|window| {
+                !window.contains_rect(rect) || candidate.is_window() && rect != window
+            }) {
+                continue;
+            }
             if rect == current
                 || !rect.contains(point)
                 || !(if parent {

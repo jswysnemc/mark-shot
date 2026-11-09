@@ -1,5 +1,6 @@
 //! 【窗口识别】【逻辑边界】校验整数矩形并按实际几何去重
 
+#[cfg(target_os = "linux")]
 use super::Window;
 use tiny_skia::Rect;
 
@@ -20,6 +21,7 @@ pub(super) fn rect(x: f64, y: f64, width: f64, height: f64) -> Option<Rect> {
 }
 
 /// 【窗口识别】【候选追加】按 windows、rect、z_order 追加有效窗口，重复矩形保留较高层级，无返回值
+#[cfg(target_os = "linux")]
 pub(super) fn append(windows: &mut Vec<Window>, rect: Rect, z_order: Option<i32>) {
     if let Some(window) = windows.iter_mut().find(|window| window.rect == rect) {
         window.z_order = window.z_order.max(z_order);

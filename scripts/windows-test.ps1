@@ -43,6 +43,9 @@ try {
     $env:PATH = "$(Join-Path $root 'target/x86_64-pc-windows-msvc/debug');$oldPath"
     Invoke-UnitTests 'image-stitch' @('-p', 'shot-image', '-p', 'shot-stitch')
     $groups = @(
+        'features::desktop::hotkeys::windows::tests::',
+        'backend::window_detection::',
+        'app::region_detection::',
         'backend::windows::native::',
         'backend::windows::clipboard::image_tests::',
         'config::tests::',
@@ -55,6 +58,7 @@ try {
         $name = $group.Replace('::', '-').TrimEnd('-')
         Invoke-UnitTests $name @('-p', 'mark-shot', '--lib', $group, '--', '--test-threads=1')
     }
+    Invoke-UnitTests 'windows-ui-automation' @('-p', 'mark-shot', '--lib', 'backend::window_detection::windows::tests::', '--', '--ignored', '--test-threads=1', '--nocapture')
 }
 finally {
     $env:PATH = $oldPath

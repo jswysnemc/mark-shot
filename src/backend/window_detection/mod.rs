@@ -3,10 +3,12 @@
 mod geometry;
 #[cfg(target_os = "linux")]
 mod niri;
+#[cfg(any(target_os = "windows", test))]
+pub(crate) mod requests;
 #[cfg(target_os = "linux")]
 mod sway;
 #[cfg(target_os = "windows")]
-mod windows;
+pub(crate) mod windows;
 
 use crate::backend::session::Session as Connection;
 #[cfg(target_os = "linux")]
@@ -20,6 +22,8 @@ type Result<T> = crate::backend::wayland::niri::Result<T>;
 pub struct Window {
     pub rect: Rect,
     pub z_order: Option<i32>,
+    #[cfg(target_os = "windows")]
+    pub native_id: usize,
 }
 
 /// 【窗口识别】【捕获快照】按 connection 读取同一合成器的可见窗口，返回全局逻辑矩形；不创建表面或长期连接

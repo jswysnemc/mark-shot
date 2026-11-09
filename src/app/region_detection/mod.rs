@@ -4,6 +4,8 @@ pub(crate) mod draw;
 mod geometry;
 pub(crate) mod input;
 pub(crate) mod motion;
+#[cfg(target_os = "windows")]
+mod native;
 mod state;
 pub(crate) mod task;
 

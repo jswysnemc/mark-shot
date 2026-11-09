@@ -9,6 +9,26 @@ use crate::{
 };
 use tiny_skia::{Color, Pixmap, Rect};
 
+/// 【截图区域识别回归】【遮挡顺序】无参数，图像分析完成后仍选择最前窗口，后台较小窗口不能覆盖真实层级
+#[test]
+fn completed_image_analysis_does_not_select_an_occluded_window() {
+    let mut state = editor(false, true, 1.0);
+    let front = state.region_detection.windows[0].rect;
+    let behind = PixelRect::new(100, 80, 140, 100);
+    state.region_detection.windows.push(Window {
+        rect: behind,
+        z_order: Some(1),
+    });
+    let mut detector = Detector::from_candidates(640, 480, vec![]);
+    detector.add_windows(&[front, behind]);
+    state.region_detection.detector = Some(detector);
+    pointer(&mut state, 130.0, 120.0, &mut 0);
+    assert_eq!(
+        state.region_detection.hovered,
+        Rect::from_xywh(40.0, 40.0, 360.0, 250.0)
+    );
+}
+
 /// 【截图区域识别回归】【输入环境】按 image、windows 与 scale 建立冻结截图和独立候选，返回可直接输入的编辑器
 fn editor(image: bool, windows: bool, scale: f32) -> EditorState {
     let mut state = crate::app::input::tests::editor();
