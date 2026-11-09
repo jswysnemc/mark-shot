@@ -173,7 +173,7 @@ impl ScreenOverlay for WaylandOverlay {
             .state
             .outputs
             .iter()
-            .find(|output| output.wl_output == *target)
+            .find(|output| output.wl_output.as_ref() == Some(target))
     }
     /// 【主选择区】【协议启用】在运行时 globals 与当前座席上绑定协议，无参数，返回支持状态
     fn enable_primary_selection(&mut self) -> bool {
@@ -491,7 +491,10 @@ impl ScreenOverlay for WaylandOverlay {
 
         let output = rt.state.probe.take()?.output?;
         let _ = rt.event_queue.flush();
-        rt.state.outputs.iter().position(|o| o.wl_output == output)
+        rt.state
+            .outputs
+            .iter()
+            .position(|o| o.wl_output.as_ref() == Some(&output))
     }
 
     fn retain_outputs(&mut self, keep: &[usize]) -> Result<(), Box<dyn std::error::Error>> {

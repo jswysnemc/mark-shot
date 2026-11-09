@@ -13,7 +13,6 @@ use ashpd::desktop::{
     screencast::{CursorMode, Screencast, SelectSourcesOptions, SourceType, Streams},
 };
 use async_trait::async_trait;
-use std::os::fd::AsFd;
 
 struct Source {
     output: usize,
@@ -25,6 +24,7 @@ pub(super) struct PortalCapture {
     session: Option<Session<Screencast>>,
     sources: Vec<Source>,
     restore_token: Option<String>,
+    first_frame_after: Option<tokio::time::Instant>,
 }
 
 /// 【Portal捕获】【授权请求】按 proxy、token 与 include_cursor 创建会话，返回授权结果，失败先关闭已经创建的会话
@@ -90,6 +90,9 @@ impl PortalCapture {
             session: Some(session),
             sources: Vec::new(),
             restore_token: response.restore_token().map(str::to_owned),
+            first_frame_after: Some(
+                tokio::time::Instant::now() + std::time::Duration::from_millis(350),
+            ),
         };
         let setup: Result<()> = async {
             let streams = response
@@ -102,11 +105,12 @@ impl PortalCapture {
                 })
                 .collect();
             let streams = reconcile(streams, outputs)?;
-            let fd = proxy
-                .open_pipe_wire_remote(capture.session.as_ref().unwrap(), Default::default())
-                .await?;
             for (output, info) in streams {
-                let stream = PipewireStream::new(info.node_id, fd.as_fd())?;
+                // 1. 【Portal捕获】【独立连接】每个原生客户端需要独立套接字，复制描述符不能隔离PipeWire协议状态
+                let fd = proxy
+                    .open_pipe_wire_remote(capture.session.as_ref().unwrap(), Default::default())
+                    .await?;
+                let stream = PipewireStream::new(info.node_id, fd)?;
                 capture.sources.push(Source {
                     output,
                     info,
@@ -135,6 +139,11 @@ impl CaptureSession for PortalCapture {
         if self.session.is_none() {
             return Err("the portal capture session is closed".into());
         }
+        // 1. 【Portal捕获】【授权过渡】Start响应先于GNOME选择窗口关闭动画，首次激活流前留出动画结束时间
+        if let Some(deadline) = self.first_frame_after {
+            tokio::time::sleep_until(deadline).await;
+            self.first_frame_after = None;
+        }
         let mut frames = Vec::with_capacity(self.sources.len());
         for source in &mut self.sources {
             let frame = source.stream.next_frame().await?;
@@ -151,7 +160,7 @@ impl CaptureSession for PortalCapture {
                 },
             });
         }
-        // 1. 【Portal捕获】【成功授权】只有真正收到原始像素后才保存恢复令牌
+        // 2. 【Portal捕获】【成功授权】只有真正收到原始像素后才保存恢复令牌
         if let Some(token) = self.restore_token.take() {
             token::write_token(&token);
         }

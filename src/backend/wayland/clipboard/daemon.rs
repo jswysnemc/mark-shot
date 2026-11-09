@@ -16,6 +16,22 @@ pub fn cli(args: impl Iterator<Item = String>) {
     let text = args.iter().any(|a| a == TEXT_ARG);
     let primary = args.iter().any(|a| a == PRIMARY_ARG);
 
+    match crate::backend::x11::clipboard::use_x11() {
+        Ok(true) => {
+            if let Err(error) = crate::backend::x11::clipboard::serve(text, primary) {
+                println!("{}", error.to_string().replace('\n', " "));
+                error!("【X11剪贴板】【服务失败】{error}");
+                std::process::exit(1);
+            }
+            return;
+        }
+        Err(error) => {
+            println!("{}", error.to_string().replace('\n', " "));
+            std::process::exit(1);
+        }
+        Ok(false) => {}
+    }
+
     if !text {
         if let Err(error) = super::image_service::serve(primary) {
             println!("{}", error.to_string().replace('\n', " "));

@@ -48,7 +48,7 @@ impl WaylandOverlay {
             .map(|o| {
                 let scale = if hidpi { o.scale() } else { 1.0 };
                 (
-                    o.wl_output.clone(),
+                    o.wl_output.clone().expect("Wayland overlay output"),
                     o.info.logical_size.unwrap_or((0, 0)),
                     scale,
                 )

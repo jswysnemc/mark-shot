@@ -3,6 +3,8 @@ pub mod capture;
 pub mod cursor;
 pub mod events;
 pub mod frozen_pixmap;
+#[cfg(target_os = "linux")]
+pub mod linux_output;
 pub mod marker_shape;
 pub mod pointer_motion;
 pub mod popup;

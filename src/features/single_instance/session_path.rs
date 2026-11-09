@@ -19,7 +19,26 @@ pub(super) struct SessionPath {
 
 impl SessionPath {
     /// 【单实例】【内核会话】按 connection 的合成器 PID 与用户创建当前运行目录内的路径，返回校验错误，不创建表面
-    pub fn for_connection(connection: &wayland_client::Connection) -> crate::AppResult<Self> {
+    pub fn for_connection(connection: &crate::backend::session::Session) -> crate::AppResult<Self> {
+        let connection = match connection {
+            crate::backend::session::Session::Wayland(connection) => connection,
+            crate::backend::session::Session::X11(display) => {
+                let root = std::env::var_os("XDG_RUNTIME_DIR")
+                    .ok_or("single-instance capture requires XDG_RUNTIME_DIR")?;
+                let uid = nix::unistd::Uid::effective().as_raw();
+                let name = std::env::var("DISPLAY").unwrap_or_default();
+                let identity = crc32fast::hash(name.as_bytes());
+                let mut path = Self::new(Path::new(&root), 1, uid)?;
+                let directory = path
+                    .socket
+                    .parent()
+                    .ok_or("invalid X11 runtime directory")?;
+                let stem = format!("x11-{identity:08x}-{}", display.screen().root);
+                path.lock = directory.join(format!("{stem}.lock"));
+                path.socket = directory.join(format!("{stem}.sock"));
+                return Ok(path);
+            }
+        };
         let peer = getsockopt(&connection.backend().poll_fd(), PeerCredentials)?;
         if peer.pid() <= 0 || peer.uid() != nix::unistd::Uid::effective().as_raw() {
             return Err("Wayland compositor does not belong to the current user".into());

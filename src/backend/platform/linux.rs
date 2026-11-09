@@ -4,26 +4,30 @@ use super::super::{
     CaptureMethod, ClipboardProvider, Notifier, OverlayShell, ScreenOverlay, capture_chain, notify,
     wayland,
 };
+use crate::backend::session::Session;
 use log::info;
 use wayland_client::Connection;
 
 /// 【Wayland】【捕获初始化】为普通截图选择原生后端；默认不捕获鼠标指针
-pub fn initialize_capture(conn: &Connection) -> Box<dyn CaptureMethod> {
+pub fn initialize_capture(conn: &Session) -> Box<dyn CaptureMethod> {
     initialize_capture_with_cursor(conn, false)
 }
 
 /// 【Wayland】【窗口后端选择】按 conn、指针与复制授权选择精确窗口后端；返回不使用显示器裁切的捕获器
 pub fn initialize_window_capture(
-    conn: &Connection,
+    conn: &Session,
     include_cursor: bool,
     allow_clipboard: bool,
 ) -> Box<dyn CaptureMethod> {
+    let Session::Wayland(conn) = conn else {
+        return initialize_capture_with_cursor(conn, include_cursor);
+    };
     let forced = std::env::var("MARK_SHOT_CAPTURE").unwrap_or_default();
     if matches!(
         forced.as_str(),
         "kde" | "image-copy" | "screencopy" | "portal"
     ) {
-        return initialize_capture_with_cursor(conn, include_cursor);
+        return wayland_capture_with_cursor(conn, include_cursor);
     }
     if !forced.is_empty() && forced != "niri-window" {
         info!("【Wayland】【窗口后端选择】忽略未知后端 {forced}");
@@ -55,9 +59,20 @@ pub fn initialize_window_capture(
 
 /// 【Wayland】【捕获初始化】根据桌面和协议选择后端；include_cursor 控制是否合成鼠标指针
 pub fn initialize_capture_with_cursor(
-    conn: &Connection,
+    conn: &Session,
     include_cursor: bool,
 ) -> Box<dyn CaptureMethod> {
+    match conn {
+        Session::Wayland(connection) => wayland_capture_with_cursor(connection, include_cursor),
+        Session::X11(display) => Box::new(crate::backend::x11::capture::Method {
+            display: display.clone(),
+            include_cursor,
+        }),
+    }
+}
+
+/// 【Wayland】【捕获分发】按conn和include_cursor选择原生或门户捕获，返回捕获链
+fn wayland_capture_with_cursor(conn: &Connection, include_cursor: bool) -> Box<dyn CaptureMethod> {
     let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
     let forced = std::env::var("MARK_SHOT_CAPTURE").unwrap_or_default();
     if matches!(
@@ -114,8 +129,16 @@ fn capture_method(name: &str, conn: &Connection, include_cursor: bool) -> Box<dy
 }
 
 pub fn initialize_overlay(
-    conn: Connection,
+    conn: Session,
 ) -> Result<Box<dyn ScreenOverlay>, Box<dyn std::error::Error>> {
+    let conn = match conn {
+        Session::X11(display) => {
+            return Ok(Box::new(crate::backend::x11::overlay::Overlay::new(
+                display,
+            )?));
+        }
+        Session::Wayland(connection) => connection,
+    };
     let layer = match crate::config::get().general.overlay {
         OverlayShell::Auto => true,
         shell => shell == OverlayShell::Layer,

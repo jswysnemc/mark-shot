@@ -2,7 +2,16 @@
 
 mod scroll;
 #[cfg(target_os = "linux")]
-pub use super::wayland::window::{WindowWake, run};
+pub use super::wayland::window::WindowWake;
+
+/// 【Linux窗口】【运行分发】按spec和content启动当前协议的原生窗口，返回生命周期结果
+#[cfg(target_os = "linux")]
+pub fn run(spec: WindowSpec, content: impl WindowContent + 'static) -> crate::AppResult {
+    match super::session::Session::connect_to_env()? {
+        super::session::Session::Wayland(_) => super::wayland::window::run(spec, content),
+        super::session::Session::X11(display) => super::x11::window::run(display, spec, content),
+    }
+}
 #[cfg(target_os = "windows")]
 pub use super::windows::window::{WindowWake, run};
 pub use scroll::{ScrollInput, ScrollSource};

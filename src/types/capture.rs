@@ -29,14 +29,14 @@ pub fn px_size((w, h): (u32, u32), scale: f32) -> (u32, u32) {
 }
 // Wayland outputs
 #[cfg(target_os = "linux")]
-use smithay_client_toolkit::output::OutputInfo as SctkOutputInfo;
+use super::linux_output::Info as SctkOutputInfo;
 #[cfg(target_os = "linux")]
 use wayland_client::protocol::wl_output;
 
 #[cfg(target_os = "linux")]
 #[derive(Debug, Clone)]
 pub struct Output {
-    pub wl_output: wl_output::WlOutput,
+    pub wl_output: Option<wl_output::WlOutput>,
     pub info: SctkOutputInfo,
 }
 

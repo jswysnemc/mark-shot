@@ -7,7 +7,7 @@ name = "mark-shot"
 version = "0.2.0"
 edition = "2024"
 rust-version = "1.95"
-description = "Native Rust screenshot and annotation tool for Linux Wayland"
+description = "Native Rust screenshot and annotation tool for Linux X11, Wayland and Windows"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 
@@ -56,6 +56,9 @@ md-5 = "0.10"
 url = "2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
+x11rb = { version = "0.14", features = ["randr", "xfixes", "shape", "xkb", "allow-unsafe-code"] }
+xkbcommon = { version = "0.9", default-features = false, features = ["x11"] }
+xim = { version = "0.6", features = ["x11rb-client", "x11rb-xcb"] }
 zbus = { version = "5.14.0", features = ["tokio"] }
 ashpd = { version = "0.13.9", features = ["screencast", "pipewire", "settings"] }
 pipewire = "0.9.2"
@@ -77,6 +80,9 @@ default = ["ocr-dynamic"]
 ocr-dynamic = ["ort/load-dynamic"]
 bundled-ocr = ["oar-ocr/download-binaries"]
 ocr-gpu = ["bundled-ocr", "dep:lzma-rust2", "oar-ocr/webgpu"]
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+xim = { version = "0.6", features = ["x11rb-server"] }
 
 [lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

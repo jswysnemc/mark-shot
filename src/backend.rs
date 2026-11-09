@@ -11,6 +11,8 @@ pub mod wayland;
 pub mod window;
 #[cfg(target_os = "windows")]
 pub mod windows;
+#[cfg(target_os = "linux")]
+pub mod x11;
 pub use platform::{
     initialize_capture, initialize_capture_with_cursor, initialize_clipboard, initialize_notifier,
     initialize_overlay, initialize_window_capture,
@@ -243,20 +245,7 @@ pub enum OverlayShell {
     Layer,
 }
 
-/// Selection of backend for displaying on the screenshot and interface screen
-/// GNOME is not supported and has not been tested yet.
-///
-/// layer_shell works as a system overlay; it will be on top of everything else, so the screenshot
-/// cannot be temporarily moved to another desktop or minimized, which seems non-optimal.
-/// Therefore, a forced full-screen window is used as default.
-///
-/// Niri, and likely other scroll managers, places every new full-screen window on the side
-/// making the user experience clunky since every trigger plays an animation of opening a new app.
-/// Therefore, layer_shell is used there instead.
-///
-/// COSMIC gets layer_shell too since a full-screen window there flashes gray while it opens,
-/// and there is few focus grabbing issues.
-/// Make sense to return to Window if these issues get fixed
+/// 【系统通知】【平台契约】交付通知内容并返回系统服务结果，与截图表面协议选择分离
 #[async_trait]
 pub trait Notifier {
     async fn notify(

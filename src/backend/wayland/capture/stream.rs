@@ -5,7 +5,7 @@ mod pixels;
 mod worker;
 
 use std::{
-    os::fd::BorrowedFd,
+    os::fd::OwnedFd,
     sync::{Arc, Mutex},
     thread::JoinHandle,
     time::Duration,
@@ -52,16 +52,15 @@ impl Drop for PendingRequest {
 }
 
 impl PipewireStream {
-    /// 【PipeWire】【会话建立】按 node_id 和授权 fd 建立唯一后台流，返回句柄；设置错误由首帧请求交付
-    pub fn new(node_id: u32, fd: BorrowedFd<'_>) -> std::io::Result<Self> {
-        let owned = fd.try_clone_to_owned()?;
+    /// 【PipeWire】【会话建立】按 node_id 接管独立授权 fd 并建立唯一后台流，返回句柄；设置错误由首帧请求交付
+    pub fn new(node_id: u32, fd: OwnedFd) -> std::io::Result<Self> {
         let (commands, receiver) = pipewire::channel::channel();
         let failure = Arc::new(Mutex::new(None));
         let thread_failure = failure.clone();
         let thread = std::thread::Builder::new()
             .name("mark-shot-pipewire".into())
             .spawn(move || {
-                if let Err(error) = worker::run(node_id, owned, receiver, thread_failure.clone()) {
+                if let Err(error) = worker::run(node_id, fd, receiver, thread_failure.clone()) {
                     *thread_failure.lock().unwrap() = Some(error);
                 }
             })?;

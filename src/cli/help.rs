@@ -1,5 +1,5 @@
 pub(super) const HELP: &str = "\
-Mark Shot - native Rust screenshot editor for Linux Wayland and Windows
+Mark Shot - native Rust screenshot editor for Linux X11, Wayland and Windows
 
 Usage: mark-shot [OPTIONS] [IMAGE]
 
@@ -8,7 +8,7 @@ Capture and editing:
   -m, --monitor                 Capture the monitor under the pointer (default)
   --fullscreen, --full-screen   Open the editor with the complete capture selected
   -f, --full                    Capture immediately without the editor
-  -w, --window                  Capture the active window (KDE; niri requires copying)
+  -w, --window                  Capture the active window (X11, KDE; niri requires copying)
   -r, --select-region           Drag a region and finish immediately
   --ocr                         Select a region for builtin OCR; first use offers models
   -S, --scroll                  Select a region and stitch a scrolling screenshot

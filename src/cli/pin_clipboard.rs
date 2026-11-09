@@ -16,6 +16,13 @@ const TEXT_LIMIT: u64 = 64 * 1024;
 /// 【贴图】【剪贴板读取】读取指定 MIME 数据；超过上限时返回错误，不无界增长缓冲
 #[cfg(target_os = "linux")]
 fn read(mime: MimeType<'_>, limit: u64) -> AppResult<Vec<u8>> {
+    if crate::backend::x11::clipboard::use_x11()? {
+        let target = match mime {
+            MimeType::Specific(target) => target,
+            _ => "UTF8_STRING",
+        };
+        return crate::backend::x11::clipboard::read(target, false, limit as usize);
+    }
     let (reader, _) = get_contents(ClipboardType::Regular, Seat::Unspecified, mime)?;
     let mut bytes = Vec::new();
     reader.take(limit + 1).read_to_end(&mut bytes)?;

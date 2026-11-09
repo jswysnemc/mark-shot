@@ -1,8 +1,7 @@
 //! 【Windows贴图】【命令入口】共享贴图参数与进程交接，原生运行时独立实现
 
-#[path = "pin/runtime.rs"]
-mod runtime;
 use crate::AppResult;
+use crate::features::pinned_image::native_window as runtime;
 pub use runtime::run;
 pub const PIN_ARG: &str = "--pin";
 pub const SCALE_ARG: &str = "--scale";

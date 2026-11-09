@@ -491,9 +491,17 @@ pub fn copy_to_primary(text: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(target_os = "linux")]
+/// 【Linux剪贴板】【正文读取】无参数，按当前桌面选择原生协议并返回UTF-8正文，失败返回空值
 pub fn paste_from_clipboard() -> Option<String> {
     use std::io::Read;
     use wl_clipboard_rs::paste::{ClipboardType, MimeType, Seat, get_contents};
+
+    if crate::backend::x11::clipboard::use_x11().ok()? {
+        return String::from_utf8(
+            crate::backend::x11::clipboard::read("UTF8_STRING", false, 4 * 1024 * 1024).ok()?,
+        )
+        .ok();
+    }
 
     let (mut pipe, _) =
         get_contents(ClipboardType::Regular, Seat::Unspecified, MimeType::Text).ok()?;

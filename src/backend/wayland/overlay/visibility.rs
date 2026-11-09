@@ -52,7 +52,7 @@ impl WaylandOverlay {
                     .state
                     .outputs
                     .iter()
-                    .position(|output| output.wl_output == *target)
+                    .position(|output| output.wl_output.as_ref() == Some(target))
                     .ok_or("the original capture output is no longer available")
             })
             .collect::<Result<Vec<_>, _>>()?;

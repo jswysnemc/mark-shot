@@ -41,7 +41,7 @@ fn threads() -> usize {
 /// 【持续捕获回归】【验证入口】以args指定结果文件，运行生产Portal会话并检查重复读帧、暂停和关闭，返回验证结果
 pub(super) async fn run(args: &[String]) -> mark_shot::AppResult {
     mark_shot::config::init(None, |_| {});
-    let conn = wayland_client::Connection::connect_to_env()?;
+    let conn = mark_shot::backend::session::Session::connect_to_env()?;
     let overlay = mark_shot::backend::initialize_overlay(conn)?;
     let output = overlay
         .discovered_outputs()

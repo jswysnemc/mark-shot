@@ -232,8 +232,18 @@ pub(super) fn run_at_seed(
     initial_position: Option<(i32, i32)>,
     seed: Option<crate::features::image_translation::seed::Seed>,
 ) -> AppResult {
+    let connection = match crate::backend::session::Session::connect_to_env()? {
+        crate::backend::session::Session::Wayland(connection) => connection,
+        crate::backend::session::Session::X11(_) => {
+            return crate::features::pinned_image::native_window::run_at_seed(
+                bytes,
+                density,
+                initial_position,
+                seed,
+            );
+        }
+    };
     let mut image = PinnedImage::decode(bytes, density)?;
-    let connection = Connection::connect_to_env()?;
     let (globals, queue) = registry_queue_init(&connection)?;
     let qh = queue.handle();
     let mut event_loop: EventLoop<Pin> = EventLoop::try_new()?;

@@ -36,9 +36,10 @@ impl OverlayState {
             .output_state
             .outputs()
             .filter_map(|wl_output| {
-                self.output_state
-                    .info(&wl_output)
-                    .map(|info| Output { wl_output, info })
+                self.output_state.info(&wl_output).map(|info| Output {
+                    wl_output: Some(wl_output),
+                    info: info.into(),
+                })
             })
             .collect();
     }

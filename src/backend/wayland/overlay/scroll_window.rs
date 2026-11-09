@@ -107,7 +107,7 @@ impl WaylandOverlay {
             .state
             .outputs
             .iter()
-            .find(|output| output.wl_output == *target)
+            .find(|output| output.wl_output.as_ref() == Some(target))
             .ok_or("the scroll window output is gone")?;
         let (width, height) = output
             .info

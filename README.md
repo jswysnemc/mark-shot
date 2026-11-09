@@ -1,6 +1,7 @@
 # Mark Shot
 
-面向 Wayland 与 Windows 的 Rust 截图与标注应用。Windows 主应用已接入原生截图、
+面向 Linux X11、Wayland 与 Windows 的 Rust 截图与标注应用。Linux 提供原生 X11 后端，
+GNOME Wayland 支持门户多屏捕获，已验证范围见 [Linux 桌面兼容](docs/linux-desktops.md)。Windows 主应用已接入原生截图、
 编辑、系统剪贴板、保存、基本贴图和 OCR 结果流程，并通过私有 Wine 实际回归；完整 Windows 交互和
 真实 Windows 11 验证仍未完成。界面使用 tiny-skia 和 cosmic-text 绘制，Wayland
 通过共享内存表面交付，不依赖 Qt、GTK、浏览器或 WebView。可运行候选、证据和
@@ -36,7 +37,7 @@ R20 计入未映射文件与原生共享页后，普通 4K 稳定 RSS 为 67.4 M
 Linux 普通截图与全屏编辑共用单实例，再次启动会转交命令并退出；延迟期间的新请求替换尚未开始
 的期限和范围，活动截图保持当前编辑内容。另存为窗口也接收转交，作用范围与证据见
 [单实例对照](docs/single-instance-compatibility.md)。
-活动窗口截图支持 KDE 与 niri。niri 的兼容截图接口会写入剪贴板，因此本次输出必须包含
+活动窗口截图支持 X11、KDE Wayland 与 niri。X11 捕获活动窗口的可见客户区。niri 的兼容截图接口会写入剪贴板，因此本次输出必须包含
 复制，例如 `--window --to c` 或 `--window --to co`；仅保存、贴图或标准输出时明确拒绝。
 精确窗口、透明度、指针与当前支持边界见 [活动窗口截图](docs/window-capture-compatibility.md)。
 编辑器保存、另存为和复制支持原版 Mac 风格外框，默认关闭，通过 `export.image_frame`
@@ -85,13 +86,13 @@ Windows 可改选系统 OCR，使用系统已经安装的语言包。选择和�
 Arch Linux 构建依赖：
 
 ```sh
-sudo pacman -S --needed rust pkgconf wayland libxkbcommon pipewire fontconfig
+sudo pacman -S --needed rust pkgconf wayland libxkbcommon libxkbcommon-x11 libxcb pipewire fontconfig
 ```
 
 Debian / Ubuntu 构建依赖：
 
 ```sh
-sudo apt install cargo rustc pkg-config libwayland-dev libxkbcommon-dev libpipewire-0.3-dev libssl-dev libfontconfig-dev fontconfig
+sudo apt install cargo rustc pkg-config libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libpipewire-0.3-dev libssl-dev libfontconfig-dev fontconfig
 ```
 
 发行版自带 Rust 版本不足时，应使用 rustup 提供的稳定工具链。
@@ -363,7 +364,8 @@ uv run --no-project --python /usr/bin/python3 python scripts/wayland_test_runtim
 验证脚本需要 niri、Xvfb、niri-use、xdotool、wtype、grim 和 Pillow；滤镜独立参考还使用
 NumPy。这些工具不属于应用运行时依赖。
 独立运行器仅在私有 Xvfb 中使用固定键码，避免连续会话下临时虚拟键盘漏发映射；应用
-仍只连接私有 Wayland，不提供 X11 后端。标记、尺子、双框放大镜及独立序号分别使用
+仍只连接私有 Wayland。原生 X11 后端使用独立的 `scripts/x11-desktop-workflow.py` 验证。
+标记、尺子、双框放大镜及独立序号分别使用
 `scripts/wayland-marker.py`、`scripts/wayland-ruler.py`、`scripts/wayland-magnifier.py`、
 `scripts/wayland-number.py`；箭头、线型和控制点使用 `scripts/wayland-arrow.py`，原图滤镜
 使用 `scripts/wayland-filter.py`。截图历史完整流程使用 `scripts/wayland-history.py`，首次

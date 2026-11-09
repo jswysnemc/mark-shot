@@ -34,7 +34,7 @@ pub(crate) struct Owner {
 impl Owner {
     /// 【单实例】【截图入口】按 connection、request 与初始 plan 占用当前会话，返回所属实例或已完成转交，不创建表面
     pub async fn start(
-        connection: &wayland_client::Connection,
+        connection: &crate::backend::session::Session,
         request: Request,
         plan: Plan,
     ) -> crate::AppResult<Entry> {

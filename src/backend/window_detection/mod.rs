@@ -25,6 +25,15 @@ pub struct Window {
 /// 【窗口识别】【捕获快照】按 connection 读取同一合成器的可见窗口，返回全局逻辑矩形；不创建表面或长期连接
 #[cfg(target_os = "linux")]
 pub async fn snapshot(connection: &Connection) -> Vec<Window> {
+    let connection = match connection {
+        Connection::Wayland(connection) => connection,
+        Connection::X11(display) => {
+            return crate::backend::x11::windows::snapshot(display).unwrap_or_else(|error| {
+                log::info!("【X11窗口识别】【查询失败】{error}");
+                Vec::new()
+            });
+        }
+    };
     let work = async {
         if let Some(path) = std::env::var_os("NIRI_SOCKET") {
             niri::snapshot(connection, path.as_ref()).await

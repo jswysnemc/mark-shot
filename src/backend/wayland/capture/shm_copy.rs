@@ -113,7 +113,7 @@ pub(super) async fn capture<P: Protocol>(
     let targets: Vec<Target> = outputs
         .iter()
         .map(|o| Target {
-            wl_output: o.wl_output.clone(),
+            wl_output: o.wl_output.clone().expect("Wayland capture output"),
             transform: o.info.transform,
             size: o.info.logical_size,
             position: o.info.logical_position,

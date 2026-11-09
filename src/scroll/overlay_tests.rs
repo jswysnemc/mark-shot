@@ -4,12 +4,14 @@
 use crate::backend::ScreenOverlay;
 
 fn presented_overlay() -> (
-    wayland_client::Connection,
+    crate::backend::session::Session,
     Box<dyn ScreenOverlay>,
     Vec<crate::types::Output>,
 ) {
     crate::config::init(None, |_| {});
-    let conn = wayland_client::Connection::connect_to_env().unwrap();
+    let conn = crate::backend::session::Session::Wayland(
+        wayland_client::Connection::connect_to_env().unwrap(),
+    );
     let mut overlay = crate::backend::initialize_overlay(conn.clone()).unwrap();
     let outputs = overlay.discovered_outputs().to_vec();
     let targets: Vec<usize> = (0..outputs.len()).collect();

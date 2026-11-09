@@ -66,7 +66,7 @@ fn bind(outputs: Vec<Output>) -> Result<Binding> {
         let version = version.ok_or("the continuous capture output is gone")?;
         let wl_output = globals.registry().bind(id, version, &qh, ());
         bound.push(Output {
-            wl_output,
+            wl_output: Some(wl_output),
             info: output.info,
         });
     }
@@ -110,8 +110,10 @@ impl Drop for Binding {
     /// 【持续捕获】【输出释放】释放支持 release 的绑定并提交销毁请求，无参数，最终连接关闭回收其余对象
     fn drop(&mut self) {
         for output in &self.outputs {
-            if output.wl_output.version() >= 3 {
-                output.wl_output.release();
+            if let Some(wl_output) = &output.wl_output
+                && wl_output.version() >= 3
+            {
+                wl_output.release();
             }
         }
         let _ = self.connection.flush();
