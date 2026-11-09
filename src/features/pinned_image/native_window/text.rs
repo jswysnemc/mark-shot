@@ -22,16 +22,17 @@ impl Drop for Job {
 impl Pin {
     /// 【原生贴图】【识别开始】无参数，识别当前原图或打开模型引导，返回是否开始有效任务
     pub(super) fn start_ocr(&mut self) -> crate::AppResult<bool> {
-        if self.ocr.is_some() {
+        if self.ocr.is_some() || self.model_waiting {
             return Ok(true);
         }
         let files = match crate::ocr::engine_choice::source(&crate::ocr::models::OcrModels::load())
         {
             Some(files) => files,
-            None => match crate::features::ocr_model_guide::run()? {
-                Some(files) => files,
-                None => return Ok(false),
-            },
+            None => {
+                self.model_dialog = Some(crate::features::ocr_model_guide::dialog());
+                self.model_waiting = true;
+                return Ok(true);
+            }
         };
         let wake = self.wake.clone().ok_or("pin window is not connected")?;
         let image = crate::ocr::OcrImage {
@@ -64,6 +65,7 @@ impl Pin {
             }
         });
         self.ocr = Some(Job { cancel, receiver });
+        self.feedback.recognizing();
         Ok(true)
     }
 
@@ -76,13 +78,20 @@ impl Pin {
             .and_then(|job| job.receiver.try_recv().ok());
         if let Some(result) = result {
             self.ocr = None;
+            self.feedback.clear();
             changed = true;
             match result {
                 Ok(text) => {
                     self.translation.source = text;
                     self.sync_translation_text();
                     if std::mem::take(&mut self.copy_after_ocr) {
-                        self.report(crate::utils::copy_to_clipboard(&self.text.line_text(false)));
+                        let text = self.text.line_text(false);
+                        let result = if text.is_empty() {
+                            Err("No text found in this image".into())
+                        } else {
+                            crate::utils::copy_to_clipboard(&text)
+                        };
+                        self.report(result);
                     }
                     if self.translation.after_ocr {
                         let result = self.start_translation();
@@ -106,6 +115,7 @@ impl Pin {
         self.cancel_translation();
         self.translation.clear();
         self.text.clear();
+        self.feedback.clear();
         self.selecting = false;
     }
 
@@ -152,8 +162,9 @@ impl Pin {
     }
 
     /// 【原生贴图】【失败反馈】按result记录失败并使用统一通知，成功不产生消息
-    pub(super) fn report(&self, result: crate::AppResult) {
+    pub(super) fn report(&mut self, result: crate::AppResult) {
         if let Err(error) = result {
+            self.feedback.error(&error.to_string());
             log::error!("【原生贴图】【业务动作】{error}");
             crate::backend::notify::send_blocking(crate::backend::notify::Notice::Failed(
                 error.to_string(),

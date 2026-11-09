@@ -118,6 +118,7 @@ pub(super) struct Pin {
     pub translation: crate::features::pinned_image::translation::Translation,
     pub translation_task: Option<crate::translation::task::Task>,
     pub translation_retired: Vec<crate::translation::task::Task>,
+    pub feedback: crate::features::pinned_image::feedback::Feedback,
     pub translation_wake: smithay_client_toolkit::reexports::calloop::ping::Ping,
     pub last_position: (f64, f64),
 }
@@ -371,6 +372,7 @@ pub(super) fn run_at_seed(
         ),
         translation_task: None,
         translation_retired: Vec::new(),
+        feedback: Default::default(),
         translation_wake,
         last_position: (0.0, 0.0),
     };
@@ -379,13 +381,21 @@ pub(super) fn run_at_seed(
         pin.apply_translation_seed(seed);
     }
     while !pin.exit {
+        pin.dirty |= pin.feedback.expire();
         pin.poll_translation();
         pin.render_preview(&qh)?;
         if pin.dirty && pin.configured && !pin.frame_pending {
             pin.render(&qh)?;
         }
-        let timeout =
-            (!pin.translation_retired.is_empty()).then_some(std::time::Duration::from_millis(10));
+        let timeout = [
+            (!pin.translation_retired.is_empty()).then_some(std::time::Duration::from_millis(10)),
+            pin.feedback
+                .deadline()
+                .map(|deadline| deadline.saturating_duration_since(std::time::Instant::now())),
+        ]
+        .into_iter()
+        .flatten()
+        .min();
         event_loop.dispatch(timeout, &mut pin)?;
     }
     Ok(())

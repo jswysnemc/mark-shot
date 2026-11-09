@@ -109,6 +109,8 @@ impl Pin {
                 }
             }
         }
+        self.feedback
+            .draw(&mut canvas, scale, &mut self.font_system, &mut self.swash);
         Ok(canvas)
     }
 

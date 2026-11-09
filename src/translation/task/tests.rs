@@ -12,6 +12,7 @@ mod catalog_tests;
 mod image_tests;
 mod process_tests;
 mod provider_tests;
+mod response_tests;
 mod transport_tests;
 
 struct Server {

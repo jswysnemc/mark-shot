@@ -97,8 +97,18 @@ pub(crate) fn mapped(
     provider: Provider,
     segments: &[Segment],
     translations: &BTreeMap<i32, String>,
-) -> Output {
-    Output {
+) -> Result<Output> {
+    if !segments.iter().any(|segment| {
+        translations
+            .get(&segment.id)
+            .is_some_and(|text| !text.trim().is_empty())
+    }) {
+        return Err(Error::new(
+            ErrorKind::Protocol,
+            "翻译服务没有返回有效译文 / No usable translation was returned",
+        ));
+    }
+    Ok(Output {
         provider,
         segments: segments
             .iter()
@@ -113,7 +123,7 @@ pub(crate) fn mapped(
                     .to_owned(),
             })
             .collect(),
-    }
+    })
 }
 
 /// 【翻译服务】【批次数量】按 provider、segments 和 texts 校验条数并返回未回填译文，避免压平请求文本污染原文回退
@@ -143,6 +153,12 @@ pub(crate) fn ordered(
     texts: Vec<String>,
 ) -> Result<Output> {
     let texts = checked(provider, segments, texts)?;
+    if texts.iter().all(|text| text.trim().is_empty()) {
+        return Err(Error::new(
+            ErrorKind::Protocol,
+            "翻译服务没有返回有效译文 / No usable translation was returned",
+        ));
+    }
     Ok(Output {
         provider,
         segments: segments

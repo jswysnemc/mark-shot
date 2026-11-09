@@ -39,9 +39,23 @@ struct Pin {
     translation_retired: Vec<crate::translation::task::Task>,
     top_supported: bool,
     menu_anchor: (f32, f32),
+    feedback: crate::features::pinned_image::feedback::Feedback,
+    model_dialog: Option<window::WindowDialog>,
+    model_waiting: bool,
 }
 
 impl WindowContent for Pin {
+    /// 【原生贴图】【更新期限】无参数，仅在完成提示或退出任务待回收时设置期限，空闲窗口保持阻塞
+    fn next_deadline(&self) -> Option<std::time::Instant> {
+        [
+            self.feedback.deadline(),
+            (!self.translation_retired.is_empty())
+                .then(|| std::time::Instant::now() + std::time::Duration::from_millis(10)),
+        ]
+        .into_iter()
+        .flatten()
+        .min()
+    }
     /// 【原生贴图】【后台通知】按wake记录窗口唤醒句柄，不启动空闲轮询
     fn connected(&mut self, wake: window::WindowWake) {
         self.wake = Some(wake);
@@ -84,10 +98,35 @@ impl WindowContent for Pin {
     }
     /// 【原生贴图】【置顶状态】无参数，返回当前原生置顶请求
     fn always_on_top(&self) -> bool {
-        self.image.always_on_top
+        self.image.always_on_top && !self.model_waiting
+    }
+    /// 【原生贴图】【识别引导】无参数，交付所属模态窗口，避免在菜单回调中阻塞贴图事件循环
+    fn take_dialog(&mut self) -> Option<window::WindowDialog> {
+        self.model_dialog.take()
+    }
+    /// 【原生贴图】【引导完成】按id与accepted恢复等待动作，取消时保留原图并解除翻译占用
+    fn dialog_closed(&mut self, id: u64, accepted: bool) -> WindowAction {
+        if id != 0x4f4352 || !self.model_waiting {
+            return WindowAction::None;
+        }
+        self.model_waiting = false;
+        if accepted {
+            let result = self.start_ocr().map(|_| ());
+            if result.is_err() {
+                self.translation.after_ocr = false;
+                self.copy_after_ocr = false;
+            }
+            self.report(result);
+        } else {
+            self.translation.after_ocr = false;
+            self.copy_after_ocr = false;
+            self.text_selection = false;
+            self.feedback.clear();
+        }
+        WindowAction::Redraw
     }
     /// 【原生贴图】【原图绘制】按canvas和scale缩放显示原图，保留原始像素用于复制与保存
-    fn draw(&mut self, canvas: &mut Pixmap, _scale: f32) {
+    fn draw(&mut self, canvas: &mut Pixmap, scale: f32) {
         canvas.draw_pixmap(
             0,
             0,
@@ -103,12 +142,15 @@ impl WindowContent for Pin {
             None,
         );
         self.draw_text(canvas);
+        self.feedback
+            .draw(canvas, scale, &mut self.fonts, &mut self.cache);
     }
     /// 【原生贴图】【内容输入】按event处理移动、菜单、缩放和快捷键，返回窗口动作，错误记录明确反馈
     fn event(&mut self, event: WindowEvent) -> WindowAction {
         let action = match event {
             WindowEvent::Wake => {
-                return if self.poll_text() {
+                let expired = self.feedback.expire();
+                return if self.poll_text() || expired {
                     WindowAction::Redraw
                 } else {
                     WindowAction::None
@@ -179,8 +221,8 @@ impl WindowContent for Pin {
         match action.map(|action| self.action(action)) {
             Some(Ok(action)) => action,
             Some(Err(error)) => {
-                log::error!("【原生贴图】【菜单动作】{error}");
-                WindowAction::None
+                self.report(Err(error));
+                WindowAction::Redraw
             }
             None => WindowAction::None,
         }
@@ -257,6 +299,9 @@ pub(crate) fn run_at_seed(
         translation_retired: Vec::new(),
         top_supported: false,
         menu_anchor: (0.0, 0.0),
+        feedback: Default::default(),
+        model_dialog: None,
+        model_waiting: false,
     };
     if let Some(seed) = seed {
         pin.apply_seed(seed)?;

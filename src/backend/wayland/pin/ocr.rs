@@ -50,6 +50,8 @@ impl Pin {
         };
         let cancel = Arc::new(AtomicBool::new(false));
         self.ocr_cancel = Some(cancel.clone());
+        self.feedback.recognizing();
+        self.dirty = true;
         let generation = self.generation;
         let sender = self.ocr_sender.clone();
         std::thread::spawn(move || {
@@ -72,6 +74,7 @@ impl Pin {
             return;
         }
         self.ocr_cancel = None;
+        self.feedback.clear();
         match result {
             Ok(text) => {
                 self.translation.source = text;
@@ -92,10 +95,7 @@ impl Pin {
             Err(error) => {
                 self.copy_after_ocr = false;
                 self.translation.after_ocr = false;
-                log::error!("【贴图】【文字识别】识别失败: {error}");
-                crate::backend::notify::send_blocking(crate::backend::notify::Notice::TextFailed(
-                    error,
-                ));
+                self.report(Err(error.into()));
             }
         }
     }

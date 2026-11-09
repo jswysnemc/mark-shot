@@ -154,7 +154,8 @@ fn ordered_results_reject_misalignment_while_models_keep_original_fallback() {
         Provider::OpenAi,
         &source,
         &response::content("{\"translations\":[{\"id\":1,\"text\":\"译文\"}]}").unwrap(),
-    );
+    )
+    .unwrap();
     assert_eq!(output.text(), "first\n译文");
     assert!(response::ordered(Provider::Tencent, &source, vec!["only one".into()]).is_err());
     assert_eq!(

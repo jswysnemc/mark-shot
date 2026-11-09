@@ -331,31 +331,57 @@ fn form_special_characters_match_actual_qt_encoding() {
 
 /// 【翻译协议测试】【原文回退】空译文保留未压平的原文，批次压平只影响发送，不得改变制表符或原文换行，无参数、无返回值
 #[test]
-fn empty_cloud_translations_preserve_original_tabs_not_flattened_request_text() {
+fn partial_cloud_translations_preserve_original_tabs_not_flattened_request_text() {
     for (provider, config, body) in [
         (
             "plugin:tencent-tmt",
             json!({"tencent":{"secretId":"test-id","secretKey":"test-key"}}),
-            json!({"Response":{"TargetTextList":[""]}}),
+            json!({"Response":{"TargetTextList":["", "译文"]}}),
         ),
         (
             "plugin:baidu-fanyi",
             json!({"baidu":{"appId":"test-id","appKey":"test-key"}}),
-            json!({"trans_result":[{"dst":""}]}),
+            json!({"trans_result":[{"dst":""}, {"dst":"译文"}]}),
         ),
         (
             "plugin:youdao-nmt",
             json!({"youdao":{"appKey":"test-id","appSecret":"test-key"}}),
-            json!({"errorCode":0,"translation":[""]}),
+            json!({"errorCode":0,"translation":["", "译文"]}),
         ),
     ] {
         let http = HttpFixture::new(vec![body]);
         assert_eq!(
-            run(config, provider, "A\tB", "English", &http)
+            run(config, provider, "A\tB\nsecond", "English", &http)
                 .unwrap()
                 .text(),
-            "A\tB",
+            "A\tB\n译文",
             "{provider}"
         );
+    }
+}
+
+/// 【翻译协议测试】【拒绝空译文】无参数，验证云服务全空响应返回协议错误，不把原文作为成功结果
+#[test]
+fn empty_cloud_translations_are_rejected() {
+    for (provider, config, body) in [
+        (
+            "plugin:tencent-tmt",
+            json!({"tencent":{"secretId":"test-id","secretKey":"test-key"}}),
+            json!({"Response":{"TargetTextList":[" "]}}),
+        ),
+        (
+            "plugin:baidu-fanyi",
+            json!({"baidu":{"appId":"test-id","appKey":"test-key"}}),
+            json!({"trans_result":[{"dst":" "}]}),
+        ),
+        (
+            "plugin:youdao-nmt",
+            json!({"youdao":{"appKey":"test-id","appSecret":"test-key"}}),
+            json!({"errorCode":0,"translation":[" "]}),
+        ),
+    ] {
+        let http = HttpFixture::new(vec![body]);
+        let error = run(config, provider, "original", "English", &http).unwrap_err();
+        assert_eq!(error.kind, ErrorKind::Protocol, "{provider}");
     }
 }

@@ -1,6 +1,7 @@
 //! 【贴图】【功能入口】原图变换、菜单动作和文字选择与 Wayland 协议分离
 
 pub mod actions;
+pub(crate) mod feedback;
 pub mod menu;
 pub mod menu_navigation;
 pub mod model;

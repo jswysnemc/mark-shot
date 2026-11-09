@@ -167,9 +167,11 @@ def wait_text(environment, expected):
     raise AssertionError(f"actual copied text did not match: {actual!r} != {expected!r}")
 
 
-def idle(process, log):
-    """【贴图翻译回归】【空闲资源】等待 process 真实回收任务，再核对 CPU、线程和提交，返回一次采样"""
+def idle(process, log, completion_notice=False):
+    """【贴图翻译回归】【空闲资源】按 completion_notice 等待完成提示到期，再核对 process 的 CPU、线程和 log 提交，返回采样"""
     session.wait_single_thread(process.pid)
+    if completion_notice:
+        time.sleep(3.2)
     time.sleep(0.3)
     before = session.resources(process.pid)
     damage = log.read_text().count(".damage_buffer(")
@@ -242,7 +244,7 @@ else:
             result["idle_source"] = idle(process, log)
             menu(rect, 10)
             first = wait_record(record, 1)
-            result["idle_translated"] = idle(process, log)
+            result["idle_translated"] = idle(process, log, completion_notice=True)
             translated = screenshot(root, "translated", rect)
             assert ImageChops.difference(source, translated).getbbox() is not None, "translation did not cover original paragraphs"
             assert first["mode"] == 0o600 and first["data"]["tokens"][0]["box"] == [20, 25, 335, 28]
@@ -296,14 +298,17 @@ else:
             equal(screenshot(root, "language-invalidated", rect), source, "language invalidates translation")
             menu(rect, 10)
             second = wait_record(record, 2)
-            result["idle_japanese"] = idle(process, log)
+            result["idle_japanese"] = idle(process, log, completion_notice=True)
             assert second["data"]["targetLanguage"] == "Japanese"
             language(rect, 2)
             mode.write_text("empty")
             menu(rect, 10)
             wait_record(record, 3)
             result["idle_failed"] = idle(process, log)
-            equal(screenshot(root, "failed-keeps-source", rect), source, "failed response preserves source")
+            failed = screenshot(root, "failed-keeps-source", rect)
+            body = (0, 0, source.width, source.height - 60)
+            equal(failed.crop(body), source.crop(body), "failed response preserves source text")
+            assert ImageChops.difference(failed, source).getbbox() is not None, "failed translation has no in-window feedback"
             mode.write_text("delay")
             menu(rect, 10)
             delayed = wait_record(record, 4)
@@ -322,7 +327,7 @@ else:
             before = screenshot(root, "guide-parent-before", rect)
             menu(rect, 10)
             guide = wait_window(environment, process, "mark-shot-ocr-model-guide")
-            guide_rect = geometry(environment, guide, (320, 396))
+            guide_rect = geometry(environment, guide, (360, 540))
             click((guide_rect["x"] + 150, guide_rect["y"] + 95), "right")
             assert len(records(record)) == 4
             result["guide_idle"] = idle(process, log)
@@ -335,7 +340,7 @@ else:
                 mode.write_text("success")
                 menu(rect, 10)
                 guide = wait_window(environment, process, "mark-shot-ocr-model-guide")
-                guide_rect = geometry(environment, guide, (320, 396))
+                guide_rect = geometry(environment, guide, (360, 540))
                 screenshot(root, "first-use-download-guide")
                 click((guide_rect["x"] + 150, guide_rect["y"] + 95))
                 deadline = time.monotonic() + 90
@@ -348,7 +353,7 @@ else:
                 else:
                     raise AssertionError("first-use download did not continue the intended translation")
                 result["download_then_translation"] = records(record)[-1]
-                result["download_then_translation_idle"] = idle(process, log)
+                result["download_then_translation_idle"] = idle(process, log, completion_notice=True)
                 assert not any(node["app_id"] == "mark-shot-ocr-model-guide" for node in windows(environment))
                 assert result["download_then_translation"]["data"]["tokens"]
                 for token in result["download_then_translation"]["data"]["tokens"]:

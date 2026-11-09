@@ -33,9 +33,9 @@ impl Pin {
         }
         if self.translation.source.is_empty() {
             self.translation.after_ocr = true;
-            if !self.start_ocr()? {
-                self.translation.after_ocr = false;
-            }
+            let result = self.start_ocr();
+            self.translation.after_ocr = matches!(result, Ok(true));
+            result?;
             return Ok(());
         }
         self.start_translation()
@@ -63,6 +63,7 @@ impl Pin {
         )?;
         self.translation.pending = Some(task.id);
         self.translation_task = Some(task);
+        self.feedback.translating(&self.translation.target);
         self.text.deselect();
         self.selecting = false;
         self.dirty = true;
@@ -101,7 +102,10 @@ impl Pin {
                     &mut self.font_system,
                 );
                 if self.translation.complete(id, blocks) {
+                    self.feedback.translated(&self.translation.target);
                     self.sync_translation_text();
+                } else {
+                    self.report(Err("No usable translation was returned".into()));
                 }
             }
             Err(error) => {
@@ -121,6 +125,7 @@ impl Pin {
         }
         self.translation.pending = None;
         self.translation.after_ocr = false;
+        self.feedback.clear();
     }
 
     /// 【贴图翻译】【显示切换】按 active 在已有原文和译文间切换，清除当前文字选择，不重新识别原图

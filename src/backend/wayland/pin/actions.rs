@@ -67,8 +67,10 @@ impl Pin {
         Ok(())
     }
     /// 【贴图】【错误反馈】记录 result 中的失败并发送桌面通知；成功不增加无用提示
-    pub fn report(&self, result: AppResult) {
+    pub fn report(&mut self, result: AppResult) {
         if let Err(error) = result {
+            self.feedback.error(&error.to_string());
+            self.dirty = true;
             log::error!("【贴图】【菜单动作】动作失败: {error}");
             crate::backend::notify::send_blocking(crate::backend::notify::Notice::Failed(
                 error.to_string(),

@@ -132,5 +132,5 @@ pub(super) async fn translate(
                 .map(|(segment, text)| (segment.id, text)),
         );
     }
-    Ok(response::mapped(Provider::Baidu, segments, &translated))
+    response::mapped(Provider::Baidu, segments, &translated)
 }

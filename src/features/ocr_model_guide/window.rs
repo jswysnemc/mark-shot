@@ -129,6 +129,10 @@ impl Drop for Guide {
 }
 
 impl WindowContent for Guide {
+    /// 【识别模型】【明确确认】无参数，仅在资源已就绪且用户完成选择后报告确认，关闭和取消返回否
+    fn dialog_accepted(&self) -> bool {
+        self.completion.get().is_some()
+    }
     /// 【识别模型】【更新期限】返回下载进度下一次期限，无参数，静止引导无定时工作
     fn next_deadline(&self) -> Option<Instant> {
         self.deadline

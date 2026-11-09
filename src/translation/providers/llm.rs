@@ -138,9 +138,9 @@ pub(super) async fn translate(
             timeout: config.timeout,
         })
         .await?;
-    Ok(response::mapped(
+    response::mapped(
         config.provider,
         segments,
         &super::model_response::parse_options(config.provider, &body, config.filter_thinking)?,
-    ))
+    )
 }

@@ -30,9 +30,9 @@ impl Pin {
             self.sync_translation_text();
         } else if self.translation.source.is_empty() {
             self.translation.after_ocr = true;
-            if !self.start_ocr()? {
-                self.translation.after_ocr = false;
-            }
+            let result = self.start_ocr();
+            self.translation.after_ocr = matches!(result, Ok(true));
+            result?;
         } else {
             self.start_translation()?;
         }
@@ -61,6 +61,7 @@ impl Pin {
         )?;
         self.translation.pending = Some(task.id);
         self.translation_task = Some(task);
+        self.feedback.translating(&self.translation.target);
         self.text.deselect();
         self.selecting = false;
         Ok(())
@@ -97,7 +98,10 @@ impl Pin {
                     &mut self.fonts,
                 );
                 if self.translation.complete(id, blocks) {
+                    self.feedback.translated(&self.translation.target);
                     self.sync_translation_text();
+                } else {
+                    self.report(Err("No usable translation was returned".into()));
                 }
             }
             Err(error) => {
@@ -116,6 +120,7 @@ impl Pin {
         }
         self.translation.pending = None;
         self.translation.after_ocr = false;
+        self.feedback.clear();
     }
 
     /// 【原生贴图】【文字同步】无参数，让文字选择对应当前原文或译文，切换显示不丢弃另一份内容
