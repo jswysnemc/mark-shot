@@ -36,6 +36,7 @@ pub use values::*;
 mod sections;
 pub use sections::*;
 mod bindings;
+pub mod desktop;
 pub use bindings::*;
 mod loading;
 pub use loading::*;
@@ -85,6 +86,7 @@ const BLUE: Rgba = rgb(137, 180, 250);
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Config {
+    pub desktop: desktop::Desktop,
     pub ui: Ui,
     pub startup: Startup,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -128,6 +130,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         let mut config = Self {
+            desktop: desktop::Desktop::default(),
             ui: Ui::default(),
             startup: Startup::default(),
             language: None,

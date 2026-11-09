@@ -3,6 +3,113 @@
 use super::{catalog::Page, window::Preferences};
 use crate::backend::window::{WindowContent, WindowEvent};
 
+/// 【设置回归】【全局绑定】无参数，全局快捷键按单个组合保存，清除只禁用全局监听，不修改编辑器绑定
+#[test]
+fn global_shortcut_records_one_chord_without_replacing_editor_bindings() {
+    use super::window::Control;
+    let mut state = Preferences::new(false).unwrap();
+    let index = entry("desktop.screenshot_shortcut");
+    state.activate(Control::Row(index));
+    state.record_shortcut(
+        index,
+        &crate::backend::window::KeyInput {
+            key: Some(crate::keys::Key::PrintScreen),
+            text: String::new(),
+            mods: crate::keys::Mods {
+                ctrl: true,
+                ..Default::default()
+            },
+        },
+    );
+    assert_eq!(
+        state.values["desktop"]["screenshot_shortcut"],
+        "Ctrl+PrintScreen"
+    );
+    assert!(!state.save(index, "Ctrl+InvalidKey".into()));
+    assert!(!state.save(index, serde_json::json!(["F8", "F9"])));
+    assert!(state.save_field("desktop", "shortcuts_enabled", true.into()));
+    state.activate(Control::Clear(index));
+    assert_eq!(state.values["desktop"]["shortcuts_enabled"], false);
+    assert_eq!(
+        state.values["desktop"]["screenshot_shortcut"],
+        "Ctrl+PrintScreen"
+    );
+    assert_eq!(state.value(entry("keys.copy")), "Ctrl+C");
+}
+
+/// 【设置回归】【颜色事务】无参数，通过真实对话框事件验证取消、透明色确认与恢复默认
+#[test]
+fn shared_color_dialog_preserves_alpha_and_commits_only_explicit_choices() {
+    use super::window::Control;
+    use crate::backend::window::{KeyInput, LEFT_BUTTON};
+    let mut state = Preferences::new(false).unwrap();
+    let index = entry("pinned.border_color");
+    assert!(state.save(index, "#12345680".into()));
+    state.activate(Control::Row(index));
+    let mut dialog = state.take_dialog().unwrap();
+    dialog.content.event(WindowEvent::Key(KeyInput {
+        key: Some(crate::keys::Key::Escape),
+        text: String::new(),
+        mods: Default::default(),
+    }));
+    state.dialog_closed(dialog.id, false);
+    assert_eq!(state.value(index), "#12345680");
+    state.activate(Control::Row(index));
+    let mut dialog = state.take_dialog().unwrap();
+    dialog.content.event(WindowEvent::PointerButton {
+        position: (75.0, 207.0),
+        button: LEFT_BUTTON,
+        pressed: true,
+    });
+    dialog.content.event(WindowEvent::Key(KeyInput {
+        key: None,
+        text: "#ff000040".into(),
+        mods: Default::default(),
+    }));
+    dialog.content.event(WindowEvent::Key(KeyInput {
+        key: Some(crate::keys::Key::Enter),
+        text: String::new(),
+        mods: Default::default(),
+    }));
+    assert!(dialog.content.dialog_accepted());
+    state.dialog_closed(dialog.id, true);
+    assert_eq!(state.value(index), "#FF000040");
+    state.activate(Control::Row(index));
+    let mut dialog = state.take_dialog().unwrap();
+    for pressed in [true, false] {
+        dialog.content.event(WindowEvent::PointerButton {
+            position: (30.0, 300.0),
+            button: LEFT_BUTTON,
+            pressed,
+        });
+    }
+    state.dialog_closed(dialog.id, true);
+    assert_eq!(
+        state.value(index),
+        super::catalog::ENTRIES[index]
+            .display(&serde_json::to_value(crate::config::Config::default()).unwrap())
+    );
+}
+
+/// 【设置回归】【实际色块】无参数，设置页在控件位置绘制所选颜色，不以主题色或色值文本代替
+#[test]
+fn color_setting_renders_its_actual_rgb_value() {
+    let mut state = Preferences::new(false).unwrap();
+    state.page = Page::Pinned;
+    let index = entry("pinned.border_color");
+    state.values["pinned"]["border_color"] = "#f20c38ff".into();
+    let layout = super::layout::Layout::new(&state);
+    let row = layout.rows.iter().find(|row| row.index == index).unwrap();
+    let sample = (
+        (row.control.left() + 16.0) as u32,
+        (row.control.top() + 12.0) as u32,
+    );
+    let mut image = tiny_skia::Pixmap::new(state.size.0, state.size.1).unwrap();
+    state.draw(&mut image, 1.0);
+    let color = image.pixel(sample.0, sample.1).unwrap().demultiply();
+    assert_eq!((color.red(), color.green(), color.blue()), (242, 12, 56));
+}
+
 /// 【设置回归】【字段定位】按 path 查找注册项，返回目录索引，缺失时使测试失败
 fn entry(path: &str) -> usize {
     super::catalog::ENTRIES

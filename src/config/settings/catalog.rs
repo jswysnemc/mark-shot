@@ -54,6 +54,7 @@ pub enum Kind {
     Choice(&'static [&'static str]),
     Segments(&'static [&'static str]),
     Text,
+    Color,
     Shortcut,
 }
 
@@ -70,6 +71,18 @@ impl Entry {
     /// 【设置窗口】【业务说明】按 chinese 返回设置作用和生效阶段，说明不显示内部配置键
     pub fn help(&self, chinese: bool) -> &'static str {
         let labels = match (self.section, self.key) {
+            ("desktop", "tray_enabled") => (
+                "后台保留截图、贴图、设置和退出菜单；需要桌面提供托盘区域",
+                "Keeps capture, pin, settings and quit actions available in the desktop tray",
+            ),
+            ("desktop", "shortcuts_enabled") => (
+                "在其他应用中也能截图；Wayland 由系统授权并确认绑定",
+                "Capture from other apps; Wayland requires system shortcut approval",
+            ),
+            ("desktop", "screenshot_shortcut") => (
+                "按下组合键重新绑定；系统占用或授权失败会显示原因",
+                "Press a key combination to rebind; conflicts and permission errors are reported",
+            ),
             ("ui", "language") => (
                 "界面语言；环境变量覆盖时以环境为准",
                 "Interface language; environment override takes priority",

@@ -74,6 +74,7 @@ fn named(keysym: Keysym) -> Option<Key> {
         Keysym::BackSpace => Key::Backspace,
         Keysym::Delete | Keysym::KP_Delete => Key::Delete,
         Keysym::Insert => Key::Insert,
+        Keysym::Print => Key::PrintScreen,
         Keysym::Home => Key::Home,
         Keysym::End => Key::End,
         Keysym::Page_Up => Key::PageUp,

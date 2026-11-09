@@ -79,7 +79,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         "default_color",
         "默认标注颜色",
         "Default annotation color",
-        Kind::Text
+        Kind::Color
     ),
     field!(
         Storage,
@@ -135,7 +135,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         "border_color",
         "贴图边框颜色",
         "Pin border color",
-        Kind::Text
+        Kind::Color
     ),
     field!(
         Pinned,

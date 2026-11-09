@@ -272,6 +272,21 @@ impl ColorPickerPopover {
         point_in_rect(local, rect)
     }
 
+    /// 【属性取色】【共享命中】按local返回实际取色子控件，原生窗口与画布使用同一几何
+    pub fn element_at(&self, local: (f64, f64)) -> Option<ColorPopoverElement> {
+        if self.sv_square_hit(local) {
+            Some(ColorPopoverElement::SvSquare)
+        } else if self.hue_slider_hit(local) {
+            Some(ColorPopoverElement::HueSlider)
+        } else if self.alpha_slider_hit(local) {
+            Some(ColorPopoverElement::AlphaSlider)
+        } else if self.hex_field_hit(local) {
+            Some(ColorPopoverElement::Field(ColorField::Hex))
+        } else {
+            self.swatch_hit(local).map(ColorPopoverElement::Swatch)
+        }
+    }
+
     /// 【属性取色】【明度范围】返回当前面板的 SV 控件矩形，环形快捷色板没有该控件
     pub fn sv_square_rect(&self) -> Option<Rect> {
         if self.radial.is_some() {

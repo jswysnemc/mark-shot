@@ -7,6 +7,10 @@ GNOME Wayland 支持门户多屏捕获，已验证范围见 [Linux 桌面兼容]
 通过共享内存表面交付，不依赖 Qt、GTK、浏览器或 WebView。可运行候选、证据和
 平台边界见 [Windows 工作流](docs/windows-platform-workflow.md)。
 
+设置中的「快捷键」可启用全局截图按键，「外观」可启用系统托盘。后台服务独立于编辑器运行，
+托盘提供截图、剪贴板贴图、设置和退出菜单。设置颜色显示实际色块，点击后复用标注取色组件，
+支持透明度、十六进制输入及恢复默认。平台条件与启动方式见 [桌面集成](docs/desktop-integration.md)。
+
 本次重写参考 `/home/snemc/workspace/LumineCapture` 的原生架构，界面与操作以 Mark Shot Qt
 实现为依据。截图、编辑、贴图、OCR 和滚动截图基础工作流已实现，完整界面一致性仍在补齐。
 二维码扫描和录像不在本次范围内。

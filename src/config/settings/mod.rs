@@ -1,6 +1,7 @@
 //! 【应用设置】【统一定义】集中字段类型、默认值、输入校验与生效时机，界面和写入端共用
 
 mod catalog;
+mod desktop;
 mod extra;
 mod metadata;
 mod shortcuts;
@@ -17,6 +18,7 @@ pub static ENTRIES: LazyLock<Vec<Entry>> = LazyLock::new(|| {
         .collect();
     entries.extend_from_slice(extra::ENTRIES);
     entries.extend(shortcuts::entries());
+    entries.extend_from_slice(desktop::ENTRIES);
     entries.extend(translation::SERVICES.iter().map(|service| Entry {
         page: Page::Translation,
         section: "translation",
@@ -131,6 +133,9 @@ impl Entry {
                 value.as_str().is_some_and(|text| choices.contains(&text))
             }
             Kind::Shortcut => value.is_string() || value.is_array(),
+            Kind::Color => value
+                .as_str()
+                .is_some_and(|text| crate::theme::Rgba::parse_hex(text).is_some()),
             Kind::Link(_) => false,
             Kind::Text => match self.default_value() {
                 Value::Number(default) => value.as_f64().is_some_and(|number| {
@@ -193,6 +198,10 @@ impl Entry {
     /// 【应用设置】【生效说明】按 chinese 返回保存后生效阶段，界面提示与注册字段共用
     pub fn effect(&self, chinese: bool) -> &'static str {
         let labels = match (self.section, self.key) {
+            ("desktop", _) => (
+                "已保存，正在更新桌面注册",
+                "Saved; updating desktop registration",
+            ),
             ("ui" | "keys", _) => ("已保存，立即生效", "Saved; applies immediately"),
             ("log", _) => ("已保存，下次启动生效", "Saved; applies next launch"),
             ("general", "to") | ("startup", "selection_loupe" | "normal_tool") => (

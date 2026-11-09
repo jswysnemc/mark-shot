@@ -75,16 +75,19 @@ impl Preferences {
         let index = *index;
         if field.text() == ENTRIES[index].display(&self.values) {
             self.editing = None;
+            self.shortcut_pause = None;
             return true;
         }
         if matches!(ENTRIES[index].kind, super::catalog::Kind::Shortcut) {
             self.editing = None;
+            self.shortcut_pause = None;
             return true;
         }
         match ENTRIES[index].parse(&field.text()) {
             Ok(value) => {
                 if self.save(index, value) {
                     self.editing = None;
+                    self.shortcut_pause = None;
                     true
                 } else {
                     false
@@ -111,6 +114,13 @@ impl Preferences {
         let Some(chord) = super::shortcuts::chord(input) else {
             return;
         };
+        if ENTRIES[index].section == "desktop" {
+            if self.save(index, chord.into()) {
+                self.editing = None;
+                self.shortcut_pause = None;
+            }
+            return;
+        }
         let mut bindings: Vec<_> = super::shortcuts::text(&self.values, ENTRIES[index].key)
             .split(" / ")
             .filter(|text| !text.is_empty())
@@ -122,6 +132,7 @@ impl Preferences {
         let value = serde_json::json!(bindings);
         if self.save(index, value) {
             self.editing = None;
+            self.shortcut_pause = None;
         }
     }
 }

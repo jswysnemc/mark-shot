@@ -149,6 +149,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
     };
     let xdg_window = args.contains("--xdg-window");
     for kind in [
+        crate::features::desktop::ARG,
         crate::backend::clipboard::DAEMON_ARG,
         crate::backend::pin::PIN_ARG,
         crate::ocr::daemon::DAEMON_ARG,

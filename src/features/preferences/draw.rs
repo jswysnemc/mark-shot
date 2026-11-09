@@ -91,7 +91,14 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
                         - if numeric_editing { 46.0 } else { 0.0 }
                 };
                 let label = controls::fit_label(painter, entry.label(chinese), 12.0, text_width);
-                let note = if entry.section == "ocr" && entry.key == "resources" {
+                let note = if entry.section == "desktop" {
+                    let message = if entry.key == "tray_enabled" {
+                        &state.desktop_status.tray
+                    } else {
+                        &state.desktop_status.shortcuts
+                    };
+                    message.label(chinese)
+                } else if entry.section == "ocr" && entry.key == "resources" {
                     state.resource_note.clone()
                 } else {
                     entry.note(&state.source, chinese)
@@ -176,6 +183,8 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
                         );
                         editors.push((row.index, layout::editor_rect(row)));
                     }
+                } else if matches!(entry.kind, Kind::Color) {
+                    super::colors::draw(painter, row.control, &state.values, row.index, focused);
                 } else if editing {
                     widgets::field(painter, row.control, "", true, false);
                     widgets::button(
@@ -190,7 +199,13 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
                         widgets::button(
                             painter,
                             layout::apply_rect(row.control),
-                            if chinese { "清除" } else { "Clear" },
+                            if entry.section == "desktop" {
+                                if chinese { "禁用" } else { "Disable" }
+                            } else if chinese {
+                                "清除"
+                            } else {
+                                "Clear"
+                            },
                             false,
                             hover == Some(Control::Clear(row.index)),
                             true,

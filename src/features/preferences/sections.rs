@@ -57,6 +57,8 @@ pub(super) fn description(page: Page, chinese: bool) -> &'static str {
 /// 【设置窗口】【业务分组】按 entry 返回排序编号与双语分组标题，同组设置保持原有顺序
 pub(super) fn group(entry: &Entry) -> (u8, &'static str, &'static str) {
     match entry.page {
+        Page::Keys if entry.section == "desktop" => (0, "全局截图", "Global screenshot"),
+        Page::Appearance if entry.section == "desktop" => (2, "系统托盘", "System tray"),
         Page::Storage if entry.section == "history" => (1, "截图历史", "History"),
         Page::Storage => (0, "文件保存", "Saved files"),
         Page::Pinned if entry.section == "pinned" => (0, "贴图", "Pins"),
@@ -71,9 +73,9 @@ pub(super) fn group(entry: &Entry) -> (u8, &'static str, &'static str) {
             _ => (4, "文件保存", "Saved files"),
         },
         Page::Keys if entry.key.starts_with("tool_") || matches!(entry.key, "undo" | "redo") => {
-            (1, "标注与编辑", "Annotation and editing")
+            (2, "标注与编辑", "Annotation and editing")
         }
-        Page::Keys => (0, "截图操作", "Capture actions"),
+        Page::Keys => (1, "编辑器快捷键", "Editor shortcuts"),
         Page::Ocr => (0, "识别引擎", "Recognition engine"),
         Page::Advanced if entry.section == "log" => (1, "诊断日志", "Diagnostics"),
         Page::Advanced if entry.section == "about" => (2, "应用信息", "Application"),

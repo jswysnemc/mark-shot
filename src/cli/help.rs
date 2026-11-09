@@ -39,6 +39,7 @@ Screenshot history:
                                 Ctrl+H opens history from the editor
 
 Configuration and diagnostics:
+  --background                  Run configured tray and global shortcuts until quit
   --config FILE                 Override ~/.config/mark-shot/config.toml
   --print-default-config        Print the complete default configuration
   --debug / --no-debug          Enable or disable diagnostic logging

@@ -81,6 +81,12 @@ pub fn write_fields(path: &Path, section: &str, fields: &[(&str, Value)]) -> io:
 
 /// 【设置窗口】【输入校验】校验 section、key 对应的 value，拒绝会导致保存路径错误的日期格式及非法快捷键
 pub(super) fn validate(section: &str, key: &str, value: &Value) -> io::Result<()> {
+    if section == "desktop" && key == "screenshot_shortcut" {
+        let text = value
+            .as_str()
+            .ok_or_else(|| io::Error::other("全局快捷键必须是一个按键组合"))?;
+        crate::keys::parse(text).map_err(io::Error::other)?;
+    }
     if let Some(entry) = super::settings::ENTRIES
         .iter()
         .find(|entry| entry.section == section && entry.key == key)

@@ -210,6 +210,13 @@ def verify(options, session):
     tap(0xFF1B)
     pin.wait(timeout=5)
     assert pin.returncode == 0
+    if options.desktop:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("gnome_shortcuts", Path(__file__).with_name("gnome-global-shortcuts-workflow.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        checks = module.verify(options, session, environment, evaluate, tap, wait, portal_action)
+        return {"checks": checks, "displays": displays}
     return {"checks": ["GNOME output discovery", "settings window mapping", "Xwayland to Wayland UTF-8 clipboard", "GNOME permission selection", "PipeWire PNG capture", "restored permission", "fullscreen editor", "copy shortcut", "Wayland PNG clipboard", "per-monitor source pixels", "permission transition pixels", "clipboard pin", "pinned original PNG"], "displays": displays}
 
 
@@ -221,6 +228,7 @@ def main():
     parser.add_argument("--shell", type=Path, default=Path("/usr/bin/gnome-shell"))
     parser.add_argument("--monitors", type=int, choices=(1, 2), default=1)
     parser.add_argument("--inside", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--desktop", action="store_true", help="verify global shortcuts after capture setup")
     options = parser.parse_args()
     options.binary = options.binary.resolve()
     options.shell = options.shell.resolve()
@@ -237,6 +245,8 @@ def main():
         environment.update(MARK_SHOT_TEST_GNOME=str(root), XDG_RUNTIME_DIR=str(root), XDG_CONFIG_HOME=str(state / "config"), XDG_DATA_HOME=str(state / "data"), XDG_STATE_HOME=str(state / "state"), XDG_CACHE_HOME=str(state / "cache"), XDG_CURRENT_DESKTOP="GNOME", XDG_SESSION_TYPE="wayland", GSETTINGS_BACKEND="memory", NO_AT_BRIDGE="1")
         (root / "config.toml").write_text('[startup]\ninclude_cursor=false\n[notifications]\nenabled=false\n[history]\nenabled=false\n')
         command = ["dbus-run-session", "--", sys.executable, str(Path(__file__).resolve()), "--inside", "--root", str(root), "--binary", str(options.binary), "--shell", str(options.shell), "--monitors", str(options.monitors)]
+        if options.desktop:
+            command.append("--desktop")
         raise SystemExit(subprocess.run(command, env=environment, timeout=90).returncode)
     if os.environ.get("MARK_SHOT_TEST_GNOME") != str(root) or os.environ.get("XDG_RUNTIME_DIR") != str(root) or os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY"):
         raise RuntimeError("GNOME tests require a fresh private session")

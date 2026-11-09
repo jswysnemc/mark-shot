@@ -38,6 +38,7 @@ use crate::{
     features::text::input_method::focus::Target, keys::Mods,
 };
 use std::time::Instant;
+wayland_client::delegate_noop!(NativeWindow: ignore crate::backend::wayland::activation::XdgActivationV1);
 
 pub(super) struct NativeWindow {
     pub registry: RegistryState,
@@ -307,6 +308,9 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         state
             .main
             .render(state.content.as_mut(), &mut state.pool, &qh)?;
+        if state.main.configured {
+            super::super::activation::activate(&globals, &qh, state.main.role.wl_surface());
+        }
         if let Some(dialog) = &mut state.dialog {
             dialog
                 .surface

@@ -2,8 +2,7 @@
 
 use super::catalog::{ENTRIES, Kind, Page};
 use crate::{
-    backend::window::{self, WindowAction, WindowContent, WindowCursor, WindowEvent, WindowSpec},
-    keys::Key,
+    backend::window::{self, WindowSpec},
     ui::{fonts::UiFonts, single_line::SingleLine},
 };
 use serde_json::Value;
@@ -30,12 +29,16 @@ pub(super) struct Preferences {
     pub status: String,
     pub toolbar: super::toolbar::Editor,
     pub translation: super::translation::State,
-    ready: bool,
+    pub(super) ready: bool,
     pub recovery: Option<String>,
     pub page_scroll: [usize; 13],
     pub dialog: Option<window::WindowDialog>,
     pub frame_preview: super::frame_preview::Preview,
-    theme_watch: Option<crate::theme::SystemWatch>,
+    pub(super) theme_watch: Option<crate::theme::SystemWatch>,
+    pub(super) desktop_watch: Option<notify::RecommendedWatcher>,
+    pub(super) shortcut_pause: Option<crate::features::desktop::recording::Pause>,
+    pub(super) desktop_status: crate::features::desktop::status::Status,
+    pub(super) color_edit: Option<super::colors::Edit>,
     pub resource_note: String,
     #[cfg(test)]
     test_directory: Option<tempfile::TempDir>,
@@ -88,6 +91,10 @@ impl Preferences {
         let toolbar = super::toolbar::Editor::new(&values);
         let translation = super::translation::State::new(&values);
         Ok(Self {
+            desktop_status: crate::features::desktop::status::read(&path),
+            desktop_watch: None,
+            shortcut_pause: None,
+            color_edit: None,
             source: crate::config::settings_store::source(&path).unwrap_or_default(),
             path,
             values,
@@ -249,6 +256,13 @@ impl Preferences {
             return false;
         }
         let applied = self.publish();
+        if section == "desktop"
+            && !cfg!(test)
+            && let Err(error) = crate::features::desktop::ensure()
+        {
+            self.status = format!("桌面服务启动失败 / Service start failed: {error}");
+            return false;
+        }
         let result = crate::config::preferences::read(&self.path);
         match result {
             Ok(values) => {
@@ -293,7 +307,7 @@ impl Preferences {
     }
 
     /// 【设置窗口】【文本定位】按 point 和 drag 更新已激活搜索框或文本选区，返回是否消费输入
-    fn edit_pointer(&mut self, point: (f64, f64), drag: bool) -> bool {
+    pub(super) fn edit_pointer(&mut self, point: (f64, f64), drag: bool) -> bool {
         let search = super::layout::search_rect(self);
         if self.search_focus
             && (drag && self.pressed == Some(Control::Search) || contains(search, point))
@@ -363,12 +377,14 @@ impl Preferences {
                 self.scroll = self.page_scroll[page as usize];
                 self.focus = None;
                 self.editing = None;
+                self.shortcut_pause = None;
                 self.search_focus = false;
                 self.search.set("", &mut self.fonts, false);
             }
             Control::Search => {
                 self.search_focus = true;
                 self.editing = None;
+                self.shortcut_pause = None;
             }
             Control::Apply => {
                 self.apply();
@@ -376,17 +392,25 @@ impl Preferences {
             Control::Reset(index) => {
                 if self.save(index, Value::Null) {
                     self.editing = None;
+                    self.shortcut_pause = None;
                 }
             }
             Control::Clear(index) => {
-                if self.save(index, serde_json::json!([])) {
+                let saved = if ENTRIES[index].section == "desktop" {
+                    self.save_field("desktop", "shortcuts_enabled", false.into())
+                } else {
+                    self.save(index, serde_json::json!([]))
+                };
+                if saved {
                     self.editing = None;
+                    self.shortcut_pause = None;
                 }
             }
             Control::Repair => self.repair(),
             Control::Step(index, direction) => self.step(index, direction),
             Control::Segment(index, choice) => {
                 self.editing = None;
+                self.shortcut_pause = None;
                 self.search_focus = false;
                 if let Kind::Segments(choices) = ENTRIES[index].kind {
                     self.save(index, choices[choice].into());
@@ -397,6 +421,7 @@ impl Preferences {
                 self.search_focus = false;
                 self.reveal_row(index);
                 match ENTRIES[index].kind {
+                    Kind::Color => super::colors::open(self, index),
                     Kind::Link(page) => {
                         if ENTRIES[index].key == "resources" {
                             self.dialog = Some(crate::features::ocr_model_guide::dialog());
@@ -417,9 +442,19 @@ impl Preferences {
                     }
                     Kind::Choice(_) | Kind::Segments(_) => {
                         self.editing = None;
+                        self.shortcut_pause = None;
                         super::menus::setting(self, index);
                     }
                     Kind::Text | Kind::Shortcut => {
+                        if ENTRIES[index].section == "desktop" && !cfg!(test) {
+                            match crate::features::desktop::recording::Pause::acquire(&self.path) {
+                                Ok(pause) => self.shortcut_pause = Some(pause),
+                                Err(error) => {
+                                    self.status = error.to_string();
+                                    return;
+                                }
+                            }
+                        }
                         if self
                             .editing
                             .as_ref()
@@ -455,258 +490,6 @@ pub(super) fn contains(rect: Rect, point: (f64, f64)) -> bool {
         && point.0 < f64::from(rect.right())
         && point.1 >= f64::from(rect.top())
         && point.1 < f64::from(rect.bottom())
-}
-
-impl WindowContent for Preferences {
-    /// 【设置窗口】【系统关闭】无参数，关闭前提交输入，失败保留窗口和草稿，返回是否允许关闭
-    fn close_requested(&mut self) -> bool {
-        self.commit_pending()
-    }
-    /// 【设置窗口】【资源对话框】无参数，取出待打开的 OCR 资源管理窗口，返回可选对话框
-    fn take_dialog(&mut self) -> Option<window::WindowDialog> {
-        self.dialog.take()
-    }
-    /// 【设置窗口】【资源返回】按对话框关闭事件刷新安装摘要，返回重绘动作，不启动下载
-    fn dialog_closed(&mut self, _id: u64, _accepted: bool) -> WindowAction {
-        self.refresh_resources();
-        WindowAction::Redraw
-    }
-    /// 【设置窗口】【动画调度】无参数，返回工具栏避让动画下一帧期限，静止时没有周期工作
-    fn next_deadline(&self) -> Option<std::time::Instant> {
-        self.toolbar.animation.deadline()
-    }
-    /// 【翻译设置】【完成通知】保存 wake 用于后台目录查询完成后唤醒窗口，无返回值
-    fn connected(&mut self, wake: window::WindowWake) {
-        self.theme_watch = Some(crate::theme::watch_system(wake.clone()));
-        self.translation.wake = Some(wake);
-    }
-    /// 【设置窗口】【首帧确认】无参数，按启动约定通知父进程窗口已经映射，无返回值
-    fn mapped(&mut self) {
-        if self.ready {
-            use std::io::Write;
-            let _ = std::io::stdout().write_all(b"\n");
-            self.ready = false;
-        }
-    }
-    /// 【设置窗口】【画面输出】以 scale 将当前状态绘制到 canvas，静止时不发起周期绘制
-    fn draw(&mut self, canvas: &mut tiny_skia::Pixmap, scale: f32) {
-        super::draw::draw(self, canvas, scale);
-        super::dropdown::draw::draw(self, canvas, scale);
-    }
-    /// 【设置窗口】【输入路由】按 event 更新当前控件和配置，返回必要的重绘或关闭动作
-    fn event(&mut self, event: WindowEvent) -> WindowAction {
-        if let WindowEvent::PointerButton {
-            position,
-            button: window::LEFT_BUTTON,
-            pressed: true,
-        } = event
-            && let Some(edge) = super::layout::resize_edge(self.size, position)
-        {
-            return WindowAction::ResizeEdge(edge);
-        }
-        if matches!(event, WindowEvent::Wake) {
-            super::translation::input::event(self, &event);
-            return WindowAction::Redraw;
-        }
-        if let Some(action) = super::dropdown::input::event(self, &event) {
-            return action;
-        }
-        let shell_hover_changed = match &event {
-            WindowEvent::PointerMove { position } => self.hit(self.pointer) != self.hit(*position),
-            _ => false,
-        };
-        if (self.translation_page() || matches!(event, WindowEvent::Wake))
-            && let Some(action) = super::translation::input::event(self, &event)
-        {
-            return if shell_hover_changed && matches!(action, WindowAction::None) {
-                WindowAction::Redraw
-            } else {
-                action
-            };
-        }
-        if self.toolbar_page()
-            && let Some(action) = super::toolbar::input::event(self, &event)
-        {
-            return if shell_hover_changed && matches!(action, WindowAction::None) {
-                WindowAction::Redraw
-            } else {
-                action
-            };
-        }
-        match event {
-            WindowEvent::Resize { size } => {
-                self.size = size;
-                self.toolbar.scroll = self
-                    .toolbar
-                    .scroll
-                    .min(super::toolbar::layout::Layout::new(self).maximum());
-                self.scroll = self.scroll.min(super::layout::Layout::new(self).maximum);
-            }
-            WindowEvent::PointerMove { position } => {
-                if self.pressed.is_some() && self.edit_pointer(position, true) {
-                    self.pointer = position;
-                    return WindowAction::Redraw;
-                }
-                if let Some(drag) = self.scrollbar_drag
-                    && let Some(bar) = self.scrollbar()
-                {
-                    self.scroll = drag.value(position, &bar);
-                    self.pointer = position;
-                    return WindowAction::Redraw;
-                }
-                let before = self.hit(self.pointer);
-                self.pointer = position;
-                if !shell_hover_changed && before == self.hit(position) {
-                    return WindowAction::None;
-                }
-            }
-            WindowEvent::PointerButton {
-                position,
-                button: window::LEFT_BUTTON,
-                pressed,
-            } => {
-                let hit = self.hit(position);
-                if !pressed && self.scrollbar_drag.take().is_some() {
-                    self.pressed = None;
-                    return WindowAction::Redraw;
-                }
-                if pressed {
-                    self.edit_pointer(position, false);
-                    if self.press_scrollbar(position) {
-                        return WindowAction::Redraw;
-                    }
-                    if position.0 >= self.size.0 as f64 - 18.0
-                        && position.1 >= self.size.1 as f64 - 18.0
-                    {
-                        return WindowAction::Resize;
-                    }
-                    if hit.is_none() && position.1 < 48.0 {
-                        return WindowAction::Move;
-                    }
-                    self.pressed = hit;
-                } else if let Some(control) =
-                    self.pressed.take().filter(|control| Some(*control) == hit)
-                {
-                    if control == Control::Close {
-                        return if self.commit_pending() {
-                            WindowAction::Close
-                        } else {
-                            WindowAction::Redraw
-                        };
-                    }
-                    self.activate(control);
-                }
-            }
-            WindowEvent::Scroll { delta, .. } => {
-                self.scroll_rows(if delta.1 > 0.0 {
-                    1
-                } else if delta.1 < 0.0 {
-                    -1
-                } else {
-                    0
-                });
-            }
-            WindowEvent::Key(input) => {
-                if input.key != Some(Key::Escape)
-                    && let Some((index, _)) = &self.editing
-                    && matches!(ENTRIES[*index].kind, Kind::Shortcut)
-                {
-                    self.record_shortcut(*index, &input);
-                    return WindowAction::Redraw;
-                }
-                if input.key == Some(Key::Escape) {
-                    if self.editing.take().is_none() && !self.search_focus {
-                        return if self.commit_pending() {
-                            WindowAction::Close
-                        } else {
-                            WindowAction::Redraw
-                        };
-                    }
-                    self.search_focus = false;
-                } else if input.mods.ctrl && input.key == Some(Key::Char('f')) {
-                    if !self.commit_pending() {
-                        return WindowAction::Redraw;
-                    }
-                    self.search_focus = true;
-                    self.editing = None;
-                    self.search.select_all(&mut self.fonts);
-                } else if self.search_focus {
-                    self.search.key(&mut self.fonts, &input);
-                    self.scroll = 0;
-                } else if input.key == Some(Key::Tab) {
-                    if self.commit_pending() {
-                        self.advance_focus(input.mods.shift);
-                    }
-                } else if input.key == Some(Key::Enter) && self.editing.is_some() {
-                    self.apply();
-                } else if let Some((index, field)) = &mut self.editing {
-                    if matches!(ENTRIES[*index].kind, Kind::Shortcut) {
-                        let index = *index;
-                        self.record_shortcut(index, &input);
-                    } else {
-                        field.key(&mut self.fonts, &input);
-                    }
-                } else if self.scroll_key(input.key) {
-                    self.focus = None;
-                } else if input.key == Some(Key::Enter)
-                    && let Some(index) = self.focus
-                {
-                    self.activate(Control::Row(index));
-                }
-            }
-            WindowEvent::Focused(false) => {
-                self.pressed = None;
-                self.scrollbar_drag = None;
-            }
-            _ => return WindowAction::None,
-        }
-        WindowAction::Redraw
-    }
-    /// 【设置窗口】【指针反馈】按 position 返回文本或按钮光标，无状态修改
-    fn cursor(&self, position: (f64, f64)) -> WindowCursor {
-        if let Some(edge) = super::layout::resize_edge(self.size, position) {
-            use window::WindowEdge;
-            return match edge {
-                WindowEdge::Top | WindowEdge::Bottom => WindowCursor::VerticalResize,
-                WindowEdge::Left | WindowEdge::Right => WindowCursor::HorizontalResize,
-                _ => WindowCursor::Resize,
-            };
-        }
-        if let Some(menu) = &self.dropdown {
-            return match super::dropdown::layout::Layout::new(menu, self.size).hit(position) {
-                Some(super::dropdown::layout::Hit::Search) => WindowCursor::Text,
-                Some(_) => WindowCursor::Pointer,
-                None => WindowCursor::Default,
-            };
-        }
-        if self.translation_page()
-            && super::translation::layout::Layout::new(self)
-                .hit(position)
-                .is_some()
-        {
-            return WindowCursor::Pointer;
-        }
-        if self.toolbar_page() {
-            if self.toolbar.drag.as_ref().is_some_and(|drag| drag.active) {
-                return WindowCursor::Grabbing;
-            }
-            if let Some(hit) = super::toolbar::layout::Layout::new(self).hit(position) {
-                return if matches!(hit, super::toolbar::layout::Hit::Item(..)) {
-                    WindowCursor::Grab
-                } else {
-                    WindowCursor::Pointer
-                };
-            }
-        }
-        if position.0 >= self.size.0 as f64 - 18.0 && position.1 >= self.size.1 as f64 - 18.0 {
-            return WindowCursor::Resize;
-        }
-        match self.hit(position) {
-            Some(Control::Search) => WindowCursor::Text,
-            Some(_) => WindowCursor::Pointer,
-            None => WindowCursor::Default,
-        }
-    }
 }
 
 /// 【设置窗口】【窗口执行】按 ready 创建普通原生窗口，返回生命周期结果

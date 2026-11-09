@@ -33,6 +33,7 @@ fn key(code: u32) -> Option<Key> {
         VK_BACK => Key::Backspace,
         VK_DELETE => Key::Delete,
         VK_INSERT => Key::Insert,
+        VK_SNAPSHOT => Key::PrintScreen,
         VK_HOME => Key::Home,
         VK_END => Key::End,
         VK_PRIOR => Key::PageUp,

@@ -12,6 +12,13 @@ theme = "light"
 # system | english | chinese; MARK_SHOT_LANG takes precedence
 language = ""
 
+[desktop]
+# 【桌面集成】【常驻注册】启用后独立后台服务持有注册，设置保存后立即生效
+tray_enabled = false
+shortcuts_enabled = false
+# 【桌面集成】【全局截图】X11与Windows直接注册；Wayland由系统门户确认实际绑定
+screenshot_shortcut = "PrintScreen"
+
 [general]
 # What happens to every screenshot, on top of what you choose in the editor:
 # e.g. with to = "s" copying also saves the file.

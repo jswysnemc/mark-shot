@@ -10,6 +10,7 @@ use crate::{
 };
 use smithay_client_toolkit::compositor::FrameCallbackData;
 use std::time::Instant;
+wayland_client::delegate_noop!(OverlayState: ignore crate::backend::wayland::activation::XdgActivationV1);
 
 /// 【截图覆盖层】【可写检查】按surface返回是否有已释放缓冲或尚可创建第二缓冲，不把帧回调视为释放
 pub(crate) fn has_writable_buffer(surface: &SurfaceData) -> bool {
@@ -121,6 +122,7 @@ impl WaylandOverlay {
         surface.frame_sent = Some(Instant::now());
         surface.waiting_release = true;
         surface.surface.commit();
+        crate::backend::wayland::activation::activate(&runtime.globals, &qh, &surface.surface);
         Ok(())
     }
 }

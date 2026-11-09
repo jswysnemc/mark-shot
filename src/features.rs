@@ -8,6 +8,7 @@ pub mod arrow;
 pub mod canvas_navigation;
 pub mod capture_history;
 pub mod color_sample;
+pub mod desktop;
 pub mod export_image;
 pub mod external_actions;
 pub mod filter;

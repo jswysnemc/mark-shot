@@ -57,6 +57,13 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
     });
     if let Command::Internal { kind, args } = options.command {
         return match kind.as_str() {
+            crate::features::desktop::ARG => {
+                if !args.is_empty() {
+                    return Err("background service accepts no additional arguments".into());
+                }
+                crate::logging::init(Process::Overlay);
+                crate::features::desktop::run()
+            }
             crate::features::preferences::READY_ARG => {
                 if !args.is_empty() {
                     return Err("settings window accepts no internal arguments".into());
@@ -97,6 +104,9 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
         };
     }
     if matches!(options.command, Command::Settings) {
+        if let Err(error) = crate::features::desktop::ensure() {
+            log::error!("【桌面集成】【服务启动】{error}");
+        }
         crate::logging::init(Process::Overlay);
         return crate::features::preferences::run(false);
     }
@@ -106,6 +116,13 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
         return crate::features::capture_history::run(false);
     }
     crate::logging::init(Process::Overlay);
+    if !matches!(
+        options.command,
+        Command::ListDisplays | Command::Capture { .. }
+    ) && let Err(error) = crate::features::desktop::ensure()
+    {
+        log::error!("【桌面集成】【服务启动】{error}");
+    }
     match options.command {
         Command::PinFile(path) => return pin::run(&std::fs::read(path)?, 1.0),
         Command::PinClipboard => return super::pin_clipboard::run(),
