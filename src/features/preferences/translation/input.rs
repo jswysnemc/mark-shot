@@ -242,6 +242,46 @@ fn edit_pointer(
 /// 【翻译设置】【控件执行】按 hit 修改 state，保存成功才切换服务或退出字段编辑
 fn activate(state: &mut Preferences, hit: Hit) {
     match hit {
+        Hit::Test => {
+            if state.translation.preview.busy() {
+                state.translation.preview.cancel();
+            } else if apply(state) {
+                let provider = state.translation.service().id;
+                state.translation.preview.start(
+                    &state.translation.root,
+                    provider,
+                    &state.path,
+                    state.translation.wake.clone(),
+                );
+            } else {
+                state
+                    .translation
+                    .preview
+                    .fail(crate::translation::Error::new(
+                        crate::translation::ErrorKind::Configuration,
+                        state.status.clone(),
+                    ));
+            }
+        }
+        Hit::CopyTest => {
+            if state.translation.preview.copyable() {
+                let text = state.translation.preview.text(state.chinese());
+                state.status = match crate::utils::copy_to_clipboard(&text) {
+                    Ok(()) => if state.chinese() {
+                        "测试详情已复制"
+                    } else {
+                        "Test details copied"
+                    }
+                    .into(),
+                    Err(_) => if state.chinese() {
+                        "复制测试详情失败"
+                    } else {
+                        "Unable to copy test details"
+                    }
+                    .into(),
+                };
+            }
+        }
         Hit::Enable | Hit::Auto => {
             if apply(state) {
                 let result = state.translation.enable(&state.path, hit == Hit::Auto);
@@ -325,11 +365,15 @@ pub(in crate::features::preferences) fn event(
     let layout = Layout::new(state);
     match event {
         WindowEvent::Wake => {
+            let preview_changed = state.translation.preview.poll();
             let result = state
                 .translation
                 .task
                 .as_ref()
-                .and_then(|task| task.finished())?;
+                .and_then(|task| task.finished());
+            let Some(result) = result else {
+                return preview_changed.then_some(WindowAction::Redraw);
+            };
             state.translation.task = None;
             match result {
                 Ok(models) => {
@@ -361,17 +405,25 @@ pub(in crate::features::preferences) fn event(
             offset(state, current.min(layout.maximum));
             state.translation.drag = None;
             state.translation.pressed = None;
+            state.translation.preview.drag = None;
             return None;
         }
         WindowEvent::Focused(false) => {
             state.translation.drag = None;
             state.translation.pressed = None;
             state.translation.reveal = false;
+            state.translation.preview.drag = None;
             return None;
         }
         WindowEvent::PointerMove { position } => {
             let changed = layout.hit(state.pointer) != layout.hit(*position);
             state.pointer = *position;
+            if let Some(drag) = state.translation.preview.drag
+                && let Some(bar) = layout.preview.scrollbar(&state.translation.preview)
+            {
+                state.translation.preview.scroll = drag.value(*position, &bar);
+                return Some(WindowAction::Redraw);
+            }
             if matches!(state.translation.pressed, Some(Hit::Field(_)))
                 && edit_pointer(state, &layout, *position, true)
             {
@@ -393,6 +445,9 @@ pub(in crate::features::preferences) fn event(
             pressed,
         } => {
             state.pointer = *position;
+            if !pressed && state.translation.preview.drag.take().is_some() {
+                return Some(WindowAction::Redraw);
+            }
             if !pressed && state.translation.drag.take().is_some() {
                 return Some(WindowAction::Redraw);
             }
@@ -402,6 +457,22 @@ pub(in crate::features::preferences) fn event(
             }
             state.search_focus = false;
             if *pressed {
+                if let Some(bar) = layout.preview.scrollbar(&state.translation.preview)
+                    && contains(bar.track, *position)
+                {
+                    if contains(bar.handle, *position) {
+                        state.translation.preview.drag =
+                            Some(scrollbar::Drag::new(*position, &bar));
+                    } else {
+                        state.translation.preview.scroll =
+                            if position.1 < f64::from(bar.handle.top()) {
+                                state.translation.preview.scroll.saturating_sub(bar.page)
+                            } else {
+                                (state.translation.preview.scroll + bar.page).min(bar.maximum)
+                            };
+                    }
+                    return Some(WindowAction::Redraw);
+                }
                 if let Some(bar) = &layout.scrollbar
                     && contains(bar.track, *position)
                 {
@@ -431,6 +502,23 @@ pub(in crate::features::preferences) fn event(
             }
         }
         WindowEvent::Scroll { position, delta } if contains(layout.viewport, *position) => {
+            if contains(layout.preview.result, *position)
+                && let Some(bar) = layout.preview.scrollbar(&state.translation.preview)
+            {
+                state.translation.preview.scroll = state
+                    .translation
+                    .preview
+                    .scroll
+                    .saturating_add_signed(if delta.1 > 0.0 {
+                        36
+                    } else if delta.1 < 0.0 {
+                        -36
+                    } else {
+                        0
+                    })
+                    .min(bar.maximum);
+                return Some(WindowAction::Redraw);
+            }
             let step = 64;
             let current = state.translation.scroll;
             offset(
@@ -476,13 +564,11 @@ pub(in crate::features::preferences) fn event(
                             },
                         );
                     state.translation.focus = Some(controls[next]);
-                    if let Hit::Field(field) = controls[next] {
-                        state.translation.scroll = state
-                            .translation
-                            .scroll
-                            .saturating_add_signed(layout.reveal(field))
-                            .min(layout.maximum);
-                    }
+                    state.translation.scroll = state
+                        .translation
+                        .scroll
+                        .saturating_add_signed(layout.reveal_control(controls[next]))
+                        .min(layout.maximum);
                 }
                 return Some(WindowAction::Redraw);
             }

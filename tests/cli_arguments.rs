@@ -10,14 +10,14 @@ fn parse(values: &[&str]) -> mark_shot::AppResult<arguments::Arguments> {
     arguments::parse(values.iter().map(OsString::from), Instant::now())
 }
 
-/// 【命令行测试】【默认入口】验证无参数时选择当前显示器并进入原生编辑器
+/// 【命令行测试】【默认入口】验证无参数时进入原生编辑器，显示器范围留给截图行为配置决定
 #[test]
-fn default_command_opens_current_display() {
+fn default_command_leaves_display_scope_to_capture_settings() {
     let Command::Editor(launch) = parse(&[]).unwrap().command else {
         panic!("expected editor")
     };
     assert_eq!(launch.mode, Mode::Editor);
-    assert!(launch.one_monitor);
+    assert!(!launch.one_monitor);
 }
 
 /// 【命令行测试】【历史入口】历史窗口与捕获互斥，重编辑只接受严格历史身份

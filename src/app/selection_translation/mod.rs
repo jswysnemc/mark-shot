@@ -86,10 +86,7 @@ pub(super) fn apply(state: &mut EditorState, dirty: &mut u32) {
             .region
             .apply(&mut state.captures, state.file_canvas.as_mut(), image);
     }
-    state.selection_translation.background_dirty = true;
-    state.filters = Default::default();
-    state.annotations_dirty = true;
-    crate::editor::dirty::mark_all_dirty(dirty, state.placements.len());
+    invalidate_background(state, dirty);
     panels::update(state, dirty);
     super::panels::toolbar::update_toolbar(state, dirty);
 }
@@ -113,11 +110,22 @@ pub(super) fn exit(state: &mut EditorState, dirty: &mut u32) {
         session
             .region
             .apply(&mut state.captures, state.file_canvas.as_mut(), None);
-        state.selection_translation.background_dirty = true;
-        state.filters = Default::default();
-        state.annotations_dirty = true;
-        crate::editor::dirty::mark_all_dirty(dirty, state.placements.len());
+        invalidate_background(state, dirty);
     }
     panels::update(state, dirty);
     super::panels::toolbar::update_toolbar(state, dirty);
+}
+
+/// 【框选翻译】【背景失效】原图像素改变后清理 state 的缩放缓存并登记完整输出，dirty 返回重绘掩码，避免复用旧译文背景
+fn invalidate_background(state: &mut EditorState, dirty: &mut u32) {
+    state.selection_translation.background_dirty = true;
+    state.navigation.frames.clear();
+    state.filters = Default::default();
+    state.annotations_dirty = true;
+    for monitor in 0..state.placements.len() {
+        if let Some(rect) = state.placements[monitor].rect() {
+            state.damage_local(monitor, rect);
+        }
+    }
+    crate::editor::dirty::mark_all_dirty(dirty, state.placements.len());
 }

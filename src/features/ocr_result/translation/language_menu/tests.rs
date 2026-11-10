@@ -147,3 +147,32 @@ fn unchanged_language_popup_has_no_new_frame_and_nontext_regions_do_not_select()
         assert!(menu.item(point.0, point.1).is_none());
     }
 }
+
+/// 【翻译回归】【菜单字形】实际弹层第一行必须完整绘制，与独立排版像素一致，无参数和返回值
+#[test]
+fn translation_ui_regression_menu_keeps_complete_glyphs() {
+    for scale in [1.0, 1.25, 2.0] {
+        let (_root, mut window) = opened(760.0);
+        let actual = frame(&mut window, scale).unwrap();
+        let actual = Pixmap::from_vec(
+            actual.pixels.to_vec(),
+            tiny_skia::IntSize::from_wh(actual.pixel_size.0, actual.pixel_size.1).unwrap(),
+        )
+        .unwrap();
+        let mut expected = actual.clone();
+        let menu = window.translation.language_menu.as_ref().unwrap();
+        let area = Rect::from_xywh(19.0, 6.0, menu.size().0 - 44.0, 28.0).unwrap();
+        let colors = super::super::super::palette::Palette::current();
+        let mut painter = Painter::new(&mut expected)
+            .with_scale(scale)
+            .with_text(&mut window.fonts, &mut window.cache);
+        painter.clipped_scene(Some(area), |painter| {
+            painter.fill_rounded(area, 0.0, colors.base);
+            painter.text_buffer(&menu.labels[0][0], (19.0, 10.5), colors.text.color());
+        });
+        assert!(
+            actual.data() == expected.data(),
+            "menu glyphs at scale {scale}"
+        );
+    }
+}

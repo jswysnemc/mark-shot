@@ -108,3 +108,10 @@ fn catalog_matches_every_actual_qt_translation_and_language_choice() {
         }
     }
 }
+
+/// 【翻译回归】【浮条中文】原文和译文必须使用中文词条，无参数和返回值
+#[test]
+fn translation_ui_regression_result_bar_labels() {
+    assert_eq!(super::Language::Chinese.text("Original"), "原文");
+    assert_eq!(super::Language::Chinese.text("Translated"), "译文");
+}

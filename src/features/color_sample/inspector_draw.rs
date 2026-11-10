@@ -15,8 +15,8 @@ fn area(left: f32, top: f32, width: f32, height: f32) -> Rect {
 
 /// 【取色面板】【屏幕适配】按 size 和 anchor 放置面板，限制在当前显示器内，矮窗口使用紧凑行距
 pub fn panel_rect(size: (i32, i32), anchor: (f64, f64)) -> Rect {
-    let width = 426.0_f32.min((size.0 - 16).max(1) as f32);
-    let height = 398.0_f32.min((size.1 - 16).max(1) as f32);
+    let width = 360.0_f32.min((size.0 - 16).max(1) as f32);
+    let height = 320.0_f32.min((size.1 - 16).max(1) as f32);
     let left = if anchor.0 as f32 + 20.0 + width < size.0 as f32 {
         anchor.0 as f32 + 20.0
     } else {
@@ -30,12 +30,30 @@ pub fn panel_rect(size: (i32, i32), anchor: (f64, f64)) -> Rect {
     )
 }
 
+/// 【取色面板】【属性下拉】按 size 与 anchor 返回紧贴属性栏的下拉范围，下方空间不足时翻转到上方
+pub fn dropdown_rect(size: (i32, i32), anchor: Rect) -> Rect {
+    let panel = panel_rect(size, (0.0, 0.0));
+    let top = if anchor.bottom() + 5.0 + panel.height() <= size.1 as f32 - 8.0 {
+        anchor.bottom() + 5.0
+    } else {
+        anchor.top() - panel.height() - 5.0
+    };
+    area(
+        anchor
+            .left()
+            .clamp(8.0, (size.0 as f32 - panel.width() - 8.0).max(8.0)),
+        top.clamp(8.0, (size.1 as f32 - panel.height() - 8.0).max(8.0)),
+        panel.width(),
+        panel.height(),
+    )
+}
+
 /// 【取色面板】【格式行】按 panel 和 index 返回格式行，八行均可见
 fn row_rect(panel: Rect, index: usize) -> Rect {
-    let height = (panel.height() - 132.0) / 8.0;
+    let height = (panel.height() - 104.0) / 8.0;
     area(
         panel.left() + 10.0,
-        panel.top() + 124.0 + index as f32 * height,
+        panel.top() + 96.0 + index as f32 * height,
         panel.width() - 20.0,
         height - 3.0,
     )
@@ -57,9 +75,9 @@ pub fn swatch_rect(panel: Rect, index: usize) -> Rect {
     let width = (panel.width() - 20.0) / 8.0;
     area(
         panel.left() + 10.0 + index as f32 * width,
-        panel.top() + 93.0,
+        panel.top() + 71.0,
         width - 5.0,
-        23.0,
+        18.0,
     )
 }
 
@@ -122,13 +140,13 @@ pub fn draw(state: &mut EditorState, monitor: usize, dirty: Option<Rect>) {
             panel.left() + 10.0,
             panel.top() + 39.0,
             panel.width() - 20.0,
-            46.0,
+            26.0,
         );
         controls::frame(painter, preview, fill, palette.border, 7.0);
         painter.text(
             preview,
             &Format::Hex.text(color),
-            TextStyle::new(18.0, ink).center(),
+            TextStyle::new(13.0, ink).center(),
         );
         for index in 0..8 {
             let fill = inspector

@@ -14,7 +14,18 @@ pub(super) fn run_overlay(
     // wayland on COSMIC unlike KDE doesn't immediately send pointer event
     let mut pointer_wait = Some(Instant::now() + POINTER_GRACE);
 
+    let mut visibility = super::capture_visibility::Visibility::new(overlay.as_mut())?;
     loop {
+        let (hidden, restored) = visibility.sync(editor_state, overlay.as_mut())?;
+        if hidden {
+            overlay.next_event(Some(Duration::from_millis(100)))?;
+            continue;
+        }
+        if restored {
+            pacing = Pacing::new(editor_state.captures.len());
+            mark_all_dirty(&mut dirty_mask, editor_state.captures.len());
+            editor_state.annotations_dirty = true;
+        }
         let mut timeout = poll_timeout(editor_state);
         if let Some(left) = pacing.source_residency.timeout(Instant::now()) {
             timeout = Some(timeout.map_or(left, |timeout| timeout.min(left)));
@@ -104,6 +115,7 @@ pub(super) fn run_overlay(
             editor_state.preferences_requested = false;
             crate::editor::text_session::commit(editor_state, &mut dirty_mask);
             overlay.suspend()?;
+            visibility.pause();
             let before = crate::config::preferences::current();
             let result = crate::features::preferences::run(false);
             overlay.resume()?;
@@ -129,6 +141,8 @@ pub(super) fn run_overlay(
 
         if editor_state.save_as_requested {
             editor_state.save_as_requested = false;
+            overlay.suspend()?;
+            visibility.pause();
             if let Some(path) = super::save_as::open(editor_state, overlay.as_mut())? {
                 editor_state.saved_as = Some(path);
                 return Ok(false);
@@ -156,6 +170,12 @@ pub(super) fn run_overlay(
             && !super::selection_size::popup::sync(editor_state, overlay.as_mut())?
         {
             super::text_menu_surface::sync(editor_state, overlay.as_mut(), &mut dirty_mask)?;
+        }
+        if editor_state.selection_translation.requested.is_some()
+            && crate::ocr::engine_choice::source(&editor_state.ocr.models).is_none()
+        {
+            overlay.suspend()?;
+            visibility.pause();
         }
         if super::selection_translation::tasks::start(
             editor_state,
@@ -339,12 +359,14 @@ pub(super) fn handle_event(editor_state: &mut EditorState, ev: OverlayEvent, dir
             super::region_detection::motion::history(editor_state, &history);
             // 1. 【选区尺寸】【移动轨迹】极值先转换为全局坐标，移出后返回也必须终止平台双击候选
             for range in &history {
-                if let Some(output) = editor_state.placements.get(range.monitor_idx) {
+                if let Some(output) = editor_state.placements.get(range.monitor_idx).cloned() {
                     for point in [range.min, range.max] {
-                        editor_state.selection_size.clicks.moved((
+                        let point = (
                             f64::from(output.position.0) + point.0,
                             f64::from(output.position.1) + point.1,
-                        ));
+                        );
+                        editor_state.selection_size.clicks.moved(point);
+                        input::capture_actions::observe(editor_state, point);
                     }
                 }
             }

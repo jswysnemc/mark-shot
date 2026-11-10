@@ -8,7 +8,7 @@ use super::fields::Field;
 use crate::ui::scrollbar;
 use tiny_skia::Rect;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(in crate::features::preferences) enum Hit {
     Enable,
     Auto,
@@ -17,6 +17,8 @@ pub(in crate::features::preferences) enum Hit {
     Reveal,
     Query,
     Models,
+    Test,
+    CopyTest,
 }
 
 pub(super) struct Row {
@@ -34,6 +36,7 @@ pub(in crate::features::preferences) struct Layout {
     pub(super) scrollbar: Option<scrollbar::Geometry>,
     pub(super) capacity: usize,
     pub(super) maximum: usize,
+    pub(super) preview: super::preview::draw::Layout,
 }
 
 pub(super) use super::super::layout::rect;
@@ -50,6 +53,7 @@ impl Layout {
             scrollbar: None,
             capacity: viewport.height() as usize,
             maximum: 0,
+            preview: super::preview::draw::Layout::new(viewport),
         };
         let total = layout.form(state);
         layout.maximum = total.saturating_sub(layout.capacity);
@@ -92,6 +96,19 @@ impl Layout {
             ),
         ));
         top += provider_height + 16.0;
+        let preview_bounds = rect(left, top, width, super::preview::draw::HEIGHT);
+        self.preview = super::preview::draw::Layout::new(preview_bounds);
+        self.panels.push((
+            preview_bounds,
+            if chinese {
+                "翻译测试"
+            } else {
+                "Translation test"
+            },
+        ));
+        self.controls.push((Hit::Test, self.preview.test));
+        self.controls.push((Hit::CopyTest, self.preview.copy));
+        top += super::preview::draw::HEIGHT + 16.0;
         let mut fields = state.translation.fields();
         fields.retain(|field| *field != Field::Provider);
         fields.sort_by_key(|field| field.group(chinese).0);
@@ -207,6 +224,23 @@ impl Layout {
             (row.label.top() - self.viewport.top() - 10.0).floor() as isize
         } else {
             (row.bounds.bottom() + 10.0 - self.viewport.bottom())
+                .max(0.0)
+                .ceil() as isize
+        }
+    }
+
+    /// 【翻译设置】【操作定位】按 hit 返回按钮或字段移入视口所需距离，测试区也支持键盘焦点导航
+    pub(super) fn reveal_control(&self, hit: Hit) -> isize {
+        if let Hit::Field(field) = hit {
+            return self.reveal(field);
+        }
+        let Some((_, bounds)) = self.controls.iter().find(|(control, _)| *control == hit) else {
+            return 0;
+        };
+        if bounds.top() < self.viewport.top() {
+            (bounds.top() - self.viewport.top() - 8.0).floor() as isize
+        } else {
+            (bounds.bottom() + 8.0 - self.viewport.bottom())
                 .max(0.0)
                 .ceil() as isize
         }

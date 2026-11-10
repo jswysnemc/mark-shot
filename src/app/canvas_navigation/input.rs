@@ -113,7 +113,11 @@ pub(crate) fn handle_pointer_move(
     super::preview::follow(state, dirty);
     state.ensure_navigation();
     let point = state.navigation_point();
+    let can_pan = crate::app::input::capture_actions::moved(state);
     if let Some(pan) = state.navigation.pan {
+        if !can_pan {
+            return;
+        }
         if state
             .navigation
             .view
@@ -186,8 +190,21 @@ pub(crate) fn handle_pointer_button(
 ) {
     if pressed {
         super::preview::clear(state, dirty);
+        if button != MouseButton::Left || over_ui(state) {
+            crate::app::input::capture_actions::cancel(state);
+        }
+    }
+    if button != MouseButton::Middle && pressed {
+        // 1. 【截图输入】【组合按键】中键尚未释放时按下其他按钮，取消单击候选
+        if state.navigation.pan.is_some() {
+            crate::app::input::capture_actions::cancel(state);
+        }
     }
     if button == MouseButton::Middle && !pressed && state.navigation.pan.take().is_some() {
+        if !over_ui(state) {
+            crate::app::input::capture_actions::middle_release(state, dirty);
+        }
+        crate::app::input::capture_actions::cancel(state);
         sync_bars(state, dirty);
         return;
     }
@@ -247,6 +264,12 @@ pub(crate) fn handle_pointer_button(
             return;
         }
         if button == MouseButton::Middle && state.navigation_policy().available() {
+            crate::app::input::capture_actions::middle_press(
+                state,
+                crate::config::preferences::current()
+                    .capture
+                    .middle_click_action,
+            );
             // 1. 【画布导航】【中键开始】先提交文字并结束旧交互，默认无单击动作时立即平移
             crate::editor::text_session::commit(state, dirty);
             state.end_collection_interaction();
@@ -376,6 +399,7 @@ pub(crate) fn owns_pointer(state: &EditorState) -> bool {
 
 /// 【画布导航】【焦点中断】结束state的平移、滑块与Ctrl点击序列，dirty返回控件清理，保留当前视图，无返回值
 pub(crate) fn focus_lost(state: &mut EditorState, dirty: &mut u32) {
+    crate::app::input::capture_actions::cancel(state);
     super::preview::clear(state, dirty);
     let pan = state.navigation.pan.take().is_some();
     let slider = state.navigation.slider.take().is_some();

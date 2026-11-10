@@ -157,7 +157,7 @@ impl EditorState {
             else {
                 continue;
             };
-            let next = transform::dragged(
+            let mut next = transform::dragged(
                 before,
                 drag.bounds,
                 drag.handle,
@@ -168,6 +168,14 @@ impl EditorState {
                 self.input.ctrl,
                 self.input.shift,
                 &mut self.text,
+            );
+            crate::features::color_sample::sampling::refresh(
+                &mut next,
+                crate::renderer::FrozenImage::from_parts(
+                    self.file_canvas.as_ref(),
+                    &self.captures,
+                    &self.placements,
+                ),
             );
             self.annotations[index] = next;
         }

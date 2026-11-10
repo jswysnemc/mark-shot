@@ -1,3 +1,4 @@
+pub(crate) mod capture_actions;
 mod modifiers;
 mod pointer_move;
 pub(crate) use modifiers::handle_canvas_modifiers;
@@ -48,7 +49,6 @@ use crate::editor::dirty::{apply_damage_rects, mark_all_dirty, mark_dirty};
 use crate::editor::{DamageZone, EditorState};
 use crate::interaction::ClickTarget;
 use crate::keys::{self, Chord, Key};
-use crate::theme::font;
 use crate::tools::{
     Tool, dispatch_activate, dispatch_button, dispatch_key, dispatch_move, dispatch_text,
 };
@@ -388,7 +388,7 @@ pub(crate) fn handle_canvas_pointer_button(
                                 let idx = char_index_for_x(
                                     &current_value,
                                     click_x,
-                                    font::label(),
+                                    crate::ui::toolbar::metrics::font(),
                                     &mut editor_state.text.font_system,
                                 );
                                 CursorInit::At(idx)
@@ -442,6 +442,18 @@ pub(crate) fn handle_canvas_pointer_button(
 
             UiHit::None => {}
         }
+    }
+
+    if capture_actions::button(
+        editor_state,
+        button,
+        pressed,
+        crate::config::preferences::current()
+            .capture
+            .double_click_action,
+        dirty_mask,
+    ) {
+        return;
     }
 
     // ── 2. dispatch event to active tool ─────────────────────────────────────

@@ -8,6 +8,9 @@ use crate::{
 
 /// 【选区把手】【命中查询】按 state 的画布坐标和视图比例返回八点命中；内部和普通边线返回 None
 pub(crate) fn hit(state: &EditorState) -> Option<SelectionHandle> {
+    if state.fullscreen_scope {
+        return None;
+    }
     let rect = state.selection.zone?;
     let point = state.canvas_point();
     let radius = 6.0 / state.canvas_transform().scale;
@@ -49,7 +52,8 @@ pub(crate) fn outside(state: &EditorState) -> bool {
 
 /// 【选区把手】【活动查询】按 state 返回是否有统一选区缩放手势，不把选区内部移动视为把手拖动
 pub(super) fn active(state: &EditorState) -> bool {
-    state.input.mouse_down
+    !state.fullscreen_scope
+        && state.input.mouse_down
         && !matches!(
             state.selection.active_handle,
             SelectionHandle::None | SelectionHandle::Move

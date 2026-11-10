@@ -333,3 +333,37 @@ fn tab_keeps_each_grouped_field_visible_in_compact_window() {
         assert!(row.bounds.bottom() <= layout.viewport.bottom());
     }
 }
+
+/// 【设置回归】【滚轮数值】无参数，数值框滚轮先提交草稿再调整，边界不滚动页面，框外保留页面滚动
+#[test]
+fn wheel_over_number_changes_value_and_commits_the_edit() {
+    use super::{catalog::ENTRIES, layout::Layout, window::Control};
+    let mut state = Preferences::new(false).unwrap();
+    let index = ENTRIES
+        .iter()
+        .position(|entry| entry.section == "history" && entry.key == "limit")
+        .unwrap();
+    state.page = ENTRIES[index].page;
+    state.activate(Control::Row(index));
+    state
+        .editing
+        .as_mut()
+        .unwrap()
+        .1
+        .set("50", &mut state.fonts, true);
+    let layout = Layout::new(&state);
+    let row = layout.rows.iter().find(|row| row.index == index).unwrap();
+    let position = (
+        f64::from(row.control.left() + row.control.width() / 2.0),
+        f64::from(row.control.top() + 10.0),
+    );
+    let before = state.scroll;
+    state.event(WindowEvent::Scroll {
+        position,
+        delta: (0.0, -15.0),
+    });
+    let step = ENTRIES[index].step().unwrap();
+    assert_eq!(state.value(index).parse::<f64>().unwrap(), 50.0 + step);
+    assert_eq!(state.scroll, before);
+    assert!(state.editing.is_none());
+}

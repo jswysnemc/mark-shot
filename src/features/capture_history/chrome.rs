@@ -1,4 +1,4 @@
-//! 【截图历史】【窗口框架】原版深色面板、矢量操作栏、记录复选框和按需状态文字
+//! 【截图历史】【窗口框架】统一明暗配色、紧凑矢量操作栏、记录复选框和按需状态文字
 
 use super::{
     layout::{Control, rect},
@@ -94,7 +94,7 @@ fn icon(control: Control) -> Option<&'static str> {
     }
 }
 
-/// 【截图历史】【按钮样式】用 state 和 control 生成原版前景、背景及边框，不改变业务状态
+/// 【截图历史】【按钮样式】用 state 和 control 生成紧凑按钮前景、背景及边框，不改变业务状态
 fn button_style(state: &HistoryWindow, control: Control) -> ButtonStyle {
     let enabled = state.enabled(control);
     let hovered =
@@ -132,7 +132,7 @@ fn button_style(state: &HistoryWindow, control: Control) -> ButtonStyle {
         fill,
         foreground: ink,
         border,
-        font_size: 40.0 / 3.0,
+        font_size: 12.0,
         weight: Weight(if primary { 600 } else { 500 }),
     }
 }
@@ -152,7 +152,7 @@ pub(super) fn draw(state: &mut HistoryWindow, canvas: &mut Pixmap, scale: f32) {
     painter.text(
         state.layout.summary,
         &format!("Screenshot History · {}", state.model.entries.len()),
-        TextStyle::new(40.0 / 3.0, foreground()).weight(Weight(600)),
+        TextStyle::new(13.0, foreground()).weight(Weight(600)),
     );
     for ((control, bounds), style) in state.layout.buttons.iter().copied().zip(styles) {
         if control == Control::Enabled {
@@ -209,6 +209,6 @@ pub(super) fn row_rect(row: usize, item_width: f32) -> tiny_skia::Rect {
         2.0,
         2.0 + row as f32 * super::layout::ROW,
         (item_width - 4.0).max(1.0),
-        44.0,
+        super::layout::ROW - 4.0,
     )
 }

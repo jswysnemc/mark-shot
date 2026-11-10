@@ -12,6 +12,7 @@ struct State {
     reporter: Reporter,
     icon: HICON,
     restart: u32,
+    menu: tokio::sync::watch::Receiver<super::menu::State>,
 }
 
 /// 【系统托盘】【宽字符】按text返回带终止符的UTF16文本，供系统同步调用
@@ -36,32 +37,11 @@ fn notify(window: HWND, state: &State, operation: u32) -> bool {
 
 /// 【系统托盘】【菜单交付】按window和state显示系统托盘菜单，选择后通过服务队列交付动作
 fn menu(window: HWND, state: &State) {
-    unsafe {
-        let menu = CreatePopupMenu();
-        if menu.is_null() {
-            return;
-        }
-        for (index, (label, _)) in super::entries().iter().enumerate() {
-            AppendMenuW(menu, MF_STRING, index + 1, wide(label).as_ptr());
-        }
-        let mut point = std::mem::zeroed();
-        GetCursorPos(&mut point);
-        SetForegroundWindow(window);
-        let selected = TrackPopupMenuEx(
-            menu,
-            TPM_RETURNCMD | TPM_RIGHTBUTTON,
-            point.x,
-            point.y,
-            window,
-            std::ptr::null(),
-        );
-        DestroyMenu(menu);
-        if let Some(action) = [Action::Capture, Action::Pin, Action::Settings, Action::Quit]
-            .get((selected as usize).wrapping_sub(1))
-        {
-            state.reporter.action(*action);
-        }
-        PostMessageW(window, WM_NULL, 0, 0);
+    let snapshot = *state.menu.borrow();
+    match super::windows_menu::show(window, snapshot) {
+        Ok(Some(action)) => state.reporter.action(action),
+        Ok(None) => {}
+        Err(error) => log::error!("【系统托盘】【菜单展示】{error}"),
     }
 }
 
@@ -106,6 +86,7 @@ unsafe extern "system" fn procedure(
 pub(super) async fn run(
     reporter: &Reporter,
     cancelled: tokio::sync::watch::Receiver<bool>,
+    menu: tokio::sync::watch::Receiver<super::menu::State>,
 ) -> Result<(), String> {
     let reporter = reporter.clone();
     native_thread::run(cancelled, move |ready| unsafe {
@@ -139,6 +120,7 @@ pub(super) async fn run(
         }
         let mut state = State {
             reporter,
+            menu,
             icon,
             restart: RegisterWindowMessageW(wide("TaskbarCreated").as_ptr()),
         };

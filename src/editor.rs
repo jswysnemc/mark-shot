@@ -54,6 +54,7 @@ use crate::utils::rects_overlap;
 
 /// Pointer and keyboard state of the current gesture.
 pub struct InputState {
+    pub(crate) capture_gestures: crate::app::input::capture_actions::Gestures,
     pub text_input: crate::features::text::input_method::focus::Target,
     pub keyboard_focus: Option<usize>,
     pub popup_serial: Option<u32>,
@@ -77,6 +78,7 @@ pub struct InputState {
 impl Default for InputState {
     fn default() -> Self {
         Self {
+            capture_gestures: Default::default(),
             text_input: Default::default(),
             keyboard_focus: None,
             popup_serial: None,

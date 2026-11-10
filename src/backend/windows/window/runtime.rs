@@ -273,8 +273,35 @@ pub fn run(spec: WindowSpec, content: impl WindowContent + 'static) -> crate::Ap
     main.paint()?;
     main.content.mapped();
     let mut dialog: Option<(u64, Surface)> = None;
+    let visibility_wake = wake.clone();
+    let mut visibility =
+        crate::backend::capture_visibility::Watch::new(move || visibility_wake.notify())?;
+    let mut hidden = false;
     let mut popups = Vec::<Popup>::new();
     loop {
+        let requested = visibility.requested()?;
+        if requested != hidden {
+            if requested {
+                popups.clear();
+                main.window.hide();
+                if let Some((_, child)) = &mut dialog {
+                    child.window.hide();
+                }
+            }
+            main.dirty = true;
+            if let Some((_, child)) = &mut dialog {
+                child.dirty = true;
+            }
+            hidden = requested;
+        }
+        visibility.applied()?;
+        if hidden {
+            native::dispatch(
+                &[wake.handle()],
+                Some(std::time::Duration::from_millis(100)),
+            )?;
+            continue;
+        }
         let active = dialog.as_mut().map_or(&mut main, |entry| &mut entry.1);
         active.sync_text()?;
         sync_popups(active, &mut popups, &queue)?;

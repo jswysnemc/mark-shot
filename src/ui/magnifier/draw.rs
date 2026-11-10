@@ -18,7 +18,7 @@ pub fn magnifier_rect(cursor: (f32, f32), monitor_w: f32, monitor_h: f32) -> Rec
 
 /// 【光标放大区】【整体高度】无参数，返回圆镜与双行读数的整体高度
 fn box_height() -> f32 {
-    size() as f32 + cfg().label_gap + cfg().label_height * 2.0
+    size() as f32 + cfg().label_gap.min(4.0) + super::readout::line_height() * 2.0
 }
 
 /// 【光标放大区】【实时绘制】按 capture、cursor 和屏幕尺寸向 p 绘制局部像素、原图颜色与坐标，无返回值

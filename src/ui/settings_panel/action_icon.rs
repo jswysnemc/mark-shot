@@ -4,7 +4,7 @@ use tiny_skia::{PathBuilder, Rect, Stroke};
 
 use super::{SettingsAction, SettingsPanel};
 use crate::renderer::{Painter, text::TextStyle};
-use crate::theme::{Rgba, font};
+use crate::theme::Rgba;
 use crate::ui::line_properties::{self, LineChoice};
 
 /// 【属性面板】【动作图标绘制】按 panel 当前属性将 action、svg 绘入 painter 的 rect，tint 指定颜色；无返回值
@@ -22,7 +22,9 @@ pub(super) fn draw(
         (rect.width() - 16.0).max(1.0),
         rect.height(),
     );
-    let icon_size = action.icon_size();
+    let icon_size = (action.icon_size() * crate::ui::toolbar::metrics::properties_scale())
+        .min(rect.width() - 8.0)
+        .min(rect.height() - 4.0);
     match action {
         SettingsAction::FilterModes => {
             if let Some(preview) = preview {
@@ -59,7 +61,7 @@ pub(super) fn draw(
                 painter.text(
                     preview,
                     panel.ruler_mode.label(),
-                    TextStyle::new(font::label(), tint.color()).center(),
+                    TextStyle::new(crate::ui::toolbar::metrics::font(), tint.color()).center(),
                 );
             }
         }

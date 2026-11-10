@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use super::widgets::*;
 
 pub struct SettingsPanel {
+    pub cells: Vec<Rect>,
     pub widgets: &'static [SettingsWidget],
     pub active_source: Option<SettingsSource>,
     pub position: (f32, f32),
@@ -67,6 +68,7 @@ impl SettingsPanel {
 
     pub fn new() -> Self {
         Self {
+            cells: Vec::new(),
             widgets: &[],
             active_source: None,
             position: (0.0, 0.0),
@@ -120,20 +122,29 @@ impl SettingsPanel {
             );
         }
 
-        let mut current_x = rect.left() + size::padding();
-        for (idx, widget) in self.widgets.iter().enumerate() {
-            let w = widget.size();
-            let right = current_x + w;
-            if px >= current_x && px <= right {
-                return if widget.is_button() {
-                    (true, Some(idx))
-                } else {
-                    (true, None)
-                };
+        for idx in 0..self.widgets.len() {
+            let Some(cell) = self.cell(idx) else { continue };
+            let point = (px - rect.left(), py - rect.top());
+            if crate::ui::toolbar::contains(cell, point) {
+                return (true, self.widgets[idx].is_button().then_some(idx));
             }
-            current_x += w + widget.trailing_padding();
         }
         (true, None)
+    }
+
+    /// 【属性面板】【控件单元】按 index 返回本地绘制矩形，首次排版前保留单行布局，越界返回空值
+    pub fn cell(&self, index: usize) -> Option<Rect> {
+        if self.cells.len() == self.widgets.len() {
+            return self.cells.get(index).copied();
+        }
+        let widget = self.widgets.get(index)?;
+        let x = size::padding()
+            + self.widgets[..index]
+                .iter()
+                .map(|item| item.size() + item.trailing_padding())
+                .sum::<f32>();
+        let height = self.item_height();
+        Rect::from_xywh(x, (self.size.1 - height) / 2.0, widget.size(), height)
     }
 
     pub fn item_height(&self) -> f32 {
@@ -154,19 +165,13 @@ impl SettingsPanel {
             let cell = layout.control(control, self.render_pos)?;
             return Some((cell.left(), cell.top(), cell.width(), cell.height()));
         }
-        let h = self.size.1;
-        let item_h = self.item_height();
-        let item_y = rect.top() + (h - item_h) / 2.0;
-
-        let mut current_x = rect.left() + size::padding();
-        for (idx, widget) in self.widgets.iter().enumerate() {
-            let w = widget.size();
-            if idx == widget_idx {
-                return Some((current_x, item_y, w, item_h));
-            }
-            current_x += w + widget.trailing_padding();
-        }
-        None
+        let cell = self.cell(widget_idx)?;
+        Some((
+            rect.left() + cell.left(),
+            rect.top() + cell.top(),
+            cell.width(),
+            cell.height(),
+        ))
     }
 
     pub fn stepper_arrow_hit(&self, widget_idx: usize, local: (f64, f64)) -> Option<StepperArrow> {
@@ -329,6 +334,9 @@ impl HoverablePanel for SettingsPanel {
 // ── Placement ─────────────────────────────────────────
 
 pub fn compute_settings_placement(editor_state: &EditorState) -> ((f32, f32), usize) {
+    if let Some(position) = super::docking::position(editor_state) {
+        return position;
+    }
     let tb = &editor_state.toolbar;
     let (panel_w, panel_h) = editor_state.settings_panel.size;
     let bounds = editor_state.placements[tb.monitor_idx].size;

@@ -128,16 +128,19 @@ pub(super) async fn translate(
     http: &dyn Transport,
 ) -> Result<Output> {
     let headers = headers(config);
-    let body = http
-        .send(Request {
-            provider: config.provider,
-            endpoint: endpoint(config),
-            content_type: "application/json",
-            headers,
-            body: payload(config, segments, target).to_string().into_bytes(),
-            timeout: config.timeout,
-        })
-        .await?;
+    let request = Request {
+        provider: config.provider,
+        endpoint: endpoint(config),
+        content_type: "application/json",
+        headers,
+        body: payload(config, segments, target).to_string().into_bytes(),
+        timeout: config.timeout,
+    };
+    let body = if config.provider == Provider::Bilibili {
+        super::bilibili::send(http, request).await?
+    } else {
+        http.send(request).await?
+    };
     response::mapped(
         config.provider,
         segments,

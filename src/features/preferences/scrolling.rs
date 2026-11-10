@@ -4,6 +4,26 @@ use super::window::Preferences;
 use crate::{keys::Key, ui::scrollbar};
 
 impl Preferences {
+    /// 【设置窗口】【数值滚轮】按 position 与 delta 微调悬停数值，先提交草稿；返回是否消费，边界不滚动页面
+    pub(super) fn scroll_number(&mut self, position: (f64, f64), delta: f64) -> bool {
+        let layout = super::layout::Layout::new(self);
+        let Some(index) = layout
+            .rows
+            .iter()
+            .find(|row| {
+                super::catalog::ENTRIES[row.index].step().is_some()
+                    && super::window::contains(row.control, position)
+                    && super::window::contains(layout.viewport, position)
+            })
+            .map(|row| row.index)
+        else {
+            return false;
+        };
+        if delta != 0.0 && self.commit_pending() {
+            self.step(index, if delta < 0.0 { 1 } else { -1 });
+        }
+        true
+    }
     /// 【设置窗口】【滚动几何】无参数，返回溢出内容的可见轨道，短列表不占用滚动条
     pub fn scrollbar(&self) -> Option<scrollbar::Geometry> {
         if self.toolbar_page() || self.translation_page() {

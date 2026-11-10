@@ -188,6 +188,7 @@ pub(crate) fn command(state: &mut EditorState, button: ToolbarButton, dirty: &mu
             }
         }
         ToolbarButton::Scope => toggle_scope(state, dirty),
+        ToolbarButton::Layout if super::super::panels::toolbar_docking::toggle(state) => {}
         ToolbarButton::Layout => {
             state.toolbar.orientation = match state.toolbar.orientation {
                 crate::ui::toolbar::Orientation::Horizontal => {
@@ -206,6 +207,11 @@ pub(crate) fn command(state: &mut EditorState, button: ToolbarButton, dirty: &mu
 
 /// 【截图工具栏】【握柄按下】在 state 的 secondary 面板内记录拖动偏移；返回是否命中握柄
 pub(super) fn begin_toolbar_drag(state: &mut EditorState, secondary: bool) -> bool {
+    if super::super::panels::toolbar_docking::current(state)
+        != crate::config::capture::ToolbarPosition::Selection
+    {
+        return false;
+    }
     let toolbar = if secondary {
         &state.action_toolbar
     } else {

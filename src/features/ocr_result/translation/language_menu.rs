@@ -166,7 +166,7 @@ pub(crate) fn frame(window: &mut ResultWindow, scale: f32) -> Option<PopupFrame<
                 row.height(),
             )
             .unwrap();
-            painter.clipped(Some(text_rect), |painter| {
+            painter.clipped_scene(Some(text_rect), |painter| {
                 painter.text_buffer(
                     &menu.labels[index][usize::from(selected)],
                     (

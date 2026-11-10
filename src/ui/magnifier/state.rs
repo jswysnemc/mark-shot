@@ -1,16 +1,18 @@
 use tiny_skia::Color;
 
-// honestly my magnifier implementation sucks a bit
-// im not sure how to properly change these constants without making it look crooked
+/// 【光标放大区】【像素倍率】无参数，按实际圆镜直径与采样格数返回倍率，兼容旧配置
 pub fn zoom() -> f32 {
-    crate::config::get().magnifier.zoom
+    size() as f32 / cells() as f32
 }
+/// 【光标放大区】【采样格数】无参数，返回配置中的采样格数
 pub fn cells() -> u32 {
     crate::config::get().magnifier.cells
 }
+/// 【光标放大区】【紧凑直径】无参数，将旧配置的二百一十像素圆镜限制到一百零五像素
 pub fn size() -> u32 {
-    crate::config::get().magnifier.size()
+    crate::config::get().magnifier.size().min(105)
 }
+/// 【光标放大区】【指针间距】无参数，返回圆镜与指针的间距
 pub fn offset() -> f32 {
     crate::config::get().magnifier.offset
 }

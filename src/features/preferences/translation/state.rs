@@ -19,6 +19,7 @@ pub(in crate::features::preferences) struct State {
     pub(super) focus: Option<super::layout::Hit>,
     pub(super) models: Vec<String>,
     pub(super) task: Option<models::Task>,
+    pub(super) preview: super::preview::Preview,
     pub(super) pressed: Option<super::layout::Hit>,
     pub(super) drag: Option<crate::ui::scrollbar::Drag>,
     pub(in crate::features::preferences) wake: Option<WindowWake>,
@@ -74,6 +75,7 @@ impl State {
             focus: None,
             models: Vec::new(),
             task: None,
+            preview: Default::default(),
             pressed: None,
             drag: None,
             wake: None,
@@ -244,6 +246,7 @@ impl State {
             patch.insert(service.vendor.into(), vendor.into());
         }
         self.persist(path, patch)?;
+        self.preview.reset();
         self.editing = None;
         self.reveal = false;
         if matches!(field, Field::Address | Field::Key) {
@@ -262,6 +265,7 @@ impl State {
         let _ = path;
         self.selected = index;
         self.cancel();
+        self.preview.reset();
         self.scroll = 0;
         self.models.clear();
         Ok(())
@@ -295,6 +299,7 @@ impl State {
     /// 【翻译设置】【交互取消】无参数，取消尚未保存编辑、菜单和查询，返回空值
     pub(in crate::features::preferences) fn cancel(&mut self) {
         self.task = None;
+        self.preview.cancel();
         self.editing = None;
         self.reveal = false;
         self.pressed = None;

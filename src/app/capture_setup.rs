@@ -35,7 +35,11 @@ pub(super) async fn start_capture(
         delay::begin_launch(launch)?;
     }
 
-    let one = launch.one_monitor;
+    let one = crate::config::preferences::current().capture.one_monitor(
+        launch.one_monitor,
+        launch.all_outputs,
+        launch.fullscreen,
+    );
     let names: Vec<_> = all
         .iter()
         .enumerate()
@@ -63,7 +67,13 @@ pub(super) async fn start_capture(
         }
     };
     // 2. 【截图】【窗口快照】窗口信息与像素都在覆盖层映射前获取，不把本程序收入候选
+    let visibility = crate::backend::capture_visibility::Guard::begin(
+        crate::config::preferences::current()
+            .capture
+            .hide_own_windows,
+    )?;
     let (screenshots, windows) = tokio::join!(capture.capture_frame(&outputs), window_work);
+    drop(visibility);
     let screenshots = screenshots?;
     prof.mark("capture");
 

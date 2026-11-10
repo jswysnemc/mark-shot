@@ -16,6 +16,24 @@ pub struct SingleLine {
 }
 
 impl SingleLine {
+    /// 【界面控件】【居中数值】按 text、fonts 创建紧凑居中输入框，返回与静态数值字号一致的控件
+    pub fn number(text: &str, fonts: &mut UiFonts) -> Self {
+        let mut editor = TextEditor::new_single_line_with_style(
+            text,
+            fonts,
+            crate::ui::text_editor::EditorStyle {
+                size: 12.0,
+                line_height: 26.0,
+                colors: None,
+            },
+        );
+        editor.center(fonts);
+        Self {
+            editor,
+            limit: 64,
+            offset: 0.0,
+        }
+    }
     /// 【界面控件】【单行构造】用 text 初始化不超过 limit 字节的编辑器，fonts 用于排版；返回输入控件
     pub fn new(text: &str, fonts: &mut UiFonts, limit: usize) -> Self {
         let text = normalized(text, limit);

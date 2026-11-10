@@ -69,7 +69,12 @@ pub const ENTRIES: &[Entry] = &[
         "编号箭头",
         "Numbered arrow"
     ),
-    entry!("marker", Button::Tool(Tool::Marker), "形状标记", "Marker"),
+    entry!(
+        "marker",
+        Button::Tool(Tool::Marker),
+        "更多形状",
+        "More shapes"
+    ),
     entry!(
         "highlighter",
         Button::Tool(Tool::Highlighter),

@@ -25,6 +25,8 @@ pub(super) fn lookup(source: &str) -> Option<&'static str> {
         "Russian" => "俄语",
         "Translated text" => "译文",
         "Recognized" => "原文",
+        "Original" => "原文",
+        "Translated" => "译文",
         "OCR text appears here" => "OCR 文字会显示在这里",
         "Translation appears here" => "翻译结果会显示在这里",
         "Translating..." => "翻译中...",

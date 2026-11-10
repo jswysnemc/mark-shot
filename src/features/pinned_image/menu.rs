@@ -14,6 +14,7 @@ pub enum PinAction {
     CopyImageText,
     TextSelection,
     Translate,
+    OpenTranslationWindow,
     TargetLanguage,
     ToggleTranslation,
     SaveAs,
@@ -87,6 +88,10 @@ pub const ITEMS: &[MenuItem] = &[
     MenuItem {
         label: "Translate",
         action: Some(A::Translate),
+    },
+    MenuItem {
+        label: "Open Translation Window",
+        action: Some(A::OpenTranslationWindow),
     },
     MenuItem {
         label: "Target Language",

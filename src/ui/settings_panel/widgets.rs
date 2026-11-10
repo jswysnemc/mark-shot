@@ -74,6 +74,7 @@ pub enum SettingsAction {
     OcrRescan,
     OcrCopyAll,
     OcrOpenResult,
+    OcrTranslate,
     OcrLanguages,
     MarkerShapes,
     RulerModes,
@@ -416,7 +417,7 @@ pub const EYEDROPPER_WIDGETS: &[SettingsWidget] = &[
     },
     SettingsWidget::Action {
         action: SettingsAction::ColorFormats,
-        svg: crate::ui::icons::COPY,
+        svg: crate::ui::icons::CHEVRON_DOWN,
     },
 ];
 
@@ -430,6 +431,7 @@ pub const OCR_WIDGETS: &[SettingsWidget] = &[
     OCR_RESCAN,
     OCR_COPY_ALL,
     OCR_OPEN_RESULT,
+    OCR_TRANSLATE,
     SettingsWidget::Separator,
     SettingsWidget::Label("Drag a new box to read another area"),
 ];
@@ -441,6 +443,7 @@ pub const OCR_WIDGETS_DOWNLOADING: &[SettingsWidget] = &[
     OCR_RESCAN,
     OCR_COPY_ALL,
     OCR_OPEN_RESULT,
+    OCR_TRANSLATE,
     SettingsWidget::Separator,
     SettingsWidget::Download,
 ];
@@ -483,6 +486,11 @@ const OCR_OPEN_RESULT: SettingsWidget = SettingsWidget::Action {
     svg: crate::ui::icons::TEXT,
 };
 
+const OCR_TRANSLATE: SettingsWidget = SettingsWidget::Action {
+    action: SettingsAction::OcrTranslate,
+    svg: crate::ui::toolbar::icons::TRANSLATE,
+};
+
 /// 【属性面板】【标注控件】依据 ann 的形状返回可编辑属性控件
 pub fn widgets_for_annotation(ann: &Annotation) -> &'static [SettingsWidget] {
     match &ann.shape {
@@ -507,7 +515,7 @@ impl PanelItem for SettingsWidget {
     /// 【属性面板】【控件尺寸】返回当前控件的逻辑宽度
     fn size(&self) -> f32 {
         let cfg = &crate::config::get().settings_panel;
-        match self {
+        let width = match self {
             SettingsWidget::TextControl(_) => cfg.icon_button_size,
             SettingsWidget::Action {
                 action: SettingsAction::NumberStyles,
@@ -543,7 +551,8 @@ impl PanelItem for SettingsWidget {
             SettingsWidget::Value { field } => field.width(),
             SettingsWidget::Download => cfg.download_width,
             SettingsWidget::Separator => cfg.separator_slot,
-        }
+        };
+        width * crate::ui::toolbar::metrics::properties_scale()
     }
 
     /// 【属性面板】【控件间距】返回当前控件之后的逻辑留白

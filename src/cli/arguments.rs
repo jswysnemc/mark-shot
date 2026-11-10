@@ -154,6 +154,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
         crate::backend::pin::PIN_ARG,
         crate::ocr::daemon::DAEMON_ARG,
         crate::features::ocr_result::transport::RESULT_ARG,
+        crate::features::ocr_result::floating::ARG,
         crate::features::capture_history::transport::READY_ARG,
         crate::features::preferences::READY_ARG,
         crate::features::pinned_image::recognition::WORKER_ARG,
@@ -361,7 +362,8 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
     } else {
         Command::Editor(Launch {
             mode,
-            one_monitor: !all_outputs,
+            one_monitor: monitor || (full && !all_outputs),
+            all_outputs,
             to,
             output,
             speed,

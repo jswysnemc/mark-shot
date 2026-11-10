@@ -147,11 +147,11 @@ pub fn bar(p: &mut Painter, bar: &Bar) {
                     TextStyle::new(13.0, ink).center(),
                 );
             }
-            Action::Copy | Action::Exit => p.icon(
-                if *action == Action::Copy {
-                    icons::COPY
-                } else {
-                    icons::CLOSE
+            Action::Copy | Action::OpenWindow | Action::Exit => p.icon(
+                match action {
+                    Action::Copy => icons::COPY,
+                    Action::OpenWindow => crate::ui::toolbar::icons::OPEN,
+                    _ => icons::CLOSE,
                 },
                 13.0,
                 rect.left() + (rect.width() - 13.0) / 2.0,

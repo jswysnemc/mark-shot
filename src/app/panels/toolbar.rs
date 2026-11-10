@@ -14,7 +14,11 @@ mod tests;
 
 /// 【截图工具栏】【状态刷新】按 state 的选区、手势和显示器更新双工具栏；dirty 返回重绘显示器
 pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
-    let monitor = if state.toolbar.user_position.is_some() {
+    let config = crate::config::preferences::current();
+    configure(state, &config.toolbar_layout, false);
+    let dock = super::toolbar_docking::prepare(state, config.capture.toolbar_position);
+    let docked = dock != crate::config::capture::ToolbarPosition::Selection;
+    let monitor = if state.toolbar.user_position.is_some() || docked {
         state.toolbar.monitor_idx
     } else {
         state.input.pointer.monitor_idx
@@ -33,8 +37,6 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
         state.toolbar.marker_filled = state.tool_settings.marker_filled;
         state.toolbar.dirty = true;
     }
-    let config = crate::config::preferences::current();
-    configure(state, &config.toolbar_layout, false);
     let main_layout = state.toolbar.arrange(available);
     let side_layout = state.action_toolbar.arrange(available);
     let selection = state.selection.zone.and_then(|rect| {
@@ -42,43 +44,57 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
             .canvas_local_rect(rect, monitor)
             .and_then(|rect| rect.intersect(&state.placements[monitor].rect()?))
     });
-    let main_position = state.toolbar.user_position.unwrap_or_else(|| {
-        if state.fullscreen_scope && state.file_canvas.is_some() {
-            return ((bounds.0 as f32 - state.toolbar.size.0) / 2.0, 12.0);
-        }
-        let rect = selection.unwrap_or_else(|| {
-            Rect::from_xywh(0.0, 0.0, bounds.0 as f32, bounds.1 as f32).unwrap()
-        });
-        let x = (rect.left() + rect.width() / 2.0 - state.toolbar.size.0 / 2.0)
-            .clamp(8.0, (bounds.0 as f32 - state.toolbar.size.0 - 8.0).max(8.0));
-        let below = rect.bottom() + 8.0;
-        let y = if below + state.toolbar.size.1 <= bounds.1 as f32 - 8.0 {
-            below
-        } else {
-            rect.top() - state.toolbar.size.1 - 8.0
-        };
-        (
-            x,
-            y.clamp(8.0, (bounds.1 as f32 - state.toolbar.size.1 - 8.0).max(8.0)),
+    let dock_positions = docked.then(|| {
+        super::toolbar_docking::positions(
+            dock,
+            (bounds.0 as f32, bounds.1 as f32),
+            state.toolbar.size,
+            (!state.fullscreen_scope).then_some(state.action_toolbar.size),
         )
     });
+    let main_position = dock_positions
+        .map(|positions| positions.0)
+        .or(state.toolbar.user_position)
+        .unwrap_or_else(|| {
+            if state.fullscreen_scope && state.file_canvas.is_some() {
+                return ((bounds.0 as f32 - state.toolbar.size.0) / 2.0, 12.0);
+            }
+            let rect = selection.unwrap_or_else(|| {
+                Rect::from_xywh(0.0, 0.0, bounds.0 as f32, bounds.1 as f32).unwrap()
+            });
+            let x = (rect.left() + rect.width() / 2.0 - state.toolbar.size.0 / 2.0)
+                .clamp(8.0, (bounds.0 as f32 - state.toolbar.size.0 - 8.0).max(8.0));
+            let below = rect.bottom() + 8.0;
+            let y = if below + state.toolbar.size.1 <= bounds.1 as f32 - 8.0 {
+                below
+            } else {
+                rect.top() - state.toolbar.size.1 - 8.0
+            };
+            (
+                x,
+                y.clamp(8.0, (bounds.1 as f32 - state.toolbar.size.1 - 8.0).max(8.0)),
+            )
+        });
     place(&mut state.toolbar, monitor, main_position, hidden);
     let side_monitor = if state.action_toolbar.user_position.is_some() {
         state.action_toolbar.monitor_idx
     } else {
         monitor
     };
-    let side_position = state.action_toolbar.user_position.unwrap_or_else(|| {
-        let rect = selection.unwrap_or_else(|| {
-            Rect::from_xywh(0.0, 0.0, bounds.0 as f32, bounds.1 as f32).unwrap()
+    let side_position = dock_positions
+        .map(|positions| positions.1)
+        .or(state.action_toolbar.user_position)
+        .unwrap_or_else(|| {
+            let rect = selection.unwrap_or_else(|| {
+                Rect::from_xywh(0.0, 0.0, bounds.0 as f32, bounds.1 as f32).unwrap()
+            });
+            side_position(
+                rect,
+                state.toolbar.rect(),
+                state.action_toolbar.size,
+                (bounds.0 as f32, bounds.1 as f32),
+            )
         });
-        side_position(
-            rect,
-            state.toolbar.rect(),
-            state.action_toolbar.size,
-            (bounds.0 as f32, bounds.1 as f32),
-        )
-    });
     place(
         &mut state.action_toolbar,
         side_monitor,
@@ -175,6 +191,10 @@ pub(crate) fn configure(
             toolbar.hovered = None;
             toolbar.disabled.clear();
             toolbar.user_position = None;
+            if reset {
+                toolbar.dock_override = None;
+                toolbar.dock_monitor = None;
+            }
             toolbar.drawn_look = None;
             toolbar.dirty = true;
         }

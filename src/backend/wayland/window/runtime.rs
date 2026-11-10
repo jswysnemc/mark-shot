@@ -301,7 +301,25 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         exit: false,
         loop_handle: event_loop.handle(),
     };
+    let visibility_wake = state.wake.clone();
+    let mut visibility =
+        crate::backend::capture_visibility::Watch::new(move || visibility_wake.notify())?;
+    let mut hidden = false;
     while !state.exit {
+        let requested = visibility.requested()?;
+        if hidden != requested {
+            state.capture_visibility(requested);
+            connection.flush()?;
+            hidden = requested;
+        }
+        visibility.applied()?;
+        if hidden {
+            event_loop.dispatch(Some(std::time::Duration::from_millis(100)), &mut state)?;
+            if let Some(control) = &mut control {
+                control.progress(&event_loop.handle())?;
+            }
+            continue;
+        }
         state.sync_stacking(&qh);
         state.sync_dialog(&qh);
         state.sync_popup(&qh, None);

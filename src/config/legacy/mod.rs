@@ -23,6 +23,7 @@ pub(super) fn decode(text: &str) -> io::Result<super::Config> {
     if let Some(pinned) = pinned::section(&root) {
         normalized.insert("pinned".into(), pinned);
     }
+    normalized.insert("capture".into(), capture::settings(&root));
     normalized.insert("region_detection".into(), capture::detection(&root, true));
     normalized.insert("window_detection".into(), capture::detection(&root, false));
     normalized.remove("regionDetection");

@@ -1,6 +1,5 @@
 use crate::editor::dirty::mark_all_dirty;
 use crate::editor::{DamageZone, EditorState};
-use crate::interaction::ClickTarget;
 use crate::tools::ToolBehavior;
 use crate::types::{CursorIcon, MouseButton, Placement, SelectionEdges, SelectionHandle};
 use crate::utils::{apply_handle_drag, cursor_for_handle};
@@ -47,6 +46,9 @@ impl ToolBehavior for SelectionTool {
         pressed: bool,
         dirty_mask: &mut u32,
     ) {
+        if state.fullscreen_scope {
+            return;
+        }
         if matches!(button, MouseButton::Right) && pressed {
             state.selection.creating = false;
             let drawing = state.input.mouse_down && state.input.drag_start.is_some();
@@ -69,19 +71,7 @@ impl ToolBehavior for SelectionTool {
             state.tool_active = true;
             let handle = selection_handle(state);
 
-            let pos = (state.canvas_point().0 as f32, state.canvas_point().1 as f32);
             state.selection.creating = handle == SelectionHandle::None;
-            // double click on selection is equal to saving the screenshot
-            if handle == SelectionHandle::Move
-                && state.input.clicks.register(ClickTarget::Selection, pos)
-                && !state.to.is_empty()
-            {
-                state.input.mouse_down = false;
-                state.tool_active = false;
-                state.finish = Some(state.to);
-                return;
-            }
-
             if handle != SelectionHandle::None {
                 if let Some(sel) = state.selection.zone {
                     state
@@ -133,6 +123,9 @@ impl ToolBehavior for SelectionTool {
     }
 
     fn on_move(&self, state: &mut EditorState, global: (f64, f64), _dirty_mask: &mut u32) {
+        if state.fullscreen_scope {
+            return;
+        }
         let old_sel = state.selection.zone;
         let mut selection_changed = false;
 
@@ -175,6 +168,9 @@ impl ToolBehavior for SelectionTool {
     }
 
     fn cursor(&self, state: &EditorState) -> CursorIcon {
+        if state.fullscreen_scope {
+            return CursorIcon::Default;
+        }
         if state.input.mouse_down && state.selection.active_handle != SelectionHandle::None {
             return cursor_for_handle(state.selection.active_handle, true)
                 .unwrap_or(CursorIcon::Crosshair);

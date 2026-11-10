@@ -2,7 +2,7 @@ use crate::renderer::Painter;
 use crate::renderer::text::TextStyle;
 use crate::theme::{color, font, radius, size, stroke};
 use crate::ui::color_popover::ColorTarget;
-use crate::ui::panel::{PanelItem, UiPanel};
+use crate::ui::panel::UiPanel;
 use crate::ui::settings_panel::{SettingsPanel, SettingsWidget, StepperArrow, ToggleVisual};
 use cosmic_text::FontSystem;
 use tiny_skia::{Color, PathBuilder, Rect, Stroke};
@@ -63,13 +63,16 @@ fn draw_settings_content(
 
     p.fill_rounded(rect, radius::panel(), cfg.background.get());
 
-    let item_h = panel.item_height();
-    let item_y = rect.top() + (h - item_h) / 2.0;
-    let mut current_x = rect.left() + size::padding();
     let text_color = cfg.text.get().color();
 
     for (index, item) in panel.widgets.iter().enumerate() {
-        let item_w = item.size();
+        let Some(cell) = panel.cell(index) else {
+            continue;
+        };
+        let current_x = cell.left();
+        let item_y = cell.top();
+        let item_w = cell.width();
+        let item_h = cell.height();
         let is_hovered = panel.hovered == Some(index);
         let is_selected = panel.selected == Some(index);
 
@@ -137,7 +140,7 @@ fn draw_settings_content(
                     item_w,
                     item_h,
                     visual,
-                    field.icon_size(),
+                    field.icon_size() * crate::ui::toolbar::metrics::properties_scale(),
                     is_on,
                     is_hovered,
                     text_color,
@@ -148,7 +151,7 @@ fn draw_settings_content(
                     p.text(
                         label_rect,
                         text,
-                        TextStyle::new(font::label(), text_color).center(),
+                        TextStyle::new(crate::ui::toolbar::metrics::font(), text_color).center(),
                     );
                 }
             }
@@ -170,17 +173,15 @@ fn draw_settings_content(
             }
             SettingsWidget::Separator => {
                 let sep_w = theme.separator_width;
-                let sep_h = h * theme.separator_length;
+                let sep_h = item_h * theme.separator_length;
                 let sep_x = current_x + (item_w - sep_w) / 2.0;
-                let sep_y = rect.top() + (h - sep_h) / 2.0;
+                let sep_y = item_y + (item_h - sep_h) / 2.0;
 
                 if let Some(sep_rect) = Rect::from_xywh(sep_x, sep_y, sep_w, sep_h) {
                     p.fill_rounded(sep_rect, radius::separator(), cfg.separator.get());
                 }
             }
         }
-
-        current_x += item_w + item.trailing_padding();
     }
 }
 
@@ -201,7 +202,7 @@ fn draw_value_field(p: &mut Painter, rect: Rect, text: &str, is_hovered: bool, t
     p.text(
         rect,
         text,
-        TextStyle::new(font::label(), text_color).center(),
+        TextStyle::new(crate::ui::toolbar::metrics::font(), text_color).center(),
     );
 }
 
@@ -212,7 +213,7 @@ fn draw_download(p: &mut Painter, x: f32, y: f32, w: f32, h: f32, percent: u8, t
         p.text(
             label,
             "Downloading",
-            TextStyle::new(font::label(), text_color),
+            TextStyle::new(crate::ui::toolbar::metrics::font(), text_color),
         );
     }
 
@@ -228,7 +229,7 @@ fn draw_download(p: &mut Painter, x: f32, y: f32, w: f32, h: f32, percent: u8, t
         p.text(
             label,
             &format!("{percent}%"),
-            TextStyle::new(font::label(), text_color).center(),
+            TextStyle::new(crate::ui::toolbar::metrics::font(), text_color).center(),
         );
     }
 }
@@ -311,7 +312,7 @@ fn draw_stepper(
         label_rect,
         text,
         editing,
-        font::label(),
+        crate::ui::toolbar::metrics::font(),
         text_color,
         if cfg.stepper_bold {
             cosmic_text::Weight::BOLD
@@ -476,7 +477,11 @@ fn draw_toggle(
             if let Some(label_rect) =
                 Rect::from_xywh(x, y, (w - box_size - cfg.checkbox_gap).max(0.0), h)
             {
-                p.text(label_rect, label, TextStyle::new(font::label(), text_color));
+                p.text(
+                    label_rect,
+                    label,
+                    TextStyle::new(crate::ui::toolbar::metrics::font(), text_color),
+                );
             }
 
             p.item_border(

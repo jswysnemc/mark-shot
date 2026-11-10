@@ -70,6 +70,9 @@ pub struct Entry {
 impl Entry {
     /// 【设置窗口】【业务说明】按 chinese 返回设置作用和生效阶段，说明不显示内部配置键
     pub fn help(&self, chinese: bool) -> &'static str {
+        if let Some(help) = super::capture::help(self.key, chinese) {
+            return help;
+        }
         let labels = match (self.section, self.key) {
             ("desktop", "tray_enabled") => (
                 "后台保留截图、贴图、设置和退出菜单；需要桌面提供托盘区域",
@@ -100,8 +103,8 @@ impl Entry {
                 "Screenshot thumbnail in completion notifications",
             ),
             ("general", "to") => (
-                "按 Enter 或双击选区时执行此操作",
-                "Action on Enter or double-clicking the selection",
+                "按 Enter 时执行此操作；双击动作单独配置",
+                "Action on Enter; double-click has its own setting",
             ),
             ("save", "directory") => (
                 "绝对路径，或图片目录下的相对路径",

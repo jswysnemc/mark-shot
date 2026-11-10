@@ -33,7 +33,8 @@ pub struct TextEditor {
     undo: VecDeque<HistoryEntry>,
     redo: Vec<HistoryEntry>,
     history_bytes: usize,
-    size: (f32, f32),
+    pub(super) size: (f32, f32),
+    pub(super) scroll_layout: super::scrolling::LayoutCache,
     pub(super) input: super::input_method::InputState,
 }
 
@@ -47,6 +48,16 @@ impl TextEditor {
         self.input.single_line = true;
         self.editor
             .with_buffer_mut(|buffer| buffer.set_wrap(cosmic_text::Wrap::None));
+        self.editor.shape_as_needed(fonts, false);
+    }
+
+    /// 【界面控件】【段落居中】按 fonts 将现有行设为居中，绘制和字符命中共用排版坐标，无返回值
+    pub fn center(&mut self, fonts: &mut FontSystem) {
+        self.editor.with_buffer_mut(|buffer| {
+            for line in &mut buffer.lines {
+                line.set_align(Some(cosmic_text::Align::Center));
+            }
+        });
         self.editor.shape_as_needed(fonts, false);
     }
 
@@ -70,6 +81,7 @@ impl TextEditor {
             redo: Vec::new(),
             history_bytes: 0,
             size: (640.0, 360.0),
+            scroll_layout: Default::default(),
             input: super::input_method::InputState::default(),
         }
     }

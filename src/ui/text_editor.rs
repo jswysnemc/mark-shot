@@ -5,6 +5,7 @@ mod draw;
 mod draw_tests;
 mod input;
 mod input_method;
+mod scrolling;
 mod state;
 mod style;
 

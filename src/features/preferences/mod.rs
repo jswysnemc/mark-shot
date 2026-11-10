@@ -19,6 +19,7 @@ mod shortcuts;
 #[cfg(test)]
 mod tests;
 mod toolbar;
+mod toolbar_preview;
 mod translation;
 mod widgets;
 mod window;

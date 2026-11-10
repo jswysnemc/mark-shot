@@ -31,6 +31,7 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
     let chinese = state.chinese();
     let palette = Palette::current();
     let layout = Layout::new(state);
+    let toolbar_position = super::toolbar_preview::position(&state.values);
     if layout.preview.is_some() {
         state
             .frame_preview
@@ -58,6 +59,11 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
         .collect::<Vec<_>>()
         .join(" ");
     state.fonts.ensure_text(&format!("{labels} {group_labels} {} {} 保存 恢复 实际导出预览 已添加外框 原图 外框关闭 按下快捷键 浅色 深色 Windows 系统 OCR 未找到匹配设置 清空搜索或尝试其他关键词 截图 标注 文字识别 翻译 原生窗口，无需浏览器运行环境", values.join(" "), state.resource_note));
+    if layout.toolbar_preview.is_some() {
+        state.fonts.ensure_text(
+            "位置预览 跟随选区 屏幕顶部 屏幕底部 屏幕左侧 屏幕右侧 选区 主栏 侧栏 属性栏",
+        );
+    }
     let mut editors = Vec::new();
     {
         let mut painter = Painter::new(canvas)
@@ -69,6 +75,9 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
             }
             if let Some(bounds) = layout.preview {
                 state.frame_preview.draw(painter, bounds, chinese);
+            }
+            if let Some(bounds) = layout.toolbar_preview {
+                super::toolbar_preview::draw(painter, bounds, toolbar_position, chinese);
             }
             for row in &layout.rows {
                 if row.bounds.bottom() <= layout.viewport.top()

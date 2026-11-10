@@ -4,6 +4,7 @@ pub(super) mod draw;
 pub(super) mod fields;
 pub(super) mod input;
 pub(super) mod layout;
+mod preview;
 mod state;
 pub(super) use state::State;
 

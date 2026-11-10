@@ -1,5 +1,7 @@
 //! 【桌面集成】【常驻服务】托盘和全局按键独立注册，配置变化后释放旧资源再建立新注册
 
+mod actions;
+mod delayed_capture;
 mod hotkeys;
 #[cfg(target_os = "windows")]
 mod native_thread;
@@ -8,21 +10,16 @@ pub mod status;
 mod tray;
 
 use crate::config::desktop::Desktop;
+use actions::Action;
 use notify::Watcher;
 use std::{fs::OpenOptions, path::Path};
 use tokio::sync::{mpsc, watch};
 
 pub const ARG: &str = "--background";
 
-#[derive(Clone, Copy)]
-enum Action {
-    Capture,
-    Pin,
-    Settings,
-    Quit,
-}
 enum Event {
     Reload,
+    DelayDue,
     Action(Action, Option<String>),
     Status(u64, bool, status::Registration),
 }
@@ -135,21 +132,44 @@ async fn serve(path: &Path, root: &Path) -> crate::AppResult {
     let mut generations = [0, 0];
     let mut paused = false;
     let mut status = status::Status::default();
+    let mut delayed = delayed_capture::Schedule::default();
+    let (menu_state, _) = watch::channel(tray::menu::State {
+        language: crate::ui::language::Language::current(),
+        delayed: false,
+    });
     sender.send(Event::Reload)?;
     loop {
         let event = tokio::select! {
+            biased;
             event = receiver.recv() => match event { Some(event) => event, None => break },
+            _ = delayed.wait() => Event::DelayDue,
             _ = tokio::time::sleep(std::time::Duration::from_secs(1)), if paused => Event::Reload,
         };
         match event {
             Event::Reload => {
-                let next = match crate::config::preferences::load(path) {
-                    Ok(config) => config.desktop,
+                let config = match crate::config::preferences::load(path) {
+                    Ok(config) => config,
                     Err(error) => {
                         log::error!("【桌面集成】【读取配置】{error}");
                         continue;
                     }
                 };
+                let language = crate::ui::language::Language::resolve(
+                    std::env::var("MARK_SHOT_LANG").ok().as_deref(),
+                    config.ui.mode(config.language.as_deref()),
+                    sys_locale::get_locale().as_deref(),
+                );
+                menu_state.send_if_modified(|state| {
+                    if state.language == language {
+                        return false;
+                    }
+                    state.language = language;
+                    true
+                });
+                let next = config.desktop;
+                if !next.tray_enabled {
+                    delayed.cancel();
+                }
                 let recording = recording::active(root);
                 if current.as_ref() == Some(&next) && recording == paused {
                     continue;
@@ -200,11 +220,12 @@ async fn serve(path: &Path, root: &Path) -> crate::AppResult {
                         hotkey,
                     };
                     let shortcut = next.screenshot_shortcut.clone();
+                    let menu = menu_state.subscribe();
                     let task = tokio::spawn(async move {
                         if hotkey {
                             hotkeys::run(shortcut, reporter, cancelled).await;
                         } else {
-                            tray::run(reporter, cancelled).await;
+                            tray::run(reporter, cancelled, menu).await;
                         }
                     });
                     workers[index] = Some(Worker { stop, task });
@@ -227,12 +248,26 @@ async fn serve(path: &Path, root: &Path) -> crate::AppResult {
                 status::write(root, &status)?;
             }
             Event::Action(Action::Quit, _) => break,
+            Event::Action(Action::Delay(seconds), _) => {
+                delayed.replace(seconds, std::time::Instant::now())
+            }
+            Event::Action(Action::CancelDelay, _) => delayed.cancel(),
+            Event::DelayDue => {
+                if delayed.take_due(std::time::Instant::now())
+                    && let Err(error) = crate::utils::spawn_self_activated(
+                        Action::Capture.arguments().unwrap(),
+                        None,
+                    )
+                {
+                    log::error!("【桌面集成】【延时截图】{error}");
+                }
+            }
             Event::Action(action, token) => {
-                let args: &[&str] = match action {
-                    Action::Capture => &[],
-                    Action::Pin => &["--pin-clipboard"],
-                    Action::Settings => &["--settings"],
-                    Action::Quit => unreachable!(),
+                if matches!(action, Action::Capture | Action::Fullscreen) {
+                    delayed.cancel();
+                }
+                let Some(args) = action.arguments() else {
+                    continue;
                 };
                 if let Err(error) = crate::utils::spawn_self_activated(args, token.as_deref()) {
                     log::error!("【桌面集成】【启动操作】{error}");
@@ -240,7 +275,16 @@ async fn serve(path: &Path, root: &Path) -> crate::AppResult {
             }
             _ => {}
         }
+        menu_state.send_if_modified(|state| {
+            let pending = delayed.pending();
+            if state.delayed == pending {
+                return false;
+            }
+            state.delayed = pending;
+            true
+        });
     }
+    delayed.cancel();
     for worker in workers.into_iter().flatten() {
         worker.close().await;
     }

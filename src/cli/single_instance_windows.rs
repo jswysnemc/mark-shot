@@ -14,7 +14,11 @@ pub(super) async fn run(
     let owner = crate::features::single_instance::Owner::start(
         crate::features::single_instance::request::Plan {
             fullscreen: launch.fullscreen,
-            all_outputs: !launch.one_monitor,
+            all_outputs: !crate::config::preferences::current().capture.one_monitor(
+                launch.one_monitor,
+                launch.all_outputs,
+                launch.fullscreen,
+            ),
             deadline: launch.shot_at,
         },
     )?;

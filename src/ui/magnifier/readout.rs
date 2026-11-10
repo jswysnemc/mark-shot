@@ -12,17 +12,17 @@ pub(super) fn width() -> f32 {
     (super::size() as f32).max(120.0)
 }
 
+/// 【光标放大区】【紧凑行高】无参数，返回兼容旧配置的双行信息条单行高度
+pub(super) fn line_height() -> f32 {
+    crate::config::get().magnifier.label_height.min(20.0)
+}
+
 /// 【光标放大区】【读数绘制】按 bounds、原图坐标 native 和采样 color 向 p 绘制双行信息；无效颜色显示占位值，无返回值
 pub(super) fn draw(painter: &mut Painter, bounds: Rect, native: (f64, f64), color: Option<Color>) {
     let config = &crate::config::get().magnifier;
-    let top = bounds.bottom() - config.label_height * 2.0;
-    let plate = Rect::from_xywh(
-        bounds.left(),
-        top,
-        bounds.width(),
-        config.label_height * 2.0,
-    )
-    .unwrap();
+    let height = line_height();
+    let top = bounds.bottom() - height * 2.0;
+    let plate = Rect::from_xywh(bounds.left(), top, bounds.width(), height * 2.0).unwrap();
     painter.fill_rounded(plate, radius::panel(), config.label_background.get());
     outline(painter, plate, radius::panel());
 
@@ -33,7 +33,7 @@ pub(super) fn draw(painter: &mut Painter, bounds: Rect, native: (f64, f64), colo
     let left = plate.left() + (plate.width() - group_width) / 2.0;
     let swatch = Rect::from_xywh(
         left,
-        top + (config.label_height - config.swatch_size) / 2.0,
+        top + (height - config.swatch_size) / 2.0,
         config.swatch_size,
         config.swatch_size,
     )
@@ -45,13 +45,7 @@ pub(super) fn draw(painter: &mut Painter, bounds: Rect, native: (f64, f64), colo
     );
     outline(painter, swatch, config.swatch_radius);
     let text_left = swatch.right() + config.swatch_gap;
-    let text_rect = Rect::from_xywh(
-        text_left,
-        top,
-        plate.right() - text_left,
-        config.label_height,
-    )
-    .unwrap();
+    let text_rect = Rect::from_xywh(text_left, top, plate.right() - text_left, height).unwrap();
     painter.text(
         text_rect,
         &text,
@@ -59,13 +53,7 @@ pub(super) fn draw(painter: &mut Painter, bounds: Rect, native: (f64, f64), colo
     );
 
     // 2. 【光标放大区】【坐标读数】第二行保留原图像素坐标，与色值使用相同取整规则
-    let coordinates = Rect::from_xywh(
-        plate.left(),
-        top + config.label_height,
-        plate.width(),
-        config.label_height,
-    )
-    .unwrap();
+    let coordinates = Rect::from_xywh(plate.left(), top + height, plate.width(), height).unwrap();
     painter.text(
         coordinates,
         &format!(

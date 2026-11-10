@@ -6,7 +6,7 @@ use mark_shot::{
     types::MouseButton,
     ui::selection_translation::{
         language_popup::{Event, Popup},
-        result_bar::Bar,
+        result_bar::{Action, Bar},
     },
 };
 use serde_json::Value;
@@ -79,7 +79,7 @@ fn fonts() -> cosmic_text::FontSystem {
     fonts
 }
 
-/// 【框选翻译测试】【生产尺寸】核对原版列表和浮条控件及各按钮矩形，不只核对整体包围盒
+/// 【框选翻译测试】【生产尺寸】保留原版按钮尺寸，新浮窗按钮插入复制与退出之间，整体宽度增加一个按钮间距
 #[test]
 fn language_list_and_every_bar_button_match_qt_geometry() {
     let reference: Value = serde_json::from_str(include_str!(
@@ -99,15 +99,35 @@ fn language_list_and_every_bar_button_match_qt_geometry() {
     );
     for case in reference["bars"].as_array().unwrap() {
         let bar = Bar::new(case["label"].as_str().unwrap().into(), true, &mut fonts);
+        let (width, height) = size(&case["size"]);
         assert_eq!(
             (bar.rect.width(), bar.rect.height()),
-            size(&case["size"]),
+            (width + 33.0, height),
             "{case}; actual cells: {:?}",
             bar.cells
         );
-        for ((_, actual), expected) in bar.cells.iter().zip(case["buttons"].as_array().unwrap()) {
-            assert_eq!(*actual, rect(&expected["rect"]), "{expected}");
+        for ((action, actual), expected) in bar
+            .cells
+            .iter()
+            .filter(|(action, _)| *action != Action::OpenWindow)
+            .zip(case["buttons"].as_array().unwrap())
+        {
+            let expected_rect = rect(&expected["rect"]);
+            let expected_rect = if *action == Action::Exit {
+                Rect::from_xywh(
+                    expected_rect.left() + 33.0,
+                    expected_rect.top(),
+                    expected_rect.width(),
+                    expected_rect.height(),
+                )
+                .unwrap()
+            } else {
+                expected_rect
+            };
+            assert_eq!(*actual, expected_rect, "{expected}");
         }
+        assert_eq!(bar.cells[4].0, Action::OpenWindow);
+        assert_eq!(bar.cells[4].1.width(), 31.0);
     }
 }
 

@@ -3,4 +3,5 @@
 pub mod draw;
 pub mod icons;
 pub mod layout;
+mod layout_fit;
 pub mod state;

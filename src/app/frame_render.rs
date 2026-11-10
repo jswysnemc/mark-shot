@@ -287,7 +287,7 @@ pub(super) fn render_monitor(
             prev_selection: prev_local.as_ref(),
             dirty_rect: dirty_rect.as_ref(),
             selection_dirty,
-            selection_edges: edges.as_ref(),
+            selection_edges: edges.as_ref().filter(|_| !editor_state.fullscreen_scope),
             selection_radius: if editor_state.file_canvas.is_some() {
                 crate::config::get().selection.border_radius
             } else {

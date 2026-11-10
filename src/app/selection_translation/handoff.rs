@@ -10,6 +10,33 @@ pub struct Image {
     pub seed: Seed,
 }
 
+/// 【框选翻译】【浮窗交接】从 state 传递原文和当前译文，首帧成功才退出截图；dirty 返回失败提示范围
+pub(super) fn open_window(state: &mut EditorState, dirty: &mut u32) {
+    let Some(session) = &state.selection_translation.session else {
+        return;
+    };
+    let document = crate::features::ocr_result::document::OcrDocument {
+        text: session
+            .source
+            .iter()
+            .map(|block| block.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n\n"),
+        png: crate::utils::encode_png(&session.region.original),
+        lines: crate::features::image_translation::selection::source_lines(&session.tokens),
+    };
+    let translated = session
+        .current()
+        .map_or("", |translation| translation.text.as_str());
+    match crate::features::ocr_result::floating::spawn(&document, &session.language, translated) {
+        Ok(()) => state.cancel = true,
+        Err(error) => {
+            log::error!("【框选翻译】【浮窗交接】{error}");
+            super::feedback(state, &format!("无法打开翻译浮窗：{error}"), dirty);
+        }
+    }
+}
+
 /// 【框选翻译】【交接准备】从 state 返回带标注原图及按导出坐标换算的 seed，随后恢复当前译文显示
 pub(in crate::app) fn prepare(state: &mut EditorState) -> Option<Image> {
     let session = state.selection_translation.session.as_ref()?;

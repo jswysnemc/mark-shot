@@ -31,7 +31,9 @@ pub(super) struct ResultWindow {
     pub cache: SwashCache,
     pub icons: crate::renderer::Icons,
     pub source: TextEditor,
+    pub(super) scrollbars: super::scrollbars::State,
     pub(super) translation: super::translation::Translation,
+    pub(super) translate_on_connect: bool,
     pub(super) stacking: super::stacking::State,
     pub(super) text_focus: super::control_input::FocusTarget,
     pub image: Pixmap,
@@ -112,7 +114,9 @@ impl ResultWindow {
             cache: SwashCache::new(),
             icons: super::titlebar_draw::icons(),
             source,
+            scrollbars: Default::default(),
             translation,
+            translate_on_connect: false,
             stacking: super::stacking::State::new(),
             text_focus: super::control_input::FocusTarget::Content,
             image,
@@ -419,6 +423,9 @@ impl WindowContent for ResultWindow {
     /// 【OCR 翻译】【窗口连接】保存 wake 以接收所属任务完成通知，无返回值，不提前初始化任务或网络
     fn connected(&mut self, wake: window::WindowWake) {
         self.translation.wake = Some(wake);
+        if std::mem::take(&mut self.translate_on_connect) {
+            super::translation::controller::start(self);
+        }
     }
     /// 【文字识别】【反馈期限】返回原文和表格反馈的最近绝对期限，无参数；全部到期后恢复无期限阻塞
     fn next_deadline(&self) -> Option<Instant> {
@@ -477,6 +484,7 @@ impl WindowContent for ResultWindow {
     /// 【文字识别】【结果绘制】按 scale 绘制 canvas；页面共用同一窗口与编辑状态
     fn draw(&mut self, canvas: &mut Pixmap, scale: f32) {
         super::draw::draw(self, canvas, scale);
+        crate::ui::window_frame::draw(canvas, scale);
     }
 
     /// 【文字识别】【窗口事件】处理 event 并返回窗口动作，菜单期间隔离正文输入

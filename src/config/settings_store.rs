@@ -62,6 +62,48 @@ fn alias(key: &str) -> String {
 /// 【应用设置】【文档路径】按 root、path 和 json 返回原文档采用的路径，旧 JSON 优先更新原结构
 fn path_in(root: &Value, path: &str, json: bool) -> Vec<String> {
     let mut keys: Vec<String> = path.split('.').map(snake).collect();
+    if json && let Some(field) = path.strip_prefix("capture.") {
+        let section = super::legacy::capture::capture_key(root);
+        if field == "freeze_scope"
+            && root[section].get("freezeScope").is_none()
+            && root[section].get(field).is_none()
+        {
+            for key in ["freezeScope", "freezeDisplayScope"] {
+                if root.get(key).is_some() {
+                    return vec![key.into()];
+                }
+            }
+        }
+        return if field == "kde_kwin_screenshot" && root[section].get(field).is_none() {
+            vec![
+                section.into(),
+                "wayland".into(),
+                "kde".into(),
+                "kwinScreenshot".into(),
+                "enabled".into(),
+            ]
+        } else {
+            let alternate = match field {
+                "hide_own_windows" => Some("hideOwnWindowsDuringCapture"),
+                "freeze_scope" => Some("freezeDisplayScope"),
+                _ => None,
+            };
+            let key = if root[section].get(field).is_some() {
+                field.to_owned()
+            } else if root[section].get(alias(field)).is_some() {
+                alias(field)
+            } else {
+                alternate
+                    .filter(|key| root[section].get(*key).is_some())
+                    .map_or_else(|| alias(field), str::to_owned)
+            };
+            vec![section.into(), key]
+        };
+    }
+
+    if json && matches!(path, "toolbar.icon_size" | "toolbar.font_size") {
+        return vec!["toolbar".into(), alias(&keys[1])];
+    }
     if json
         && let Some(key) = path.strip_prefix("keys.")
         && root["keys"].get(key).is_none()

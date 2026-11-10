@@ -94,6 +94,10 @@ section!(ToolbarIcons {
 });
 
 section!(Toolbar {
+    #[serde(alias = "iconSize")]
+    icon_size: u32 = 22,
+    #[serde(alias = "fontSize")]
+    font_size: u32 = 11,
     button_size: f32 = 30.0,
     button_gap: f32 = 2.0,
     separator_slot: f32 = 1.0,

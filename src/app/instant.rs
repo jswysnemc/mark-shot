@@ -44,7 +44,13 @@ pub async fn full(conn: crate::backend::session::Session, launch: Launch) -> Res
         prof.mark("active output probed");
     }
 
+    let visibility = crate::backend::capture_visibility::Guard::begin(
+        crate::config::preferences::current()
+            .capture
+            .hide_own_windows,
+    )?;
     let shots = capture.capture_frame(&outputs).await?;
+    drop(visibility);
     drop(overlay);
     prof.mark("capture");
 
@@ -79,7 +85,13 @@ pub async fn window(conn: crate::backend::session::Session, launch: Launch) -> R
         launch.outputs().copy,
     );
     delay::wait(launch.shot_at, &*method, &mut prof).await?;
+    let visibility = crate::backend::capture_visibility::Guard::begin(
+        crate::config::preferences::current()
+            .capture
+            .hide_own_windows,
+    )?;
     let capture = method.capture_active_window().await?;
+    drop(visibility);
     prof.mark("capture");
     let png = encode_png_with_alpha(capture.pixmap.into_pixmap());
     prof.mark("png encoded");

@@ -39,6 +39,35 @@ fn key(state: &mut Preferences, key: Option<Key>, text: &str) {
 
 /// 【设置下拉测试】【字段点击】按 state 当前目标语言框发送真实鼠标事件，无返回值
 fn open_target(state: &mut Preferences) {
+    // 1. 【设置下拉测试】【字段可见】先通过实际滚轮事件显示语言字段，避免新增预览区后点击视口外坐标
+    for _ in 0..24 {
+        let layout = crate::features::preferences::translation::layout::Layout::new(state);
+        let viewport = crate::features::preferences::layout::viewport(state);
+        let (_, bounds) = layout
+            .controls
+            .iter()
+            .find(|(hit, _)| {
+                *hit == crate::features::preferences::translation::layout::Hit::Field(Field::Target)
+            })
+            .unwrap();
+        if bounds.top() >= viewport.top() && bounds.bottom() <= viewport.bottom() {
+            break;
+        }
+        state.event(WindowEvent::Scroll {
+            position: (
+                f64::from(viewport.left() + 1.0),
+                f64::from(viewport.top() + 10.0),
+            ),
+            delta: (
+                0.0,
+                if bounds.top() < viewport.top() {
+                    -1.0
+                } else {
+                    1.0
+                },
+            ),
+        });
+    }
     let layout = crate::features::preferences::translation::layout::Layout::new(state);
     let bounds = layout
         .controls

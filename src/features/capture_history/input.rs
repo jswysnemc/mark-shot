@@ -190,7 +190,7 @@ impl HistoryWindow {
         self.focus = Focus::List;
         let y = position.1 - self.layout.list.y() as f64;
         let within = y % ROW as f64;
-        if !(2.0..46.0).contains(&within) {
+        if !(2.0..f64::from(ROW - 2.0)).contains(&within) {
             self.last_click = None;
             return if focus_changed {
                 WindowAction::Redraw
@@ -253,7 +253,10 @@ impl HistoryWindow {
         self.splitter_hovered = splitter;
         self.hovered_row = row;
         if let Some(drag) = self.splitter_drag {
-            let width = drag.width(position, self.layout.size.0 - 24.0);
+            let width = drag.width(
+                position,
+                self.layout.list.width() + self.layout.preview.width() - 1.0,
+            );
             if width != self.layout.list.width() {
                 self.left_width = width;
                 self.relayout((self.layout.size.0 as u32, self.layout.size.1 as u32));

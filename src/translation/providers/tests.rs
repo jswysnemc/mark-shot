@@ -385,3 +385,39 @@ fn empty_cloud_translations_are_rejected() {
         assert_eq!(error.kind, ErrorKind::Protocol, "{provider}");
     }
 }
+
+/// 【翻译协议测试】【临时网络恢复】无参数，同一哔哩哔哩请求断开后重试并保持分段身份，不改变模型或待翻译内容
+#[test]
+fn bilibili_retries_transient_transport_failures_within_the_same_request() {
+    let fixture = HttpFixture::new(vec![]);
+    *fixture.replies.lock().unwrap() = VecDeque::from([
+        Err(Error::new(ErrorKind::Network, "connection closed")),
+        Ok(
+            json!({"choices":[{"message":{"content":"{\"translations\":[{\"id\":0,\"text\":\"译文\"}]}"}}]}),
+        ),
+    ]);
+    let output = run(json!({}), "plugin:bilibili", "source", "Chinese", &fixture).unwrap();
+    assert_eq!(output.text(), "译文");
+    let requests = fixture.requests.lock().unwrap();
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests[0].endpoint, requests[1].endpoint);
+    assert_eq!(requests[0].body, requests[1].body);
+    assert!(requests[1].timeout < requests[0].timeout);
+}
+
+/// 【翻译协议测试】【永久失败边界】无参数，参数及鉴权错误不重试，连续网络故障最多三次
+#[test]
+fn bilibili_does_not_retry_permanent_failures_or_exceed_three_attempts() {
+    for (kind, detail, count) in [
+        (ErrorKind::Http, "bilibili http 401: unauthorized", 1),
+        (ErrorKind::Http, "bilibili http 400: invalid model", 1),
+        (ErrorKind::Protocol, "invalid JSON", 1),
+        (ErrorKind::Network, "connection closed", 3),
+    ] {
+        let fixture = HttpFixture::new(vec![]);
+        *fixture.replies.lock().unwrap() =
+            (0..count).map(|_| Err(Error::new(kind, detail))).collect();
+        assert!(run(json!({}), "plugin:bilibili", "source", "Chinese", &fixture).is_err());
+        assert_eq!(fixture.requests.lock().unwrap().len(), count);
+    }
+}

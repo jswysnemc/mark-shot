@@ -28,6 +28,7 @@ pub(super) struct Preferences {
     pub cache: cosmic_text::SwashCache,
     pub status: String,
     pub toolbar: super::toolbar::Editor,
+    pub toolbar_editor: bool,
     pub translation: super::translation::State,
     pub(super) ready: bool,
     pub recovery: Option<String>,
@@ -114,6 +115,7 @@ impl Preferences {
             cache: cosmic_text::SwashCache::new(),
             status: String::new(),
             toolbar,
+            toolbar_editor: false,
             translation,
             ready,
             recovery,
@@ -145,7 +147,7 @@ impl Preferences {
 
     /// 【工具栏设置】【页面判断】无参数，返回当前是否显示工具栏内容，搜索结果沿用通用设置列表
     pub fn toolbar_page(&self) -> bool {
-        self.page == Page::Toolbar && self.search.text().is_empty()
+        self.page == Page::Toolbar && self.toolbar_editor && self.search.text().is_empty()
     }
 
     /// 【翻译设置】【页面判断】无参数，返回当前是否显示独立翻译配置页面
@@ -365,6 +367,7 @@ impl Preferences {
         match control {
             Control::Close | Control::Scrollbar => {}
             Control::Page(page) => {
+                self.toolbar_editor = false;
                 self.translation.cancel();
                 self.toolbar.cancel();
                 self.toolbar.config = serde_json::from_value(self.values["toolbar_layout"].clone())
@@ -427,6 +430,7 @@ impl Preferences {
                             self.dialog = Some(crate::features::ocr_model_guide::dialog());
                         } else {
                             self.activate(Control::Page(page));
+                            self.toolbar_editor = page == Page::Toolbar;
                             if page == Page::Translation
                                 && let Some(selected) =
                                     crate::config::settings::translation::SERVICES
@@ -463,7 +467,11 @@ impl Preferences {
                             return;
                         }
                         let text = self.value(index);
-                        let mut field = SingleLine::new(&text, &mut self.fonts, 2048);
+                        let mut field = if ENTRIES[index].step().is_some() {
+                            SingleLine::number(&text, &mut self.fonts)
+                        } else {
+                            SingleLine::new(&text, &mut self.fonts, 2048)
+                        };
                         field.select_all(&mut self.fonts);
                         self.editing = Some((index, field));
                     }

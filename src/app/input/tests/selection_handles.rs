@@ -97,3 +97,32 @@ fn all_tools_resize_from_all_eight_handles() {
         }
     }
 }
+
+/// 【全屏标注回归】【选区固定】无参数，全屏模式下八点及内部均不能拖动或清除选区，标注工具仍能正常绘制
+#[test]
+fn fullscreen_selection_has_no_resize_or_move_gestures() {
+    let mut state = editor();
+    let before = tiny_skia::Rect::from_xywh(0.0, 0.0, 640.0, 480.0).unwrap();
+    state.selection.zone = Some(before);
+    state.fullscreen_scope = true;
+    select_tool(&mut state, Tool::Selection, &mut 0);
+    for (x, y) in [(0.0, 0.0), (320.0, 0.0), (639.0, 240.0), (300.0, 200.0)] {
+        pointer(&mut state, x, y, &mut 0);
+        state.toolbar.opacity = 0.0;
+        state.action_toolbar.opacity = 0.0;
+        state.settings_panel.visible = false;
+        assert!(super::super::selection_handles::hit(&state).is_none());
+        handle_pointer_button(&mut state, MouseButton::Left, true, &mut 0);
+        pointer(&mut state, x + 30.0, y + 20.0, &mut 0);
+        handle_pointer_button(&mut state, MouseButton::Left, false, &mut 0);
+        assert_eq!(state.selection.zone, Some(before));
+        assert!(!state.tool_active);
+    }
+    select_tool(&mut state, Tool::Pen, &mut 0);
+    pointer(&mut state, 150.0, 150.0, &mut 0);
+    handle_pointer_button(&mut state, MouseButton::Left, true, &mut 0);
+    pointer(&mut state, 220.0, 180.0, &mut 0);
+    handle_pointer_button(&mut state, MouseButton::Left, false, &mut 0);
+    assert_eq!(state.annotations.len(), 1);
+    assert_eq!(state.selection.zone, Some(before));
+}

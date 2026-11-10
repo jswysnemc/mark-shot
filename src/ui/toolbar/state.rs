@@ -18,6 +18,9 @@ pub struct Toolbar {
     pub toolbar_pixmap: Option<Pixmap>, // to change its opacity (SVG icons limitation)
     pub drawn_look: Option<ToolbarLook>,
 
+    pub docking: crate::config::capture::ToolbarPosition,
+    pub dock_override: Option<crate::config::capture::ToolbarPosition>,
+    pub dock_monitor: Option<usize>,
     pub secondary: bool,
     pub orientation: Orientation,
     pub cells: Vec<Rect>,
@@ -49,6 +52,7 @@ pub struct Toolbar {
 /// while only its position or opacity changes, the cached picture is reused
 #[derive(Clone, PartialEq)]
 pub struct ToolbarLook {
+    icon_size: u32,
     theme: crate::theme::Mode,
     selected: Option<usize>,
     translating: bool,
@@ -172,6 +176,9 @@ impl Toolbar {
         let mut toolbar = Self {
             toolbar_pixmap: None,
             drawn_look: None,
+            docking: Default::default(),
+            dock_override: None,
+            dock_monitor: None,
             secondary: false,
             orientation: Orientation::Horizontal,
             cells: Vec::new(),
@@ -218,6 +225,7 @@ impl Toolbar {
 
     pub fn look(&self) -> ToolbarLook {
         ToolbarLook {
+            icon_size: super::metrics::icon() as u32,
             theme: crate::theme::Mode::current(),
             selected: self.selected,
             translating: self.translating,

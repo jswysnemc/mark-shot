@@ -147,7 +147,7 @@ impl Layout {
         rect(
             self.editor.x() + 2.0,
             self.editor.y() + 2.0,
-            self.editor.width() - 4.0,
+            self.editor.width() - 14.0,
             self.editor.height() - 4.0,
         )
     }

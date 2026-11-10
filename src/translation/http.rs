@@ -7,6 +7,7 @@ use std::time::Duration;
 
 const MAX_RESPONSE: usize = 4 * 1024 * 1024;
 
+#[derive(Clone)]
 pub(crate) struct Request {
     pub provider: Provider,
     pub endpoint: String,
@@ -156,6 +157,13 @@ fn network_error(error: reqwest::Error) -> Error {
     if error.is_timeout() {
         Error::new(ErrorKind::Timeout, "timed out")
     } else {
-        Error::new(ErrorKind::Network, "translation network request failed")
+        let detail = if error.is_connect() {
+            "无法连接翻译服务，请检查网络或代理 / Cannot connect to translation service"
+        } else if error.is_body() || error.is_decode() {
+            "翻译响应读取中断 / Translation response was interrupted"
+        } else {
+            "翻译请求传输失败 / Translation request transport failed"
+        };
+        Error::new(ErrorKind::Network, detail)
     }
 }

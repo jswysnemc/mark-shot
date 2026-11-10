@@ -14,6 +14,27 @@ fn protocol(detail: &str) -> Error {
 
 /// 【模型翻译】【业务错误】按 provider 和 error 返回厂商业务错误，空对象沿用原版空字段，任务交付前统一脱敏
 fn api_error(provider: Provider, error: &Value) -> Error {
+    if provider == Provider::Responses {
+        let message = error
+            .as_str()
+            .or_else(|| error.get("message").and_then(Value::as_str))
+            .filter(|message| !message.trim().is_empty())
+            .unwrap_or(
+                "服务返回错误，但未提供错误描述 / Service returned an error without a message",
+            );
+        let code = error
+            .get("code")
+            .or_else(|| error.get("type"))
+            .and_then(Value::as_str)
+            .filter(|code| !code.is_empty());
+        return Error::new(
+            ErrorKind::Api,
+            code.map_or_else(
+                || format!("openai-responses error: {message}"),
+                |code| format!("openai-responses error ({code}): {message}"),
+            ),
+        );
+    }
     let message = error
         .get("message")
         .and_then(Value::as_str)
@@ -90,7 +111,10 @@ pub(super) fn parse_options(
             "invalid JSON response from Anthropic"
         }));
     }
-    if let Some(error) = body.get("error") {
+    if let Some(error) = body
+        .get("error")
+        .filter(|error| provider != Provider::Responses || !error.is_null())
+    {
         return Err(api_error(provider, error));
     }
     let content = match provider {

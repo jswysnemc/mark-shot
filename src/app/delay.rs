@@ -53,6 +53,7 @@ pub(super) fn begin_launch(launch: &mut super::Launch) -> crate::AppResult {
 fn apply(launch: &mut super::Launch, plan: crate::features::single_instance::request::Plan) {
     launch.fullscreen = plan.fullscreen;
     launch.one_monitor = !plan.all_outputs;
+    launch.all_outputs = plan.all_outputs;
     launch.shot_at = plan.deadline;
 }
 

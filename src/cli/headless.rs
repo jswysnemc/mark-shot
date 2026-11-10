@@ -71,7 +71,13 @@ async fn capture(
     outputs: &[Output],
     options: &CaptureOptions,
 ) -> AppResult<(Vec<u8>, u32, u32, f32)> {
+    let visibility = crate::backend::capture_visibility::Guard::begin(
+        crate::config::preferences::current()
+            .capture
+            .hide_own_windows,
+    )?;
     let result = method.capture_frame(outputs).await?;
+    drop(visibility);
     let kept: Vec<_> = result
         .frames
         .iter()

@@ -12,6 +12,8 @@ pub(super) fn lookup(source: &str) -> Option<&'static str> {
         "Copy Image Text" => "复制图片文字",
         "Text Selection Copy" => "拖选复制文字",
         "Target Language" => "目标语言",
+        "Open Translation Window" => "打开翻译浮窗",
+        "Translation window" => "翻译浮窗",
         "Show Original Text" => "显示原文",
         "Show Translated Text" => "显示译文",
         "Save As" => "另存为",

@@ -163,6 +163,14 @@ async fn capture_one(
     // apparently without this option, scaling picture comes with reducing screenshots quality
     let mut options = HashMap::from([("native-resolution", Value::from(true))]);
     options.insert("include-cursor", Value::from(include_cursor));
+    options.insert(
+        "hide-caller-windows",
+        Value::from(
+            crate::config::preferences::current()
+                .capture
+                .hide_own_windows,
+        ),
+    );
     let result = match target {
         Target::Screen(name) => {
             proxy

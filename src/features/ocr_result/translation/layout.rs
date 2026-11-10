@@ -152,7 +152,7 @@ impl Layout {
             editor: rect(
                 frame.x() + 5.0,
                 frame.y() + 5.0,
-                frame.width() - 10.0,
+                frame.width() - 20.0,
                 frame.height() - 10.0,
             ),
             frame,

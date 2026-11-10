@@ -74,7 +74,7 @@ impl HistoryWindow {
             store,
             jobs: Jobs::default(),
             icons: super::chrome::icons(),
-            layout: Layout::new((800, 520)),
+            layout: Layout::new((720, 480)),
             focus: Focus::Control(Control::Close),
             focused: true,
             hovered: None,
@@ -83,7 +83,7 @@ impl HistoryWindow {
             clear_dialog_pending: false,
             picker: None,
             save_snapshot: None,
-            left_width: 210.0,
+            left_width: 190.0,
             splitter_drag: None,
             scrollbar_drag: None,
             splitter_hovered: false,
@@ -372,6 +372,7 @@ impl WindowContent for HistoryWindow {
     fn draw(&mut self, canvas: &mut Pixmap, scale: f32) {
         self.relayout((self.layout.size.0 as u32, self.layout.size.1 as u32));
         super::draw::draw(self, canvas, scale);
+        crate::ui::window_frame::draw(canvas, scale);
     }
     /// 【截图历史】【窗口事件】处理 event；返回重绘、关闭或窗口管理动作
     fn event(&mut self, event: WindowEvent) -> WindowAction {
@@ -445,7 +446,7 @@ pub fn run(ready: bool) -> AppResult {
         WindowSpec {
             title: "Screenshot History".into(),
             app_id: "mark-shot-history".into(),
-            size: (800, 520),
+            size: (720, 480),
             minimum: (440, 320),
         },
         HistoryWindow::new(ready)?,

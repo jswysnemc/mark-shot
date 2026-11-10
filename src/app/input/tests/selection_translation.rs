@@ -284,3 +284,71 @@ fn handoff_rescales_seed_when_the_remaining_selection_uses_a_lower_scale_output(
     );
     image.seed.validate().unwrap();
 }
+
+/// 【框选翻译测试】【识别转翻译】无参数，OCR 属性按钮关闭识别交互并打开目标语言列表，不改变当前选区
+#[test]
+fn ocr_translate_action_enters_translation_mode() {
+    let mut state = editor();
+    state.selected_tool = crate::tools::Tool::Ocr;
+    let region = Rect::from_xywh(100.0, 100.0, 200.0, 100.0);
+    state.selection.zone = region;
+    crate::app::panels::settings::run_settings_action(
+        &mut state,
+        crate::ui::settings_panel::SettingsAction::OcrTranslate,
+        &mut 0,
+    );
+    assert_eq!(state.selected_tool, crate::tools::Tool::Pick);
+    assert_eq!(state.selection.zone, region);
+    assert!(state.selection_translation.popup.is_some());
+    assert!(!state.model_popover.open);
+}
+
+/// 【翻译回归】【原图重绘】真实点击原文后局部刷新必须覆盖翻译区域，最终画布恢复原始像素，无参数和返回值
+#[test]
+fn translation_ui_regression_original_click_repaints_capture() {
+    let mut state = editor();
+    state.selection.zone = Rect::from_xywh(100.0, 320.0, 300.0, 150.0);
+    state.selected_tool = crate::tools::Tool::Pick;
+    state.enable_region_rendering();
+    pointer(&mut state, 250.0, 420.0, &mut 0);
+    crate::app::input::handle_axis_scroll(
+        &mut state,
+        crate::types::ScrollEvent::wheel(120),
+        &mut 0,
+    );
+    assert!(!state.canvas_transform().is_identity());
+    state.region_rendering.opaque_background = true;
+    translated(&mut state);
+    crate::app::region_rendering_test_support::paint(&mut state, None, false);
+    crate::app::frame_backdrop::compose(&mut state, 0, None);
+    assert_eq!(state.canvas[0].pixel(250, 420).unwrap().red(), 245);
+    state.damage_rects.clear();
+    let bar = state.selection_translation.bar.as_ref().unwrap();
+    let cell = bar
+        .cells
+        .iter()
+        .find(|(a, _)| *a == Action::Original)
+        .unwrap()
+        .1;
+    let point = (
+        f64::from(bar.rect.x() + cell.x() + cell.width() / 2.0),
+        f64::from(bar.rect.y() + cell.y() + cell.height() / 2.0),
+    );
+    pointer(&mut state, point.0, point.1, &mut 0);
+    for pressed in [true, false] {
+        super::super::handle_pointer_button(
+            &mut state,
+            crate::types::MouseButton::Left,
+            pressed,
+            &mut 0,
+        );
+    }
+    let dirty = state.monitor_dirty_rect(0);
+    crate::app::region_rendering_test_support::paint(&mut state, dirty, false);
+    let damage = dirty.and_then(|r| crate::renderer::rect_bounds(&r, 640, 480));
+    crate::app::frame_backdrop::compose(&mut state, 0, damage);
+    assert_eq!(
+        state.canvas[0].pixel(250, 420),
+        Some(tiny_skia::PremultipliedColorU8::from_rgba(30, 34, 38, 255).unwrap())
+    );
+}

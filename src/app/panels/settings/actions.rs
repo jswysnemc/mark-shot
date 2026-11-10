@@ -18,6 +18,10 @@ pub fn run_settings_action(
         SettingsAction::OcrRescan => crate::tools::ocr::restart_ocr(editor_state, dirty_mask),
         SettingsAction::OcrCopyAll => crate::tools::ocr::copy_all(editor_state, dirty_mask),
         SettingsAction::OcrOpenResult => crate::tools::ocr::open_result(editor_state),
+        SettingsAction::OcrTranslate => {
+            crate::app::input::select_tool(editor_state, crate::tools::Tool::Pick, dirty_mask);
+            crate::app::selection_translation::toggle(editor_state, dirty_mask)
+        }
         SettingsAction::OcrLanguages => {
             super::super::model::toggle_model_popover(editor_state, dirty_mask)
         }

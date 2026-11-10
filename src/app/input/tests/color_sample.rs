@@ -109,3 +109,43 @@ fn sample_is_an_undoable_annotation_with_stable_color() {
     state.redo(&mut 0);
     assert_eq!(state.annotations.len(), 1);
 }
+
+/// 【取色回归】【移动采样点】无参数，移动颜色标注后实时读取新点原图，撤销恢复旧点及旧颜色
+#[test]
+fn moving_sample_refreshes_label_and_property_color_and_undo_restores_both() {
+    let mut state = editor();
+    let mut image = tiny_skia::Pixmap::new(640, 480).unwrap();
+    image.fill(tiny_skia::Color::from_rgba8(32, 67, 92, 255));
+    for y in 0..480 {
+        for x in 240..640 {
+            image.data_mut()[(y * 640 + x) * 4..(y * 640 + x + 1) * 4]
+                .copy_from_slice(&[120, 180, 40, 255]);
+        }
+    }
+    state.captures[0].pixmap = image.into();
+    select_tool(&mut state, Tool::Eyedropper, &mut 0);
+    pointer(&mut state, 180.0, 170.0, &mut 0);
+    handle_pointer_button(&mut state, MouseButton::Left, true, &mut 0);
+    pointer(&mut state, 200.0, 200.0, &mut 0);
+    handle_pointer_button(&mut state, MouseButton::Left, false, &mut 0);
+    select_tool(&mut state, Tool::Pick, &mut 0);
+    pointer(&mut state, 250.0, 215.0, &mut 0);
+    handle_pointer_button(&mut state, MouseButton::Left, true, &mut 0);
+    pointer(&mut state, 330.0, 215.0, &mut 0);
+    let expected = tiny_skia::Color::from_rgba8(120, 180, 40, 255);
+    assert_eq!(
+        crate::app::panels::settings::current_color(&state),
+        expected
+    );
+    handle_pointer_button(&mut state, MouseButton::Left, false, &mut 0);
+    let AnnotationShape::ColorSample { sample } = state.annotations[0].shape else {
+        panic!("missing sample")
+    };
+    assert_eq!(sample.color, expected);
+    assert_eq!(state.annotations[0].color, expected);
+    state.undo(&mut 0);
+    assert_eq!(
+        state.annotations[0].color,
+        tiny_skia::Color::from_rgba8(32, 67, 92, 255)
+    );
+}

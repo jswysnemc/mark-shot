@@ -19,6 +19,64 @@ fn capture(root: &Value) -> &Value {
     &root[capture_key(root)]
 }
 
+/// 【原版配置】【截图策略】按 root 独立转换已支持的行为字段；非法字段单独回退，不丢失其他有效配置
+pub(super) fn settings(root: &Value) -> Value {
+    let source = capture(root);
+    let mut result = serde_json::to_value(super::super::capture::Capture::default()).unwrap();
+    for (key, aliases) in [
+        (
+            "freeze_scope",
+            &["freeze_scope", "freezeScope", "freezeDisplayScope"][..],
+        ),
+        (
+            "hide_own_windows",
+            &[
+                "hide_own_windows",
+                "hideOwnWindows",
+                "hideOwnWindowsDuringCapture",
+            ],
+        ),
+        (
+            "double_click_action",
+            &["double_click_action", "doubleClickAction"],
+        ),
+        (
+            "middle_click_action",
+            &["middle_click_action", "middleClickAction"],
+        ),
+        ("toolbar_position", &["toolbar_position", "toolbarPosition"]),
+        ("kde_kwin_screenshot", &["kde_kwin_screenshot"]),
+    ] {
+        let value = values::first(source, aliases).or_else(|| {
+            (key == "freeze_scope")
+                .then(|| values::first(root, aliases))
+                .flatten()
+        });
+        let value = if key == "kde_kwin_screenshot" {
+            value.or_else(|| source.pointer("/wayland/kde/kwinScreenshot/enabled"))
+        } else {
+            value
+        };
+        let Some(value) = value else { continue };
+        let value = if matches!(key, "hide_own_windows" | "kde_kwin_screenshot") {
+            values::boolean(value).map(Value::Bool)
+        } else if value == &Value::Bool(false) && key.ends_with("click_action") {
+            Some("none".into())
+        } else {
+            Some(value.clone())
+        };
+        if let Some(value) = value {
+            let mut candidate = result.clone();
+            candidate[key] = value;
+            if let Ok(config) = serde_json::from_value::<super::super::capture::Capture>(candidate)
+            {
+                result = serde_json::to_value(config).unwrap();
+            }
+        }
+    }
+    result
+}
+
 /// 【原版配置】【识别开关】按 root 与 image 返回独立识别对象，错误值使用原版开启默认，不创建任务
 pub(super) fn detection(root: &Value, image: bool) -> Value {
     let (native, legacy) = if image {

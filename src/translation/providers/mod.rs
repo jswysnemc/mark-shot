@@ -1,6 +1,7 @@
 //! 【翻译服务】【服务组合】选择已解析的原生实现，不在调用失败后自动向其他服务发送原文
 
 mod baidu;
+mod bilibili;
 pub(crate) mod llm;
 mod model_response;
 mod tc3;

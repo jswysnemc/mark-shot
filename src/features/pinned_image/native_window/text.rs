@@ -97,9 +97,18 @@ impl Pin {
                         let result = self.start_translation();
                         self.report(result);
                     }
+                    if std::mem::take(&mut self.window_after_ocr) {
+                        let result = if self.translation.source.is_empty() {
+                            Err("No text found in this image".into())
+                        } else {
+                            self.open_translation_window()
+                        };
+                        self.report(result);
+                    }
                 }
                 Err(error) => {
                     self.copy_after_ocr = false;
+                    self.window_after_ocr = false;
                     self.translation.after_ocr = false;
                     self.report(Err(error.into()));
                 }
@@ -112,6 +121,7 @@ impl Pin {
     pub(super) fn clear_text(&mut self) {
         self.ocr = None;
         self.copy_after_ocr = false;
+        self.window_after_ocr = false;
         self.cancel_translation();
         self.translation.clear();
         self.text.clear();

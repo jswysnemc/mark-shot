@@ -2,8 +2,11 @@
 
 #[cfg(target_os = "linux")]
 mod linux;
+pub(super) mod menu;
 #[cfg(target_os = "windows")]
 mod windows;
+#[cfg(target_os = "windows")]
+mod windows_menu;
 use super::Reporter;
 
 /// 【系统托盘】【共享图标】无参数，将项目SVG栅格化为两种平台共用的32像素图标，返回解码结果
@@ -22,29 +25,16 @@ fn icon() -> Result<tiny_skia::Pixmap, String> {
     Ok(image)
 }
 
-/// 【系统托盘】【菜单语言】无参数，按当前界面语言返回有序菜单和动作
-fn entries() -> [(&'static str, super::Action); 4] {
-    use super::Action;
-    let labels =
-        if crate::ui::language::Language::current() == crate::ui::language::Language::Chinese {
-            ["截图", "剪贴板贴图", "设置", "退出"]
-        } else {
-            ["Screenshot", "Pin clipboard", "Settings", "Quit"]
-        };
-    [
-        (labels[0], Action::Capture),
-        (labels[1], Action::Pin),
-        (labels[2], Action::Settings),
-        (labels[3], Action::Quit),
-    ]
-}
-
-/// 【系统托盘】【注册生命周期】按reporter和cancelled启动平台托盘，返回前释放图标和菜单
-pub(super) async fn run(reporter: Reporter, cancelled: tokio::sync::watch::Receiver<bool>) {
+/// 【系统托盘】【注册生命周期】按 reporter、cancelled 和 menu 启动平台托盘，状态变化刷新菜单，返回前释放资源
+pub(super) async fn run(
+    reporter: Reporter,
+    cancelled: tokio::sync::watch::Receiver<bool>,
+    menu: tokio::sync::watch::Receiver<menu::State>,
+) {
     #[cfg(target_os = "linux")]
-    let result = linux::run(&reporter, cancelled).await;
+    let result = linux::run(&reporter, cancelled, menu).await;
     #[cfg(target_os = "windows")]
-    let result = windows::run(&reporter, cancelled).await;
+    let result = windows::run(&reporter, cancelled, menu).await;
     if let Err(error) = result {
         reporter.status(super::status::Registration::Failed(error));
     }

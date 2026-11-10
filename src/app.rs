@@ -2,6 +2,7 @@ pub(crate) mod annotation_collection;
 pub(crate) mod annotation_selection;
 pub(crate) mod canvas_navigation;
 mod capture_setup;
+mod capture_visibility;
 mod cursor_magnifier;
 use capture_setup::start_capture;
 mod event_loop;
@@ -97,6 +98,7 @@ const POINTER_GRACE: Duration = Duration::from_millis(100);
 pub struct Launch {
     pub mode: Mode,
     pub one_monitor: bool,
+    pub all_outputs: bool,
     pub to: Option<Outputs>,
     pub output: Option<PathBuf>,
     pub speed: bool,

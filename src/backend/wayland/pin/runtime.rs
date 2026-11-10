@@ -380,7 +380,32 @@ pub(super) fn run_at_seed(
     if let Some(seed) = seed {
         pin.apply_translation_seed(seed);
     }
+    let visibility_wake = pin.translation_wake.clone();
+    let mut visibility =
+        crate::backend::capture_visibility::Watch::new(move || visibility_wake.ping())?;
+    let mut hidden = false;
     while !pin.exit {
+        let requested = visibility.requested()?;
+        if hidden != requested {
+            if requested {
+                pin.popup = None;
+                pin.preview = None;
+                pin.shell.surface().attach(None, 0, 0);
+                pin.shell.surface().commit();
+                pin.configured = false;
+                pin.frame_pending = false;
+            } else {
+                pin.recreate(&qh);
+                pin.resize(false, &qh);
+            }
+            connection.flush()?;
+            hidden = requested;
+        }
+        visibility.applied()?;
+        if hidden {
+            event_loop.dispatch(Some(std::time::Duration::from_millis(100)), &mut pin)?;
+            continue;
+        }
         pin.dirty |= pin.feedback.expire();
         pin.poll_translation();
         pin.render_preview(&qh)?;

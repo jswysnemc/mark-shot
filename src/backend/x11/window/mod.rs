@@ -1,5 +1,6 @@
 //! 【X11普通窗口】【内容运行时】设置、OCR和贴图共享原生输入、模态窗口及菜单生命周期
 
+mod capture_visibility;
 mod events;
 mod geometry;
 mod popup;
@@ -279,13 +280,25 @@ pub fn run(
     let wake = task_wake::Source::new()?;
     let theme = crate::theme::config_watch::Watch::current();
     let mut node = Node::new(display.clone(), spec, Box::new(content), &wake)?;
+    let visibility_wake = wake.wake();
+    let mut visibility =
+        crate::backend::capture_visibility::Watch::new(move || visibility_wake.notify())?;
+    let mut hidden = false;
     let mut mode = crate::theme::Mode::current();
     loop {
         if super::wait::theme_changed(theme.as_ref()) || mode != crate::theme::Mode::current() {
             mode = crate::theme::Mode::current();
             node.refresh_theme();
         }
-        node.sync(&wake)?;
+        let requested = visibility.requested()?;
+        if requested != hidden {
+            node.capture_visibility(requested)?;
+            hidden = requested;
+        }
+        visibility.applied()?;
+        if !hidden {
+            node.sync(&wake)?;
+        }
         if node.close {
             return Ok(());
         }
@@ -297,7 +310,10 @@ pub fn run(
         if received {
             continue;
         }
-        let deadline = node.deadline();
+        let deadline = [node.deadline(), visibility.deadline()]
+            .into_iter()
+            .flatten()
+            .min();
         let timeout =
             deadline.map(|deadline| deadline.saturating_duration_since(std::time::Instant::now()));
         let notified = super::wait::wait_with_theme(&display, &wake, timeout, theme.as_ref())?;

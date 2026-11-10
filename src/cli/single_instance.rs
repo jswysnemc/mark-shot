@@ -22,7 +22,11 @@ pub(super) async fn run(
     let request = Request {
         capture: true,
         fullscreen: launch.fullscreen,
-        all_outputs: !launch.one_monitor,
+        all_outputs: !crate::config::preferences::current().capture.one_monitor(
+            launch.one_monitor,
+            launch.all_outputs,
+            launch.fullscreen,
+        ),
         capture_delay_ms: launch.shot_at.map_or(0, |at| {
             i64::try_from(at.saturating_duration_since(now).as_millis()).unwrap_or(i64::MAX)
         }),
@@ -30,7 +34,11 @@ pub(super) async fn run(
     };
     let plan = Plan {
         fullscreen: launch.fullscreen,
-        all_outputs: !launch.one_monitor,
+        all_outputs: !crate::config::preferences::current().capture.one_monitor(
+            launch.one_monitor,
+            launch.all_outputs,
+            launch.fullscreen,
+        ),
         deadline: launch.shot_at,
     };
     let owner = match Owner::start(&connection, request, plan).await? {

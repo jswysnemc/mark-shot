@@ -4,6 +4,7 @@ use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, Weight};
 
 pub(crate) struct Title {
     pub text: String,
+    pub font_size: f32,
     pub buffer: Buffer,
     pub lines: Vec<cosmic_text::LayoutLine>,
     pub width: f32,
@@ -21,7 +22,8 @@ impl Title {
                 crate::fonts::text_faces::fallback(fonts, &family, true, false, character);
             crate::fonts::text_faces::family_with_weight(fonts, &fallback, Weight::BOLD, false);
         }
-        let mut buffer = Buffer::new_empty(Metrics::new(11.0, 15.0));
+        let font_size = crate::ui::toolbar::metrics::font();
+        let mut buffer = Buffer::new_empty(Metrics::new(font_size, font_size * 15.0 / 11.0));
         buffer.set_size(None, None);
         // 1. 【标注多选】【字距单位】原版零点二像素字距截断为六十四分之十二像素，排版接口再转换为字号比例
         buffer.set_text(
@@ -29,17 +31,23 @@ impl Title {
             &Attrs::new()
                 .family(Family::Name(&family))
                 .weight(Weight::BOLD)
-                .letter_spacing(12.0 / 64.0 / 11.0),
+                .letter_spacing(12.0 / 64.0 / font_size),
             Shaping::Advanced,
             None,
         );
         buffer.shape_until_scroll(fonts, false);
-        let lines =
-            crate::fonts::fixed_layout::lines(fonts, &buffer, 11.0, None, cosmic_text::Wrap::None);
+        let lines = crate::fonts::fixed_layout::lines(
+            fonts,
+            &buffer,
+            font_size,
+            None,
+            cosmic_text::Wrap::None,
+        );
         let width = lines.iter().map(|line| line.w).fold(0.0, f32::max);
         let height = buffer.layout_runs().map(|run| run.line_height).sum();
         Self {
             text,
+            font_size,
             buffer,
             lines,
             width,

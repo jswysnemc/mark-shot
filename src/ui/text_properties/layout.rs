@@ -122,7 +122,7 @@ impl TextLayout {
             values: [size_value, opacity_value],
             controls,
             value_font_size: (font_size - 1.0).max(8.0),
-            icon_size: icon_size.round().min(button_size - 8.0).max(20.0),
+            icon_size: icon_size.round().min(button_size - 8.0).max(8.0),
         }
     }
 

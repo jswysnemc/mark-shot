@@ -1,6 +1,7 @@
 #[cfg(any(target_os = "linux", test))]
 mod capture_chain;
 pub mod capture_session;
+pub mod capture_visibility;
 pub mod notify;
 pub mod output_selection;
 mod platform;

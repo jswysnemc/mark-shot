@@ -78,8 +78,16 @@ pub fn contains(rect: Rect, point: (f64, f64)) -> bool {
 /// 【取色面板】【显示面板】冻结 state 当前颜色并在指针附近展示完整格式，dirty 返回局部重绘范围
 pub fn open(state: &mut EditorState, dirty: &mut u32) {
     let color = state
-        .color_inspector
-        .live
+        .selected_annotation_index()
+        .and_then(|index| state.annotations.get(index))
+        .filter(|annotation| {
+            matches!(
+                annotation.shape,
+                crate::types::AnnotationShape::ColorSample { .. }
+            )
+        })
+        .map(|annotation| annotation.color)
+        .or(state.color_inspector.live)
         .unwrap_or(state.tool_settings.color);
     state.color_inspector.live = Some(color);
     state.color_inspector.remember(color);
@@ -87,7 +95,13 @@ pub fn open(state: &mut EditorState, dirty: &mut u32) {
     let monitor = state.input.pointer.monitor_idx;
     let size = state.placements[monitor].size;
     close(state, dirty);
-    let rect = layout::panel_rect(size, state.input.pointer.local);
+    let rect = if let Some(anchor) = crate::ui::panel::UiPanel::rect(&state.settings_panel)
+        .filter(|_| state.settings_panel.monitor_idx == monitor)
+    {
+        layout::dropdown_rect(size, anchor)
+    } else {
+        layout::panel_rect(size, state.input.pointer.local)
+    };
     state.color_inspector.panel = Some((monitor, rect));
     state
         .color_inspector

@@ -56,6 +56,7 @@ impl Pin {
                 self.selecting = false;
             }
             PinAction::Translate => self.request_translation()?,
+            PinAction::OpenTranslationWindow => self.open_translation_window()?,
             PinAction::ToggleTranslation => {
                 self.translation.active = !self.translation.active;
                 self.sync_translation_text();

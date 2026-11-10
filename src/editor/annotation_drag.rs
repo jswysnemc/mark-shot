@@ -357,6 +357,18 @@ pub fn apply_annotation_drag(state: &mut EditorState, global: (f64, f64)) {
         .damage_rects
         .push(DamageZone::Global(ann.damage_bbox(true)));
 
+    // 3. 【取色标注】【拖动采样】引线指向点变化后刷新原图颜色，属性栏与标签保持一致
+    if let Some(color) = crate::features::color_sample::sampling::refresh(
+        ann,
+        crate::renderer::FrozenImage::from_parts(
+            state.file_canvas.as_ref(),
+            &state.captures,
+            &state.placements,
+        ),
+    ) {
+        state.color_inspector.live = Some(color);
+        state.settings_panel.dirty = true;
+    }
     if let Some(drag) = state.ann_drag.as_mut() {
         drag.prev_global = global;
     }

@@ -4,8 +4,15 @@ use crate::{config::Config, editor::EditorState};
 
 /// 【设置窗口】【编辑器恢复】比较 before、after 并将变化应用到 state，dirty 返回重绘；启动捕获参数留到下次截图
 pub fn apply(state: &mut EditorState, before: &Config, after: &Config, dirty: &mut u32) {
-    if before.toolbar_layout != after.toolbar_layout {
+    if before.toolbar_layout != after.toolbar_layout
+        || before.capture.toolbar_position != after.capture.toolbar_position
+        || before.toolbar != after.toolbar
+    {
         crate::app::configure_toolbar(state, &after.toolbar_layout);
+    }
+    if before.toolbar != after.toolbar {
+        state.settings_panel.active_source = None;
+        state.settings_panel.dirty = true;
     }
     if before.general.to != after.general.to {
         state.to = after.general.to;

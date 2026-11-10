@@ -1,4 +1,4 @@
-//! 【框选翻译】【结果浮条】五个动作分别命中，留白消费点击，右键不能切换显示
+//! 【框选翻译】【结果浮条】语言、显示、复制、浮窗和退出分别命中，留白消费点击
 
 use crate::types::MouseButton;
 use tiny_skia::Rect;
@@ -9,6 +9,7 @@ pub enum Action {
     Original,
     Translated,
     Copy,
+    OpenWindow,
     Exit,
 }
 
@@ -36,6 +37,7 @@ impl Bar {
             (Action::Original, language.text("Original"), false),
             (Action::Translated, language.text("Translated"), false),
             (Action::Copy, "", true),
+            (Action::OpenWindow, "", true),
             (Action::Exit, "", true),
         ] {
             let width = (super::font::width(text, fonts).ceil()

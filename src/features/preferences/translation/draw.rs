@@ -59,6 +59,34 @@ pub(in crate::features::preferences) fn draw(
             (field, text)
         })
         .collect::<Vec<_>>();
+    let model = values
+        .iter()
+        .find(|(field, _)| *field == Field::Model)
+        .map(|(_, text)| text.as_str());
+    let target = values
+        .iter()
+        .find(|(field, _)| *field == Field::Target)
+        .map_or("", |(_, text)| text.as_str());
+    let preview_text = super::preview::draw::prepare(
+        &mut state.translation.preview,
+        &layout.preview,
+        chinese,
+        &mut state.fonts,
+        super::preview::sample(target),
+    );
+    let metadata = model.map_or_else(
+        || {
+            format!(
+                "{} · {target}",
+                if chinese {
+                    "测试当前查看的服务"
+                } else {
+                    "Test viewed service"
+                }
+            )
+        },
+        |model| format!("{model} · {target}"),
+    );
     let labels = layout
         .rows
         .iter()
@@ -83,6 +111,7 @@ pub(in crate::features::preferences) fn draw(
         .collect::<Vec<_>>()
         .join(" ");
     state.fonts.ensure_text(&format!("{labels} {service_labels} {panel_labels} 查询模型 取消查询 选择模型 保存 显示 隐藏 使用默认值 {}", values.iter().map(|(_, text)| text.as_str()).collect::<Vec<_>>().join(" ")));
+    state.fonts.ensure_text("翻译测试 测试翻译 取消测试 复制详情 预制原文 测试成功 译文 测试失败 错误详情 测试中 测试结果 测试当前查看的服务");
     let mut editor_rect = None;
     {
         let mut painter = Painter::new(canvas)
@@ -93,6 +122,14 @@ pub(in crate::features::preferences) fn draw(
             for (bounds, title) in &layout.panels {
                 widgets::panel(painter, *bounds, title);
             }
+            super::preview::draw::draw(
+                painter,
+                &layout.preview,
+                &preview_text,
+                &state.translation.preview,
+                &metadata,
+                chinese,
+            );
             for row in &layout.rows {
                 let (title, help) = row.field.caption(chinese);
                 let title = controls::fit_label(painter, title, 12.0, row.label.width());
@@ -104,6 +141,22 @@ pub(in crate::features::preferences) fn draw(
                 let hovered = hover == Some(*hit) || state.translation.focus == Some(*hit);
                 let mut enabled = true;
                 let label: String = match *hit {
+                    Hit::Test => match (chinese, state.translation.preview.busy()) {
+                        (true, true) => "取消测试",
+                        (true, false) => "测试翻译",
+                        (false, true) => "Cancel test",
+                        (false, false) => "Test translation",
+                    }
+                    .into(),
+                    Hit::CopyTest => {
+                        enabled = state.translation.preview.copyable();
+                        if chinese {
+                            "复制详情"
+                        } else {
+                            "Copy details"
+                        }
+                        .into()
+                    }
                     Hit::Enable => {
                         if state.translation.root["provider"] == state.translation.service().id {
                             if chinese {

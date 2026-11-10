@@ -114,6 +114,8 @@ pub(super) fn warn_unknown_keys(text: &str, origin: &str) {
 
 /// 【配置】【参数校验】约束 config 的数值范围，非法参数回退到对应默认值；无返回值
 pub(super) fn validate(config: &mut Config) {
+    config.toolbar.icon_size = config.toolbar.icon_size.clamp(12, 48);
+    config.toolbar.font_size = config.toolbar.font_size.clamp(8, 24);
     config.history.normalize();
     config.translation.normalize();
     config.pinned.border_width = if config.pinned.border_width.is_finite() {

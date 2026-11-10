@@ -40,6 +40,17 @@ pub(crate) struct State {
 }
 
 impl State {
+    /// 【翻译浮窗】【已有译文】按 source 和 target 恢复已完成快照，无返回值，不产生网络任务
+    pub fn restore(&mut self, source: &str, target: &str) {
+        self.visible = true;
+        self.completed = Some(Snapshot {
+            source: source.trim().into(),
+            target: target.trim().into(),
+        });
+        self.pending = None;
+        self.notice = None;
+        self.failed = false;
+    }
     /// 【OCR 翻译】【任务资格】返回是否存在尚未完成的当前所属任务，无参数，不依赖工作线程状态推测完成
     pub fn busy(&self) -> bool {
         self.pending.is_some()

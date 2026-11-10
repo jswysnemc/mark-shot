@@ -10,12 +10,24 @@ pub(crate) fn title(count: usize) -> String {
 
 /// 【标注多选】【标题尺寸】按width返回标题框，参数为已测量标签宽度，最小宽度为五十八像素
 pub(crate) fn title_rect(width: f32) -> Rect {
-    Rect::from_xywh(8.0, 6.0, width.max(58.0), 32.0).unwrap()
+    let scale = (crate::ui::toolbar::metrics::font() / 11.0).max(1.0);
+    Rect::from_xywh(
+        8.0,
+        6.0 * scale,
+        width.max(58.0),
+        crate::ui::toolbar::metrics::button(false) + 2.0,
+    )
+    .unwrap()
 }
 
 /// 【标注多选】【控件组合】按title_width返回宽度、透明度和颜色布局，参数为已测量标题宽度，其他按钮为空值
 pub(crate) fn new(title_width: f32) -> TextLayout {
-    let mut layout = TextLayout::new(30.0, 11.0, 22.0, false);
+    let mut layout = TextLayout::new(
+        crate::ui::toolbar::metrics::button(false),
+        crate::ui::toolbar::metrics::font(),
+        crate::ui::toolbar::metrics::icon(),
+        false,
+    );
     let shift = title_rect(title_width).width() + 6.0;
     let moved = |rect: Rect| {
         Rect::from_xywh(rect.x() + shift, rect.y(), rect.width(), rect.height()).unwrap()

@@ -121,6 +121,7 @@ pub(super) fn draw(state: &mut ResultWindow, canvas: &mut Pixmap, scale: f32) {
     }
     if state.view == View::Text {
         super::translation::draw::draw(state, canvas, scale);
+        super::scrollbars::draw(state, canvas, scale);
     }
     // 3. 【文字识别】【页脚入口】没有状态时尺寸入口位于页脚中部，不增加默认快捷键文字
     let mut painter = Painter::new(canvas)

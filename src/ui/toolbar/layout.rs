@@ -26,17 +26,14 @@ impl Toolbar {
             .find_map(|(item, rect)| {
                 matches!(item, ToolbarItem::Button(_)).then_some(rect.width().min(rect.height()))
             })
-            .unwrap_or(
-                crate::config::get().toolbar.button_size - if self.secondary { 2.0 } else { 0.0 },
-            )
+            .unwrap_or(super::metrics::button(self.secondary))
     }
 
     /// 【截图工具栏】【布局更新】按 available 的窗口尺寸排版；返回尺寸或方向是否变化
     pub fn arrange(&mut self, available: (f32, f32)) -> bool {
         let old = (self.size, self.cells.clone(), self.orientation);
         let margin = self.margin();
-        let requested =
-            crate::config::get().toolbar.button_size - if self.secondary { 2.0 } else { 0.0 };
+        let requested = super::metrics::button(self.secondary);
         let gap = crate::config::get().toolbar.button_gap;
         let vertical = self.orientation == Orientation::Vertical;
         let limit = (if vertical { available.1 } else { available.0 } - margin * 2.0)
@@ -55,7 +52,7 @@ impl Toolbar {
             .count();
         let fitted = (limit - GRIP_THICKNESS - self.items.len() as f32 * gap - separators as f32)
             / buttons as f32;
-        let button = if fitted >= 26.0 {
+        let button = if fitted >= (super::metrics::icon() + 4.0).max(26.0) {
             requested.min(fitted)
         } else {
             requested

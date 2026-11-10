@@ -53,13 +53,13 @@ mod tests {
             )
         };
         assert_eq!(navigate(None, Key::Down, enabled), Some(0));
-        assert_eq!(navigate(None, Key::Up, enabled), Some(19));
+        assert_eq!(navigate(None, Key::Up, enabled), Some(ITEMS.len() - 1));
         assert_eq!(navigate(Some(0), Key::Down, enabled), Some(3));
         assert_eq!(navigate(Some(3), Key::Up, enabled), Some(0));
-        assert_eq!(navigate(Some(19), Key::Down, enabled), Some(0));
-        assert_eq!(navigate(Some(0), Key::Up, enabled), Some(19));
+        assert_eq!(navigate(Some(ITEMS.len() - 1), Key::Down, enabled), Some(0));
+        assert_eq!(navigate(Some(0), Key::Up, enabled), Some(ITEMS.len() - 1));
         assert_eq!(navigate(Some(3), Key::Home, enabled), Some(0));
-        assert_eq!(navigate(Some(3), Key::End, enabled), Some(19));
+        assert_eq!(navigate(Some(3), Key::End, enabled), Some(ITEMS.len() - 1));
         assert!(!available(1, enabled));
         assert!(!available(2, enabled));
         assert!(!available(usize::MAX, enabled));

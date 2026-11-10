@@ -147,6 +147,7 @@ fn action(state: &mut EditorState, action: Action, dirty: &mut u32) {
             }
         }
         Action::Exit => super::exit(state, dirty),
+        Action::OpenWindow => super::handoff::open_window(state, dirty),
     }
 }
 

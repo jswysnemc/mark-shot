@@ -9,6 +9,7 @@ mod annotation_rotation;
 mod annotation_selection;
 mod annotation_style;
 mod canvas_navigation;
+mod capture_actions;
 mod color;
 mod color_sample;
 mod cursor_magnifier;

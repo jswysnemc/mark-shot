@@ -14,11 +14,11 @@ use crate::types::Outputs;
 
 /// config section: every field sits next to its default
 macro_rules! section {
-    ($name:ident { $($field:ident : $ty:ty = $default:expr),* $(,)? }) => {
+    ($name:ident { $( $(#[$meta:meta])* $field:ident : $ty:ty = $default:expr),* $(,)? }) => {
         #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
         #[serde(default)]
         pub struct $name {
-            $(pub $field: $ty,)*
+            $( $(#[$meta])* pub $field: $ty,)*
         }
 
         impl Default for $name {
@@ -33,6 +33,7 @@ mod component_theme;
 mod legacy_theme;
 mod values;
 pub use values::*;
+pub mod capture;
 mod sections;
 pub use sections::*;
 mod bindings;
@@ -68,6 +69,9 @@ pub use export::Export;
 mod region_detection;
 pub use region_detection::Detection;
 #[cfg(test)]
+#[path = "config/tests/capture_behavior.rs"]
+mod capture_behavior_tests;
+#[cfg(test)]
 #[path = "config/tests/legacy_config.rs"]
 mod legacy_config_tests;
 #[cfg(test)]
@@ -86,6 +90,7 @@ const BLUE: Rgba = rgb(137, 180, 250);
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Config {
+    pub capture: capture::Capture,
     pub desktop: desktop::Desktop,
     pub ui: Ui,
     pub startup: Startup,
@@ -130,6 +135,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         let mut config = Self {
+            capture: capture::Capture::default(),
             desktop: desktop::Desktop::default(),
             ui: Ui::default(),
             startup: Startup::default(),

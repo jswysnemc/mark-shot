@@ -88,6 +88,10 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
                 crate::logging::init(Process::OcrResult);
                 crate::features::ocr_result::transport::cli(&args)
             }
+            crate::features::ocr_result::floating::ARG => {
+                crate::logging::init(Process::OcrResult);
+                crate::features::ocr_result::floating::cli(&args)
+            }
             crate::features::pinned_image::recognition::WORKER_ARG => {
                 crate::logging::init(Process::OcrDaemon);
                 crate::features::pinned_image::recognition::cli(&args)

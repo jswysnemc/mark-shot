@@ -6,6 +6,7 @@ use ksni::TrayMethods;
 struct Tray {
     reporter: Reporter,
     pixels: Vec<u8>,
+    menu: super::menu::State,
 }
 
 impl ksni::Tray for Tray {
@@ -30,22 +31,9 @@ impl ksni::Tray for Tray {
         self.reporter
             .activated(Action::Capture, ksni::current_xdg_activation_token());
     }
-    /// 【系统托盘】【操作菜单】无参数，返回截图、剪贴板贴图、设置及退出动作
+    /// 【系统托盘】【操作菜单】无参数，将共用菜单转换为宿主支持的项目、分隔线和延时子菜单
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
-        super::entries()
-            .into_iter()
-            .map(|(label, action)| {
-                ksni::menu::StandardItem {
-                    label: label.into(),
-                    activate: Box::new(move |tray: &mut Self| {
-                        tray.reporter
-                            .activated(action, ksni::current_xdg_activation_token())
-                    }),
-                    ..Default::default()
-                }
-                .into()
-            })
-            .collect()
+        items(super::menu::entries(self.menu))
     }
     /// 【系统托盘】【宿主恢复】无参数，在托盘区域重新上线时报告注册恢复
     fn watcher_online(&self) {
@@ -58,6 +46,41 @@ impl ksni::Tray for Tray {
             .status(super::super::status::Registration::Unavailable);
         true
     }
+}
+
+/// 【系统托盘】【菜单转换】按 entries 递归生成 DBusMenu，回调只交付动作，不在宿主线程创建窗口
+fn items(entries: Vec<super::menu::Item>) -> Vec<ksni::MenuItem<Tray>> {
+    entries
+        .into_iter()
+        .map(|entry| match entry {
+            super::menu::Item::Separator => ksni::MenuItem::Separator,
+            super::menu::Item::Submenu {
+                label,
+                items: children,
+            } => ksni::menu::SubMenu {
+                label,
+                submenu: items(children),
+                ..Default::default()
+            }
+            .into(),
+            super::menu::Item::Action {
+                label,
+                action,
+                enabled,
+            } => ksni::menu::StandardItem {
+                label,
+                enabled,
+                activate: Box::new(move |tray: &mut Tray| {
+                    if enabled {
+                        tray.reporter
+                            .activated(action, ksni::current_xdg_activation_token());
+                    }
+                }),
+                ..Default::default()
+            }
+            .into(),
+        })
+        .collect()
 }
 
 /// 【系统托盘】【图标栅格】无参数，将项目已有SVG转为ARGB像素，返回解码错误
@@ -77,6 +100,7 @@ fn pixels() -> Result<Vec<u8>, String> {
 pub(super) async fn run(
     reporter: &Reporter,
     mut cancelled: tokio::sync::watch::Receiver<bool>,
+    mut menu: tokio::sync::watch::Receiver<super::menu::State>,
 ) -> Result<(), String> {
     let connection = zbus::Connection::session()
         .await
@@ -87,6 +111,7 @@ pub(super) async fn run(
     let registration = Tray {
         reporter: reporter.clone(),
         pixels: pixels()?,
+        menu: *menu.borrow_and_update(),
     }
     .assume_sni_available(true)
     .spawn();
@@ -101,7 +126,16 @@ pub(super) async fn run(
     {
         reporter.status(super::super::status::Registration::Registered(String::new()));
     }
-    let _ = cancelled.changed().await;
+    loop {
+        tokio::select! {
+            _ = cancelled.changed() => break,
+            result = menu.changed() => {
+                if result.is_err() { break; }
+                let state = *menu.borrow_and_update();
+                if handle.update(move |tray| tray.menu = state).await.is_none() { break; }
+            }
+        }
+    }
     handle.shutdown().await;
     Ok(())
 }

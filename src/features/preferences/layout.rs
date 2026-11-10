@@ -77,6 +77,7 @@ pub(super) struct Layout {
     pub groups: Vec<Group>,
     pub maximum: usize,
     pub preview: Option<Rect>,
+    pub toolbar_preview: Option<Rect>,
 }
 
 impl Layout {
@@ -90,6 +91,7 @@ impl Layout {
         let mut top = viewport.top() - state.scroll as f32;
         let mut last_group = None;
         let mut preview = None;
+        let mut toolbar_preview = None;
         let mut frame_left = viewport.left();
         for index in visible {
             let entry = &ENTRIES[index];
@@ -169,6 +171,15 @@ impl Layout {
                 compact,
             });
             top += height;
+            if entry.section == "capture" && entry.key == "toolbar_position" {
+                toolbar_preview = Some(rect(
+                    viewport.left() + 16.0,
+                    top,
+                    width - 32.0,
+                    super::toolbar_preview::HEIGHT,
+                ));
+                top += super::toolbar_preview::HEIGHT + 8.0;
+            }
             if let Some(group) = groups.last_mut() {
                 group.bounds = rect(
                     group.bounds.left(),
@@ -185,6 +196,7 @@ impl Layout {
             groups,
             maximum: height.saturating_sub(viewport.height() as usize),
             preview,
+            toolbar_preview,
         }
     }
 

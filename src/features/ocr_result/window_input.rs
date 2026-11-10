@@ -201,6 +201,9 @@ impl ResultWindow {
         {
             return WindowAction::None;
         }
+        if let Some(action) = super::scrollbars::event(self, &event) {
+            return action;
+        }
         match event {
             WindowEvent::Wake => {
                 let now = Instant::now();

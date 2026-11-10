@@ -162,7 +162,9 @@ fn content(p: &mut Painter, toolbar: &Toolbar) {
         } else {
             cfg.icon.get()
         };
-        let size = 22.0;
+        let size = super::metrics::icon()
+            .min(cell.width() - 4.0)
+            .min(cell.height() - 4.0);
         let icon_rect = Rect::from_xywh(
             cell.left() + (cell.width() - size) / 2.0,
             cell.top() + (cell.height() - size) / 2.0,

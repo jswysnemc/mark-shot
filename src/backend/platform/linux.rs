@@ -43,7 +43,10 @@ pub fn initialize_window_capture(
             )),
         });
     }
-    if forced != "niri-window"
+    if crate::config::preferences::current()
+        .capture
+        .kde_kwin_screenshot
+        && forced != "niri-window"
         && std::env::var("XDG_CURRENT_DESKTOP")
             .unwrap_or_default()
             .split(':')
@@ -74,6 +77,15 @@ pub fn initialize_capture_with_cursor(
 /// 【Wayland】【捕获分发】按conn和include_cursor选择原生或门户捕获，返回捕获链
 fn wayland_capture_with_cursor(conn: &Connection, include_cursor: bool) -> Box<dyn CaptureMethod> {
     let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
+    if !crate::config::preferences::current()
+        .capture
+        .kde_kwin_screenshot
+        && desktop
+            .split(':')
+            .any(|part| part.eq_ignore_ascii_case("KDE"))
+    {
+        return capture_method("portal", conn, include_cursor);
+    }
     let forced = std::env::var("MARK_SHOT_CAPTURE").unwrap_or_default();
     if matches!(
         forced.as_str(),

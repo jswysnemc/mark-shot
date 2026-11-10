@@ -34,6 +34,7 @@ struct Pin {
     selecting: bool,
     ocr: Option<text::Job>,
     copy_after_ocr: bool,
+    window_after_ocr: bool,
     translation: crate::features::pinned_image::translation::Translation,
     translation_task: Option<crate::translation::task::Task>,
     translation_retired: Vec<crate::translation::task::Task>,
@@ -115,11 +116,13 @@ impl WindowContent for Pin {
             if result.is_err() {
                 self.translation.after_ocr = false;
                 self.copy_after_ocr = false;
+                self.window_after_ocr = false;
             }
             self.report(result);
         } else {
             self.translation.after_ocr = false;
             self.copy_after_ocr = false;
+            self.window_after_ocr = false;
             self.text_selection = false;
             self.feedback.clear();
         }
@@ -290,6 +293,7 @@ pub(crate) fn run_at_seed(
         selecting: false,
         ocr: None,
         copy_after_ocr: false,
+        window_after_ocr: false,
         translation: crate::features::pinned_image::translation::Translation::new(
             crate::config::translation::current()
                 .map(|config| config.target_language)

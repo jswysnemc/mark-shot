@@ -47,6 +47,9 @@ fn reasoning_and_chunked_content_are_separated_from_translations() {
         {"type":"reasoning","summary":[{"text":"private"}]},
         {"type":"message","content":[{"type":"output_text","text":"{\"translations\":[{\"id\":7,\"text\":\"译文\"}]}"}]}]});
     assert_eq!(parse(Provider::Responses, &body).unwrap()[&7], "译文");
+    let mut completed = body.clone();
+    completed["error"] = Value::Null;
+    assert_eq!(parse(Provider::Responses, &completed).unwrap()[&7], "译文");
     let mut incomplete = body.clone();
     incomplete["status"] = "incomplete".into();
     assert!(parse(Provider::Responses, &incomplete).is_err());
@@ -56,4 +59,21 @@ fn reasoning_and_chunked_content_are_separated_from_translations() {
         "译文"
     );
     assert!(parse_options(Provider::Bilibili, &body, false).is_err());
+}
+
+/// 【模型翻译测试】【响应错误详情】无参数，Responses 字符串错误、错误代码及缺失描述都返回可诊断信息
+#[test]
+fn responses_errors_keep_string_messages_codes_and_missing_message_context() {
+    for (error, expected) in [
+        (serde_json::json!("model unavailable"), "model unavailable"),
+        (
+            serde_json::json!({"code":"model_not_found","message":"No such model"}),
+            "model_not_found",
+        ),
+        (serde_json::json!({}), "without a message"),
+    ] {
+        let result = parse(Provider::Responses, &serde_json::json!({"error":error})).unwrap_err();
+        assert_eq!(result.kind, ErrorKind::Api);
+        assert!(result.detail.contains(expected));
+    }
 }

@@ -1,5 +1,6 @@
 //! 【应用设置】【统一定义】集中字段类型、默认值、输入校验与生效时机，界面和写入端共用
 
+mod capture;
 mod catalog;
 mod desktop;
 mod extra;
@@ -17,6 +18,7 @@ pub static ENTRIES: LazyLock<Vec<Entry>> = LazyLock::new(|| {
         .cloned()
         .collect();
     entries.extend_from_slice(extra::ENTRIES);
+    entries.extend(capture::entries());
     entries.extend(shortcuts::entries());
     entries.extend_from_slice(desktop::ENTRIES);
     entries.extend(translation::SERVICES.iter().map(|service| Entry {
@@ -34,6 +36,9 @@ static DEFAULTS: LazyLock<Value> =
 impl Entry {
     /// 【应用设置】【候选文案】按 value 和 chinese 返回具有字段语义的选项名称，原始值用于保存
     pub fn option_label<'a>(&self, value: &'a str, chinese: bool) -> &'a str {
+        if let Some(label) = capture::label(self.key, value, chinese) {
+            return label;
+        }
         match (self.section, self.key, value) {
             ("general", "to", "") => {
                 if chinese {
@@ -170,6 +175,8 @@ impl Entry {
     /// 【应用设置】【数值范围】无参数，返回与业务约束一致的闭区间，没有限制时返回空值
     pub fn range(&self) -> Option<(f64, f64)> {
         match (self.section, self.key) {
+            ("toolbar", "icon_size") => Some((12.0, 48.0)),
+            ("toolbar", "font_size") => Some((8.0, 24.0)),
             ("history", "limit") => Some((1.0, 200.0)),
             ("history", "max_size_mib") => Some((1.0, 4096.0)),
             ("pinned", "border_width") => Some((0.0, 16.0)),
@@ -208,15 +215,19 @@ impl Entry {
                 "已保存，关闭设置后生效",
                 "Saved; applies when settings close",
             ),
-            (
-                "general" | "ocr" | "startup" | "magnifier" | "region_detection"
-                | "window_detection",
-                _,
-            ) => ("已保存，下次截图生效", "Saved; applies next capture"),
-            ("toolbar_layout", _) => (
+            ("capture", "double_click_action" | "middle_click_action") => (
+                "已保存，关闭设置后生效",
+                "Saved; applies when settings close",
+            ),
+            ("capture", "toolbar_position") | ("toolbar" | "toolbar_layout", _) => (
                 "已保存，关闭设置后更新工具栏",
                 "Saved; toolbar updates when settings close",
             ),
+            (
+                "capture" | "general" | "ocr" | "startup" | "magnifier" | "region_detection"
+                | "window_detection",
+                _,
+            ) => ("已保存，下次截图生效", "Saved; applies next capture"),
             _ => (
                 "已保存，下次执行对应操作时生效",
                 "Saved; applies to the next operation",

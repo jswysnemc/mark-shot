@@ -38,7 +38,9 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
             .settings_panel
             .collection_title
             .as_ref()
-            .is_none_or(|title| title.text != text)
+            .is_none_or(|title| {
+                title.text != text || title.font_size != crate::ui::toolbar::metrics::font()
+            })
         {
             editor_state.settings_panel.collection_title =
                 Some(crate::ui::annotation_collection::title::Title::new(
@@ -174,6 +176,7 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
     {
         new_widgets = &new_widgets[..new_widgets.len() - 1];
     }
+    let available_width = crate::ui::settings_panel::available_width(editor_state);
     let text_layout = if let SettingsSource::Collection { .. } = new_source {
         Some(crate::ui::annotation_collection::layout::new(
             editor_state
@@ -185,11 +188,12 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
     } else {
         text.then(|| {
             crate::ui::text_properties::layout::TextLayout::new(
-                30.0,
-                11.0,
-                22.0,
+                crate::ui::toolbar::metrics::button(false),
+                crate::ui::toolbar::metrics::font(),
+                crate::ui::toolbar::metrics::icon(),
                 selected_ann.is_some() && editor_state.selected_tool == Tool::Pick,
             )
+            .fit(available_width)
         })
     };
     if text_layout.is_some_and(|layout| layout.controls[5].is_some()) {
@@ -235,7 +239,7 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
         editor_state.settings_panel.size = text_layout.map_or(
             (
                 editor_state.settings_panel.size.0,
-                crate::theme::size::panel_height(),
+                crate::ui::toolbar::metrics::properties_height(),
             ),
             |layout| layout.size,
         );
@@ -311,6 +315,7 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
         close_color_popover(editor_state, dirty_mask);
     }
 
+    let arranged = editor_state.settings_panel.arrange(available_width);
     let should_be_visible =
         !new_widgets.is_empty() && !editor_state.tool_active && !editor_state.ui_hidden;
 
@@ -333,7 +338,7 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
         &mut editor_state.settings_panel,
         old_rect,
         old_monitor,
-        source_changed || layout_changed || download_changed,
+        source_changed || layout_changed || arranged || download_changed,
         &mut editor_state.damage_rects,
         dirty_mask,
     );

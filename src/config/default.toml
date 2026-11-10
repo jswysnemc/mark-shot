@@ -22,8 +22,7 @@ screenshot_shortcut = "PrintScreen"
 [general]
 # What happens to every screenshot, on top of what you choose in the editor:
 # e.g. with to = "s" copying also saves the file.
-# Finishing without an explicit choice (Enter, a double click on the selection,
-# releasing the mouse in -r, -f and -w) does only this. Overridden by -t.
+# Finishing without an explicit choice (Enter, releasing the mouse in -r, -f and -w) does only this. Overridden by -t.
 #
 # The same letters as -t, in any order:
 #   c  copy to the clipboard
@@ -41,6 +40,19 @@ to = "cs"
 #         outside the screenshot you'd have to cancel the capture.
 # auto    layer on niri, where a window would open as a new column, and on COSMIC, window everywhere else
 overlay = "auto"
+
+[capture]
+# 【截图行为】【冻结范围】all-screens | cursor-screen，显式显示器和 --all-outputs 优先
+freeze_scope = "all-screens"
+# 【截图行为】【自身窗口】仅捕获期间隐藏，完成、失败或捕获进程退出后恢复
+hide_own_windows = true
+# 【截图行为】【KDE 后端】关闭后使用桌面门户，不调用 KWin ScreenShot2
+kde_kwin_screenshot = true
+# 【截图行为】【快捷动作】none | copy | save | save-as | pin | cancel，中键拖动始终平移
+double_click_action = "copy"
+middle_click_action = "none"
+# 【工具栏】【固定停靠】selection | top | bottom | left | right，图片编辑窗口保持自身布局
+toolbar_position = "selection"
 
 [startup]
 # 【启动配置】【鼠标像素】仅在明确启用时把鼠标收入原始截图
@@ -204,6 +216,9 @@ main_vertical = false
 actions_vertical = true
 
 [toolbar]
+# 【工具栏】【尺寸】图标 12–48 像素，属性字号 8–24 像素，点击区域随之调整
+icon_size = 22
+font_size = 11
 button_size = 30.0
 button_gap = 2.0
 separator_slot = 1.0

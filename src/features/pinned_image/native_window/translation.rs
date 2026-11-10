@@ -4,6 +4,34 @@ use super::*;
 use crate::translation::{request::Request, task::Task};
 
 impl Pin {
+    /// 【贴图翻译】【浮窗入口】无参数，复用已有识别及译文打开独立浮窗，缺少原文时识别后继续，返回交接结果
+    pub(super) fn open_translation_window(&mut self) -> crate::AppResult {
+        if self.translation.source.is_empty() {
+            self.window_after_ocr = true;
+            let result = self.start_ocr();
+            self.window_after_ocr = matches!(result, Ok(true));
+            result?;
+            return Ok(());
+        }
+        self.window_after_ocr = false;
+        let document = crate::features::ocr_result::document::OcrDocument {
+            text: self
+                .translation
+                .source
+                .lines
+                .iter()
+                .map(|line| line.text.as_str())
+                .collect::<Vec<_>>()
+                .join("\n"),
+            png: self.image.png()?,
+            lines: self.translation.source.lines.clone(),
+        };
+        crate::features::ocr_result::floating::spawn(
+            &document,
+            &self.translation.target,
+            &crate::features::image_translation::model::text(&self.translation.blocks),
+        )
+    }
     /// 【原生贴图】【译文交接】按seed恢复识别和译文，不启动识别或网络请求，返回元数据校验结果
     pub(super) fn apply_seed(
         &mut self,

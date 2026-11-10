@@ -44,18 +44,25 @@ pub(super) fn draw(state: &mut HistoryWindow, canvas: &mut Pixmap, scale: f32) {
                 .format("%m-%d %H:%M:%S")
                 .to_string();
             let size = format!("{} × {}", entry.width, entry.height);
-            let text_width = (bounds.width() - 73.0).max(1.0);
+            let text_width = (bounds.width() - 61.0).max(1.0);
             for (line, text) in [title, size].into_iter().enumerate() {
-                let text = controls::fit_label(&mut painter, &text, 12.0, text_width);
+                let text = controls::fit_label(&mut painter, &text, 11.0, text_width);
                 painter.text(
                     rect(
-                        bounds.x() + 69.0,
-                        bounds.y() + 4.0 + line as f32 * 18.0,
+                        bounds.x() + 57.0,
+                        bounds.y() + 2.0 + line as f32 * 16.0,
                         text_width,
-                        18.0,
+                        16.0,
                     ),
                     &text,
-                    TextStyle::new(12.0, chrome::foreground()),
+                    TextStyle::new(
+                        11.0,
+                        if line == 0 {
+                            chrome::foreground()
+                        } else {
+                            chrome::muted()
+                        },
+                    ),
                 );
             }
         }
@@ -85,7 +92,7 @@ pub(super) fn draw(state: &mut HistoryWindow, canvas: &mut Pixmap, scale: f32) {
             image(
                 &mut list,
                 thumbnail,
-                rect(9.0, 6.0 + row as f32 * super::layout::ROW, 56.0, 38.0),
+                rect(7.0, 5.0 + row as f32 * super::layout::ROW, 44.0, 30.0),
                 scale,
             );
         }

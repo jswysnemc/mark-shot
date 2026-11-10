@@ -48,6 +48,7 @@ impl WindowContent for Preferences {
     fn draw(&mut self, canvas: &mut tiny_skia::Pixmap, scale: f32) {
         super::draw::draw(self, canvas, scale);
         super::dropdown::draw::draw(self, canvas, scale);
+        crate::ui::window_frame::draw(canvas, scale);
     }
     /// 【设置窗口】【输入路由】按 event 更新当前控件和配置，返回必要的重绘或关闭动作
     fn event(&mut self, event: WindowEvent) -> WindowAction {
@@ -154,7 +155,10 @@ impl WindowContent for Preferences {
                     self.activate(control);
                 }
             }
-            WindowEvent::Scroll { delta, .. } => {
+            WindowEvent::Scroll { position, delta } => {
+                if self.scroll_number(position, delta.1) {
+                    return WindowAction::Redraw;
+                }
                 self.scroll_rows(if delta.1 > 0.0 {
                     1
                 } else if delta.1 < 0.0 {
@@ -172,6 +176,11 @@ impl WindowContent for Preferences {
                     return WindowAction::Redraw;
                 }
                 if input.key == Some(Key::Escape) {
+                    if self.toolbar_editor {
+                        self.toolbar_editor = false;
+                        self.toolbar.cancel();
+                        return WindowAction::Redraw;
+                    }
                     self.shortcut_pause = None;
                     if self.editing.take().is_none() && !self.search_focus {
                         return if self.commit_pending() {
