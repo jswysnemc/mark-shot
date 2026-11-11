@@ -42,8 +42,12 @@ impl Recorder {
                     }
                 }
                 Control::Stop => {
+                    if self.stop_requested || self.status.phase == "saving" {
+                        return Ok(());
+                    }
                     if let Some(controller) = &self.controller {
                         controller.send(Command::Stop)?;
+                        self.stop_requested = true;
                     }
                 }
                 Control::Start => {
@@ -52,6 +56,7 @@ impl Recorder {
                     self.server.attach(&controller);
                     self.status = controller.snapshot();
                     self.controller = Some(controller);
+                    self.stop_requested = false;
                     self.deadline =
                         Some(std::time::Instant::now() + std::time::Duration::from_millis(250));
                     self.error_scroll = 0;
@@ -117,8 +122,12 @@ impl WindowContent for Recorder {
     fn close_requested(&mut self) -> bool {
         if self.active() {
             self.close_after_stop = true;
-            if let Some(controller) = &self.controller {
-                let _ = controller.send(Command::Stop);
+            // 1. 【录制窗口】【等待保存】关闭时已进入导出则等待完成，避免第二次停止取消转换
+            if !self.stop_requested
+                && let Some(controller) = &self.controller
+                && controller.snapshot().phase != "saving"
+            {
+                self.stop_requested = controller.send(Command::Stop).is_ok();
             }
             false
         } else {

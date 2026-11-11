@@ -114,7 +114,8 @@ pub(super) fn draw(state: &mut Recorder, canvas: &mut tiny_skia::Pixmap, scale: 
         let enabled = match control {
             Control::Audio(_) => !active && state.config.format != "gif",
             Control::Pause => ["paused", "recording"].contains(&state.status.phase.as_str()),
-            Control::Stop | Control::Copy => true,
+            Control::Stop => !state.stop_requested && state.status.phase != "saving",
+            Control::Copy => true,
             _ => !active,
         };
         controls::button(
