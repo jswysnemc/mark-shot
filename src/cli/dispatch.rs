@@ -114,6 +114,14 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
         crate::logging::init(Process::Overlay);
         return crate::features::preferences::run(false);
     }
+    if let Command::Recording(target) = options.command {
+        crate::logging::init(Process::Overlay);
+        crate::features::desktop::ensure()?;
+        return crate::features::recording::run(target);
+    }
+    if let Command::RecordingControl(action) = &options.command {
+        return crate::features::recording::command(action);
+    }
     if matches!(options.command, Command::History) {
         crate::logging::init(Process::History);
         crate::config::log_warnings();

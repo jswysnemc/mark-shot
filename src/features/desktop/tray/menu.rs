@@ -23,7 +23,7 @@ pub(super) enum Item {
     Separator,
 }
 
-/// 【系统托盘】【菜单构造】按 state 返回非录像菜单，取消项仅在有待执行计划时可用，不读取配置文件
+/// 【系统托盘】【菜单构造】按 state 返回截图与录制菜单，取消延时项仅在有待执行计划时可用
 pub(super) fn entries(state: State) -> Vec<Item> {
     let chinese = state.language == Language::Chinese;
     let label = |cn: &str, en: &str| if chinese { cn } else { en }.to_owned();
@@ -58,6 +58,15 @@ pub(super) fn entries(state: State) -> Vec<Item> {
             label: label("延时截图", "Delayed Capture"),
             items: delays,
         },
+        Item::Submenu {
+            label: label("屏幕录制", "Recording"),
+            items: vec![
+                action("开始录制", "Start Recording", Action::Record),
+                action("暂停录制", "Pause Recording", Action::PauseRecording),
+                action("继续录制", "Resume Recording", Action::ResumeRecording),
+                action("停止并保存", "Stop and Save", Action::StopRecording),
+            ],
+        },
         action("设置", "Settings", Action::Settings),
         action("截图历史", "Screenshot History", Action::History),
         Item::Separator,
@@ -69,7 +78,7 @@ pub(super) fn entries(state: State) -> Vec<Item> {
 mod tests {
     use super::*;
 
-    /// 【系统托盘测试】【Qt 菜单对齐】无参数，中英文菜单顺序与延时启用状态一致，录像项和多余分隔线均不出现
+    /// 【系统托盘测试】【Qt 菜单对齐】无参数，中英文菜单顺序与延时状态一致，录制命令独立分组
     #[test]
     fn qt_menu_order_and_delay_state_are_shared_by_platforms() {
         for language in [Language::Chinese, Language::English] {
@@ -97,8 +106,8 @@ mod tests {
                         Action::Quit
                     ]
                 );
-                assert_eq!(menu.len(), 8);
-                assert_eq!(menu[6], Item::Separator);
+                assert_eq!(menu.len(), 9);
+                assert_eq!(menu[7], Item::Separator);
                 let Item::Submenu { items, .. } = &menu[3] else {
                     panic!("missing delay submenu")
                 };

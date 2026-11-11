@@ -82,7 +82,8 @@ fn rejects_invalid_and_conflicting_options() {
         vec!["--capture-to", "shot.png", "--pin-clipboard"],
         vec!["--region", "0,0,1,1"],
         vec!["--full", "--ocr"],
-        vec!["--recording-status"],
+        vec!["--recording-status", "--stop-recording"],
+        vec!["--record", "--settings"],
     ] {
         assert!(parse(&values).is_err(), "{values:?}");
     }

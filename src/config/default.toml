@@ -19,6 +19,20 @@ shortcuts_enabled = false
 # 【桌面集成】【全局截图】X11与Windows直接注册；Wayland由系统门户确认实际绑定
 screenshot_shortcut = "PrintScreen"
 
+[recording]
+# 【屏幕录制】【文件配置】mp4 | mkv | gif；GIF 在停止后从工作视频转换
+format = "mp4"
+quality = "balanced"
+encoder = "auto"
+fps = 30
+gif_fps = 12
+countdown = 3
+# off | system | microphone
+audio = "off"
+cursor = true
+# 【屏幕录制】【保存目录】留空使用系统视频目录中的 Mark Shot 文件夹
+directory = ""
+
 [general]
 # What happens to every screenshot, on top of what you choose in the editor:
 # e.g. with to = "s" copying also saves the file.

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - rewrite/native-wayland
+      - feat/native-recording
   pull_request:
   workflow_dispatch:
 
@@ -22,9 +23,24 @@ env:
   VSLANG: '1033'
 
 jobs:
+  media:
+    name: Windows recording export components
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cross compiler
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 nasm make pkg-config
+      - name: Build minimal media tools with sources
+        run: bash scripts/recording/build-components.sh windows > /tmp/recording-build.log 2>&1 || { tail -100 /tmp/recording-build.log; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-recording-components
+          path: target/recording-components-windows/
+          if-no-files-found: error
   windows:
     name: Windows x86_64 MSVC (CPU OCR)
     runs-on: windows-2022
+    needs: media
     timeout-minutes: 90
     defaults:
       run:
@@ -59,6 +75,20 @@ jobs:
 
       - name: Run Windows unit tests
         run: ./scripts/windows-test.ps1
+
+      - name: Download recording components
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-recording-components
+          path: target/recording-components-windows
+
+      - name: Encode and decode native recording fixture
+        run: |
+          $env:MARK_SHOT_RECORDING_EVIDENCE = Join-Path $env:GITHUB_WORKSPACE 'target/windows-evidence/recording'
+          cargo test --lib --locked --target x86_64-pc-windows-msvc media_foundation_encodes_video_and_audio -- --ignored --nocapture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/recording/verify-media.py target/recording-components-windows "$env:MARK_SHOT_RECORDING_EVIDENCE/native-encoding.mp4" --audio --report "$env:MARK_SHOT_RECORDING_EVIDENCE/probe.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Compile CPU OCR release
         run: cargo build --release --bin mark-shot --target x86_64-pc-windows-msvc --locked -j 2

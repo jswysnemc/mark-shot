@@ -3,12 +3,12 @@
 ## 范围
 
 - Wayland 与 Windows 均为正式平台目标，共享业务与渲染逻辑，隔离原生后端；Windows 主应用已接入，完整交互仍未完成
-- 产品完全移除 Qt 依赖，Qt 目录仅作为只读行为与性能对照；不维护产品 X11 后端
+- 产品完全移除 Qt 依赖，Qt 目录仅作为只读行为与性能对照；支持 Linux Wayland/X11 和 Windows
 - Linux 截图后端优先使用 ext-image-copy-capture、wlr-screencopy；KDE 使用 ScreenShot2，Windows 使用原生显示器与 GDI 捕获
 - 不具备原生捕获协议时回退到桌面 portal，滚动截图使用持续捕获和图像拼接
 - 软件绘制界面，无 GPU 界面运行时；静态截图和动态标注分层，按损坏区域提交帧
 - OCR 使用 oar-ocr / PP-OCRv5，默认按需加载；模型下载必须经过明确用户操作
-- 不实现扫码与录像，不将滚动截图视为录像功能
+- 暂不实现扫码；录像独立于截图编辑器，平台采集、编码和导出位于 `features/recording`
 
 ## 模块
 

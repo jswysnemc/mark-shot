@@ -4,6 +4,7 @@
 pub enum Page {
     Appearance,
     Capture,
+    Recording,
     Keys,
     Ocr,
     Translation,
@@ -16,9 +17,10 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::Appearance,
         Self::Capture,
+        Self::Recording,
         Self::Toolbar,
         Self::Keys,
         Self::Ocr,
@@ -33,6 +35,7 @@ impl Page {
         let labels = match self {
             Self::Appearance => ("外观与语言", "Appearance"),
             Self::Capture => ("截图与标注", "Capture"),
+            Self::Recording => ("屏幕录制", "Recording"),
             Self::Keys => ("快捷键", "Shortcuts"),
             Self::Ocr => ("文字识别", "OCR"),
             Self::Translation => ("翻译服务", "Translation"),
@@ -74,6 +77,22 @@ impl Entry {
             return help;
         }
         let labels = match (self.section, self.key) {
+            ("recording", "directory") => (
+                "留空保存到视频目录中的 Mark Shot 文件夹；也可指定完整路径",
+                "Empty uses Videos/Mark Shot; otherwise enter a full path",
+            ),
+            ("recording", "encoder") => (
+                "自动优先硬件编码；失败会显示原因，软件模式可能增加占用",
+                "Automatic prefers hardware; errors show details. Software may use more CPU",
+            ),
+            ("recording", "format") => (
+                "GIF 在停止后转换，不含音频；转换失败保留原始视频",
+                "GIF is converted after stopping, without audio; failed exports keep the video",
+            ),
+            ("recording", _) => (
+                "下次录制生效；从托盘的屏幕录制入口开始",
+                "Applies to the next session; start from the tray Recording action",
+            ),
             ("desktop", "tray_enabled") => (
                 "后台保留截图、贴图、设置和退出菜单；需要桌面提供托盘区域",
                 "Keeps capture, pin, settings and quit actions available in the desktop tray",

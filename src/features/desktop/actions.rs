@@ -9,6 +9,10 @@ pub(super) enum Action {
     CancelDelay,
     Settings,
     History,
+    Record,
+    PauseRecording,
+    ResumeRecording,
+    StopRecording,
     Quit,
 }
 
@@ -21,6 +25,10 @@ impl Action {
             Self::Pin => Some(&["--pin-clipboard"]),
             Self::Settings => Some(&["--settings"]),
             Self::History => Some(&["--history"]),
+            Self::Record => Some(&["--record"]),
+            Self::PauseRecording => Some(&["--pause-recording"]),
+            Self::ResumeRecording => Some(&["--resume-recording"]),
+            Self::StopRecording => Some(&["--stop-recording"]),
             Self::Delay(_) | Self::CancelDelay | Self::Quit => None,
         }
     }

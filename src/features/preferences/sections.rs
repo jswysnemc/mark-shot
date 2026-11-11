@@ -14,6 +14,10 @@ pub(super) fn description(page: Page, chinese: bool) -> &'static str {
             "配置截图行为、标注工具与文件保存方式",
             "Capture behavior, annotation tools and saved files",
         ),
+        Page::Recording => (
+            "录制质量、帧率、音频与保存位置",
+            "Recording quality, frame rate, audio and destination",
+        ),
         Page::Keys => (
             "点击快捷键录入；重复组合会提示冲突",
             "Click a shortcut to record; conflicting bindings are checked",
@@ -95,6 +99,7 @@ pub(super) fn icon(page: Page) -> &'static str {
     match page {
         Page::Appearance => SUN,
         Page::Capture => icons::RECTANGLE,
+        Page::Recording => icons::VIDEO,
         Page::Keys => KEYS,
         Page::Ocr => icons::OCR,
         Page::Translation => icons::GLOBE,

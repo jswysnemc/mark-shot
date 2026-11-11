@@ -34,6 +34,7 @@ mod legacy_theme;
 mod values;
 pub use values::*;
 pub mod capture;
+pub mod recording;
 mod sections;
 pub use sections::*;
 mod bindings;
@@ -91,6 +92,7 @@ const BLUE: Rgba = rgb(137, 180, 250);
 #[serde(default)]
 pub struct Config {
     pub capture: capture::Capture,
+    pub recording: recording::Recording,
     pub desktop: desktop::Desktop,
     pub ui: Ui,
     pub startup: Startup,
@@ -136,6 +138,7 @@ impl Default for Config {
     fn default() -> Self {
         let mut config = Self {
             capture: capture::Capture::default(),
+            recording: recording::Recording::default(),
             desktop: desktop::Desktop::default(),
             ui: Ui::default(),
             startup: Startup::default(),

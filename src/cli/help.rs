@@ -29,6 +29,14 @@ Headless capture:
   --output-name NAME           Basename when writing into a directory
   --list-displays               Print available output information as JSON
 
+Screen recording:
+  --record                      Open the native recording controller
+  --record-select               Select a recording region within one display
+  --recording-status            Print the current recording state as JSON
+  --pause-recording             Pause the active recording
+  --resume-recording            Resume the paused recording
+  --stop-recording              Stop and finalize the recording
+
 Pinning:
   --pin-image FILE              Open an image as a separate pinned window
   --pin-clipboard               Pin a clipboard image or plain text
@@ -50,5 +58,5 @@ Configuration and diagnostics:
   -v, --version                 Show the application version
 
 OCR runs locally with PP-OCRv5. Models are downloaded only after an explicit click.
-QR/barcode scanning and screen recording are not included in this rewrite.
+Recording export tools are included in the complete build package. QR/barcode scanning is not included.
 ";

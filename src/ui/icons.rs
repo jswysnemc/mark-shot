@@ -2,6 +2,7 @@ use crate::tools::Tool;
 use crate::types::Finish;
 
 pub const APPLICATION: &str = include_str!("../../assets/hicolor/scalable/apps/mark-shot.svg");
+pub const VIDEO: &str = include_str!("../../assets/icons/recording.svg");
 
 pub const SELECTION: &str = include_str!("../../assets/icons/mark-shot/tool-move.svg");
 pub const ARROW: &str = include_str!("../../assets/icons/mark-shot/tool-arrow.svg");

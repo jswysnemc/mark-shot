@@ -22,6 +22,7 @@ pub mod ocr_model_guide;
 pub mod ocr_result;
 pub mod pinned_image;
 pub mod preferences;
+pub mod recording;
 pub mod region_detection;
 pub mod ruler;
 pub mod save_as;

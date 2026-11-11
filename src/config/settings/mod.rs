@@ -5,6 +5,7 @@ mod catalog;
 mod desktop;
 mod extra;
 mod metadata;
+mod recording;
 mod shortcuts;
 pub(crate) mod translation;
 pub use catalog::{Entry, Kind, Page, value_label};
@@ -19,6 +20,7 @@ pub static ENTRIES: LazyLock<Vec<Entry>> = LazyLock::new(|| {
         .collect();
     entries.extend_from_slice(extra::ENTRIES);
     entries.extend(capture::entries());
+    entries.extend(recording::entries());
     entries.extend(shortcuts::entries());
     entries.extend_from_slice(desktop::ENTRIES);
     entries.extend(translation::SERVICES.iter().map(|service| Entry {
@@ -36,6 +38,11 @@ static DEFAULTS: LazyLock<Value> =
 impl Entry {
     /// 【应用设置】【候选文案】按 value 和 chinese 返回具有字段语义的选项名称，原始值用于保存
     pub fn option_label<'a>(&self, value: &'a str, chinese: bool) -> &'a str {
+        if self.section == "recording"
+            && let Some(label) = recording::label(self.key, value, chinese)
+        {
+            return label;
+        }
         if let Some(label) = capture::label(self.key, value, chinese) {
             return label;
         }
@@ -175,6 +182,9 @@ impl Entry {
     /// 【应用设置】【数值范围】无参数，返回与业务约束一致的闭区间，没有限制时返回空值
     pub fn range(&self) -> Option<(f64, f64)> {
         match (self.section, self.key) {
+            ("recording", "fps") => Some((1.0, 60.0)),
+            ("recording", "gif_fps") => Some((1.0, 30.0)),
+            ("recording", "countdown") => Some((0.0, 10.0)),
             ("toolbar", "icon_size") => Some((12.0, 48.0)),
             ("toolbar", "font_size") => Some((8.0, 24.0)),
             ("history", "limit") => Some((1.0, 200.0)),

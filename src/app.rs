@@ -96,6 +96,7 @@ const POINTER_GRACE: Duration = Duration::from_millis(100);
 /// Launch options from the command line.
 #[derive(Debug, Clone, Default)]
 pub struct Launch {
+    pub record_select: bool,
     pub mode: Mode,
     pub one_monitor: bool,
     pub all_outputs: bool,
@@ -127,7 +128,9 @@ impl Launch {
 
     /// 【截图】【任务检查】编辑与 OCR 可以仅显示交互结果；其他快捷模式必须具有导出输出
     fn has_work(&self) -> bool {
-        matches!(self.mode, Mode::Editor | Mode::Ocr | Mode::Scroll) || !self.outputs().is_empty()
+        self.record_select
+            || matches!(self.mode, Mode::Editor | Mode::Ocr | Mode::Scroll)
+            || !self.outputs().is_empty()
     }
 
     fn outputs(&self) -> Outputs {
@@ -287,6 +290,17 @@ async fn make_screenshot(
             return Ok(());
         }
         editor_state.ocr.models.shutdown();
+        if launch.record_select {
+            let target =
+                crate::features::recording::selection::selected(&editor_state, overlay.as_ref())?;
+            drop(editor_state);
+            drop(overlay);
+            crate::utils::memory::release_unused();
+            if let Some(target) = target {
+                return crate::features::recording::selection::spawn(&target);
+            }
+            return Ok(());
+        }
         if editor_state.upload.copied {
             drop(overlay);
             crate::backend::notify::send(crate::backend::notify::Notice::ImageUrlCopied).await;

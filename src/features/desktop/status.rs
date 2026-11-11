@@ -76,21 +76,12 @@ impl Registration {
 }
 
 /// 【桌面集成】【状态目录】按配置路径和显示会话计算私有目录，返回路径或创建错误
-pub(super) fn directory(config: &Path) -> io::Result<PathBuf> {
-    let mut hash = std::collections::hash_map::DefaultHasher::new();
-    std::path::absolute(config)?.hash(&mut hash);
-    for key in [
-        "DISPLAY",
-        "WAYLAND_DISPLAY",
-        "XDG_SESSION_TYPE",
-        "DBUS_SESSION_BUS_ADDRESS",
-    ] {
-        std::env::var_os(key).hash(&mut hash);
-    }
+pub(crate) fn directory(config: &Path) -> io::Result<PathBuf> {
+    let identity = session_identity(config, |key| std::env::var_os(key))?;
     let root = dirs::cache_dir()
         .ok_or_else(|| io::Error::other("cache directory unavailable"))?
         .join("mark-shot/desktop")
-        .join(format!("{:016x}", hash.finish()));
+        .join(format!("{identity:016x}"));
     std::fs::create_dir_all(&root)?;
     #[cfg(unix)]
     {
@@ -99,6 +90,32 @@ pub(super) fn directory(config: &Path) -> io::Result<PathBuf> {
     }
     Ok(root)
 }
+
+/// 【桌面集成】【会话标识】按 config 和 environment 返回服务标识，Wayland 忽略无关的 XWayland 显示编号
+fn session_identity(
+    config: &Path,
+    environment: impl Fn(&str) -> Option<std::ffi::OsString>,
+) -> io::Result<u64> {
+    let mut hash = std::collections::hash_map::DefaultHasher::new();
+    std::path::absolute(config)?.hash(&mut hash);
+    for key in [
+        "DISPLAY",
+        "WAYLAND_DISPLAY",
+        "XDG_SESSION_TYPE",
+        "DBUS_SESSION_BUS_ADDRESS",
+    ] {
+        // 1. 【桌面集成】【会话识别】Wayland 会话可能启动多个 XWayland，不能以 DISPLAY 拆分同一会话
+        if key == "DISPLAY" && environment("WAYLAND_DISPLAY").is_some() {
+            continue;
+        }
+        environment(key).hash(&mut hash);
+    }
+    Ok(hash.finish())
+}
+
+#[cfg(test)]
+#[path = "status_tests.rs"]
+mod tests;
 
 /// 【桌面集成】【状态读取】按配置路径读取当前会话的状态，文件缺失返回空状态
 pub fn read(config: &Path) -> Status {

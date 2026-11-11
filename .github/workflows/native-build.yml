@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - rewrite/native-wayland
+      - feat/native-recording
     tags:
       - 'native-v*'
   workflow_dispatch:
@@ -41,7 +42,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential clang libclang-dev pkg-config \
             libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libpipewire-0.3-dev \
-            libssl-dev libfontconfig-dev fontconfig fonts-noto-core fonts-noto-cjk
+            libssl-dev libfontconfig-dev fontconfig fonts-noto-core fonts-noto-cjk \
+            meson ninja-build nasm libva-dev libdrm-dev libcap-dev libpulse-dev \
+            libxcomposite-dev libxrandr-dev libxfixes-dev libxdamage-dev libegl-dev libdbus-1-dev libgbm-dev wayland-protocols
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -88,6 +91,9 @@ jobs:
       - name: Compile native release
         run: cargo build --release --locked -j 2
 
+      - name: Build recording components with corresponding sources
+        run: bash scripts/recording/build-components.sh linux > target/recording-build.log 2>&1 || { tail -100 target/recording-build.log; exit 1; }
+
       - name: Verify executable and linkage
         run: |
           ./target/release/mark-shot --help > target/native-help.txt
@@ -130,12 +136,13 @@ jobs:
         run: |
           mkdir -p target/native-dist/mark-shot-native/docs target/native-dist/mark-shot-native/licenses
           install -m 755 target/release/mark-shot target/native-dist/mark-shot-native/mark-shot
+          cp -a target/recording-components-linux target/native-dist/mark-shot-native/recording
           cp LICENSE-MIT LICENSE-APACHE README.md target/native-dist/mark-shot-native/
           cp assets/fonts/LICENSE-OFL.txt assets/fonts/LICENSE-NUMERALS.txt target/native-dist/mark-shot-native/licenses/
           cp assets/icons/mark-shot/LICENSE target/native-dist/mark-shot-native/licenses/LICENSE-ICONS.txt
           cp target/native-license-notices.txt target/native-dist/mark-shot-native/licenses/DEPENDENCIES.txt
           cp target/native-runtime-notices/*.txt target/native-dist/mark-shot-native/licenses/
-          cp docs/*.md target/native-dist/mark-shot-native/docs/
+          cp -a docs/. target/native-dist/mark-shot-native/docs/
           cp target/native-help.txt target/native-linkage.txt target/native-dist/mark-shot-native/
           printf '%s\n' "$GITHUB_SHA" > target/native-dist/mark-shot-native/SOURCE-COMMIT
           tar -C target/native-dist -czf target/mark-shot-native-linux-x86_64.tar.gz mark-shot-native

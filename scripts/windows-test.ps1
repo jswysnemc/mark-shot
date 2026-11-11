@@ -44,6 +44,8 @@ try {
     Invoke-UnitTests 'image-stitch' @('-p', 'shot-image', '-p', 'shot-stitch')
     $groups = @(
         'features::desktop::hotkeys::windows::tests::',
+        'features::desktop::status::tests::',
+        'features::recording::',
         'backend::window_detection::',
         'app::region_detection::',
         'app::input::tests::cursor_magnifier::',
@@ -61,6 +63,7 @@ try {
     }
     Invoke-UnitTests 'windows-ui-automation' @('-p', 'mark-shot', '--lib', 'backend::window_detection::windows::tests::', '--', '--ignored', '--test-threads=1', '--nocapture')
     Invoke-UnitTests 'cursor-magnifier-render' @('-p', 'mark-shot', '--test', 'cursor_magnifier_render')
+    Invoke-UnitTests 'recording-arguments' @('-p', 'mark-shot', '--test', 'recording_arguments')
 }
 finally {
     $env:PATH = $oldPath

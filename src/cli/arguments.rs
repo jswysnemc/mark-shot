@@ -79,6 +79,8 @@ pub enum Command {
     ListDisplays,
     History,
     Settings,
+    Recording(crate::features::recording::Target),
+    RecordingControl(String),
     HistoryEdit(String),
     HistorySnapshot,
     PinOcrSnapshot { copy: bool },
@@ -188,6 +190,21 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
     let list_displays = args.contains("--list-displays");
     let history = args.contains("--history");
     let settings = args.contains("--settings");
+    let recording = args.contains("--record");
+    let record_select = args.contains("--record-select");
+    let record_target: Option<String> = args.opt_value_from_str("--record-target")?;
+    let controls: Vec<_> = [
+        ("--recording-status", "status"),
+        ("--pause-recording", "pause"),
+        ("--resume-recording", "resume"),
+        ("--stop-recording", "stop"),
+    ]
+    .into_iter()
+    .filter_map(|(flag, action)| args.contains(flag).then_some(action))
+    .collect();
+    if controls.len() > 1 || (record_target.is_some() && !recording) {
+        return Err("conflicting recording options / 录制参数冲突".into());
+    }
     let history_edit: Option<String> = args.opt_value_from_str("--history-edit")?;
     let history_snapshot = args.contains("--history-edit-snapshot");
     let pin_ocr_copy = args.contains(crate::features::pinned_image::actions::OCR_COPY_ARG);
@@ -203,7 +220,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
     let pin_clipboard = args.contains("--pin-clipboard");
     let full = args.contains(["-f", "--full"]);
     let window = args.contains(["-w", "--window"]);
-    let quick_region = args.contains(["-r", "--select-region"]);
+    let quick_region = args.contains(["-r", "--select-region"]) || record_select;
     let ocr = args.contains("--ocr");
     let scroll = args.contains(["-S", "--scroll"]);
     let fullscreen = args.contains("--fullscreen") | args.contains("--full-screen");
@@ -278,6 +295,8 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
         list_displays,
         history,
         settings,
+        recording,
+        !controls.is_empty(),
         history_edit.is_some(),
         history_snapshot,
         pin_ocr_snapshot,
@@ -343,6 +362,15 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
             shot_at,
             speed,
         })
+    } else if recording {
+        Command::Recording(
+            record_target
+                .map(|value| serde_json::from_str(&value))
+                .transpose()?
+                .unwrap_or_default(),
+        )
+    } else if let Some(action) = controls.first() {
+        Command::RecordingControl((*action).into())
     } else if list_displays {
         Command::ListDisplays
     } else if settings {
@@ -376,6 +404,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
             fullscreen_default_tool,
             file_default_tool,
             default_color,
+            record_select,
         })
     };
     Ok(Arguments {
