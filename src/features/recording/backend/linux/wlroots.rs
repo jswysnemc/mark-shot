@@ -23,6 +23,20 @@ pub(super) fn build(config: &Recording, target: &Target, path: &Path) -> Result<
     {
         return Err("直接 Wayland 录制需要完整构建包 / Direct Wayland recording requires the bundled component".into());
     }
+    // 1. 【Wayland录制】【显示器解析】多显示器时也明确指定默认来源，避免组件要求用户在终端选择
+    let session =
+        crate::backend::session::Session::connect_to_env().map_err(|error| error.to_string())?;
+    let overlay = crate::backend::initialize_overlay(session).map_err(|error| error.to_string())?;
+    let (index, output) = overlay
+        .discovered_outputs()
+        .iter()
+        .enumerate()
+        .find(|(index, output)| {
+            target.display.is_empty()
+                || crate::backend::output_selection::name(output, *index) == target.display
+        })
+        .ok_or("录制显示器已移除 / Display removed")?;
+    let name = crate::backend::output_selection::name(output, index);
     let mut command = Command::new(executable);
     command
         .args([
@@ -34,24 +48,9 @@ pub(super) fn build(config: &Recording, target: &Target, path: &Path) -> Result<
             "-f",
         ])
         .arg(path);
-    if !target.display.is_empty() {
-        command.args(["-o", &target.display]);
-    }
+    command.args(["-o", &name]);
     if let Some([x, y, width, height]) = target.crop {
-        // 1. 【Wayland录制】【全局区域】wf-recorder 接受全局逻辑几何，将物理区域还原到目标输出
-        let session = crate::backend::session::Session::connect_to_env()
-            .map_err(|error| error.to_string())?;
-        let overlay =
-            crate::backend::initialize_overlay(session).map_err(|error| error.to_string())?;
-        let output = overlay
-            .discovered_outputs()
-            .iter()
-            .enumerate()
-            .find(|(index, output)| {
-                crate::backend::output_selection::name(output, *index) == target.display
-            })
-            .map(|(_, output)| output)
-            .ok_or("录制显示器已移除 / Display removed")?;
+        // 2. 【Wayland录制】【全局区域】wf-recorder 接受全局逻辑几何，将物理区域还原到目标输出
         let (left, top) = output.info.logical_position.unwrap_or(output.info.location);
         let scale = output.scale();
         command.args([
