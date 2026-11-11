@@ -51,19 +51,21 @@ impl Encoder {
             output.SetUINT32(&MF_MT_AVG_BITRATE, bitrate)?;
             output.SetUINT32(&MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_Main.0 as u32)?;
             let video = writer.AddStream(&output)?;
-            writer.SetInputMediaType(
-                video,
-                &media_type::video(
-                    if device.is_some() {
-                        &MFVideoFormat_NV12
-                    } else {
-                        &MFVideoFormat_RGB32
-                    },
-                    size,
-                    config.frame_rate(),
-                )?,
-                None,
+            let input = media_type::video(
+                if device.is_some() {
+                    &MFVideoFormat_NV12
+                } else {
+                    &MFVideoFormat_RGB32
+                },
+                size,
+                config.frame_rate(),
             )?;
+            if device.is_none() {
+                // 1. 【Windows录制】【像素方向】GDI 提供自上而下 BGRA；显式正步长避免系统按 RGB 默认方向翻转
+                input.SetUINT32(&MF_MT_DEFAULT_STRIDE, size.0 * 4)?;
+                input.SetUINT32(&MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_0_255.0 as u32)?;
+            }
+            writer.SetInputMediaType(video, &input, None)?;
             let audio = if config.audio != "off" && config.format != "gif" {
                 let stream = writer.AddStream(&media_type::audio(true)?)?;
                 writer.SetInputMediaType(stream, &media_type::audio(false)?, None)?;

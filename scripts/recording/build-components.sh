@@ -60,10 +60,12 @@ if [[ "$platform" == windows ]]; then
   x86_64-w64-mingw32-strip "$destination/ffmpeg.exe" "$destination/ffprobe.exe"
 else
   cp "$prefix/bin/ffmpeg" "$prefix/bin/ffprobe" "$destination/"
-  gsr_revision=f97d1e392816503282d20a0804c3ce3fd2943767
+  gsr_archive="$task_root/scripts/recording/vendor/gpu-screen-recorder-f97d1e3.tar.xz"
+  printf '%s  %s\n' '4c8b74be6a6938369db5500a7bcbca10f5f0a2c21a228f62fc4ef15da6c44d6b' "$gsr_archive" | sha256sum --check
+  tar -xf "$gsr_archive" -C "$sources"
   vulkan_revision=88487f687f3100ebe1d3559a8a34d971ee85b977
   wf_revision=c5de47440e8e81c92befb696cb69819cdb3bfe8a
-  for entry in "gpu-screen-recorder|https://repo.dec05eba.com/gpu-screen-recorder|$gsr_revision" "Vulkan-Headers|https://github.com/KhronosGroup/Vulkan-Headers.git|$vulkan_revision" "wf-recorder|https://github.com/ammen99/wf-recorder.git|$wf_revision"; do
+  for entry in "Vulkan-Headers|https://github.com/KhronosGroup/Vulkan-Headers.git|$vulkan_revision" "wf-recorder|https://github.com/ammen99/wf-recorder.git|$wf_revision"; do
     IFS='|' read -r name address revision <<< "$entry"
     if [[ ! -d "$sources/$name/.git" ]]; then git init "$sources/$name"; git -C "$sources/$name" remote add origin "$address"; fi
     git -C "$sources/$name" fetch --depth 1 origin "$revision"
@@ -121,6 +123,7 @@ cp "$build_root/ffmpeg/config.h" "$destination/FFMPEG-CONFIG.h"
 mkdir -p "$sources/mark-shot-build/scripts/recording"
 cp "$task_root/scripts/recording/"*.sh "$task_root/scripts/recording/"*.py "$task_root/scripts/recording/"*.h "$task_root/scripts/recording/"*.hpp "$sources/mark-shot-build/scripts/recording/"
 cp "$task_root/scripts/ci-download.py" "$sources/mark-shot-build/scripts/"
+cp -a "$task_root/scripts/recording/vendor" "$sources/mark-shot-build/scripts/recording/"
 tar --exclude=.git -C "$sources" -cJf "$destination/COMPONENT-SOURCES.tar.xz" .
 cat > "$destination/NOTICES.txt" <<'EOF'
 Recording components are separate executables, not linked into Mark Shot.
