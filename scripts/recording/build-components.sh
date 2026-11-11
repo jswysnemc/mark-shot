@@ -63,14 +63,11 @@ else
   gsr_archive="$task_root/scripts/recording/vendor/gpu-screen-recorder-f97d1e3.tar.xz"
   printf '%s  %s\n' '4c8b74be6a6938369db5500a7bcbca10f5f0a2c21a228f62fc4ef15da6c44d6b' "$gsr_archive" | sha256sum --check
   tar -xf "$gsr_archive" -C "$sources"
-  vulkan_revision=88487f687f3100ebe1d3559a8a34d971ee85b977
-  wf_revision=c5de47440e8e81c92befb696cb69819cdb3bfe8a
-  for entry in "Vulkan-Headers|https://github.com/KhronosGroup/Vulkan-Headers.git|$vulkan_revision" "wf-recorder|https://github.com/ammen99/wf-recorder.git|$wf_revision"; do
-    IFS='|' read -r name address revision <<< "$entry"
-    if [[ ! -d "$sources/$name/.git" ]]; then git init "$sources/$name"; git -C "$sources/$name" remote add origin "$address"; fi
-    git -C "$sources/$name" fetch --depth 1 origin "$revision"
-    git -C "$sources/$name" checkout --detach FETCH_HEAD
-    [[ "$(git -C "$sources/$name" rev-parse HEAD)" == "$revision" ]]
+  for entry in 'vulkan-headers-88487f6.tar.xz|3285a5a1726edc80641af1b1f02c0313b1b6883c46588f170bda9e187c9ec1da' 'wf-recorder-c5de474.tar.xz|a5041b47587dedb6e7c578f303141fc3acd4c8993fcaa9b46b71795247c978b9'; do
+    IFS='|' read -r name digest <<< "$entry"
+    archive="$task_root/scripts/recording/vendor/$name"
+    printf '%s  %s\n' "$digest" "$archive" | sha256sum --check
+    tar -xf "$archive" -C "$sources"
   done
   python3 "$task_root/scripts/recording/patch-gsr.py" "$sources/gpu-screen-recorder"
   # 3. 【录制构建】【静态媒体依赖】媒体库静态链接，桌面协议和驱动使用系统 ABI
