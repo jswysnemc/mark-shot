@@ -134,18 +134,24 @@ jobs:
 
       - name: Package native build
         run: |
-          mkdir -p target/native-dist/mark-shot-native/docs target/native-dist/mark-shot-native/licenses
-          install -m 755 target/release/mark-shot target/native-dist/mark-shot-native/mark-shot
-          cp -a target/recording-components-linux target/native-dist/mark-shot-native/recording
-          cp LICENSE-MIT LICENSE-APACHE README.md target/native-dist/mark-shot-native/
-          cp assets/fonts/LICENSE-OFL.txt assets/fonts/LICENSE-NUMERALS.txt target/native-dist/mark-shot-native/licenses/
-          cp assets/icons/mark-shot/LICENSE target/native-dist/mark-shot-native/licenses/LICENSE-ICONS.txt
-          cp target/native-license-notices.txt target/native-dist/mark-shot-native/licenses/DEPENDENCIES.txt
-          cp target/native-runtime-notices/*.txt target/native-dist/mark-shot-native/licenses/
-          cp -a docs/. target/native-dist/mark-shot-native/docs/
-          cp target/native-help.txt target/native-linkage.txt target/native-dist/mark-shot-native/
-          printf '%s\n' "$GITHUB_SHA" > target/native-dist/mark-shot-native/SOURCE-COMMIT
-          tar -C target/native-dist -czf target/mark-shot-native-linux-x86_64.tar.gz mark-shot-native
+          staging=$(mktemp -d "$RUNNER_TEMP/mark-shot-package.XXXXXX")
+          package="$staging/mark-shot-native"
+          mkdir -p "$package/docs" "$package/licenses" "$package/recording"
+          install -m 755 target/release/mark-shot "$package/mark-shot"
+          cp -a target/recording-components-linux/. "$package/recording/"
+          for component in ffmpeg ffprobe gpu-screen-recorder wf-recorder; do
+            test -x "$package/recording/$component"
+          done
+          (cd "$package/recording"; sha256sum --check SHA256SUMS)
+          cp LICENSE-MIT LICENSE-APACHE README.md "$package/"
+          cp assets/fonts/LICENSE-OFL.txt assets/fonts/LICENSE-NUMERALS.txt "$package/licenses/"
+          cp assets/icons/mark-shot/LICENSE "$package/licenses/LICENSE-ICONS.txt"
+          cp target/native-license-notices.txt "$package/licenses/DEPENDENCIES.txt"
+          cp target/native-runtime-notices/*.txt "$package/licenses/"
+          cp -a docs/. "$package/docs/"
+          cp target/native-help.txt target/native-linkage.txt "$package/"
+          printf '%s\n' "$GITHUB_SHA" > "$package/SOURCE-COMMIT"
+          tar -C "$staging" -czf target/mark-shot-native-linux-x86_64.tar.gz mark-shot-native
           cd target
           sha256sum mark-shot-native-linux-x86_64.tar.gz > mark-shot-native-linux-x86_64.tar.gz.sha256
 
