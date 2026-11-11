@@ -87,7 +87,7 @@ jobs:
           $env:MARK_SHOT_RECORDING_EVIDENCE = Join-Path $env:GITHUB_WORKSPACE 'target/windows-evidence/recording'
           cargo test --lib --locked --target x86_64-pc-windows-msvc media_foundation_encodes_video_and_audio -- --ignored --nocapture
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python scripts/recording/verify-media.py target/recording-components-windows "$env:MARK_SHOT_RECORDING_EVIDENCE/native-encoding.mp4" --audio --report "$env:MARK_SHOT_RECORDING_EVIDENCE/probe.json"
+          python scripts/recording/verify-media.py target/recording-components-windows "$env:MARK_SHOT_RECORDING_EVIDENCE/native-encoding.mp4" --audio --fixture-colors --report "$env:MARK_SHOT_RECORDING_EVIDENCE/probe.json"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Compile CPU OCR release

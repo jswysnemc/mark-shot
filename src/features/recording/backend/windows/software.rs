@@ -87,6 +87,7 @@ pub(super) fn run(
     let mut paused_at = None;
     let mut pause_offset = 0;
     let mut last_video = 0;
+    let mut frames = 0;
     let interval = Duration::from_secs_f64(1.0 / f64::from(config.frame_rate()));
     let duration = 10_000_000 / i64::from(config.frame_rate());
     let mut next = Instant::now();
@@ -126,6 +127,7 @@ pub(super) fn run(
         encoder
             .video(&sample)
             .map_err(|error| format!("Software encode: {error}"))?;
+        frames += 1;
         last_video = (pts / 10000) as u64;
         publish(status, "recording", &detail, last_video);
         next = (next + interval).max(Instant::now());
@@ -134,7 +136,11 @@ pub(super) fn run(
     publish(status, "saving", &detail, last_video);
     encoder
         .finish()
-        .map_err(|error| format!("MP4 finalize: {error}"))
+        .map_err(|error| format!("MP4 finalize: {error}"))?;
+    if frames == 0 {
+        return Err("录制没有生成视频帧 / No video frames recorded".into());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -160,7 +166,11 @@ mod tests {
             for (index, pixel) in pixels.as_chunks_mut::<4>().0.iter_mut().enumerate() {
                 pixel.copy_from_slice(&[
                     if index % 320 < 160 { 255 } else { 0 },
-                    (frame * 4) as u8,
+                    if index / 320 >= 120 {
+                        220
+                    } else {
+                        (frame * 2) as u8
+                    },
                     if index % 320 >= 160 { 255 } else { 0 },
                     255,
                 ]);

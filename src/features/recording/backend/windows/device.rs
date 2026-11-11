@@ -4,7 +4,7 @@ use windows::{
     Win32::{
         Graphics::{Direct3D::D3D_DRIVER_TYPE_HARDWARE, Direct3D11::*, Dxgi::IDXGIDevice},
         Media::MediaFoundation::*,
-        System::Com::*,
+        System::WinRT::{RO_INIT_MULTITHREADED, RoInitialize, RoUninitialize},
     },
     core::{Interface, Result},
 };
@@ -14,9 +14,9 @@ impl Runtime {
     /// 【Windows录制】【运行时启动】无参数，在当前线程初始化 COM 与媒体框架，返回资源错误
     pub fn new() -> Result<Self> {
         unsafe {
-            CoInitializeEx(None, COINIT_MULTITHREADED).ok()?;
+            RoInitialize(RO_INIT_MULTITHREADED)?;
             if let Err(error) = MFStartup(MF_VERSION, MFSTARTUP_FULL) {
-                CoUninitialize();
+                RoUninitialize();
                 return Err(error);
             }
         }
@@ -28,7 +28,7 @@ impl Drop for Runtime {
     fn drop(&mut self) {
         unsafe {
             let _ = MFShutdown();
-            CoUninitialize();
+            RoUninitialize();
         }
     }
 }

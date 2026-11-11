@@ -21,14 +21,14 @@ flags=(--disable-debug --disable-doc --disable-autodetect --disable-everything
   --disable-network --disable-avdevice --disable-shared --enable-static --enable-pic
   --enable-ffmpeg --enable-ffprobe --enable-avfilter --enable-swscale --enable-swresample
   --enable-decoder=h264,aac --enable-parser=h264,aac
-  --enable-demuxer=mov,matroska,concat --enable-muxer=mp4,matroska,gif,null
+  --enable-demuxer=mov,matroska,concat --enable-muxer=mp4,matroska,gif,null,rawvideo
   --enable-protocol=file,pipe --enable-bsf=extract_extradata,h264_mp4toannexb
   --enable-filter=buffer,buffersink,scale,fps,format,split,palettegen,paletteuse,abuffer,abuffersink,amix,aresample,aformat,anull,null,hwupload,scale_vaapi
   --prefix="$prefix")
 
 if [[ "$platform" == windows ]]; then
   flags+=(--enable-cross-compile --target-os=mingw32 --arch=x86_64
-    --cross-prefix=x86_64-w64-mingw32- --enable-encoder=gif,wrapped_avframe,pcm_s16le --pkg-config=pkg-config
+    --cross-prefix=x86_64-w64-mingw32- --enable-encoder=gif,wrapped_avframe,pcm_s16le,rawvideo --pkg-config=pkg-config
     --extra-ldflags=-static)
 elif [[ "$platform" == linux ]]; then
   python3 "$task_root/scripts/ci-download.py" \
@@ -44,7 +44,7 @@ elif [[ "$platform" == linux ]]; then
   tar -xf "$build_root/nv-codec-headers.tar.gz" -C "$sources"
   make -C "$sources/nv-codec-headers-n13.0.19.0" PREFIX="$prefix" install
   export PKG_CONFIG_PATH="$prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-  flags+=(--enable-encoder=gif,wrapped_avframe,pcm_s16le,aac,libx264,h264_vaapi,h264_nvenc
+  flags+=(--enable-encoder=gif,wrapped_avframe,pcm_s16le,rawvideo,aac,libx264,h264_vaapi,h264_nvenc
     --enable-gpl --enable-version3 --enable-libx264 --enable-vaapi
     --enable-ffnvcodec --enable-nvenc --enable-cuda --pkg-config-flags=--static)
 else
@@ -104,7 +104,13 @@ PY
   strip "$destination/gpu-screen-recorder" "$destination/ffmpeg" "$destination/ffprobe"
   cp "$sources/gpu-screen-recorder/LICENSE" "$destination/licenses/GPU-SCREEN-RECORDER.txt"
   cp "$x264_source/COPYING" "$destination/licenses/X264.txt"
-  cp "$sources/nv-codec-headers-n13.0.19.0/README" "$destination/licenses/NV-CODEC-HEADERS.txt"
+  python3 - "$sources/nv-codec-headers-n13.0.19.0/include/ffnvcodec" "$destination/licenses/NV-CODEC-HEADERS.txt" <<'PY'
+from pathlib import Path
+import sys
+headers = sorted(Path(sys.argv[1]).glob('*.h'))
+notices = [f"{header.name}\n{header.read_text().split('*/', 1)[0]}*/\n" for header in headers]
+Path(sys.argv[2]).write_text('\n'.join(notices))
+PY
   ldd "$destination/gpu-screen-recorder" > "$destination/LINUX-RUNTIME.txt"
   if grep -E 'not found|libavcodec|libavformat|libavfilter' "$destination/LINUX-RUNTIME.txt"; then exit 1; fi
 fi
@@ -120,7 +126,8 @@ cat > "$destination/NOTICES.txt" <<'EOF'
 Recording components are separate executables, not linked into Mark Shot.
 FFmpeg 9.0: https://ffmpeg.org/ ; see COPYING files and FFMPEG-CONFIG.h.
 Linux GPU Screen Recorder: GPL-3.0-only, source f97d1e392816503282d20a0804c3ce3fd2943767.
-Linux x264: GPL-2.0-or-later; combined Linux media executables use GPL-3.0-or-later.
+Linux x264: GPL-2.0-or-later; FFmpeg and wf-recorder media executables use GPL-3.0-or-later.
+GPU Screen Recorder and its combined executable use GPL-3.0-only.
 wf-recorder: MIT source c5de47440e8e81c92befb696cb69819cdb3bfe8a, linked with GPL media libraries.
 Windows media export tools: LGPL-2.1-or-later; H.264/AAC capture uses Windows system APIs.
 Corresponding source, integration modifications and build scripts are included in COMPONENT-SOURCES.tar.xz.

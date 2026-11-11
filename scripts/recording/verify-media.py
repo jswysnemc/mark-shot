@@ -37,10 +37,28 @@ def main() -> None:
     parser.add_argument("media", type=Path)
     parser.add_argument("--duration", type=float, default=2.0)
     parser.add_argument("--audio", action="store_true")
+    parser.add_argument("--fixture-colors", action="store_true")
     parser.add_argument("--report", type=Path, required=True)
     args = parser.parse_args()
     report = verify(args.tools, args.media, args.duration, args.audio)
+    if args.fixture_colors:
+        verify_fixture_colors(args.tools, args.media)
     args.report.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+
+def verify_fixture_colors(directory: Path, media: Path) -> None:
+    """按 directory 解码 media 首帧，验证测试色块的上下方向和红蓝通道。"""
+    suffix = ".exe" if (directory / "ffmpeg.exe").exists() else ""
+    pixels = subprocess.check_output([
+        str(directory / f"ffmpeg{suffix}"), "-v", "error", "-i", str(media),
+        "-frames:v", "1", "-pix_fmt", "rgb24", "-f", "rawvideo", "-",
+    ], timeout=30)
+    assert len(pixels) == 320 * 240 * 3, len(pixels)
+    for x, y, expected in [(80, 60, (0, 0, 255)), (240, 60, (255, 0, 0)),
+                           (80, 180, (0, 220, 255)), (240, 180, (255, 220, 0))]:
+        offset = (y * 320 + x) * 3
+        actual = tuple(pixels[offset:offset + 3])
+        assert all(abs(a - b) < 40 for a, b in zip(actual, expected)), (x, y, actual, expected)
 
 
 if __name__ == "__main__":
