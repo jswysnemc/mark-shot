@@ -23,3 +23,14 @@ pub(crate) struct State {
     pub(super) pointer_valid: bool,
     pub(super) worker: Option<Worker>,
 }
+
+impl State {
+    /// 【截图区域识别】【层级可用】无参数，返回滚轮是否可以在包含层级之间切换候选区域
+    pub(crate) fn layered(&self) -> bool {
+        #[cfg(target_os = "windows")]
+        if self.native.is_some() {
+            return true;
+        }
+        self.detector.is_some()
+    }
+}

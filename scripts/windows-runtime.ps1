@@ -48,7 +48,7 @@ function Resolve-WindowsRuntime {
         }
     }
     $queue = [System.Collections.Generic.Queue[string]]::new()
-    Get-ChildItem $PackageDirectory -File | Where-Object { $_.Extension -in '.exe', '.dll' } |
+    Get-ChildItem $PackageDirectory -File -Recurse | Where-Object { $_.Extension -in '.exe', '.dll' } |
         ForEach-Object { $queue.Enqueue($_.FullName) }
     $seen = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     while ($queue.Count -gt 0) {

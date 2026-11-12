@@ -32,7 +32,7 @@ fn write(canvas: &mut Pixmap, tile: &Pixmap, position: (u32, u32), area: IntRect
         let source = &tile.data()[source..source + bytes];
         let target = &mut canvas.data_mut()[target..target + bytes];
         if !blend {
-            target.copy_from_slice(source);
+            crate::utils::transparent_pixmap::copy_changed(target, source);
             continue;
         }
         for (source, target) in source
@@ -41,6 +41,10 @@ fn write(canvas: &mut Pixmap, tile: &Pixmap, position: (u32, u32), area: IntRect
             .iter()
             .zip(target.as_chunks_mut::<4>().0)
         {
+            // 1. 【标注渲染】【透明片段】透明瓦片没有像素贡献，不写回已恢复的前景，避免触碰整屏零页
+            if source[3] == 0 {
+                continue;
+            }
             let inverse = 255 - u32::from(source[3]);
             for channel in 0..4 {
                 target[channel] = (u32::from(source[channel])

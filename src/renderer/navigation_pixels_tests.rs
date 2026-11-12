@@ -80,3 +80,42 @@ fn fractional_coverage_and_unsupported_transform_are_explicit() {
         Transform::from_rotate(30.0)
     ));
 }
+
+/// 【画布导航测试】【区域相位】分数平移与缩放的局部采样等同完整采样，损坏范围外像素保持原值
+#[test]
+fn regional_sampling_keeps_whole_canvas_phase_and_untouched_pixels() {
+    let mut source = Pixmap::new(37, 29).unwrap();
+    for (index, pixel) in source.pixels_mut().iter_mut().enumerate() {
+        *pixel = tiny_skia::ColorU8::from_rgba(
+            (index * 17) as u8,
+            (index * 31) as u8,
+            (index * 7) as u8,
+            137,
+        )
+        .premultiply();
+    }
+    for scale in [0.75, 1.25, 1.5, 2.0] {
+        let transform = Transform::from_scale(scale, scale).post_translate(3.375, 5.625);
+        let mut full = Pixmap::new(120, 100).unwrap();
+        full.fill(Color::from_rgba8(51, 55, 62, 255));
+        let mut partial = full.clone();
+        draw(&mut full, source.as_ref(), transform);
+        let area = tiny_skia::IntRect::from_xywh(13, 17, 31, 29).unwrap();
+        assert!(draw_region(
+            &mut partial,
+            source.as_ref(),
+            transform,
+            Some(area)
+        ));
+        for y in 0..100 {
+            for x in 0..120 {
+                let expected = if (13..44).contains(&x) && (17..46).contains(&y) {
+                    full.pixel(x, y).unwrap()
+                } else {
+                    tiny_skia::ColorU8::from_rgba(51, 55, 62, 255).premultiply()
+                };
+                assert_eq!(partial.pixel(x, y).unwrap(), expected);
+            }
+        }
+    }
+}

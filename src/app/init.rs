@@ -130,7 +130,7 @@ pub fn initial_paint(
     prof: &mut Profiler,
 ) -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..editor_state.canvas.len() {
-        super::frame_backdrop::stage(editor_state, overlay.as_mut(), i, None)?;
+        super::frame_backdrop::stage(editor_state, overlay.as_mut(), i, None, true)?;
     }
     overlay.flush()?;
     prof.mark("frames staged + flushed");

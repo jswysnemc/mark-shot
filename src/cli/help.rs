@@ -41,6 +41,11 @@ Pinning:
   --pin-image FILE              Open an image as a separate pinned window
   --pin-clipboard               Pin a clipboard image or plain text
 
+QR codes and barcodes:
+  --scan, --scan-code            Select a screen region and show decoded results
+  --scan IMAGE                  Scan an image file in the native result window
+  --scan-json IMAGE             Decode locally and print a JSON array without a window
+
 Screenshot history:
   --settings                    Open preferences and configure capture tools
   --history                     Browse, search and manage completed captures
@@ -58,5 +63,5 @@ Configuration and diagnostics:
   -v, --version                 Show the application version
 
 OCR runs locally with PP-OCRv5. Models are downloaded only after an explicit click.
-Recording export tools are included in the complete build package. QR/barcode scanning is not included.
+Recording export tools are included in the complete build package. QR/barcode scanning is built in.
 ";

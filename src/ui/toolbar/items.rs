@@ -7,6 +7,7 @@ pub enum Integration {
     OpenWith,
     Extensions,
     Translate,
+    ScanCode,
     Upload,
     Settings,
 }
@@ -37,6 +38,7 @@ impl ToolbarButton {
             Self::Integration(Integration::Extensions) => Some(Action::Extensions),
             Self::Integration(Integration::Upload) => Some(Action::Upload),
             Self::Integration(Integration::Translate) => Some(Action::Translate),
+            Self::Integration(Integration::ScanCode) => Some(Action::ScanCode),
             Self::Integration(Integration::Settings) => Some(Action::Settings),
             Self::Scroll => Some(Action::ScrollCapture),
             Self::Undo => Some(Action::Undo),
@@ -112,6 +114,7 @@ pub const ACTION_ITEMS: &[ToolbarItem] = &[
     I(B::Scroll),
     I(B::Finish(Finish::Pin)),
     I(B::Tool(Tool::Ocr)),
+    I(B::Integration(Integration::ScanCode)),
     I(B::Integration(Integration::Translate)),
     S,
     I(B::Finish(Finish::Copy)),

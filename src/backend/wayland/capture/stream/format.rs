@@ -3,7 +3,7 @@
 use pipewire::spa::{self, param::video::VideoFormat, pod::Pod};
 
 /// 【PipeWire】【协商参数】用 buffer 序列化原始视频格式集合，返回借用的协议参数
-pub(super) fn build_format_pod(buffer: &mut Vec<u8>) -> &Pod {
+pub(crate) fn build_format_pod(buffer: &mut Vec<u8>) -> &Pod {
     use spa::pod::serialize::PodSerializer;
     use spa::pod::{ChoiceValue, Object, Property, PropertyFlags, Value};
     use spa::sys::*;

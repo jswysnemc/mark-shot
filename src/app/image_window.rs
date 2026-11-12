@@ -7,6 +7,9 @@ use crate::{
 };
 use tiny_skia::Rect;
 
+pub(crate) mod input;
+pub(crate) mod layout;
+
 #[cfg(test)]
 #[path = "image_window_tests.rs"]
 mod tests;
@@ -21,25 +24,27 @@ pub(super) fn prepare(
     let maximum = (placement.size.0 as f32 * 0.9, placement.size.1 as f32 * 0.9);
     let source = (file.original.width() as f32, file.original.height() as f32);
     let factor = (maximum.0 / source.0).min(maximum.1 / source.1).min(1.0);
+    let minimum = layout::minimum();
     let requested = (
-        (source.0 * factor).max(640.0_f32.min(maximum.0)).round() as u32,
-        (source.1 * factor).max(360.0_f32.min(maximum.1)).round() as u32,
+        ((source.0 * factor).round() as u32).max(minimum.0),
+        ((source.1 * factor).round() as u32).max(minimum.1),
     );
-    let window = overlay.configure_image_window(requested);
+    let window = overlay.configure_image_window(requested, minimum);
     overlay.present(&[output])?;
     if window && let Some(size) = overlay.image_window_size() {
         placement.position = (0, 0);
         placement.size = (size.0 as i32, size.1 as i32);
+        let viewport = layout::viewport(size);
         let navigation = crate::features::canvas_navigation::model::Navigation::new(
             (file.original.width(), file.original.height()),
-            size,
+            (viewport.width() as u32, viewport.height() as u32),
             true,
         )
         .ok_or("invalid editor window size")?;
         let fitted = navigation.projection().widget_rect;
         file.viewport = Rect::from_xywh(
-            fitted.x as f32,
-            fitted.y as f32,
+            viewport.left() + fitted.x as f32,
+            viewport.top() + fitted.y as f32,
             fitted.width as f32,
             fitted.height as f32,
         )
@@ -59,9 +64,14 @@ pub(super) fn resize(state: &mut EditorState, size: (u32, u32), dirty: &mut u32)
     }
     state.ensure_navigation();
     state.placements[0].size = (size.0 as i32, size.1 as i32);
-    state.navigation.window = Rect::from_xywh(0.0, 0.0, size.0 as f32, size.1 as f32);
+    let viewport = if state.image_window.enabled {
+        layout::viewport(size)
+    } else {
+        Rect::from_xywh(0.0, 0.0, size.0 as f32, size.1 as f32).unwrap()
+    };
+    state.navigation.window = Some(viewport);
     if let Some(view) = &mut state.navigation.view {
-        view.resize(size, true);
+        view.resize((viewport.width() as u32, viewport.height() as u32), true);
     }
     state.navigation.frames.fill(None);
     state.toolbar.user_position = None;

@@ -23,8 +23,14 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
     } else {
         state.input.pointer.monitor_idx
     };
+    let side_monitor = if !docked && state.action_toolbar.user_position.is_some() {
+        state.action_toolbar.monitor_idx
+    } else {
+        monitor
+    };
     let bounds = state.placements[monitor].size;
     let available = (bounds.0 as f32 - 16.0, bounds.1 as f32 - 16.0);
+    let side_bounds = state.placements[side_monitor].size;
     let hidden = state.selection.zone.is_none() || state.tool_active || state.ui_hidden;
     let old_main = state.toolbar.rect();
     let old_main_monitor = state.toolbar.monitor_idx;
@@ -37,8 +43,15 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
         state.toolbar.marker_filled = state.tool_settings.marker_filled;
         state.toolbar.dirty = true;
     }
-    let main_layout = state.toolbar.arrange(available);
-    let side_layout = state.action_toolbar.arrange(available);
+    let main_layout = if state.image_window.enabled {
+        state.toolbar.orientation = crate::ui::toolbar::Orientation::Horizontal;
+        state.toolbar.arrange((100_000.0, available.1))
+    } else {
+        state.toolbar.arrange(available)
+    };
+    let side_layout = state
+        .action_toolbar
+        .arrange((side_bounds.0 as f32 - 16.0, side_bounds.1 as f32 - 16.0));
     let selection = state.selection.zone.and_then(|rect| {
         state
             .canvas_local_rect(rect, monitor)
@@ -57,7 +70,14 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
         .or(state.toolbar.user_position)
         .unwrap_or_else(|| {
             if state.fullscreen_scope && state.file_canvas.is_some() {
-                return ((bounds.0 as f32 - state.toolbar.size.0) / 2.0, 12.0);
+                return (
+                    (bounds.0 as f32 - state.toolbar.size.0) / 2.0,
+                    if state.image_window.enabled {
+                        crate::ui::image_window::TITLE_HEIGHT + crate::ui::image_window::INSET
+                    } else {
+                        12.0
+                    },
+                );
             }
             let rect = selection.unwrap_or_else(|| {
                 Rect::from_xywh(0.0, 0.0, bounds.0 as f32, bounds.1 as f32).unwrap()
@@ -75,12 +95,7 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
                 y.clamp(8.0, (bounds.1 as f32 - state.toolbar.size.1 - 8.0).max(8.0)),
             )
         });
-    place(&mut state.toolbar, monitor, main_position, hidden);
-    let side_monitor = if state.action_toolbar.user_position.is_some() {
-        state.action_toolbar.monitor_idx
-    } else {
-        monitor
-    };
+    place(&mut state.toolbar, monitor, main_position, bounds, hidden);
     let side_position = dock_positions
         .map(|positions| positions.1)
         .or(state.action_toolbar.user_position)
@@ -99,6 +114,7 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
         &mut state.action_toolbar,
         side_monitor,
         side_position,
+        side_bounds,
         hidden || state.fullscreen_scope,
     );
     let undo = !state.undo_stack.is_empty();
@@ -216,6 +232,7 @@ fn disable(toolbar: &mut Toolbar, undo: bool, redo: bool, clear: bool, busy: boo
                             | crate::ui::toolbar::Integration::Extensions
                             | crate::ui::toolbar::Integration::Upload
                             | crate::ui::toolbar::Integration::Translate
+                            | crate::ui::toolbar::Integration::ScanCode
                             | crate::ui::toolbar::Integration::Settings
                     )
                 }
@@ -233,8 +250,26 @@ fn disable(toolbar: &mut Toolbar, undo: bool, redo: bool, clear: bool, busy: boo
     }
 }
 
-/// 【截图工具栏】【位置设置】同步 toolbar 的 monitor、position、hidden；不保留跨屏移动动画
-fn place(toolbar: &mut Toolbar, monitor: usize, position: (f32, f32), hidden: bool) {
+/// 【截图工具栏】【位置设置】按 bounds 限制 toolbar 的 position，更新 monitor 和 hidden，无返回值
+fn place(
+    toolbar: &mut Toolbar,
+    monitor: usize,
+    position: (f32, f32),
+    bounds: (i32, i32),
+    hidden: bool,
+) {
+    // 1. 【截图工具栏】【边界收敛】手动放置后尺寸仍可能变化，按本栏显示器重新限制整个矩形
+    let position = (
+        position
+            .0
+            .clamp(8.0, (bounds.0 as f32 - toolbar.size.0 - 8.0).max(8.0)),
+        position
+            .1
+            .clamp(8.0, (bounds.1 as f32 - toolbar.size.1 - 8.0).max(8.0)),
+    );
+    if toolbar.user_position.is_some() {
+        toolbar.user_position = Some(position);
+    }
     if toolbar.monitor_idx != monitor
         || toolbar.position != position
         || toolbar.interferes != hidden

@@ -41,6 +41,10 @@ pub(super) fn search_rect(state: &Preferences) -> Rect {
 pub(super) fn close_rect(state: &Preferences) -> Rect {
     rect(state.size.0 as f32 - 42.0, 9.0, 30.0, 30.0)
 }
+/// 【设置导航】【返回位置】按 state 返回标题旁固定按钮范围，不随内容滚动
+pub(super) fn back_rect(state: &Preferences) -> Rect {
+    rect(sidebar(state) + 20.0, 65.0, 68.0, 28.0)
+}
 /// 【设置窗口】【路径位置】按 state 返回底栏可复制路径区域
 pub(super) fn path_rect(state: &Preferences) -> Rect {
     rect(

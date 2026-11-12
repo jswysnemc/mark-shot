@@ -49,12 +49,14 @@ impl ToolBehavior for PickTool {
 
             // nothing selected, nothing was selected > nothing to do
             if selected_annotation.is_none() && state.selected_annotation_index().is_none() {
+                state.input.clicks.clear();
                 state.begin_collection_marquee();
                 return;
             }
 
             // select empty space > deselect
             if selected_annotation.is_none() {
+                state.input.clicks.clear();
                 if let Some(old_idx) = state.selected_annotation_index()
                     && let Some(old_ann) = state.annotations.get(old_idx)
                 {

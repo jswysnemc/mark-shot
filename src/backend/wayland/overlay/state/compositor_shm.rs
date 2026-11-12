@@ -125,7 +125,9 @@ impl OverlayState {
                 return;
             }
         };
-        let defer_image_frame = self.image_window.is_some() && sd.mapped && !transparent_parent;
+        let defer_image_frame = (self.image_window.is_some() && sd.mapped
+            || self.defer_capture_frame)
+            && !transparent_parent;
         if transparent_parent || self.image_window.is_some() && !defer_image_frame {
             shm_buffer.clear(pool);
         }
@@ -160,6 +162,7 @@ impl OverlayState {
 
         sd.shm_buffer = Some(shm_buffer);
         sd.spare_buffer = None;
+        sd.buffer_history = Default::default();
         sd.width = w;
         sd.height = h;
     }

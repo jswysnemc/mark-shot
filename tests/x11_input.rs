@@ -224,7 +224,7 @@ fn xim_preedit_commit_and_fallback_follow_the_current_text_target() {
     let server = RunningServer::start();
     let display = x11::connection::Display::connect().unwrap();
     let mut overlay = x11::overlay::Overlay::new(display.clone()).unwrap();
-    overlay.configure_image_window((400, 300));
+    overlay.configure_image_window((400, 300), (320, 240));
     overlay.present(&[0]).unwrap();
     overlay
         .stage_frame(0, &vec![255; 400 * 300 * 4], None)

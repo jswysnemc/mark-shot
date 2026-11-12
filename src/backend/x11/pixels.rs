@@ -48,11 +48,41 @@ impl Format {
 
     /// 【X11像素】【读取转换】按data、width和height解码服务器像素，返回不透明RGBA或长度错误
     pub fn decode(&self, data: &[u8], width: usize, height: usize) -> crate::AppResult<Vec<u8>> {
+        let mut rgba = Vec::new();
+        self.decode_into(data, width, height, &mut rgba)?;
+        Ok(rgba)
+    }
+
+    /// 【X11像素】【复用读取】按 data、width、height 解码到 rgba，复用容量，返回格式或长度错误
+    pub(crate) fn decode_into(
+        &self,
+        data: &[u8],
+        width: usize,
+        height: usize,
+        rgba: &mut Vec<u8>,
+    ) -> crate::AppResult {
         let stride = self.stride(width);
         if data.len() < stride * height {
             return Err("truncated X11 image".into());
         }
-        let mut rgba = vec![255; width * height * 4];
+        rgba.resize(width * height * 4, 255);
+        if self.bytes == 4 && self.little && self.masks == [0xff0000, 0xff00, 0xff] {
+            for (source, target) in data
+                .chunks_exact(stride)
+                .take(height)
+                .zip(rgba.chunks_exact_mut(width * 4))
+            {
+                for (source, target) in source[..width * 4]
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .zip(target.as_chunks_mut::<4>().0)
+                {
+                    *target = [source[2], source[1], source[0], 255];
+                }
+            }
+            return Ok(());
+        }
         for row in 0..height {
             for column in 0..width {
                 let source = &data[row * stride + column * self.bytes..][..self.bytes];
@@ -72,7 +102,7 @@ impl Format {
                 }
             }
         }
-        Ok(rgba)
+        Ok(())
     }
 
     /// 【X11像素】【写入转换】按rgba和size编码服务器扫描行，返回协议缓冲或尺寸错误
@@ -81,11 +111,35 @@ impl Format {
         if rgba.len() != width * height * 4 {
             return Err("X11 frame dimensions differ from pixels".into());
         }
+        let mut data = Vec::new();
+        self.encode_region(rgba, width, (0, 0, width, height), &mut data);
+        Ok(data)
+    }
+
+    /// 【X11像素】【局部编码】按 rgba、source_width、area 转换指定范围到可复用 data，调用方保证边界有效
+    fn encode_region(
+        &self,
+        rgba: &[u8],
+        source_width: usize,
+        area: (usize, usize, usize, usize),
+        data: &mut Vec<u8>,
+    ) {
+        let (x, y, width, height) = area;
         let stride = self.stride(width);
-        let mut data = vec![0; stride * height];
+        data.resize(stride * height, 0);
+        if self.bytes == 4 && self.little && self.masks == [0xff0000, 0xff00, 0xff] {
+            for row in 0..height {
+                let start = ((y + row) * source_width + x) * 4;
+                crate::utils::copy_swizzled(
+                    &mut data[row * stride..row * stride + width * 4],
+                    &rgba[start..start + width * 4],
+                );
+            }
+            return;
+        }
         for row in 0..height {
             for column in 0..width {
-                let pixel = &rgba[(row * width + column) * 4..][..4];
+                let pixel = &rgba[((y + row) * source_width + x + column) * 4..][..4];
                 let mut value = 0u32;
                 for (channel, mask) in self.masks.iter().copied().enumerate() {
                     value |= ((u32::from(pixel[channel]) * (mask >> mask.trailing_zeros()) + 127)
@@ -103,7 +157,6 @@ impl Format {
                 }
             }
         }
-        Ok(data)
     }
 }
 
@@ -115,39 +168,67 @@ pub fn present(
     size: (u16, u16),
     rgba: &[u8],
 ) -> crate::AppResult {
+    present_region(display, window, gc, size, rgba, None)
+}
+
+/// 【X11像素】【损坏上传】按 damage 只转换并上传变化区域，rgba 保留完整帧，临时缓冲限制在 256KiB 或单行大小
+pub(crate) fn present_region(
+    display: &Display,
+    window: Window,
+    gc: Gcontext,
+    size: (u16, u16),
+    rgba: &[u8],
+    damage: Option<crate::types::DamageRect>,
+) -> crate::AppResult {
+    let width = usize::from(size.0);
+    let height = usize::from(size.1);
+    if rgba.len() != width * height * 4 {
+        return Err("X11 frame dimensions differ from pixels".into());
+    }
+    let (x, y, w, h) = damage.unwrap_or((0, 0, size.0.into(), size.1.into()));
+    let right = x.saturating_add(w).min(size.0.into()) as usize;
+    let bottom = y.saturating_add(h).min(size.1.into()) as usize;
+    let (x, y) = (x as usize, y as usize);
+    if x >= right || y >= bottom {
+        return Ok(());
+    }
     let format = Format::new(
         display,
         display.screen().root_depth,
         display.screen().root_visual,
     )?;
-    let data = format.encode(rgba, size)?;
-    let stride = format.stride(usize::from(size.0));
+    let stride = format.stride(right - x);
     let rows = ((display
         .connection
         .maximum_request_bytes()
-        .saturating_sub(64))
+        .saturating_sub(64)
+        .min(256 * 1024))
         / stride)
         .max(1)
-        .min(usize::from(size.1));
-    for start in (0..usize::from(size.1)).step_by(rows) {
-        let count = rows.min(usize::from(size.1) - start);
-        display
-            .connection
-            .put_image(
-                ImageFormat::Z_PIXMAP,
-                window,
-                gc,
-                size.0,
-                count as u16,
-                0,
-                start as i16,
-                0,
-                display.screen().root_depth,
-                &data[start * stride..(start + count) * stride],
-            )?
-            .check()?;
+        .min(bottom - y);
+    let mut data = Vec::with_capacity(rows * stride);
+    let mut requests = Vec::new();
+    for start in (y..bottom).step_by(rows) {
+        let count = rows.min(bottom - start);
+        format.encode_region(rgba, width, (x, start, right - x, count), &mut data);
+        requests.push(display.connection.put_image(
+            ImageFormat::Z_PIXMAP,
+            window,
+            gc,
+            (right - x) as u16,
+            count as u16,
+            x as i16,
+            start as i16,
+            0,
+            display.screen().root_depth,
+            &data,
+        )?);
     }
+    // 1. 【X11像素】【顺序屏障】先发送整批请求再查询错误，避免每个扫描块独立等待服务器往返
     display.connection.flush()?;
+    for request in requests {
+        request.check()?;
+    }
     Ok(())
 }
 

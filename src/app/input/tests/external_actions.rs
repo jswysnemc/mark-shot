@@ -96,6 +96,7 @@ fn toolbar_integrations_enable_only_implemented_actions_and_repeat_click_closes(
                         | Integration::Extensions
                         | Integration::Upload
                         | Integration::Translate
+                        | Integration::ScanCode
                         | Integration::Settings
                 )
             );

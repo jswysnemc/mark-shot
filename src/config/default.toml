@@ -163,6 +163,7 @@ open_with = []
 extensions = []
 upload = []
 translate = []
+scan_code = []
 pin = "Ctrl+P"
 cancel = "Escape"
 undo = "Ctrl+Z"
@@ -178,6 +179,10 @@ settings = "Ctrl+,"
 clear_annotations = []
 toggle_scope = []
 toggle_toolbar_layout = []
+record_video = "Ctrl+Shift+R"
+record_gif = "Ctrl+Shift+G"
+record_pause = "Ctrl+Shift+P"
+record_stop = "Ctrl+Shift+E"
 size_up = "]"
 size_down = "["
 tool_selection = "S"
@@ -223,7 +228,7 @@ main = [
     "magnifier", "ruler", "laser", "eyedropper", "separator", "clear", "undo", "redo",
 ]
 actions = [
-    "scope", "separator", "open_with", "extensions", "scroll", "pin", "ocr", "translate",
+    "scope", "separator", "open_with", "extensions", "scroll", "pin", "ocr", "scan_code", "translate",
     "separator", "copy", "save_as", "upload", "separator", "settings", "separator", "cancel",
 ]
 main_vertical = false

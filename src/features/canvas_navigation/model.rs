@@ -12,6 +12,7 @@ pub struct Navigation {
     zoom: f64,
     center: Option<Point>,
     rect: Rect,
+    free_pan: bool,
 }
 
 impl Navigation {
@@ -26,6 +27,7 @@ impl Navigation {
             zoom: 1.0,
             center: None,
             rect: Rect::default(),
+            free_pan: false,
         };
         view.refresh(available);
         Some(view)
@@ -52,6 +54,11 @@ impl Navigation {
     /// 【画布导航】【中心读取】返回已初始化的原图中心，选择阶段可以为空，无参数
     pub fn center(self) -> Option<Point> {
         self.center
+    }
+
+    /// 【画布导航】【小图平移】按 enabled 允许小图在窗口留白内移动，截图模式继续沿用居中约束，无返回值
+    pub fn set_free_pan(&mut self, enabled: bool) {
+        self.free_pan = enabled;
     }
 
     /// 【画布导航】【适配比例】返回原图等比适配窗口时的逻辑缩放比例，无参数
@@ -91,7 +98,12 @@ impl Navigation {
         let center = self.center.unwrap_or_else(|| self.image_center());
         let axis = |value: f64, length: f64, scaled: f64, visible: f64| {
             if scaled <= visible {
-                length / 2.0
+                if self.free_pan {
+                    let half = visible / (2.0 * scale);
+                    value.clamp(length - half, half)
+                } else {
+                    length / 2.0
+                }
             } else {
                 let half = visible / (2.0 * scale);
                 value.clamp(half, length - half)
@@ -188,12 +200,20 @@ impl Navigation {
             if active_axes.0 {
                 (f64::from(values.0) + f64::from(self.window_size.0) / 2.0) / scale
             } else {
-                self.image_center().0
+                if self.free_pan {
+                    self.center.unwrap_or_else(|| self.image_center()).0
+                } else {
+                    self.image_center().0
+                }
             },
             if active_axes.1 {
                 (f64::from(values.1) + f64::from(self.window_size.1) / 2.0) / scale
             } else {
-                self.image_center().1
+                if self.free_pan {
+                    self.center.unwrap_or_else(|| self.image_center()).1
+                } else {
+                    self.image_center().1
+                }
             },
         ));
         self.refresh(available);

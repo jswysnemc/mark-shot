@@ -126,6 +126,8 @@ pub(crate) fn start(
             std::panic::catch_unwind(|| detect(&captures, &placements, space))
                 .unwrap_or_else(|_| Err("region detection worker panicked".into()))
         };
+        // 2. 【截图区域识别】【分析回收】临时边缘与形态学数组已经释放，一次性归还空闲堆页，不进入交互帧循环
+        crate::utils::memory::release_unused();
         if !flag.load(Ordering::Relaxed) && sender.send(result).is_ok() {
             wake.notify();
         }

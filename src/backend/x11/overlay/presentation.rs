@@ -15,6 +15,39 @@ use x11rb::{
 };
 
 impl ScreenOverlay for Overlay {
+    /// 【X11截图场景】【能力启用】按 captures 验证截图角色，返回是否使用稀疏前景，无额外协议要求
+    fn enable_capture_scene(
+        &mut self,
+        _captures: &mut [crate::types::Capture],
+    ) -> crate::AppResult<bool> {
+        Ok(self.image_size.is_none())
+    }
+
+    /// 【X11截图场景】【直接交付】按 monitor_idx/frame 组合到曝光帧并局部上传，首次呈现设置焦点，返回协议结果
+    fn stage_capture_scene(
+        &mut self,
+        monitor_idx: usize,
+        frame: crate::types::capture_scene::Frame<'_>,
+    ) -> crate::AppResult {
+        let surface = &mut self
+            .surfaces
+            .get_mut(monitor_idx)
+            .ok_or("X11 scene surface missing")?
+            .1;
+        let first = !surface.mapped;
+        surface.present_scene(frame)?;
+        if first {
+            self.display
+                .connection
+                .set_input_focus(
+                    InputFocus::POINTER_ROOT,
+                    surface.window,
+                    x11rb::CURRENT_TIME,
+                )?
+                .check()?;
+        }
+        Ok(())
+    }
     /// 【X11覆盖层】【输入法同步】按snapshot接入当前正文输入法，空值关闭上下文，返回协议结果
     fn set_text_input(
         &mut self,
@@ -78,9 +111,18 @@ impl ScreenOverlay for Overlay {
         self.scroll_frame(monitor_idx, frame)
     }
     /// 【X11覆盖层】【图片窗口】按size选择普通窗口角色，返回支持状态
-    fn configure_image_window(&mut self, size: (u32, u32)) -> bool {
+    fn configure_image_window(&mut self, size: (u32, u32), minimum: (u32, u32)) -> bool {
         self.image_size = Some(size);
+        self.image_minimum = minimum;
         true
+    }
+    /// 【X11图片窗口】【系统操作】按 action 执行窗口管理器请求，serial 在 X11 不使用，返回协议结果
+    fn image_window_action(
+        &mut self,
+        action: crate::types::image_window::Action,
+        _serial: Option<u32>,
+    ) -> crate::AppResult {
+        self.image_action(action)
     }
     /// 【X11覆盖层】【窗口尺寸】无参数，返回当前图片窗口尺寸
     fn image_window_size(&self) -> Option<(u32, u32)> {
@@ -120,6 +162,9 @@ impl ScreenOverlay for Overlay {
                     self.image_size.is_none(),
                 )?,
             ));
+            if self.image_size.is_some() {
+                self.prepare_image_window()?;
+            }
         }
         Ok(())
     }
@@ -128,7 +173,7 @@ impl ScreenOverlay for Overlay {
         &mut self,
         monitor_idx: usize,
         pixels: &[u8],
-        _damage: Option<DamageRect>,
+        damage: Option<DamageRect>,
     ) -> crate::AppResult {
         let surface = &mut self
             .surfaces
@@ -136,7 +181,7 @@ impl ScreenOverlay for Overlay {
             .ok_or("X11 overlay surface missing")?
             .1;
         let first = !surface.mapped;
-        surface.present(pixels)?;
+        surface.present_region(pixels, damage)?;
         if first {
             self.display
                 .connection

@@ -116,6 +116,10 @@ impl Pin {
                     self.resize(false, qh);
                 }
                 PinAction::Edit => actions::open(&self.image.png()?, false)?,
+                PinAction::ScanCode => crate::features::code_scan::transport::spawn_from_pin(
+                    &self.image.png()?,
+                    self.image.always_on_top,
+                )?,
                 PinAction::Copy => crate::backend::initialize_clipboard()
                     .copy_image_to_clipboard(&self.image.png()?)?,
                 PinAction::CopySelectedText => {

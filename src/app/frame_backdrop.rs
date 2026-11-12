@@ -44,13 +44,53 @@ pub(super) fn compose(editor: &mut EditorState, monitor: usize, damage: Option<D
     crate::renderer::opaque_backdrop::compose(&capture.pixmap, &mut editor.canvas[monitor], damage);
 }
 
-/// 【截图绘制】【背景提交】按editor、overlay、monitor和damage交付帧，返回协议结果；明确支持消费时归还已交付前景，其他接口保留CPU内容
+/// 【截图绘制】【背景提交】按editor、overlay、monitor和damage交付帧，reclaim_transparent控制透明页检查，返回协议结果；其他接口保留原所有权
 pub(super) fn stage(
     editor: &mut EditorState,
     overlay: &mut dyn ScreenOverlay,
     monitor: usize,
     damage: Option<DamageRect>,
+    reclaim_transparent: bool,
 ) -> crate::AppResult {
+    if editor.region_rendering.native_scene {
+        let identity = editor.canvas_transform().is_identity();
+        if identity && editor.region_rendering.baked_background {
+            crate::renderer::opaque_backdrop::compose(
+                &editor.captures[monitor].pixmap,
+                &mut editor.canvas[monitor],
+                damage,
+            );
+        }
+        let placement = &editor.placements[monitor];
+        let local = |rect| crate::tools::selection::global_selection_to_local(&rect, placement);
+        let selection = editor.selection.zone.and_then(local);
+        let hovered = editor
+            .region_detection
+            .hovered
+            .filter(|_| editor.region_rendering.native_hover)
+            .and_then(local);
+        let opaque = !identity || editor.region_rendering.baked_background;
+        overlay.stage_capture_scene(
+            monitor,
+            crate::types::capture_scene::Frame {
+                foreground: &mut editor.canvas[monitor],
+                background: &editor.captures[monitor].pixmap,
+                damage,
+                selection,
+                hovered,
+                opaque,
+            },
+        )?;
+        if !opaque && reclaim_transparent {
+            let size = &editor.canvas[monitor];
+            let (x, y, width, height) = damage.unwrap_or((0, 0, size.width(), size.height()));
+            if let Some(area) = tiny_skia::IntRect::from_xywh(x as i32, y as i32, width, height) {
+                // 1. 【截图场景】【透明页归还】交付成功并获得定期检查许可后回收相交全零页，保留非零前景及尚未提交输出
+                crate::utils::transparent_pixmap::reclaim_region(&mut editor.canvas[monitor], area);
+            }
+        }
+        return Ok(());
+    }
     if !editor.canvas_transform().is_identity() {
         return overlay.stage_opaque_frame(monitor, editor.canvas[monitor].data(), damage);
     }

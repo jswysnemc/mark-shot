@@ -65,6 +65,16 @@ impl Overlay {
 }
 
 impl ScreenOverlay for Overlay {
+    /// 【帧生命周期测试】【场景交付】按 monitor/frame 执行各平台共用的软件场景合成，返回实际像素结果
+    fn stage_capture_scene(
+        &mut self,
+        monitor: usize,
+        frame: crate::types::capture_scene::Frame<'_>,
+    ) -> AppResult {
+        crate::backend::software_scene::compose(&frame, &mut self.frames[monitor], true)?;
+        self.sent += 1;
+        Ok(())
+    }
     /// 【帧生命周期测试】【背景能力】无参数，返回支持原始网格背景合成
     fn supports_native_frame_background(&self) -> bool {
         true

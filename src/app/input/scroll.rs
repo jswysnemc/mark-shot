@@ -23,6 +23,11 @@ pub fn handle_axis_scroll(
     event: crate::types::ScrollEvent,
     dirty_mask: &mut u32,
 ) {
+    if crate::app::capture_start::input::hit(editor_state).is_some()
+        || editor_state.capture_start.pressed.is_some()
+    {
+        return;
+    }
     if editor_state
         .color_inspector
         .panel

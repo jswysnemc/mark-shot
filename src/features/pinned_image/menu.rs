@@ -12,6 +12,7 @@ pub enum PinAction {
     Copy,
     CopySelectedText,
     CopyImageText,
+    ScanCode,
     TextSelection,
     Translate,
     OpenTranslationWindow,
@@ -80,6 +81,10 @@ pub const ITEMS: &[MenuItem] = &[
     MenuItem {
         label: "Copy Image Text",
         action: Some(A::CopyImageText),
+    },
+    MenuItem {
+        label: "Scan QR / barcode",
+        action: Some(A::ScanCode),
     },
     MenuItem {
         label: "Text Selection Copy",

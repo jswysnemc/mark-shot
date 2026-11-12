@@ -92,6 +92,7 @@ impl Window {
             minimum: options.minimum,
             layered: options.layered,
             activate: options.activate,
+            image_window: Cell::new(false),
             cursor: Cell::new(cursor),
             owner: std::thread::current().id(),
             inside: Cell::new(false),
@@ -145,6 +146,32 @@ impl Window {
     /// 【Windows窗口】【句柄借用】无参数，返回原生句柄值，调用方不得关闭窗口或替换其用户数据
     pub fn handle(&self) -> isize {
         self.hwnd as isize
+    }
+
+    /// 【Windows图片窗口】【可调整边框】无参数，启用系统移动缩放与最小最大化，自绘客户区保留全部尺寸，返回系统错误
+    pub fn enable_image_frame(&mut self) -> io::Result<()> {
+        self.context.image_window.set(true);
+        unsafe {
+            let style = GetWindowLongPtrW(self.hwnd, GWL_STYLE) as u32;
+            SetWindowLongPtrW(
+                self.hwnd,
+                GWL_STYLE,
+                (style | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU) as isize,
+            );
+            if SetWindowPos(
+                self.hwnd,
+                std::ptr::null_mut(),
+                0,
+                0,
+                0,
+                0,
+                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER,
+            ) == 0
+            {
+                return Err(super::last_error());
+            }
+        }
+        Ok(())
     }
 
     /// 【Windows窗口】【原生边界】无参数，返回当前物理屏幕位置和尺寸，不推测窗口管理器布局

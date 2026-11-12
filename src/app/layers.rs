@@ -14,6 +14,11 @@ pub(super) fn build_with_transparency(
     for placement in placements {
         let (width, height) = placement.px_size();
         let mut output = Pixmap::new(width, height).expect("cannot allocate output canvas");
+        crate::utils::transparent_pixmap::prepare_sparse(&mut output);
+        #[cfg(target_os = "linux")]
+        if transparent {
+            crate::utils::transparent_pixmap::clear(&mut output);
+        }
         if !transparent {
             renderer::init_dimming(&mut output, None, None, placement.scale);
         }

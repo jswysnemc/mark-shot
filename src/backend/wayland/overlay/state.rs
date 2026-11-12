@@ -30,6 +30,7 @@ use smithay_client_toolkit::output::OutputState;
 use smithay_client_toolkit::shm::Shm;
 
 pub struct OverlayState {
+    pub(crate) defer_capture_frame: bool,
     pub(super) primary_selection: primary_selection::PrimarySelection,
     pub text_input: crate::backend::wayland::text_input::TextInput,
     pub popup: Option<crate::backend::wayland::overlay_popup::OverlayPopup>,
@@ -62,6 +63,8 @@ pub struct OverlayState {
     // ── ui & input state ─────────────────────────────────────────────────────────
     pub surfaces: HashMap<usize, SurfaceData>,
     pub image_window: Option<(u32, u32)>,
+    pub image_minimum: (u32, u32),
+    pub image_maximized: bool,
     pub events: VecDeque<OverlayEvent>,
     pub scale: f64,
     pub pending_flush: bool,
@@ -165,6 +168,7 @@ impl OverlayState {
     ) -> Self {
         Self {
             primary_selection: Default::default(),
+            defer_capture_frame: false,
             text_input: Default::default(),
             popup: None,
             popup_grabs: VecDeque::new(),
@@ -188,6 +192,8 @@ impl OverlayState {
             outputs: Vec::new(),
             surfaces: HashMap::new(),
             image_window: None,
+            image_minimum: (320, 240),
+            image_maximized: false,
             events: VecDeque::new(),
             frac_scale: None,
             pointer_surface_idx: None,

@@ -58,6 +58,7 @@ impl WindowHandler for OverlayState {
                 .find(|surface| &surface.surface == window.wl_surface())
         {
             let actual = (surface.width, surface.height);
+            self.image_maximized = configure.is_maximized();
             self.image_window = Some(actual);
             window.set_window_geometry(0, 0, actual.0, actual.1);
             self.events

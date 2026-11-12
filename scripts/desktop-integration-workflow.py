@@ -62,6 +62,8 @@ def verify(runtime, watcher):
         """【桌面集成回归】【真实触发】按key或activate触发截图并关闭，验证新窗口实际映射，无返回值"""
         assert not windows()
         if key:
+            # 1. 【桌面集成回归】【防抖间隔】独立触发之间超过生产端四百毫秒防抖，快速构建不能吞掉第二次测试
+            time.sleep(0.45)
             runtime.command("xdotool", "key", key)
         else:
             activate()

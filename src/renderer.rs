@@ -11,6 +11,7 @@ mod dimming;
 pub(crate) mod editor_text;
 mod frame_scene;
 pub mod frozen_image;
+pub(crate) mod navigation_background;
 pub(crate) mod opaque_backdrop;
 pub use dimming::init_dimming;
 use dimming::{blit_rect, update_dimming_delta};
@@ -177,10 +178,12 @@ pub(crate) fn render_frame_with_collection(
         false,
         None,
         None,
+        None,
+        None,
     );
 }
 
-/// 【画布导航】【帧合成】按req与view绘制画布，叠层参数提供控件；background_changed重采样背景，original_text_id排除编辑原件，无返回值
+/// 【画布导航】【帧合成】按req与view绘制画布，叠层参数提供控件；background_changed重采样背景，original_text_id排除编辑原件，image_header隔离窗口工具区，navigation_cache保存稳定局部背景，无返回值
 pub(crate) fn render_frame_with_navigation(
     req: &mut RenderRequest,
     selection_size: Option<crate::ui::selection_size::cache::Overlay<'_>>,
@@ -190,6 +193,8 @@ pub(crate) fn render_frame_with_navigation(
     background_changed: bool,
     original_text_id: Option<u64>,
     region: Option<&crate::editor::region_rendering::State>,
+    image_header: Option<Rect>,
+    navigation_cache: Option<&std::cell::RefCell<navigation_background::TileCache>>,
 ) {
     let s = req.scale;
     let dirty_rect = req.dirty_rect;
@@ -223,6 +228,7 @@ pub(crate) fn render_frame_with_navigation(
             annotation_delete,
             collection.as_ref(),
             region,
+            navigation_cache,
         );
     }
 
@@ -230,6 +236,12 @@ pub(crate) fn render_frame_with_navigation(
         .with_scale(s)
         .with_icons(req.icons_cache)
         .with_text(req.text.font_system, req.text.swash_cache);
+
+    if let Some(header) = image_header {
+        p.clipped(dirty_rect.copied(), |p| {
+            p.fill_rounded(header, 0.0, crate::theme::window::Palette::current().window)
+        });
+    }
 
     if let Some(overlay) = selection_size
         .as_ref()

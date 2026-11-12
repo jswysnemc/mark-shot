@@ -10,6 +10,7 @@ impl WaylandOverlay {
         }
         // 1. 【滚动截图】【输入释放】先销毁独占焦点的原表面，再建立按需焦点表面
         self.suspend_surfaces()?;
+        self.runtime.state.defer_capture_frame = false;
         self.scrolling = Some(monitor_idx);
         self.resume_surfaces()?;
         log::info!("【滚动截图】【输入角色】已释放独占键盘，目标表面={monitor_idx}");

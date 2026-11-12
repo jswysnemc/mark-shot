@@ -79,6 +79,7 @@ pub enum Command {
     ListDisplays,
     History,
     Settings,
+    CodeScan { path: PathBuf, json: bool },
     Recording(crate::features::recording::Target),
     RecordingControl(String),
     HistoryEdit(String),
@@ -157,6 +158,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
         crate::ocr::daemon::DAEMON_ARG,
         crate::features::ocr_result::transport::RESULT_ARG,
         crate::features::ocr_result::floating::ARG,
+        crate::features::code_scan::transport::ARG,
         crate::features::capture_history::transport::READY_ARG,
         crate::features::preferences::READY_ARG,
         crate::features::pinned_image::recognition::WORKER_ARG,
@@ -190,9 +192,17 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
     let list_displays = args.contains("--list-displays");
     let history = args.contains("--history");
     let settings = args.contains("--settings");
+    let code_scan = args.contains("--scan") | args.contains("--scan-code");
+    let scan_json = args.contains("--scan-json");
+    if code_scan && scan_json {
+        return Err("--scan and --scan-json are mutually exclusive".into());
+    }
     let recording = args.contains("--record");
     let record_select = args.contains("--record-select");
     let record_target: Option<String> = args.opt_value_from_str("--record-target")?;
+    let record_target: Option<crate::features::recording::Target> = record_target
+        .map(|value| serde_json::from_str(&value))
+        .transpose()?;
     let controls: Vec<_> = [
         ("--recording-status", "status"),
         ("--pause-recording", "pause"),
@@ -202,7 +212,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
     .into_iter()
     .filter_map(|(flag, action)| args.contains(flag).then_some(action))
     .collect();
-    if controls.len() > 1 || (record_target.is_some() && !recording) {
+    if controls.len() > 1 || (record_target.is_some() && !recording && !record_select) {
         return Err("conflicting recording options / 录制参数冲突".into());
     }
     let history_edit: Option<String> = args.opt_value_from_str("--history-edit")?;
@@ -283,6 +293,15 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
         return Err("only one image file may be opened".into());
     }
     let image = rest.pop().map(PathBuf::from);
+    if scan_json && image.is_none() {
+        return Err("--scan-json requires an image file".into());
+    }
+    if (code_scan || scan_json) && (record_select || quick_ocr || output.is_some() || to.is_some())
+    {
+        return Err("scan cannot be combined with recording, OCR or capture output actions".into());
+    }
+    let scan_file = (code_scan || scan_json) && image.is_some();
+    let quick_region = quick_region || (code_scan && !scan_file);
     let modes = [full, window, quick_region, ocr, scroll]
         .into_iter()
         .filter(|enabled| *enabled)
@@ -295,6 +314,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
         list_displays,
         history,
         settings,
+        scan_file,
         recording,
         !controls.is_empty(),
         history_edit.is_some(),
@@ -306,7 +326,9 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
     .into_iter()
     .filter(|enabled| *enabled)
     .count();
-    if commands > 1 || (commands > 0 && (image.is_some() || modes > 0 || fullscreen)) {
+    if commands > 1
+        || (commands > 0 && ((image.is_some() && !scan_file) || modes > 0 || fullscreen))
+    {
         return Err(
             "capture, history, display listing, pinning and image editing are mutually exclusive"
                 .into(),
@@ -348,7 +370,12 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
     } else {
         Mode::Editor
     };
-    let command = if let Some(destination) = capture_to {
+    let command = if scan_file {
+        Command::CodeScan {
+            path: image.unwrap(),
+            json: scan_json,
+        }
+    } else if let Some(destination) = capture_to {
         if output.is_some() || to.is_some() {
             return Err("--capture-to cannot be combined with --output or --to".into());
         }
@@ -363,12 +390,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
             speed,
         })
     } else if recording {
-        Command::Recording(
-            record_target
-                .map(|value| serde_json::from_str(&value))
-                .transpose()?
-                .unwrap_or_default(),
-        )
+        Command::Recording(record_target.unwrap_or_default())
     } else if let Some(action) = controls.first() {
         Command::RecordingControl((*action).into())
     } else if list_displays {
@@ -405,6 +427,8 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
             file_default_tool,
             default_color,
             record_select,
+            record_format: record_target.and_then(|target| target.format),
+            code_scan,
         })
     };
     Ok(Arguments {

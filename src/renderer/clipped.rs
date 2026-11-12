@@ -63,8 +63,10 @@ impl Painter<'_> {
         // 3. 【局部绘制】【单次覆盖】只替换当前损坏范围，区域外像素完全不参与重复合成
         for row in 0..height as usize {
             let start = (y as usize + row) * stride + x as usize * 4;
-            self.canvas.data_mut()[start..start + local_stride]
-                .copy_from_slice(&local.data()[row * local_stride..(row + 1) * local_stride]);
+            crate::utils::transparent_pixmap::copy_changed(
+                &mut self.canvas.data_mut()[start..start + local_stride],
+                &local.data()[row * local_stride..(row + 1) * local_stride],
+            );
         }
     }
 }

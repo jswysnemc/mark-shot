@@ -1,99 +1,74 @@
-//! 【录制窗口】【紧凑控制】复用原生窗口与统一控件，不保留视频预览帧
+//! 【录制窗口】【流程编排】准备窗口、倒计时小组件与后台会话顺序衔接，界面关闭后录制继续
 
-mod draw;
-mod events;
-mod layout;
+mod background;
+mod countdown;
+mod fonts;
+mod host;
+mod setup;
+mod summary;
 
-use super::{Status, Target, controller::Controller, ipc::Server};
-use crate::{
-    backend::window::{self, WindowSpec},
-    config::recording::Recording,
-    ui::fonts::UiFonts,
-};
+use super::Target;
+use crate::config::recording::Recording;
+use host::{Host, Shared};
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
-pub(super) struct Recorder {
-    config: Recording,
-    target: Target,
-    controller: Option<Controller>,
-    server: Server,
-    fonts: UiFonts,
-    cache: cosmic_text::SwashCache,
-    icons: crate::renderer::Icons,
-    size: (u32, u32),
-    pointer: (f64, f64),
-    pressed: Option<layout::Control>,
-    status: Status,
-    close_after_stop: bool,
-    stop_requested: bool,
-    error_scroll: usize,
-    settings_opened: bool,
-    deadline: Option<std::time::Instant>,
-}
+/// 小组件销毁请求发出后等待合成器刷新一帧的时间，保证采集的第一帧不含小组件
+const SETTLE: Duration = Duration::from_millis(60);
 
-impl Recorder {
-    /// 【录制窗口】【界面语言】无参数，返回是否使用中文
-    fn chinese(&self) -> bool {
-        crate::ui::language::Language::current() == crate::ui::language::Language::Chinese
-    }
-
-    /// 【录制窗口】【活动判断】无参数，返回设备或导出线程是否仍在工作
-    fn active(&self) -> bool {
-        self.controller
-            .as_ref()
-            .is_some_and(|controller| !controller.finished())
-    }
-
-    /// 【录制窗口】【选项保存】无参数，逐字段写入当前配置，保留其他设置，返回保存错误
-    fn save(&self) -> crate::AppResult {
-        let values = serde_json::to_value(&self.config)?;
-        let changes = values
-            .as_object()
-            .unwrap()
-            .iter()
-            .map(|(key, value)| (format!("recording.{key}"), value.clone()))
-            .collect::<Vec<_>>();
-        let path = crate::config::preferences::path()?;
-        crate::config::settings_store::write(&path, &changes)?;
-        crate::config::preferences::reload(&path)?;
-        Ok(())
-    }
-}
-
-/// 【录制窗口】【启动】按 target 创建独立窗口，返回配置、独占锁或平台窗口错误
-pub(super) fn run(target: Target) -> crate::AppResult {
-    let icons = [crate::ui::icons::CLOSE, crate::ui::icons::VIDEO]
-        .into_iter()
-        .filter_map(|svg| {
-            usvg::Tree::from_str(svg, &usvg::Options::default())
-                .ok()
-                .map(|tree| (svg, tree))
-        })
-        .collect();
-    let recorder = Recorder {
-        config: crate::config::preferences::current().recording.clone(),
-        target,
-        controller: None,
-        server: Server::new()?,
-        fonts: UiFonts::with_system_family("Sans Serif"),
-        cache: cosmic_text::SwashCache::new(),
-        icons,
-        size: (560, 420),
-        pointer: (-1.0, -1.0),
-        pressed: None,
-        status: Status::default(),
-        close_after_stop: false,
-        stop_requested: false,
-        error_scroll: 0,
-        settings_opened: false,
-        deadline: None,
-    };
-    window::run(
-        WindowSpec {
-            title: "Mark Shot — Recording".into(),
-            app_id: "mark-shot-recording".into(),
-            size: recorder.size,
-            minimum: (480, 420),
-        },
-        recorder,
+/// 【录制窗口】【目标摘要】按 host 和 config 返回倒计时小组件显示的目标与格式说明
+fn describe(host: &Shared, config: &Recording) -> String {
+    let cn = crate::ui::language::Language::current() == crate::ui::language::Language::Chinese;
+    // 格式与帧率在前，目标说明较长时由小组件截断末尾
+    format!(
+        "{} · {}",
+        summary::format(config),
+        summary::target(host.borrow().target(), cn)
     )
+}
+
+/// 【录制窗口】【启动】按 target 打开准备窗口，开始后关闭界面转入后台，返回配置、独占锁或平台窗口错误
+///
+/// 录制失败或倒计时被取消时回到准备窗口，成功保存后进程退出
+pub(super) fn run(target: Target) -> crate::AppResult {
+    let host: Shared = Rc::new(RefCell::new(Host::new(target)?));
+    let fonts = fonts::shared();
+    let mut failure = None;
+    loop {
+        // 1. 【录制窗口】【准备阶段】用户确认选项；直接关闭或转去框选区域时结束本进程
+        setup::run(host.clone(), fonts.clone(), failure.take())?;
+        let Some(config) = host.borrow_mut().take_request() else {
+            return Ok(());
+        };
+        // 2. 【录制窗口】【倒计时阶段】只在设置了倒计时时显示小组件；取消回到准备窗口，小组件故障不阻止录制
+        if config.countdown > 0 {
+            let duration = Duration::from_secs(u64::from(config.countdown));
+            match countdown::run(fonts.clone(), duration, describe(&host, &config)) {
+                Ok(true) => std::thread::sleep(SETTLE),
+                Ok(false) => continue,
+                Err(error) => log::error!("【录制窗口】【倒计时小组件】{error}"),
+            }
+        }
+        // 3. 【录制窗口】【后台阶段】没有任何界面，暂停、继续和停止来自截图界面、托盘或命令行
+        if let Err(error) = host.borrow_mut().start(config) {
+            failure = Some(error);
+            continue;
+        }
+        let status = background::wait(&host);
+        match status.phase.as_str() {
+            "finished" => {
+                background::finished(&status);
+                return Ok(());
+            }
+            "cancelled" => {}
+            _ => {
+                failure = Some(if status.detail.is_empty() {
+                    status.phase.clone()
+                } else {
+                    status.detail.clone()
+                });
+            }
+        }
+        // 4. 【录制窗口】【返回准备】取消或失败后释放已结束的会话，保留目标供再次开始
+        host.borrow_mut().reset();
+    }
 }

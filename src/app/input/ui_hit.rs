@@ -151,6 +151,32 @@ pub(in crate::app) fn hit_test_ui(editor_state: &EditorState, local: (f64, f64))
 
 /// 【界面】【光标选择】依据 editor_state 的弹层、按钮和工具状态返回光标类型
 pub fn compute_cursor(editor_state: &EditorState) -> CursorIcon {
+    if let Some(control) = crate::app::capture_start::input::hit(editor_state) {
+        return if control == crate::ui::capture_start::Control::Background {
+            CursorIcon::Default
+        } else {
+            CursorIcon::Pointer
+        };
+    }
+    if editor_state.image_window.enabled
+        && let Some(hit) = crate::ui::image_window::hit(
+            (
+                editor_state.placements[0].size.0 as u32,
+                editor_state.placements[0].size.1 as u32,
+            ),
+            editor_state.input.pointer.local,
+        )
+    {
+        use crate::{backend::window::WindowEdge, ui::image_window::Hit};
+        return match hit {
+            Hit::Move => CursorIcon::Default,
+            Hit::Resize(WindowEdge::Top | WindowEdge::Bottom) => CursorIcon::NsResize,
+            Hit::Resize(WindowEdge::Left | WindowEdge::Right) => CursorIcon::EwResize,
+            Hit::Resize(WindowEdge::TopLeft | WindowEdge::BottomRight) => CursorIcon::NwseResize,
+            Hit::Resize(_) => CursorIcon::NeswResize,
+            _ => CursorIcon::Pointer,
+        };
+    }
     if editor_state.color_inspector.panel.is_some() {
         return if editor_state
             .color_inspector

@@ -3,7 +3,7 @@
 use super::*;
 
 impl ToolBehavior for TextTool {
-    /// 【文字事务】【工具点击】按 state 的 button、pressed 开始新建或重新编辑，dirty 返回范围；文字区域不启动标注拖动
+    /// 【文字事务】【工具点击】按 state 的 button、pressed 新建文字或选择已有对象，dirty 返回范围；已有文字仅双击编辑
     fn on_button(
         &self,
         state: &mut EditorState,
@@ -11,23 +11,24 @@ impl ToolBehavior for TextTool {
         pressed: bool,
         dirty: &mut u32,
     ) {
-        if !matches!(button, MouseButton::Left) || !pressed {
+        if !matches!(button, MouseButton::Left) {
             return;
         }
         if state.text_session.is_some() {
             return;
         }
-        if let Some(id) = state
-            .annotations
-            .iter()
-            .rev()
-            .find(|annotation| {
-                matches!(annotation.shape, AnnotationShape::Text { .. })
-                    && annotation.initial_hit_test(state.canvas_point())
-            })
-            .map(|annotation| annotation.id)
-        {
-            crate::editor::text_session::begin_existing(state, id, dirty);
+        if !pressed {
+            crate::editor::annotation_drag::commit_drag_if_changed(state);
+            return;
+        }
+        if state.annotations.iter().rev().any(|annotation| {
+            matches!(annotation.shape, AnnotationShape::Text { .. })
+                && (state.canvas_body_hit(annotation, state.canvas_point())
+                    || state.selected_annotation_ids().contains(&annotation.id)
+                        && state.canvas_handle(annotation, state.canvas_point())
+                            != crate::types::SelectionHandle::None)
+        }) {
+            crate::tools::pick::PickTool.on_button(state, button, pressed, dirty);
             return;
         }
         let Some(space) = crate::tools::drawing_space::DrawingSpace::from_editor(state) else {
@@ -44,6 +45,7 @@ impl ToolBehavior for TextTool {
         }) {
             return;
         }
+        state.input.clicks.clear();
         crate::editor::text_session::begin_new(state, point, 1.0 / space.pixel_scale, dirty);
     }
 

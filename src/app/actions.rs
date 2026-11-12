@@ -42,6 +42,7 @@ pub fn run(editor_state: &mut EditorState, action: Action, dirty_mask: &mut u32)
             | Action::OpenWith
             | Action::Extensions
             | Action::Upload
+            | Action::ScanCode
     ) {
         crate::editor::text_session::commit(editor_state, dirty_mask);
     }
@@ -63,6 +64,10 @@ pub fn run(editor_state: &mut EditorState, action: Action, dirty_mask: &mut u32)
         || editor_state.color_popover.hue_dragging
         || editor_state.color_popover.alpha_dragging;
     match action {
+        Action::RecordVideo | Action::RecordGif | Action::RecordPause | Action::RecordStop => {
+            super::capture_start::input::shortcut(editor_state, action, dirty_mask);
+        }
+        Action::ScanCode => super::code_scan::open(editor_state, dirty_mask),
         Action::Translate => super::selection_translation::toggle(editor_state, dirty_mask),
         Action::Upload => super::upload::request(editor_state, dirty_mask),
         Action::OpenWith => super::external_actions::toggle(

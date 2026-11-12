@@ -1,8 +1,10 @@
 pub mod annotations;
 pub mod capture;
+pub mod capture_scene;
 pub mod cursor;
 pub mod events;
 pub mod frozen_pixmap;
+pub mod image_window;
 #[cfg(target_os = "linux")]
 pub mod linux_output;
 pub mod marker_shape;

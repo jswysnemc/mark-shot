@@ -60,15 +60,37 @@ pub trait ClipboardProvider {
 pub(crate) mod composited_pixels;
 #[cfg(any(target_os = "windows", test))]
 pub(crate) mod native_backdrop;
+pub(crate) mod software_scene;
 
 pub trait ScreenOverlay {
+    /// 【截图场景】【能力启用】按 captures 准备共享原图，返回是否支持独立背景和稀疏前景；只在截图呈现前调用
+    fn enable_capture_scene(&mut self, _captures: &mut [Capture]) -> crate::AppResult<bool> {
+        Ok(false)
+    }
+
+    /// 【截图场景】【组合提交】按 monitor_idx 和 frame 提交背景、遮罩与前景，返回协议结果，前景像素由调用方持续保留
+    fn stage_capture_scene(
+        &mut self,
+        _monitor_idx: usize,
+        _frame: crate::types::capture_scene::Frame<'_>,
+    ) -> crate::AppResult {
+        Err("native capture scenes are unavailable".into())
+    }
     /// 【图片编辑】【窗口角色】按 size 请求普通可调整窗口，返回后端是否支持；必须在 present 前调用
-    fn configure_image_window(&mut self, _size: (u32, u32)) -> bool {
+    fn configure_image_window(&mut self, _size: (u32, u32), _minimum: (u32, u32)) -> bool {
         false
     }
     /// 【图片编辑】【实际窗口】返回合成器确认的逻辑尺寸，非图片窗口返回空值
     fn image_window_size(&self) -> Option<(u32, u32)> {
         None
+    }
+    /// 【图片窗口】【系统交互】按 action 和按下 serial 执行窗口管理操作，返回后端结果，不改变图片内容
+    fn image_window_action(
+        &mut self,
+        _action: crate::types::image_window::Action,
+        _serial: Option<u32>,
+    ) -> crate::AppResult {
+        Err("image window actions are unavailable".into())
     }
     /// 【截图绘制】【原生背景能力】无参数，返回后端是否能够在原生缓冲中合成同网格冻结背景
     fn supports_native_frame_background(&self) -> bool {

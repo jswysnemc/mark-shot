@@ -168,6 +168,9 @@ pub fn handle_key(
         super::super::actions::run(editor_state, action, dirty_mask);
         return;
     }
+    if !claimed && super::super::selection_history::key(editor_state, chord, dirty_mask) {
+        return;
+    }
 
     if let Some(key) = special {
         handle_key_press(editor_state, key, dirty_mask);

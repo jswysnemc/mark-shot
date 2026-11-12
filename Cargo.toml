@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/shot-image", "crates/shot-stitch"]
+members = ["crates/shot-image", "crates/shot-stitch", "crates/shot-media"]
 resolver = "3"
 
 [package]
@@ -50,15 +50,20 @@ tempfile = "3.27"
 notify = "8.2"
 shot-image = { path = "crates/shot-image" }
 shot-stitch = { path = "crates/shot-stitch" }
+shot-media = { path = "crates/shot-media" }
 i_overlay = { version = "=4.2.2", default-features = false }
 kurbo = "=0.13.1"
 reqwest = { version = "0.12", default-features = false, features = ["native-tls", "json", "hickory-dns"] }
 md-5 = "0.10"
 url = "2"
+rxing = { version = "0.9.4", default-features = false, features = ["decoders", "full_barcode_format_support", "multi_barcode_readers", "encoding_rs"] }
+
+[dev-dependencies]
+rxing = { version = "0.9.4", default-features = false, features = ["encoders"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ksni = "0.3.6"
-x11rb = { version = "0.14", features = ["randr", "xfixes", "shape", "xkb", "allow-unsafe-code"] }
+x11rb = { version = "0.14", features = ["randr", "xfixes", "shape", "xkb", "shm", "allow-unsafe-code"] }
 xkbcommon = { version = "0.9", default-features = false, features = ["x11"] }
 xim = { version = "0.6", features = ["x11rb-client", "x11rb-xcb"] }
 zbus = { version = "5.14.0", features = ["tokio"] }
@@ -70,7 +75,7 @@ wayland-protocols = { version = "0.32", features = ["staging", "unstable", "wayl
 wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 wl-clipboard-rs = "0.9.3"
 nix = { version = "0.31.2", features = ["fs", "process", "poll", "feature", "socket", "signal", "user"] }
-rustix = { version = "1.1.4", features = ["event"] }
+rustix = { version = "1.1.4", features = ["event", "time"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.62.2", features = ["Globalization", "Graphics_Imaging", "Media_Ocr", "Storage_Streams", "Win32_System_WinRT", "Win32_System_Com", "Win32_System_Variant", "Win32_UI_Accessibility", "Graphics_Capture", "Graphics_DirectX_Direct3D11", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_MediaFoundation", "Win32_Media_Audio", "Win32_Media_KernelStreaming", "Win32_Media_Multimedia", "Win32_System_Com_StructuredStorage", "Win32_System_Performance", "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Graphics_Capture"] }

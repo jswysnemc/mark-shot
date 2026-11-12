@@ -226,7 +226,8 @@ def clipping_and_cross_output(binary, source_path, source, config, environment, 
         before = resources(process.pid)
         time.sleep(1)
         after = resources(process.pid)
-        if after["threads"] != 1 or after["cpu_ticks"] != before["cpu_ticks"]:
+        # 1. 【贴图回归】【空闲线程】普通窗口保留一个文件事件监听线程，两次采样必须线程稳定且没有持续计算
+        if after["threads"] > 2 or after["threads"] != before["threads"] or after["cpu_ticks"] != before["cpu_ticks"]:
             raise AssertionError(f"dragging kept idle workers or frame polling: {before} -> {after}")
         key(environment, "Escape")
         process.wait(timeout=3)

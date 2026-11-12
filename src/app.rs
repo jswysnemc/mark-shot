@@ -2,7 +2,9 @@ pub(crate) mod annotation_collection;
 pub(crate) mod annotation_selection;
 pub(crate) mod canvas_navigation;
 mod capture_setup;
+pub(crate) mod capture_start;
 mod capture_visibility;
+mod code_scan;
 mod cursor_magnifier;
 use capture_setup::start_capture;
 mod event_loop;
@@ -13,6 +15,7 @@ pub(crate) mod selection_translation;
 mod theme_switch;
 pub(crate) mod upload;
 use event_loop::run_overlay;
+mod foreground_residency;
 mod frame_backdrop;
 #[cfg(all(test, target_os = "linux"))]
 mod frame_lifecycle_overlay;
@@ -33,13 +36,14 @@ mod file_canvas_theme;
 mod finish;
 mod image_export;
 mod image_setup;
-mod image_window;
+pub(crate) mod image_window;
 mod init;
 pub(crate) mod input;
 mod instant;
 mod layers;
 mod ocr;
 mod panels;
+pub(crate) mod selection_history;
 
 /// 【工具栏配置】【设置返回】按 config 重置 state 工具栏位置与缓存，后续面板刷新负责实际排版
 pub(crate) fn configure_toolbar(
@@ -96,7 +100,9 @@ const POINTER_GRACE: Duration = Duration::from_millis(100);
 /// Launch options from the command line.
 #[derive(Debug, Clone, Default)]
 pub struct Launch {
+    pub code_scan: bool,
     pub record_select: bool,
+    pub record_format: Option<crate::features::recording::Format>,
     pub mode: Mode,
     pub one_monitor: bool,
     pub all_outputs: bool,
@@ -128,7 +134,8 @@ impl Launch {
 
     /// 【截图】【任务检查】编辑与 OCR 可以仅显示交互结果；其他快捷模式必须具有导出输出
     fn has_work(&self) -> bool {
-        self.record_select
+        self.code_scan
+            || self.record_select
             || matches!(self.mode, Mode::Editor | Mode::Ocr | Mode::Scroll)
             || !self.outputs().is_empty()
     }
@@ -194,6 +201,8 @@ async fn make_screenshot(
         start_capture(conn, &mut launch, &mut prof).await?
     };
     editor_state.to = launch.outputs();
+    selection_history::load(&mut editor_state);
+    capture_start::initialize(&mut editor_state, &launch);
     editor_state.toolbar.to = editor_state.to;
     editor_state.output = launch.output.clone();
     editor_state.mode = launch.editor_mode(editor_state.ocr.models.active_installed());
@@ -290,7 +299,21 @@ async fn make_screenshot(
             return Ok(());
         }
         editor_state.ocr.models.shutdown();
-        if launch.record_select {
+        if launch.code_scan {
+            let image = if editor_state.cancel {
+                None
+            } else {
+                render_final(&mut editor_state)
+            };
+            drop(editor_state);
+            drop(overlay);
+            crate::utils::memory::release_unused();
+            if let Some((png, _, _)) = image {
+                return crate::features::code_scan::transport::spawn(&png);
+            }
+            return Ok(());
+        }
+        if editor_state.capture_start.recording.is_some() {
             let target =
                 crate::features::recording::selection::selected(&editor_state, overlay.as_ref())?;
             drop(editor_state);

@@ -10,6 +10,11 @@ pub(crate) struct State {
     pub(crate) cached_annotations: bool,
     pub(crate) opaque_background: bool,
     pub(crate) native_background: bool,
+    pub(crate) native_scene: bool,
+    pub(crate) native_hover: bool,
+    pub(crate) baked_background: bool,
+    pub(crate) navigation_caches:
+        Vec<std::cell::RefCell<crate::renderer::navigation_background::TileCache>>,
 }
 
 #[cfg(test)]
@@ -90,6 +95,13 @@ impl EditorState {
         if !self.region_rendering.enabled {
             return;
         }
+        // 1. 【截图场景】【乘法底图】荧光笔依赖既有遮罩，保留原合成顺序并提交完整不透明前景
+        self.region_rendering.baked_background = self.region_rendering.native_scene
+            && self
+                .annotations
+                .iter()
+                .chain(self.pending.iter())
+                .any(|annotation| matches!(annotation.shape, AnnotationShape::Highlighter { .. }));
         let cache = self
             .annotations
             .iter()
@@ -109,8 +121,16 @@ impl EditorState {
             }
         }
         let identity = self.canvas_transform().is_identity();
-        for (layer, placement) in self.dimmed.iter_mut().zip(&self.placements) {
-            let size = if identity {
+        self.region_rendering
+            .navigation_caches
+            .resize_with(self.placements.len(), Default::default);
+        for (index, (layer, placement)) in self.dimmed.iter_mut().zip(&self.placements).enumerate()
+        {
+            let mut cache = self.region_rendering.navigation_caches[index].borrow_mut();
+            if identity {
+                cache.invalidate();
+            }
+            let size = if identity || self.region_rendering.native_scene && !cache.ready() {
                 (1, 1)
             } else {
                 placement.px_size()

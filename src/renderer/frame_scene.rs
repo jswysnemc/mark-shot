@@ -24,7 +24,11 @@ pub(super) fn draw(
     let dirty_rect = req.dirty_rect;
 
     if let Some(region) = region {
-        background_restore::draw(req);
+        if region.native_scene && !region.baked_background {
+            background_restore::clear_foreground(req);
+        } else {
+            background_restore::draw(req);
+        }
         if region.cached_annotations {
             if collection.as_ref().is_some_and(|overlay| overlay.dragging) {
                 collection_stack::bodies(req);
@@ -99,7 +103,11 @@ pub(super) fn draw(
             .with_scale(s)
             .with_origin(req.offset)
             .clipped(dirty_rect.copied(), |painter| {
-                crate::app::region_detection::draw::region(painter, *rect);
+                if region.is_some_and(|region| region.native_hover) {
+                    crate::app::region_detection::draw::border(painter, *rect);
+                } else {
+                    crate::app::region_detection::draw::region(painter, *rect);
+                }
             });
     }
 

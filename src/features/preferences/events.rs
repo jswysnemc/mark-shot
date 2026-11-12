@@ -176,9 +176,7 @@ impl WindowContent for Preferences {
                     return WindowAction::Redraw;
                 }
                 if input.key == Some(Key::Escape) {
-                    if self.toolbar_editor {
-                        self.toolbar_editor = false;
-                        self.toolbar.cancel();
+                    if self.back() {
                         return WindowAction::Redraw;
                     }
                     self.shortcut_pause = None;
@@ -194,6 +192,7 @@ impl WindowContent for Preferences {
                     if !self.commit_pending() {
                         return WindowAction::Redraw;
                     }
+                    self.back();
                     self.search_focus = true;
                     self.editing = None;
                     self.shortcut_pause = None;

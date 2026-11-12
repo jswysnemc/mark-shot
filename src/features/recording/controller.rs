@@ -94,7 +94,8 @@ impl Controller {
             .clone()
     }
 
-    /// 【录制控制】【命令投递】按 command 投递有界控制消息，返回队列错误
+    /// 【录制控制】【命令投递】按 command 投递有界控制消息，返回队列错误；运行时命令统一经由本地命令服务投递
+    #[cfg(test)]
     pub fn send(&self, command: Command) -> Result<(), String> {
         self.sender
             .try_send(command)

@@ -6,6 +6,8 @@ use crate::{tools::Tool, types::Mode};
 /// 【光标放大区】【显示判断】按 state 的工具、选区手势及弹层返回是否显示；开关只控制支持的阶段，取色保留独立开关优先级
 pub fn visible(state: &EditorState) -> bool {
     if crate::app::canvas_navigation::input::owns_pointer(state)
+        || crate::app::capture_start::input::hit(state).is_some()
+        || state.capture_start.pressed.is_some()
         || state.mode == Mode::Ocr
         || state.selection_translation.busy()
         || state.selection_translation.popup.is_some()

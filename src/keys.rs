@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
+mod labels;
 use std::sync::{Arc, OnceLock, RwLock};
 
 use log::info;
@@ -60,6 +61,7 @@ pub enum Action {
     Extensions,
     Upload,
     Translate,
+    ScanCode,
     Cancel,
     Undo,
     Redo,
@@ -74,6 +76,10 @@ pub enum Action {
     ClearAnnotations,
     ToggleScope,
     ToggleToolbarLayout,
+    RecordVideo,
+    RecordGif,
+    RecordPause,
+    RecordStop,
     SizeUp,
     SizeDown,
     Tool(Tool),
@@ -90,6 +96,7 @@ pub const ACTIONS: &[(&str, Action, &[&str])] = &[
     ("extensions", Action::Extensions, &[]),
     ("upload", Action::Upload, &[]),
     ("translate", Action::Translate, &[]),
+    ("scan_code", Action::ScanCode, &[]),
     ("pin", Action::Finish(Finish::Pin), &["Ctrl+P"]),
     ("cancel", Action::Cancel, &["Escape"]),
     ("undo", Action::Undo, &["Ctrl+Z"]),
@@ -105,6 +112,10 @@ pub const ACTIONS: &[(&str, Action, &[&str])] = &[
     ("clear_annotations", Action::ClearAnnotations, &[]),
     ("toggle_scope", Action::ToggleScope, &[]),
     ("toggle_toolbar_layout", Action::ToggleToolbarLayout, &[]),
+    ("record_video", Action::RecordVideo, &["Ctrl+Shift+R"]),
+    ("record_gif", Action::RecordGif, &["Ctrl+Shift+G"]),
+    ("record_pause", Action::RecordPause, &["Ctrl+Shift+P"]),
+    ("record_stop", Action::RecordStop, &["Ctrl+Shift+E"]),
     ("size_up", Action::SizeUp, &["]"]),
     ("size_down", Action::SizeDown, &["["]),
     ("tool_selection", Action::Tool(Tool::Selection), &["S"]),

@@ -14,7 +14,9 @@ REQUIRED = {
     "native-help.txt", "native-linkage.txt", "licenses/DEPENDENCIES.txt",
     "licenses/LICENSE-OFL.txt", "licenses/LICENSE-NUMERALS.txt", "licenses/LICENSE-ICONS.txt",
     "licenses/LICENSE-ONNXRUNTIME.txt", "licenses/NOTICES-ONNXRUNTIME.txt",
-    "docs/rewrite-status.md",
+    "docs/rewrite-status.md", "media/libmarkshot-media.so", "media/NOTICES.txt",
+    "media/MEDIA-SOURCES.tar.xz", "media/SHA256SUMS", "media/FFMPEG-CONFIG.h",
+    "media/licenses/FFMPEG.txt", "media/licenses/OPENH264.txt",
 }
 
 
@@ -54,4 +56,20 @@ def verify_archive(archive, manifest):
         linkage = package.extractfile(f"{ROOT}/native-linkage.txt").read().decode()
         require(not re.search(r"not found|libQt|libgtk|webkit|webview|webgpu_dawn", linkage, re.IGNORECASE), "forbidden or missing native dependency")
         require(b"Usage:" in package.extractfile(f"{ROOT}/native-help.txt").read(), "missing executable smoke test output")
+        # 3. 【原生发布】【媒体库完整性】库和对应源码必须与随包清单一致，禁止重新混入外部录制程序
+        media_checksums = package.extractfile(f"{ROOT}/media/SHA256SUMS").read().decode().splitlines()
+        expected_media = {"libmarkshot-media.so", "MEDIA-SOURCES.tar.xz"}
+        found = set()
+        for line in media_checksums:
+            match = re.fullmatch(r"([0-9a-f]{64})  (libmarkshot-media\.so|MEDIA-SOURCES\.tar\.xz)", line)
+            require(match is not None, "invalid media checksum entry")
+            digest_value, name = match.groups()
+            require(name not in found, "duplicate media checksum entry")
+            found.add(name)
+            with package.extractfile(f"{ROOT}/media/{name}") as source:
+                require(hashlib.file_digest(source, "sha256").hexdigest() == digest_value, "media checksum mismatch")
+        require(found == expected_media, "missing media checksums")
+        require(package.extractfile(f"{ROOT}/media/libmarkshot-media.so").read(4) == b"\x7fELF", "media library is not ELF")
+        forbidden = {"ffmpeg", "ffprobe", "wf-recorder", "gpu-screen-recorder"}
+        require(not any(PurePosixPath(name).name in forbidden for name in members), "external recording executable in package")
     return {"archive_sha256": manifest.archive_sha256, "binary_sha256": digest}

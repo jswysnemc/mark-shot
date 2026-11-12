@@ -123,6 +123,7 @@ impl Server {
                                 format!("控制请求失败 / Control request failed: {error}");
                         }
                     }
+                    status.window_open = true;
                     let _ = serde_json::to_writer(&mut stream, &status);
                 }
             })?;

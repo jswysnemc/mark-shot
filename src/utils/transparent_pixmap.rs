@@ -2,8 +2,12 @@
 
 use tiny_skia::Pixmap;
 
+#[cfg(target_os = "linux")]
+mod page_residency;
 mod region;
 pub(crate) use region::reclaim_region;
+mod copy;
+pub(crate) use copy::copy_changed;
 
 /// 【前景缓存】【稀疏页策略】按pixmap限制自有内部页的透明大页分配，无返回值，不改像素；避免少量扫描行写入占有整块大页
 pub(crate) fn prepare_sparse(pixmap: &mut Pixmap) {

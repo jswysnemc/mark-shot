@@ -57,6 +57,17 @@ class ArtifactTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "checksum file"):
                 verify_archive(archive, manifest)
 
+    def test_native_media_is_complete_and_matches_its_sources(self):
+        """【原生发布测试】【媒体交付】拒绝缺失库、替换库、缺失源码、错误摘要及外部录制程序，无参数无返回值"""
+        with tempfile.TemporaryDirectory() as directory:
+            *_, manifest = fixture(directory)
+            for changes in ({"media/libmarkshot-media.so": None}, {"media/libmarkshot-media.so": b"\x7fELFchanged"}, {"media/MEDIA-SOURCES.tar.xz": b"changed"}, {"media/SHA256SUMS": b"invalid\n"}, {"recording/wf-recorder": b"executable"}):
+                with self.subTest(changes=changes):
+                    archive = write_package(directory, changes)
+                    current = replace(manifest, archive_sha256=sha256_file(archive))
+                    with self.assertRaises(ValueError):
+                        verify_archive(archive, current)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -253,17 +253,17 @@ pub fn button(
     if !inside(state) {
         text_session::commit(state, dirty);
         if state.selected_tool == Tool::Text {
-            if let Some(id) = state
-                .annotations
-                .iter()
-                .rev()
-                .find(|annotation| {
-                    matches!(annotation.shape, crate::types::AnnotationShape::Text { .. })
-                        && annotation.initial_hit_test(state.canvas_point())
-                })
-                .map(|annotation| annotation.id)
-            {
-                text_session::begin_existing(state, id, dirty);
+            if state.annotations.iter().rev().any(|annotation| {
+                matches!(annotation.shape, crate::types::AnnotationShape::Text { .. })
+                    && annotation.initial_hit_test(state.canvas_point())
+            }) {
+                crate::tools::ToolBehavior::on_button(
+                    &crate::tools::pick::PickTool,
+                    state,
+                    button,
+                    pressed,
+                    dirty,
+                );
             }
             return true;
         }

@@ -512,6 +512,7 @@ pub(crate) fn handle_canvas_pointer_button(
 
 /// 【界面】【工具切换】在 editor_state 中切换到 tool 并结束旧手势与弹层；dirty_mask 返回重绘显示器
 pub fn select_tool(editor_state: &mut EditorState, tool: Tool, dirty_mask: &mut u32) {
+    editor_state.input.clicks.clear();
     if editor_state.selected_tool != tool {
         editor_state.selection.creating = false;
     }
