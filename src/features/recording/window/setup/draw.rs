@@ -1,4 +1,4 @@
-//! 【录制设置】【界面绘制】标题、分段行、开关、提示与操作区分层绘制，不读取视频数据
+//! 【录制设置】【界面绘制】标题、选择框、开关、提示与操作区分层绘制，不读取视频数据
 
 use super::{
     super::summary,
@@ -15,7 +15,7 @@ use crate::{
 /// 提示区单行高度
 const NOTICE_LINE: f32 = 14.0;
 
-/// 一行分段选项的绘制数据：行、各段文字、选中段、是否可用
+/// 一行选择框的绘制数据：行、选项文字、当前选项、是否可用
 type RowView = (Row, Vec<String>, usize, bool);
 
 /// 【录制设置】【内容绘制】按 state、canvas 与 scale 绘制完整准备窗口，无返回值
@@ -24,7 +24,7 @@ pub(super) fn draw(state: &mut Setup, canvas: &mut tiny_skia::Pixmap, scale: f32
     let text = |a: &'static str, b: &'static str| if cn { a } else { b };
     let size = state.size;
     // 1. 【录制设置】【显示数据】先从选项模型取出全部文字，绘制阶段不再访问配置
-    let rows: Vec<RowView> = Row::ALL
+    let rows: Vec<RowView> = layout::rows(state.advanced)
         .into_iter()
         .map(|row| {
             (
@@ -43,6 +43,16 @@ pub(super) fn draw(state: &mut Setup, canvas: &mut tiny_skia::Pixmap, scale: f32
         copy: text("复制详情", "Copy details"),
     };
     let failed = state.failure.is_some();
+    let no_audio = text("GIF 不录制声音", "GIF has no audio");
+    let advanced = if state.advanced {
+        text("收起更多选项", "Hide additional options").to_owned()
+    } else {
+        format!(
+            "{} · {} fps",
+            text("更多选项", "Additional options"),
+            state.config.frame_rate()
+        )
+    };
     let notice: Vec<String> = match &state.failure {
         Some(failure) => failure.lines().map(str::to_owned).collect(),
         None => vec![
@@ -59,6 +69,10 @@ pub(super) fn draw(state: &mut Setup, canvas: &mut tiny_skia::Pixmap, scale: f32
         "{}{}{}{}{}",
         labels.title, labels.cursor, labels.settings, labels.start, labels.copy
     );
+    glyphs.push_str(&advanced);
+    if state.config.format == "gif" {
+        glyphs.push_str(no_audio);
+    }
     for (row, choices, ..) in &rows {
         glyphs.push_str(row.label(cn));
         choices.iter().for_each(|choice| glyphs.push_str(choice));
@@ -77,40 +91,64 @@ pub(super) fn draw(state: &mut Setup, canvas: &mut tiny_skia::Pixmap, scale: f32
         .with_icons(&state.icons)
         .with_text(&mut fonts.system, &mut fonts.cache);
     header(&mut painter, size, labels.title, hover, palette);
-    // 3. 【录制设置】【分段选项】每行一个连续的单选组，选中项使用强调色
-    for (index, (row, choices, selected, enabled)) in rows.iter().enumerate() {
+    // 3. 【录制设置】【表单选项】每行只显示当前值，展开后再选择其他选项，不把所有参数铺成按钮矩阵
+    for (row, choices, selected, enabled) in &rows {
+        let index = layout::index(*row);
         painter.text(
             layout::label(index),
             row.label(cn),
             TextStyle::new(11.0, palette.muted),
         );
-        let choices: Vec<&str> = choices.iter().map(String::as_str).collect();
-        controls::segmented(
+        let label = if *row == Row::Audio && !enabled {
+            no_audio
+        } else {
+            choices[*selected].as_str()
+        };
+        controls::select(
             &mut painter,
             layout::field(size, index),
-            &choices,
-            Some(*selected),
-            match hover {
-                Some(Control::Choice(hovered, segment)) if hovered == *row => Some(segment),
-                _ => None,
-            },
+            label,
+            hover == Some(Control::Field(*row)),
+            state
+                .choice
+                .as_ref()
+                .is_some_and(|(opened, _)| opened == row),
             *enabled,
         );
     }
     // 4. 【录制设置】【光标开关】布尔选项使用开关，整行都是点击目标
-    painter.text(
-        layout::label(rows.len()),
-        labels.cursor,
-        TextStyle::new(11.0, palette.muted),
-    );
-    controls::switch(
+    if state.advanced {
+        painter.text(
+            layout::label(7),
+            labels.cursor,
+            TextStyle::new(11.0, palette.muted),
+        );
+        controls::switch(
+            &mut painter,
+            layout::field(size, 7),
+            cursor,
+            hover == Some(Control::Cursor),
+        );
+    }
+    controls::icon_button(
         &mut painter,
-        layout::field(size, rows.len()),
-        cursor,
-        hover == Some(Control::Cursor),
+        layout::advanced(size),
+        &advanced,
+        Some(icons::CHEVRON_DOWN),
+        controls::ButtonStyle {
+            fill: if hover == Some(Control::Advanced) {
+                palette.alternate
+            } else {
+                palette.window
+            },
+            foreground: palette.accent,
+            border: palette.window,
+            font_size: 11.0,
+            weight: cosmic_text::Weight::NORMAL,
+        },
     );
     // 5. 【录制设置】【提示与错误】失败详情折行后按可见高度显示，滚轮浏览其余行，完整内容可复制
-    let area = layout::notice(size);
+    let area = layout::notice(size, state.advanced);
     let width = area.width() - if failed { 84.0 } else { 0.0 };
     let lines = wrap(&mut painter, &notice, 10.0, width);
     let visible = (area.height() / NOTICE_LINE).max(1.0) as usize;
@@ -142,6 +180,9 @@ pub(super) fn draw(state: &mut Setup, canvas: &mut tiny_skia::Pixmap, scale: f32
         );
     }
     footer(&mut painter, size, &items, hover, &labels, palette);
+    if let Some((_, choice)) = &state.choice {
+        choice.draw(&mut painter, size);
+    }
     crate::ui::window_frame::draw(painter.canvas(), scale);
 }
 

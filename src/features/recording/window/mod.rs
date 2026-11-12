@@ -4,6 +4,7 @@ mod background;
 mod countdown;
 mod fonts;
 mod host;
+mod preparation;
 mod setup;
 mod summary;
 
@@ -39,12 +40,21 @@ pub(super) fn run(target: Target) -> crate::AppResult {
         let Some(config) = host.borrow_mut().take_request() else {
             return Ok(());
         };
+        host.borrow_mut().prepare(&config);
         // 2. 【录制窗口】【倒计时阶段】只在设置了倒计时时显示小组件；取消回到准备窗口，小组件故障不阻止录制
         if config.countdown > 0 {
             let duration = Duration::from_secs(u64::from(config.countdown));
-            match countdown::run(fonts.clone(), duration, describe(&host, &config)) {
+            match countdown::run(
+                host.clone(),
+                fonts.clone(),
+                duration,
+                describe(&host, &config),
+            ) {
                 Ok(true) => std::thread::sleep(SETTLE),
-                Ok(false) => continue,
+                Ok(false) => {
+                    host.borrow_mut().reset();
+                    continue;
+                }
                 Err(error) => log::error!("【录制窗口】【倒计时小组件】{error}"),
             }
         }

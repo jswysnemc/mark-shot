@@ -38,14 +38,24 @@ impl WindowContent for Countdown {
                     return WindowAction::None;
                 };
                 let now = Instant::now();
+                let seconds = schedule.seconds(now);
+                if self.host.borrow_mut().countdown(seconds) {
+                    self.deadline = None;
+                    return WindowAction::Close;
+                }
                 // 1. 【录制倒计时】【倒数结束】标记完成并关闭，采集在小组件销毁后才开始
                 if schedule.expired(now) {
                     self.deadline = None;
                     self.completed.set(true);
                     return WindowAction::Close;
                 }
-                self.deadline = Some(schedule.next_wake(now));
-                WindowAction::Redraw
+                self.deadline = Some(schedule.next_wake(now).min(now + super::CONTROL_POLL));
+                if seconds == self.displayed_seconds {
+                    WindowAction::None
+                } else {
+                    self.displayed_seconds = seconds;
+                    WindowAction::Redraw
+                }
             }
             WindowEvent::PointerMove { position } => {
                 let before = Self::over_cancel(self.pointer);

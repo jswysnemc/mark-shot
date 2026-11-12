@@ -1,14 +1,10 @@
-//! 【录制设置】【控件布局】绘制与命中共用紧凑几何，分段行随窗口宽度伸缩
+//! 【录制设置】【控件布局】绘制与命中共用紧凑几何，选择框随窗口宽度伸缩
 
-use super::{
-    Setup,
-    options::{self, Row},
-};
-use crate::ui::controls;
+use super::{Setup, options::Row};
 use tiny_skia::Rect;
 
 /// 准备窗口的初始与最小逻辑尺寸
-pub(super) const SIZE: (u32, u32) = (400, 372);
+pub(super) const SIZE: (u32, u32) = (400, 300);
 /// 标题栏高度，同时是窗口拖动范围
 pub(super) const TITLE: f32 = 44.0;
 /// 左右内边距
@@ -19,17 +15,55 @@ const ROW: f32 = 32.0;
 const LABEL: f32 = 68.0;
 /// 底部操作区高度
 const FOOTER: f32 = 50.0;
-/// 光标开关所在行序号，位于全部分段行之后
-const CURSOR_ROW: usize = Row::ALL.len();
+/// 光标开关所在行序号，位于高级参数之后
+const CURSOR_ROW: usize = 7;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(super) enum Control {
     Close,
     Choice(Row, usize),
+    Field(Row),
     Cursor,
     Settings,
     Copy,
     Start,
+    Advanced,
+}
+
+/// 【录制设置】【可见行】按 advanced 返回常用选项与按需展开的参数，保留配置值而不重复创建设置
+pub(super) fn rows(advanced: bool) -> Vec<Row> {
+    let mut rows = vec![Row::Source, Row::Format, Row::Audio, Row::Countdown];
+    if advanced {
+        rows.extend([Row::Quality, Row::Fps]);
+    }
+    rows
+}
+
+/// 【录制设置】【行位置】按 row 返回表单内实际行号，第五行留给高级选项展开入口
+pub(super) fn index(row: Row) -> usize {
+    match row {
+        Row::Source => 0,
+        Row::Format => 1,
+        Row::Audio => 2,
+        Row::Countdown => 3,
+        Row::Quality => 5,
+        Row::Fps => 6,
+    }
+}
+
+/// 【录制设置】【展开尺寸】按 advanced 返回表单所需的最小高度，窗口宽度继续由现有尺寸决定
+pub(super) fn height(advanced: bool) -> u32 {
+    if advanced { 396 } else { SIZE.1 }
+}
+
+/// 【录制设置】【展开入口】按 size 返回常用参数之后的高级选项入口，整行都可点击
+pub(super) fn advanced(size: (u32, u32)) -> Rect {
+    rect(
+        PAD,
+        TITLE + 4.0 * ROW + 3.0,
+        size.0 as f32 - PAD * 2.0,
+        ROW - 6.0,
+    )
 }
 
 /// 【录制设置】【矩形构造】按 x、y、width、height 返回有效控件矩形
@@ -54,7 +88,7 @@ pub(super) fn field(size: (u32, u32), index: usize) -> Rect {
 
 /// 【录制设置】【整行范围】按 size 和 row 返回该行包含标签与控件的范围，滚轮微调按整行命中
 pub(super) fn row(size: (u32, u32), row: Row) -> Rect {
-    let index = Row::ALL.iter().position(|value| *value == row).unwrap_or(0);
+    let index = index(row);
     rect(
         PAD,
         TITLE + index as f32 * ROW,
@@ -74,8 +108,9 @@ pub(super) fn cursor(size: (u32, u32)) -> Rect {
 }
 
 /// 【录制设置】【提示区域】按 size 返回选项与操作区之间的说明或错误范围，高度随窗口伸缩
-pub(super) fn notice(size: (u32, u32)) -> Rect {
-    let top = TITLE + (CURSOR_ROW + 1) as f32 * ROW + 6.0;
+pub(super) fn notice(size: (u32, u32), advanced: bool) -> Rect {
+    let rows = if advanced { CURSOR_ROW + 1 } else { 5 };
+    let top = TITLE + rows as f32 * ROW + 6.0;
     rect(
         PAD,
         top,
@@ -93,18 +128,16 @@ pub(super) fn footer(size: (u32, u32)) -> f32 {
 pub(super) fn controls(state: &Setup) -> Vec<(Control, Rect)> {
     let size = state.size;
     let mut items = vec![(Control::Close, rect(size.0 as f32 - 40.0, 8.0, 28.0, 28.0))];
-    // 1. 【录制设置】【分段行】每行的段数来自选项模型，自定义帧率或倒计时会多出一段
-    for (index, row) in Row::ALL.into_iter().enumerate() {
-        let count = options::count(row, &state.config);
+    // 1. 【录制设置】【选择框】每行只有一个点击入口，其他选项由统一短菜单按需显示
+    for row in rows(state.advanced) {
+        let index = index(row);
         let bounds = field(size, index);
-        for segment in 0..count {
-            items.push((
-                Control::Choice(row, segment),
-                controls::segment(bounds, count, segment),
-            ));
-        }
+        items.push((Control::Field(row), bounds));
     }
-    items.push((Control::Cursor, cursor(size)));
+    if state.advanced {
+        items.push((Control::Cursor, cursor(size)));
+    }
+    items.push((Control::Advanced, advanced(size)));
     // 2. 【录制设置】【底部操作】次要入口靠左，主操作靠右，错误详情的复制入口位于提示区右上
     let y = footer(size) + 10.0;
     items.push((Control::Settings, rect(PAD, y, 96.0, 30.0)));
@@ -113,7 +146,7 @@ pub(super) fn controls(state: &Setup) -> Vec<(Control, Rect)> {
         rect(size.0 as f32 - PAD - 128.0, y, 128.0, 30.0),
     ));
     if state.failure.is_some() {
-        let area = notice(size);
+        let area = notice(size, state.advanced);
         items.push((
             Control::Copy,
             rect(area.right() - 76.0, area.top(), 76.0, 22.0),

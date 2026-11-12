@@ -52,6 +52,8 @@ pub struct Status {
     pub elapsed_ms: u64,
     pub detail: String,
     pub output: Option<String>,
+    #[serde(default)]
+    pub format: String,
 }
 
 impl Default for Status {
@@ -63,6 +65,7 @@ impl Default for Status {
             elapsed_ms: 0,
             detail: String::new(),
             output: None,
+            format: String::new(),
         }
     }
 }

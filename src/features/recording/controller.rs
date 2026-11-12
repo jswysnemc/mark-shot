@@ -24,6 +24,7 @@ impl Controller {
         let status = Arc::new(Mutex::new(Status {
             phase: "countdown".into(),
             output: Some(output.destination.to_string_lossy().into()),
+            format: config.format.clone(),
             ..Default::default()
         }));
         let shared = status.clone();

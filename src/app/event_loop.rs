@@ -287,7 +287,7 @@ pub(super) fn poll_timeout(editor_state: &EditorState) -> Option<Duration> {
     if let Some(interval) = editor_state.selection_translation.poll_interval() {
         timeout = Some(timeout.map_or(interval, |other| other.min(interval)));
     }
-    if editor_state.capture_start.visible {
+    if editor_state.capture_start.polls_recording() {
         let interval = editor_state.capture_start.query.timeout();
         timeout = Some(timeout.map_or(interval, |other| other.min(interval)));
     }

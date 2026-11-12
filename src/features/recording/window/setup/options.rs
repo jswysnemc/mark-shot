@@ -23,7 +23,8 @@ pub(super) enum Outcome {
 }
 
 impl Row {
-    /// 【录制设置】【全部行】无参数，返回从上到下的分段行顺序，光标选项单独处理
+    /// 【录制设置】【全部行】无参数，返回全部配置行，光标选项单独处理
+    #[cfg(test)]
     pub(super) const ALL: [Self; 6] = [
         Self::Source,
         Self::Format,
@@ -100,7 +101,8 @@ pub(super) fn choices(row: Row, config: &Recording, target: &Target, cn: bool) -
     }
 }
 
-/// 【录制设置】【选项数量】按 row 和 config 返回该行的段数，布局命中时无需生成文字
+/// 【录制设置】【选项数量】按 row 和 config 返回该行的选项数，校验时无需生成文字
+#[cfg(test)]
 pub(super) fn count(row: Row, config: &Recording) -> usize {
     match row {
         Row::Source => 2,
@@ -110,7 +112,7 @@ pub(super) fn count(row: Row, config: &Recording) -> usize {
     }
 }
 
-/// 【录制设置】【选中段】按 row、config 和 target 返回当前选中序号，取值始终包含在选项内
+/// 【录制设置】【当前选项】按 row、config 和 target 返回当前选中序号，取值始终包含在选项内
 pub(super) fn selected(row: Row, config: &Recording, target: &Target) -> usize {
     match row {
         Row::Source => usize::from(target.crop.is_none()),
@@ -149,10 +151,7 @@ pub(super) fn choose(
         Row::Source => match index {
             0 => Outcome::SelectRegion,
             _ => {
-                *target = Target {
-                    format: target.format,
-                    ..Default::default()
-                };
+                target.crop = None;
                 Outcome::Redraw
             }
         },
@@ -296,7 +295,8 @@ mod tests {
             choose(Row::Source, 1, &mut config, &mut target),
             Outcome::Redraw
         );
-        assert!(target.crop.is_none() && target.display.is_empty());
+        assert!(target.crop.is_none());
+        assert_eq!(target.display, "DP-1");
         assert_eq!(target.format, Some(Format::Gif));
     }
 

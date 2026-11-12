@@ -48,12 +48,13 @@ gestures {
 class TestRuntime:
     """【Wayland 测试】【会话生命周期】管理 root 中的独立显示服务器、合成器及验证状态"""
 
-    def __init__(self, root, scale=1.2):
+    def __init__(self, root, scale=1.2, extra_config=""):
         """【测试运行器】【状态构造】使用 root 保存配置与日志，scale 为输出比例；不启动进程，无返回值"""
         self.root = root.resolve()
         if not 0.5 <= scale <= 4.0:
             raise ValueError("test output scale must be between 0.5 and 4")
         self.scale = scale
+        self.extra_config = extra_config
         self.processes = []
         self.logs = []
         self.environment = dict(os.environ)
@@ -65,7 +66,7 @@ class TestRuntime:
         child = self.root / "niri-child"
         child.mkdir(exist_ok=True)
         config = child / "config.kdl"
-        config.write_text(CONFIG.replace("scale 1.2", f"scale {self.scale}"))
+        config.write_text(CONFIG.replace("scale 1.2", f"scale {self.scale}") + self.extra_config)
         for key in ("WAYLAND_DISPLAY", "NIRI_SOCKET", "WINIT_UNIX_BACKEND"):
             self.environment.pop(key, None)
         self.environment.update(XDG_RUNTIME_DIR=str(self.root), XDG_CONFIG_HOME=str(self.root / "config"), XDG_DATA_HOME=str(self.root / "data"), XDG_STATE_HOME=str(self.root / "state"))

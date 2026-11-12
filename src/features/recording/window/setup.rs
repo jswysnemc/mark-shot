@@ -1,4 +1,4 @@
-//! 【录制设置】【准备窗口】分段选项与开关组成的紧凑设置界面，确认开始后立即关闭
+//! 【录制设置】【准备窗口】选择框与按需展开选项组成的紧凑表单，确认开始后立即关闭
 
 mod draw;
 mod events;
@@ -24,6 +24,9 @@ pub(super) struct Setup {
     pressed: Option<layout::Control>,
     notice_scroll: usize,
     settings_opened: bool,
+    advanced: bool,
+    requested_size: Option<(u32, u32)>,
+    choice: Option<(options::Row, crate::ui::controls::Choice)>,
 }
 
 impl Setup {
@@ -64,14 +67,19 @@ impl Setup {
 /// 参数：host 录制会话宿主，窗口关闭后由调用方领取开始请求；fonts 与倒计时小组件共享的字库；
 /// failure 上一轮录制的失败详情，存在时显示在提示区并可复制
 pub(super) fn run(host: Shared, fonts: fonts::Shared, failure: Option<String>) -> crate::AppResult {
-    let icons = [crate::ui::icons::CLOSE, crate::ui::icons::VIDEO]
-        .into_iter()
-        .filter_map(|svg| {
-            usvg::Tree::from_str(svg, &usvg::Options::default())
-                .ok()
-                .map(|tree| (svg, tree))
-        })
-        .collect();
+    let icons = [
+        crate::ui::icons::CLOSE,
+        crate::ui::icons::VIDEO,
+        crate::ui::icons::CHEVRON_DOWN,
+        crate::ui::icons::CHECK,
+    ]
+    .into_iter()
+    .filter_map(|svg| {
+        usvg::Tree::from_str(svg, &usvg::Options::default())
+            .ok()
+            .map(|tree| (svg, tree))
+    })
+    .collect();
     let target = host.borrow().target().clone();
     let mut setup = Setup {
         host,
@@ -85,6 +93,9 @@ pub(super) fn run(host: Shared, fonts: fonts::Shared, failure: Option<String>) -
         pressed: None,
         notice_scroll: 0,
         settings_opened: false,
+        advanced: false,
+        requested_size: Some(layout::SIZE),
+        choice: None,
     };
     setup.reload();
     window::run(

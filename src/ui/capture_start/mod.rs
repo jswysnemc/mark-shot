@@ -24,6 +24,8 @@ pub(crate) enum Control {
 #[derive(Default)]
 pub(crate) struct State {
     pub visible: bool,
+    pub recording_controls: bool,
+    pub bar_tops: Vec<f32>,
     pub checked: bool,
     pub stop_requested: bool,
     pub recording: Option<Format>,
@@ -35,6 +37,16 @@ pub(crate) struct State {
 }
 
 impl State {
+    /// 【截图录制】【状态查询】无参数，返回当前截图是否需要继续接收后台录制状态，文件编辑和专用识别不启用
+    pub(crate) fn polls_recording(&self) -> bool {
+        self.visible || self.recording_controls
+    }
+
+    /// 【截图录制】【控制栏可见】无参数，返回起始栏或活动录制控制栏是否需要绘制，选区完成后仍显示活动会话
+    pub(crate) fn shows_bar(&self) -> bool {
+        self.visible || (self.recording_controls && self.active())
+    }
+
     /// 【截图起始】【停止防重】无参数，首次活动录制停止返回 true，并立即锁定控制按钮直到会话结束
     pub(crate) fn request_stop(&mut self) -> bool {
         if !self.active() || self.status.phase == "saving" || self.stop_requested {

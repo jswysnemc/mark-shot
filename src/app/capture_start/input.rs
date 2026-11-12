@@ -10,10 +10,7 @@ use crate::{
 
 /// 【截图起始】【交互可用】按 state 返回起始控件是否接受输入，已选区或画布拖动时不拦截
 fn available(state: &EditorState) -> bool {
-    state.capture_start.visible
-        && !state.input.mouse_down
-        && !state.tool_active
-        && state.selection.zone.is_none()
+    state.capture_start.shows_bar() && !state.input.mouse_down && !state.tool_active
 }
 
 /// 【截图起始】【当前命中】按 state 返回当前显示器上指针命中的控件，起始控件不可用时返回空值
@@ -21,9 +18,10 @@ pub(crate) fn hit(state: &EditorState) -> Option<Control> {
     if !available(state) {
         return None;
     }
-    layout::hit(
+    layout::toolbar_hit(
         state.placements[state.input.pointer.monitor_idx].size,
-        state.capture_start.active(),
+        &state.capture_start,
+        state.input.pointer.monitor_idx,
         state.input.pointer.local,
     )
 }
@@ -66,14 +64,11 @@ pub(crate) fn button(
 /// 【截图起始】【快捷键入口】按 action 触发与顶部按钮相同的录制动作，dirty 返回更新；起始控件不可用时忽略
 pub(crate) fn shortcut(state: &mut EditorState, action: crate::keys::Action, dirty: &mut u32) {
     use crate::keys::Action;
-    if !available(state) {
-        return;
-    }
     let control = match action {
-        Action::RecordVideo => Control::Video,
-        Action::RecordGif => Control::Gif,
-        Action::RecordPause => Control::Pause,
-        Action::RecordStop => Control::Stop,
+        Action::RecordVideo if state.capture_start.visible && available(state) => Control::Video,
+        Action::RecordGif if state.capture_start.visible && available(state) => Control::Gif,
+        Action::RecordPause if state.capture_start.polls_recording() => Control::Pause,
+        Action::RecordStop if state.capture_start.polls_recording() => Control::Stop,
         _ => return,
     };
     activate(state, control, dirty);
@@ -129,6 +124,8 @@ fn activate(state: &mut EditorState, control: Control, dirty: &mut u32) {
         }
         _ => return,
     }
-    super::super::input::refresh_panels(state, dirty);
+    if !matches!(control, Control::Pause | Control::Stop) {
+        super::super::input::refresh_panels(state, dirty);
+    }
     damage(state, dirty);
 }

@@ -150,6 +150,7 @@ impl Node {
                     )?
                     .check()?;
                 self.surface.size = native;
+                self.content.event(WindowEvent::Resize { size });
                 self.dirty = true;
             }
         }

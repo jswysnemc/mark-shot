@@ -19,6 +19,17 @@ impl Setup {
         let result: crate::AppResult<()> = (|| {
             match control {
                 Control::Close => close = true,
+                Control::Field(row) if options::enabled(row, &self.config) => {
+                    self.choice = Some((
+                        row,
+                        crate::ui::controls::Choice::new(
+                            layout::field(self.size, layout::index(row)),
+                            options::choices(row, &self.config, &self.target, self.chinese()),
+                            options::selected(row, &self.config, &self.target),
+                        ),
+                    ));
+                }
+                Control::Field(_) => {}
                 Control::Choice(row, index) if options::enabled(row, &self.config) => {
                     match options::choose(row, index, &mut self.config, &mut self.target) {
                         Outcome::Redraw => {}
@@ -37,6 +48,11 @@ impl Setup {
                 }
                 Control::Choice(..) => {}
                 Control::Cursor => self.config.cursor = !self.config.cursor,
+                Control::Advanced => {
+                    self.advanced = !self.advanced;
+                    self.notice_scroll = 0;
+                    self.requested_size = Some((self.size.0, layout::height(self.advanced)));
+                }
                 Control::Settings => {
                     self.save()?;
                     crate::features::preferences::spawn()?;
@@ -72,6 +88,11 @@ impl Setup {
 }
 
 impl WindowContent for Setup {
+    /// 【录制设置】【按需尺寸】无参数，仅在展开或收起高级选项后请求新高度，不覆盖用户平时调整的宽度
+    fn preferred_size(&self) -> Option<(u32, u32)> {
+        self.requested_size
+    }
+
     /// 【录制设置】【绘制委托】按 canvas 与 scale 绘制当前选项，无返回值
     fn draw(&mut self, canvas: &mut tiny_skia::Pixmap, scale: f32) {
         super::draw::draw(self, canvas, scale);
@@ -79,9 +100,34 @@ impl WindowContent for Setup {
 
     /// 【录制设置】【事件分派】按 event 处理指针、滚轮与键盘，返回原生窗口动作
     fn event(&mut self, event: WindowEvent) -> WindowAction {
+        if let Some((row, choice)) = &mut self.choice {
+            let row = *row;
+            let action = choice.event(&event, self.size);
+            match action {
+                crate::ui::controls::ChoiceEvent::Selected(index) => {
+                    self.choice = None;
+                    return self.activate(Control::Choice(row, index));
+                }
+                crate::ui::controls::ChoiceEvent::Closed => self.choice = None,
+                crate::ui::controls::ChoiceEvent::Keep => return WindowAction::None,
+                crate::ui::controls::ChoiceEvent::Redraw => return WindowAction::Redraw,
+            }
+            if !matches!(event, WindowEvent::Resize { .. } | WindowEvent::Focused(_)) {
+                return WindowAction::Redraw;
+            }
+        }
         match event {
             WindowEvent::Resize { size } => {
                 self.size = size;
+                if self.requested_size == Some(size) {
+                    self.requested_size = None;
+                }
+                // 1. 【录制设置】【窄窗收起】用户或合成器缩小高度后保留参数并收起高级区，避免与底部开始按钮重叠
+                if self.advanced && size.1 < layout::height(true) {
+                    self.advanced = false;
+                    self.notice_scroll = 0;
+                    self.requested_size = None;
+                }
                 WindowAction::Redraw
             }
             // 1. 【录制设置】【设置窗口返回】重新读取偏好，本次指定的格式继续覆盖用户默认值
@@ -130,11 +176,16 @@ impl WindowContent for Setup {
             }
             WindowEvent::Scroll { position, delta } => {
                 // 4. 【录制设置】【滚轮微调】帧率行按滚轮步进，提示区滚动查看完整失败详情
-                if layout::contains(layout::row(self.size, Row::Fps), position) && delta.1 != 0.0 {
+                if self.advanced
+                    && layout::contains(layout::row(self.size, Row::Fps), position)
+                    && delta.1 != 0.0
+                {
                     options::step_frame_rate(if delta.1 < 0.0 { 1 } else { -1 }, &mut self.config);
                     return WindowAction::Redraw;
                 }
-                if layout::contains(layout::notice(self.size), position) && delta.1 != 0.0 {
+                if layout::contains(layout::notice(self.size, self.advanced), position)
+                    && delta.1 != 0.0
+                {
                     self.notice_scroll = self
                         .notice_scroll
                         .saturating_add_signed(if delta.1 > 0.0 { 1 } else { -1 });

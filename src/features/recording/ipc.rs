@@ -10,7 +10,7 @@ use std::{
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
-        mpsc::SyncSender,
+        mpsc::{Receiver, SyncSender},
     },
     time::Duration,
 };
@@ -137,10 +137,31 @@ impl Server {
         })
     }
 
-    /// 【录制控制】【绑定会话】按 controller 更新唯一活动录制，返回空值
-    pub fn attach(&self, controller: &super::controller::Controller) {
-        *self.session.lock().unwrap() =
-            Some((controller.sender.clone(), controller.status.clone()));
+    /// 【录制控制】【准备绑定】按 sender 与 status 绑定倒计时状态，工作线程尚未创建时也接受停止命令，无返回值
+    pub(super) fn bind(&self, sender: SyncSender<Command>, status: Shared) {
+        *self.session.lock().unwrap() = Some((sender, status));
+    }
+
+    /// 【录制控制】【绑定会话】按 controller 替换准备状态，pending 中已接收的命令在同一锁内交付，不丢失交接期间的停止
+    pub fn attach(
+        &self,
+        controller: &super::controller::Controller,
+        pending: Option<&Receiver<Command>>,
+    ) {
+        let mut session = self.session.lock().unwrap();
+        *session = Some((controller.sender.clone(), controller.status.clone()));
+        if let Some(pending) = pending {
+            for command in pending.try_iter() {
+                if let Err(error) = controller.sender.try_send(command) {
+                    log::error!("【录制控制】【准备交接】控制请求交付失败: {error}");
+                }
+            }
+        }
+    }
+
+    /// 【录制控制】【回到准备】无参数，清除已结束会话，保留独占锁与命令服务供设置窗口继续使用
+    pub(super) fn clear(&self) {
+        *self.session.lock().unwrap() = None;
     }
 }
 

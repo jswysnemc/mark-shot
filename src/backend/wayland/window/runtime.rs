@@ -329,6 +329,7 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
             continue;
         }
         state.sync_stacking(&qh);
+        state.sync_content_size();
         state.sync_dialog(&qh);
         state.sync_popup(&qh, None);
         state

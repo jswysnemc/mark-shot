@@ -4,7 +4,7 @@ mod draw;
 mod events;
 mod schedule;
 
-use super::fonts;
+use super::{fonts, host};
 use crate::backend::window::{self, WindowSpec};
 use schedule::Schedule;
 use std::{
@@ -16,8 +16,11 @@ use tiny_skia::Rect;
 
 /// 小组件的固定逻辑尺寸
 const SIZE: (u32, u32) = (272, 56);
+/// 本地取消命令的最长观察间隔，数字未变化时不重新绘制
+const CONTROL_POLL: Duration = Duration::from_millis(50);
 
 pub(super) struct Countdown {
+    host: host::Shared,
     fonts: fonts::Shared,
     duration: Duration,
     schedule: Option<Schedule>,
@@ -26,6 +29,7 @@ pub(super) struct Countdown {
     pressed: bool,
     deadline: Option<Instant>,
     completed: Rc<Cell<bool>>,
+    displayed_seconds: u64,
 }
 
 impl Countdown {
@@ -52,8 +56,9 @@ impl Countdown {
     fn begin(&mut self, now: Instant) {
         if self.schedule.is_none() {
             let schedule = Schedule::new(now + self.duration);
-            self.deadline = Some(schedule.next_wake(now));
+            self.deadline = Some(schedule.next_wake(now).min(now + CONTROL_POLL));
             self.schedule = Some(schedule);
+            self.host.borrow_mut().countdown(self.duration.as_secs());
         }
     }
 }
@@ -63,6 +68,7 @@ impl Countdown {
 /// 参数：fonts 与准备窗口共享的字库、duration 倒计时时长、summary 目标与格式摘要；
 /// 返回倒计时是否完整结束，用户取消返回 false，平台窗口故障返回错误
 pub(super) fn run(
+    host: host::Shared,
     fonts: fonts::Shared,
     duration: Duration,
     summary: String,
@@ -76,6 +82,7 @@ pub(super) fn run(
             minimum: SIZE,
         },
         Countdown {
+            host,
             fonts,
             duration,
             schedule: None,
@@ -84,6 +91,7 @@ pub(super) fn run(
             pressed: false,
             deadline: None,
             completed: completed.clone(),
+            displayed_seconds: duration.as_secs().max(1),
         },
     )?;
     Ok(completed.get())

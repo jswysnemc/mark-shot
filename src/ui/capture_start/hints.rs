@@ -46,7 +46,7 @@ pub(crate) fn groups(state: &EditorState, cn: bool) -> (Vec<Hint>, Vec<Hint>) {
     if free {
         selection.push(Hint {
             key: ", / .".into(),
-            title: label("切换历史选区", "Recent regions"),
+            title: label("历史选区", "Recent regions"),
         });
     }
     for (action, title) in [
@@ -59,7 +59,10 @@ pub(crate) fn groups(state: &EditorState, cn: bool) -> (Vec<Hint>, Vec<Hint>) {
     let session = if state.capture_start.active() {
         [
             (Action::RecordPause, label("暂停 / 继续", "Pause / resume")),
-            (Action::RecordStop, label("停止并保存", "Stop and save")),
+            (
+                Action::RecordStop,
+                super::text::control_label(super::Control::Stop, &state.capture_start.status, cn),
+            ),
         ]
     } else {
         [
@@ -75,6 +78,14 @@ pub(crate) fn groups(state: &EditorState, cn: bool) -> (Vec<Hint>, Vec<Hint>) {
         (Action::Settings, label("设置", "Settings")),
     ]) {
         push(&mut recording, &map, action, title);
+    }
+    if !state.region() {
+        push(
+            &mut recording,
+            &map,
+            Action::ToggleUi,
+            label("切换工具栏", "Toggle toolbar"),
+        );
     }
     (selection, recording)
 }
@@ -120,7 +131,12 @@ pub(crate) fn draw(
         // 2. 【截图起始】【键位键帽】按键文本放在浅色圆角块内，与说明文字区分开
         let key = controls::fit_label(painter, &hint.key, 10.0, key_column - 12.0);
         let key_width = (painter.measure(&key, 10.0) + 10.0).min(key_column - 4.0);
-        let cap = rect(cell.left(), cell.top() + 2.0, key_width, 16.0);
+        let cap = rect(
+            cell.left(),
+            cell.top() + 2.0,
+            key_width,
+            (cell.height() - 4.0).min(16.0),
+        );
         painter.fill_rounded(cap, 4.0, palette.alternate);
         painter.text(cap, &key, TextStyle::new(10.0, palette.text).center());
         let title = controls::fit_label(painter, hint.title, 11.0, cell.width() - key_column - 4.0);

@@ -24,12 +24,22 @@ pub(super) fn label(control: Control, paused: bool, cn: bool) -> &'static str {
     }
 }
 
+/// 【截图录制】【阶段按钮】按 control、status 和 cn 返回当前可执行动作，倒计时与启动阶段取消录制而不是保存
+pub(super) fn control_label(control: Control, status: &Status, cn: bool) -> &'static str {
+    if control == Control::Stop && matches!(status.phase.as_str(), "countdown" | "starting") {
+        if cn { "取消录制" } else { "Cancel" }
+    } else {
+        label(control, status.phase == "paused", cn)
+    }
+}
+
 /// 【截图起始】【录制类型】按 status 的输出路径和 cn 返回 GIF 或录屏名称
 fn kind(status: &Status, cn: bool) -> &'static str {
-    if status
-        .output
-        .as_ref()
-        .is_some_and(|path| path.ends_with(".gif"))
+    if status.format == "gif"
+        || status
+            .output
+            .as_ref()
+            .is_some_and(|path| path.ends_with(".gif"))
     {
         "GIF"
     } else if cn {

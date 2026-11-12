@@ -6,6 +6,58 @@ use crate::{
     ui::capture_start::{Control, layout},
 };
 
+/// 【截图录制测试】【工具栏避让】全屏选区显示编辑工具栏时，录制栏不能遮住截图工具按钮
+#[test]
+fn recording_bar_remains_clear_of_the_editing_toolbar() {
+    let mut state = editor();
+    state.capture_start.visible = false;
+    state.capture_start.status.phase = "recording".into();
+    state.selection.zone = state.placements[0].rect();
+    state.ui_hidden = false;
+    state.toolbar.monitor_idx = 0;
+    state.toolbar.position = (100.0, 8.0);
+    state.toolbar.render_pos = state.toolbar.position;
+    state.toolbar.size = (1000.0, 40.0);
+    state.toolbar.opacity = 1.0;
+    for top in [8.0, 56.0] {
+        state.toolbar.position.1 = top;
+        state.toolbar.render_pos = state.toolbar.position;
+        placement::sync(&mut state, &mut 0);
+        let bar = layout::toolbar(state.placements[0].size, &state.capture_start, 0);
+        let tools = tiny_skia::Rect::from_xywh(100.0, top, 1000.0, 40.0).unwrap();
+        assert!(!crate::utils::rects_overlap(&bar, &tools));
+    }
+    let stop = layout::toolbar_controls(state.placements[0].size, &state.capture_start, 0)
+        .into_iter()
+        .find(|(control, _)| *control == Control::Stop)
+        .unwrap()
+        .1;
+    crate::app::input::handle_pointer_move(
+        &mut state,
+        0,
+        f64::from(stop.left() + stop.width() / 2.0),
+        f64::from(stop.top() + stop.height() / 2.0),
+        &mut 0,
+    );
+    for pressed in [true, false] {
+        crate::app::input::handle_pointer_button(&mut state, MouseButton::Left, pressed, &mut 0);
+    }
+    assert!(state.capture_start.stop_requested);
+}
+
+/// 【截图起始测试】【后台停止】截图选区形成后仍能停止后台录制，不能因起始提示隐藏而丢弃控制快捷键
+#[test]
+fn recording_stop_survives_completed_screenshot_selection() {
+    let mut state = editor();
+    state.capture_start.status.phase = "recording".into();
+    state.capture_start.status.window_open = true;
+    click(&mut state, Control::Fullscreen);
+    assert!(!state.capture_start.visible);
+    state.mode = Mode::Ocr;
+    crate::app::actions::run(&mut state, crate::keys::Action::RecordStop, &mut 0);
+    assert!(state.capture_start.stop_requested);
+}
+
 /// 【截图起始测试】【编辑器】无参数，返回启用起始界面的轻量测试编辑器
 fn editor() -> EditorState {
     let mut state = crate::app::input::tests::editor();

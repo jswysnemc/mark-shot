@@ -1,6 +1,7 @@
 //! 【录制会话】【进程宿主】IPC 服务与录制控制器脱离窗口存活，界面关闭后录制继续
 
 use super::super::{Status, Target, controller::Controller, ipc::Server};
+use super::preparation::Preparation;
 use crate::config::recording::Recording;
 use std::{cell::RefCell, rc::Rc};
 
@@ -12,6 +13,7 @@ pub(super) struct Host {
     controller: Option<Controller>,
     target: Target,
     request: Option<Recording>,
+    preparation: Option<Preparation>,
 }
 
 impl Host {
@@ -22,6 +24,7 @@ impl Host {
             controller: None,
             target,
             request: None,
+            preparation: None,
         })
     }
 
@@ -45,6 +48,21 @@ impl Host {
         self.request.take()
     }
 
+    /// 【录制会话】【准备发布】按 config 发布倒计时或启动阶段，设置窗口关闭后仍能通过截图界面查询与取消
+    pub(super) fn prepare(&mut self, config: &Recording) {
+        let preparation = Preparation::new(config);
+        self.server
+            .bind(preparation.sender.clone(), preparation.status.clone());
+        self.preparation = Some(preparation);
+    }
+
+    /// 【录制会话】【倒计时更新】按 seconds 同步剩余秒数，返回本地命令服务是否已收到取消
+    pub(super) fn countdown(&mut self, seconds: u64) -> bool {
+        self.preparation
+            .as_mut()
+            .is_some_and(|preparation| preparation.update(seconds))
+    }
+
     /// 【录制会话】【开始录制】按 config 启动工作线程并绑定命令服务，返回配置或输出错误
     ///
     /// 倒计时已由小组件在界面上完成，工作线程立即进入采集，保证小组件不出现在录制画面中
@@ -53,7 +71,13 @@ impl Host {
         // 1. 【录制会话】【旧会话回收】上一轮已结束的控制器在此释放，避免线程句柄堆积
         self.controller = None;
         let controller = Controller::start(config, self.target.clone())?;
-        self.server.attach(&controller);
+        self.server.attach(
+            &controller,
+            self.preparation
+                .as_ref()
+                .map(|preparation| &preparation.commands),
+        );
+        self.preparation = None;
         self.controller = Some(controller);
         Ok(())
     }
@@ -74,6 +98,14 @@ impl Host {
 
     /// 【录制会话】【会话重置】无参数，释放已结束的控制器，保留目标与命令服务
     pub(super) fn reset(&mut self) {
+        let failed = self
+            .controller
+            .as_ref()
+            .is_some_and(|controller| controller.snapshot().phase == "failed");
         self.controller = None;
+        self.preparation = None;
+        if !failed {
+            self.server.clear();
+        }
     }
 }

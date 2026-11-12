@@ -1,6 +1,7 @@
 //! 【原生窗口】【接口】普通 xdg-toplevel 窗口与内容之间的事件契约
 
 mod capture_visibility;
+mod content_size;
 mod deadline;
 mod dialog;
 mod dialog_protocol;

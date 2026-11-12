@@ -22,6 +22,11 @@ use super::panels::settings::{
 
 /// 【界面】【动作分派】在 editor_state 中执行 action 并处理工具上下文；dirty_mask 返回重绘显示器，无返回值
 pub fn run(editor_state: &mut EditorState, action: Action, dirty_mask: &mut u32) {
+    // 1. 【截图录制】【独立控制】后台暂停和停止不依赖截图工具、识别或上传阶段，避免其他任务屏蔽录制控制
+    if matches!(action, Action::RecordPause | Action::RecordStop) {
+        super::capture_start::input::shortcut(editor_state, action, dirty_mask);
+        return;
+    }
     if editor_state.selection_translation.busy() {
         if action == Action::Cancel {
             super::selection_translation::tasks::cancel(editor_state, dirty_mask);

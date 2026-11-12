@@ -1,9 +1,13 @@
 //! 【界面控件】【基础按钮】独立窗口共用紧凑按钮与文字截断规则
 
+mod choice;
 mod segmented;
+mod select;
 mod switch;
 
+pub use choice::{Choice, ChoiceEvent};
 pub use segmented::{segment, segmented};
+pub use select::select;
 pub use switch::{SWITCH_SIZE, switch};
 
 use tiny_skia::{Rect, Stroke};

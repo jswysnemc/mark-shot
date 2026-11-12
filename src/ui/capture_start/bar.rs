@@ -26,11 +26,11 @@ pub(super) fn draw(
 ) {
     let active = start.active();
     let paused = start.status.phase == "paused";
-    let top = layout::top(size, active);
+    let top = layout::toolbar(size, start, monitor);
     controls::frame(painter, top, palette.base, palette.border, 8.0);
     // 1. 【截图起始】【录制状态】活动录制在栏内显示状态点、类型、阶段和时长
     if active {
-        let area = layout::status(size);
+        let area = layout::toolbar_status(size, start, monitor);
         painter.fill_rounded(
             rect(
                 area.left() - 7.0,
@@ -67,7 +67,7 @@ pub(super) fn draw(
         Some(Format::Gif) => Control::Gif,
         None => Control::Region,
     };
-    for (control, bounds) in layout::controls(size, active) {
+    for (control, bounds) in layout::toolbar_controls(size, start, monitor) {
         let enabled = match control {
             Control::Video | Control::Gif => start.can_record(),
             Control::Pause => start.can_pause(),
@@ -79,13 +79,16 @@ pub(super) fn draw(
         let icon = match control {
             Control::Pause if paused => Some(icons::SCROLL_RESUME),
             Control::Pause => Some(icons::SCROLL_PAUSE),
+            Control::Stop if matches!(start.status.phase.as_str(), "countdown" | "starting") => {
+                Some(icons::CLOSE)
+            }
             Control::Stop => Some(icons::SAVE),
             _ => None,
         };
         controls::icon_button(
             painter,
             bounds,
-            text::label(control, paused, cn),
+            text::control_label(control, &start.status, cn),
             icon,
             controls::ButtonStyle {
                 fill: if chosen {
@@ -137,7 +140,6 @@ pub(super) fn draw(
 
 /// 【截图起始】【字形文本】按 start 和 cn 返回顶部栏本帧会绘制的全部文字，供调用方预先准备缺失字形
 pub(super) fn glyphs(start: &State, cn: bool) -> String {
-    let paused = start.status.phase == "paused";
     let mut value = String::new();
     for control in [
         Control::Region,
@@ -147,7 +149,7 @@ pub(super) fn glyphs(start: &State, cn: bool) -> String {
         Control::Pause,
         Control::Stop,
     ] {
-        value.push_str(text::label(control, paused, cn));
+        value.push_str(text::control_label(control, &start.status, cn));
     }
     value.push_str(&text::status(&start.status, cn));
     value.push_str(&text::message(&start.status, &start.message, cn));

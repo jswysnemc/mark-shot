@@ -3,6 +3,83 @@
 use super::{Control, State, layout, text};
 use crate::features::recording::Status;
 
+/// 【截图起始测试】【提示完整性】常见低分辨率必须同时显示两组各七条提示，不能把录制快捷键裁掉
+#[test]
+fn expanded_hints_remain_visible_on_common_laptop_outputs() {
+    for size in [
+        (853, 480),
+        (853, 533),
+        (1024, 640),
+        (1270, 720),
+        (1366, 768),
+        (1920, 1080),
+    ] {
+        let grid = layout::hint_grid(size, (7, 7)).unwrap();
+        assert!(grid.columns * grid.rows >= 14, "{size:?}");
+    }
+}
+
+/// 【截图录制测试】【编辑阶段控制】起始提示隐藏后只显示录制控制，空闲会话和文件编辑不保留无效控制栏
+#[test]
+fn compact_recording_bar_survives_intro_without_reintroducing_capture_entries() {
+    let mut state = State {
+        recording_controls: true,
+        ..Default::default()
+    };
+    state.status.phase = "recording".into();
+    assert!(state.shows_bar() && state.polls_recording());
+    for size in [(1270, 720), (640, 360), (320, 240)] {
+        let controls = layout::toolbar_controls(size, &state, 0);
+        assert_eq!(
+            controls
+                .iter()
+                .map(|(control, _)| *control)
+                .collect::<Vec<_>>(),
+            [Control::Pause, Control::Stop]
+        );
+        let status = layout::toolbar_status(size, &state, 0);
+        assert!(status.right() < controls[0].1.left());
+        assert!(status.width() >= 60.0);
+        for (control, bounds) in controls {
+            assert_eq!(
+                layout::toolbar_hit(
+                    size,
+                    &state,
+                    0,
+                    (
+                        f64::from(bounds.left() + bounds.width() / 2.0),
+                        f64::from(bounds.top() + bounds.height() / 2.0)
+                    )
+                ),
+                Some(control)
+            );
+        }
+    }
+    state.status.phase = "idle".into();
+    assert!(!state.shows_bar());
+    state.recording_controls = false;
+    assert!(!state.polls_recording());
+}
+
+/// 【截图录制测试】【倒计时取消】准备阶段明确显示取消，兼容旧状态来源没有格式字段的情况
+#[test]
+fn countdown_controls_cancel_and_preserve_legacy_status_decoding() {
+    let mut status: Status =
+        serde_json::from_str(r#"{"phase":"countdown","elapsed_ms":0,"detail":"3","output":null}"#)
+            .unwrap();
+    status.format = "gif".into();
+    assert_eq!(text::status(&status, true), "GIF · 3 秒后开始");
+    assert_eq!(
+        text::control_label(Control::Stop, &status, true),
+        "取消录制"
+    );
+    status.phase = "recording".into();
+    assert_eq!(
+        text::control_label(Control::Stop, &status, true),
+        "停止并保存"
+    );
+}
+
 /// 【截图起始测试】【重复停止】已发送停止后仍收到旧录制快照也不允许再次停止，保存阶段不接受取消导出
 #[test]
 fn stop_is_claimed_once_until_the_session_ends() {
@@ -51,12 +128,12 @@ fn entry_and_message_visibility_follow_the_session() {
     assert!(!state.message_visible());
 }
 
-/// 【截图起始测试】【低分辨率】提示宽高不超过四分之一，入口始终位于屏幕内且不相交
+/// 【截图起始测试】【低分辨率】提示保留完整键位列宽且不超出紧凑范围，入口始终位于屏幕内且不相交
 #[test]
 fn compact_panels_fit_low_resolution_and_scaled_outputs() {
     for size in [(1920, 1080), (1270, 720), (853, 480), (640, 360)] {
         let hints = layout::hints(size);
-        assert!(hints.width() <= size.0 as f32 / 4.0);
+        assert!(hints.width() <= size.0 as f32 / if size.0 < 1280 { 2.5 } else { 4.0 });
         assert!(hints.height() <= size.1 as f32 / 4.0);
         assert!(hints.bottom() <= size.1 as f32 && hints.right() <= size.0 as f32);
         for active in [false, true] {
@@ -124,8 +201,10 @@ fn hint_grid_never_exceeds_the_reserved_panel() {
             assert!(grid.bounds.width() <= limit.width());
             assert!(grid.bounds.height() <= limit.height());
             assert!(grid.bounds.bottom() <= limit.bottom() && grid.bounds.right() <= limit.right());
-            let fit = ((limit.height() - 16.0) / layout::HINT_ROW).max(0.0) as usize;
+            let fit =
+                ((limit.height() - grid.padding * 2.0) / grid.row_height + 0.001).max(0.0) as usize;
             assert!(grid.rows <= fit && grid.rows > 0);
+            assert!((16.0..=layout::HINT_ROW).contains(&grid.row_height));
             for column in 0..grid.columns {
                 let cell = layout::hint_cell(&grid, column, 0);
                 assert!(cell.right() <= grid.bounds.right());
