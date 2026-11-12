@@ -2,6 +2,7 @@
 
 from dataclasses import asdict
 import io
+import hashlib
 import json
 from pathlib import Path
 import tarfile
@@ -14,6 +15,8 @@ def write_package(directory, replacements=None, extra=()):
     """【原生发布测试】【归档生成】在 directory 写入归档，replacements 替换成员，extra 追加成员，返回文件路径"""
     files = {name: b"license or documentation\n" for name in REQUIRED}
     files.update({"mark-shot": b"\x7fELFtest-binary", "SOURCE-COMMIT": b"a" * 40 + b"\n", "native-help.txt": b"Usage: mark-shot [options]\n", "native-linkage.txt": b"libc.so.6 => /lib/libc.so.6\n"})
+    files["media/libmarkshot-media.so"] = b"\x7fELFtest-media-library"
+    files["media/SHA256SUMS"] = "".join(f"{hashlib.sha256(files['media/' + name]).hexdigest()}  {name}\n" for name in ("libmarkshot-media.so", "MEDIA-SOURCES.tar.xz")).encode()
     files.update(replacements or {})
     archive = Path(directory) / ARCHIVE_NAME
     with tarfile.open(archive, "w:gz") as package:

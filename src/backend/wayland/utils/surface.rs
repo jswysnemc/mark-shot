@@ -74,6 +74,7 @@ pub struct SurfaceData {
 
     pub shm_buffer: Option<ShmBuffer>,
     pub(crate) spare_buffer: Option<ShmBuffer>,
+    pub(crate) buffer_history: crate::backend::wayland::overlay::buffer_history::History,
     pub(crate) waiting_release: bool,
     /// Whether the surface currently has a buffer attached.
     pub mapped: bool,

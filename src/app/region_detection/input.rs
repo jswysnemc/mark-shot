@@ -19,6 +19,13 @@ fn selecting(state: &EditorState) -> bool {
 
 /// 【截图区域识别】【悬停刷新】按 state 的当前指针更新图像或窗口候选，dirty 返回完整损坏范围
 pub(crate) fn refresh(state: &mut EditorState, dirty: &mut u32) {
+    if crate::app::capture_start::input::hit(state).is_some()
+        || state.capture_start.pressed.is_some()
+    {
+        draw::apply(state, None);
+        apply_damage_rects(state, dirty);
+        return;
+    }
     if !selecting(state) {
         sync(state, dirty);
         return;

@@ -19,19 +19,36 @@ pub fn checkerboard(canvas: &mut tiny_skia::Pixmap, scale: f32) {
 
 /// 【显示画布】【局部底纹】按 scale 和 offset 的窗口物理坐标填充 canvas，局部恢复保持与整窗相同相位，无返回值
 pub fn checkerboard_region(canvas: &mut tiny_skia::Pixmap, scale: (f32, f32), offset: (i32, i32)) {
+    let area = tiny_skia::IntRect::from_xywh(0, 0, canvas.width(), canvas.height()).unwrap();
+    checkerboard_area(canvas, scale, offset, area);
+}
+
+/// 【显示画布】【范围底纹】按 scale、offset 和 area 恢复 canvas 的相交底纹，返回值为空，窗口外相位保持不变
+pub(crate) fn checkerboard_area(
+    canvas: &mut tiny_skia::Pixmap,
+    scale: (f32, f32),
+    offset: (i32, i32),
+    area: tiny_skia::IntRect,
+) {
+    let full = tiny_skia::IntRect::from_xywh(0, 0, canvas.width(), canvas.height()).unwrap();
+    let Some(area) = area.intersect(&full) else {
+        return;
+    };
     let stride = canvas.width() as usize * 4;
     let colors = [[51, 55, 62, 255], [60, 64, 72, 255]];
     let cell = ((12.0 * scale.0).max(1.0), (12.0 * scale.1).max(1.0));
     let rows = [0_usize, 1].map(|phase| {
-        (0..canvas.width())
+        (area.left()..area.right())
             .flat_map(|column| {
                 colors[(((column as f32 + offset.0 as f32) / cell.0).floor() as i32 + phase as i32)
                     .rem_euclid(2) as usize]
             })
             .collect::<Vec<_>>()
     });
-    for (row, target) in canvas.data_mut().chunks_exact_mut(stride).enumerate() {
-        target.copy_from_slice(
+    let bytes = area.width() as usize * 4;
+    for row in area.top()..area.bottom() {
+        let first = row as usize * stride + area.left() as usize * 4;
+        canvas.data_mut()[first..first + bytes].copy_from_slice(
             &rows
                 [(((row as f32 + offset.1 as f32) / cell.1).floor() as i32).rem_euclid(2) as usize],
         );

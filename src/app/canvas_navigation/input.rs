@@ -13,7 +13,8 @@ use std::time::{Duration, Instant};
 
 /// 【画布导航】【控件保护】按state返回是否有优先接收输入的屏幕控件或弹层
 fn over_ui(state: &EditorState) -> bool {
-    state.text_context_menu.is_some()
+    crate::app::capture_start::input::hit(state).is_some()
+        || state.text_context_menu.is_some()
         || state.external_panel.kind.is_some()
         || state.selection_translation.busy()
         || state.upload.busy()
@@ -110,6 +111,13 @@ pub(crate) fn handle_pointer_move(
     let (monitor, lx, ly) =
         crate::utils::global_point_to_local(&state.placements, global, monitor, (x, y));
     state.input.pointer = PointerState::new(monitor, (lx, ly), global);
+    if crate::app::capture_start::input::pointer(state, dirty) {
+        crate::app::region_detection::input::refresh(state, dirty);
+        return;
+    }
+    if crate::app::image_window::input::pointer(state, dirty) {
+        return;
+    }
     super::preview::follow(state, dirty);
     state.ensure_navigation();
     let point = state.navigation_point();
@@ -188,6 +196,12 @@ pub(crate) fn handle_pointer_button(
     pressed: bool,
     dirty: &mut u32,
 ) {
+    if crate::app::capture_start::input::button(state, button, pressed, dirty) {
+        return;
+    }
+    if crate::app::image_window::input::button(state, button, pressed, dirty) {
+        return;
+    }
     if pressed {
         super::preview::clear(state, dirty);
         if button != MouseButton::Left || over_ui(state) {

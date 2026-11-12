@@ -30,6 +30,14 @@ pub(super) fn run_overlay(
         if let Some(left) = pacing.source_residency.timeout(Instant::now()) {
             timeout = Some(timeout.map_or(left, |timeout| timeout.min(left)));
         }
+        if let Some(left) = pacing
+            .foreground_residency
+            .timeout(Instant::now(), |monitor| {
+                !is_dirty(dirty_mask, monitor) && !pacing.owes_to(monitor)
+            })
+        {
+            timeout = Some(timeout.map_or(left, |timeout| timeout.min(left)));
+        }
         if let Some(deadline) = pointer_wait {
             let left = deadline.saturating_duration_since(Instant::now());
             timeout = Some(timeout.map_or(left, |t| t.min(left)));
@@ -100,6 +108,20 @@ pub(super) fn run_overlay(
             }
         }
         super::region_detection::task::poll(editor_state, &mut dirty_mask);
+        super::capture_start::sync(editor_state, &mut dirty_mask);
+        if let Some(action) = editor_state.image_window.action.take() {
+            if let Err(error) = overlay.image_window_action(action, editor_state.input.popup_serial)
+            {
+                log::error!("【图片窗口】【系统交互】{error}");
+            }
+            if matches!(
+                action,
+                crate::types::image_window::Action::Move
+                    | crate::types::image_window::Action::Resize(_)
+            ) {
+                editor_state.image_window.pressed = None;
+            }
+        }
         super::region_detection::input::sync(editor_state, &mut dirty_mask);
         super::upload::start(editor_state, overlay.as_mut(), &mut dirty_mask);
         super::annotation_selection::sync(editor_state, &mut dirty_mask);
@@ -155,6 +177,9 @@ pub(super) fn run_overlay(
         }
 
         if editor_state.finish.is_some() || editor_state.cancel {
+            if !editor_state.cancel {
+                super::selection_history::record(editor_state);
+            }
             break;
         }
         if let Some(action) = editor_state.external_action_requested.take() {
@@ -225,6 +250,7 @@ pub(super) fn run_overlay(
             editor_state.file_canvas.as_ref().map(|file| &file.original),
             Instant::now(),
         );
+        super::foreground_residency::reclaim(editor_state, &mut pacing, dirty_mask, Instant::now());
     }
 
     Ok(false)
@@ -259,6 +285,10 @@ pub(super) fn poll_timeout(editor_state: &EditorState) -> Option<Duration> {
         None
     };
     if let Some(interval) = editor_state.selection_translation.poll_interval() {
+        timeout = Some(timeout.map_or(interval, |other| other.min(interval)));
+    }
+    if editor_state.capture_start.visible {
+        let interval = editor_state.capture_start.query.timeout();
         timeout = Some(timeout.map_or(interval, |other| other.min(interval)));
     }
     if let Some(deadline) = editor_state.selection_translation.ocr_deadline {
@@ -302,6 +332,7 @@ pub(super) fn poll_timeout(editor_state: &EditorState) -> Option<Duration> {
 }
 
 pub(super) fn poll_background_work(editor_state: &mut EditorState, dirty_mask: &mut u32) {
+    super::capture_start::poll(editor_state, dirty_mask);
     if let Some(fonts) = editor_state.text.system_fonts.take_if(|f| f.is_finished())
         && let Ok(db) = fonts.join()
     {
@@ -342,6 +373,7 @@ pub(super) fn handle_event(editor_state: &mut EditorState, ev: OverlayEvent, dir
             editor_state.input.keyboard_focus = Some(monitor_idx)
         }
         OverlayEvent::FocusLost { monitor_idx } => {
+            editor_state.capture_start.pressed = None;
             super::canvas_navigation::input::focus_lost(editor_state, dirty_mask);
             super::annotation_collection::input::focus_lost(editor_state, dirty_mask);
             super::selection_size::apply::commit(editor_state, dirty_mask);

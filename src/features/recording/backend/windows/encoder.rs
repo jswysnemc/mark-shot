@@ -2,7 +2,7 @@
 
 use super::{device::Device, media_type};
 use crate::config::recording::Recording;
-use std::path::Path;
+use std::{cell::Cell, path::Path};
 use windows::{
     Win32::Media::MediaFoundation::*,
     core::{Interface, PCWSTR, Result},
@@ -13,10 +13,11 @@ pub(super) struct Encoder {
     video: u32,
     audio: Option<u32>,
     pub hardware: bool,
+    finalized: Cell<bool>,
 }
 
 impl Encoder {
-    /// 【Windows录制】【编码器建立】按设备、路径、尺寸与配置建立编码，require_hardware 控制硬件必要性
+    /// 【Windows录制】【编码器建立】按 device、path、size 与 config 建立编码，hardware 控制是否允许硬件转换器，返回系统错误
     pub fn new(
         device: Option<&Device>,
         path: &Path,
@@ -80,6 +81,7 @@ impl Encoder {
                 video,
                 audio,
                 hardware,
+                finalized: Cell::new(false),
             })
         }
     }
@@ -128,6 +130,22 @@ impl Encoder {
 
     /// 【Windows录制】【文件收尾】无参数，排空编码与写出 MP4 索引，错误必须传给保存状态
     pub fn finish(&self) -> Result<()> {
+        self.finalized.set(true);
         unsafe { self.writer.Finalize() }
     }
 }
+
+impl Drop for Encoder {
+    /// 【Windows录制】【异常收尾】无参数，提前退出时尝试写出已接收帧的索引，失败保留原始录制错误
+    fn drop(&mut self) {
+        if !self.finalized.get()
+            && let Err(error) = self.finish()
+        {
+            log::error!("【Windows录制】【异常收尾】MP4 finalize: {error}");
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "encoder_tests.rs"]
+mod tests;

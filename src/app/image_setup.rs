@@ -102,6 +102,7 @@ fn setup(
     editor.enable_region_rendering();
     super::frame_backdrop::configure(&mut editor, overlay.as_mut(), preferred);
     editor.file_canvas = Some(file);
+    editor.image_window.enabled = overlay.image_window_size().is_some();
     editor.selection.zone = Some(image_region);
 
     // 2. 【图片编辑】【目标表面】仅映射目标显示器，背景仍使用共享内存表面，输入不影响其他显示器

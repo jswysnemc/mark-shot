@@ -8,6 +8,11 @@
 use crate::utils::copy_swizzled;
 use smithay_client_toolkit::shm::slot::{Buffer, SlotPool};
 use wayland_client::protocol::{wl_buffer, wl_shm};
+
+#[cfg(test)]
+#[path = "shm_tests.rs"]
+mod tests;
+
 pub struct ShmBuffer {
     pub buffer: Buffer,
     reclaimed: bool,
@@ -35,6 +40,11 @@ pub fn create_shm_buffer(
 }
 
 impl ShmBuffer {
+    /// 【共享缓冲】【内容失效】无参数，返回空闲回收是否已经移除旧像素，调用方随后必须完整恢复
+    pub(crate) fn reclaimed(&self) -> bool {
+        self.reclaimed
+    }
+
     /// 【共享缓冲】【服务端占用】无参数，返回当前槽位是否仍有服务端正在读取的缓冲
     pub(crate) fn active(&self) -> bool {
         self.buffer.slot().has_active_buffers()
@@ -83,6 +93,50 @@ impl ShmBuffer {
                 .canvas(&self.buffer)
                 .ok_or("the destination native buffer became active")?;
             super::shm_sparse::copy(&mut destination[first..first + count], &row[..count], false);
+        }
+        Ok(())
+    }
+
+    /// 【共享缓冲】【差异复制】按 pool、source 和 damage 修复已释放目标；回收后的槽位完整复制，返回尺寸或占用错误
+    pub(crate) fn copy_region(
+        &mut self,
+        pool: &mut SlotPool,
+        source: &ShmBuffer,
+        damage: Option<crate::types::DamageRect>,
+    ) -> crate::AppResult {
+        let Some((x, y, width, height)) = damage.filter(|_| !self.reclaimed) else {
+            return self.copy_from(pool, source);
+        };
+        if self.buffer.height() != source.buffer.height()
+            || self.buffer.stride() != source.buffer.stride()
+        {
+            return Err("native frame buffer dimensions changed".into());
+        }
+        let stride = self.buffer.stride() as usize;
+        let right = (x.saturating_add(width) as usize).min(stride / 4);
+        let bottom = (y.saturating_add(height) as usize).min(self.buffer.height() as usize);
+        if x as usize >= right || y as usize >= bottom {
+            return Ok(());
+        }
+        self.write(pool, |_| Ok(()))?;
+        let slot = source.buffer.slot();
+        let bytes = (right - x as usize) * 4;
+        let mut scratch = vec![0; bytes.min(64 * 1024)];
+        // 1. 【共享缓冲】【累计损坏】备用帧保留其他有效像素，仅复制其缺少的历次损坏并集
+        for row in y as usize..bottom {
+            for offset in (0..bytes).step_by(scratch.len()) {
+                let first = row * stride + x as usize * 4 + offset;
+                let count = scratch.len().min(bytes - offset);
+                scratch[..count].copy_from_slice(&pool.raw_data_mut(&slot)[first..first + count]);
+                let destination = pool
+                    .canvas(&self.buffer)
+                    .ok_or("the destination native buffer became active")?;
+                super::shm_sparse::copy(
+                    &mut destination[first..first + count],
+                    &scratch[..count],
+                    false,
+                );
+            }
         }
         Ok(())
     }

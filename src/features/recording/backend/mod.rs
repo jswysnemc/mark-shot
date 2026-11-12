@@ -1,8 +1,5 @@
 //! 【录制后端】【平台边界】原始视频留在平台线程，主界面仅接收有界状态
 
-pub(super) mod component;
-#[cfg(target_os = "linux")]
-mod linux;
 #[cfg(target_os = "windows")]
 mod windows;
 
@@ -24,7 +21,7 @@ pub fn run(
     status: &Shared,
 ) -> Result<(), String> {
     #[cfg(target_os = "linux")]
-    return linux::run(config, target, path, commands, status);
+    return super::session::run(config, target, path, commands, status);
     #[cfg(target_os = "windows")]
     return windows::run(config, target, path, commands, status);
 }

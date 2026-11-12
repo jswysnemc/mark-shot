@@ -26,9 +26,14 @@ pub(crate) fn has_writable_buffer(surface: &SurfaceData) -> bool {
 
 /// 【截图覆盖层】【释放进度】按state处理服务端释放；reclaim仅允许透明模式回收备用页，唤醒等待槽位的输出，无返回值
 pub(super) fn released(state: &mut OverlayState, reclaim: bool) {
+    let now = Instant::now();
     for (&monitor, surface) in &mut state.surfaces {
-        if reclaim && let Some(spare) = &mut surface.spare_buffer {
-            spare.reclaim(&mut state.pool)
+        if (reclaim || surface.buffer_history.due(now))
+            && let Some(spare) = &mut surface.spare_buffer
+            && !spare.active()
+        {
+            spare.reclaim(&mut state.pool);
+            surface.buffer_history.reclaimed(spare.reclaimed());
         }
         if surface.waiting_release && surface.frame_sent.is_none() && has_writable_buffer(surface) {
             surface.waiting_release = false;
@@ -37,6 +42,22 @@ pub(super) fn released(state: &mut OverlayState, reclaim: bool) {
             });
         }
     }
+}
+
+/// 【截图覆盖层】【空闲等待】按 state 返回最早可回收备用帧的剩余时间，活动槽位等待真实释放事件，避免零期限轮询
+pub(super) fn idle_timeout(state: &OverlayState) -> Option<std::time::Duration> {
+    let now = Instant::now();
+    state
+        .surfaces
+        .values()
+        .filter(|surface| {
+            surface
+                .spare_buffer
+                .as_ref()
+                .is_some_and(|spare| !spare.active() && !spare.reclaimed())
+        })
+        .filter_map(|surface| surface.buffer_history.timeout(now))
+        .min()
 }
 
 impl WaylandOverlay {
@@ -83,7 +104,8 @@ impl WaylandOverlay {
         let pool = &mut runtime.state.pool;
         let full = damage.is_none_or(|area| area == (0, 0, size.0, size.1));
         // 1. 【截图覆盖层】【服务端隔离】当前缓冲活动时只修改空闲备用槽位，完整帧直接覆盖，局部帧先复制最新可读内容
-        if current.active() {
+        let swapped = current.active();
+        if swapped {
             if surface
                 .spare_buffer
                 .as_ref()
@@ -91,12 +113,17 @@ impl WaylandOverlay {
             {
                 return Err("both native frame buffers are still active".into());
             }
+            let fresh = surface.spare_buffer.is_none();
             let mut spare = match surface.spare_buffer.take() {
                 Some(buffer) => buffer,
                 None => create_shm_buffer(pool, size.0, size.1)?,
             };
             if !full {
-                spare.copy_from(pool, current)?
+                if fresh {
+                    spare.copy_from(pool, current)?;
+                } else {
+                    spare.copy_region(pool, current, surface.buffer_history.missing)?;
+                }
             }
             let old = surface.shm_buffer.replace(spare).unwrap();
             surface.spare_buffer = Some(old);
@@ -110,6 +137,9 @@ impl WaylandOverlay {
             }
             Ok(())
         })?;
+        surface
+            .buffer_history
+            .changed(damage, swapped, Instant::now());
         // 2. 【截图覆盖层】【活动登记】通过槽位接口附着并保持所有权，只有wl_buffer.release允许后续修改或回收
         buffer.buffer.attach_to(&surface.surface)?;
         let (x, y, width, height) = damage.unwrap_or((0, 0, size.0, size.1));

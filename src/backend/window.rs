@@ -165,6 +165,11 @@ pub trait WindowContent {
         false
     }
 
+    /// 【原生窗口】【浮层优先级】无参数，返回置顶窗口是否高于普通贴图；默认 false，Wayland 映射为 Overlay 层
+    fn above_pinned_windows(&self) -> bool {
+        false
+    }
+
     /// 【原生窗口】【置顶能力】通知 supported 是否可使用真实置顶角色，内容不得把不支持的请求显示为已成功，无返回值
     fn stacking_supported(&mut self, _supported: bool) {}
     /// 【原生窗口】【内容期限】返回下一次单次唤醒的绝对期限，无参数；到期 Wake 后须消费或更新，默认无期限及周期工作

@@ -37,3 +37,26 @@ fn distinct_configs_and_displays_stay_isolated() {
         identity("config.toml", None, ":1")
     );
 }
+
+/// 【桌面集成测试】【监听反馈】无参数，读取状态和刷新目录权限不得唤醒窗口，原子替换状态必须通知
+#[cfg(unix)]
+#[test]
+fn status_reads_and_directory_permissions_do_not_wake_the_reader() {
+    use std::{sync::mpsc, time::Duration};
+    let root = tempfile::tempdir().unwrap();
+    let (sender, receiver) = mpsc::channel();
+    let _watcher = super::watch_directory(root.path(), move || {
+        let _ = sender.send(());
+    })
+    .unwrap();
+    super::write(root.path(), &super::Status::default()).unwrap();
+    receiver.recv_timeout(Duration::from_secs(2)).unwrap();
+    while receiver.recv_timeout(Duration::from_millis(100)).is_ok() {}
+    std::fs::read(root.path().join("status.json")).unwrap();
+    // 1. 【桌面集成测试】【真实反馈】状态读取路径会重新校验权限，元数据事件不能重新触发相同读取
+    let permissions = std::fs::metadata(root.path()).unwrap().permissions();
+    std::fs::set_permissions(root.path(), permissions).unwrap();
+    assert!(receiver.recv_timeout(Duration::from_millis(200)).is_err());
+    super::write(root.path(), &super::Status::default()).unwrap();
+    receiver.recv_timeout(Duration::from_secs(2)).unwrap();
+}

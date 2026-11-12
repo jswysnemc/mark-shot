@@ -27,7 +27,7 @@ fn fixture() -> (tempfile::TempDir, Preferences) {
     state.values = preferences::read(&state.path).unwrap();
     state.toolbar = Editor::new(&state.values);
     state.page = Page::Toolbar;
-    state.toolbar_editor = true;
+    state.open_toolbar();
     (directory, state)
 }
 

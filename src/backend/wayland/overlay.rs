@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 use wayland_client::backend::WaylandError;
 
 mod buffer_budget;
+pub(crate) mod buffer_history;
 mod frame_mode;
 pub(crate) mod frame_pixels;
 pub(super) mod frame_staging;
@@ -82,11 +83,58 @@ impl WaylandOverlay {
 }
 
 impl ScreenOverlay for WaylandOverlay {
+    /// 【截图场景】【能力启用】按 captures 准备共享背景，返回当前合成器是否支持完整原生场景
+    fn enable_capture_scene(
+        &mut self,
+        _captures: &mut [crate::types::Capture],
+    ) -> crate::AppResult<bool> {
+        let enabled = self.runtime.state.image_window.is_none() && self.composited_background;
+        self.runtime.state.defer_capture_frame = enabled;
+        Ok(enabled)
+    }
+    /// 【截图场景】【组合交付】按 monitor_idx/frame 提交共享背景和局部前景，返回协议执行结果
+    fn stage_capture_scene(
+        &mut self,
+        monitor_idx: usize,
+        mut frame: crate::types::capture_scene::Frame<'_>,
+    ) -> crate::AppResult {
+        let scale = self
+            .runtime
+            .state
+            .surfaces
+            .get(&monitor_idx)
+            .ok_or("capture surface is unavailable")?
+            .scale;
+        frame.selection = frame
+            .selection
+            .and_then(|rect| crate::renderer::scale_rect(&rect, scale));
+        frame.hovered = frame
+            .hovered
+            .and_then(|rect| crate::renderer::scale_rect(&rect, scale));
+        let damage = frame.damage;
+        self.stage_with_pixels(
+            monitor_idx,
+            frame_pixels::FramePixels::Scene(frame),
+            None,
+            damage,
+        )
+    }
     /// 【图片编辑】【窗口启用】按 size 设置初始逻辑尺寸并使用普通窗口，返回是否成功
-    fn configure_image_window(&mut self, size: (u32, u32)) -> bool {
+    fn configure_image_window(&mut self, size: (u32, u32), minimum: (u32, u32)) -> bool {
         self.layer = false;
         self.runtime.state.image_window = Some(size);
+        self.runtime.state.image_minimum = minimum;
         true
+    }
+    /// 【图片窗口】【系统操作】按 action 和 serial 调用当前 xdg 窗口操作，返回协议状态
+    fn image_window_action(
+        &mut self,
+        action: crate::types::image_window::Action,
+        serial: Option<u32>,
+    ) -> crate::AppResult {
+        image_window::action(&mut self.runtime.state, action, serial)?;
+        self.runtime.event_queue.flush()?;
+        Ok(())
     }
     /// 【图片编辑】【窗口尺寸】返回最后一次合成器配置的尺寸，无额外参数
     fn image_window_size(&self) -> Option<(u32, u32)> {
@@ -411,14 +459,21 @@ impl ScreenOverlay for WaylandOverlay {
             }
 
             // 3. 【截图输入】【统一等待】输入和控制连接同时等待，服务请求不会新增绘制或轮询线程
+            let wait_timeout = timeout
+                .into_iter()
+                .chain(frame_staging::idle_timeout(&rt.state))
+                .min();
             match poll_sources::wait(
                 rt,
                 self.task_source.as_ref(),
                 self.theme_source.as_ref(),
                 self.controller.as_ref(),
-                timeout,
+                wait_timeout,
             )? {
-                poll_sources::Wake::Tick => return Ok(OverlayEvent::Tick),
+                poll_sources::Wake::Tick => {
+                    frame_staging::released(&mut rt.state, !self.composited_background);
+                    return Ok(OverlayEvent::Tick);
+                }
                 poll_sources::Wake::Wayland | poll_sources::Wake::Progress => {}
             }
         }

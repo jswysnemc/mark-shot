@@ -73,6 +73,7 @@ impl NativeWindow {
                 &self.main.spec,
                 geometry,
                 output.as_ref().map(|value| &value.output),
+                self.content.above_pinned_windows(),
                 &self.compositor,
                 self.layers.as_ref().unwrap(),
                 qh,

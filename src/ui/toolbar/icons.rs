@@ -14,8 +14,10 @@ pub const TRANSLATE: &str = include_str!("../../../assets/icons/mark-shot/transl
 pub const UPLOAD: &str = include_str!("../../../assets/icons/mark-shot/upload.svg");
 pub const SETTINGS: &str = include_str!("../../../assets/icons/mark-shot/settings.svg");
 pub const SAVE_AS: &str = include_str!("../../../assets/icons/mark-shot/save-as.svg");
+pub const SCAN_CODE: &str = include_str!("../../../assets/icons/scan-code.svg");
 pub const EXTRA: &[&str] = &[
     CLEAR, UNDO, REDO, SCOPE, LAYOUT, OPEN, EXTENSIONS, TRANSLATE, UPLOAD, SETTINGS, SAVE_AS,
+    SCAN_CODE,
 ];
 
 /// 【截图工具栏】【图标查找】返回 button 的内置 SVG；工具大小由主副工具栏统一控制
@@ -35,6 +37,7 @@ pub fn icon(button: ToolbarButton) -> &'static str {
             Integration::OpenWith => OPEN,
             Integration::Extensions => EXTENSIONS,
             Integration::Translate => TRANSLATE,
+            Integration::ScanCode => SCAN_CODE,
             Integration::Upload => UPLOAD,
             Integration::Settings => SETTINGS,
         },

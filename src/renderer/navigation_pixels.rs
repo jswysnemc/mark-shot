@@ -46,6 +46,16 @@ fn sample(pixel: usize, scale: f32, offset: f32, length: usize) -> Sample {
 
 /// 【画布导航】【轴向绘制】按 transform 将 source 以双线性插值合成到 canvas；只处理可见矩形，返回是否支持此变换
 pub(super) fn draw(canvas: &mut Pixmap, source: PixmapRef<'_>, transform: Transform) -> bool {
+    draw_region(canvas, source, transform, None)
+}
+
+/// 【画布导航】【局部采样】按 transform 和 damage 绘制 source，像素坐标保持完整画布相位，返回是否支持轴向变换
+pub(super) fn draw_region(
+    canvas: &mut Pixmap,
+    source: PixmapRef<'_>,
+    transform: Transform,
+    damage: Option<tiny_skia::IntRect>,
+) -> bool {
     if transform.kx != 0.0
         || transform.ky != 0.0
         || transform.sx <= 0.0
@@ -54,14 +64,22 @@ pub(super) fn draw(canvas: &mut Pixmap, source: PixmapRef<'_>, transform: Transf
     {
         return false;
     }
-    let left = transform.tx.floor().clamp(0.0, canvas.width() as f32) as usize;
-    let top = transform.ty.floor().clamp(0.0, canvas.height() as f32) as usize;
+    let full = tiny_skia::IntRect::from_xywh(0, 0, canvas.width(), canvas.height()).unwrap();
+    let Some(area) = damage.unwrap_or(full).intersect(&full) else {
+        return true;
+    };
+    let left =
+        (transform.tx.floor().clamp(0.0, canvas.width() as f32) as usize).max(area.left() as usize);
+    let top =
+        (transform.ty.floor().clamp(0.0, canvas.height() as f32) as usize).max(area.top() as usize);
     let right = (transform.tx + source.width() as f32 * transform.sx)
         .ceil()
         .clamp(0.0, canvas.width() as f32) as usize;
+    let right = right.min(area.right() as usize);
     let bottom = (transform.ty + source.height() as f32 * transform.sy)
         .ceil()
         .clamp(0.0, canvas.height() as f32) as usize;
+    let bottom = bottom.min(area.bottom() as usize);
     if left >= right || top >= bottom {
         return true;
     }

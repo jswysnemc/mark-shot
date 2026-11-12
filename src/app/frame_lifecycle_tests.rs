@@ -86,6 +86,53 @@ fn equal(actual: &Harness, expected: &Harness) {
     }
 }
 
+/// 【帧生命周期测试】【荧光笔回退】实际 Multiply 笔迹越过选区后保留原色，添加与撤销仅有局部损坏时仍完整切换前景
+#[test]
+fn sparse_scene_preserves_highlighter_blending_and_mode_transitions() {
+    let mut actual = Harness::new(1.0, false);
+    let mut expected = Harness::new(1.0, false);
+    actual.state.region_rendering.native_scene = true;
+    for harness in [&mut actual, &mut expected] {
+        harness.render(1, false);
+    }
+    equal(&actual, &expected);
+    for selected in [
+        Rect::from_xywh(0.0, 0.0, 640.0, 480.0),
+        Rect::from_xywh(200.0, 150.0, 300.0, 250.0),
+    ] {
+        for harness in [&mut actual, &mut expected] {
+            harness.state.selection.zone = selected;
+            let annotation = support::annotation(
+                1,
+                0.0,
+                AnnotationShape::Highlighter {
+                    points: vec![(80.0, 210.0), (180.0, 220.0), (260.0, 220.0)],
+                    flat_ends: [false; 2],
+                },
+            );
+            harness
+                .state
+                .damage_rects
+                .push(DamageZone::Global(annotation.damage_bbox(false)));
+            harness.state.annotations = vec![annotation];
+            harness.state.annotations_dirty = true;
+            harness.render(1, false);
+        }
+        equal(&actual, &expected);
+        assert!(actual.state.region_rendering.baked_background);
+    }
+    for harness in [&mut actual, &mut expected] {
+        harness.state.damage_rects.push(DamageZone::Global(
+            harness.state.annotations[0].damage_bbox(false),
+        ));
+        harness.state.annotations.clear();
+        harness.state.annotations_dirty = true;
+        harness.render(1, false);
+    }
+    assert!(!actual.state.region_rendering.baked_background);
+    equal(&actual, &expected);
+}
+
 /// 【帧生命周期测试】【首次局部通知】无参数，首次仅收到面板损坏时仍恢复完整选区外背景，消费与只读及分数比例均一致，无返回值
 #[test]
 fn first_frame_restores_the_whole_scene_when_only_a_panel_is_marked_dirty() {
@@ -335,4 +382,193 @@ fn consumed_foreground_keeps_independent_mixed_output_frames() {
         equal(&actual, &expected);
         assert_eq!(actual.overlay.frames[0], original_first);
     }
+}
+
+/// 【帧生命周期测试】【缩放缓存预算】原生场景改变视图时不分配完整背景副本，局部正文与透明像素仍等同旧缓存
+#[test]
+fn native_navigation_does_not_keep_a_complete_background_after_view_changes() {
+    for scale in [1.0, 1.25, 1.5] {
+        for zoom in [1.3, 0.75] {
+            let mut actual = Harness::new(scale, false);
+            let mut expected = Harness::new(scale, false);
+            actual.state.region_rendering.native_scene = true;
+            for harness in [&mut actual, &mut expected] {
+                harness.state.ensure_navigation();
+                harness
+                    .state
+                    .navigation
+                    .view
+                    .as_mut()
+                    .unwrap()
+                    .zoom_at(zoom, (300.0, 200.0), true);
+                assert!(!harness.state.canvas_transform().is_identity());
+                harness.render(1, false);
+            }
+            equal(&actual, &expected);
+            assert_eq!(actual.state.dimmed[0].data().len(), 4);
+            for (start, end) in [
+                ((70.0, 80.0), (170.0, 130.0)),
+                ((130.0, 120.0), (300.0, 210.0)),
+            ] {
+                for harness in [&mut actual, &mut expected] {
+                    harness.rectangle(start, end);
+                    harness.render(1, false);
+                }
+                equal(&actual, &expected);
+            }
+            for harness in [&mut actual, &mut expected] {
+                harness.state.navigation.view.as_mut().unwrap().zoom_at(
+                    1.15,
+                    (210.5, 130.25),
+                    true,
+                );
+                harness.render(1, false);
+            }
+            equal(&actual, &expected);
+            assert_eq!(actual.state.dimmed[0].data().len(), 4);
+            let reclaimed = actual.pacing.foreground_residency.reclaim_due(
+                &mut actual.state.canvas,
+                std::time::Instant::now() + std::time::Duration::from_secs(1),
+                |_| true,
+            );
+            assert_eq!(reclaimed, vec![0]);
+            actual.state.dimmed[0] = tiny_skia::Pixmap::new(1, 1).unwrap();
+            actual.state.region_rendering.navigation_caches[0]
+                .borrow_mut()
+                .invalidate();
+            for harness in [&mut actual, &mut expected] {
+                harness.rectangle((50.0, 90.0), (190.0, 180.0));
+                harness.render(1, false);
+            }
+            equal(&actual, &expected);
+        }
+    }
+}
+
+/// 【帧生命周期测试】【双屏导航缓存】不同设备比例共用导航时，局部缓存及空闲回收按输出独立，全部帧仍等同旧背景
+#[test]
+fn native_navigation_keeps_independent_mixed_output_caches_after_idle() {
+    let mut actual = Harness::new(1.25, false);
+    let mut expected = Harness::new(1.25, false);
+    actual.state.region_rendering.native_scene = true;
+    for harness in [&mut actual, &mut expected] {
+        let mut second = support::editor_size((360, 240), 1.5, true);
+        second.placements[0].position = (640, 0);
+        harness.state.placements.push(second.placements.remove(0));
+        harness.state.captures.push(second.captures.remove(0));
+        harness.state.canvas.push(second.canvas.remove(0));
+        harness.state.dimmed.push(second.dimmed.remove(0));
+        harness
+            .state
+            .annotations_layer
+            .push(second.annotations_layer.remove(0));
+        harness.state.selection.zone = Rect::from_xywh(0.0, 0.0, 1000.0, 480.0);
+        harness.overlay = Overlay::new(&harness.state.canvas, false);
+        harness.pacing = Pacing::new(2);
+        harness.state.ensure_navigation();
+        harness
+            .state
+            .navigation
+            .view
+            .as_mut()
+            .unwrap()
+            .zoom_at(1.3, (430.0, 190.0), true);
+        harness.render(3, false);
+    }
+    equal(&actual, &expected);
+    for (start, end) in [
+        ((680.0, 60.0), (780.0, 170.0)),
+        ((70.0, 90.0), (190.0, 180.0)),
+    ] {
+        for harness in [&mut actual, &mut expected] {
+            harness.rectangle(start, end);
+            harness.render(3, false);
+        }
+        equal(&actual, &expected);
+    }
+    let reclaimed = actual.pacing.foreground_residency.reclaim_due(
+        &mut actual.state.canvas,
+        std::time::Instant::now() + std::time::Duration::from_secs(1),
+        |monitor| monitor == 1,
+    );
+    assert_eq!(reclaimed, vec![1]);
+    actual.state.dimmed[1] = tiny_skia::Pixmap::new(1, 1).unwrap();
+    actual.state.region_rendering.navigation_caches[1]
+        .borrow_mut()
+        .invalidate();
+    for harness in [&mut actual, &mut expected] {
+        harness.rectangle((700.0, 70.0), (790.0, 170.0));
+        harness.render(2, false);
+    }
+    equal(&actual, &expected);
+}
+
+/// 【帧生命周期测试】【空闲背景保留】回收已提交CPU画布后复用实际采样的导航背景，保留未交付像素，视图改变仍失效旧缓存
+#[test]
+fn native_navigation_idle_reclamation_keeps_sampled_background_and_pending_pixels() {
+    // 1. 【帧生命周期测试】【背景准备】通过实际局部渲染采样导航块，旧缓存路径提供完整像素对照
+    let mut actual = Harness::new(1.25, false);
+    let mut expected = Harness::new(1.25, false);
+    actual.state.region_rendering.native_scene = true;
+    for harness in [&mut actual, &mut expected] {
+        harness.state.ensure_navigation();
+        harness
+            .state
+            .navigation
+            .view
+            .as_mut()
+            .unwrap()
+            .zoom_at(1.3, (230.0, 190.0), true);
+        harness.render(1, false);
+        for _ in 0..2 {
+            harness.rectangle((70.0, 90.0), (290.0, 240.0));
+            harness.render(1, false);
+        }
+    }
+    equal(&actual, &expected);
+    let background = actual.state.dimmed[0].data().to_vec();
+    assert!(background.len() > 4);
+    let pending = actual.state.canvas[0].data().to_vec();
+    let now = std::time::Instant::now() + std::time::Duration::from_secs(1);
+    // 2. 【帧生命周期测试】【提交边界】未提交输出保留全部像素，提交后只清空CPU画布并保留采样背景
+    assert!(
+        super::foreground_residency::reclaim(&mut actual.state, &mut actual.pacing, 1, now,)
+            .is_empty()
+    );
+    assert!(
+        actual.state.canvas[0].data() == pending,
+        "pending canvas pixels changed"
+    );
+    assert_eq!(
+        super::foreground_residency::reclaim(&mut actual.state, &mut actual.pacing, 0, now,),
+        vec![0]
+    );
+    assert!(
+        actual.state.dimmed[0].data() == background,
+        "sampled background was discarded"
+    );
+    assert!(
+        actual.state.region_rendering.navigation_caches[0]
+            .borrow()
+            .ready()
+    );
+    assert!(actual.state.canvas[0].data().iter().all(|byte| *byte == 0));
+    for harness in [&mut actual, &mut expected] {
+        harness.rectangle((70.0, 90.0), (290.0, 240.0));
+        harness.render(1, false);
+    }
+    equal(&actual, &expected);
+    // 3. 【帧生命周期测试】【视图变化】改变倍率后重新采样，旧背景不能参与新视图的局部恢复
+    for harness in [&mut actual, &mut expected] {
+        harness
+            .state
+            .navigation
+            .view
+            .as_mut()
+            .unwrap()
+            .zoom_at(1.15, (210.5, 130.25), true);
+        harness.render(1, false);
+    }
+    equal(&actual, &expected);
+    assert_eq!(actual.state.dimmed[0].data().len(), 4);
 }

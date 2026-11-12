@@ -17,6 +17,7 @@ pub enum ToastKind {
     OcrNoModel,
     OcrDownloadFailed,
     OcrFailed,
+    ScanFailed,
     OcrNoText,
     CopyFailed,
     ColorCopied,
@@ -64,6 +65,13 @@ impl ToastKind {
             ToastLife::Timed(Duration::try_from_secs_f32(secs.max(0.0)).unwrap_or(Duration::MAX))
         };
         match self {
+            ToastKind::ScanFailed => ToastSpec {
+                text: "Cannot open code scanner",
+                anchor: ToastAnchor::CursorMonitorCenter,
+                life: timed(cfg.lifetime),
+                fade_in,
+                fade_out,
+            },
             ToastKind::SettingsFailed => ToastSpec {
                 text: "Failed to save settings",
                 anchor: ToastAnchor::CursorMonitorCenter,

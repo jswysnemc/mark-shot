@@ -27,6 +27,8 @@ pub struct Notification<'a> {
 
 pub enum Notice<'a> {
     Saved(PathBuf),
+    /// 录制成品已发布到 `PathBuf`
+    RecordingSaved(PathBuf),
     /// Contains `Some(PathBuf)`
     /// if the copied image was also saved to disk,
     /// otherwise the PNG itself, previewed if notif daemon can show it.
@@ -50,6 +52,12 @@ impl<'a> Notice<'a> {
         let (summary, body, error, file) = match self {
             Notice::Saved(path) => (
                 "Screenshot saved",
+                path.display().to_string(),
+                false,
+                Some(path),
+            ),
+            Notice::RecordingSaved(path) => (
+                "Recording saved",
                 path.display().to_string(),
                 false,
                 Some(path),

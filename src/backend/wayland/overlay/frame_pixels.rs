@@ -7,6 +7,7 @@ pub(crate) enum FramePixels<'a> {
     Borrowed(&'a [u8]),
     Opaque(&'a [u8]),
     Consumed(&'a mut Pixmap),
+    Scene(crate::types::capture_scene::Frame<'a>),
 }
 
 impl FramePixels<'_> {
@@ -21,6 +22,7 @@ impl FramePixels<'_> {
         let source = match self {
             Self::Borrowed(source) | Self::Opaque(source) => *source,
             Self::Consumed(pixmap) => pixmap.data(),
+            Self::Scene(_) => return Err("capture scene already includes its background".into()),
         };
         crate::backend::composited_pixels::write(source, background, native, size, damage)?;
         if let Self::Consumed(pixmap) = self {
@@ -42,6 +44,7 @@ impl FramePixels<'_> {
         match self {
             Self::Borrowed(pixels) | Self::Opaque(pixels) => pixels.len(),
             Self::Consumed(pixmap) => pixmap.data().len(),
+            Self::Scene(frame) => frame.foreground.data().len(),
         }
     }
 
@@ -55,6 +58,10 @@ impl FramePixels<'_> {
         let length = size.0 as usize * size.1 as usize * 4;
         if self.len() != length || native.len() != length {
             return Err("foreground dimensions do not match native storage".into());
+        }
+        if let Self::Scene(frame) = self {
+            frame.damage = damage;
+            return crate::backend::software_scene::compose(frame, native, true);
         }
         if let Self::Consumed(pixmap) = self {
             crate::utils::transparent_pixmap::prepare_sparse(pixmap);
@@ -92,6 +99,7 @@ impl FramePixels<'_> {
     /// 【原生前景】【字节批次】按range写入native，返回值为空；借用路径不改源，消费路径在复制结束后才清空相同源区间
     fn write_range(&mut self, native: &mut [u8], range: std::ops::Range<usize>) {
         match self {
+            Self::Scene(_) => unreachable!("capture scenes use direct composition"),
             Self::Opaque(source) => {
                 crate::utils::copy_swizzled(&mut native[range.clone()], &source[range]);
             }

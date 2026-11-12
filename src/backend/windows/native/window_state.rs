@@ -24,6 +24,7 @@ pub(super) struct Context {
     pub minimum: (u32, u32),
     pub layered: bool,
     pub activate: bool,
+    pub image_window: Cell<bool>,
     pub cursor: Cell<HCURSOR>,
     pub owner: ThreadId,
     pub inside: Cell<bool>,
@@ -197,13 +198,21 @@ pub(super) unsafe extern "system" fn procedure(
             return 1;
         }
         WM_GETMINMAXINFO => {
+            // 1. 【Windows图片窗口】【系统尺寸】先让系统填充最大化与追踪上限，再覆盖应用要求的最小尺寸
+            unsafe {
+                DefWindowProcW(hwnd, message, wparam, lparam);
+            }
             let info = unsafe { &mut *(lparam as *mut MINMAXINFO) };
             let dpi = unsafe { windows_sys::Win32::UI::HiDpi::GetDpiForWindow(hwnd) };
-            let minimum = super::window_limits::physical(context.minimum, dpi);
+            let minimum = super::window_limits::physical(
+                context.minimum,
+                if context.image_window.get() { 96 } else { dpi },
+            );
             info.ptMinTrackSize.x = minimum.0;
             info.ptMinTrackSize.y = minimum.1;
             return 0;
         }
+        WM_NCCALCSIZE if context.image_window.get() => return 0,
         WM_PAINT => {
             let mut paint: PAINTSTRUCT = unsafe { std::mem::zeroed() };
             let dc = unsafe { BeginPaint(hwnd, &mut paint) };

@@ -58,12 +58,14 @@ fn text_editor() -> crate::editor::EditorState {
     state
 }
 
-/// 【交互回归】【单击插入】首次点击显示光标，再次点击正文重新定位；直接输入扩展外框，撤销保留原件
+/// 【交互回归】【双击插入】双击显示光标，再次点击正文重新定位；直接输入扩展外框，撤销保留原件
 #[test]
-fn pick_single_click_opens_caret_and_next_click_positions_it() {
+fn pick_double_click_opens_caret_and_next_click_positions_it() {
     let mut state = text_editor();
     let original = state.annotations[0].clone();
     select_tool(&mut state, Tool::Pick, &mut 0);
+    click(&mut state, (180.0, 185.0));
+    assert!(state.text_session.is_none());
     click(&mut state, (180.0, 185.0));
     assert!(state.text_session.is_some());
     assert!(state.ann_drag.is_none());
@@ -158,7 +160,7 @@ fn trash_clears_all_annotations_and_active_text_then_undo_restores_them() {
     );
 }
 
-/// 【交互回归】【编辑中字号】单击重编辑后属性面板隐藏也能用滚轮调整文字；图片入口的新草稿同样优先调整字号
+/// 【交互回归】【编辑中字号】双击重编辑后属性面板隐藏也能用滚轮调整文字；图片入口的新草稿同样优先调整字号
 #[test]
 fn wheel_changes_active_text_even_when_properties_are_hidden() {
     for existing in [false, true] {
@@ -168,6 +170,7 @@ fn wheel_changes_active_text_even_when_properties_are_hidden() {
             crate::editor::file_canvas::FileCanvas::new(source, state.selection.zone.unwrap());
         if existing {
             select_tool(&mut state, Tool::Pick, &mut 0);
+            click(&mut state, (180.0, 185.0));
             click(&mut state, (180.0, 185.0));
             assert!(!state.settings_panel.visible);
         } else {

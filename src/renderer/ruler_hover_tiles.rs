@@ -59,7 +59,7 @@ mod tests {
 
     /// 【尺子悬停测试】【完整参考】按canvas、hover、origin和scale使用原有完整透明层绘制参考像素，无返回值
     fn reference(canvas: &mut Pixmap, hover: &RulerHover, origin: (f32, f32), scale: f32) {
-        let mut fonts = FontSystem::new();
+        let mut fonts = crate::fonts::bundled();
         let mut cache = SwashCache::new();
         let mut full = Pixmap::new(canvas.width(), canvas.height()).unwrap();
         super::super::ruler_overlay::draw_hover(
@@ -99,7 +99,7 @@ mod tests {
                 origin,
                 scale,
                 None,
-                &mut FontSystem::new(),
+                &mut crate::fonts::bundled(),
                 &mut SwashCache::new(),
                 Default::default(),
             );
@@ -133,7 +133,7 @@ mod tests {
                         origin,
                         scale,
                         Some(&dirty),
-                        &mut FontSystem::new(),
+                        &mut crate::fonts::bundled(),
                         &mut SwashCache::new(),
                         Default::default(),
                     );

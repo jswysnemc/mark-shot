@@ -47,7 +47,15 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
         .enumerate()
         .map(|(index, page)| (page, layout::nav_rect(state, index)))
         .collect();
-    let title = if state.search.text().is_empty() {
+    let toolbar_page = state.toolbar_page();
+    let back = layout::back_rect(state);
+    let title = if toolbar_page {
+        if chinese {
+            "工具栏 / 按钮配置"
+        } else {
+            "Toolbar / Buttons"
+        }
+    } else if state.search.text().is_empty() {
         state.page.title(chinese)
     } else if chinese {
         "搜索结果"
@@ -74,7 +82,7 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
     }
     .to_owned();
     state.fonts.ensure_text(&format!(
-        "{title} {description} {status} {path} {} 设置 搜索设置 逐项保存到本机 配置路径 已保存",
+        "{title} {description} {status} {path} {} 设置 搜索设置 逐项保存到本机 配置路径 已保存 返回 Back",
         Page::ALL
             .iter()
             .map(|page| page.title(chinese))
@@ -230,11 +238,35 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
             close.top() + 7.0,
             palette.muted,
         );
+        if toolbar_page {
+            controls::icon_button(
+                &mut painter,
+                back,
+                if chinese { "返回" } else { "Back" },
+                None,
+                controls::ButtonStyle {
+                    fill: if hover == Some(Control::Back) {
+                        palette.pressed
+                    } else {
+                        palette.base
+                    },
+                    foreground: palette.text,
+                    border: palette.alternate,
+                    font_size: 12.0,
+                    weight: cosmic_text::Weight::NORMAL,
+                },
+            );
+        }
+        let title_left = if toolbar_page {
+            back.right() + 12.0
+        } else {
+            sidebar + 20.0
+        };
         painter.text(
             rect(
-                sidebar + 20.0,
+                title_left,
                 68.0,
-                state.size.0 as f32 - sidebar - 40.0,
+                state.size.0 as f32 - title_left - 20.0,
                 24.0,
             ),
             title,

@@ -157,6 +157,12 @@ pub fn apply_annotation_drag(state: &mut EditorState, global: (f64, f64)) {
     if matches!(handle, SelectionHandle::None) {
         return;
     }
+    // 1. 【文字交互】【拖动隔离】按屏幕距离取消双击候选，拖出后回到起点也不恢复旧候选
+    let distance = (global.0 - start_global.0).hypot(global.1 - start_global.1)
+        * state.canvas_transform().scale;
+    if distance > f64::from(crate::config::get().input.double_click_distance) {
+        state.input.clicks.clear();
+    }
     let filter_geometry = state.ann_drag.as_ref().and_then(|drag| {
         if let AnnotationShape::Redact { filter } = drag.orig.shape {
             Some(filter)

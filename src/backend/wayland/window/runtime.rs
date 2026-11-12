@@ -249,7 +249,15 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
     let role = if content.always_on_top()
         && let Some(layers) = &layers
     {
-        super::role::Role::layer(&spec, layer_geometry, None, &compositor, layers, &qh)
+        super::role::Role::layer(
+            &spec,
+            layer_geometry,
+            None,
+            content.above_pinned_windows(),
+            &compositor,
+            layers,
+            &qh,
+        )
     } else {
         super::role::Role::window(&spec, &compositor, &shell, &qh)
     };

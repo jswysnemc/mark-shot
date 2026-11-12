@@ -216,44 +216,9 @@ pub(super) fn field(
     }
 }
 
-/// 【设置窗口】【布尔开关】按 bounds、checked 和 hovered 绘制可见状态与焦点，点击范围沿用 bounds
+/// 【设置窗口】【布尔开关】按 bounds、checked 和 hovered 绘制共享开关，点击范围沿用 bounds，无返回值
 pub(super) fn switch(painter: &mut Painter<'_>, bounds: Rect, checked: bool, hovered: bool) {
-    let palette = Palette::current();
-    let track = rect(
-        bounds.right() - 38.0,
-        bounds.top() + (bounds.height() - 22.0) / 2.0,
-        38.0,
-        22.0,
-    );
-    controls::frame(
-        painter,
-        track,
-        if checked {
-            palette.accent
-        } else {
-            palette.alternate
-        },
-        if hovered || checked {
-            palette.accent
-        } else {
-            palette.border
-        },
-        11.0,
-    );
-    painter.fill_rounded(
-        rect(
-            track.left() + if checked { 19.0 } else { 3.0 },
-            track.top() + 3.0,
-            16.0,
-            16.0,
-        ),
-        8.0,
-        if checked {
-            palette.on_accent
-        } else {
-            palette.base
-        },
-    );
+    controls::switch(painter, bounds, checked, hovered);
 }
 
 /// 【设置窗口】【下拉入口】按 bounds、label、hovered 和 expanded 绘制选择框，箭头随展开状态变化

@@ -22,6 +22,7 @@ pub(crate) struct SliderDrag {
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) struct FrameKey {
+    pub baked_background: bool,
     pub view: ViewTransform,
     pub selection: Option<Rect>,
     pub offset: (f32, f32),
@@ -61,9 +62,15 @@ impl EditorState {
             view.refresh(available);
             return true;
         }
-        let Some(window) = crate::utils::get_full_workspace_rect(&self.placements) else {
+        let Some(mut window) = crate::utils::get_full_workspace_rect(&self.placements) else {
             return false;
         };
+        if self.image_window.enabled {
+            window = crate::app::image_window::layout::viewport((
+                window.width() as u32,
+                window.height() as u32,
+            ));
+        }
         let image = self.file_canvas.as_ref().map_or(
             (
                 window.width().round() as u32,
@@ -71,7 +78,7 @@ impl EditorState {
             ),
             |file| (file.original.width(), file.original.height()),
         );
-        let Some(view) = Navigation::new(
+        let Some(mut view) = Navigation::new(
             image,
             (
                 window.width().round() as u32,
@@ -81,6 +88,7 @@ impl EditorState {
         ) else {
             return false;
         };
+        view.set_free_pan(self.file_canvas.is_some());
         self.navigation.reference = Some(view.projection().widget_rect);
         self.navigation.window = Some(window);
         self.navigation.view = Some(view);

@@ -1,4 +1,4 @@
-"""使用随包 FFprobe/FFmpeg 核验媒体时长、尺寸、音轨与完整解码。"""
+"""使用测试环境独立安装的 FFprobe/FFmpeg 核验媒体时长、尺寸、音轨与完整解码。"""
 
 import argparse
 import json

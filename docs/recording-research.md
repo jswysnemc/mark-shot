@@ -1,12 +1,12 @@
 # Mark Shot 录制恢复调研
 
-日期：2026-11-11。基线：Rust `e8c8966`；Qt `934d8f3`。本轮覆盖 Linux Wayland/X11、Windows，暂不实施 macOS。性能数字只有标注实测环境、提交和方法时才表示测量结果。
+更新：2026-11-12；原调研日期：2026-11-11。基线：Rust `e8c8966`；Qt `934d8f3`。本轮覆盖 Linux Wayland/X11、Windows，暂不实施 macOS。性能数字只有标注实测环境、提交和方法时才表示测量结果。
 
 ## 结论与实施选择
 
 高性能首先取决于原始像素经过哪些内存，而不是实现语言。主路径应保持 GPU 表面直到编码，避免 GPU → CPU BGRA → CPU NV12 → GPU 的整帧往返。控制消息可以跨进程，原始视频帧不应经过 JSON、PNG 或 stdin rawvideo 管道。
 
-录制业务独立于截图：主程序管理选区、设置、暂停和输出，录制任务拥有设备与编码器。停止后整体释放。Windows 采用 WGC/D3D11 与 Media Foundation，使用系统 H.264/AAC 能力；Linux 采用独立录制组件，优先 GPU 捕获与硬编码。组件与主程序分别记录许可证和来源。GIF 放在录制结束后的转换阶段，避免实时量化挤占采集线程。具体后端可用性必须通过实际启动确认，失败保留原因，不能用编码器枚举代替运行成功。
+录制业务独立于截图：主程序管理选区、设置、暂停和输出，录制任务拥有设备与编码器。停止后整体释放。Windows 采用 WGC/D3D11 与 Media Foundation，使用系统 H.264/AAC 能力；Linux 使用进程内协议采集和私有共享媒体库，直接 Wayland 兼容时使用 DMA-BUF/VAAPI，其余提供共享内存与软件编码回退。媒体库单独记录许可证与来源。GIF 放在录制结束后的转换阶段，避免实时量化挤占采集线程。具体后端可用性必须通过实际启动确认，失败保留原因，不能用编码器枚举代替运行成功。
 
 小体积分别衡量主程序、录制组件、压缩下载、解压安装和系统依赖。系统已有图形驱动和编解码框架时可减少分发量；动态链接只转移依赖，不会让依赖消失。完整 libobs 的场景、直播、插件和预览能力超出本产品需求，不作为嵌入依赖。
 
@@ -37,7 +37,7 @@
 
 Qt 已有有界队列、提前限帧、缓冲复用、暂停时钟和录制 UI，恢复时不能将它们重新包装为新增性能收益。核心问题是 Qt WGC 的 STAGING/Map/memcpy 和 PipeWire 的 glReadPixels，随后 VAAPI/QSV 再上传。Rust 的截图/长截图流则每次请求一帧 CPU RGBA，交付后停流；不适合直接承担实时录像。
 
-Rust 已有 Linux X11、Wayland、Windows；旧架构文档排除 X11 的描述已过时。macOS 尚无完整平台工厂，本轮按用户要求排除。可复用的是配置、原生窗口、选区、托盘、通知、文件命名和进程管理；录制帧与 GPU 生命周期另建契约。[Qt/Rust 源码清单](recording/qt-audit.md)
+Rust 已有 Linux X11、Wayland、Windows；旧架构文档排除 X11 的描述已过时。macOS 尚无完整平台工厂，本轮按用户要求排除。可复用的是配置、原生窗口、选区、托盘、通知和文件命名；录制帧与 GPU 生命周期另建契约。[Qt/Rust 源码清单](recording/qt-audit.md)
 
 ## 平台边界
 
@@ -66,9 +66,9 @@ Windows WGC 提供纹理，D3D11 保留自有表面并裁剪/转换后交给编�
 
 ## 打包与许可
 
-主程序继续按仓库许可证发布。独立组件的 GPL/LGPL 与依赖通知另附，提供固定源码及构建脚本。动态链接、静态链接或子进程都不自动免除组件分发义务。不要把使用 libx264 的 FFmpeg 构建称作纯 LGPL，也不要删除授权文件来缩小安装包。[FFmpeg 法律说明](https://ffmpeg.org/legal.html)
+主程序继续按仓库许可证发布。媒体库使用 LGPL FFmpeg 与 BSD OpenH264，不引入 GPL 编码器；依赖通知、固定源码及构建脚本随包提供。动态链接、静态链接或子进程都不自动免除组件分发义务。不要把使用 libx264 的 FFmpeg 构建称作纯 LGPL，也不要删除授权文件来缩小安装包。[FFmpeg 法律说明](https://ffmpeg.org/legal.html)
 
-最小 FFmpeg 必须按实际功能裁剪：视频结束后转 GIF 需要 demuxer、decoder、scale、palettegen/paletteuse 和 GIF muxer，只有编码器的构建不够。Windows 使用系统编码时无须为实时 MP4 链路捆绑完整 FFmpeg；额外容器/导出按单独组件管理。
+最小 FFmpeg 必须按实际功能裁剪：视频结束后转 GIF 需要 demuxer、decoder、scale、palettegen/paletteuse 和 GIF muxer，只有编码器的构建不够。Windows 使用系统编码时无须为实时 MP4 链路捆绑完整 FFmpeg；额外容器/导出使用同进程的可替换共享库。
 
 ## 验收方法与目前证据边界
 

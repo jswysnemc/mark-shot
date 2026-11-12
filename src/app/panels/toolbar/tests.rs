@@ -1,5 +1,7 @@
 //! 【工具栏回归】【编辑器同步】验证全屏合并、返回双栏与配置更新
 
+mod geometry;
+
 use super::{configure, update_toolbar};
 use crate::{
     app::input::tests::editor,

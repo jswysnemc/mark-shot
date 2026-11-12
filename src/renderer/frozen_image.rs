@@ -28,6 +28,16 @@ pub struct FrozenImage<'a> {
 impl<'a> FrozenImage<'a> {
     /// 【画布导航】【完整像素矩阵】按canvas与transform绘制冻结像素，局部缓冲仅减去整数物理原点，无返回值
     pub(crate) fn draw_transformed(self, canvas: &mut Pixmap, transform: tiny_skia::Transform) {
+        self.draw_transformed_region(canvas, transform, None);
+    }
+
+    /// 【画布导航】【区域像素矩阵】按 canvas、transform 和 damage 绘制原图，保持整窗采样相位及范围外像素，无返回值
+    pub(crate) fn draw_transformed_region(
+        self,
+        canvas: &mut Pixmap,
+        transform: tiny_skia::Transform,
+        damage: Option<tiny_skia::IntRect>,
+    ) {
         let mut image = |pixels: PixmapRef<'_>, viewport: Rect| {
             let source = tiny_skia::Transform::from_scale(
                 viewport.width() / pixels.width() as f32 * self.factor,
@@ -38,7 +48,25 @@ impl<'a> FrozenImage<'a> {
                 viewport.top() * self.factor + self.offset.1,
             )
             .post_concat(transform);
-            if super::navigation_pixels::draw(canvas, pixels, source) {
+            let sampled = if damage.is_none() {
+                super::navigation_pixels::draw(canvas, pixels, source)
+            } else {
+                super::navigation_pixels::draw_region(canvas, pixels, source, damage)
+            };
+            if sampled {
+                return;
+            }
+            let mask = damage.and_then(|area| {
+                let mut mask = tiny_skia::Mask::new(canvas.width(), canvas.height())?;
+                mask.fill_path(
+                    &tiny_skia::PathBuilder::from_rect(area.to_rect()),
+                    tiny_skia::FillRule::Winding,
+                    false,
+                    tiny_skia::Transform::identity(),
+                );
+                Some(mask)
+            });
+            if damage.is_some() && mask.is_none() {
                 return;
             }
             canvas.draw_pixmap(
@@ -50,7 +78,7 @@ impl<'a> FrozenImage<'a> {
                     ..Default::default()
                 },
                 source,
-                None,
+                mask.as_ref(),
             );
         };
         match self.source {

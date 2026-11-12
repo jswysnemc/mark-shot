@@ -22,6 +22,8 @@ pub(super) fn lookup(source: &str) -> Option<&'static str> {
         "Pin image" => "置顶图片",
         "Close" => "关闭",
         "Translate" => "翻译",
+        "Cannot open code scanner" => "无法打开扫码窗口",
+        "Scan QR / barcode" => "识别二维码与条形码",
         "Always on Top" => "始终置顶",
         "Failed to save settings" => "保存设置失败",
         "Open with" => "打开方式",

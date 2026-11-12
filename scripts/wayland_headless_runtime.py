@@ -23,7 +23,7 @@ for_window [app_id="mark-shot-pin"] floating enable
 class HeadlessRuntime:
     """【贴图回归】【隔离资源】管理 root 下 sway 进程和日志，binary 可为未安装的独立测试工具"""
 
-    def __init__(self, root, binary):
+    def __init__(self, root, binary, renderer="pixman"):
         """【贴图回归】【会话构造】保存 root、binary，不启动进程；environment 只属于本实例"""
         self.root = root.resolve()
         self.binary = binary.resolve()
@@ -31,6 +31,7 @@ class HeadlessRuntime:
         self.log = None
         self.runtime = None
         self.environment = dict(os.environ)
+        self.renderer = renderer
 
     def __enter__(self):
         """【贴图回归】【会话启动】创建私有目录，启动两输出并校验套接字；返回环境，失败时关闭进程"""
@@ -45,7 +46,7 @@ class HeadlessRuntime:
                 self.environment.pop(key, None)
             self.environment.update(XDG_RUNTIME_DIR=str(runtime), XDG_CONFIG_HOME=str(self.root / "config"),
                                     XDG_DATA_HOME=str(self.root / "data"), XDG_STATE_HOME=str(self.root / "state"),
-                                    WLR_BACKENDS="headless", WLR_RENDERER="pixman", WLR_HEADLESS_OUTPUTS="2")
+                                    WLR_BACKENDS="headless", WLR_RENDERER=self.renderer, WLR_HEADLESS_OUTPUTS="2")
             library = self.binary.parent.parent / "lib"
             self.environment["LD_LIBRARY_PATH"] = str(library)
             self.log = (self.root / "sway.log").open("w")

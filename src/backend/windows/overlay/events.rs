@@ -12,6 +12,9 @@ use crate::{
 };
 use std::time::{Duration, Instant};
 
+#[cfg(test)]
+mod tests;
+
 /// 【Windows覆盖层】【鼠标按钮】按原生button返回共享鼠标职责，其他按钮保持未处理
 fn button(button: u32) -> Option<MouseButton> {
     match button {
@@ -115,6 +118,10 @@ impl Overlay {
         }
         let monitor_idx = monitor.unwrap();
         match event {
+            WindowEvent::Resize { size } if self.image_size.is_some() => {
+                self.image_size = Some(size);
+                self.pending.push_back(OverlayEvent::CanvasResized { size });
+            }
             WindowEvent::PointerMove { position } => {
                 self.cursor_output = Some(monitor_idx);
                 self.pending.push_back(OverlayEvent::PointerMove {
@@ -146,7 +153,8 @@ impl Overlay {
                 button: code,
                 pressed,
             } => {
-                if self.popup.is_some() {
+                // 1. 【Windows弹层】【释放归属】打开菜单的按下仍由父窗口捕获，松开必须交回原控件清理手势
+                if pressed && self.popup.is_some() {
                     let id = self.popup.take().unwrap().0;
                     self.pending.push_back(OverlayEvent::Popup {
                         id,

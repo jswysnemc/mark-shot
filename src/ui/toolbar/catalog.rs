@@ -123,6 +123,12 @@ pub const ENTRIES: &[Entry] = &[
     entry!("pin", Button::Finish(Finish::Pin), "贴图", "Pin"),
     entry!("ocr", Button::Tool(Tool::Ocr), "文字识别", "OCR"),
     entry!(
+        "scan_code",
+        Button::Integration(Integration::ScanCode),
+        "识别二维码与条形码",
+        "Scan QR / barcode"
+    ),
+    entry!(
         "translate",
         Button::Integration(Integration::Translate),
         "翻译",

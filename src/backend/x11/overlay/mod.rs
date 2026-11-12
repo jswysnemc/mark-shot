@@ -1,6 +1,7 @@
 //! 【X11覆盖层】【资源状态】每个显示器拥有独立截图窗口，像素交付前保持隐藏
 
 mod events;
+mod image_window;
 mod popup;
 mod presentation;
 mod scroll;
@@ -20,6 +21,7 @@ pub struct Overlay {
     wake: task_wake::Source,
     pending: VecDeque<OverlayEvent>,
     image_size: Option<(u32, u32)>,
+    image_minimum: (u32, u32),
     cursor_output: Option<usize>,
     suspended: bool,
     scrolling: Option<usize>,
@@ -60,6 +62,7 @@ impl Overlay {
             wake: task_wake::Source::new()?,
             pending: VecDeque::new(),
             image_size: None,
+            image_minimum: (320, 240),
             cursor_output: None,
             suspended: false,
             scrolling: None,

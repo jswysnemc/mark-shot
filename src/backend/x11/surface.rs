@@ -3,6 +3,10 @@
 use super::{connection::Display, pixels};
 use x11rb::{connection::Connection, protocol::xproto::*, wrapper::ConnectionExt as _};
 
+#[cfg(test)]
+#[path = "surface_tests.rs"]
+mod tests;
+
 pub struct Surface {
     pub display: Display,
     pub window: Window,
@@ -120,13 +124,77 @@ impl Surface {
 
     /// 【X11窗口】【绘制提交】按pixels保存当前帧并提交服务器，首次提交后映射窗口，返回协议错误
     pub fn present(&mut self, pixels: &[u8]) -> crate::AppResult {
-        self.pixels.clear();
-        self.pixels.extend_from_slice(pixels);
+        self.present_region(pixels, None)
+    }
+
+    /// 【X11截图场景】【持久帧合成】按 frame 更新唯一完整曝光副本并上传损坏部分，尺寸变化强制完整更新
+    pub(crate) fn present_scene(
+        &mut self,
+        mut frame: crate::types::capture_scene::Frame<'_>,
+    ) -> crate::AppResult {
+        if (frame.foreground.width(), frame.foreground.height())
+            != (u32::from(self.size.0), u32::from(self.size.1))
+        {
+            return Err("X11 scene dimensions differ from window".into());
+        }
+        if self.pixels.len() != frame.foreground.data().len() || !self.mapped {
+            frame.damage = None;
+            self.pixels.resize(frame.foreground.data().len(), 0);
+        }
+        crate::backend::software_scene::compose(&frame, &mut self.pixels, false)?;
         if !self.mapped {
             self.display.connection.map_window(self.window)?.check()?;
             self.mapped = true;
         }
-        self.repaint()
+        pixels::present_region(
+            &self.display,
+            self.window,
+            self.gc,
+            self.size,
+            &self.pixels,
+            frame.damage,
+        )
+    }
+
+    /// 【X11窗口】【局部保存】按 pixels 和 damage 更新持久曝光帧，首次显示强制复制完整帧，返回协议结果
+    pub(crate) fn present_region(
+        &mut self,
+        pixels: &[u8],
+        damage: Option<crate::types::DamageRect>,
+    ) -> crate::AppResult {
+        let width = usize::from(self.size.0);
+        let height = usize::from(self.size.1);
+        if pixels.len() != width * height * 4 {
+            return Err("X11 surface dimensions differ from pixels".into());
+        }
+        let damage = damage.filter(|_| self.mapped && self.pixels.len() == pixels.len());
+        if let Some((x, y, w, h)) = damage {
+            let right = x.saturating_add(w).min(self.size.0.into()) as usize;
+            let bottom = y.saturating_add(h).min(self.size.1.into()) as usize;
+            if x as usize >= right || y as usize >= bottom {
+                return Ok(());
+            }
+            for row in y as usize..bottom {
+                let start = (row * width + x as usize) * 4;
+                let end = (row * width + right) * 4;
+                self.pixels[start..end].copy_from_slice(&pixels[start..end]);
+            }
+        } else {
+            self.pixels.clear();
+            self.pixels.extend_from_slice(pixels);
+        }
+        if !self.mapped {
+            self.display.connection.map_window(self.window)?.check()?;
+            self.mapped = true;
+        }
+        pixels::present_region(
+            &self.display,
+            self.window,
+            self.gc,
+            self.size,
+            &self.pixels,
+            damage,
+        )
     }
 
     /// 【X11窗口】【曝光重绘】无参数，上传保存的有效帧，返回协议错误

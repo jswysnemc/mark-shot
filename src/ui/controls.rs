@@ -1,5 +1,11 @@
 //! 【界面控件】【基础按钮】独立窗口共用紧凑按钮与文字截断规则
 
+mod segmented;
+mod switch;
+
+pub use segmented::{segment, segmented};
+pub use switch::{SWITCH_SIZE, switch};
+
 use tiny_skia::{Rect, Stroke};
 
 use crate::{

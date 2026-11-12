@@ -155,16 +155,38 @@ pub fn watch(
     config: &Path,
     wake: crate::backend::window::WindowWake,
 ) -> io::Result<notify::RecommendedWatcher> {
+    watch_directory(&directory(config)?, move || wake.notify())
+}
+
+/// 【桌面集成】【目录订阅】按 directory 监听文件变化并调用 wake，返回负责释放监听的句柄
+fn watch_directory(
+    directory: &Path,
+    wake: impl Fn() + Send + 'static,
+) -> io::Result<notify::RecommendedWatcher> {
     let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
         if event.is_ok_and(|event| {
-            event.kind.is_modify() || event.kind.is_create() || event.kind.is_remove()
+            // 1. 【桌面集成】【避免反馈】状态读取会校验目录权限，仅状态文件的内容和名称变化需要重绘
+            event
+                .paths
+                .iter()
+                .any(|path| path.file_name().is_some_and(|name| name == "status.json"))
+                && matches!(
+                    event.kind,
+                    notify::EventKind::Create(_)
+                        | notify::EventKind::Remove(_)
+                        | notify::EventKind::Modify(
+                            notify::event::ModifyKind::Data(_)
+                                | notify::event::ModifyKind::Name(_)
+                                | notify::event::ModifyKind::Any
+                        )
+                )
         }) {
-            wake.notify();
+            wake();
         }
     })
     .map_err(io::Error::other)?;
     watcher
-        .watch(&directory(config)?, notify::RecursiveMode::NonRecursive)
+        .watch(directory, notify::RecursiveMode::NonRecursive)
         .map_err(io::Error::other)?;
     Ok(watcher)
 }

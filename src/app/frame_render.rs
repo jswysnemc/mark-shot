@@ -31,6 +31,7 @@ pub(super) struct Pacing {
     pub(super) owed: Vec<Option<Redraw>>,
     pub(super) dimmed_for: Vec<Option<Rect>>,
     pub(super) source_residency: super::source_residency::Residency,
+    pub(super) foreground_residency: super::foreground_residency::Residency,
 }
 
 impl Pacing {
@@ -39,6 +40,7 @@ impl Pacing {
             owed: vec![None; monitors],
             dimmed_for: vec![None; monitors],
             source_residency: Default::default(),
+            foreground_residency: Default::default(),
         }
     }
 
@@ -116,7 +118,15 @@ pub(super) fn render_dirty_monitors(
             owed.area(),
             &mut pacing.dimmed_for[i],
         );
-        super::frame_backdrop::stage(editor_state, overlay, i, damage)?;
+        let native_scene = editor_state.region_rendering.native_scene;
+        let opaque = !editor_state.canvas_transform().is_identity()
+            || editor_state.region_rendering.baked_background;
+        let reclaim_transparent =
+            native_scene && !opaque && pacing.foreground_residency.regional_due(i, Instant::now());
+        super::frame_backdrop::stage(editor_state, overlay, i, damage, reclaim_transparent)?;
+        pacing
+            .foreground_residency
+            .touched(i, native_scene, opaque, Instant::now());
         rendered_any = true;
     }
     overlay.flush()?;
@@ -191,10 +201,22 @@ pub(super) fn render_monitor(
     editor_state: &mut EditorState,
     i: usize,
     frame: &Frame,
-    dirty_rect: Option<Rect>,
+    mut dirty_rect: Option<Rect>,
     dimmed_for: &mut Option<Rect>,
 ) -> Option<DamageRect> {
     editor_state.prepare_region_layers();
+    // 1. 【截图场景】【候选层级】仅将空选区的整数候选分离，已有正文及分数边缘维持原有绘制顺序
+    editor_state.region_rendering.native_hover = editor_state.region_rendering.native_scene
+        && editor_state.annotations.is_empty()
+        && editor_state.pending.is_none()
+        && editor_state.text_session.is_none()
+        && editor_state.selection.zone.is_none()
+        && editor_state.placements[i].scale == 1.0
+        && editor_state.region_detection.hovered.is_none_or(|rect| {
+            [rect.left(), rect.top(), rect.right(), rect.bottom()]
+                .iter()
+                .all(|value| value.fract() == 0.0)
+        });
     // No loupe while reading text: it sits right where the
     // pointer is selecting and hides the line under it.
     let is_mag_monitor = editor_state.selected_tool != Tool::Ocr
@@ -225,6 +247,7 @@ pub(super) fn render_monitor(
         0.0
     };
     let key = crate::editor::canvas_navigation::state::FrameKey {
+        baked_background: editor_state.region_rendering.baked_background,
         view,
         selection: local_sel,
         offset,
@@ -237,6 +260,9 @@ pub(super) fn render_monitor(
         .frames
         .resize(editor_state.placements.len(), None);
     let previous_key = editor_state.navigation.frames[i];
+    if previous_key.is_some_and(|previous| previous.baked_background != key.baked_background) {
+        dirty_rect = None;
+    }
     let background_changed = previous_key != Some(key)
         && (!view.is_identity() || previous_key.is_some_and(|key| !key.view.is_identity()));
     editor_state.navigation.frames[i] = Some(key);
@@ -252,9 +278,9 @@ pub(super) fn render_monitor(
 
     let dragged_index = editor_state.dragged_index();
     let hidden = frame.annotations_hidden;
-    let selected_annotation = editor_state.selected_annotation_index().filter(|_| {
-        !hidden && editor_state.text_session.is_none() && editor_state.selected_tool != Tool::Text
-    });
+    let selected_annotation = editor_state
+        .selected_annotation_index()
+        .filter(|_| !hidden && editor_state.text_session.is_none());
     let collection_bounds = editor_state.collection_bounds();
     let drawing_space = crate::tools::drawing_space::DrawingSpace::from_editor(editor_state);
     let dirty = dirty_rect.as_ref();
@@ -405,12 +431,31 @@ pub(super) fn render_monitor(
             .region_rendering
             .enabled
             .then_some(&editor_state.region_rendering),
+        editor_state.image_window.enabled.then(|| {
+            Rect::from_xywh(
+                0.0,
+                0.0,
+                editor_state.placements[i].size.0 as f32,
+                super::image_window::layout::viewport((
+                    editor_state.placements[i].size.0 as u32,
+                    editor_state.placements[i].size.1 as u32,
+                ))
+                .top(),
+            )
+            .unwrap()
+        }),
+        editor_state
+            .region_rendering
+            .native_scene
+            .then(|| &editor_state.region_rendering.navigation_caches[i]),
     );
     crate::ui::canvas_navigation::draw::draw(editor_state, i, dirty_rect);
     crate::ui::canvas_navigation::zoom::draw(editor_state, i, dirty_rect);
     super::selection_translation::panels::draw(editor_state, i, dirty_rect);
     super::selection_size::panels::draw_popup(editor_state, i, dirty_rect);
     crate::features::color_sample::inspector_draw::draw(editor_state, i, dirty_rect);
+    crate::ui::image_window::draw(editor_state, i);
+    crate::ui::capture_start::draw::draw(editor_state, i);
 
     damage
 }

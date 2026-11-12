@@ -13,7 +13,7 @@ GNOME Wayland 支持门户多屏捕获，已验证范围见 [Linux 桌面兼容]
 
 本次重写参考 `/home/snemc/workspace/LumineCapture` 的原生架构，界面与操作以 Mark Shot Qt
 实现为依据。截图、编辑、贴图、OCR 和滚动截图基础工作流已实现，完整界面一致性仍在补齐。
-支持 Linux Wayland/X11 与 Windows 屏幕录制、暂停恢复、系统声音或麦克风，以及 MP4、MKV、GIF 输出。完整构建包包含独立媒体组件，使用方法和平台限制见[录制说明](docs/recording/usage.md)。二维码扫描暂未实现。
+支持 Linux Wayland/X11 与 Windows 屏幕录制、暂停恢复、系统声音或麦克风，以及 MP4、MKV、GIF 输出。完整构建包包含进程内共享媒体库，不调用外部录制器，使用方法和平台限制见[录制说明](docs/recording/usage.md)。二维码与条形码支持本地图片、屏幕选区和贴图识别，无需下载模型，见[扫码说明](docs/code-scanning.md)。
 界面默认使用浅色主题，按 `Ctrl+Shift+L` 切换并保存明暗主题；可在 `[ui]` 设置
 `theme = "light"`、`theme = "dark"` 或跟随系统的 `theme = "system"`，快捷键使用 `keys.toggle_theme` 配置。
 主题范围、原版配色和实际验证边界见 [主题对照](docs/theme-compatibility.md)。

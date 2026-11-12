@@ -30,14 +30,21 @@ pub(super) fn draw(
     annotation_delete: Option<&crate::ui::annotation_selection::delete_cache::Cache>,
     collection: Option<&crate::app::annotation_collection::chrome::Overlay<'_>>,
     region: Option<&crate::editor::region_rendering::State>,
+    navigation_cache: Option<&std::cell::RefCell<super::navigation_background::TileCache>>,
 ) {
-    if background_changed {
-        background(req, view);
-    }
-    if let Some(dirty) = req.dirty_rect {
-        super::blit_rect(req.dimmed, req.canvas, dirty, req.scale);
+    if region.is_some_and(|region| region.native_scene)
+        && let Some(cache) = navigation_cache
+    {
+        super::navigation_background::restore(req, view, background_changed, cache);
     } else {
-        req.canvas.data_mut().copy_from_slice(req.dimmed.data());
+        if background_changed {
+            background(req, view);
+        }
+        if let Some(dirty) = req.dirty_rect {
+            super::blit_rect(req.dimmed, req.canvas, dirty, req.scale);
+        } else {
+            req.canvas.data_mut().copy_from_slice(req.dimmed.data());
+        }
     }
     let origin = view.origin(req.offset);
     let scale = req.scale * view.scale as f32;

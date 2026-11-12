@@ -5,6 +5,7 @@ on:
     branches:
       - rewrite/native-wayland
       - feat/native-recording
+      - feat/native-barcode-scanning
     tags:
       - 'native-v*'
   workflow_dispatch:
@@ -91,8 +92,13 @@ jobs:
       - name: Compile native release
         run: cargo build --release --locked -j 2
 
-      - name: Build recording components with corresponding sources
-        run: bash scripts/recording/build-components.sh linux > target/recording-build.log 2>&1 || { tail -100 target/recording-build.log; exit 1; }
+      - name: Build in-process media library with corresponding sources
+        run: bash scripts/media/build-libraries.sh linux > target/media-build.log 2>&1 || { tail -100 target/media-build.log; exit 1; }
+
+      - name: Verify in-process software encoding and exports
+        run: |
+          mkdir -p target/media-evidence
+          MARK_SHOT_MEDIA_LIBRARY="$PWD/target/media-linux/libmarkshot-media.so" MARK_SHOT_MEDIA_EVIDENCE="$PWD/target/media-evidence" cargo test -p shot-media --locked -- --ignored --nocapture
 
       - name: Verify executable and linkage
         run: |
@@ -136,13 +142,11 @@ jobs:
         run: |
           staging=$(mktemp -d "$RUNNER_TEMP/mark-shot-package.XXXXXX")
           package="$staging/mark-shot-native"
-          mkdir -p "$package/docs" "$package/licenses" "$package/recording"
+          mkdir -p "$package/docs" "$package/licenses" "$package/media"
           install -m 755 target/release/mark-shot "$package/mark-shot"
-          cp -a target/recording-components-linux/. "$package/recording/"
-          for component in ffmpeg ffprobe gpu-screen-recorder wf-recorder; do
-            test -x "$package/recording/$component"
-          done
-          (cd "$package/recording"; sha256sum --check SHA256SUMS)
+          cp -a target/media-linux/. "$package/media/"
+          test -f "$package/media/libmarkshot-media.so"
+          (cd "$package/media"; sha256sum --check SHA256SUMS)
           cp LICENSE-MIT LICENSE-APACHE README.md "$package/"
           cp assets/fonts/LICENSE-OFL.txt assets/fonts/LICENSE-NUMERALS.txt "$package/licenses/"
           cp assets/icons/mark-shot/LICENSE "$package/licenses/LICENSE-ICONS.txt"

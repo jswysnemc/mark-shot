@@ -236,3 +236,59 @@ fn overlay_wakes_without_polling_and_preserves_timeout() {
     ));
     assert!(started.elapsed() >= Duration::from_millis(25));
 }
+
+/// 【X11集成测试】【完整覆盖】无参数，屏幕覆盖层逐输出使用完整尺寸并绕过窗口管理器工作区约束
+#[test]
+#[ignore = "requires MARK_SHOT_TEST_X11_DISPLAY on an isolated Xvfb"]
+fn overlays_use_output_geometry_and_override_redirect() {
+    let display = private_display();
+    let root = display.screen().root;
+    let before = display
+        .connection
+        .query_tree(root)
+        .unwrap()
+        .reply()
+        .unwrap()
+        .children;
+    let mut overlay = x11::overlay::Overlay::new(display.clone()).unwrap();
+    let outputs = overlay.discovered_outputs().to_vec();
+    overlay
+        .present(&(0..outputs.len()).collect::<Vec<_>>())
+        .unwrap();
+    overlay.flush().unwrap();
+    let after = display
+        .connection
+        .query_tree(root)
+        .unwrap()
+        .reply()
+        .unwrap()
+        .children;
+    let windows: Vec<_> = after
+        .into_iter()
+        .filter(|window| !before.contains(window))
+        .collect();
+    assert_eq!(windows.len(), outputs.len());
+    for (window, output) in windows.into_iter().zip(outputs) {
+        let attributes = display
+            .connection
+            .get_window_attributes(window)
+            .unwrap()
+            .reply()
+            .unwrap();
+        assert!(attributes.override_redirect);
+        let geometry = display
+            .connection
+            .get_geometry(window)
+            .unwrap()
+            .reply()
+            .unwrap();
+        assert_eq!(
+            (i32::from(geometry.x), i32::from(geometry.y)),
+            output.info.logical_position.unwrap()
+        );
+        assert_eq!(
+            (i32::from(geometry.width), i32::from(geometry.height)),
+            output.info.logical_size.unwrap()
+        );
+    }
+}

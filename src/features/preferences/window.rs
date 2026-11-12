@@ -28,7 +28,7 @@ pub(super) struct Preferences {
     pub cache: cosmic_text::SwashCache,
     pub status: String,
     pub toolbar: super::toolbar::Editor,
-    pub toolbar_editor: bool,
+    pub toolbar_return: Option<super::navigation::Location>,
     pub translation: super::translation::State,
     pub(super) ready: bool,
     pub recovery: Option<String>,
@@ -48,6 +48,7 @@ pub(super) struct Preferences {
 #[derive(Clone, Copy, PartialEq)]
 pub(super) enum Control {
     Close,
+    Back,
     Page(Page),
     Row(usize),
     Segment(usize, usize),
@@ -115,7 +116,7 @@ impl Preferences {
             cache: cosmic_text::SwashCache::new(),
             status: String::new(),
             toolbar,
-            toolbar_editor: false,
+            toolbar_return: None,
             translation,
             ready,
             recovery,
@@ -147,7 +148,7 @@ impl Preferences {
 
     /// 【工具栏设置】【页面判断】无参数，返回当前是否显示工具栏内容，搜索结果沿用通用设置列表
     pub fn toolbar_page(&self) -> bool {
-        self.page == Page::Toolbar && self.toolbar_editor && self.search.text().is_empty()
+        self.page == Page::Toolbar && self.toolbar_return.is_some() && self.search.text().is_empty()
     }
 
     /// 【翻译设置】【页面判断】无参数，返回当前是否显示独立翻译配置页面
@@ -187,6 +188,9 @@ impl Preferences {
 
     /// 【设置窗口】【控件命中】按 point 返回可点击控件，菜单打开时优先命中菜单项
     pub fn hit(&self, point: (f64, f64)) -> Option<Control> {
+        if self.toolbar_page() && contains(super::layout::back_rect(self), point) {
+            return Some(Control::Back);
+        }
         if contains(super::layout::close_rect(self), point) {
             return Some(Control::Close);
         }
@@ -211,6 +215,9 @@ impl Preferences {
             return Some(Control::ConfigPath);
         }
         if self.recovery.is_some() {
+            return None;
+        }
+        if self.toolbar_page() || self.translation_page() {
             return None;
         }
         super::layout::Layout::new(self).hit(self, point)
@@ -366,8 +373,11 @@ impl Preferences {
         }
         match control {
             Control::Close | Control::Scrollbar => {}
+            Control::Back => {
+                self.back();
+            }
             Control::Page(page) => {
-                self.toolbar_editor = false;
+                self.toolbar_return = None;
                 self.translation.cancel();
                 self.toolbar.cancel();
                 self.toolbar.config = serde_json::from_value(self.values["toolbar_layout"].clone())
@@ -385,6 +395,7 @@ impl Preferences {
                 self.search.set("", &mut self.fonts, false);
             }
             Control::Search => {
+                self.back();
                 self.search_focus = true;
                 self.editing = None;
                 self.shortcut_pause = None;
@@ -428,9 +439,10 @@ impl Preferences {
                     Kind::Link(page) => {
                         if ENTRIES[index].key == "resources" {
                             self.dialog = Some(crate::features::ocr_model_guide::dialog());
+                        } else if page == Page::Toolbar {
+                            self.open_toolbar();
                         } else {
                             self.activate(Control::Page(page));
-                            self.toolbar_editor = page == Page::Toolbar;
                             if page == Page::Translation
                                 && let Some(selected) =
                                     crate::config::settings::translation::SERVICES

@@ -1,6 +1,7 @@
 //! 【Windows覆盖层】【资源状态】原生窗口固定在创建线程，冻结来源由共享业务拥有
 
 mod events;
+mod image_window;
 mod presentation;
 
 use super::{input::Decoder, native};
@@ -25,6 +26,8 @@ pub struct Overlay {
     text: Option<crate::types::text_input::Snapshot>,
     focus: Option<crate::types::text_input::Focus>,
     popup: Option<(u64, usize, native::Window)>,
+    image_size: Option<(u32, u32)>,
+    image_minimum: (u32, u32),
 }
 
 impl Overlay {
@@ -44,6 +47,8 @@ impl Overlay {
             popup: None,
             text: None,
             focus: None,
+            image_size: None,
+            image_minimum: (320, 240),
         })
     }
 

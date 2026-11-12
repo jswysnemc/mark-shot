@@ -92,6 +92,10 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
                 crate::logging::init(Process::OcrResult);
                 crate::features::ocr_result::floating::cli(&args)
             }
+            crate::features::code_scan::transport::ARG => {
+                crate::logging::init(Process::Overlay);
+                crate::features::code_scan::transport::cli(&args)
+            }
             crate::features::pinned_image::recognition::WORKER_ARG => {
                 crate::logging::init(Process::OcrDaemon);
                 crate::features::pinned_image::recognition::cli(&args)
@@ -113,6 +117,10 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
         }
         crate::logging::init(Process::Overlay);
         return crate::features::preferences::run(false);
+    }
+    if let Command::CodeScan { path, json } = &options.command {
+        crate::logging::init(Process::Overlay);
+        return crate::features::code_scan::transport::file(path, *json);
     }
     if let Command::Recording(target) = options.command {
         crate::logging::init(Process::Overlay);

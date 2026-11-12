@@ -29,6 +29,12 @@ pub(super) fn apply(state: &mut EditorState, next: Option<Rect>) {
 pub(crate) fn region(painter: &mut Painter<'_>, rect: Rect) {
     let path = PathBuilder::from_rect(rect);
     painter.fill_path(&path, Color::from_rgba8(94, 234, 212, 32));
+    border(painter, rect);
+}
+
+/// 【截图场景】【候选边框】按 painter 和 rect 仅绘制候选描边，半透明填充由原生场景复用单像素表面
+pub(crate) fn border(painter: &mut Painter<'_>, rect: Rect) {
+    let path = PathBuilder::from_rect(rect);
     painter.stroke_path(
         &path,
         Color::from_rgba8(94, 234, 212, 255),

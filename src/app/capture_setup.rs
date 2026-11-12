@@ -84,18 +84,22 @@ pub(super) async fn start_capture(
     let shrunk = kept.len() < outputs.len();
     let outputs: Vec<_> = kept.iter().map(|&i| outputs[i].clone()).collect();
 
-    let captures = init::build_captures(screenshots.frames)?;
+    let mut captures = init::build_captures(screenshots.frames)?;
     let placements = init::build_placements(&outputs, hidpi);
     let compatible = super::frame_backdrop::compatible(&captures, &placements);
     if !compatible {
         overlay.set_composited_background(false);
     }
+    let native_scene = compatible
+        && std::env::var_os("MARK_SHOT_CAPTURE_SCENE").is_none_or(|value| value != "0")
+        && overlay.enable_capture_scene(&mut captures)?;
+    log::info!("【截图场景】【能力选择】稀疏前景={native_scene}，原始网格兼容={compatible}");
     // 3. 【截图】【覆盖层显示】原始帧已经进入私有来源后才分配绘制与原生表面，避免两份整屏缓冲叠加缓存写入峰值
     let present_at = std::time::Instant::now();
     overlay.present(&targets)?;
     let present_dt = present_at.elapsed();
     let (canvas, dimmed, annotations) =
-        init::build_layers_with_transparency(&placements, launch.fullscreen);
+        init::build_layers_with_transparency(&placements, launch.fullscreen || native_scene);
     prof.mark("base_pixmaps + layers + placements");
 
     let icons_cache = icons_handle.join().expect("Failed to join icons thread");
@@ -119,6 +123,7 @@ pub(super) async fn start_capture(
         build_ocr_state(),
     );
     editor_state.enable_region_rendering();
+    editor_state.region_rendering.native_scene = native_scene;
     prof.mark("editor_state built");
 
     super::frame_backdrop::configure(&mut editor_state, overlay.as_mut(), preferred && compatible);

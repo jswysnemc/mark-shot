@@ -132,6 +132,16 @@ fn corners(req: &mut RenderRequest<'_>, area: IntRect) {
 
 /// 【画布导航】【视口遮罩】按painter、selection和size绘制选区外遮罩，无返回值，与旧导航缓存使用同一矩形顺序
 pub(super) fn shade(painter: &mut Painter<'_>, selection: Option<&Rect>, size: (f32, f32)) {
+    shade_region(painter, selection, size, None);
+}
+
+/// 【画布导航】【区域遮罩】按 painter、selection、size 和 clip 只合成损坏范围，原矩形抗锯齿相位保持不变，无返回值
+pub(super) fn shade_region(
+    painter: &mut Painter<'_>,
+    selection: Option<&Rect>,
+    size: (f32, f32),
+    clip: Option<IntRect>,
+) {
     let color = crate::config::get().selection.dim;
     if let Some(selection) = selection {
         for (left, top, right, bottom) in [
@@ -146,22 +156,30 @@ pub(super) fn shade(painter: &mut Painter<'_>, selection: Option<&Rect>, size: (
             ),
         ] {
             if let Some(rect) = Rect::from_ltrb(left, top, right, bottom) {
-                shade_rectangle(painter, rect, color);
+                shade_rectangle(painter, rect, color, clip);
             }
         }
     } else if let Some(rect) = Rect::from_xywh(0.0, 0.0, size.0, size.1) {
-        shade_rectangle(painter, rect, color);
+        shade_rectangle(painter, rect, color, clip);
     }
 }
 
 /// 【画布导航】【遮罩矩形】将 rect 以 color 绘入 painter；整数内部快速填充，边缘保留原路径抗锯齿，无返回值
-fn shade_rectangle(painter: &mut Painter<'_>, rect: Rect, color: crate::theme::Rgba) {
+fn shade_rectangle(
+    painter: &mut Painter<'_>,
+    rect: Rect,
+    color: crate::theme::Rgba,
+    clip: Option<IntRect>,
+) {
     let scale = painter.scale();
     let Some(pixels) = rect.transform(painter.transform()) else {
         return;
     };
     let canvas = painter.canvas();
-    let bounds = IntRect::from_xywh(0, 0, canvas.width(), canvas.height()).unwrap();
+    let full = IntRect::from_xywh(0, 0, canvas.width(), canvas.height()).unwrap();
+    let Some(bounds) = clip.unwrap_or(full).intersect(&full) else {
+        return;
+    };
     let Some(outer) = pixels.round_out().and_then(|rect| rect.intersect(&bounds)) else {
         return;
     };
@@ -236,6 +254,29 @@ pub(super) fn draw(req: &mut RenderRequest<'_>) {
         return;
     };
     identity(req, area);
+}
+
+/// 【截图场景】【透明恢复】按 req 清除损坏前景中原有非零内容，不触碰已经透明的整块像素，遮罩交由合成器绘制
+pub(super) fn clear_foreground(req: &mut RenderRequest<'_>) {
+    let Some(area) = damage(req.canvas, req.dirty_rect, req.scale) else {
+        return;
+    };
+    let stride = req.canvas.width() as usize * 4;
+    for row in area.top()..area.bottom() {
+        let first = row as usize * stride + area.left() as usize * 4;
+        let bytes = &mut req.canvas.data_mut()[first..first + area.width() as usize * 4];
+        for block in bytes.chunks_mut(256) {
+            if block
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|pixel| *pixel != [0; 4])
+            {
+                block.fill(0);
+            }
+        }
+    }
+    corners(req, area);
 }
 
 #[cfg(test)]

@@ -9,6 +9,46 @@ use crate::{
 use std::{io, time::Duration};
 
 impl ScreenOverlay for Overlay {
+    /// 【Windows截图场景】【能力启用】按 captures 验证截图角色，返回是否使用稀疏前景，图片窗口保持原有路径
+    fn enable_capture_scene(
+        &mut self,
+        _captures: &mut [crate::types::Capture],
+    ) -> crate::AppResult<bool> {
+        Ok(self.image_size.is_none())
+    }
+
+    /// 【Windows截图场景】【单次交付】按 monitor_idx/frame 直接组合到唯一 DIB，返回提交状态
+    fn stage_capture_scene(
+        &mut self,
+        monitor_idx: usize,
+        frame: crate::types::capture_scene::Frame<'_>,
+    ) -> crate::AppResult {
+        let size = (frame.foreground.width(), frame.foreground.height());
+        self.surface(monitor_idx)?.update_bitmap(size, |bitmap| {
+            crate::backend::software_scene::compose(&frame, bitmap.pixels_mut(), true)
+                .map_err(|error| io::Error::other(error.to_string()))
+        })?;
+        self.staged[monitor_idx] = true;
+        Ok(())
+    }
+    /// 【Windows图片窗口】【角色配置】按 size 和 minimum 配置可调整普通窗口，返回支持状态
+    fn configure_image_window(&mut self, size: (u32, u32), minimum: (u32, u32)) -> bool {
+        self.image_size = Some(size);
+        self.image_minimum = minimum;
+        true
+    }
+    /// 【Windows图片窗口】【实际尺寸】无参数，返回最近窗口消息确认的物理客户区尺寸
+    fn image_window_size(&self) -> Option<(u32, u32)> {
+        self.image_size
+    }
+    /// 【Windows图片窗口】【系统操作】按 action 执行窗口操作，Windows 无需 serial，返回系统结果
+    fn image_window_action(
+        &mut self,
+        action: crate::types::image_window::Action,
+        _serial: Option<u32>,
+    ) -> crate::AppResult {
+        self.image_action(action)
+    }
     /// 【Windows覆盖层】【背景能力】无参数，返回原生BGRA合成可用，不分配独立完整背景
     fn supports_native_frame_background(&self) -> bool {
         true
@@ -51,18 +91,37 @@ impl ScreenOverlay for Overlay {
                 .outputs
                 .get(index)
                 .ok_or("invalid Windows display target")?;
-            let window = native::Window::new(
+            let mut bounds = output.native.bounds;
+            if let Some(size) = self.image_size {
+                bounds.left += (bounds.width as i32 - size.0 as i32).max(0) / 2;
+                bounds.top += (bounds.height as i32 - size.1 as i32).max(0) / 2;
+                bounds.width = size.0;
+                bounds.height = size.1;
+            }
+            let mut window = native::Window::new(
                 native::WindowOptions {
-                    title: "Mark Shot".into(),
-                    bounds: output.native.bounds,
-                    minimum: (1, 1),
-                    topmost: true,
+                    title: if self.image_size.is_some() {
+                        "Mark Shot - Edit"
+                    } else {
+                        "Mark Shot"
+                    }
+                    .into(),
+                    bounds,
+                    minimum: if self.image_size.is_some() {
+                        self.image_minimum
+                    } else {
+                        (1, 1)
+                    },
+                    topmost: self.image_size.is_none(),
                     activate: true,
                     layered: false,
                     owner: 0,
                 },
                 self.queue.clone(),
             )?;
+            if self.image_size.is_some() {
+                window.enable_image_frame()?;
+            }
             self.surfaces.push((index, window));
         }
         self.staged = vec![false; self.surfaces.len()];
