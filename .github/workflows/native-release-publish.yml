@@ -1,0 +1,58 @@
+name: Publish verified native artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing native tag to publish
+        required: true
+        type: string
+      run_id:
+        description: Native Release run with all builds and verification successful
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test publication and build reuse contracts
+        run: python3 -m unittest discover -s tests/packaging -p 'test_release_*.py'
+      - name: Verify the complete canonical source build
+        id: context
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NATIVE_TAG: ${{ inputs.tag }}
+          VERIFIED_RUN_ID: ${{ inputs.run_id }}
+        run: python3 scripts/packaging/release_build.py --tag "$NATIVE_TAG" --run-id "$VERIFIED_RUN_ID"
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.context.outputs.run_id }}
+          pattern: native-*
+          merge-multiple: true
+          path: target/publish-assets
+      - name: Resume immutable verified publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NATIVE_TAG: ${{ steps.context.outputs.tag }}
+          SOURCE_SHA: ${{ steps.context.outputs.source_sha }}
+        run: python3 scripts/packaging/publish_assets.py --directory target/publish-assets --tag "$NATIVE_TAG" --source-sha "$SOURCE_SHA"

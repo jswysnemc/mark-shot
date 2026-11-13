@@ -2,10 +2,12 @@
 
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 
 from artifact_metadata import checksum
+from release_asset_names import asset_name
 
 
 def request(endpoint, method="GET", payload=None, missing_ok=False):
@@ -37,6 +39,7 @@ def verify_asset(tag, path, metadata, repository):
         return
     # 1. 【原生发布】【兼容核验】没有服务器摘要时下载原始字节，不依赖文件名和大小判断相等
     with tempfile.TemporaryDirectory(prefix="mark-shot-release-") as temporary:
+        name = asset_name(path)
         subprocess.run(
             [
                 "gh",
@@ -46,11 +49,44 @@ def verify_asset(tag, path, metadata, repository):
                 "--repo",
                 repository,
                 "--pattern",
-                path.name,
+                name,
                 "--dir",
                 temporary,
             ],
             check=True,
         )
-        if checksum(Path(temporary) / path.name) != digest:
+        if checksum(Path(temporary) / name) != digest:
             raise ValueError(f"remote asset checksum mismatch: {path.name}")
+
+
+def find_release(repository, tag, api=request):
+    """【原生发布】【草稿定位】按 repository 和 tag 查询公开版本及草稿；api 为请求函数，返回发布记录或空值"""
+    base = f"repos/{repository}/releases"
+    release = api(f"{base}/tags/{tag}", missing_ok=True)
+    if release is not None:
+        return release
+    # 1. 【原生发布】【草稿恢复】标签接口只查询公开版本，必须分页检查当前令牌可见的草稿
+    page = 1
+    while True:
+        releases = api(f"{base}?per_page=100&page={page}")
+        for release in releases:
+            if release["tag_name"] == tag:
+                return release
+        if len(releases) < 100:
+            return None
+        page += 1
+
+
+def upload_asset(tag, path, repository):
+    """【原生发布】【规范上传】按 tag、path 和 repository 上传规范名称的文件，原始包和内部版本不变，无返回值"""
+    path = Path(path)
+    name = asset_name(path)
+    with tempfile.TemporaryDirectory(prefix="mark-shot-release-upload-") as temporary:
+        uploaded = path
+        if name != path.name:
+            uploaded = Path(temporary) / name
+            shutil.copyfile(path, uploaded)
+        subprocess.run(
+            ["gh", "release", "upload", tag, "--repo", repository, str(uploaded)],
+            check=True,
+        )

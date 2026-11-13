@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from artifact_metadata import checksum
+from release_asset_names import asset_name
 
 
 def render(notes, context, files, repository):
@@ -25,9 +26,10 @@ def render(notes, context, files, repository):
         "| --- | ---: | --- |",
     ]
     for path in sorted(files, key=lambda item: item.name):
-        url = f"{base}/releases/download/{quote(context.tag, safe='')}/{quote(path.name, safe='')}"
+        name = asset_name(path)
+        url = f"{base}/releases/download/{quote(context.tag, safe='')}/{quote(name, safe='')}"
         lines.append(
-            f"| [{escape(path.name)}]({url}) | {path.stat().st_size} | `{checksum(path)}` |"
+            f"| [{escape(name)}]({url}) | {path.stat().st_size} | `{checksum(path)}` |"
         )
     lines.extend(
         [

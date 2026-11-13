@@ -5,10 +5,10 @@ import json
 import os
 from pathlib import Path
 import re
-import subprocess
 
 from artifact_metadata import checksum
-from release_api import request, verify_asset
+from release_api import find_release, request, upload_asset, verify_asset
+from release_asset_names import asset_name
 from release_context import resolve
 from release_notes import render
 
@@ -56,6 +56,8 @@ def assets(directory, context):
     }
     if packages != set(result) or len(result) != len(set(result)):
         raise ValueError("release packages and verification records do not match")
+    if len({asset_name(path) for path in result}) != len(result):
+        raise ValueError("normalized release asset names collide")
     return result
 
 
@@ -67,7 +69,7 @@ def publish(directory, context, notes=None, repository=None):
     body = render(notes, context, files, repository)
     base = f"repos/{repository}/releases"
     prerelease = "-" in context.version.split("+", 1)[0]
-    metadata = request(f"{base}/tags/{context.tag}", missing_ok=True)
+    metadata = find_release(repository, context.tag, request)
     # 1. 【原生发布】【草稿准备】首次发布只创建草稿，任何后续失败都不会公开不完整版本
     if metadata is None:
         metadata = request(
@@ -85,32 +87,22 @@ def publish(directory, context, notes=None, repository=None):
     if metadata["tag_name"] != context.tag or metadata["prerelease"] != prerelease:
         raise ValueError("release tag mismatch")
     existing = {item["name"]: item for item in metadata["assets"]}
-    if set(existing) - {path.name for path in files}:
+    if set(existing) - {asset_name(path) for path in files}:
         raise ValueError("release contains unexpected assets")
     # 2. 【原生发布】【不可变上传】相同文件只核验，不同内容拒绝覆盖；摘要文件和元数据不上传
     for path in files:
-        if path.name in existing:
-            verify_asset(context.tag, path, existing[path.name], repository)
+        name = asset_name(path)
+        if name in existing:
+            verify_asset(context.tag, path, existing[name], repository)
         else:
-            subprocess.run(
-                [
-                    "gh",
-                    "release",
-                    "upload",
-                    context.tag,
-                    "--repo",
-                    repository,
-                    str(path),
-                ],
-                check=True,
-            )
+            upload_asset(context.tag, path, repository)
     # 3. 【原生发布】【完整核验】所有远程安装包的字节摘要一致后，统一更新页面并公开发布
     metadata = request(f"{base}/{metadata['id']}")
     remote = {item["name"]: item for item in metadata["assets"]}
-    if set(remote) != {path.name for path in files}:
+    if set(remote) != {asset_name(path) for path in files}:
         raise ValueError("published release assets mismatch")
     for path in files:
-        verify_asset(context.tag, path, remote[path.name], repository)
+        verify_asset(context.tag, path, remote[asset_name(path)], repository)
     metadata = request(
         f"{base}/{metadata['id']}",
         "PATCH",

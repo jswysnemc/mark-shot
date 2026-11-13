@@ -8,6 +8,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/packaging"))
 from artifact_metadata import checksum
+from release_asset_names import asset_name
 from release_context import Context
 from release_notes import render
 
@@ -33,9 +34,10 @@ class ReleaseNotes(unittest.TestCase):
             for path in files:
                 self.assertIn(checksum(path), body[start:end])
                 self.assertIn(
-                    f"/releases/download/{context.tag}/{path.name}", body[start:end]
+                    f"/releases/download/{context.tag}/{asset_name(path)}",
+                    body[start:end],
                 )
-            self.assertLess(body.index("[a~preview.deb]"), body.index("[z.zip]"))
+            self.assertLess(body.index("[a.preview.deb]"), body.index("[z.zip]"))
             self.assertNotIn(".sha256]", body)
 
     def test_empty_update_description_is_rejected(self):

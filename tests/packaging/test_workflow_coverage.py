@@ -116,6 +116,25 @@ class WorkflowCoverage(unittest.TestCase):
                 "rewrite/native-wayland", (WORKFLOWS / f"{name}.yml").read_text()
             )
 
+    def test_publication_retry_validates_build_before_cross_run_download(self):
+        """【原生发布】【复用顺序】无传参，跨任务下载之前必须验证固定源码和全部平台，并与主入口共享并发锁，无返回值"""
+        data = workflow("native-release-publish")
+        steps = data["jobs"]["publish"]["steps"]
+        validation = next(
+            step for step in steps if "release_build.py" in step.get("run", "")
+        )
+        download = next(
+            step for step in steps if step.get("uses") == "actions/download-artifact@v4"
+        )
+        self.assertLess(steps.index(validation), steps.index(download))
+        self.assertEqual(
+            download["with"]["run-id"], "${{ steps.context.outputs.run_id }}"
+        )
+        self.assertEqual(
+            data["concurrency"]["group"], "native-release-${{ inputs.tag }}"
+        )
+        self.assertNotIn("push", data["on"])
+
     def test_source_verification_failures_preserve_build_evidence(self):
         """【原生构建】【失败证据】无传参，验证前收集构建产物，正式验证产物仍在验证后上传，失败使用独立证据名称，无返回值"""
         steps = workflow("debian-source")["jobs"]["resolute"]["steps"]
