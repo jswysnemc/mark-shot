@@ -58,6 +58,9 @@ jobs:
     needs: packages
     runs-on: ubuntu-24.04
     container: ubuntu:24.04
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Install runtime prerequisites
         run: |

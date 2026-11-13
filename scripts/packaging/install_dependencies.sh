@@ -22,7 +22,7 @@ case "$ID" in
     ;;
   fedora)
     packages=(gcc gcc-c++ make clang clang-devel pkgconf-pkg-config ca-certificates curl git python3
-      wayland-devel libxkbcommon-devel libxcb-devel pipewire-devel openssl-devel fontconfig-devel
+      wayland-devel libxkbcommon-devel libxkbcommon-x11-devel libxcb-devel pipewire-devel openssl-devel fontconfig-devel
       google-noto-sans-fonts google-noto-sans-cjk-fonts nasm libva-devel libdrm-devel mesa-libgbm-devel
       pulseaudio-libs-devel xz zstd)
     if [[ "$packaging" == packaging ]]; then

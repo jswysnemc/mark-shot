@@ -52,7 +52,12 @@ def package(repository, package_version, arch, commit, destination):
     if len(binaries) != 1 or len(sources) != 1:
         raise ValueError("RPM build must produce one binary and one source package")
     for item, kind in ((binaries[0], "rpm"), (sources[0], "srpm")):
-        asset = destination / item.name
+        name = (
+            item.name
+            if kind == "rpm"
+            else f"mark-shot_{package_version}_fedora_{arch}.src.rpm"
+        )
+        asset = destination / name
         shutil.copy2(item, asset)
         finalize(asset, package_version, arch, commit, kind)
     return destination / binaries[0].name

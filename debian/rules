@@ -9,6 +9,13 @@ export CARGO_NET_OFFLINE = true
 %:
 	dh $@ --buildsystem=none
 
+# 【原生打包】【第三方保护】Cargo 校验全部 vendor 文件，禁止递归替换第三方 config.sub 或运行 autoreconf
+override_dh_update_autotools_config:
+	@:
+
+override_dh_autoreconf:
+	@:
+
 override_dh_auto_build:
 	bash scripts/packaging/build_linux.sh --offline
 

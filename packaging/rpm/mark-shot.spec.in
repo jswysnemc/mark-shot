@@ -8,7 +8,7 @@ Source0:        mark-shot-@upstream@-source.tar.xz
 BuildRequires:  gcc gcc-c++ make clang clang-devel pkgconf-pkg-config python3
 BuildRequires:  rust >= 1.95
 BuildRequires:  cargo >= 1.95
-BuildRequires:  wayland-devel libxkbcommon-devel libxcb-devel pipewire-devel
+BuildRequires:  wayland-devel libxkbcommon-devel libxkbcommon-x11-devel libxcb-devel pipewire-devel
 BuildRequires:  openssl-devel fontconfig-devel nasm libva-devel libdrm-devel
 BuildRequires:  mesa-libgbm-devel pulseaudio-libs-devel xz
 Requires:       pulseaudio-libs

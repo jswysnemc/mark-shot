@@ -1,6 +1,7 @@
 """【原生构建】【迁移审计】检查 Qt 工作流逐项迁移及正式发布的默认保护边界"""
 
 from pathlib import Path
+import re
 import unittest
 
 import yaml
@@ -28,6 +29,18 @@ def workflow(name):
 
 
 class WorkflowCoverage(unittest.TestCase):
+    def test_container_array_scripts_use_bash(self):
+        """【原生构建】【容器脚本】无传参，复现默认 sh 无法解析 Bash 数组的问题，无返回值"""
+        for name in (*MIGRATED, "native-linux-package"):
+            data = workflow(name)
+            for job in data["jobs"].values():
+                if not job.get("container"):
+                    continue
+                shell = job.get("defaults", {}).get("run", {}).get("shell")
+                for step in job.get("steps", []):
+                    if re.search(r"\b\w+=\(", step.get("run", "")):
+                        self.assertEqual(step.get("shell", shell), "bash", name)
+
     def test_all_ten_qt_workflows_have_native_entries(self):
         """【原生构建】【覆盖测试】无传参，验证十个入口和两个公共任务均存在，无返回值"""
         for name in (*MIGRATED, "native-linux-package", "native-release-context"):

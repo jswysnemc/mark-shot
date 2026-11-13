@@ -52,6 +52,27 @@ def repository(directory):
 
 
 class ReleaseSources(unittest.TestCase):
+    def test_debian_autotools_steps_keep_vendor_files_unchanged(self):
+        """【原生打包】【vendor保护】无传参，执行实际 Debian 规则入口，拒绝自动改写第三方构建文件，无返回值"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            shutil.copytree(ROOT / "debian", root / "debian")
+            source = root / "vendor/onig_sys/oniguruma/config.sub"
+            source.parent.mkdir(parents=True)
+            source.write_text("immutable upstream config\n")
+            before = source.read_bytes()
+            for target in (
+                "override_dh_update_autotools_config",
+                "override_dh_autoreconf",
+            ):
+                subprocess.run(
+                    ["make", "-f", "debian/rules", target],
+                    cwd=root,
+                    check=True,
+                    capture_output=True,
+                )
+                self.assertEqual(source.read_bytes(), before)
+
     def test_ci_toolchain_check_keeps_source_constraints(self):
         """【原生打包】【工具链测试】无传参，确认 CI 分离校验不改正式源码约束，拒绝 Rust 1.93，无返回值"""
         with tempfile.TemporaryDirectory() as temporary:

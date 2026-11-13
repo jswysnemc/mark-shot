@@ -9,6 +9,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/packaging"))
@@ -23,6 +24,7 @@ from artifact_metadata import (
 from install_linux import install
 from package_pacman import package as pacman
 from package_portable import package as portable
+from package_rpm import package as rpm
 from publish_assets import assets
 from release_context import Context
 from source_tree import archive
@@ -64,6 +66,43 @@ def fixture(directory):
 
 
 class ArtifactContracts(unittest.TestCase):
+    def test_source_rpm_assets_do_not_collide_between_architectures(self):
+        """【原生打包】【RPM矩阵】无传参，复现两种架构合并产物时的源码包名称冲突，无返回值"""
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source = directory / "upstream.tar.xz"
+            source.write_bytes(b"source")
+            names = []
+            for arch in ("x86_64", "aarch64"):
+                destination = directory / arch
+
+                def build(command, **kwargs):
+                    """【原生打包】【RPM样本】按 command 模拟本轮架构构建，kwargs 保留调用契约，返回成功结果"""
+                    top = destination / "rpmbuild"
+                    binaries = top / "RPMS" / arch
+                    binaries.mkdir()
+                    (binaries / f"mark-shot-0.2.0-1.fc45.{arch}.rpm").write_bytes(
+                        b"binary"
+                    )
+                    (top / "SRPMS/mark-shot-0.2.0-1.fc45.src.rpm").write_bytes(
+                        arch.encode()
+                    )
+                    return subprocess.CompletedProcess(command, 0)
+
+                with (
+                    patch(
+                        "package_rpm.architecture",
+                        side_effect=lambda value=None: value or arch,
+                    ),
+                    patch(
+                        "package_rpm.prepare", return_value={"source_archive": source}
+                    ),
+                    patch("package_rpm.subprocess.run", side_effect=build),
+                ):
+                    rpm(ROOT, "0.2.0", arch, COMMIT, destination)
+                names.append(next(destination.glob("*.src.rpm")).name)
+            self.assertNotEqual(names[0], names[1])
+
     def test_input_validation(self):
         """【原生打包】【输入测试】无传参，验证合法架构、版本和完整提交，拒绝路径片段，无返回值"""
         self.assertEqual(architecture("arm64"), "aarch64")
