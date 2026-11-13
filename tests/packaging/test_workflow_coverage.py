@@ -87,11 +87,22 @@ class WorkflowCoverage(unittest.TestCase):
             self.assertIn("workflow_call", child["on"])
             self.assertNotIn("push", child["on"])
             self.assertNotIn("release", child["on"])
-            self.assertEqual(
-                child["on"]["workflow_call"]["inputs"]["upload_to_release"]["default"],
-                "false",
+            self.assertNotIn(
+                "upload_to_release", child["on"]["workflow_call"]["inputs"]
             )
-            self.assertIn("inputs.upload_to_release", child["jobs"]["publish"]["if"])
+            self.assertNotIn(
+                "upload_to_release", child["on"]["workflow_dispatch"]["inputs"]
+            )
+            self.assertNotIn("publish", child["jobs"])
+
+    def test_binary_aur_upload_requires_explicit_manual_request(self):
+        """【原生发布】【稳定渠道保护】无传参，统一发布调用不得在缺少 AUR 密钥时自动上传稳定渠道，无返回值"""
+        step = next(
+            step
+            for step in workflow("release-aur-bin")["jobs"]["aur"]["steps"]
+            if step.get("name") == "Publish validated AUR metadata"
+        )
+        self.assertIn("inputs.push_to_aur", step["if"])
 
     def test_deleted_branches_are_not_workflow_triggers(self):
         """【原生构建】【分支同步】无传参，禁止发布和构建入口依赖已删除分支，无返回值"""

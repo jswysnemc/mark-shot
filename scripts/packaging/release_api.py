@@ -27,8 +27,8 @@ def request(endpoint, method="GET", payload=None, missing_ok=False):
     return json.loads(result.stdout) if result.stdout.strip() else None
 
 
-def verify_asset(tag, path, metadata):
-    """【原生发布】【远程摘要】按 tag、path 和远程 metadata 核验 SHA-256；旧资产下载复核，成功无返回值"""
+def verify_asset(tag, path, metadata, repository):
+    """【原生发布】【远程摘要】按 tag、path、metadata 和 repository 核验 SHA-256；旧资产下载复核，成功无返回值"""
     digest = checksum(path)
     remote_digest = metadata.get("digest")
     if remote_digest:
@@ -43,6 +43,8 @@ def verify_asset(tag, path, metadata):
                 "release",
                 "download",
                 tag,
+                "--repo",
+                repository,
                 "--pattern",
                 path.name,
                 "--dir",

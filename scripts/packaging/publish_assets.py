@@ -90,10 +90,19 @@ def publish(directory, context, notes=None, repository=None):
     # 2. 【原生发布】【不可变上传】相同文件只核验，不同内容拒绝覆盖；摘要文件和元数据不上传
     for path in files:
         if path.name in existing:
-            verify_asset(context.tag, path, existing[path.name])
+            verify_asset(context.tag, path, existing[path.name], repository)
         else:
             subprocess.run(
-                ["gh", "release", "upload", context.tag, str(path)], check=True
+                [
+                    "gh",
+                    "release",
+                    "upload",
+                    context.tag,
+                    "--repo",
+                    repository,
+                    str(path),
+                ],
+                check=True,
             )
     # 3. 【原生发布】【完整核验】所有远程安装包的字节摘要一致后，统一更新页面并公开发布
     metadata = request(f"{base}/{metadata['id']}")
@@ -101,7 +110,7 @@ def publish(directory, context, notes=None, repository=None):
     if set(remote) != {path.name for path in files}:
         raise ValueError("published release assets mismatch")
     for path in files:
-        verify_asset(context.tag, path, remote[path.name])
+        verify_asset(context.tag, path, remote[path.name], repository)
     metadata = request(
         f"{base}/{metadata['id']}",
         "PATCH",

@@ -74,7 +74,16 @@ class ReleasePublication(unittest.TestCase):
             url = publish(self.root, self.context, self.notes, "owner/project")
         self.assertEqual(url, self.metadata["html_url"])
         command.assert_called_once_with(
-            ["gh", "release", "upload", self.context.tag, str(self.asset)], check=True
+            [
+                "gh",
+                "release",
+                "upload",
+                self.context.tag,
+                "--repo",
+                "owner/project",
+                str(self.asset),
+            ],
+            check=True,
         )
         self.assertEqual(
             [
@@ -150,8 +159,14 @@ class ReleasePublication(unittest.TestCase):
             (directory / self.asset.name).write_bytes(self.asset.read_bytes())
 
         with patch("release_api.subprocess.run", side_effect=download) as command:
-            verify_asset(self.context.tag, self.asset, {"digest": None})
+            verify_asset(
+                self.context.tag, self.asset, {"digest": None}, "owner/project"
+            )
         self.assertEqual(command.call_count, 1)
+        self.assertEqual(
+            command.call_args.args[0][command.call_args.args[0].index("--repo") + 1],
+            "owner/project",
+        )
 
     def test_only_missing_release_is_tolerated(self):
         """【原生发布】【接口错误】无传参，仅允许 404 返回空值，认证及网络失败必须报错，无返回值"""

@@ -9,9 +9,6 @@ on:
       checkout_ref:
         type: string
         default: ''
-      upload_to_release:
-        type: boolean
-        default: false
   workflow_dispatch:
     inputs:
       tag:
@@ -22,10 +19,6 @@ on:
         description: Optional source reference for artifact-only verification
         type: string
         default: ''
-      upload_to_release:
-        description: Publish manual-run assets only after verifying the exact native tag
-        type: boolean
-        default: false
 permissions:
   contents: read
 concurrency:
@@ -40,7 +33,7 @@ jobs:
     with:
       tag: ${{ inputs.tag || '' }}
       checkout_ref: ${{ inputs.checkout_ref || '' }}
-      publish: ${{ inputs.upload_to_release || false }}
+      publish: false
   packages:
     needs: context
     strategy:
@@ -91,26 +84,3 @@ jobs:
           "${images[0]}" --appimage-extract
           (cd squashfs-root/usr/lib/mark-shot/media; sha256sum --check SHA256SUMS)
           python3 -c 'import ctypes; ctypes.CDLL("squashfs-root/usr/lib/mark-shot/media/libmarkshot-media.so")'
-  publish:
-    needs: [context, packages, verify-ubuntu2404]
-    if: needs.context.outputs.publish == 'true' && inputs.upload_to_release
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.context.outputs.source_sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: native-*
-          merge-multiple: true
-          path: target/publish-assets
-      - name: Publish only verified immutable assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NATIVE_TAG: ${{ needs.context.outputs.tag }}
-          SOURCE_SHA: ${{ needs.context.outputs.source_sha }}
-        run: python3 scripts/packaging/publish_assets.py --directory target/publish-assets --tag "$NATIVE_TAG" --source-sha "$SOURCE_SHA"

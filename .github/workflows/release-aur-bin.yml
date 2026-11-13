@@ -9,9 +9,6 @@ on:
       checkout_ref:
         type: string
         default: ''
-      upload_to_release:
-        type: boolean
-        default: false
   workflow_dispatch:
     inputs:
       tag:
@@ -22,10 +19,6 @@ on:
         description: Optional source reference for artifact-only verification
         type: string
         default: ''
-      upload_to_release:
-        description: Publish manual-run assets only after verifying the exact native tag
-        type: boolean
-        default: false
       push_to_aur:
         description: Publish binary metadata to AUR after GitHub assets are verified
         type: boolean
@@ -48,7 +41,7 @@ jobs:
     with:
       tag: ${{ inputs.tag || '' }}
       checkout_ref: ${{ inputs.checkout_ref || '' }}
-      publish: ${{ inputs.upload_to_release || inputs.push_to_aur || false }}
+      publish: ${{ inputs.push_to_aur || false }}
   packages:
     needs: context
     strategy:
@@ -73,33 +66,9 @@ jobs:
       version: ${{ needs.context.outputs.version }}
       source_sha: ${{ needs.context.outputs.source_sha }}
 
-  publish:
-    needs: [context, packages]
-    if: needs.context.outputs.publish == 'true' && inputs.upload_to_release
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.context.outputs.source_sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: native-*
-          merge-multiple: true
-          path: target/publish-assets
-      - name: Publish only verified immutable assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NATIVE_TAG: ${{ needs.context.outputs.tag }}
-          SOURCE_SHA: ${{ needs.context.outputs.source_sha }}
-        run: python3 scripts/packaging/publish_assets.py --directory target/publish-assets --tag "$NATIVE_TAG" --source-sha "$SOURCE_SHA"
-
   aur:
-    needs: [context, packages, publish]
-    if: always() && needs.packages.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped') && !contains(needs.context.outputs.version, '-')
+    needs: [context, packages]
+    if: always() && needs.packages.result == 'success' && !contains(needs.context.outputs.version, '-')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -129,7 +98,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
       - name: Publish validated AUR metadata
-        if: needs.context.outputs.publish == 'true' && (github.event_name != 'workflow_dispatch' || inputs.push_to_aur)
+        if: needs.context.outputs.publish == 'true' && inputs.push_to_aur && (github.event_name != 'workflow_dispatch' || inputs.push_to_aur)
         env:
           AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           AUR_SSH_KNOWN_HOSTS: ${{ vars.AUR_SSH_KNOWN_HOSTS }}

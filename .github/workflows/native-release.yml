@@ -35,8 +35,6 @@ jobs:
 
   binaries:
     needs: context
-    permissions:
-      contents: write
     uses: ./.github/workflows/release-binaries.yml
     with:
       tag: ${{ needs.context.outputs.tag }}
@@ -45,8 +43,6 @@ jobs:
 
   deb:
     needs: context
-    permissions:
-      contents: write
     uses: ./.github/workflows/release-deb.yml
     with:
       tag: ${{ needs.context.outputs.tag }}
@@ -54,8 +50,6 @@ jobs:
 
   rpm:
     needs: context
-    permissions:
-      contents: write
     uses: ./.github/workflows/release-rpm.yml
     with:
       tag: ${{ needs.context.outputs.tag }}
@@ -63,8 +57,6 @@ jobs:
 
   arch:
     needs: context
-    permissions:
-      contents: write
     uses: ./.github/workflows/release-aur-bin.yml
     with:
       tag: ${{ needs.context.outputs.tag }}
@@ -72,8 +64,6 @@ jobs:
 
   appimage:
     needs: context
-    permissions:
-      contents: write
     uses: ./.github/workflows/release-appimage.yml
     with:
       tag: ${{ needs.context.outputs.tag }}
@@ -81,8 +71,6 @@ jobs:
 
   flatpak:
     needs: context
-    permissions:
-      contents: write
     uses: ./.github/workflows/release-flatpak.yml
     with:
       tag: ${{ needs.context.outputs.tag }}
