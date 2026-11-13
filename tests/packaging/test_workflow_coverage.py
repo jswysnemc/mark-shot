@@ -32,6 +32,18 @@ def workflow(name):
 
 
 class WorkflowCoverage(unittest.TestCase):
+    def test_ppa_upload_uses_a_verified_workspace_relative_directory(self):
+        """【原生发布】【容器产物路径】无传参，防止容器外临时路径导致只上传 dsc 而丢失源码归档，无返回值"""
+        steps = workflow("ppa-publish")["jobs"]["source"]["steps"]
+        upload = next(
+            step for step in steps if step.get("uses") == "actions/upload-artifact@v4"
+        )
+        self.assertEqual(upload["with"]["path"], "target/ppa-source-artifacts/")
+        collection = next(
+            step for step in steps if "collect_debian_source.py" in step.get("run", "")
+        )
+        self.assertLess(steps.index(collection), steps.index(upload))
+
     def test_rpm_cache_does_not_restore_packaging_workspaces(self):
         """【原生构建】【缓存范围】无传参，确认 RPM 只缓存 Cargo 工具和下载，不恢复打包工作目录，无返回值"""
         steps = workflow("native-linux-package")["jobs"]["package"]["steps"]

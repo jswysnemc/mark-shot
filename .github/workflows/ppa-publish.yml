@@ -112,14 +112,12 @@ jobs:
         run: |
           [[ "$PPA_TARGET" =~ ^ppa:[A-Za-z0-9_-]+/[A-Za-z0-9_-]+$ ]]
           bash scripts/packaging/sign_ppa.sh "$RUNNER_TEMP/ppa-source/mark-shot_${DEBIAN_VERSION}_source.changes"
+      - name: Collect and verify complete source artifacts
+        run: python3 scripts/packaging/collect_debian_source.py --source "$RUNNER_TEMP/ppa-source" --destination target/ppa-source-artifacts
       - uses: actions/upload-artifact@v4
         with:
           name: native-ppa-source
-          path: |
-            ${{ runner.temp }}/ppa-source/*.dsc
-            ${{ runner.temp }}/ppa-source/*.tar.*
-            ${{ runner.temp }}/ppa-source/*.changes
-            ${{ runner.temp }}/ppa-source/*.buildinfo
+          path: target/ppa-source-artifacts/
           if-no-files-found: error
       - name: Upload signed source to Launchpad
         if: inputs.publish
