@@ -87,6 +87,7 @@ class WorkflowCoverage(unittest.TestCase):
             Loader=yaml.BaseLoader,
         )
         self.assertEqual(data["runtime"], "org.freedesktop.Platform")
+        self.assertIn("org.freedesktop.Sdk.Extension.llvm20", data["sdk-extensions"])
         self.assertIn("--share=network", data["finish-args"])
         self.assertIn("--socket=pulseaudio", data["finish-args"])
 

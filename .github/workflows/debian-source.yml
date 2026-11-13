@@ -32,7 +32,7 @@ jobs:
       - name: Install declared source build dependencies
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          mk-build-deps --install --remove --tool 'apt-get --no-install-recommends -y' debian/control
+          python3 scripts/packaging/debian_build_dependencies.py --install
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: '1.99.1'
@@ -49,9 +49,9 @@ jobs:
           SOURCE_ROOT: ${{ steps.source.outputs.source_root }}
           DEBIAN_VERSION: ${{ steps.source.outputs.debian_version }}
         run: |
-          (cd "$SOURCE_ROOT"; dpkg-buildpackage -S -sa -us -uc)
+          bash scripts/packaging/build_debian_source.sh "$SOURCE_ROOT" source
           dpkg-source -x "$RUNNER_TEMP/native-source/mark-shot_$DEBIAN_VERSION.dsc" "$RUNNER_TEMP/reconstructed"
-          (cd "$RUNNER_TEMP/reconstructed"; dpkg-buildpackage -b -us -uc)
+          bash scripts/packaging/build_debian_source.sh "$RUNNER_TEMP/reconstructed" binary
       - name: Lint and install reconstructed package
         run: |
           for changes in "$RUNNER_TEMP"/native-source/*.changes "$RUNNER_TEMP"/*.changes; do

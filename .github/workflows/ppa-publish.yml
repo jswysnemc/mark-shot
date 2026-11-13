@@ -48,7 +48,7 @@ jobs:
       - name: Install declared source build dependencies
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          mk-build-deps --install --remove --tool 'apt-get --no-install-recommends -y' debian/control
+          python3 scripts/packaging/debian_build_dependencies.py --install
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: '1.99.1'
@@ -63,6 +63,7 @@ jobs:
           PUBLISH: ${{ inputs.publish }}
           MANUAL_REF: ${{ inputs.checkout_ref || github.sha }}
           GH_TOKEN: ${{ github.token }}
+          PPA_BUILD_DEPENDENCY_PPA: ${{ vars.PPA_BUILD_DEPENDENCY_PPA }}
         run: |
           [[ "$NATIVE_TAG" =~ ^native-v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           [[ "$PPA_REVISION" =~ ^[1-9][0-9]*$ ]]
@@ -72,6 +73,19 @@ jobs:
             arguments=(--publish)
             source_ref="$NATIVE_TAG"
             apt-get install -y --no-install-recommends gh gnupg dput
+            if [[ -n "$PPA_BUILD_DEPENDENCY_PPA" ]]; then
+              [[ "$PPA_BUILD_DEPENDENCY_PPA" =~ ^ppa:[A-Za-z0-9_-]+/[A-Za-z0-9_-]+$ ]]
+              apt-get install -y --no-install-recommends software-properties-common
+              add-apt-repository --yes "$PPA_BUILD_DEPENDENCY_PPA"
+              apt-get update
+            fi
+            for package in rustc cargo; do
+              candidate=$(apt-cache policy "$package" | awk '/Candidate:/ {print $2}')
+              if ! dpkg --compare-versions "$candidate" ge 1.95; then
+                printf '【原生发布】【PPA前提】Launchpad 构建要求 %s >= 1.95，当前发行版候选为 %s；需先配置满足约束的构建依赖来源\n' "$package" "$candidate" >&2
+                exit 1
+              fi
+            done
             gh release view "$NATIVE_TAG" --json tagName,isDraft,isPrerelease > "$RUNNER_TEMP/release.json"
             python3 -c 'import json, os; r=json.load(open(os.environ["RUNNER_TEMP"]+"/release.json")); assert r["tagName"] == os.environ["NATIVE_TAG"] and not r["isDraft"] and not r["isPrerelease"]'
           fi
@@ -86,7 +100,7 @@ jobs:
           python3 scripts/packaging/prepare_source.py --format debian --version "$PACKAGE_VERSION" --source-sha "$SOURCE_SHA" --revision "0ppa$PPA_REVISION~resolute1" --output "$RUNNER_TEMP/ppa-source" > "$RUNNER_TEMP/source-context"
           cat "$RUNNER_TEMP/source-context"
           source_root=$(sed -n 's/^source_root=//p' "$RUNNER_TEMP/source-context")
-          (cd "$source_root"; dpkg-buildpackage -S -sa -us -uc)
+          bash scripts/packaging/build_debian_source.sh "$source_root" source
           lintian --display-info --pedantic --fail-on error "$RUNNER_TEMP/ppa-source/"*.changes
       - name: Sign and verify production upload
         if: inputs.publish

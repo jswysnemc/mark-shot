@@ -8,6 +8,9 @@ The build does not access the network. Dependency license notices prepared befor
 the build are in debian/dependency-licenses. debian/source-commit identifies the
 upstream revision. Qt source archives and Qt v* release tags are not supported.
 
-Ubuntu 26.04 supplies the Rust >= 1.95 build dependencies needed by Launchpad.
-CI pins Rust 1.99.1; packaged builds use the default dynamic CPU OCR feature.
+Ubuntu 26.04 currently supplies Rust 1.93.1. Launchpad requires a configured
+build-dependency source supplying rustc and cargo >= 1.95 before PPA upload.
+CI verifies the actual Rustup 1.99.1 toolchain separately from all dpkg-managed
+system dependencies; the original source package retains its strict Rust
+Build-Depends constraints. Builds use the default dynamic CPU OCR feature.
 The OCR runtime and models remain explicit user downloads, not build inputs.

@@ -32,6 +32,8 @@ Qt 插件由原生内置 OCR、翻译、扫码与媒体模块替代，不生成�
 
 CI 固定 Rust 1.99.1。Linux 系统包使用 `/usr/lib/mark-shot/mark-shot` 与同目录下 `media/`；`/usr/bin/mark-shot` 使用相对符号链接。Flatpak 使用相同布局，前缀为 `/app`。程序无需修改现有媒体库查找规则。
 
+Ubuntu 26.04 官方仓库当前提供 Rust 1.93.1，不能满足原生项目的 1.95 最低要求。源码持续集成分别验证实际 Rustup 1.99.1 工具链和全部 dpkg 系统依赖，再执行构建；源码包仍保留 `rustc/cargo >= 1.95` 约束。Launchpad 不能联网安装 Rustup，因此 PPA 生产上传还要求提前配置满足约束的构建依赖来源；工作流在发现发行版候选版本不足时明确失败，不上传无法构建的源码。
+
 媒体库保留 LGPL 构建配置、匹配源码、版权与摘要，不启用 FFmpeg 的 GPL 或 nonfree 组件。Debian/PPA 提交三个源码组件：原生 Git 源码、离线 Cargo vendor、原始媒体源码。源码 RPM 与 Flatpak 同样包含离线 Cargo 和原始媒体源码，不以预编译库充当源码。
 
 vendor 通过固定版本 `cargo-vendor-filterer` 生成，保留 `Cargo.lock`。当前锁文件中 libloading、system-deps、vcpkg 的预编译测试样本及 ring 的 Windows 对象文件不参与 Linux 构建，因此单独剔除并更新 vendor 校验清单；其余源码与版权保留。依赖更新后如果出现其他预编译库，源码准备直接失败，不能静默交付。
@@ -46,6 +48,8 @@ DEB 的动态依赖在各目标容器内通过 `dpkg-shlibdeps` 生成；RPM 使
 | Windows 签名 | 可选秘密 `WINDOWS_CODESIGN_CERTIFICATE_BASE64`、`WINDOWS_CODESIGN_CERTIFICATE_PASSWORD`；可选变量 `WINDOWS_CODESIGN_TIMESTAMP_URL` |
 | AUR | 秘密 `AUR_SSH_PRIVATE_KEY`；变量 `AUR_SSH_KNOWN_HOSTS`，内容为独立核对过的 AUR SSH 主机公钥记录 |
 | PPA | `ppa-production` 环境；变量 `PPA_TARGET`，如 `ppa:team/name`；秘密 `LAUNCHPAD_GPG_PRIVATE_KEY`、可选秘密 `LAUNCHPAD_GPG_PASSPHRASE` |
+
+当 Ubuntu 自带 Rust 不足时，可用变量 `PPA_BUILD_DEPENDENCY_PPA` 指定提供新版 Rust 的签名 PPA；生产验证会检查该来源的候选版本。Launchpad 目标 PPA 必须同时配置相同的构建依赖关系，不能只在持续集成容器中添加软件源。
 
 Windows 未配置证书时生成未签名包；配置后签名或验签失败必须阻止交付。只签名应用程序和私有媒体库，不重签系统运行库。签名后重建媒体摘要与最终 ZIP 摘要。
 

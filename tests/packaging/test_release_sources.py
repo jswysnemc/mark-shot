@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "scripts/packaging"))
 from prepare_aur import prepare as prepare_aur
 from prepare_source import prepare
 from release_context import resolve
+from debian_build_dependencies import system_dependencies, verify
 
 
 def repository(directory):
@@ -51,6 +52,36 @@ def repository(directory):
 
 
 class ReleaseSources(unittest.TestCase):
+    def test_ci_toolchain_check_keeps_source_constraints(self):
+        """【原生打包】【工具链测试】无传参，确认 CI 分离校验不改正式源码约束，拒绝 Rust 1.93，无返回值"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            shutil.copytree(ROOT / "debian", root / "debian")
+            (root / "Cargo.toml").write_text('[package]\nrust-version="1.95"\n')
+            control = (root / "debian/control").read_text()
+            dependencies = system_dependencies(root)
+            self.assertNotIn("rustc", dependencies)
+            self.assertNotIn("cargo", dependencies)
+            self.assertIn("libpipewire-0.3-dev", dependencies)
+            with patch(
+                "debian_build_dependencies.subprocess.check_output",
+                return_value="cargo 1.93.1 (test)\n",
+            ):
+                with self.assertRaises(ValueError):
+                    verify(root)
+            with (
+                patch(
+                    "debian_build_dependencies.subprocess.check_output",
+                    side_effect=["cargo 1.99.1 (test)\n", "rustc 1.99.1 (test)\n"],
+                ),
+                patch("debian_build_dependencies.subprocess.run") as check,
+            ):
+                verify(root)
+                self.assertEqual(
+                    check.call_args.args[0], ["dpkg-checkbuilddeps", "-d", dependencies]
+                )
+            self.assertEqual((root / "debian/control").read_text(), control)
+
     def test_only_native_tags_and_matching_versions(self):
         """【原生发布】【边界测试】无传参，拒绝 Qt 标签、错误版本及无效引用，无返回值"""
         with tempfile.TemporaryDirectory() as temporary:

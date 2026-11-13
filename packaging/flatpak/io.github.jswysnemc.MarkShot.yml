@@ -5,6 +5,7 @@ runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
+  - org.freedesktop.Sdk.Extension.llvm20
 command: mark-shot
 
 finish-args:
@@ -27,12 +28,13 @@ modules:
   - name: mark-shot
     buildsystem: simple
     build-options:
-      append-path: /usr/lib/sdk/rust-stable/bin
+      append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/llvm20/bin
       env:
         CARGO_HOME: /run/build/mark-shot/cargo-home
         CARGO_NET_OFFLINE: 'true'
         # 【原生打包】【沙箱工具链】SDK 提供 rustc，禁止 rustup 尝试联网安装固定版本
         RUSTUP_TOOLCHAIN: stable
+        LIBCLANG_PATH: /usr/lib/sdk/llvm20/lib
     build-commands:
       - bash scripts/packaging/build_linux.sh --offline
       - python3 scripts/packaging/install_linux.py --destination / --prefix /app --source-sha "$(cat SOURCE-COMMIT)" --licenses packaging/licenses
