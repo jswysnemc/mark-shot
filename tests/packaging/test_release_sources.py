@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import struct
 import tarfile
 import tempfile
 import unittest
@@ -15,6 +16,7 @@ from prepare_aur import prepare as prepare_aur
 from prepare_source import prepare
 from release_context import resolve
 from debian_build_dependencies import system_dependencies, verify
+from prepare_flatpak_source import render_icons
 
 
 def repository(directory):
@@ -52,6 +54,20 @@ def repository(directory):
 
 
 class ReleaseSources(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("rsvg-convert"), "SVG renderer is not installed")
+    def test_flatpak_icons_have_explicit_raster_dimensions(self):
+        """【原生打包】【图标测试】无传参，实际渲染 AppStream 图标并校验 PNG 尺寸，无返回值"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            icons = root / "assets/hicolor/scalable/apps"
+            icons.mkdir(parents=True)
+            shutil.copy2(ROOT / "assets/hicolor/scalable/apps/mark-shot.svg", icons)
+            paths = render_icons(root)
+            for path, size in zip(paths, (128, 256)):
+                data = path.read_bytes()
+                self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
+                self.assertEqual(struct.unpack_from(">II", data, 16), (size, size))
+
     def test_debian_autotools_steps_keep_vendor_files_unchanged(self):
         """【原生打包】【vendor保护】无传参，执行实际 Debian 规则入口，拒绝自动改写第三方构建文件，无返回值"""
         with tempfile.TemporaryDirectory() as temporary:

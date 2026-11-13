@@ -7,6 +7,8 @@ sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
   - org.freedesktop.Sdk.Extension.llvm20
 command: mark-shot
+cleanup:
+  - /share/icons/hicolor/scalable/apps/io.github.jswysnemc.MarkShot.svg
 
 finish-args:
   - --share=ipc
@@ -38,6 +40,8 @@ modules:
     build-commands:
       - bash scripts/packaging/build_linux.sh --offline
       - python3 scripts/packaging/install_linux.py --destination / --prefix /app --source-sha "$(cat SOURCE-COMMIT)" --licenses packaging/licenses
+      - install -Dm644 packaging/desktop/icons/128x128/io.github.jswysnemc.MarkShot.png /app/share/icons/hicolor/128x128/apps/io.github.jswysnemc.MarkShot.png
+      - install -Dm644 packaging/desktop/icons/256x256/io.github.jswysnemc.MarkShot.png /app/share/icons/hicolor/256x256/apps/io.github.jswysnemc.MarkShot.png
     sources:
       # 【原生打包】【离线来源】工作流将此路径替换为固定提交生成的完整源码归档
       - type: archive

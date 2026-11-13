@@ -5,15 +5,15 @@ from pathlib import Path
 import subprocess
 
 from artifact_metadata import finalize, source_sha, version
-from prepare_source import prepare
+from prepare_flatpak_source import prepare_flatpak
 
 
 def package(repository, package_version, commit, destination):
     """【原生打包】【Flatpak生成】按仓库、版本、提交及输出准备离线源码，返回完整产物清单"""
     repository, destination = Path(repository).resolve(), Path(destination).resolve()
     package_version, commit = version(package_version), source_sha(commit)
-    source = prepare(
-        repository, commit, package_version, destination / "source", "bundle"
+    source = prepare_flatpak(
+        repository, commit, package_version, destination / "source"
     )
     template = (
         repository / "packaging/flatpak/io.github.jswysnemc.MarkShot.yml"

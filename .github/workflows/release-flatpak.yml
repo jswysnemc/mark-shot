@@ -48,7 +48,7 @@ jobs:
       - name: Install Flatpak tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder desktop-file-utils appstream
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder desktop-file-utils appstream librsvg2-bin
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
       - uses: dtolnay/rust-toolchain@stable
         with:

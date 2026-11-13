@@ -101,6 +101,9 @@ class WorkflowCoverage(unittest.TestCase):
         )
         self.assertEqual(data["runtime"], "org.freedesktop.Platform")
         self.assertIn("org.freedesktop.Sdk.Extension.llvm20", data["sdk-extensions"])
+        commands = "\n".join(data["modules"][0]["build-commands"])
+        self.assertIn("/app/share/icons/hicolor/128x128/apps/", commands)
+        self.assertIn("/app/share/icons/hicolor/256x256/apps/", commands)
         self.assertIn("--share=network", data["finish-args"])
         self.assertIn("--socket=pulseaudio", data["finish-args"])
 
