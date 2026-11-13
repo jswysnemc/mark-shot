@@ -50,6 +50,8 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
+          # 【原生构建】【工具链】ort-sys 复制动态库依赖 Cargo 1.100 之前的构建目录结构
+          toolchain: '1.99.1'
           components: clippy,rustfmt
 
       - name: Cache Cargo

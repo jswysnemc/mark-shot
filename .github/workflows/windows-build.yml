@@ -65,6 +65,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: '1.99.1'
           targets: x86_64-pc-windows-msvc
           components: clippy,rustfmt
 
