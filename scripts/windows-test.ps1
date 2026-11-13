@@ -45,6 +45,7 @@ try {
     $groups = @(
         'features::desktop::hotkeys::windows::tests::',
         'features::desktop::status::tests::',
+        'features::desktop::tray::',
         'features::recording::',
         'backend::window_detection::',
         'app::region_detection::',

@@ -3,6 +3,9 @@
 #[cfg(target_os = "linux")]
 mod linux;
 pub(super) mod menu;
+pub(super) mod recording;
+#[cfg(test)]
+mod recording_tests;
 #[cfg(target_os = "windows")]
 mod windows;
 #[cfg(target_os = "windows")]

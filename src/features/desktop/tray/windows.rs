@@ -1,5 +1,9 @@
 //! 【系统托盘】【Windows通知区域】隐藏窗口接收托盘菜单与Explorer重启通知，退出清理图标
 
+#[cfg(test)]
+#[path = "windows_tests.rs"]
+mod tests;
+
 use super::super::{Action, Reporter, native_thread};
 use windows_sys::Win32::{
     Foundation::*,

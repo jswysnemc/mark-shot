@@ -19,6 +19,7 @@ pub const ARG: &str = "--background";
 
 enum Event {
     Reload,
+    RecordingPoll,
     DelayDue,
     Action(Action, Option<String>),
     Status(u64, bool, status::Registration),
@@ -133,9 +134,11 @@ async fn serve(path: &Path, root: &Path) -> crate::AppResult {
     let mut paused = false;
     let mut status = status::Status::default();
     let mut delayed = delayed_capture::Schedule::default();
+    let mut recording_query = crate::features::recording::status_query::Query::default();
     let (menu_state, _) = watch::channel(tray::menu::State {
         language: crate::ui::language::Language::current(),
         delayed: false,
+        recording: tray::recording::State::Unavailable,
     });
     sender.send(Event::Reload)?;
     loop {
@@ -144,8 +147,28 @@ async fn serve(path: &Path, root: &Path) -> crate::AppResult {
             event = receiver.recv() => match event { Some(event) => event, None => break },
             _ = delayed.wait() => Event::DelayDue,
             _ = tokio::time::sleep(std::time::Duration::from_secs(1)), if paused => Event::Reload,
+            _ = tokio::time::sleep(recording_query.timeout()),
+                if current.as_ref().is_some_and(|desktop| desktop.tray_enabled) => Event::RecordingPoll,
         };
         match event {
+            Event::RecordingPoll => {
+                if let Some(result) = recording_query.poll() {
+                    let next = match result {
+                        Ok(status) => tray::recording::State::from_status(&status),
+                        Err(error) => {
+                            log::error!("【系统托盘】【录制状态】{error}");
+                            tray::recording::State::Unavailable
+                        }
+                    };
+                    menu_state.send_if_modified(|state| {
+                        if state.recording == next {
+                            return false;
+                        }
+                        state.recording = next;
+                        true
+                    });
+                }
+            }
             Event::Reload => {
                 let config = match crate::config::preferences::load(path) {
                     Ok(config) => config,

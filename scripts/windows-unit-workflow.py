@@ -13,6 +13,7 @@ from windows_test_runtime import run
 
 
 GROUPS = [
+    "features::desktop::tray::",
     "backend::windows::native::",
     "backend::windows::overlay::scroll::tests::",
     "backend::windows::clipboard::",

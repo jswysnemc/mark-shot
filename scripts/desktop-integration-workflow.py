@@ -123,6 +123,7 @@ def verify(runtime, watcher):
     window = wait(windows, "tray settings action did not map a window")[0]
     runtime.command("xdotool", "windowfocus", window, "key", "Escape")
     wait(lambda: not windows(), "settings window did not close")
+    recording_checks = load("desktop-recording-checks.py").verify(runtime, watcher, menu, wait)
     configure(path, "Ctrl+F9", keys=False)
     wait(lambda: status().get("shortcuts", {}).get("state") == "disabled", "shortcut disable was not applied")
     runtime.command("xdotool", "key", "ctrl+F9")
@@ -132,12 +133,14 @@ def verify(runtime, watcher):
     item = watcher.bus.get_object(address, object_path)
     menu_path = item.Get("org.kde.StatusNotifierItem", "Menu", dbus_interface="org.freedesktop.DBus.Properties")
     menu = watcher.bus.get_object(address, menu_path)
+    _, layout = menu.GetLayout(0, -1, [], dbus_interface="com.canonical.dbusmenu")
+    quit_item = next(int(child[0]) for child in layout[2] if str(child[1].get("label", "")) in ("退出", "Quit"))
     menu.Event(quit_item, "clicked", dbus.Int32(0), dbus.UInt32(0), dbus_interface="com.canonical.dbusmenu")
     service.wait(timeout=8)
     assert service.returncode == 0
     wait(lambda: not watcher.bus.name_has_owner(address), "tray bus name remained after quit")
     assert status()["shortcuts"]["state"] == "stopped"
-    return {"checks": ["single desktop service", "global screenshot key", "Caps Lock and Num Lock", "live shortcut replacement", "old key release", "independent tray registration", "occupied shortcut error and recovery", "recording pause and resume", "StatusNotifierItem registration", "actual tray icon pixels", "tray capture action", "tray settings action", "shortcut disable", "tray quit and unregister"]}
+    return {"checks": ["single desktop service", "global screenshot key", "Caps Lock and Num Lock", "live shortcut replacement", "old key release", "independent tray registration", "occupied shortcut error and recovery", "recording pause and resume", "StatusNotifierItem registration", "actual tray icon pixels", "tray capture action", "tray settings action", "shortcut disable", "tray quit and unregister"] + recording_checks}
 
 
 def main():

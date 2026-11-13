@@ -7,6 +7,7 @@ use crate::ui::language::Language;
 pub(in crate::features::desktop) struct State {
     pub language: Language,
     pub delayed: bool,
+    pub recording: super::recording::State,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -59,13 +60,8 @@ pub(super) fn entries(state: State) -> Vec<Item> {
             items: delays,
         },
         Item::Submenu {
-            label: label("屏幕录制", "Recording"),
-            items: vec![
-                action("开始录制", "Start Recording", Action::Record),
-                action("暂停录制", "Pause Recording", Action::PauseRecording),
-                action("继续录制", "Resume Recording", Action::ResumeRecording),
-                action("停止并保存", "Stop and Save", Action::StopRecording),
-            ],
+            label: state.recording.label(state.language).into(),
+            items: state.recording.entries(state.language),
         },
         action("设置", "Settings", Action::Settings),
         action("截图历史", "Screenshot History", Action::History),
@@ -83,7 +79,11 @@ mod tests {
     fn qt_menu_order_and_delay_state_are_shared_by_platforms() {
         for language in [Language::Chinese, Language::English] {
             for delayed in [false, true] {
-                let menu = entries(State { language, delayed });
+                let menu = entries(State {
+                    language,
+                    delayed,
+                    recording: super::super::recording::State::Idle,
+                });
                 let actions: Vec<_> = menu
                     .iter()
                     .filter_map(|item| match item {
