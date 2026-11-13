@@ -63,7 +63,8 @@ def package(repository, package_version, commit, destination):
             "-c",
             "test -f /app/lib/mark-shot/media/libmarkshot-media.so && "
             "test -f /app/lib/mark-shot/media/MEDIA-SOURCES.tar.xz && "
-            "test -f /app/share/licenses/mark-shot/DEPENDENCIES.txt",
+            "test -f /app/share/licenses/mark-shot/DEPENDENCIES.txt && "
+            "cd /app/lib/mark-shot/media && sha256sum --check SHA256SUMS",
         ],
         check=True,
     )

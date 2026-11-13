@@ -29,9 +29,7 @@ class MediaBuildContracts(unittest.TestCase):
         self.assertTrue(all(row.endswith("-fno-lto") for row in rows))
         self.assertIn("-fstack-protector-strong", rows[0])
         self.assertIn("-Wl,-z,relro", rows[2])
-        self.assertIn(
-            "--disable-lto --extra-cflags=-fno-lto --extra-ldflags=-fno-lto", script
-        )
+        self.assertIn("--extra-cflags=-fno-lto --extra-ldflags=-fno-lto", script)
 
     def test_wrapper_compilation_and_upstream_link_checks_are_separate(self):
         """【媒体构建】【链接测试】无传参，执行实际编译命令片段，拒绝在共享链接阶段向上游传递 Werror，无返回值"""

@@ -29,6 +29,8 @@ modules:
   - name: mark-shot
     buildsystem: simple
     build-options:
+      # 【原生打包】【媒体摘要】构建脚本已剥离符号，避免封装时再次修改已校验的 ELF
+      no-strip: true
       append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/llvm20/bin
       env:
         CARGO_HOME: /run/build/mark-shot/cargo-home

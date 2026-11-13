@@ -32,7 +32,7 @@ fetch https://ffmpeg.org/releases/ffmpeg-9.0.tar.xz \
 tar -xf "$build_root/ffmpeg.tar.xz" -C "$sources"
 fi
 flags=(--disable-debug --disable-doc --disable-autodetect --disable-everything --disable-programs
-  --disable-lto --extra-cflags=-fno-lto --extra-ldflags=-fno-lto
+  --extra-cflags=-fno-lto --extra-ldflags=-fno-lto
   --disable-network --disable-avdevice --disable-shared --enable-static --enable-pic
   --enable-avfilter --enable-swscale --enable-swresample
   "--enable-decoder=h264,aac" "--enable-parser=h264,aac" "--enable-encoder=gif,aac"
