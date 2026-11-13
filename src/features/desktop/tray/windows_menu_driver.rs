@@ -105,15 +105,12 @@ impl Session {
     /// 【系统托盘测试】【菜单导航】按 window 和 handle 核验弹出菜单并排队选择，返回通知或按键投递错误
     fn popup(&mut self, window: HWND, handle: HMENU) -> Result<(), String> {
         if self.root.is_null() {
-            // 1. 【系统托盘测试】【根菜单】菜单显示前读取真实属性，再选择录制子菜单或取消
+            // 1. 【系统托盘测试】【根菜单】从末项反向选择录制子菜单，避开延时子菜单的自动展开
             self.inspect(handle)?;
             if self.expected.selected.is_none() {
                 return keys(window, &[VK_ESCAPE]);
             }
-            keys(
-                window,
-                &[VK_HOME, VK_DOWN, VK_DOWN, VK_DOWN, VK_DOWN, VK_RIGHT],
-            )
+            keys(window, &[VK_END, VK_UP, VK_UP, VK_UP, VK_RIGHT])
         } else if handle == self.recording {
             // 2. 【系统托盘测试】【录制子菜单】启用项等待系统交付动作，禁用项尝试回车后取消
             self.submenu_opened = true;
