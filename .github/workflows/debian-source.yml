@@ -52,6 +52,10 @@ jobs:
           bash scripts/packaging/build_debian_source.sh "$SOURCE_ROOT" source
           dpkg-source -x "$RUNNER_TEMP/native-source/mark-shot_$DEBIAN_VERSION.dsc" "$RUNNER_TEMP/reconstructed"
           bash scripts/packaging/build_debian_source.sh "$RUNNER_TEMP/reconstructed" binary
+      - name: Collect source and binary artifacts
+        run: |
+          mkdir -p target/source-artifacts
+          find "$RUNNER_TEMP/native-source" "$RUNNER_TEMP" -maxdepth 1 -type f             \( -name 'mark-shot_*.dsc' -o -name 'mark-shot_*.tar.*' -o -name 'mark-shot_*.changes' -o -name 'mark-shot_*.buildinfo' -o -name 'mark-shot_*.deb' \)             -exec cp {} target/source-artifacts/ \;
       - name: Lint and install reconstructed package
         run: |
           for changes in "$RUNNER_TEMP"/native-source/*.changes "$RUNNER_TEMP"/*.changes; do
@@ -62,12 +66,15 @@ jobs:
           bash debian/tests/smoke
           test "$(stat -Lc '%a' /usr/bin/mark-shot)" = 755
           test "$(stat -Lc '%U:%G' /usr/bin/mark-shot)" = root:root
-      - name: Collect source and binary artifacts
-        run: |
-          mkdir -p target/source-artifacts
-          find "$RUNNER_TEMP/native-source" "$RUNNER_TEMP" -maxdepth 1 -type f             \( -name 'mark-shot_*.dsc' -o -name 'mark-shot_*.tar.*' -o -name 'mark-shot_*.changes' -o -name 'mark-shot_*.buildinfo' -o -name 'mark-shot_*.deb' \)             -exec cp {} target/source-artifacts/ \;
       - uses: actions/upload-artifact@v4
         with:
           name: native-debian-source-resolute
           path: target/source-artifacts/
           if-no-files-found: error
+      - name: Upload failed verification evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-debian-source-resolute
+          path: target/source-artifacts/
+          if-no-files-found: ignore

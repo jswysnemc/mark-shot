@@ -1,0 +1,7 @@
+# 【原生打包】【固定媒体版本】跨平台媒体接口使用固定 FFmpeg 9，不链接发行版中不同版本的 FFmpeg
+# 【原生打包】【LGPL可替换库】FFmpeg 位于独立动态库中，应用通过该库加载媒体功能，用户可以重建和替换
+# 【原生打包】【源码交付】匹配源码、构建脚本与 LGPL 许可随 MEDIA-SOURCES.tar.xz 交付，源码包保留原始媒体组件
+# 【原生打包】【例外边界】仅匹配这三个组件和这个私有库路径，其他内嵌依赖仍按错误处理
+mark-shot: embedded-library libavfilter [usr/lib/mark-shot/media/libmarkshot-media.so]
+mark-shot: embedded-library libavutil [usr/lib/mark-shot/media/libmarkshot-media.so]
+mark-shot: embedded-library libswscale [usr/lib/mark-shot/media/libmarkshot-media.so]

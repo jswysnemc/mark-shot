@@ -32,6 +32,37 @@ def workflow(name):
 
 
 class WorkflowCoverage(unittest.TestCase):
+    def test_source_verification_failures_preserve_build_evidence(self):
+        """【原生构建】【失败证据】无传参，验证前收集构建产物，正式验证产物仍在验证后上传，失败使用独立证据名称，无返回值"""
+        steps = workflow("debian-source")["jobs"]["resolute"]["steps"]
+        collection = next(
+            step
+            for step in steps
+            if step.get("name") == "Collect source and binary artifacts"
+        )
+        verification = next(
+            step
+            for step in steps
+            if step.get("name") == "Lint and install reconstructed package"
+        )
+        uploads = [
+            step for step in steps if step.get("uses") == "actions/upload-artifact@v4"
+        ]
+        self.assertLess(steps.index(collection), steps.index(verification))
+        normal = next(
+            step
+            for step in uploads
+            if step["with"]["name"] == "native-debian-source-resolute"
+        )
+        evidence = next(
+            step
+            for step in uploads
+            if step["with"]["name"] == "evidence-debian-source-resolute"
+        )
+        self.assertLess(steps.index(verification), steps.index(normal))
+        self.assertEqual(evidence["if"], "failure()")
+        self.assertEqual(evidence["with"]["path"], "target/source-artifacts/")
+
     def test_debian_source_lint_uses_the_debian_vendor_profile(self):
         """【原生构建】【发行标识校验】无传参，Ubuntu 容器中的 Debian 源码包必须使用 Debian 校验配置，不忽略合法 unstable 标识，无返回值"""
         step = next(

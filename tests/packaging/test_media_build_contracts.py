@@ -10,6 +10,22 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class MediaBuildContracts(unittest.TestCase):
+    def test_debian_embedded_media_exceptions_are_narrow_and_documented(self):
+        """【媒体构建】【内嵌依赖范围】无传参，例外只允许固定可替换库中的三个 FFmpeg 组件，禁止通配或整类豁免，无返回值"""
+        text = (ROOT / "debian/mark-shot.lintian-overrides").read_text()
+        entries = {
+            line for line in text.splitlines() if line and not line.startswith("#")
+        }
+        self.assertEqual(
+            entries,
+            {
+                f"mark-shot: embedded-library {name} [usr/lib/mark-shot/media/libmarkshot-media.so]"
+                for name in ("libavfilter", "libavutil", "libswscale")
+            },
+        )
+        self.assertIn("LGPL", text)
+        self.assertIn("MEDIA-SOURCES.tar.xz", text)
+
     def test_media_lto_overrides_keep_hardening_flags(self):
         """【媒体构建】【LTO覆盖】无传参，验证保留发行版参数并在末尾禁用媒体 LTO，无返回值"""
         script = (ROOT / "scripts/media/build-libraries.sh").read_text()
