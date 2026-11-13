@@ -36,6 +36,8 @@ Ubuntu 26.04 官方仓库当前提供 Rust 1.93.1，不能满足原生项目的 
 
 媒体库保留 LGPL 构建配置、匹配源码、版权与摘要，不启用 FFmpeg 的 GPL 或 nonfree 组件。Debian/PPA 提交四个源码组件：原生 Git 源码、离线 Cargo vendor、原始媒体源码、固定测试字体归档。字体组件保留 Noto Sans 2.015 原始归档及 OFL 许可，仅用于私有字体配置中的 Qt 几何对照测试，不改变程序字体或安装系统字体。源码 RPM 与 Flatpak 同样包含完整离线输入，不以预编译库充当源码。
 
+Debian 源码构建依赖还明确包含 `fonts-dejavu-core`，提供菜单、语言列表和表格对照使用的 DejaVu Sans 及 LGC 别名配置。最小容器不能依赖完整桌面主机预装这些字体。
+
 vendor 通过固定版本 `cargo-vendor-filterer` 生成，保留 `Cargo.lock`。当前锁文件中 libloading、system-deps、vcpkg 的预编译测试样本及 ring 的 Windows 对象文件不参与 Linux 构建，因此单独剔除并更新 vendor 校验清单；其余源码与版权保留。依赖更新后如果出现其他预编译库，源码准备直接失败，不能静默交付。
 
 DEB 的动态依赖在各目标容器内通过 `dpkg-shlibdeps` 生成；RPM 使用目标 Fedora 的自动依赖扫描。pacman x86_64 包在 Arch 容器构建并安装验证。与 Qt 工作流一致，ARM64 pacman 包在 Ubuntu 24.04 ARM 主机生成并验证，不宣称完成 Arch Linux ARM 实机验证；系统库代际不匹配时应使用 AUR 源码包。

@@ -147,6 +147,13 @@ def verify(config):
     if "Noto Sans CJK" not in cjk:
         raise RuntimeError(f"System Noto CJK fallback unavailable: {cjk}")
     print(f"CJK fallback -> {cjk}")
+    for family in ("DejaVu Sans", "DejaVu LGC Sans"):
+        actual = subprocess.check_output(
+            ["fc-match", "-f", "%{family[0]}|%{file}", family], env=env, text=True,
+        )
+        if not actual.startswith("DejaVu Sans|"):
+            raise RuntimeError(f"【CI字体】【菜单依赖】{family} requires DejaVu Sans and its aliases: {actual}")
+        print(f"{family} -> {actual}")
 
 
 def main():

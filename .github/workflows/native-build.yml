@@ -61,7 +61,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential clang libclang-dev pkg-config \
             libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libpipewire-0.3-dev \
-            libssl-dev libfontconfig-dev fontconfig fonts-noto-core fonts-noto-cjk \
+            libssl-dev libfontconfig-dev fontconfig fonts-dejavu-core fonts-noto-core fonts-noto-cjk \
             meson ninja-build nasm libva-dev libdrm-dev libcap-dev libpulse-dev \
             libxcomposite-dev libxrandr-dev libxfixes-dev libxdamage-dev libegl-dev libdbus-1-dev libgbm-dev wayland-protocols
 

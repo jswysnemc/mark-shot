@@ -9,15 +9,43 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
+import sys
+
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
     "reference_fonts", ROOT / "scripts/ci-reference-fonts.py"
 )
 FONTS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(FONTS)
+sys.path.insert(0, str(ROOT / "scripts/packaging"))
+from debian_build_dependencies import system_dependencies
 
 
 class ReferenceFontSources(unittest.TestCase):
+    def test_reference_verification_rejects_missing_menu_fonts_early(self):
+        """【原生打包】【菜单依赖预检】无传参，Noto 校验正常但缺少 DejaVu 时立即失败，不等待完整 Rust 编译，无返回值"""
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Path(temporary) / "fonts.conf"
+            outputs = [
+                str(config.parent / "ttf" / f"NotoSans-{style}.ttf")
+                for _ in range(3)
+                for style in FONTS.FONTS
+            ]
+            outputs.extend(
+                ["Noto Sans CJK SC|/system/cjk.ttc", "Noto Sans|/system/noto.ttf"]
+            )
+            with (
+                patch.object(FONTS.subprocess, "run"),
+                patch.object(FONTS.subprocess, "check_output", side_effect=outputs),
+                patch("builtins.print"),
+                self.assertRaisesRegex(RuntimeError, "DejaVu Sans"),
+            ):
+                FONTS.verify(config)
+
+    def test_debian_declares_dejavu_menu_reference_fonts(self):
+        """【原生打包】【菜单测试字体】无传参，确保最小构建环境安装 DejaVu 字体及 LGC 别名，不依赖完整主机预装，无返回值"""
+        self.assertIn("fonts-dejavu-core", system_dependencies(ROOT).split(", "))
+
     def test_debian_tests_use_declared_python_and_offline_fonts(self):
         """【原生打包】【测试环境】无传参，检查实际 Debian 测试命令使用离线字体、私有目录及已声明解释器，无返回值"""
         command = subprocess.check_output(

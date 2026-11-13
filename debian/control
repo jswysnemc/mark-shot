@@ -18,6 +18,7 @@ Build-Depends:
  libssl-dev,
  libfontconfig-dev,
  fontconfig,
+ fonts-dejavu-core,
  fonts-noto-core,
  fonts-noto-cjk,
  libva-dev,
