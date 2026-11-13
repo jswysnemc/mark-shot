@@ -72,6 +72,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: packaging-${{ inputs.kind }}-${{ inputs.target }}-${{ inputs.arch }}
+          cache-targets: ${{ inputs.kind != 'rpm' }}
       - name: Install source RPM tools
         if: inputs.kind == 'rpm'
         run: |

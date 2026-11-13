@@ -40,6 +40,8 @@ vendor 通过固定版本 `cargo-vendor-filterer` 生成，保留 `Cargo.lock`�
 
 DEB 的动态依赖在各目标容器内通过 `dpkg-shlibdeps` 生成；RPM 使用目标 Fedora 的自动依赖扫描。pacman x86_64 包在 Arch 容器构建并安装验证。与 Qt 工作流一致，ARM64 pacman 包在 Ubuntu 24.04 ARM 主机生成并验证，不宣称完成 Arch Linux ARM 实机验证；系统库代际不匹配时应使用 AUR 源码包。
 
+RPM 每次使用独立临时目录准备离线源码和执行 `rpmbuild`，只将本轮二进制、源码包及摘要复制到输出目录。RPM 任务不缓存 Cargo target 目录，避免缓存恢复或重试复用旧打包树；已有输出和其他文件不因工作目录清理而删除。
+
 ## 渠道配置
 
 | 渠道 | 必要配置 |

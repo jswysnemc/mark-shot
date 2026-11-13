@@ -100,7 +100,10 @@ class ArtifactContracts(unittest.TestCase):
 
                 def build(command, **kwargs):
                     """【原生打包】【RPM样本】按 command 模拟本轮架构构建，kwargs 保留调用契约，返回成功结果"""
-                    top = destination / "rpmbuild"
+                    definition = next(
+                        value for value in command if value.startswith("_topdir ")
+                    )
+                    top = Path(definition.removeprefix("_topdir "))
                     binaries = top / "RPMS" / arch
                     binaries.mkdir()
                     (binaries / f"mark-shot-0.2.0-1.fc45.{arch}.rpm").write_bytes(

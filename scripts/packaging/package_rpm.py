@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 import shutil
 import subprocess
+import tempfile
 
 from artifact_metadata import architecture, finalize, source_sha, version
 from prepare_source import prepare
@@ -21,11 +22,23 @@ def package(repository, package_version, arch, commit, destination):
         raise ValueError(
             "RPM builds must use a native runner of the requested architecture"
         )
-    top = destination / "rpmbuild"
+    destination.mkdir(parents=True, exist_ok=True)
+    # 1. 【原生打包】【工作隔离】缓存或重试可能保留旧目录，本轮源码和 RPM 只使用独立工作区
+    with tempfile.TemporaryDirectory(
+        prefix=".rpm-build-", dir=destination
+    ) as temporary:
+        return _build(
+            repository, package_version, arch, commit, destination, Path(temporary)
+        )
+
+
+def _build(repository, package_version, arch, commit, destination, workspace):
+    """【原生打包】【独立构建】按仓库、版本、架构和提交在 workspace 构建，产物复制至 destination，返回二进制路径"""
+    top = workspace / "rpmbuild"
     for directory in ("BUILD", "BUILDROOT", "RPMS", "SOURCES", "SPECS", "SRPMS"):
         (top / directory).mkdir(parents=True, exist_ok=False)
     source = prepare(
-        repository, commit, package_version, destination / "source", "bundle"
+        repository, commit, package_version, workspace / "source", "bundle"
     )
     shutil.copy2(source["source_archive"], top / "SOURCES")
     rpm_version = package_version.replace("-", "~", 1).replace("+", ".")

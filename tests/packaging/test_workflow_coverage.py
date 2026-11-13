@@ -32,6 +32,14 @@ def workflow(name):
 
 
 class WorkflowCoverage(unittest.TestCase):
+    def test_rpm_cache_does_not_restore_packaging_workspaces(self):
+        """【原生构建】【缓存范围】无传参，确认 RPM 只缓存 Cargo 工具和下载，不恢复打包工作目录，无返回值"""
+        steps = workflow("native-linux-package")["jobs"]["package"]["steps"]
+        cache = next(
+            step for step in steps if step.get("uses") == "Swatinem/rust-cache@v2"
+        )
+        self.assertEqual(cache["with"]["cache-targets"], "${{ inputs.kind != 'rpm' }}")
+
     @unittest.skipUnless(shutil.which("flatpak"), "Flatpak command is not installed")
     def test_flatpak_finish_permissions_are_accepted(self):
         """【原生构建】【权限验证】无传参，使用真实 Flatpak 命令校验完整权限，不依赖运行时下载，无返回值"""
