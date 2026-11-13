@@ -26,6 +26,7 @@ struct Session {
     recording: HMENU,
     submenu_opened: bool,
     error: Option<String>,
+    trace: Vec<String>,
 }
 
 thread_local! {
@@ -70,6 +71,32 @@ fn keys(window: HWND, keys: &[VIRTUAL_KEY]) -> Result<(), String> {
 }
 
 impl Session {
+    /// 【系统托盘测试】【通知记录】按 message、first 和 second 保存有界菜单通知，供失败时定位选中项，无返回值
+    fn record(&mut self, message: u32, first: WPARAM, second: LPARAM) {
+        if self.trace.len() >= 128 {
+            return;
+        }
+        let handle = if message == WM_MENUSELECT {
+            second as HMENU
+        } else {
+            first as HMENU
+        };
+        let role = if self.root.is_null() {
+            "opening"
+        } else if handle == self.root {
+            "root"
+        } else if handle == self.recording {
+            "recording"
+        } else if handle == unsafe { GetSubMenu(self.root, 3) } {
+            "delay"
+        } else {
+            "other"
+        };
+        self.trace.push(format!(
+            "message={message:#x}, menu={role}, first={first:#x}, second={second:#x}"
+        ));
+    }
+
     /// 【系统托盘测试】【菜单检查】按 handle 读取录制标题、操作及禁用标记，返回结构或属性不符合预期的错误
     fn inspect(&mut self, handle: HMENU) -> Result<(), String> {
         self.root = handle;
@@ -105,12 +132,12 @@ impl Session {
     /// 【系统托盘测试】【菜单导航】按 window 和 handle 核验弹出菜单并排队选择，返回通知或按键投递错误
     fn popup(&mut self, window: HWND, handle: HMENU) -> Result<(), String> {
         if self.root.is_null() {
-            // 1. 【系统托盘测试】【根菜单】从末项反向选择录制子菜单，避开延时子菜单的自动展开
+            // 1. 【系统托盘测试】【根菜单】首个方向键建立末项选择，再向上越过分隔符到达录制子菜单
             self.inspect(handle)?;
             if self.expected.selected.is_none() {
                 return keys(window, &[VK_ESCAPE]);
             }
-            keys(window, &[VK_END, VK_UP, VK_UP, VK_UP, VK_RIGHT])
+            keys(window, &[VK_UP, VK_UP, VK_UP, VK_UP, VK_RIGHT])
         } else if handle == self.recording {
             // 2. 【系统托盘测试】【录制子菜单】启用项等待系统交付动作，禁用项尝试回车后取消
             self.submenu_opened = true;
@@ -135,6 +162,13 @@ unsafe extern "system" fn callback(
     first: WPARAM,
     second: LPARAM,
 ) -> LRESULT {
+    if matches!(message, WM_INITMENUPOPUP | WM_MENUSELECT) {
+        SESSION.with(|cell| {
+            if let Some(session) = cell.borrow_mut().as_mut() {
+                session.record(message, first, second);
+            }
+        });
+    }
     if message == WM_INITMENUPOPUP || (message == WM_TIMER && first == TIMER) {
         SESSION.with(|cell| {
             let mut session = cell.borrow_mut();
@@ -228,6 +262,7 @@ impl Window {
                 recording: std::ptr::null_mut(),
                 submenu_opened: false,
                 error: None,
+                trace: Vec::new(),
             });
         });
         // 1. 【系统托盘测试】【右键通知】执行实际回调，生产路径负责读取最新快照和交付动作
@@ -249,7 +284,10 @@ impl Window {
             .with(|cell| cell.borrow_mut().take())
             .ok_or("missing menu session")?;
         if let Some(error) = session.error {
-            return Err(error);
+            return Err(format!(
+                "{error}; native menu events: {}",
+                session.trace.join(" -> ")
+            ));
         }
         if session.root.is_null()
             || (session.expected.selected.is_some() && !session.submenu_opened)
