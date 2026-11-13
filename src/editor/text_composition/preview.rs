@@ -61,8 +61,8 @@ pub(super) fn show(state: &mut EditorState, preedit: Preedit, dirty: &mut u32) {
     );
     // 1. 【输入法】【候选格式】只对候选范围加下划线，原正文格式不改变，换行按实际编辑行切分
     editor.with_buffer_mut(|buffer| {
-        for line in start.line..=end.line {
-            let value = &mut buffer.lines[line];
+        for (offset, value) in buffer.lines[start.line..=end.line].iter_mut().enumerate() {
+            let line = start.line + offset;
             let from = if line == start.line { start.index } else { 0 };
             let to = if line == end.line {
                 end.index

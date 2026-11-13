@@ -166,8 +166,8 @@ impl TextEditor {
         editor.insert_string(&displayed, None);
         let end = editor.cursor();
         editor.with_buffer_mut(|buffer| {
-            for index in start.line..=end.line {
-                let line = &mut buffer.lines[index];
+            for (offset, line) in buffer.lines[start.line..=end.line].iter_mut().enumerate() {
+                let index = start.line + offset;
                 let from = if index == start.line { start.index } else { 0 };
                 let to = if index == end.line {
                     end.index
