@@ -16,6 +16,13 @@ Files: assets/icons/mark-shot/*
 Copyright: The icon authors identified in assets/icons/mark-shot/LICENSE
 License: MIT
 
+Files: reference-fonts/*
+Copyright: The Noto Project Authors identified in reference-fonts/OFL.txt
+License: OFL-1.1
+Comment: The original Noto Sans 2.015 archive is used only for offline tests;
+ its full notice is retained in reference-fonts/OFL.txt and installed as
+ /usr/share/licenses/mark-shot/LICENSE-REFERENCE-FONTS.txt.
+
 Files: vendor/*
 Copyright: The crate authors identified in each vendor/*/Cargo.toml and license file
 License: various

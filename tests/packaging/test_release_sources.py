@@ -180,7 +180,7 @@ class ReleaseSources(unittest.TestCase):
                 resolve(root, "native-v0.2.0", "HEAD")
 
     def test_debian_components_and_source_reconstruction(self):
-        """【原生源码】【组件测试】无传参，验证上游、vendor 和媒体组件可由 dpkg-source 重建，无返回值"""
+        """【原生源码】【组件测试】无传参，验证上游、vendor、媒体和固定字体组件可由 dpkg-source 重建，无返回值"""
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             root = directory / "repo"
@@ -191,10 +191,19 @@ class ReleaseSources(unittest.TestCase):
                 """【原生源码】【依赖样本】按 command 模拟外部依赖取得，其他命令使用 kwargs 原样执行，返回结果"""
                 if str(command[1]).endswith("vendor_sources.sh"):
                     source = Path(command[2])
-                    for name in ("vendor", "media", "packaging/licenses"):
+                    for name in (
+                        "vendor",
+                        "media",
+                        "reference-fonts",
+                        "packaging/licenses",
+                    ):
                         (source / name).mkdir(parents=True)
                     (source / "vendor/test.rs").write_text("fn main() {}\n")
                     (source / "media/SOURCE-SHA256SUMS").write_text("source manifest\n")
+                    (source / "reference-fonts/NotoSans-v2.015.zip").write_bytes(
+                        b"pinned fonts"
+                    )
+                    (source / "reference-fonts/OFL.txt").write_text("font license\n")
                     (source / "packaging/licenses/DEPENDENCIES.txt").write_text(
                         "dependency licenses\n"
                     )
@@ -211,11 +220,15 @@ class ReleaseSources(unittest.TestCase):
             self.assertTrue(
                 (source / "debian/dependency-licenses/DEPENDENCIES.txt").is_file()
             )
-            for component in ("vendor", "media"):
+            for component, top in (
+                ("vendor", "vendor"),
+                ("media", "media"),
+                ("reference-fonts", "reference-fonts"),
+            ):
                 with tarfile.open(
                     directory / f"output/mark-shot_0.2.0.orig-{component}.tar.xz"
                 ) as stream:
-                    self.assertEqual(stream.getmembers()[0].name, component)
+                    self.assertEqual(stream.getmembers()[0].name, top)
             if shutil.which("dpkg-source"):
                 subprocess.run(
                     ["dpkg-source", "-b", str(source)],
@@ -237,6 +250,13 @@ class ReleaseSources(unittest.TestCase):
                 )
                 self.assertTrue((reconstructed / "vendor/test.rs").is_file())
                 self.assertTrue((reconstructed / "media/SOURCE-SHA256SUMS").is_file())
+                self.assertEqual(
+                    (
+                        reconstructed / "reference-fonts/NotoSans-v2.015.zip"
+                    ).read_bytes(),
+                    b"pinned fonts",
+                )
+                self.assertTrue((reconstructed / "reference-fonts/OFL.txt").is_file())
 
     def test_aur_template_is_pinned_and_validated(self):
         """【原生发布】【AUR测试】无传参，检查固定提交、版本替换和非法修订号拦截，无返回值"""

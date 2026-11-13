@@ -9,6 +9,7 @@ This does not install fonts globally or change/bundle application fonts.
 
 Usage: python3 scripts/ci-reference-fonts.py [--root target/ci-private/fonts]
 Export FONTCONFIG_FILE=<root>/fonts.conf for tests (or pass --github-env).
+Use --archive for an offline source archive; --download-only prepares source inputs.
 Only the Python standard library, curl and fontconfig commands are required.
 """
 
@@ -49,17 +50,33 @@ def checked(data, expected, name):
     return data
 
 
-def prepare(root):
-    """【CI字体】【私有安装】在root下载固定字体并生成隔离配置，返回配置路径，不修改系统字体"""
+def source_archive(root, archive=None):
+    """【CI字体】【归档准备】在 root 校验或下载固定归档，archive 指定离线来源且禁止联网替代，返回归档路径"""
     root.mkdir(parents=True, exist_ok=True)
-    archive = root / "NotoSans-v2.015.zip"
-    if not archive.exists():
+    destination = root / "NotoSans-v2.015.zip"
+    # 1. 【CI字体】【离线来源】指定源码组件后只校验该文件，缺失或摘要不符直接失败
+    if archive is not None:
+        archive = Path(archive).resolve()
+        data = checked(archive.read_bytes(), ARCHIVE_SHA256, str(archive))
+        if archive != destination.resolve():
+            destination.write_bytes(data)
+    elif not destination.exists():
         temporary = root / "download.zip.part"
         subprocess.run([sys.executable, str(Path(__file__).with_name("ci-download.py")),
                         URL, str(temporary), ARCHIVE_SHA256], check=True)
         checked(temporary.read_bytes(), ARCHIVE_SHA256, URL)
-        temporary.replace(archive)
-    checked(archive.read_bytes(), ARCHIVE_SHA256, str(archive))
+        temporary.replace(destination)
+    checked(destination.read_bytes(), ARCHIVE_SHA256, str(destination))
+    with zipfile.ZipFile(destination) as source:
+        (root / "OFL.txt").write_bytes(
+            checked(source.read("OFL.txt"), LICENSE_SHA256, "OFL.txt")
+        )
+    return destination
+
+
+def prepare(root, archive=None):
+    """【CI字体】【私有安装】在 root 准备固定字体及隔离配置，archive 可指定离线来源，返回配置路径，不修改系统字体"""
+    archive = source_archive(root, archive)
     font_dir = root / "ttf"
     font_dir.mkdir(exist_ok=True)
     with zipfile.ZipFile(archive) as source:
@@ -137,8 +154,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path("target/ci-private/fonts"))
     parser.add_argument("--github-env", type=Path, help="append FONTCONFIG_FILE to this env file")
+    parser.add_argument("--archive", type=Path, help="use only this verified offline source archive")
+    parser.add_argument("--download-only", action="store_true", help="prepare the archive and its license without installing fonts")
     args = parser.parse_args()
-    config = prepare(args.root.resolve())
+    if args.download_only:
+        archive = source_archive(args.root.resolve(), args.archive)
+        print(f"archive={archive}")
+        return
+    config = prepare(args.root.resolve(), args.archive)
     verify(config)
     if args.github_env:
         with args.github_env.open("a", encoding="utf-8") as output:

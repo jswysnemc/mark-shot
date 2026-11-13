@@ -23,4 +23,7 @@ if find "$source_root/vendor" -type f \( -name '*.a' -o -name '*.lib' -o -name '
 fi
 python3 "$repository/scripts/packaging/fetch_media_sources.py" \
   --root "$repository" --destination "$source_root/media" --cache "$repository/target/media-source-cache"
+python3 "$repository/scripts/ci-reference-fonts.py" \
+  --download-only --root "$source_root/reference-fonts"
 (cd "$source_root"; bash "$repository/scripts/packaging/collect_licenses.sh" "$source_root/packaging/licenses")
+cp "$source_root/reference-fonts/OFL.txt" "$source_root/packaging/licenses/LICENSE-REFERENCE-FONTS.txt"

@@ -9,7 +9,7 @@ use std::path::Path;
 fn running() -> (tempfile::TempDir, ResultWindow, Value) {
     let script = "import json,os,subprocess,sys,time; child=subprocess.Popen(['/bin/sleep','60']); json.dump({'pid':os.getpid(),'child':child.pid,'input':sys.argv[1]},open(sys.argv[2]+'.record.json','w')); time.sleep(60)";
     let command = format!(
-        "exec /usr/bin/python -c '{}' {{input}} {{config}}",
+        "exec /usr/bin/python3 -c '{}' {{input}} {{config}}",
         script.replace('\'', "'\\''")
     );
     let (root, mut window) = super::tests::window(&command);

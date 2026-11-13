@@ -10,6 +10,9 @@ case "$arch" in
   *) printf '【原生打包】【版权收集】不支持的架构: %s\n' "$arch" >&2; exit 1 ;;
 esac
 mkdir -p "$destination" "$root/target/packaging-tools/cargo-about"
+if [[ -f "$root/reference-fonts/OFL.txt" ]]; then
+  cp "$root/reference-fonts/OFL.txt" "$destination/LICENSE-REFERENCE-FONTS.txt"
+fi
 archive="$root/target/packaging-tools/cargo-about.tar.gz"
 python3 "$root/scripts/ci-download.py" \
   "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.3/cargo-about-0.9.3-$arch-unknown-linux-musl.tar.gz" \

@@ -42,7 +42,7 @@ fn command(work: &str) -> String {
         "import json,os,sys,time; json.dump({{'pid':os.getpid(),'input':sys.argv[1]}},open(sys.argv[2],'w')); {work}"
     );
     format!(
-        "exec /usr/bin/python -c '{}' {{input}} {{config}}",
+        "exec /usr/bin/python3 -c '{}' {{input}} {{config}}",
         script.replace('\'', "'\\''")
     )
 }

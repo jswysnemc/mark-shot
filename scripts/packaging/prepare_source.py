@@ -49,6 +49,13 @@ def prepare(repository, commit, package_version, destination, kind, revision="1"
             "media",
             epoch,
         )
+        # 3. 【原生源码】【测试字体】组件名必须匹配解包目录，保留离线对照测试的固定输入
+        archive(
+            source / "reference-fonts",
+            destination / f"mark-shot_{upstream}.orig-reference-fonts.tar.xz",
+            "reference-fonts",
+            epoch,
+        )
         shutil.move(
             source / "packaging/licenses", source / "debian/dependency-licenses"
         )

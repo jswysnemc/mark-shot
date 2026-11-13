@@ -52,7 +52,7 @@ fn command_receives_private_original_protocol_and_cleans_up_input() {
     let record = root.path().join("record.json");
     let script = "import json,os,sys; p=sys.argv[1]; data=json.load(open(p)); json.dump({'path':p,'mode':os.stat(p).st_mode & 511,'data':data,'target':sys.argv[2]},open(sys.argv[3],'w')); print(json.dumps({'tokens':[{'text':'translated'}]}))";
     let template = format!(
-        "/usr/bin/python -c {} {{input}} {{targetLanguage}} {{config}}",
+        "/usr/bin/python3 -c {} {{input}} {{targetLanguage}} {{config}}",
         quote(script)
     );
     let target = "English'; exit 7; #";

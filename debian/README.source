@@ -1,8 +1,10 @@
-Native Mark Shot source packages contain three upstream components:
+Native Mark Shot source packages contain four upstream components:
 
 - orig: the exact native Git commit
 - orig-vendor: Linux Cargo dependencies selected from the unchanged Cargo.lock
 - orig-media: FFmpeg, OpenH264 and nv-codec-headers source files with a SHA-256 manifest
+- orig-reference-fonts: byte-pinned Noto Sans 2.015 reference archive and its OFL notice,
+  used only to reproduce the Qt geometry fixtures without network access
 
 The build does not access the network. Dependency license notices prepared before
 the build are in debian/dependency-licenses. debian/source-commit identifies the

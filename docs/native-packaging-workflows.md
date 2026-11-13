@@ -11,7 +11,7 @@ Qt 版 `origin/main` 的十个工作流已迁移为原生 Rust 入口。平台�
 | `release-aur-bin.yml` | x86_64/ARM64 pacman 包、摘要与 AUR 二进制元数据 |
 | `release-appimage.yml` | x86_64；Debian 12 构建，全部载荷 ELF 的 glibc 需求不超过 2.36，在 Ubuntu 24.04 验证最终包 |
 | `release-flatpak.yml` | x86_64；Freedesktop 25.08 SDK，离线源码构建、安装与沙箱启动验证 |
-| `debian-source.yml` | Ubuntu 26.04 Resolute；三个上游组件、源码重建、二进制构建、Lintian 与安装测试 |
+| `debian-source.yml` | Ubuntu 26.04 Resolute；四个上游组件、源码重建、二进制构建、Lintian 与安装测试 |
 | `aur-publish.yml` | 两种架构的 AUR 源码包，固定源码提交，生成规范 `.SRCINFO` |
 | `ppa-publish.yml` | 正式原生版本校验、Resolute 离线源码准备、GPG 签名验证及 Launchpad 上传 |
 
@@ -34,7 +34,7 @@ Qt 插件由原生内置 OCR、翻译、扫码与媒体模块替代，不生成�
 
 Ubuntu 26.04 官方仓库当前提供 Rust 1.93.1，不能满足原生项目的 1.95 最低要求。源码持续集成分别验证实际 Rustup 1.99.1 工具链和全部 dpkg 系统依赖，再执行构建；源码包仍保留 `rustc/cargo >= 1.95` 约束。Launchpad 不能联网安装 Rustup，因此 PPA 生产上传还要求提前配置满足约束的构建依赖来源；工作流在发现发行版候选版本不足时明确失败，不上传无法构建的源码。
 
-媒体库保留 LGPL 构建配置、匹配源码、版权与摘要，不启用 FFmpeg 的 GPL 或 nonfree 组件。Debian/PPA 提交三个源码组件：原生 Git 源码、离线 Cargo vendor、原始媒体源码。源码 RPM 与 Flatpak 同样包含离线 Cargo 和原始媒体源码，不以预编译库充当源码。
+媒体库保留 LGPL 构建配置、匹配源码、版权与摘要，不启用 FFmpeg 的 GPL 或 nonfree 组件。Debian/PPA 提交四个源码组件：原生 Git 源码、离线 Cargo vendor、原始媒体源码、固定测试字体归档。字体组件保留 Noto Sans 2.015 原始归档及 OFL 许可，仅用于私有字体配置中的 Qt 几何对照测试，不改变程序字体或安装系统字体。源码 RPM 与 Flatpak 同样包含完整离线输入，不以预编译库充当源码。
 
 vendor 通过固定版本 `cargo-vendor-filterer` 生成，保留 `Cargo.lock`。当前锁文件中 libloading、system-deps、vcpkg 的预编译测试样本及 ring 的 Windows 对象文件不参与 Linux 构建，因此单独剔除并更新 vendor 校验清单；其余源码与版权保留。依赖更新后如果出现其他预编译库，源码准备直接失败，不能静默交付。
 
