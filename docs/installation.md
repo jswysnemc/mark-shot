@@ -2,11 +2,49 @@
 
 **English** | [简体中文](zh-CN/installation.md)
 
-No native release has been published yet. Until the first one is out, build Mark Shot from
-source. The 0.1.x packages on the Releases page and in distribution repositories contain the
-earlier Qt implementation.
+The current native prerelease is
+[0.2.0-preview.7](https://github.com/jswysnemc/mark-shot/releases/tag/native-v0.2.0-preview.7).
+The 0.1.x packages contain the earlier Qt implementation, preserved on `qt-old`.
+This prerelease does not update stable AUR or PPA channels.
+
+## Prebuilt downloads
+
+Choose a package from the release page for your distribution and architecture. It provides
+8 DEB packages, RPM binaries and source packages, Arch packages, AppImage, Flatpak,
+Linux portable archives and a Windows x86_64 archive. Prebuilt packages include the recording
+library and license notices; Rust is only needed for source builds.
+
+For the Linux x86_64 portable archive, keep the extracted directory intact:
+
+```sh
+tar -xzf mark-shot-native-0.2.0-preview.7-linux-x86_64.tar.gz
+./mark-shot-native-0.2.0-preview.7-linux-x86_64/mark-shot
+```
+
+Use the `linux-aarch64` archive on ARM64. On Windows, extract the complete ZIP and run
+`mark-shot.exe`; do not separate it from the bundled media and resource files.
+
+## Verify downloads
+
+Expand **Files and SHA-256** on the release page and compare the complete digest with your file.
+Checksum files and internal JSON metadata are not separate release assets.
+
+```sh
+sha256sum mark-shot-native-0.2.0-preview.7-linux-x86_64.tar.gz
+```
+
+On Windows, use PowerShell:
+
+```powershell
+Get-FileHash .\mark-shot-native-0.2.0-preview.7-windows-x86_64-msvc.zip -Algorithm SHA256
+```
+
+Release filenames use `.` instead of `~` to comply with GitHub asset naming. Debian and RPM
+package versions still retain their prerelease ordering inside the package.
 
 ## Requirements
+
+The requirements and commands below apply to source builds.
 
 - Linux on x86_64 or aarch64, or Windows on x86_64
 - Rust 1.95 or newer. The repository pins a toolchain in `rust-toolchain.toml`; `rustup` installs

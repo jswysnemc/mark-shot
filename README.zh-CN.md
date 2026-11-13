@@ -5,7 +5,7 @@
   <p><a href="README.md">English</a> | <strong>简体中文</strong></p>
   <p>
     <a href="https://github.com/jswysnemc/mark-shot/releases">
-      <img src="https://img.shields.io/github/v/release/jswysnemc/mark-shot?color=6da0f2&labelColor=4a5054&label=release&style=flat-square&logo=github" alt="发行版本" />
+      <img src="https://img.shields.io/github/v/release/jswysnemc/mark-shot?include_prereleases=true&color=6da0f2&labelColor=4a5054&label=release&style=flat-square&logo=github" alt="发行版本" />
     </a>
     <a href="https://gitter.im/mark-shot/community">
       <img src="https://img.shields.io/badge/gitter-join%20chat-46bc99?labelColor=4a5054&style=flat-square&logo=gitter" alt="Gitter" />
@@ -20,8 +20,10 @@
 Mark Shot 冻结屏幕画面，由用户框选区域并添加标注，然后复制、保存、贴图、识别文字、翻译或上传。
 程序使用 Rust 编写，界面由自身的软件渲染器绘制，不依赖 Qt、GTK 或 WebView。
 
-> **当前状态。** 本分支是原生重写版本（0.2.0，开发中）。
-> [Releases](https://github.com/jswysnemc/mark-shot/releases) 页面上的 0.1.x 安装包属于此前的 Qt 实现。
+> **当前状态。** `main` 为原生 Rust 重写版本，当前预发布为
+> [0.2.0-preview.7](https://github.com/jswysnemc/mark-shot/releases/tag/native-v0.2.0-preview.7)。
+> 0.1.x 安装包属于此前的 Qt 实现，源码保留在
+> [`qt-old`](https://github.com/jswysnemc/mark-shot/tree/qt-old) 分支。
 > Linux 的 Wayland 与 X11 是主要目标平台。Windows 版本可以运行，但尚未在真实 Windows 设备上完成全部验证。
 
 ## 功能
@@ -51,7 +53,11 @@ Mark Shot 冻结屏幕画面，由用户框选区域并添加标注，然后复�
 
 ## 安装
 
-原生版本尚未发布安装包，目前需要从源码构建。构建要求 Rust 1.95 或更新版本；
+下载 [0.2.0-preview.7](https://github.com/jswysnemc/mark-shot/releases/tag/native-v0.2.0-preview.7)，
+按发行版和架构选择安装包。发布页面的折叠列表展示文件及 SHA-256，摘要文件不再作为独立资产上传。
+校验方法和可用格式见[安装说明](docs/zh-CN/installation.md)。
+
+从源码构建时，需要 Rust 1.95 或更新版本；
 `rustup` 会按 `rust-toolchain.toml` 自动选用固定的工具链。
 
 ```sh
@@ -62,7 +68,7 @@ cargo build --release --locked
 ./target/release/mark-shot --help
 ```
 
-屏幕录制还需要随程序提供的媒体库。该步骤、各发行版的依赖以及发布流程生成的安装包格式见
+预编译安装包已包含录制媒体库。从源码构建时还需单独构建媒体库，具体步骤及各发行版的依赖见
 [安装说明](docs/zh-CN/installation.md)。
 
 ## 快速开始

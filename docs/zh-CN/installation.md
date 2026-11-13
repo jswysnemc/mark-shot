@@ -2,10 +2,48 @@
 
 [English](../installation.md) | **简体中文**
 
-原生版本尚未发布安装包，首个版本发布之前需要从源码构建。Releases 页面和各发行版仓库中的
-0.1.x 安装包属于此前的 Qt 实现。
+当前原生预发布为
+[0.2.0-preview.7](https://github.com/jswysnemc/mark-shot/releases/tag/native-v0.2.0-preview.7)。
+0.1.x 安装包属于此前的 Qt 实现，源码保留在 `qt-old` 分支。
+本次预发布不更新 AUR 或 PPA 稳定渠道。
+
+## 下载预编译安装包
+
+在发布页面按发行版和架构选择安装包。当前提供 8 个 DEB 安装包、RPM 二进制包与源码包、
+Arch 安装包、AppImage、Flatpak、Linux 便携归档和 Windows x86_64 归档。
+预编译安装包已包含录制媒体库和许可声明，只有从源码构建时才需要 Rust。
+
+Linux x86_64 便携归档解压后应保留完整目录：
+
+```sh
+tar -xzf mark-shot-native-0.2.0-preview.7-linux-x86_64.tar.gz
+./mark-shot-native-0.2.0-preview.7-linux-x86_64/mark-shot
+```
+
+ARM64 使用 `linux-aarch64` 归档。Windows 解压完整 ZIP 后运行 `mark-shot.exe`，
+不要将程序与随包提供的媒体库和资源文件分开。
+
+## 校验下载文件
+
+展开发布页面的 **Files and SHA-256 / 文件列表与 SHA-256**，核对完整摘要。
+摘要文件和内部 JSON 元数据不再作为独立发布资产上传。
+
+```sh
+sha256sum mark-shot-native-0.2.0-preview.7-linux-x86_64.tar.gz
+```
+
+Windows 使用 PowerShell：
+
+```powershell
+Get-FileHash .\mark-shot-native-0.2.0-preview.7-windows-x86_64-msvc.zip -Algorithm SHA256
+```
+
+发布文件名用 `.` 替换 `~`，以符合 GitHub 资产命名规则。
+Debian 和 RPM 包内版本仍保留预发布排序规则。
 
 ## 环境要求
+
+以下环境要求和命令适用于从源码构建。
 
 - x86_64 或 aarch64 的 Linux，或 x86_64 的 Windows
 - Rust 1.95 或更新版本。仓库在 `rust-toolchain.toml` 中固定了工具链，`rustup` 会在首次构建时自动安装。

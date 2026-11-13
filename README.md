@@ -5,7 +5,7 @@
   <p><strong>English</strong> | <a href="README.zh-CN.md">简体中文</a></p>
   <p>
     <a href="https://github.com/jswysnemc/mark-shot/releases">
-      <img src="https://img.shields.io/github/v/release/jswysnemc/mark-shot?color=6da0f2&labelColor=4a5054&label=release&style=flat-square&logo=github" alt="Release" />
+      <img src="https://img.shields.io/github/v/release/jswysnemc/mark-shot?include_prereleases=true&color=6da0f2&labelColor=4a5054&label=release&style=flat-square&logo=github" alt="Release" />
     </a>
     <a href="https://gitter.im/mark-shot/community">
       <img src="https://img.shields.io/badge/gitter-join%20chat-46bc99?labelColor=4a5054&style=flat-square&logo=gitter" alt="Gitter" />
@@ -21,9 +21,11 @@ Mark Shot freezes the screen, lets you select a region, annotate it, and then co
 recognize, translate or upload the result. It is written in Rust and draws its own interface in
 software, so it does not depend on Qt, GTK or a web view.
 
-> **Status.** This branch is the native rewrite (version 0.2.0, in development). The 0.1.x
-> packages on the [Releases](https://github.com/jswysnemc/mark-shot/releases) page are the earlier
-> Qt implementation. Linux on Wayland and X11 is the primary target. The Windows build runs, but
+> **Status.** `main` contains the native Rust rewrite. The current prerelease is
+> [0.2.0-preview.7](https://github.com/jswysnemc/mark-shot/releases/tag/native-v0.2.0-preview.7).
+> The 0.1.x packages contain the earlier Qt implementation, preserved on
+> [`qt-old`](https://github.com/jswysnemc/mark-shot/tree/qt-old).
+> Linux on Wayland and X11 is the primary target. The Windows build runs, but
 > has not been fully verified on real Windows machines yet.
 
 ## Features
@@ -53,8 +55,13 @@ Details and known limits are in [Platform support](docs/platform-support.md).
 
 ## Install
 
-No native release has been published yet, so build from source for now. Rust 1.95 or newer is
-required; `rustup` picks the pinned toolchain from `rust-toolchain.toml` automatically.
+Download [0.2.0-preview.7](https://github.com/jswysnemc/mark-shot/releases/tag/native-v0.2.0-preview.7)
+and choose a package for your distribution and architecture. The release page contains a collapsed
+file list with SHA-256 values; checksum files are not separate assets. See
+[Installation](docs/installation.md) for download verification and the available formats.
+
+To build from source, Rust 1.95 or newer is required; `rustup` picks the pinned toolchain from
+`rust-toolchain.toml` automatically.
 
 ```sh
 git clone https://github.com/jswysnemc/mark-shot.git
@@ -64,9 +71,8 @@ cargo build --release --locked
 ./target/release/mark-shot --help
 ```
 
-Screen recording additionally needs the bundled media library. See
-[Installation](docs/installation.md) for that step, for per-distribution dependencies and for the
-package formats produced by the release workflows.
+Prebuilt packages include the recording media library. Source builds need to build it separately;
+see [Installation](docs/installation.md) for that step and per-distribution dependencies.
 
 ## Quick start
 

@@ -124,8 +124,26 @@ python3 scripts/packaging/install_linux.py \
 
 The per-format scripts `package_deb.py`, `package_rpm.py`, `package_pacman.py`,
 `package_appimage.py`, `package_flatpak.py` and `package_portable.py` turn that tree into a
-package. Each `release-*.yml` workflow runs one of them when a `native-v*` tag is published, and
-`windows-build.yml` produces the Windows archive.
+package. `native-release.yml` handles `native-v*` tags, calls the existing `release-*.yml`
+workflows and waits for all verification and package jobs before publishing. `windows-build.yml`
+produces the Windows archive. Per-format manual runs produce Actions artifacts rather than a
+partial GitHub Release. Stable AUR metadata publication requires an explicit manual request.
+
+Add the update description at `release/notes/<version>.md` before creating a tag. The publisher
+creates a draft, verifies every uploaded package, and then exposes the release with a collapsed
+download list and SHA-256 values. Checksum sidecars and JSON manifests stay in Actions artifacts.
+Published filenames normalize `~` and `+` to `.`, without changing the package contents.
+
+If only publication fails, reuse the verified build without rebuilding or moving its tag:
+
+```sh
+gh workflow run native-release-publish.yml --ref main \
+  -f tag=native-v0.2.0-preview.7 -f run_id=43512259674
+```
+
+The retry workflow checks the source repository, exact tag commit, original release workflow
+and every required build group before downloading its artifacts. It resumes the existing draft
+and rejects assets with different contents. Prereleases do not update stable AUR or PPA channels.
 
 Distribution builds run offline: `prepare_source.py` vendors the Rust crates and the media library
 sources into the source archive, and `build_linux.sh --offline` uses only those.

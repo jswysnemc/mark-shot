@@ -113,8 +113,24 @@ python3 scripts/packaging/install_linux.py \
 
 `package_deb.py`、`package_rpm.py`、`package_pacman.py`、`package_appimage.py`、
 `package_flatpak.py` 和 `package_portable.py` 分别把该目录制作为对应格式的安装包。
-发布 `native-v*` 标签后，各 `release-*.yml` 工作流运行其中一个脚本，`windows-build.yml`
-生成 Windows 归档。
+`native-release.yml` 处理 `native-v*` 标签，调用既有 `release-*.yml` 工作流，
+等待全部验证和打包任务成功后再公开发布；`windows-build.yml` 生成 Windows 归档。
+单格式工作流的手动执行生成 Actions 产物，不会公开不完整的 GitHub Release。
+AUR 稳定渠道的元数据上传需要显式启用手动选项。
+
+创建标签之前，在 `release/notes/<version>.md` 编写更新描述。发布脚本先创建草稿，逐个核验远程
+安装包，再公开包含折叠下载列表和 SHA-256 的发布页面。摘要文件和 JSON 清单保留在 Actions
+产物中。发布文件名将 `~`、`+` 规范化为 `.`，不修改包内版本和文件内容。
+
+如果只有发布阶段失败，可复用已验证构建，不重新编译，也不移动版本标签：
+
+```sh
+gh workflow run native-release-publish.yml --ref main \
+  -f tag=native-v0.2.0-preview.7 -f run_id=43512259674
+```
+
+重试工作流先核对来源仓库、标签对应提交、原发布工作流及全部必需构建组，再下载产物。
+脚本恢复已有草稿，并拒绝覆盖不同内容的资产。预发布不更新 AUR 或 PPA 稳定渠道。
 
 发行版构建在离线环境中进行：`prepare_source.py` 把 Rust 依赖和媒体库源码一并放入源码归档，
 `build_linux.sh --offline` 只使用这些内容。
