@@ -55,7 +55,8 @@ jobs:
           toolchain: '1.99.1'
       - uses: Swatinem/rust-cache@v2
         with:
-          key: flatpak-vendor
+          key: flatpak-vendor-v2
+          cache-targets: false
       - name: Install fixed vendoring tool
         run: cargo install --locked cargo-vendor-filterer@0.5.18
       - name: Build and verify offline Flatpak

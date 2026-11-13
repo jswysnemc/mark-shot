@@ -2,7 +2,9 @@
 
 import argparse
 from pathlib import Path
+import shutil
 import subprocess
+import tempfile
 
 from artifact_metadata import finalize, source_sha, version
 from prepare_flatpak_source import prepare_flatpak
@@ -12,18 +14,26 @@ def package(repository, package_version, commit, destination):
     """【原生打包】【Flatpak生成】按仓库、版本、提交及输出准备离线源码，返回完整产物清单"""
     repository, destination = Path(repository).resolve(), Path(destination).resolve()
     package_version, commit = version(package_version), source_sha(commit)
-    source = prepare_flatpak(
-        repository, commit, package_version, destination / "source"
-    )
+    destination.mkdir(parents=True, exist_ok=True)
+    # 1. 【原生打包】【工作隔离】本轮源码、构建树及仓库不复用缓存或重试留下的目录
+    with tempfile.TemporaryDirectory(
+        prefix=".flatpak-build-", dir=destination
+    ) as temporary:
+        return _build(repository, package_version, commit, destination, Path(temporary))
+
+
+def _build(repository, package_version, commit, destination, workspace):
+    """【原生打包】【独立沙箱构建】按仓库、版本及提交在 workspace 构建，验证后复制至 destination，返回清单"""
+    source = prepare_flatpak(repository, commit, package_version, workspace / "source")
     template = (
         repository / "packaging/flatpak/io.github.jswysnemc.MarkShot.yml"
     ).read_text()
     template = template.replace(
         "path: mark-shot-source.tar.xz", f"path: {source['source_archive']}"
     )
-    manifest = destination / "io.github.jswysnemc.MarkShot.yml"
+    manifest = workspace / "io.github.jswysnemc.MarkShot.yml"
     manifest.write_text(template)
-    repo = destination / "flatpak-repo"
+    repo = workspace / "flatpak-repo"
     subprocess.run(
         [
             "flatpak-builder",
@@ -31,12 +41,12 @@ def package(repository, package_version, commit, destination):
             "--install-deps-from=flathub",
             "--force-clean",
             f"--repo={repo}",
-            str(destination / "flatpak-build"),
+            str(workspace / "flatpak-build"),
             str(manifest),
         ],
         check=True,
     )
-    asset = destination / f"mark-shot-native-{package_version}-linux-x86_64.flatpak"
+    asset = workspace / f"mark-shot-native-{package_version}-linux-x86_64.flatpak"
     subprocess.run(
         [
             "flatpak",
@@ -68,7 +78,10 @@ def package(repository, package_version, commit, destination):
         ],
         check=True,
     )
-    return finalize(asset, package_version, "x86_64", commit, "flatpak")
+    # 2. 【原生打包】【验证交付】只复制安装和沙箱验证均通过的最终包，不删除其他输出
+    result = destination / asset.name
+    shutil.copy2(asset, result)
+    return finalize(result, package_version, "x86_64", commit, "flatpak")
 
 
 def main():

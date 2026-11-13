@@ -39,6 +39,13 @@ class WorkflowCoverage(unittest.TestCase):
             step for step in steps if step.get("uses") == "Swatinem/rust-cache@v2"
         )
         self.assertEqual(cache["with"]["cache-targets"], "${{ inputs.kind != 'rpm' }}")
+        flatpak = next(
+            step
+            for step in workflow("release-flatpak")["jobs"]["packages"]["steps"]
+            if step.get("uses") == "Swatinem/rust-cache@v2"
+        )
+        self.assertEqual(flatpak["with"]["cache-targets"], "false")
+        self.assertEqual(flatpak["with"]["key"], "flatpak-vendor-v2")
 
     @unittest.skipUnless(shutil.which("flatpak"), "Flatpak command is not installed")
     def test_flatpak_finish_permissions_are_accepted(self):
