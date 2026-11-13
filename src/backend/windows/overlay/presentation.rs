@@ -85,6 +85,7 @@ impl ScreenOverlay for Overlay {
     /// 【Windows覆盖层】【线程内创建】按targets创建隐藏全屏窗口，返回结果；像素交付前不显示
     fn present(&mut self, targets: &[usize]) -> crate::AppResult {
         self.popup = None;
+        self.scroll = Default::default();
         self.surfaces.clear();
         for &index in targets {
             let output = self
@@ -259,8 +260,44 @@ impl ScreenOverlay for Overlay {
         self.surface(monitor_idx)?.hide();
         Ok(())
     }
-    /// 【Windows覆盖层】【输入范围】按monitor_idx和rect接收共享输入配置，无返回值；滚动角色将在独立控制窗口实现
+    /// 【Windows覆盖层】【输入范围】按monitor_idx和rect接收共享输入配置，无返回值；长截图仅映射局部控制窗口
     fn set_input_rect(&mut self, _monitor_idx: usize, _rect: Option<(i32, i32, i32, i32)>) {}
+    /// 【Windows长截图】【启动接口】按monitor_idx切换局部控制窗口，返回原生窗口创建结果
+    fn begin_scroll(&mut self, monitor_idx: usize) -> crate::AppResult {
+        self.start_scroll(monitor_idx)
+    }
+    /// 【Windows长截图】【面板配置】按rect和paused更新控制区域，暂停后允许恢复隐藏面板，返回配置结果
+    fn configure_scroll_panel(&mut self, rect: tiny_skia::Rect, paused: bool) -> crate::AppResult {
+        self.scroll.rect = Some(rect);
+        if paused {
+            self.scroll.hidden = false;
+        }
+        Ok(())
+    }
+    /// 【Windows长截图】【窗口角色】无参数，返回当前是否已切换为局部控制窗口
+    fn is_scroll_window(&self) -> bool {
+        self.scroll.monitor.is_some()
+    }
+    /// 【Windows长截图】【可见状态】无参数，返回面板是否因与捕获区域重叠而隐藏
+    fn scroll_controls_hidden(&self) -> bool {
+        self.scroll.hidden
+    }
+    /// 【Windows长截图】【帧隔离】按frame和region检查实际面板位置，返回当前帧是否可进入拼接器
+    fn allow_scroll_frame(
+        &mut self,
+        _frame: &crate::types::MonitorFrame,
+        region: tiny_skia::Rect,
+    ) -> crate::AppResult<bool> {
+        self.allow_scroll(region)
+    }
+    /// 【Windows长截图】【局部交付】按monitor_idx和frame提交面板像素，返回原生绘制结果
+    fn stage_scroll_panel(
+        &mut self,
+        monitor_idx: usize,
+        frame: &crate::types::scroll_panel::ScrollPanelFrame<'_>,
+    ) -> crate::AppResult {
+        self.scroll_frame(monitor_idx, frame)
+    }
     /// 【Windows覆盖层】【输出绑定】按monitor_idx返回窗口创建时的原生显示器，超界返回空值
     fn surface_output(&self, monitor_idx: usize) -> Option<&Output> {
         self.surfaces

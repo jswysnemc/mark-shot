@@ -3,6 +3,7 @@
 mod events;
 mod image_window;
 mod presentation;
+mod scroll;
 
 use super::{input::Decoder, native};
 use crate::{
@@ -28,6 +29,8 @@ pub struct Overlay {
     popup: Option<(u64, usize, native::Window)>,
     image_size: Option<(u32, u32)>,
     image_minimum: (u32, u32),
+    scroll: scroll::State,
+    previous_focus: isize,
 }
 
 impl Overlay {
@@ -49,6 +52,10 @@ impl Overlay {
             focus: None,
             image_size: None,
             image_minimum: (320, 240),
+            scroll: Default::default(),
+            previous_focus: unsafe {
+                windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow() as isize
+            },
         })
     }
 

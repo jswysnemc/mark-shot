@@ -326,6 +326,19 @@ impl Window {
         self.shown = false;
     }
 
+    /// 【Windows窗口】【缓冲回收】无参数，释放隐藏表面的唯一DIB，下一次提交重新按所需尺寸分配
+    pub fn discard_bitmap(&mut self) {
+        self.context.bitmap.borrow_mut().take();
+    }
+
+    /// 【Windows窗口】【按需聚焦】无参数，在用户点击控件后请求前台及键盘焦点，首次显示仍保持不激活
+    pub fn focus(&mut self) {
+        unsafe {
+            SetForegroundWindow(self.hwnd);
+            windows_sys::Win32::UI::Input::KeyboardAndMouse::SetFocus(self.hwnd);
+        }
+    }
+
     /// 【Windows窗口】【模态输入】按enabled启用或隔离父窗口输入，无返回值，关闭子窗口后由运行时恢复
     pub fn set_enabled(&mut self, enabled: bool) {
         unsafe {

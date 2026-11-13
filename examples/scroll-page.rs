@@ -76,9 +76,17 @@ impl WindowContent for Page {
 
 /// 【滚动截图回归】【测试入口】用命令参数指定本次 trace，仅在有私有会话标记时建立页面，无返回值
 fn main() -> mark_shot::AppResult {
-    let root = std::path::PathBuf::from(std::env::var("XDG_RUNTIME_DIR")?);
-    if !root.join("runtime.json").is_file() {
-        return Err("scroll page requires an owned private runtime".into());
+    // 1. 【滚动截图回归】【隔离校验】各平台只接受自己的私有运行时标记，避免在用户桌面创建测试页面
+    #[cfg(target_os = "linux")]
+    {
+        let root = std::path::PathBuf::from(std::env::var("XDG_RUNTIME_DIR")?);
+        if !root.join("runtime.json").is_file() {
+            return Err("scroll page requires an owned private runtime".into());
+        }
+    }
+    #[cfg(target_os = "windows")]
+    if std::env::var("MARK_SHOT_PRIVATE_WINDOWS_TEST").as_deref() != Ok("1") {
+        return Err("scroll page requires the private Windows test runtime".into());
     }
     let trace = std::env::args_os()
         .nth(1)

@@ -51,6 +51,7 @@ try {
         'app::input::tests::cursor_magnifier::',
         'backend::windows::native::',
         'backend::windows::overlay::events::tests::',
+        'backend::windows::overlay::scroll::tests::',
         'backend::windows::clipboard::image_tests::',
         'config::tests::',
         'features::capture_history::tests::storage::',

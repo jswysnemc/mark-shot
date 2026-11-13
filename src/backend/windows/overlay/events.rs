@@ -117,6 +117,13 @@ impl Overlay {
             return;
         }
         let monitor_idx = monitor.unwrap();
+        let offset = match self.scroll_input_offset(monitor_idx) {
+            Ok(offset) => offset,
+            Err(error) => {
+                log::error!("【Windows长截图】【输入坐标】{error}");
+                return;
+            }
+        };
         match event {
             WindowEvent::Resize { size } if self.image_size.is_some() => {
                 self.image_size = Some(size);
@@ -126,8 +133,8 @@ impl Overlay {
                 self.cursor_output = Some(monitor_idx);
                 self.pending.push_back(OverlayEvent::PointerMove {
                     monitor_idx,
-                    x: position.0,
-                    y: position.1,
+                    x: position.0 + offset.0,
+                    y: position.1 + offset.1,
                     history: Vec::new(),
                 });
             }
@@ -165,10 +172,13 @@ impl Overlay {
                 let Some(button) = button(code) else {
                     return;
                 };
+                if pressed && self.scroll.monitor == Some(monitor_idx) {
+                    self.surfaces[monitor_idx].1.focus();
+                }
                 self.pending.push_back(OverlayEvent::PointerMove {
                     monitor_idx,
-                    x: position.0,
-                    y: position.1,
+                    x: position.0 + offset.0,
+                    y: position.1 + offset.1,
                     history: Vec::new(),
                 });
                 self.pending.push_back(OverlayEvent::PointerButton {
