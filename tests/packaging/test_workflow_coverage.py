@@ -32,6 +32,29 @@ def workflow(name):
 
 
 class WorkflowCoverage(unittest.TestCase):
+    def test_packaging_does_not_depend_on_local_documentation(self):
+        """【原生构建】【文档隔离】无传参，确认 Linux 和 Windows 打包不复制本地文档，无返回值"""
+        linux = next(
+            step
+            for step in workflow("native-build")["jobs"]["linux"]["steps"]
+            if step.get("name") == "Package native build"
+        )["run"]
+        windows = (ROOT / "scripts/windows-package.ps1").read_text()
+        for text in (linux, windows):
+            self.assertNotIn("README.md", text)
+            self.assertNotIn("docs/", text)
+            self.assertNotIn(".docs", text)
+
+    def test_preview_publication_fetches_notes_history(self):
+        """【原生发布】【历史检出】无传参，确认历史发布说明恢复使用完整 Git 历史，无返回值"""
+        checkout = next(
+            step
+            for step in workflow("native-release")["jobs"]["publish"]["steps"]
+            if step.get("uses") == "actions/checkout@v4"
+        )
+        self.assertEqual(checkout["with"]["fetch-depth"], "0")
+        self.assertEqual(checkout["with"]["persist-credentials"], "false")
+
     def test_source_verification_failures_preserve_build_evidence(self):
         """【原生构建】【失败证据】无传参，验证前收集构建产物，正式验证产物仍在验证后上传，失败使用独立证据名称，无返回值"""
         steps = workflow("debian-source")["jobs"]["resolute"]["steps"]

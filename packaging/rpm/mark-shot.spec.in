@@ -41,7 +41,6 @@ python3 scripts/packaging/media_checksums.py --directory "%{buildroot}/usr/lib/m
 %{_datadir}/applications/io.github.jswysnemc.MarkShot.desktop
 %{_datadir}/metainfo/io.github.jswysnemc.MarkShot.metainfo.xml
 %{_datadir}/icons/hicolor/scalable/apps/io.github.jswysnemc.MarkShot.svg
-%{_mandir}/man1/mark-shot.1*
 %license %{_datadir}/licenses/mark-shot/
 %doc %{_datadir}/doc/mark-shot/
 

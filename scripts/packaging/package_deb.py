@@ -1,7 +1,6 @@
 """【原生打包】【DEB产物】在目标发行版生成真实动态依赖与可安装的 Debian 软件包"""
 
 import argparse
-import gzip
 import os
 from pathlib import Path
 import shutil
@@ -90,9 +89,6 @@ def package(stage, package_version, arch, target, commit, destination, repositor
     )
     documentation = stage / "usr/share/doc/mark-shot"
     shutil.copy2(repository / "debian/copyright", documentation / "copyright")
-    man = stage / "usr/share/man/man1/mark-shot.1"
-    Path(str(man) + ".gz").write_bytes(gzip.compress(man.read_bytes(), mtime=0))
-    man.unlink()
     destination.mkdir(parents=True, exist_ok=True)
     asset = (
         destination

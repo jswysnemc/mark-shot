@@ -19,9 +19,10 @@ class ControlReleaseTests(unittest.TestCase):
         report = json.loads((release / "native-preview-5-verification.json").read_text())
         with tempfile.TemporaryDirectory() as directory:
             verification = Path(directory) / "verification.json"
-            notes = release / "native-preview-5-notes.md"
+            notes = Path(directory) / "notes.md"
+            notes.write_text("Native control verification fixture.\n")
             verification.write_text(json.dumps(report))
-            current = replace(manifest, tag="native-v0.2.0-preview.6", verification_sha256=sha256_file(verification))
+            current = replace(manifest, tag="native-v0.2.0-preview.6", verification_sha256=sha256_file(verification), notes_sha256=sha256_file(notes))
             with self.assertRaisesRegex(ValueError, "OCR control verification"):
                 current.verify_documents(verification, notes)
             result = {"sha256": manifest.binary_sha256, "bytes": manifest.binary_bytes,

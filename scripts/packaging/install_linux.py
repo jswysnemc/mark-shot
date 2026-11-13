@@ -48,7 +48,6 @@ def install(root, binary, media, destination, prefix, arch, commit, licenses=Non
             root / "assets/hicolor/scalable/apps/mark-shot.svg",
             "share/icons/hicolor/scalable/apps/io.github.jswysnemc.MarkShot.svg",
         ),
-        (root / "packaging/desktop/mark-shot.1", "share/man/man1/mark-shot.1"),
     ):
         target = installed / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -68,8 +67,6 @@ def install(root, binary, media, destination, prefix, arch, commit, licenses=Non
         shutil.copytree(licenses, notices, dirs_exist_ok=True)
     documentation = installed / "share/doc/mark-shot"
     documentation.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(root / "README.md", documentation / "README.md")
-    shutil.copytree(root / "docs", documentation / "docs", dirs_exist_ok=True)
     shutil.copy2(root / "Cargo.lock", documentation / "Cargo.lock")
     return installed
 

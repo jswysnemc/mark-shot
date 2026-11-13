@@ -147,17 +147,16 @@ jobs:
         run: |
           staging=$(mktemp -d "$RUNNER_TEMP/mark-shot-package.XXXXXX")
           package="$staging/mark-shot-native"
-          mkdir -p "$package/docs" "$package/licenses" "$package/media"
+          mkdir -p "$package/licenses" "$package/media"
           install -m 755 target/release/mark-shot "$package/mark-shot"
           cp -a target/media-linux/. "$package/media/"
           test -f "$package/media/libmarkshot-media.so"
           (cd "$package/media"; sha256sum --check SHA256SUMS)
-          cp LICENSE-MIT LICENSE-APACHE README.md "$package/"
+          cp LICENSE-MIT LICENSE-APACHE "$package/"
           cp assets/fonts/LICENSE-OFL.txt assets/fonts/LICENSE-NUMERALS.txt "$package/licenses/"
           cp assets/icons/mark-shot/LICENSE "$package/licenses/LICENSE-ICONS.txt"
           cp target/packaging-licenses/DEPENDENCIES.txt "$package/licenses/DEPENDENCIES.txt"
           cp target/packaging-licenses/*.txt "$package/licenses/"
-          cp -a docs/. "$package/docs/"
           cp target/native-help.txt target/native-linkage.txt "$package/"
           printf '%s\n' "$NATIVE_SOURCE_SHA" > "$package/SOURCE-COMMIT"
           tar -C "$staging" -czf target/mark-shot-native-linux-${{ matrix.arch }}.tar.gz mark-shot-native

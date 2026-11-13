@@ -3,6 +3,7 @@
 import io
 import json
 from pathlib import Path
+import shutil
 import struct
 import subprocess
 import sys
@@ -23,6 +24,7 @@ from artifact_metadata import (
 )
 from install_linux import install
 from media_checksums import verify_media
+from package_deb import package as deb
 from package_pacman import package as pacman
 from package_portable import package as portable
 from package_rpm import package as rpm
@@ -181,6 +183,14 @@ class ArtifactContracts(unittest.TestCase):
             self.assertEqual(
                 (installed / "lib/mark-shot/SOURCE-COMMIT").read_text().strip(), COMMIT
             )
+            self.assertTrue((installed / "share/doc/mark-shot/Cargo.lock").is_file())
+            for path in (
+                "share/doc/mark-shot/README.md",
+                "share/doc/mark-shot/docs",
+                "share/doc/mark-shot/.docs",
+                "share/man/man1/mark-shot.1",
+            ):
+                self.assertFalse((installed / path).exists())
             with self.assertRaises(ValueError):
                 install(
                     ROOT, binary, media, directory / "bad", "/usr", "x86_64", COMMIT
@@ -234,6 +244,33 @@ class ArtifactContracts(unittest.TestCase):
                             for item in stream
                         )
                     )
+
+    @unittest.skipUnless(shutil.which("dpkg-deb"), "dpkg-deb is not installed")
+    def test_debian_package_does_not_require_a_local_manual(self):
+        """【原生打包】【DEB文档隔离】无传参，使用真实 dpkg-deb 构建不含本地手册和 Markdown 的安装包，无返回值"""
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            binary, media, licenses = fixture(directory / "inputs")
+            stage = directory / "stage"
+            install(ROOT, binary, media, stage, "/usr", "x86_64", COMMIT, licenses)
+            with patch("package_deb.dependencies", return_value="libc6, libpulse0"):
+                record = deb(
+                    stage,
+                    "0.2.0",
+                    "x86_64",
+                    "debian13",
+                    COMMIT,
+                    directory / "packages",
+                    ROOT,
+                )
+            package = directory / "packages" / record["file"]
+            unpacked = directory / "unpacked"
+            subprocess.run(
+                ["dpkg-deb", "--extract", str(package), str(unpacked)], check=True
+            )
+            self.assertTrue((unpacked / "usr/share/doc/mark-shot/copyright").is_file())
+            self.assertFalse((unpacked / "usr/share/man").exists())
+            self.assertFalse(list(unpacked.rglob("*.md")))
 
     def test_release_assets_reject_tampering(self):
         """【原生发布】【摘要测试】无传参，拒绝文件篡改、错误版本及路径穿越，无返回值"""

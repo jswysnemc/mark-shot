@@ -22,7 +22,7 @@ $name = 'mark-shot-native-windows-x86_64-msvc'
 $staging = Join-Path $root "target/windows-package-$([guid]::NewGuid().ToString('N'))"
 $package = Join-Path $staging $name
 New-Item -ItemType Directory -Force $package, $evidence | Out-Null
-New-Item -ItemType Directory (Join-Path $package 'licenses'), (Join-Path $package 'docs') | Out-Null
+New-Item -ItemType Directory (Join-Path $package 'licenses') | Out-Null
 
 Push-Location $root
 try {
@@ -34,9 +34,7 @@ try {
     Copy-Item (Join-Path $root 'target/media-windows') (Join-Path $package 'media') -Recurse
     $linkage = Join-Path $package 'windows-linkage.txt'
     Resolve-WindowsRuntime -PackageDirectory $package -BuildDirectory $build -LogPath $linkage
-    Copy-Item LICENSE-MIT, LICENSE-APACHE, README.md $package
-    Copy-Item docs/*.md (Join-Path $package 'docs')
-    Copy-Item docs/recording (Join-Path $package 'docs/recording') -Recurse
+    Copy-Item LICENSE-MIT, LICENSE-APACHE $package
     Copy-Item assets/fonts/LICENSE-OFL.txt, assets/fonts/LICENSE-NUMERALS.txt (Join-Path $package 'licenses')
     Copy-Item assets/icons/mark-shot/LICENSE (Join-Path $package 'licenses/LICENSE-ICONS.txt')
     Copy-Item Cargo.lock (Join-Path $package 'DEPENDENCIES-Cargo.lock')

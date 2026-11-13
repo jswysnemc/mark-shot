@@ -9,7 +9,7 @@ edition = "2024"
 rust-version = "1.95"
 description = "Native Rust screenshot and annotation tool for Linux X11, Wayland and Windows"
 license = "MIT OR Apache-2.0"
-readme = "README.md"
+readme = false
 
 [dependencies]
 async-trait = "0.1"

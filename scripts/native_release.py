@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 from native_release_manifest import ReleaseManifest
+from native_release_notes import resolve_notes
 from native_release_publish import GitHub, publish
 
 
@@ -20,11 +21,12 @@ def main():
     parser.add_argument("--validate-only", action="store_true")
     options = parser.parse_args()
     manifest = ReleaseManifest.load(options.manifest)
-    manifest.verify_documents(options.verification, options.notes)
+    notes = resolve_notes(Path.cwd(), options.notes, manifest.notes_sha256, options.directory / "release-notes.md")
+    manifest.verify_documents(options.verification, notes)
     if options.validate_only:
         print(json.dumps({"tag": manifest.tag, "validated": True}))
         return
-    result = publish(GitHub(), manifest, options.notes, options.verification, options.directory, os.environ["GITHUB_SHA"])
+    result = publish(GitHub(), manifest, notes, options.verification, options.directory, os.environ["GITHUB_SHA"])
     print(json.dumps(result))
 
 
