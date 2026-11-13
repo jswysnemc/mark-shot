@@ -83,8 +83,16 @@ if grep -Eq '^#define CONFIG_(GPL|NONFREE) 1' "$build_root/ffmpeg/config.h"; the
 fi
 read -r -a media_cflags <<< "$(pkg-config --cflags libavcodec libavformat libavutil libavfilter libswscale libswresample)"
 read -r -a media_libs <<< "$(pkg-config --static --libs libavformat libavcodec libavfilter libswscale libswresample libavutil)"
-"$compiler" -shared -fPIC -O2 -fvisibility=hidden -Wall -Wextra -Werror \
-  "${media_cflags[@]}" "$task_root"/crates/shot-media/native/*.c "${link_flags[@]}" \
+# 【媒体构建】【严格编译】只对项目包装代码启用 Werror，发行版 LTO 对上游源码的诊断不提升为项目错误
+objects=()
+mkdir -p "$build_root/objects"
+for source in "$task_root"/crates/shot-media/native/*.c; do
+  object="$build_root/objects/$(basename "${source%.c}").o"
+  "$compiler" -c -fPIC -O2 -fvisibility=hidden -Wall -Wextra -Werror \
+    "${media_cflags[@]}" "$source" -o "$object"
+  objects+=("$object")
+done
+"$compiler" -shared "${objects[@]}" "${link_flags[@]}" \
   -o "$build_root/$library" "${media_libs[@]}" "${native_libs[@]}"
 "$stripper" "$build_root/$library"
 cp "$build_root/$library" "$destination/$library"
