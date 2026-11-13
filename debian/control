@@ -1,0 +1,39 @@
+Source: mark-shot
+Section: graphics
+Priority: optional
+Maintainer: Mark Shot maintainers <snemc@qq.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ cargo (>= 1.95),
+ rustc (>= 1.95),
+ clang,
+ libclang-dev,
+ pkg-config,
+ python3 (>= 3.11),
+ libwayland-dev,
+ libxkbcommon-dev,
+ libxkbcommon-x11-dev,
+ libxcb1-dev,
+ libpipewire-0.3-dev,
+ libssl-dev,
+ libfontconfig-dev,
+ libva-dev,
+ libdrm-dev,
+ libgbm-dev,
+ libpulse-dev,
+ nasm,
+ xz-utils,
+Standards-Version: 4.7.3
+Rules-Requires-Root: no
+Homepage: https://github.com/jswysnemc/mark-shot
+Vcs-Browser: https://github.com/jswysnemc/mark-shot
+Vcs-Git: https://github.com/jswysnemc/mark-shot.git
+
+Package: mark-shot
+Architecture: amd64 arm64
+Depends: ${misc:Depends}, ${shlibs:Depends}, libpulse0
+Recommends: pipewire, xdg-desktop-portal, fonts-noto-core, fonts-noto-cjk
+Description: native screenshot, annotation and recording tool
+ Mark Shot provides Wayland and X11 capture, image annotation, scrolling
+ screenshots, pinned images, local OCR, translation, QR and barcode
+ recognition, and screen recording without a Qt runtime.

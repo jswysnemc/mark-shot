@@ -1,0 +1,73 @@
+name: Publish native AUR source package
+
+on:
+  push:
+    tags: ['native-v*']
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Native version tag, for example native-v0.2.0
+        required: true
+        type: string
+      checkout_ref:
+        description: Optional source reference for artifact-only verification
+        type: string
+        default: ''
+      publish:
+        description: Publish metadata to AUR after verifying the exact stable native tag
+        type: boolean
+        default: false
+      pkgrel:
+        description: AUR package release number
+        type: string
+        default: '1'
+permissions:
+  contents: read
+concurrency:
+  group: aur-publish-${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+jobs:
+  context:
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'native-v')
+    uses: ./.github/workflows/native-release-context.yml
+    with:
+      tag: ${{ inputs.tag || '' }}
+      checkout_ref: ${{ inputs.checkout_ref || '' }}
+      publish: ${{ inputs.publish || false }}
+
+  aur:
+    needs: context
+    runs-on: ubuntu-24.04
+    if: ${{ !contains(needs.context.outputs.version, '-') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.context.outputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare immutable source package template
+        env:
+          NATIVE_TAG: ${{ needs.context.outputs.tag }}
+          SOURCE_SHA: ${{ needs.context.outputs.source_sha }}
+          PKGREL: ${{ inputs.pkgrel || '1' }}
+        run: python3 scripts/packaging/prepare_aur.py --pkgrel "$PKGREL" --tag "$NATIVE_TAG" --source-sha "$SOURCE_SHA"
+
+      - name: Generate canonical SRCINFO
+        run: |
+          docker run --rm -v "$PWD/target/aur-work:/pkg" -w /pkg archlinux:base-devel bash -lc 'pacman -Syu --noconfirm --needed sudo >/dev/null; useradd -m builder; chown -R builder:builder /pkg; su builder -c "cd /pkg && makepkg --printsrcinfo > .SRCINFO"'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-aur-source-metadata
+          path: target/aur-work/
+          include-hidden-files: true
+          if-no-files-found: error
+      - name: Publish validated AUR metadata
+        if: needs.context.outputs.publish == 'true'
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          AUR_SSH_KNOWN_HOSTS: ${{ vars.AUR_SSH_KNOWN_HOSTS }}
+        run: bash scripts/packaging/publish_aur.sh mark-shot target/aur-work

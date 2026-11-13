@@ -1,0 +1,27 @@
+# 【原生发布】【AUR源码包】固定源码提交，使用原生 Rust 与可重建媒体库
+pkgname=mark-shot
+pkgver=@pkgver@
+pkgrel=@pkgrel@
+pkgdesc='Native screenshot, annotation and recording tool'
+arch=('x86_64' 'aarch64')
+url='https://github.com/jswysnemc/mark-shot'
+license=('MIT' 'Apache-2.0')
+depends=('glibc' 'fontconfig' 'libxkbcommon' 'libxkbcommon-x11' 'libxcb' 'openssl' 'pipewire' 'libpulse' 'libva' 'libdrm' 'mesa')
+makedepends=('git' 'rust' 'clang' 'pkgconf' 'python' 'nasm' 'curl' 'xz')
+optdepends=('noto-fonts: fallback fonts' 'noto-fonts-cjk: CJK fonts' 'xdg-desktop-portal: portal capture')
+conflicts=('mark-shot-bin')
+_commit=@commit@
+source=("mark-shot::git+https://github.com/jswysnemc/mark-shot.git#commit=$_commit")
+sha256sums=('SKIP')
+
+# 【原生发布】【构建方法】无传参，在固定源码目录构建程序、媒体库和依赖版权，无返回值
+build() {
+  cd "$srcdir/mark-shot"
+  bash scripts/packaging/build_linux.sh
+}
+
+# 【原生发布】【安装方法】无传参，按 pkgdir 生成完整原生安装树，无返回值
+package() {
+  cd "$srcdir/mark-shot"
+  python scripts/packaging/install_linux.py --destination "$pkgdir" --source-sha "$_commit"
+}

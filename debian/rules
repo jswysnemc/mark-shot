@@ -1,0 +1,32 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+export CARGO_TARGET_DIR = $(CURDIR)/target
+export CARGO_NET_OFFLINE = true
+# 【原生打包】【系统工具链】Launchpad 只使用发行版 rustc，不调用联网安装工具
+
+%:
+	dh $@ --buildsystem=none
+
+override_dh_auto_build:
+	bash scripts/packaging/build_linux.sh --offline
+
+override_dh_auto_test:
+	CARGO_HOME="$(CARGO_HOME)" cargo test --workspace --locked --offline -j 2 \
+		--config 'source.crates-io.replace-with="vendored-sources"' \
+		--config 'source.vendored-sources.directory="$(CURDIR)/vendor"'
+
+override_dh_auto_install:
+	python3 scripts/packaging/install_linux.py --destination debian/mark-shot \
+		--source-sha "$$(cat debian/source-commit)" --licenses debian/dependency-licenses
+
+# 【原生打包】【来源校验】第三方 Cargo.toml.orig 必须保留，清理时不改变 vendor 内容
+override_dh_auto_clean:
+	rm -rf target debian/cargo-home
+
+override_dh_clean:
+	dh_clean -Xvendor/ -Xmedia/
+
+override_dh_shlibdeps:
+	dh_shlibdeps -- -ldebian/mark-shot/usr/lib/mark-shot/media

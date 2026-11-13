@@ -73,6 +73,8 @@ OCR 翻译窗口已接入目标语言、响应式分栏、独立译文编辑与�
 
 ## 构建
 
+多平台构建、各格式发行包、AUR 与 PPA 入口见 [原生构建与发布工作流](docs/native-packaging-workflows.md)。
+
 Linux 构建需要 Rust 1.95 或更新版本，以及 Wayland、xkbcommon、PipeWire、Fontconfig 开发库。文字系统匹配使用
 Fontconfig 提供的 `fc-match`；缺少该工具时使用已加载字体回退，不能保证与原版字体一致。OCR 依赖的
 最低编译器版本为 1.95，当前使用 Rust 1.98 验证。

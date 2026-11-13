@@ -1,0 +1,6 @@
+#!/bin/sh
+# 【原生打包】【AppImage启动】保留实际程序目录，使媒体库按程序路径解析
+set -eu
+base=${APPDIR:-$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)}
+export LD_LIBRARY_PATH="$base/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+exec "$base/usr/lib/mark-shot/mark-shot" "$@"

@@ -4,7 +4,8 @@
 param(
     [Parameter(Mandatory)]
     [ValidatePattern('^[0-9a-fA-F]{40}$')]
-    [string]$SourceSha
+    [string]$SourceSha,
+    [switch]$Sign
 )
 
 Set-StrictMode -Version Latest
@@ -51,6 +52,7 @@ The media subdirectory includes the in-process GIF/MKV shared library, notices a
 Windows system DLLs are supplied by the OS; required MSVC CRT DLLs are app-local.
 This is a CI build artifact, not a release or proof of full Windows desktop compatibility.
 '@ | Set-Content (Join-Path $package 'BUILD-NOTES.txt') -Encoding utf8NoBOM
+    if ($Sign) { & (Join-Path $PSScriptRoot 'windows-sign-artifact.ps1') -Path $package }
     Invoke-WindowsHelp -PackageDirectory $package -OutputPath (Join-Path $package 'windows-help.txt')
     # 清单覆盖包内每个文件（不包含清单本身），另对最终 ZIP 计算外部 SHA256。
     $hashes = foreach ($file in (Get-ChildItem $package -File -Recurse | Sort-Object FullName)) {

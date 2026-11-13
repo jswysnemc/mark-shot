@@ -1,0 +1,115 @@
+name: Publish native source package to PPA
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: Official stable native tag, for example native-v0.2.0
+        required: true
+        type: string
+      ppa_revision:
+        description: PPA rebuild number
+        default: '1'
+        type: string
+      checkout_ref:
+        description: Optional native source reference for artifact-only verification
+        type: string
+        default: ''
+      publish:
+        description: Sign and upload to the configured production PPA
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: native-ppa-publish
+  cancel-in-progress: false
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  DEBIAN_FRONTEND: noninteractive
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    container: ubuntu:26.04
+    environment: ppa-production
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+
+      - name: Bootstrap source tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates curl python3 devscripts equivs lintian
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install declared source build dependencies
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          mk-build-deps --install --remove --tool 'apt-get --no-install-recommends -y' debian/control
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.99.1'
+      - name: Install fixed vendoring tool
+        run: cargo install --locked cargo-vendor-filterer@0.5.18
+
+      - name: Validate stable native source and official release
+        id: release
+        env:
+          NATIVE_TAG: ${{ inputs.upstream_tag }}
+          PPA_REVISION: ${{ inputs.ppa_revision }}
+          PUBLISH: ${{ inputs.publish }}
+          MANUAL_REF: ${{ inputs.checkout_ref || github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$NATIVE_TAG" =~ ^native-v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$PPA_REVISION" =~ ^[1-9][0-9]*$ ]]
+          arguments=()
+          source_ref="$MANUAL_REF"
+          if [[ "$PUBLISH" == true ]]; then
+            arguments=(--publish)
+            source_ref="$NATIVE_TAG"
+            apt-get install -y --no-install-recommends gh gnupg dput
+            gh release view "$NATIVE_TAG" --json tagName,isDraft,isPrerelease > "$RUNNER_TEMP/release.json"
+            python3 -c 'import json, os; r=json.load(open(os.environ["RUNNER_TEMP"]+"/release.json")); assert r["tagName"] == os.environ["NATIVE_TAG"] and not r["isDraft"] and not r["isPrerelease"]'
+          fi
+          python3 scripts/packaging/release_context.py --tag "$NATIVE_TAG" --ref "$source_ref" "${arguments[@]}"
+      - name: Prepare and build offline source package
+        id: source
+        env:
+          PACKAGE_VERSION: ${{ steps.release.outputs.version }}
+          SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+          PPA_REVISION: ${{ inputs.ppa_revision }}
+        run: |
+          python3 scripts/packaging/prepare_source.py --format debian --version "$PACKAGE_VERSION" --source-sha "$SOURCE_SHA" --revision "0ppa$PPA_REVISION~resolute1" --output "$RUNNER_TEMP/ppa-source" > "$RUNNER_TEMP/source-context"
+          cat "$RUNNER_TEMP/source-context"
+          source_root=$(sed -n 's/^source_root=//p' "$RUNNER_TEMP/source-context")
+          (cd "$source_root"; dpkg-buildpackage -S -sa -us -uc)
+          lintian --display-info --pedantic --fail-on error "$RUNNER_TEMP/ppa-source/"*.changes
+      - name: Sign and verify production upload
+        if: inputs.publish
+        env:
+          DEBIAN_VERSION: ${{ steps.source.outputs.debian_version }}
+          LAUNCHPAD_GPG_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_GPG_PRIVATE_KEY }}
+          LAUNCHPAD_GPG_PASSPHRASE: ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE }}
+          PPA_TARGET: ${{ vars.PPA_TARGET }}
+        run: |
+          [[ "$PPA_TARGET" =~ ^ppa:[A-Za-z0-9_-]+/[A-Za-z0-9_-]+$ ]]
+          bash scripts/packaging/sign_ppa.sh "$RUNNER_TEMP/ppa-source/mark-shot_${DEBIAN_VERSION}_source.changes"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-ppa-source
+          path: |
+            ${{ runner.temp }}/ppa-source/*.dsc
+            ${{ runner.temp }}/ppa-source/*.tar.*
+            ${{ runner.temp }}/ppa-source/*.changes
+            ${{ runner.temp }}/ppa-source/*.buildinfo
+          if-no-files-found: error
+      - name: Upload signed source to Launchpad
+        if: inputs.publish
+        env:
+          PPA_TARGET: ${{ vars.PPA_TARGET }}
+          DEBIAN_VERSION: ${{ steps.source.outputs.debian_version }}
+        run: dput "$PPA_TARGET" "$RUNNER_TEMP/ppa-source/mark-shot_${DEBIAN_VERSION}_source.changes"

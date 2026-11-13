@@ -1,0 +1,97 @@
+name: Release native Flatpak
+
+on:
+  push:
+    tags: ['native-v*']
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Native version tag, for example native-v0.2.0
+        required: true
+        type: string
+      checkout_ref:
+        description: Optional source reference for artifact-only verification
+        type: string
+        default: ''
+      upload_to_release:
+        description: Publish manual-run assets only after verifying the exact native tag
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: release-flatpak-${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+jobs:
+  context:
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'native-v')
+    uses: ./.github/workflows/native-release-context.yml
+    with:
+      tag: ${{ inputs.tag || '' }}
+      checkout_ref: ${{ inputs.checkout_ref || '' }}
+      publish: ${{ inputs.upload_to_release || false }}
+
+  packages:
+    needs: context
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.context.outputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder desktop-file-utils appstream
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.99.1'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: flatpak-vendor
+      - name: Install fixed vendoring tool
+        run: cargo install --locked cargo-vendor-filterer@0.5.18
+      - name: Build and verify offline Flatpak
+        env:
+          PACKAGE_VERSION: ${{ needs.context.outputs.version }}
+          SOURCE_SHA: ${{ needs.context.outputs.source_sha }}
+        run: python3 scripts/packaging/package_flatpak.py --version "$PACKAGE_VERSION" --source-sha "$SOURCE_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-flatpak-x86_64
+          path: |
+            target/packages/*.flatpak
+            target/packages/*.sha256
+            target/packages/*.json
+          if-no-files-found: error
+
+  publish:
+    needs: [context, packages]
+    if: needs.context.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.context.outputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          merge-multiple: true
+          path: target/publish-assets
+      - name: Publish only verified immutable assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NATIVE_TAG: ${{ needs.context.outputs.tag }}
+          SOURCE_SHA: ${{ needs.context.outputs.source_sha }}
+        run: python3 scripts/packaging/publish_assets.py --directory target/publish-assets --tag "$NATIVE_TAG" --source-sha "$SOURCE_SHA"

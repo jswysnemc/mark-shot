@@ -1,0 +1,187 @@
+"""【原生发布】【源码测试】验证原生标签隔离、固定提交及 Debian 离线组件的来源"""
+
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+import unittest
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts/packaging"))
+from prepare_aur import prepare as prepare_aur
+from prepare_source import prepare
+from release_context import resolve
+
+
+def repository(directory):
+    """【原生发布】【仓库样本】在 directory 创建最小原生提交和标签，返回提交摘要"""
+    directory.mkdir()
+    shutil.copytree(ROOT / "debian", directory / "debian")
+    (directory / "packaging").mkdir()
+    (directory / "packaging/placeholder").write_text("source\n")
+    (directory / "Cargo.toml").write_text(
+        '[package]\nname="mark-shot"\nversion="0.2.0"\n[features]\nocr-dynamic=[]\n[dependencies]\nshot-media={path="crates/shot-media"}\n'
+    )
+    (directory / "Cargo.lock").write_text("version=4\n")
+    subprocess.run(["git", "init", "-q", str(directory)], check=True)
+    subprocess.run(["git", "-C", str(directory), "add", "."], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(directory),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-qm",
+            "test: native source",
+        ],
+        check=True,
+    )
+    commit = subprocess.check_output(
+        ["git", "-C", str(directory), "rev-parse", "HEAD"], text=True
+    ).strip()
+    subprocess.run(["git", "-C", str(directory), "tag", "native-v0.2.0"], check=True)
+    return commit
+
+
+class ReleaseSources(unittest.TestCase):
+    def test_only_native_tags_and_matching_versions(self):
+        """【原生发布】【边界测试】无传参，拒绝 Qt 标签、错误版本及无效引用，无返回值"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "repo"
+            commit = repository(root)
+            context = resolve(root, "native-v0.2.0", commit, publish=True)
+            self.assertEqual(context.commit, commit)
+            self.assertTrue(context.publish)
+            for tag in ("v0.2.0", "native-v0.3.0", "native-v../../bad"):
+                with self.assertRaises(ValueError):
+                    resolve(root, tag, commit)
+            with self.assertRaises(ValueError):
+                resolve(root, "native-v0.2.0", "HEAD;ls")
+            (root / "change").write_text("new source")
+            subprocess.run(["git", "-C", str(root), "add", "change"], check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.com",
+                    "commit",
+                    "-qm",
+                    "test: later source",
+                ],
+                check=True,
+            )
+            with self.assertRaises(ValueError):
+                resolve(root, "native-v0.2.0", "HEAD", publish=True)
+
+    def test_qt_source_is_rejected(self):
+        """【原生发布】【源码测试】无传参，拒绝具有 Cargo.toml 但没有原生模块的提交，无返回值"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "repo"
+            repository(root)
+            (root / "Cargo.toml").write_text(
+                '[package]\nname="mark-shot"\nversion="0.2.0"\n'
+            )
+            subprocess.run(["git", "-C", str(root), "add", "Cargo.toml"], check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.com",
+                    "commit",
+                    "-qm",
+                    "test: Qt source",
+                ],
+                check=True,
+            )
+            with self.assertRaises(ValueError):
+                resolve(root, "native-v0.2.0", "HEAD")
+
+    def test_debian_components_and_source_reconstruction(self):
+        """【原生源码】【组件测试】无传参，验证上游、vendor 和媒体组件可由 dpkg-source 重建，无返回值"""
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            root = directory / "repo"
+            commit = repository(root)
+            original_run = subprocess.run
+
+            def vendor(command, **kwargs):
+                """【原生源码】【依赖样本】按 command 模拟外部依赖取得，其他命令使用 kwargs 原样执行，返回结果"""
+                if str(command[1]).endswith("vendor_sources.sh"):
+                    source = Path(command[2])
+                    for name in ("vendor", "media", "packaging/licenses"):
+                        (source / name).mkdir(parents=True)
+                    (source / "vendor/test.rs").write_text("fn main() {}\n")
+                    (source / "media/SOURCE-SHA256SUMS").write_text("source manifest\n")
+                    (source / "packaging/licenses/DEPENDENCIES.txt").write_text(
+                        "dependency licenses\n"
+                    )
+                    return subprocess.CompletedProcess(command, 0)
+                return original_run(command, **kwargs)
+
+            with patch("prepare_source.subprocess.run", side_effect=vendor):
+                result = prepare(root, commit, "0.2.0", directory / "output", "debian")
+            source = result["source_root"]
+            self.assertFalse((source / "SOURCE-COMMIT").exists())
+            self.assertEqual(
+                (source / "debian/source-commit").read_text().strip(), commit
+            )
+            self.assertTrue(
+                (source / "debian/dependency-licenses/DEPENDENCIES.txt").is_file()
+            )
+            for component in ("vendor", "media"):
+                with tarfile.open(
+                    directory / f"output/mark-shot_0.2.0.orig-{component}.tar.xz"
+                ) as stream:
+                    self.assertEqual(stream.getmembers()[0].name, component)
+            if shutil.which("dpkg-source"):
+                subprocess.run(
+                    ["dpkg-source", "-b", str(source)],
+                    cwd=directory / "output",
+                    check=True,
+                    capture_output=True,
+                )
+                reconstructed = directory / "reconstructed"
+                subprocess.run(
+                    [
+                        "dpkg-source",
+                        "--no-check",
+                        "-x",
+                        str(directory / "output/mark-shot_0.2.0-1.dsc"),
+                        str(reconstructed),
+                    ],
+                    check=True,
+                    capture_output=True,
+                )
+                self.assertTrue((reconstructed / "vendor/test.rs").is_file())
+                self.assertTrue((reconstructed / "media/SOURCE-SHA256SUMS").is_file())
+
+    def test_aur_template_is_pinned_and_validated(self):
+        """【原生发布】【AUR测试】无传参，检查固定提交、版本替换和非法修订号拦截，无返回值"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "repo"
+            repository(root)
+            context = resolve(root, "native-v0.2.0", "HEAD")
+            result = prepare_aur(ROOT, context, Path(temporary) / "aur")
+            self.assertIn(f"_commit={context.commit}", result.read_text())
+            self.assertNotIn("@pkgver@", result.read_text())
+            with self.assertRaises(ValueError):
+                prepare_aur(ROOT, context, Path(temporary) / "bad", revision="1;ls")
+
+
+if __name__ == "__main__":
+    unittest.main()

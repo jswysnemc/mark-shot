@@ -1,0 +1,42 @@
+app-id: io.github.jswysnemc.MarkShot
+branch: stable
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: mark-shot
+
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --device=dri
+  - --filesystem=xdg-pictures
+  - --filesystem=xdg-download
+  - --talk-name=org.freedesktop.Notifications
+  - --own-name=org.kde.StatusNotifierItem-*
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=com.canonical.AppMenu.Registrar
+  - --talk-name=org.freedesktop.portal.Desktop
+  - --talk-name=org.kde.KWin.ScreenShot2
+
+modules:
+  - name: mark-shot
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/mark-shot/cargo-home
+        CARGO_NET_OFFLINE: 'true'
+        # 【原生打包】【沙箱工具链】SDK 提供 rustc，禁止 rustup 尝试联网安装固定版本
+        RUSTUP_TOOLCHAIN: stable
+    build-commands:
+      - bash scripts/packaging/build_linux.sh --offline
+      - python3 scripts/packaging/install_linux.py --destination / --prefix /app --source-sha "$(cat SOURCE-COMMIT)" --licenses packaging/licenses
+    sources:
+      # 【原生打包】【离线来源】工作流将此路径替换为固定提交生成的完整源码归档
+      - type: archive
+        path: mark-shot-source.tar.xz

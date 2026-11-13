@@ -9,6 +9,11 @@ on:
     tags:
       - 'native-v*'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      checkout_ref:
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -25,8 +30,16 @@ env:
 
 jobs:
   linux:
-    name: Linux Wayland x86_64
-    runs-on: ubuntu-24.04
+    name: Linux Wayland ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
     env:
       XDG_CONFIG_HOME: ${{ github.workspace }}/target/ci-private/config
       XDG_DATA_HOME: ${{ github.workspace }}/target/ci-private/data
@@ -36,6 +49,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
+
+      - name: Record actual source identity
+        run: echo "NATIVE_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Install native dependencies
         run: |
@@ -83,13 +101,24 @@ jobs:
       - name: Check dynamic and bundled OCR targets
         run: |
           cargo clippy --workspace --all-targets --locked -j 2 -- -D warnings
-          cargo clippy --workspace --all-targets --no-default-features --features ocr-gpu --locked -j 2 -- -D warnings
+          if [[ "$(uname -m)" == x86_64 ]]; then
+            cargo clippy --workspace --all-targets --no-default-features --features ocr-gpu --locked -j 2 -- -D warnings
+          fi
 
       - name: Test Python verification tools
         run: uv run --python 3.14 --with pillow --with numpy python -m unittest discover -s scripts -p 'test_*.py'
 
       - name: Check verification tool imports
         run: uv run --with ruff ruff check --select F scripts
+
+      - name: Test package contracts and migrated workflow coverage
+        run: |
+          uv run --with pyyaml python -m unittest discover -s tests/packaging -v
+          uv run --with ruff ruff check --select F scripts/packaging tests/packaging
+          uv run --with ruff ruff format --check scripts/packaging tests/packaging
+
+      - name: Validate workflow expressions and packaging scripts
+        run: bash scripts/packaging/check_workflows.sh
 
       - name: Compile native release
         run: cargo build --release --locked -j 2
@@ -111,34 +140,8 @@ jobs:
             exit 1
           fi
 
-      - name: Collect dependency licenses
-        run: |
-          python3 scripts/ci-download.py https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.3/cargo-about-0.9.3-x86_64-unknown-linux-musl.tar.gz target/cargo-about.tar.gz 3ad1e94ea1e63d69d1961f4fb15ccbbe9575d906111f96d2cb4dce6df48f71b4
-          printf '%s  %s\n' '3ad1e94ea1e63d69d1961f4fb15ccbbe9575d906111f96d2cb4dce6df48f71b4' 'target/cargo-about.tar.gz' | sha256sum --check
-          mkdir -p target/cargo-about
-          tar -xzf target/cargo-about.tar.gz --strip-components=1 -C target/cargo-about
-          target/cargo-about/cargo-about generate --locked --workspace --target x86_64-unknown-linux-gnu --fail --config release/about.toml --output-file target/native-license-notices.txt release/license-notices.hbs
-
-      - name: Collect native runtime notices
-        run: |
-          cargo metadata --locked --format-version 1 > target/native-metadata.json
-          python3 - <<'PY'
-          import csv
-          import json
-          from pathlib import Path
-          packages = json.loads(Path("target/native-metadata.json").read_text())["packages"]
-          manifest = Path(next(item["manifest_path"] for item in packages if item["name"] == "ort-sys"))
-          table = manifest.parent / "build/download/dist.tsv"
-          with table.open() as source:
-              rows = [row for row in csv.DictReader(source, delimiter="\t") if row["target"] == "x86_64-unknown-linux-gnu" and row["feature_set"] == "none"]
-          assert len(rows) == 1, "ambiguous native runtime distribution"
-          assert rows[0]["url"] == "https://cdn.pyke.io/0/pyke:ort-rs/ms@1.28.0/x86_64-unknown-linux-gnu.tar.lzma2", "runtime version changed"
-          assert rows[0]["sha256_hash"] == "e454f710f8a49f53aa5b4ff51e3454ae1835777e431c6c35c5255ce6f205fd68", "runtime distribution changed"
-          PY
-          mkdir -p target/native-runtime-notices
-          curl --retry 4 --connect-timeout 20 --max-time 180 -fsSLo target/native-runtime-notices/LICENSE-ONNXRUNTIME.txt https://raw.githubusercontent.com/microsoft/onnxruntime/da9b5e364c465de65c49d91e696cd6485270757f/LICENSE
-          curl --retry 4 --connect-timeout 20 --max-time 180 -fsSLo target/native-runtime-notices/NOTICES-ONNXRUNTIME.txt https://raw.githubusercontent.com/microsoft/onnxruntime/da9b5e364c465de65c49d91e696cd6485270757f/ThirdPartyNotices.txt
-          printf '%s  %s\n' '2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c' 'target/native-runtime-notices/LICENSE-ONNXRUNTIME.txt' '0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2' 'target/native-runtime-notices/NOTICES-ONNXRUNTIME.txt' | sha256sum --check
+      - name: Collect dependency and native runtime notices
+        run: bash scripts/packaging/collect_licenses.sh
 
       - name: Package native build
         run: |
@@ -152,20 +155,20 @@ jobs:
           cp LICENSE-MIT LICENSE-APACHE README.md "$package/"
           cp assets/fonts/LICENSE-OFL.txt assets/fonts/LICENSE-NUMERALS.txt "$package/licenses/"
           cp assets/icons/mark-shot/LICENSE "$package/licenses/LICENSE-ICONS.txt"
-          cp target/native-license-notices.txt "$package/licenses/DEPENDENCIES.txt"
-          cp target/native-runtime-notices/*.txt "$package/licenses/"
+          cp target/packaging-licenses/DEPENDENCIES.txt "$package/licenses/DEPENDENCIES.txt"
+          cp target/packaging-licenses/*.txt "$package/licenses/"
           cp -a docs/. "$package/docs/"
           cp target/native-help.txt target/native-linkage.txt "$package/"
-          printf '%s\n' "$GITHUB_SHA" > "$package/SOURCE-COMMIT"
-          tar -C "$staging" -czf target/mark-shot-native-linux-x86_64.tar.gz mark-shot-native
+          printf '%s\n' "$NATIVE_SOURCE_SHA" > "$package/SOURCE-COMMIT"
+          tar -C "$staging" -czf target/mark-shot-native-linux-${{ matrix.arch }}.tar.gz mark-shot-native
           cd target
-          sha256sum mark-shot-native-linux-x86_64.tar.gz > mark-shot-native-linux-x86_64.tar.gz.sha256
+          sha256sum mark-shot-native-linux-${{ matrix.arch }}.tar.gz > mark-shot-native-linux-${{ matrix.arch }}.tar.gz.sha256
 
       - name: Upload native build
         uses: actions/upload-artifact@v4
         with:
-          name: mark-shot-native-linux-x86_64
+          name: mark-shot-native-linux-${{ matrix.arch }}
           path: |
-            target/mark-shot-native-linux-x86_64.tar.gz
-            target/mark-shot-native-linux-x86_64.tar.gz.sha256
+            target/mark-shot-native-linux-${{ matrix.arch }}.tar.gz
+            target/mark-shot-native-linux-${{ matrix.arch }}.tar.gz.sha256
           if-no-files-found: error

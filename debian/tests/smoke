@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# 【原生打包】【安装验证】确认桌面资源、程序入口、媒体库与版权随软件包一起安装
+set -euo pipefail
+mark-shot --version
+mark-shot --help
+test -L /usr/bin/mark-shot
+test -f /usr/lib/mark-shot/media/libmarkshot-media.so
+test -f /usr/lib/mark-shot/media/MEDIA-SOURCES.tar.xz
+test -f /usr/share/licenses/mark-shot/DEPENDENCIES.txt
+desktop-file-validate /usr/share/applications/io.github.jswysnemc.MarkShot.desktop
+python3 -c 'import ctypes; ctypes.CDLL("/usr/lib/mark-shot/media/libmarkshot-media.so")'
+if ldd /usr/lib/mark-shot/mark-shot /usr/lib/mark-shot/media/libmarkshot-media.so | grep -Ei 'not found|libQt'; then
+  exit 1
+fi

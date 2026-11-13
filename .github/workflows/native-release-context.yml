@@ -1,0 +1,56 @@
+name: Native release context
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        default: ''
+      checkout_ref:
+        type: string
+        default: ''
+      publish:
+        type: boolean
+        default: false
+    outputs:
+      tag:
+        value: ${{ jobs.context.outputs.tag }}
+      version:
+        value: ${{ jobs.context.outputs.version }}
+      source_sha:
+        value: ${{ jobs.context.outputs.source_sha }}
+      publish:
+        value: ${{ jobs.context.outputs.publish }}
+permissions:
+  contents: read
+jobs:
+  context:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.context.outputs.tag }}
+      version: ${{ steps.context.outputs.version }}
+      source_sha: ${{ steps.context.outputs.source_sha }}
+      publish: ${{ steps.context.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate native source and publication boundary
+        id: context
+        env:
+          NATIVE_TAG: ${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+          SOURCE_REF: ${{ inputs.checkout_ref || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          PUBLISH_REQUESTED: ${{ inputs.publish }}
+          MANUAL_REF: ${{ inputs.checkout_ref }}
+        shell: bash
+        run: |
+          arguments=()
+          if [[ "$EVENT_NAME" == push || "$EVENT_NAME" == release ]]; then
+            SOURCE_REF="$NATIVE_TAG"
+            arguments=(--publish)
+          elif [[ "$PUBLISH_REQUESTED" == true ]]; then
+            SOURCE_REF="${MANUAL_REF:-$NATIVE_TAG}"
+            arguments=(--publish)
+          fi
+          python3 scripts/packaging/release_context.py --tag "$NATIVE_TAG" --ref "$SOURCE_REF" "${arguments[@]}"

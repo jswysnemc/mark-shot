@@ -6,7 +6,7 @@ task_root="$(cd "$(dirname "$0")/../.." && pwd)"
 build_root="${MARK_SHOT_MEDIA_BUILD:-$task_root/target/media-build-$platform}"
 destination="${MARK_SHOT_MEDIA_DIST:-$task_root/target/media-$platform}"
 prefix="$build_root/prefix"
-sources="$build_root/sources"
+sources="${MARK_SHOT_MEDIA_SOURCES:-$build_root/sources}"
 jobs="${MARK_SHOT_BUILD_JOBS:-2}"
 mkdir -p "$sources" "$prefix" "$destination/licenses" "$build_root/ffmpeg"
 source_bundle=false
@@ -30,15 +30,15 @@ fi
 flags=(--disable-debug --disable-doc --disable-autodetect --disable-everything --disable-programs
   --disable-network --disable-avdevice --disable-shared --enable-static --enable-pic
   --enable-avfilter --enable-swscale --enable-swresample
-  --enable-decoder=h264,aac --enable-parser=h264,aac --enable-encoder=gif,aac
-  --enable-demuxer=mov,matroska --enable-muxer=mp4,matroska,gif
-  --enable-protocol=file --enable-bsf=extract_extradata,h264_mp4toannexb
-  --enable-filter=buffer,buffersink,scale,fps,format,split,palettegen,paletteuse
+  "--enable-decoder=h264,aac" "--enable-parser=h264,aac" "--enable-encoder=gif,aac"
+  "--enable-demuxer=mov,matroska" "--enable-muxer=mp4,matroska,gif"
+  --enable-protocol=file "--enable-bsf=extract_extradata,h264_mp4toannexb"
+  "--enable-filter=buffer,buffersink,scale,fps,format,split,palettegen,paletteuse"
   --prefix="$prefix" --pkg-config-flags=--static)
 compiler=cc
-stripper=strip
+stripper="strip"
 library=libmarkshot-media.so
-link_flags=(-Wl,-z,defs -Wl,-Bsymbolic -Wl,--exclude-libs,ALL)
+link_flags=("-Wl,-z,defs" "-Wl,-Bsymbolic" "-Wl,--exclude-libs,ALL")
 native_libs=()
 if [[ "$platform" == linux ]]; then
   native_libs=(-lgbm -ldl)
@@ -47,8 +47,14 @@ if [[ "$platform" == linux ]]; then
     "$build_root/openh264.tar.gz" 558544ad358283a7ab2930d69a9ceddf913f4a51ee9bf1bfb9e377322af81a69
   tar -xf "$build_root/openh264.tar.gz" -C "$sources"
   fi
-  make -C "$sources/openh264-2.6.0" -j"$jobs" libraries BUILDTYPE=Release ENABLEPIC=Yes
-  make -C "$sources/openh264-2.6.0" install-static PREFIX="$prefix"
+  # 【媒体构建】【架构选择】OpenH264 使用 arm64 名称，Linux 主机通常返回 aarch64
+  case "$(uname -m)" in
+    x86_64) codec_arch=x86_64 ;;
+    aarch64|arm64) codec_arch=arm64 ;;
+    *) printf 'Unsupported Linux media architecture\n' >&2; exit 1 ;;
+  esac
+  make -C "$sources/openh264-2.6.0" -j"$jobs" libraries ARCH="$codec_arch" BUILDTYPE=Release ENABLEPIC=Yes
+  make -C "$sources/openh264-2.6.0" install-static ARCH="$codec_arch" PREFIX="$prefix"
   cp "$sources/openh264-2.6.0/LICENSE" "$destination/licenses/OPENH264.txt"
   if [[ "$source_bundle" == false ]]; then
   fetch https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n13.0.19.0.tar.gz \
@@ -56,14 +62,14 @@ if [[ "$platform" == linux ]]; then
   tar -xf "$build_root/nv-codec-headers.tar.gz" -C "$sources"
   fi
   make -C "$sources/nv-codec-headers-n13.0.19.0" PREFIX="$prefix" install
-  flags+=(--enable-libopenh264 --enable-encoder=libopenh264,h264_vaapi,h264_nvenc --enable-vaapi
+  flags+=(--enable-libopenh264 "--enable-encoder=libopenh264,h264_vaapi,h264_nvenc" --enable-vaapi
     --enable-ffnvcodec --enable-nvenc --enable-cuda)
 elif [[ "$platform" == windows ]]; then
   compiler=x86_64-w64-mingw32-gcc
   stripper=x86_64-w64-mingw32-strip
   library=markshot-media.dll
   flags+=(--enable-cross-compile --target-os=mingw32 --arch=x86_64 --cross-prefix=x86_64-w64-mingw32- --pkg-config=pkg-config)
-  link_flags=(-static-libgcc -Wl,--exclude-all-symbols)
+  link_flags=(-static-libgcc "-Wl,--exclude-all-symbols")
 else
   echo "Unsupported media platform: $platform" >&2
   exit 1
@@ -103,6 +109,7 @@ else
     tar -xf "$build_root/nv-codec-headers.tar.gz" -C "$bundle_sources"
   fi
 fi
+# shellcheck disable=SC2094
 (cd "$bundle_sources"; find . -type f ! -name SOURCE-SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SOURCE-SHA256SUMS)
 printf 'Build from this directory: bash scripts/media/build-libraries.sh %s\nRequired tools: C/C++ compiler, make, nasm, pkg-config, Python 3. Linux also needs libva/libdrm/libgbm/PulseAudio development headers (libva-dev libdrm-dev libgbm-dev libpulse-dev on Ubuntu). Windows cross build needs MinGW-w64.\nOpenH264 test media (res/) omitted; all library source and build files are included unchanged. Full upstream URL and digest are in the build script.\n' "$platform" > "$bundle/BUILD.txt"
 tar -cJf "$destination/MEDIA-SOURCES.tar.xz" -C "$bundle" .

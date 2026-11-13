@@ -6,8 +6,20 @@ on:
       - rewrite/native-wayland
       - feat/native-recording
       - feat/native-barcode-scanning
-  pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      checkout_ref:
+        type: string
+        default: ''
+      sign:
+        type: boolean
+        default: false
+    secrets:
+      WINDOWS_CODESIGN_CERTIFICATE_BASE64:
+        required: false
+      WINDOWS_CODESIGN_CERTIFICATE_PASSWORD:
+        required: false
 
 permissions:
   contents: read
@@ -29,6 +41,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
       - name: Install cross compiler
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 nasm make pkg-config
       - name: Build minimal media library with sources
@@ -56,6 +70,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
+
+      - name: Record actual source identity
+        run: '"NATIVE_SOURCE_SHA=$((& git rev-parse HEAD).Trim())" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8'
 
       - name: Configure MSVC x64 tools
         uses: ilammy/msvc-dev-cmd@v1
@@ -125,7 +144,12 @@ jobs:
         run: cargo build --release --bin mark-shot --target x86_64-pc-windows-msvc --locked -j 2
 
       - name: Package and verify standalone build
-        run: ./scripts/windows-package.ps1 -SourceSha $env:GITHUB_SHA
+        env:
+          SIGN_PACKAGE: ${{ inputs.sign || false }}
+          WINDOWS_CODESIGN_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CODESIGN_CERTIFICATE_BASE64 }}
+          WINDOWS_CODESIGN_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_CERTIFICATE_PASSWORD }}
+          WINDOWS_CODESIGN_TIMESTAMP_URL: ${{ vars.WINDOWS_CODESIGN_TIMESTAMP_URL }}
+        run: ./scripts/windows-package.ps1 -SourceSha $env:NATIVE_SOURCE_SHA -Sign:($env:SIGN_PACKAGE -eq 'true')
 
       - name: Upload Windows build (not a release)
         uses: actions/upload-artifact@v4

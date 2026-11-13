@@ -1,0 +1,152 @@
+name: Native Linux package
+on:
+  workflow_call:
+    inputs:
+      kind:
+        required: true
+        type: string
+      arch:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+      image:
+        type: string
+        default: ''
+      target:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      source_sha:
+        required: true
+        type: string
+permissions:
+  contents: read
+env:
+  CARGO_TERM_COLOR: always
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+jobs:
+  package:
+    runs-on: ${{ inputs.runner }}
+    container: ${{ inputs.image }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    env:
+      PACKAGE_KIND: ${{ inputs.kind }}
+      PACKAGE_ARCH: ${{ inputs.arch }}
+      PACKAGE_VERSION: ${{ inputs.version }}
+      PACKAGE_TARGET: ${{ inputs.target }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
+    steps:
+      - name: Bootstrap container checkout tools
+        if: inputs.image != ''
+        run: |
+          source /etc/os-release
+          case "$ID" in
+            debian|ubuntu) apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl python3 ;;
+            fedora) dnf -y --setopt=install_weak_deps=False install git ca-certificates curl python3 ;;
+            arch) pacman -Syu --noconfirm --needed git ca-certificates curl python ;;
+            *) exit 1 ;;
+          esac
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate build identity
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(uname -m)" = "$PACKAGE_ARCH"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
+      - name: Install native packaging dependencies
+        run: bash scripts/packaging/install_dependencies.sh packaging
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.99.1'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: packaging-${{ inputs.kind }}-${{ inputs.target }}-${{ inputs.arch }}
+      - name: Install source RPM tools
+        if: inputs.kind == 'rpm'
+        run: |
+          dnf -y --setopt=install_weak_deps=False install rust cargo redhat-rpm-config
+          cargo install --locked cargo-vendor-filterer@0.5.18
+      - name: Build complete native application
+        if: inputs.kind != 'rpm'
+        run: bash scripts/packaging/build_linux.sh
+      - name: Stage complete installation
+        if: inputs.kind != 'rpm'
+        run: python3 scripts/packaging/install_linux.py --destination target/package-stage --arch "$PACKAGE_ARCH" --source-sha "$SOURCE_SHA"
+      - name: Build requested package
+        run: |
+          case "$PACKAGE_KIND" in
+            deb) python3 scripts/packaging/package_deb.py --stage target/package-stage --version "$PACKAGE_VERSION" --arch "$PACKAGE_ARCH" --target "$PACKAGE_TARGET" --source-sha "$SOURCE_SHA" ;;
+            pacman|portable) python3 "scripts/packaging/package_$PACKAGE_KIND.py" --stage target/package-stage --version "$PACKAGE_VERSION" --arch "$PACKAGE_ARCH" --source-sha "$SOURCE_SHA" ;;
+            rpm) python3 scripts/packaging/package_rpm.py --version "$PACKAGE_VERSION" --arch "$PACKAGE_ARCH" --source-sha "$SOURCE_SHA" ;;
+            appimage) python3 scripts/packaging/package_appimage.py --stage target/package-stage --version "$PACKAGE_VERSION" --source-sha "$SOURCE_SHA" ;;
+            *) exit 1 ;;
+          esac
+      - name: Verify generated package and installation
+        run: |
+          (cd target/packages; sha256sum --check ./*.sha256)
+          case "$PACKAGE_KIND" in
+            deb)
+              apt-get install -y "$PWD"/target/packages/*.deb
+              apt-get check
+              bash debian/tests/smoke
+              ;;
+            rpm)
+              dnf install -y "$PWD"/target/packages/mark-shot-*."$PACKAGE_ARCH".rpm
+              bash debian/tests/smoke
+              rpm -qp --requires target/packages/*.src.rpm
+              ;;
+            pacman)
+              source /etc/os-release
+              if [[ "$ID" == arch ]]; then
+                pacman -U --noconfirm target/packages/*.pkg.tar.zst
+                bash debian/tests/smoke
+              else
+                mkdir target/pacman-check
+                tar --zstd -xf target/packages/*.pkg.tar.zst -C target/pacman-check
+                target/pacman-check/usr/bin/mark-shot --version
+                target/pacman-check/usr/bin/mark-shot --help
+                test -f target/pacman-check/.PKGINFO
+              fi
+              ;;
+            portable)
+              mkdir target/portable-check
+              tar -xzf target/packages/*.tar.gz -C target/portable-check
+              commands=(target/portable-check/*/mark-shot)
+              test "${#commands[@]}" = 1
+              "${commands[0]}" --version
+              test -f target/portable-check/*/usr/lib/mark-shot/media/MEDIA-SOURCES.tar.xz
+              ;;
+          esac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ inputs.kind }}-${{ inputs.target }}-${{ inputs.arch }}
+          path: |
+            target/packages/*.deb
+            target/packages/*.rpm
+            target/packages/*.pkg.tar.zst
+            target/packages/*.tar.gz
+            target/packages/*.AppImage
+            target/packages/*.sha256
+            target/packages/*.json
+          if-no-files-found: error
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-${{ inputs.kind }}-${{ inputs.target }}-${{ inputs.arch }}
+          path: |
+            target/packaging-*.txt
+            target/packaging-media.log
+            target/packaging-media-evidence/
+          if-no-files-found: ignore

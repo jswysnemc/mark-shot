@@ -1,0 +1,49 @@
+Name:           mark-shot
+Version:        @rpm_version@
+Release:        1%{?dist}
+Summary:        Native screenshot, annotation and recording tool
+License:        MIT AND Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND CC0-1.0 AND CDLA-Permissive-2.0 AND ISC AND MPL-2.0 AND Unicode-3.0 AND Unlicense AND Zlib AND LGPL-2.1-or-later AND OFL-1.1
+URL:            https://github.com/jswysnemc/mark-shot
+Source0:        mark-shot-@upstream@-source.tar.xz
+BuildRequires:  gcc gcc-c++ make clang clang-devel pkgconf-pkg-config python3
+BuildRequires:  rust >= 1.95
+BuildRequires:  cargo >= 1.95
+BuildRequires:  wayland-devel libxkbcommon-devel libxcb-devel pipewire-devel
+BuildRequires:  openssl-devel fontconfig-devel nasm libva-devel libdrm-devel
+BuildRequires:  mesa-libgbm-devel pulseaudio-libs-devel xz
+Requires:       pulseaudio-libs
+Recommends:     xdg-desktop-portal
+Recommends:     google-noto-sans-fonts
+
+%description
+Mark Shot provides native Wayland and X11 screenshot capture, annotation,
+scrolling screenshots, pinned images, local OCR, translation, QR and barcode
+recognition, and recording. The replaceable media library includes its sources.
+
+%prep
+%setup -q -n mark-shot-@upstream@
+
+%build
+export CARGO_NET_OFFLINE=true
+bash scripts/packaging/build_linux.sh --offline
+
+%install
+python3 scripts/packaging/install_linux.py --destination "%{buildroot}" \
+    --source-sha "$(cat SOURCE-COMMIT)" --licenses packaging/licenses
+
+%check
+target/release/mark-shot --version
+
+%files
+%{_bindir}/mark-shot
+/usr/lib/mark-shot/
+%{_datadir}/applications/io.github.jswysnemc.MarkShot.desktop
+%{_datadir}/metainfo/io.github.jswysnemc.MarkShot.metainfo.xml
+%{_datadir}/icons/hicolor/scalable/apps/io.github.jswysnemc.MarkShot.svg
+%{_mandir}/man1/mark-shot.1*
+%license %{_datadir}/licenses/mark-shot/
+%doc %{_datadir}/doc/mark-shot/
+
+%changelog
+* Fri Nov 13 2026 Mark Shot maintainers <snemc@qq.com> - @rpm_version@-1
+- Package the native application with offline Rust and media sources

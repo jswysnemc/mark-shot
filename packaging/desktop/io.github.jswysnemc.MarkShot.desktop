@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Mark Shot
+Comment=Native screenshot, annotation and recording tool
+Comment[zh_CN]=原生截图、标注与录屏工具
+Exec=mark-shot %f
+Icon=io.github.jswysnemc.MarkShot
+Terminal=false
+Categories=Graphics;
+MimeType=image/png;image/jpeg;image/webp;
+StartupNotify=true
+Keywords=screenshot;capture;annotation;recording;

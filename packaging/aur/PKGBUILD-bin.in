@@ -1,0 +1,21 @@
+# 【原生发布】【AUR二进制包】只使用对应原生标签中已经验证的两种架构资产
+pkgname=mark-shot-bin
+pkgver=@pkgver@
+pkgrel=@pkgrel@
+pkgdesc='Native screenshot, annotation and recording tool (prebuilt binary)'
+arch=('x86_64' 'aarch64')
+url='https://github.com/jswysnemc/mark-shot'
+license=('MIT' 'Apache-2.0')
+depends=('glibc' 'fontconfig' 'libxkbcommon' 'libxkbcommon-x11' 'libxcb' 'openssl' 'pipewire' 'libpulse' 'libva' 'libdrm' 'mesa')
+optdepends=('noto-fonts: fallback fonts' 'noto-fonts-cjk: CJK fonts' 'xdg-desktop-portal: portal capture' 'mark-shot: source build if Arch ARM library versions differ')
+provides=("mark-shot=$pkgver")
+conflicts=('mark-shot')
+source_x86_64=("https://github.com/jswysnemc/mark-shot/releases/download/@tag@/mark-shot-bin-@pkgver@-1-x86_64.pkg.tar.zst")
+source_aarch64=("https://github.com/jswysnemc/mark-shot/releases/download/@tag@/mark-shot-bin-@pkgver@-1-aarch64.pkg.tar.zst")
+sha256sums_x86_64=('@sha_x86_64@')
+sha256sums_aarch64=('@sha_aarch64@')
+
+# 【原生发布】【安装方法】无传参，将经摘要校验的 usr 安装树复制到 pkgdir，无返回值
+package() {
+  cp -a "$srcdir/usr" "$pkgdir/"
+}

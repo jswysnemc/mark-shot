@@ -1,0 +1,13 @@
+name: Build native platforms
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    uses: ./.github/workflows/native-build.yml
+  windows:
+    uses: ./.github/workflows/windows-build.yml

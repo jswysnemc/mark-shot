@@ -1,0 +1,73 @@
+name: Debian native source package
+on:
+  push:
+    branches: [main, rewrite/native-wayland]
+    paths: ['debian/**', 'scripts/packaging/**', '.github/workflows/debian-source.yml', 'Cargo.toml', 'Cargo.lock']
+  pull_request:
+    paths: ['debian/**', 'scripts/packaging/**', '.github/workflows/debian-source.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  DEBIAN_FRONTEND: noninteractive
+jobs:
+  resolute:
+    runs-on: ubuntu-24.04
+    container: ubuntu:26.04
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+
+      - name: Bootstrap source tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates curl python3 devscripts equivs lintian
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install declared source build dependencies
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          mk-build-deps --install --remove --tool 'apt-get --no-install-recommends -y' debian/control
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.99.1'
+      - name: Install fixed vendoring tool
+        run: cargo install --locked cargo-vendor-filterer@0.5.18
+
+      - name: Prepare exact offline source components
+        id: source
+        run: |
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
+          python3 scripts/packaging/prepare_source.py --format debian --version "$version" --source-sha "$(git rev-parse HEAD)" --output "$RUNNER_TEMP/native-source"
+      - name: Build source package and reconstruct it
+        env:
+          SOURCE_ROOT: ${{ steps.source.outputs.source_root }}
+          DEBIAN_VERSION: ${{ steps.source.outputs.debian_version }}
+        run: |
+          (cd "$SOURCE_ROOT"; dpkg-buildpackage -S -sa -us -uc)
+          dpkg-source -x "$RUNNER_TEMP/native-source/mark-shot_$DEBIAN_VERSION.dsc" "$RUNNER_TEMP/reconstructed"
+          (cd "$RUNNER_TEMP/reconstructed"; dpkg-buildpackage -b -us -uc)
+      - name: Lint and install reconstructed package
+        run: |
+          for changes in "$RUNNER_TEMP"/native-source/*.changes "$RUNNER_TEMP"/*.changes; do
+            lintian --display-info --pedantic --fail-on error "$changes"
+          done
+          apt-get install -y "$RUNNER_TEMP"/mark-shot_*_amd64.deb desktop-file-utils
+          apt-get check
+          bash debian/tests/smoke
+          test "$(stat -Lc '%a' /usr/bin/mark-shot)" = 755
+          test "$(stat -Lc '%U:%G' /usr/bin/mark-shot)" = root:root
+      - name: Collect source and binary artifacts
+        run: |
+          mkdir -p target/source-artifacts
+          find "$RUNNER_TEMP/native-source" "$RUNNER_TEMP" -maxdepth 1 -type f             \( -name 'mark-shot_*.dsc' -o -name 'mark-shot_*.tar.*' -o -name 'mark-shot_*.changes' -o -name 'mark-shot_*.buildinfo' -o -name 'mark-shot_*.deb' \)             -exec cp {} target/source-artifacts/ \;
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-debian-source-resolute
+          path: target/source-artifacts/
+          if-no-files-found: error

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.jswysnemc.MarkShot</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT OR Apache-2.0</project_license>
+  <name>Mark Shot</name>
+  <summary>Native screenshot, annotation and recording tool</summary>
+  <summary xml:lang="zh-CN">原生截图、标注与录屏工具</summary>
+  <description>
+    <p>Mark Shot captures and annotates screenshots on Wayland and X11. It includes scrolling capture, pinned images, local OCR, translation, QR and barcode recognition, and screen recording.</p>
+    <p xml:lang="zh-CN">Mark Shot 支持 Wayland 与 X11 截图、图像标注、滚动截图、置顶贴图、本地文字识别、翻译、二维码与条形码识别，以及屏幕录制。</p>
+  </description>
+  <launchable type="desktop-id">io.github.jswysnemc.MarkShot.desktop</launchable>
+  <url type="homepage">https://github.com/jswysnemc/mark-shot</url>
+  <url type="bugtracker">https://github.com/jswysnemc/mark-shot/issues</url>
+  <developer id="io.github.jswysnemc"><name>jswysnemc</name></developer>
+  <content_rating type="oars-1.1"/>
+  <releases><release version="0.2.0" type="development" date="2026-11-13"/></releases>
+</component>

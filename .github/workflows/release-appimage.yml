@@ -1,0 +1,105 @@
+name: Release native AppImage
+
+on:
+  push:
+    tags: ['native-v*']
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Native version tag, for example native-v0.2.0
+        required: true
+        type: string
+      checkout_ref:
+        description: Optional source reference for artifact-only verification
+        type: string
+        default: ''
+      upload_to_release:
+        description: Publish manual-run assets only after verifying the exact native tag
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: release-appimage-${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+jobs:
+  context:
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'native-v')
+    uses: ./.github/workflows/native-release-context.yml
+    with:
+      tag: ${{ inputs.tag || '' }}
+      checkout_ref: ${{ inputs.checkout_ref || '' }}
+      publish: ${{ inputs.upload_to_release || false }}
+  packages:
+    needs: context
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+            image: 'debian:12'
+            target: debian12
+    uses: ./.github/workflows/native-linux-package.yml
+    with:
+      kind: appimage
+      arch: ${{ matrix.arch }}
+      runner: ${{ matrix.runner }}
+      image: ${{ matrix.image }}
+      target: ${{ matrix.target }}
+      version: ${{ needs.context.outputs.version }}
+      source_sha: ${{ needs.context.outputs.source_sha }}
+
+  verify-ubuntu2404:
+    needs: packages
+    runs-on: ubuntu-24.04
+    container: ubuntu:24.04
+    steps:
+      - name: Install runtime prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates libfontconfig1 libxkbcommon0 libxkbcommon-x11-0 libxcb1 libpipewire-0.3-0t64 libpulse0 libva2 libdrm2 libgbm1 libssl3t64 python3
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-appimage-debian12-x86_64
+          path: artifacts
+      - name: Verify final AppImage on Ubuntu 24.04
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: |
+          cd artifacts
+          sha256sum --check ./*.sha256
+          chmod +x ./*.AppImage
+          images=(./*.AppImage)
+          test "${#images[@]}" = 1
+          "${images[0]}" --version
+          "${images[0]}" --help
+          "${images[0]}" --appimage-extract
+          python3 -c 'import ctypes; ctypes.CDLL("squashfs-root/usr/lib/mark-shot/media/libmarkshot-media.so")'
+  publish:
+    needs: [context, packages, verify-ubuntu2404]
+    if: needs.context.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.context.outputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          merge-multiple: true
+          path: target/publish-assets
+      - name: Publish only verified immutable assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NATIVE_TAG: ${{ needs.context.outputs.tag }}
+          SOURCE_SHA: ${{ needs.context.outputs.source_sha }}
+        run: python3 scripts/packaging/publish_assets.py --directory target/publish-assets --tag "$NATIVE_TAG" --source-sha "$SOURCE_SHA"
