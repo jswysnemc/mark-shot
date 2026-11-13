@@ -1,13 +1,6 @@
 name: Native Rust Build
 
 on:
-  push:
-    branches:
-      - rewrite/native-wayland
-      - feat/native-recording
-      - feat/native-barcode-scanning
-    tags:
-      - 'native-v*'
   workflow_dispatch:
   workflow_call:
     inputs:

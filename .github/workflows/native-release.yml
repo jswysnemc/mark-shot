@@ -1,76 +1,115 @@
-name: Native Preview Release
+name: Native Release
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - rewrite/native-wayland
-    paths:
-      - '.github/workflows/native-release.yml'
-      - 'release/native-preview*'
-      - 'scripts/native_release*.py'
-      - 'scripts/test_native_release*.py'
+    tags: ['native-v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing native tag to publish or retry
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: native-preview-${{ github.ref }}
+  group: native-release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  context:
+    uses: ./.github/workflows/native-release-context.yml
+    with:
+      tag: ${{ inputs.tag || github.ref_name }}
+      publish: true
+
+  verify:
+    needs: context
+    uses: ./.github/workflows/native-build.yml
+    with:
+      checkout_ref: ${{ needs.context.outputs.source_sha }}
+
+  binaries:
+    needs: context
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-binaries.yml
+    with:
+      tag: ${{ needs.context.outputs.tag }}
+      checkout_ref: ${{ needs.context.outputs.source_sha }}
+    secrets: inherit
+
+  deb:
+    needs: context
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-deb.yml
+    with:
+      tag: ${{ needs.context.outputs.tag }}
+      checkout_ref: ${{ needs.context.outputs.source_sha }}
+
+  rpm:
+    needs: context
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-rpm.yml
+    with:
+      tag: ${{ needs.context.outputs.tag }}
+      checkout_ref: ${{ needs.context.outputs.source_sha }}
+
+  arch:
+    needs: context
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-aur-bin.yml
+    with:
+      tag: ${{ needs.context.outputs.tag }}
+      checkout_ref: ${{ needs.context.outputs.source_sha }}
+
+  appimage:
+    needs: context
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-appimage.yml
+    with:
+      tag: ${{ needs.context.outputs.tag }}
+      checkout_ref: ${{ needs.context.outputs.source_sha }}
+
+  flatpak:
+    needs: context
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-flatpak.yml
+    with:
+      tag: ${{ needs.context.outputs.tag }}
+      checkout_ref: ${{ needs.context.outputs.source_sha }}
+
   publish:
-    name: Publish verified native preview
+    name: Publish complete verified release
+    needs: [context, verify, binaries, deb, rpm, arch, appimage, flatpak]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
-      actions: read
     steps:
-      - name: Checkout publication instructions
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          persist-credentials: false
-          # 【原生发布】【历史说明】完整历史用于恢复已取消跟踪且摘要固定的发布说明
+          ref: ${{ needs.context.outputs.source_sha }}
           fetch-depth: 0
-
-      - name: Test publication validation
-        run: python3 -m unittest discover -s scripts -p 'test_native_release*.py'
-
-      - name: Check whether a preview is requested
-        id: manifest
-        run: |
-          if [ -f release/native-preview-6.json ]; then
-            echo 'prefix=release/native-preview-6' >> "$GITHUB_OUTPUT"
-            echo 'present=true' >> "$GITHUB_OUTPUT"
-          elif [ -f release/native-preview-5.json ]; then
-            echo 'prefix=release/native-preview-5' >> "$GITHUB_OUTPUT"
-            echo 'present=true' >> "$GITHUB_OUTPUT"
-          elif [ -f release/native-preview-4.json ]; then
-            echo 'prefix=release/native-preview-4' >> "$GITHUB_OUTPUT"
-            echo 'present=true' >> "$GITHUB_OUTPUT"
-          elif [ -f release/native-preview-3.json ]; then
-            echo 'prefix=release/native-preview-3' >> "$GITHUB_OUTPUT"
-            echo 'present=true' >> "$GITHUB_OUTPUT"
-          elif [ -f release/native-preview-2.json ]; then
-            echo 'prefix=release/native-preview-2' >> "$GITHUB_OUTPUT"
-            echo 'present=true' >> "$GITHUB_OUTPUT"
-          elif [ -f release/native-preview.json ]; then
-            echo 'prefix=release/native-preview' >> "$GITHUB_OUTPUT"
-            echo 'present=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'present=false' >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Publish immutable verified artifact
-        if: steps.manifest.outputs.present == 'true'
+          persist-credentials: false
+      - name: Test release publication contracts
+        run: python3 -m unittest discover -s tests/packaging -p 'test_release_*.py'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          merge-multiple: true
+          path: target/publish-assets
+      - name: Publish packages and inline checksums
         env:
           GH_TOKEN: ${{ github.token }}
-          PREVIEW_PREFIX: ${{ steps.manifest.outputs.prefix }}
-        run: |
-          python3 scripts/native_release.py \
-            --manifest "$PREVIEW_PREFIX.json" \
-            --notes "$PREVIEW_PREFIX-notes.md" \
-            --verification "$PREVIEW_PREFIX-verification.json"
+          NATIVE_TAG: ${{ needs.context.outputs.tag }}
+          SOURCE_SHA: ${{ needs.context.outputs.source_sha }}
+        run: python3 scripts/packaging/publish_assets.py --directory target/publish-assets --tag "$NATIVE_TAG" --source-sha "$SOURCE_SHA"

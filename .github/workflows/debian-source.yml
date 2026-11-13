@@ -1,7 +1,7 @@
 name: Debian native source package
 on:
   push:
-    branches: [main, rewrite/native-wayland]
+    branches: [main, dev]
     paths: ['debian/**', 'scripts/packaging/**', '.github/workflows/debian-source.yml', 'Cargo.toml', 'Cargo.lock']
   pull_request:
     paths: ['debian/**', 'scripts/packaging/**', '.github/workflows/debian-source.yml']

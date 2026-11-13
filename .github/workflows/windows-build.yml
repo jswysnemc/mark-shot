@@ -1,11 +1,6 @@
 name: Windows Rust Build
 
 on:
-  push:
-    branches:
-      - rewrite/native-wayland
-      - feat/native-recording
-      - feat/native-barcode-scanning
   workflow_dispatch:
   workflow_call:
     inputs:

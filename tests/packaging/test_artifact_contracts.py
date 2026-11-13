@@ -280,7 +280,7 @@ class ArtifactContracts(unittest.TestCase):
             asset.write_bytes(b"test")
             finalize(asset, "0.2.0", "x86_64", COMMIT, "portable")
             context = Context("native-v0.2.0", "0.2.0", COMMIT, False)
-            self.assertEqual(len(assets(directory, context)), 3)
+            self.assertEqual(assets(directory, context), [asset])
             with self.assertRaises(ValueError):
                 assets(directory, Context("native-v0.2.1", "0.2.1", COMMIT, False))
             asset.write_bytes(b"tampered")

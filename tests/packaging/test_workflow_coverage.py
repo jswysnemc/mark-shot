@@ -45,8 +45,8 @@ class WorkflowCoverage(unittest.TestCase):
             self.assertNotIn("docs/", text)
             self.assertNotIn(".docs", text)
 
-    def test_preview_publication_fetches_notes_history(self):
-        """【原生发布】【历史检出】无传参，确认历史发布说明恢复使用完整 Git 历史，无返回值"""
+    def test_publication_checks_out_exact_tag_with_full_history(self):
+        """【原生发布】【固定检出】无传参，确认统一发布入口检出已验证提交和完整标签历史，无返回值"""
         checkout = next(
             step
             for step in workflow("native-release")["jobs"]["publish"]["steps"]
@@ -54,6 +54,56 @@ class WorkflowCoverage(unittest.TestCase):
         )
         self.assertEqual(checkout["with"]["fetch-depth"], "0")
         self.assertEqual(checkout["with"]["persist-credentials"], "false")
+        self.assertEqual(
+            checkout["with"]["ref"], "${{ needs.context.outputs.source_sha }}"
+        )
+
+    def test_release_waits_for_all_inherited_builds_and_verification(self):
+        """【原生发布】【发布门槛】无传参，确保既有平台构建与验证全部成功后才能公开安装包，无返回值"""
+        data = workflow("native-release")
+        expected = {
+            "context",
+            "verify",
+            "binaries",
+            "deb",
+            "rpm",
+            "arch",
+            "appimage",
+            "flatpak",
+        }
+        self.assertEqual(set(data["jobs"]["publish"]["needs"]), expected)
+        self.assertEqual(data["on"]["push"]["tags"], ["native-v*"])
+        for job in expected - {"context", "verify"}:
+            self.assertNotIn("upload_to_release", data["jobs"][job]["with"])
+        for name in (
+            "release-binaries",
+            "release-deb",
+            "release-rpm",
+            "release-aur-bin",
+            "release-appimage",
+            "release-flatpak",
+        ):
+            child = workflow(name)
+            self.assertIn("workflow_call", child["on"])
+            self.assertNotIn("push", child["on"])
+            self.assertNotIn("release", child["on"])
+            self.assertEqual(
+                child["on"]["workflow_call"]["inputs"]["upload_to_release"]["default"],
+                "false",
+            )
+            self.assertIn("inputs.upload_to_release", child["jobs"]["publish"]["if"])
+
+    def test_deleted_branches_are_not_workflow_triggers(self):
+        """【原生构建】【分支同步】无传参，禁止发布和构建入口依赖已删除分支，无返回值"""
+        for name in (
+            "native-build",
+            "windows-build",
+            "debian-source",
+            "native-release",
+        ):
+            self.assertNotIn(
+                "rewrite/native-wayland", (WORKFLOWS / f"{name}.yml").read_text()
+            )
 
     def test_source_verification_failures_preserve_build_evidence(self):
         """【原生构建】【失败证据】无传参，验证前收集构建产物，正式验证产物仍在验证后上传，失败使用独立证据名称，无返回值"""

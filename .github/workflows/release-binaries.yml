@@ -1,10 +1,17 @@
 name: Release native binaries
 
 on:
-  push:
-    tags: ['native-v*']
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      checkout_ref:
+        type: string
+        default: ''
+      upload_to_release:
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       tag:
@@ -91,7 +98,7 @@ jobs:
 
   publish:
     needs: [context, packages, collect-windows]
-    if: needs.context.outputs.publish == 'true'
+    if: needs.context.outputs.publish == 'true' && inputs.upload_to_release
     runs-on: ubuntu-24.04
     permissions:
       contents: write
