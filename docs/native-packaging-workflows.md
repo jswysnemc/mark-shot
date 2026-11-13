@@ -38,6 +38,8 @@ Ubuntu 26.04 官方仓库当前提供 Rust 1.93.1，不能满足原生项目的 
 
 Debian 源码构建依赖还明确包含 `fonts-dejavu-core`，提供菜单、语言列表和表格对照使用的 DejaVu Sans 及 LGC 别名配置。最小容器不能依赖完整桌面主机预装这些字体。
 
+通用 Debian 源码包使用 `unstable` 发行标识；即使在 Ubuntu 容器中构建，也显式使用 Lintian 的 Debian 校验配置。PPA 源码包使用 `resolute` 标识及 Ubuntu 校验配置，不能通过忽略发行标识错误混用两类产物。
+
 vendor 通过固定版本 `cargo-vendor-filterer` 生成，保留 `Cargo.lock`。当前锁文件中 libloading、system-deps、vcpkg 的预编译测试样本及 ring 的 Windows 对象文件不参与 Linux 构建，因此单独剔除并更新 vendor 校验清单；其余源码与版权保留。依赖更新后如果出现其他预编译库，源码准备直接失败，不能静默交付。
 
 DEB 的动态依赖在各目标容器内通过 `dpkg-shlibdeps` 生成；RPM 使用目标 Fedora 的自动依赖扫描。pacman x86_64 包在 Arch 容器构建并安装验证。与 Qt 工作流一致，ARM64 pacman 包在 Ubuntu 24.04 ARM 主机生成并验证，不宣称完成 Arch Linux ARM 实机验证；系统库代际不匹配时应使用 AUR 源码包。

@@ -55,7 +55,7 @@ jobs:
       - name: Lint and install reconstructed package
         run: |
           for changes in "$RUNNER_TEMP"/native-source/*.changes "$RUNNER_TEMP"/*.changes; do
-            lintian --display-info --pedantic --fail-on error "$changes"
+            lintian --profile debian --display-info --pedantic --fail-on error "$changes"
           done
           apt-get install -y "$RUNNER_TEMP"/mark-shot_*_amd64.deb desktop-file-utils
           apt-get check

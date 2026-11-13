@@ -32,6 +32,17 @@ def workflow(name):
 
 
 class WorkflowCoverage(unittest.TestCase):
+    def test_debian_source_lint_uses_the_debian_vendor_profile(self):
+        """【原生构建】【发行标识校验】无传参，Ubuntu 容器中的 Debian 源码包必须使用 Debian 校验配置，不忽略合法 unstable 标识，无返回值"""
+        step = next(
+            step
+            for step in workflow("debian-source")["jobs"]["resolute"]["steps"]
+            if step.get("name") == "Lint and install reconstructed package"
+        )
+        self.assertIn("lintian --profile debian", step["run"])
+        self.assertIn("--fail-on error", step["run"])
+        self.assertNotIn("--suppress-tags", step["run"])
+
     def test_ppa_upload_uses_a_verified_workspace_relative_directory(self):
         """【原生发布】【容器产物路径】无传参，防止容器外临时路径导致只上传 dsc 而丢失源码归档，无返回值"""
         steps = workflow("ppa-publish")["jobs"]["source"]["steps"]
