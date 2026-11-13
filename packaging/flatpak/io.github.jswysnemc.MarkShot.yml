@@ -20,7 +20,6 @@ finish-args:
   - --filesystem=xdg-pictures
   - --filesystem=xdg-download
   - --talk-name=org.freedesktop.Notifications
-  - --own-name=org.kde.StatusNotifierItem-*
   - --talk-name=org.kde.StatusNotifierWatcher
   - --talk-name=com.canonical.AppMenu.Registrar
   - --talk-name=org.freedesktop.portal.Desktop

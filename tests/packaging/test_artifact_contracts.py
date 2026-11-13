@@ -22,6 +22,7 @@ from artifact_metadata import (
     version,
 )
 from install_linux import install
+from media_checksums import verify_media
 from package_pacman import package as pacman
 from package_portable import package as portable
 from package_rpm import package as rpm
@@ -66,6 +67,27 @@ def fixture(directory):
 
 
 class ArtifactContracts(unittest.TestCase):
+    def test_media_refresh_keeps_source_archive_immutable(self):
+        """【原生打包】【摘要刷新】无传参，允许受控库路径修正，但拒绝任何源码变更，无返回值"""
+        with tempfile.TemporaryDirectory() as temporary:
+            binary, media, licenses = fixture(Path(temporary))
+            original = verify_media(media, arch="x86_64")
+            with (media / "libmarkshot-media.so").open("ab") as stream:
+                stream.write(b"changed RPATH")
+            with self.assertRaises(ValueError):
+                verify_media(media, arch="x86_64")
+            current = verify_media(media, refresh=True, arch="x86_64")
+            self.assertNotEqual(
+                current["libmarkshot-media.so"], original["libmarkshot-media.so"]
+            )
+            self.assertEqual(
+                current["MEDIA-SOURCES.tar.xz"], original["MEDIA-SOURCES.tar.xz"]
+            )
+            verify_media(media, arch="x86_64")
+            (media / "MEDIA-SOURCES.tar.xz").write_bytes(b"changed sources")
+            with self.assertRaises(ValueError):
+                verify_media(media, refresh=True, arch="x86_64")
+
     def test_source_rpm_assets_do_not_collide_between_architectures(self):
         """【原生打包】【RPM矩阵】无传参，复现两种架构合并产物时的源码包名称冲突，无返回值"""
         with tempfile.TemporaryDirectory() as temporary:

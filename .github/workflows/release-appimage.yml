@@ -82,6 +82,7 @@ jobs:
           "${images[0]}" --version
           "${images[0]}" --help
           "${images[0]}" --appimage-extract
+          (cd squashfs-root/usr/lib/mark-shot/media; sha256sum --check SHA256SUMS)
           python3 -c 'import ctypes; ctypes.CDLL("squashfs-root/usr/lib/mark-shot/media/libmarkshot-media.so")'
   publish:
     needs: [context, packages, verify-ubuntu2404]

@@ -33,6 +33,7 @@ python3 scripts/packaging/install_linux.py --destination "%{buildroot}" \
 
 %check
 target/release/mark-shot --version
+python3 scripts/packaging/media_checksums.py --directory "%{buildroot}/usr/lib/mark-shot/media" --refresh
 
 %files
 %{_bindir}/mark-shot

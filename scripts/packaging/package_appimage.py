@@ -5,8 +5,10 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 
 from artifact_metadata import architecture, finalize, source_sha, version
+from media_checksums import verify_media
 
 
 def glibc_requirement(directory, maximum=(2, 36)):
@@ -87,14 +89,32 @@ def package(repository, stage, package_version, commit, destination):
             ),
             "--custom-apprun",
             str(repository / "packaging/appimage/AppRun"),
-            "--output",
-            "appimage",
         ],
         cwd=destination,
         env=environment,
         check=True,
     )
+    # 1. 【原生打包】【路径修正】部署工具会修改 ELF 的 RPATH，封装前刷新媒体库摘要
+    verify_media(private / "media", refresh=True)
     glibc_requirement(stage)
+    # 2. 【原生打包】【独立封装】直接调用同一固定工具内的输出插件，不再次部署或修改 ELF
+    with tempfile.TemporaryDirectory(
+        prefix="linuxdeploy-output-", dir=tools
+    ) as temporary:
+        subprocess.run(
+            [str(tool), "--appimage-extract"],
+            cwd=temporary,
+            stdout=subprocess.DEVNULL,
+            check=True,
+        )
+        plugin = Path(temporary) / "squashfs-root/usr/bin/linuxdeploy-plugin-appimage"
+        subprocess.run(
+            [str(plugin), "--appdir", str(stage)],
+            cwd=destination,
+            env=environment,
+            check=True,
+        )
+    verify_media(private / "media")
     if not asset.is_file():
         raise FileNotFoundError("linuxdeploy did not create the requested AppImage")
     subprocess.run([str(asset), "--version"], env=environment, check=True)

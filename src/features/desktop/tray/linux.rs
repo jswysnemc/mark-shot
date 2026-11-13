@@ -114,6 +114,8 @@ pub(super) async fn run(
         menu: *menu.borrow_and_update(),
     }
     .assume_sni_available(true)
+    // 【系统托盘】【沙箱注册】Flatpak 不能申请带进程号的固定服务名，改用连接唯一名称
+    .disable_dbus_name(ashpd::is_sandboxed())
     .spawn();
     let handle = tokio::select! {
         _ = cancelled.changed() => return Ok(()),

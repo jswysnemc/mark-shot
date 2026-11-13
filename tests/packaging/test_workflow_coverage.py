@@ -2,6 +2,9 @@
 
 from pathlib import Path
 import re
+import shutil
+import subprocess
+import tempfile
 import unittest
 
 import yaml
@@ -29,6 +32,31 @@ def workflow(name):
 
 
 class WorkflowCoverage(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("flatpak"), "Flatpak command is not installed")
+    def test_flatpak_finish_permissions_are_accepted(self):
+        """【原生构建】【权限验证】无传参，使用真实 Flatpak 命令校验完整权限，不依赖运行时下载，无返回值"""
+        data = yaml.load(
+            (ROOT / "packaging/flatpak/io.github.jswysnemc.MarkShot.yml").read_text(),
+            Loader=yaml.BaseLoader,
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / "files").mkdir()
+            (directory / "metadata").write_text(
+                "[Application]\nname=io.github.jswysnemc.MarkShot\nruntime=org.freedesktop.Platform/x86_64/25.08\nsdk=org.freedesktop.Sdk/x86_64/25.08\n"
+            )
+            subprocess.run(
+                [
+                    "flatpak",
+                    "build-finish",
+                    "--no-exports",
+                    *data["finish-args"],
+                    str(directory),
+                ],
+                check=True,
+                capture_output=True,
+            )
+
     def test_container_array_scripts_use_bash(self):
         """【原生构建】【容器脚本】无传参，复现默认 sh 无法解析 Bash 数组的问题，无返回值"""
         for name in (*MIGRATED, "native-linux-package"):

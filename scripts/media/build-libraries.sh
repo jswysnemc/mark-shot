@@ -10,6 +10,10 @@ sources="${MARK_SHOT_MEDIA_SOURCES:-$build_root/sources}"
 jobs="${MARK_SHOT_BUILD_JOBS:-2}"
 mkdir -p "$sources" "$prefix" "$destination/licenses" "$build_root/ffmpeg"
 source_bundle=false
+# 【媒体构建】【链接配置】FFmpeg 汇编常量依赖独立编译，覆盖继承的 LTO 参数但保留发行版硬化配置
+export CFLAGS="${CFLAGS:-} -fno-lto"
+export CXXFLAGS="${CXXFLAGS:-} -fno-lto"
+export LDFLAGS="${LDFLAGS:-} -fno-lto"
 if [[ -f "$sources/SOURCE-SHA256SUMS" ]]; then
   (cd "$sources"; sha256sum --check --status SOURCE-SHA256SUMS)
   source_bundle=true
@@ -28,6 +32,7 @@ fetch https://ffmpeg.org/releases/ffmpeg-9.0.tar.xz \
 tar -xf "$build_root/ffmpeg.tar.xz" -C "$sources"
 fi
 flags=(--disable-debug --disable-doc --disable-autodetect --disable-everything --disable-programs
+  --disable-lto --extra-cflags=-fno-lto --extra-ldflags=-fno-lto
   --disable-network --disable-avdevice --disable-shared --enable-static --enable-pic
   --enable-avfilter --enable-swscale --enable-swresample
   "--enable-decoder=h264,aac" "--enable-parser=h264,aac" "--enable-encoder=gif,aac"

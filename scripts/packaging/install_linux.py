@@ -4,7 +4,8 @@ import argparse
 from pathlib import Path
 import shutil
 
-from artifact_metadata import architecture, checksum, source_sha, verify_elf
+from artifact_metadata import architecture, source_sha, verify_elf
+from media_checksums import verify_media
 
 
 def install(root, binary, media, destination, prefix, arch, commit, licenses=None):
@@ -19,19 +20,7 @@ def install(root, binary, media, destination, prefix, arch, commit, licenses=Non
     verify_elf(media / "libmarkshot-media.so", arch)
     if not licenses or not (Path(licenses) / "DEPENDENCIES.txt").is_file():
         raise ValueError("complete packages require dependency license notices")
-    expected = {}
-    for row in (media / "SHA256SUMS").read_text().splitlines():
-        digest, name = row.split("  ", 1)
-        if (
-            name not in ("libmarkshot-media.so", "MEDIA-SOURCES.tar.xz")
-            or name in expected
-        ):
-            raise ValueError("invalid media checksum manifest")
-        if checksum(media / name) != digest:
-            raise ValueError(f"media checksum mismatch: {name}")
-        expected[name] = digest
-    if len(expected) != 2:
-        raise ValueError("the media package must include matching sources")
+    verify_media(media, arch=arch)
     installed = destination / prefix.relative_to("/")
     private = installed / "lib/mark-shot"
     private.mkdir(parents=True, exist_ok=True)

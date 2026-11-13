@@ -7,6 +7,7 @@ test -L /usr/bin/mark-shot
 test -f /usr/lib/mark-shot/media/libmarkshot-media.so
 test -f /usr/lib/mark-shot/media/MEDIA-SOURCES.tar.xz
 test -f /usr/share/licenses/mark-shot/DEPENDENCIES.txt
+(cd /usr/lib/mark-shot/media; sha256sum --check SHA256SUMS)
 desktop-file-validate /usr/share/applications/io.github.jswysnemc.MarkShot.desktop
 python3 -c 'import ctypes; ctypes.CDLL("/usr/lib/mark-shot/media/libmarkshot-media.so")'
 if ldd /usr/lib/mark-shot/mark-shot /usr/lib/mark-shot/media/libmarkshot-media.so | grep -Ei 'not found|libQt'; then
