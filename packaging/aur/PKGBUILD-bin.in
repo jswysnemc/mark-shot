@@ -10,8 +10,10 @@ depends=('glibc' 'fontconfig' 'libxkbcommon' 'libxkbcommon-x11' 'libxcb' 'openss
 optdepends=('noto-fonts: fallback fonts' 'noto-fonts-cjk: CJK fonts' 'xdg-desktop-portal: portal capture' 'mark-shot: source build if Arch ARM library versions differ')
 provides=("mark-shot=$pkgver")
 conflicts=('mark-shot')
-source_x86_64=("https://github.com/jswysnemc/mark-shot/releases/download/@tag@/mark-shot-bin-@pkgver@-1-x86_64.pkg.tar.zst")
-source_aarch64=("https://github.com/jswysnemc/mark-shot/releases/download/@tag@/mark-shot-bin-@pkgver@-1-aarch64.pkg.tar.zst")
+options=('!strip')
+# 【原生发布】【下载文件】使用独立文件名，避免 makepkg 将下载资产误认为已构建的输出包
+source_x86_64=("mark-shot-prebuilt-@pkgver@-x86_64.pkg.tar.zst::https://github.com/jswysnemc/mark-shot/releases/download/@tag@/mark-shot-bin-@pkgver@-1-x86_64.pkg.tar.zst")
+source_aarch64=("mark-shot-prebuilt-@pkgver@-aarch64.pkg.tar.zst::https://github.com/jswysnemc/mark-shot/releases/download/@tag@/mark-shot-bin-@pkgver@-1-aarch64.pkg.tar.zst")
 sha256sums_x86_64=('@sha_x86_64@')
 sha256sums_aarch64=('@sha_aarch64@')
 
