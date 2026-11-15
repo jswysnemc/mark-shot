@@ -1,7 +1,8 @@
-//! 【单实例】【会话路径】使用内核合成器身份区分 Wayland 会话，目录与锁文件只属于当前用户
+//! 【单实例】【会话路径】使用内核合成器身份或显示名区分 Wayland 会话，目录与锁文件只属于当前用户
 
 use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};
 use std::{
+    ffi::OsStr,
     fs::{self, DirBuilder, File, OpenOptions},
     os::unix::{
         ffi::OsStrExt,
@@ -18,7 +19,7 @@ pub(super) struct SessionPath {
 }
 
 impl SessionPath {
-    /// 【单实例】【内核会话】按 connection 的合成器 PID 与用户创建当前运行目录内的路径，返回校验错误，不创建表面
+    /// 【单实例】【内核会话】按 connection 的对端身份与显示名创建当前运行目录内的路径，返回校验错误，不创建表面
     pub fn for_connection(connection: &crate::backend::session::Session) -> crate::AppResult<Self> {
         let connection = match connection {
             crate::backend::session::Session::Wayland(connection) => connection,
@@ -40,18 +41,17 @@ impl SessionPath {
             }
         };
         let peer = getsockopt(&connection.backend().poll_fd(), PeerCredentials)?;
-        if peer.pid() <= 0 || peer.uid() != nix::unistd::Uid::effective().as_raw() {
-            return Err("Wayland compositor does not belong to the current user".into());
-        }
+        let display = std::env::var_os("WAYLAND_DISPLAY");
+        let identity = wayland_identity(peer.pid(), peer.uid(), display.as_deref())?;
         let root = std::env::var_os("XDG_RUNTIME_DIR")
             .ok_or("single-instance capture requires XDG_RUNTIME_DIR")?;
-        Self::new(Path::new(&root), peer.pid(), peer.uid())
+        Self::new(Path::new(&root), identity, peer.uid())
     }
 
-    /// 【单实例】【私有路径】按 root、compositor_pid 与 uid 创建私有目录，返回短套接字及锁路径，拒绝符号链接和其他用户目录
-    pub fn new(root: &Path, compositor_pid: i32, uid: u32) -> crate::AppResult<Self> {
+    /// 【单实例】【私有路径】按 root、compositor_identity 与 uid 创建私有目录，返回短套接字及锁路径，拒绝符号链接和其他用户目录
+    pub fn new(root: &Path, compositor_identity: i32, uid: u32) -> crate::AppResult<Self> {
         private_directory(root, uid)?;
-        if compositor_pid <= 0 {
+        if compositor_identity <= 0 {
             return Err("single-instance compositor identity is invalid".into());
         }
         let directory = root.join("mark-shot-instance");
@@ -61,13 +61,13 @@ impl SessionPath {
             Err(error) => return Err(error.into()),
         }
         private_directory(&directory, uid)?;
-        let socket = directory.join(format!("capture-{compositor_pid}.sock"));
+        let socket = directory.join(format!("capture-{compositor_identity}.sock"));
         if socket.as_os_str().as_bytes().len() >= 104 {
             return Err("single-instance socket path exceeds the Unix socket limit".into());
         }
         Ok(Self {
             socket,
-            lock: directory.join(format!("capture-{compositor_pid}.lock")),
+            lock: directory.join(format!("capture-{compositor_identity}.lock")),
             uid,
         })
     }
@@ -107,6 +107,24 @@ impl SessionPath {
             let _ = fs::remove_file(&self.socket);
         }
     }
+}
+
+/// 【单实例】【Wayland身份】按 compositor_pid、uid 与 display 返回正数会话标识，PID 不可见时使用显示名，缺失名称按 wayland-0 处理
+pub(super) fn wayland_identity(
+    compositor_pid: i32,
+    uid: u32,
+    display: Option<&OsStr>,
+) -> crate::AppResult<i32> {
+    // 1. 【单实例】【内核身份】始终核对用户，可见合成器保持原有 PID 标识
+    if compositor_pid < 0 || uid != nix::unistd::Uid::effective().as_raw() {
+        return Err("Wayland compositor does not belong to the current user".into());
+    }
+    if compositor_pid > 0 {
+        return Ok(compositor_pid);
+    }
+    // 2. 【单实例】【命名空间回退】对端在其他 PID 命名空间时，按显示名生成稳定正数标识
+    let display = display.unwrap_or_else(|| OsStr::new("wayland-0"));
+    Ok((crc32fast::hash(display.as_bytes()) & 0x7fff_ffff).max(1) as i32)
 }
 
 /// 【单实例】【目录认证】按 path 与 uid 检查真实私有目录，返回权限或文件类型错误，不修改已有目录权限
