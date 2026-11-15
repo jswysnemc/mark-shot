@@ -95,7 +95,6 @@ fn sparse_editor_keeps_selection_annotation_and_hover_pixels() {
                     0.0,
                     crate::types::AnnotationShape::Rectangle {
                         radius: 7.0,
-                        focus: false,
                         fixed_ratio: false,
                         start: (75.0, 80.0),
                         end: (195.0, 170.0),
@@ -166,7 +165,6 @@ fn partial_sparse_frames_keep_pixels_outside_damage() {
                 0.0,
                 crate::types::AnnotationShape::Rectangle {
                     radius: 0.0,
-                    focus: false,
                     fixed_ratio: false,
                     start: (x, 80.0),
                     end: (x + 100.0, 170.0),

@@ -2,6 +2,7 @@
 
 pub mod drag;
 pub mod draw;
+pub mod focus;
 pub mod geometry;
 pub mod model;
 pub mod raster;

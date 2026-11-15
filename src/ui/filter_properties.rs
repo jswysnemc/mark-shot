@@ -9,13 +9,14 @@ use crate::features::filter::{
 use crate::renderer::{FrozenImage, Painter};
 use crate::ui::choice_popover::{ChoiceOption, ChoicePopover, draw_choice_popover};
 
-/// 【滤镜】【面板创建】返回关闭的五模式选择面板，不预先分配界面像素缓存
+/// 【滤镜】【面板创建】返回包含聚焦变体的模式选择面板，不预先分配界面像素缓存
 pub fn popover() -> ChoicePopover {
+    let language = crate::ui::language::Language::current();
     ChoicePopover::new(
         "Filter effect",
         FilterMode::ALL
             .map(|mode| ChoiceOption {
-                label: mode.label(),
+                label: language.text(mode.label()),
             })
             .to_vec(),
     )
@@ -38,12 +39,25 @@ pub fn preview(painter: &mut Painter<'_>, mode: FilterMode, rect: Rect, color: C
         }
     }
     let image = FrozenImage::image(&source, Rect::from_xywh(0.0, 0.0, 20.0, 16.0).unwrap());
-    let filter = RegionFilter::new((0.0, 0.0), (20.0, 16.0), 4.0, mode).unwrap();
-    let Some(key) = FilterKey::new(image, filter) else {
-        return;
-    };
-    let Some(raster) = Raster::new(image, key) else {
-        return;
+    // 1. 【滤镜】【预览来源】聚焦直接合成小型遮罩，普通效果仍使用原图滤镜算法
+    let pixels = if mode.is_focus() {
+        let mut result = source.clone();
+        let filter = RegionFilter::new((4.0, 3.0), (16.0, 13.0), 14.0, mode).unwrap();
+        crate::features::filter::focus::draw(
+            &mut Painter::new(&mut result).with_frozen_image(image),
+            filter,
+            1.0,
+        );
+        result
+    } else {
+        let filter = RegionFilter::new((0.0, 0.0), (20.0, 16.0), 4.0, mode).unwrap();
+        let Some(key) = FilterKey::new(image, filter) else {
+            return;
+        };
+        let Some(raster) = Raster::new(image, key) else {
+            return;
+        };
+        raster.pixels
     };
     let width = rect.width().min(26.0);
     let height = rect.height().min(width * 0.8);
@@ -55,7 +69,7 @@ pub fn preview(painter: &mut Painter<'_>, mode: FilterMode, rect: Rect, color: C
     painter.canvas().draw_pixmap(
         0,
         0,
-        raster.pixels.as_ref(),
+        pixels.as_ref(),
         &PixmapPaint {
             opacity: color.alpha(),
             quality: if mode == FilterMode::Pixelate {

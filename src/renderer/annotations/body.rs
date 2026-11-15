@@ -92,6 +92,10 @@ pub(super) fn draw(
             draw_pen(p, points, ann.color, ann.stroke_width, ann.shadow_color);
         }
         AnnotationShape::Redact { filter } => {
+            if filter.mode.is_focus() {
+                crate::features::filter::focus::draw_annotation(p, ann);
+                return;
+            }
             crate::features::filter::draw::draw(
                 p,
                 *filter,

@@ -33,7 +33,6 @@ fn annotation(shape: AnnotationShape) -> Annotation {
 fn rectangle(bounds: Rect) -> Annotation {
     annotation(AnnotationShape::Rectangle {
         radius: 0.0,
-        focus: false,
         fixed_ratio: false,
         start: (bounds.left(), bounds.top()),
         end: (bounds.right(), bounds.bottom()),

@@ -493,7 +493,7 @@ outline_color = "#000000"
 # Original image strength, from 4 to 48; the default effect is pixelation
 strength = 14.0
 step = 1.0
-# mode = "pixelate" # pixelate, blur, grayscale, invert, brighten
+# mode = "pixelate" # pixelate, blur, grayscale, invert, brighten, focus, focus_ellipse
 
 [tools.pen]
 # 0 draws the raw pointer path, closer to 1 is smoother (and lags more)

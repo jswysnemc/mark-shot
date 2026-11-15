@@ -27,6 +27,9 @@ mod tool_tests;
 
 /// 【标注渲染】【缓存需求】按annotation返回是否需要保留旧完整栅格，已验证的固定路径图形可以使用区域合成
 fn requires_cache(annotation: &Annotation) -> bool {
+    if crate::features::filter::focus::enabled(annotation) {
+        return false;
+    }
     !matches!(
         annotation.shape,
         AnnotationShape::Rectangle { .. }

@@ -34,7 +34,6 @@ pub enum AnnotationShape {
         filled: bool,
         radius: f32,
         fixed_ratio: bool,
-        focus: bool,
     },
     Marker {
         start: (f32, f32),
@@ -54,7 +53,6 @@ pub enum AnnotationShape {
         end: (f32, f32),
         filled: bool,
         fixed_ratio: bool,
-        focus: bool,
     },
     Line {
         line: crate::features::line::LineSkeleton,

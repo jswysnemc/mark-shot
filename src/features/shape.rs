@@ -1,7 +1,5 @@
 //! 【框形标注】【几何约束】共用圆角路径与等比例端点，编辑预览和导出使用相同参数
 
-pub mod focus;
-
 use tiny_skia::{Path, Rect, Transform};
 
 /// 【框形标注】【半径校验】将 value 限制到零至二百五十六像素，非有限值返回零

@@ -17,15 +17,19 @@ pub enum FilterMode {
     Grayscale = 2,
     Invert = 3,
     Brighten = 4,
+    Focus = 5,
+    FocusEllipse = 6,
 }
 
 impl FilterMode {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 7] = [
         Self::Pixelate,
         Self::Blur,
         Self::Grayscale,
         Self::Invert,
         Self::Brighten,
+        Self::Focus,
+        Self::FocusEllipse,
     ];
 
     /// 【滤镜】【模式标识】返回稳定配置名称，不以本地化文字保存模式
@@ -36,6 +40,8 @@ impl FilterMode {
             Self::Grayscale => "grayscale",
             Self::Invert => "invert",
             Self::Brighten => "brighten",
+            Self::Focus => "focus",
+            Self::FocusEllipse => "focus_ellipse",
         }
     }
 
@@ -47,7 +53,14 @@ impl FilterMode {
             Self::Grayscale => "Grayscale",
             Self::Invert => "Invert",
             Self::Brighten => "Brighten",
+            Self::Focus => "Focus",
+            Self::FocusEllipse => "Ellipse focus",
         }
+    }
+
+    /// 【滤镜】【聚焦模式】无参数，返回当前效果是否通过周围遮罩聚焦目标区域
+    pub fn is_focus(self) -> bool {
+        matches!(self, Self::Focus | Self::FocusEllipse)
     }
 
     /// 【滤镜】【模式解析】将 value 转为模式，接受原版编号和稳定名称；未知值返回空值

@@ -18,10 +18,13 @@ fn fill(canvas: &mut Pixmap, area: IntRect, pixels: [u8; 4]) {
     let stride = canvas.width() as usize * 4;
     for row in area.top()..area.bottom() {
         let offset = row as usize * stride + area.left() as usize * 4;
-        for pixel in canvas.data_mut()[offset..offset + area.width() as usize * 4]
-            .as_chunks_mut::<4>()
-            .0
-        {
+        let bytes = &mut canvas.data_mut()[offset..offset + area.width() as usize * 4];
+        // 1. 【截图绘制】【透明行清空】孔洞直接使用字节清空，不逐像素重复写入四个零通道
+        if pixels == [0; 4] {
+            bytes.fill(0);
+            continue;
+        }
+        for pixel in bytes.as_chunks_mut::<4>().0 {
             *pixel = pixels;
         }
     }
@@ -266,12 +269,7 @@ pub(super) fn clear_foreground(req: &mut RenderRequest<'_>) {
         let first = row as usize * stride + area.left() as usize * 4;
         let bytes = &mut req.canvas.data_mut()[first..first + area.width() as usize * 4];
         for block in bytes.chunks_mut(256) {
-            if block
-                .as_chunks::<4>()
-                .0
-                .iter()
-                .any(|pixel| *pixel != [0; 4])
-            {
+            if !crate::utils::transparent_pixmap::is_zero(block) {
                 block.fill(0);
             }
         }

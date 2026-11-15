@@ -88,6 +88,9 @@ fn reference(source: &Pixmap, key: FilterKey) -> Pixmap {
             filters::Filter::Brighten(filters::brightness_amount(f64::from(key.strength))),
         )
         .unwrap(),
+        FilterMode::Focus | FilterMode::FocusEllipse => {
+            unreachable!("focus does not produce a pixel filter key")
+        }
     };
     let filtered = rgba(&filtered);
     filtered
@@ -104,7 +107,7 @@ fn reference(source: &Pixmap, key: FilterKey) -> Pixmap {
 fn every_mode_and_strength_matches_whole_region_reference() {
     let source = pixels::image(690, 620);
     let image = FrozenImage::image(&source, Rect::from_xywh(0.0, 0.0, 690.0, 620.0).unwrap());
-    for mode in FilterMode::ALL {
+    for mode in FilterMode::ALL.into_iter().filter(|mode| !mode.is_focus()) {
         for strength in [4.0, 14.0, 48.0] {
             let filter = RegionFilter::new((31.0, 27.0), (640.0, 598.0), strength, mode).unwrap();
             let key = FilterKey::new(image, filter).unwrap();
@@ -140,7 +143,7 @@ fn native_pixels_and_strength_survive_preview_and_export_mapping() {
     let source = pixels::image(700, 640);
     let viewport = Rect::from_xywh(-30.0, 20.0, 280.0, 256.0).unwrap();
     let image = FrozenImage::image(&source, viewport);
-    for mode in FilterMode::ALL {
+    for mode in FilterMode::ALL.into_iter().filter(|mode| !mode.is_focus()) {
         let filter = RegionFilter::new((10.0, 35.0), (170.0, 240.0), 14.0, mode).unwrap();
         let first = Raster::new(image, FilterKey::new(image, filter).unwrap()).unwrap();
         for scale in [0.73, 1.2, 2.5] {

@@ -35,23 +35,7 @@ fn write(canvas: &mut Pixmap, tile: &Pixmap, position: (u32, u32), area: IntRect
             crate::utils::transparent_pixmap::copy_changed(target, source);
             continue;
         }
-        for (source, target) in source
-            .as_chunks::<4>()
-            .0
-            .iter()
-            .zip(target.as_chunks_mut::<4>().0)
-        {
-            // 1. 【标注渲染】【透明片段】透明瓦片没有像素贡献，不写回已恢复的前景，避免触碰整屏零页
-            if source[3] == 0 {
-                continue;
-            }
-            let inverse = 255 - u32::from(source[3]);
-            for channel in 0..4 {
-                target[channel] = (u32::from(source[channel])
-                    + (u32::from(target[channel]) * inverse + 127) / 255)
-                    .min(255) as u8;
-            }
-        }
+        super::annotation_tile_blend::blend(source, target);
     }
 }
 
@@ -72,7 +56,7 @@ fn tiles(
         &mut Painter<'_>,
         Rect,
         &mut std::collections::HashMap<u64, cosmic_text::Editor<'static>>,
-    ),
+    ) -> bool,
 ) {
     let Some(area) = background_restore::damage(req.canvas, req.dirty_rect, req.scale) else {
         return;
@@ -100,23 +84,28 @@ fn tiles(
             }
             // 1. 【标注渲染】【固定相位】子画布继承完整视口相位，局部原点只增加整数物理像素
             let local_origin = (origin.0 + x as f32 / scale, origin.1 + y as f32 / scale);
+            let bounds = IntRect::from_xywh(x as i32, y as i32, SIDE, SIDE).unwrap();
+            let Some(visible) = bounds.intersect(&area) else {
+                continue;
+            };
             let global = Rect::from_xywh(
-                local_origin.0,
-                local_origin.1,
-                SIDE as f32 / scale,
-                SIDE as f32 / scale,
+                origin.0 + visible.left() as f32 / scale,
+                origin.1 + visible.top() as f32 / scale,
+                visible.width() as f32 / scale,
+                visible.height() as f32 / scale,
             )
             .unwrap();
-            body(
+            let painted = body(
                 &mut painter.sub(&mut tile).with_origin(local_origin),
                 global,
                 req.text.editors,
             );
-            let bounds = IntRect::from_xywh(x as i32, y as i32, SIDE, SIDE).unwrap();
-            if let Some(bounds) = bounds.intersect(&area) {
-                // 2. 【标注渲染】【损坏交付】相交像素只合成一次，块内其他像素不写回最终画布
-                write(painter.canvas(), &tile, (x, y), bounds, blend);
+            // 2. 【聚焦滤镜】【透明块跳过】透明孔洞没有正文贡献，不扫描或交付完整零像素块
+            if !painted {
+                continue;
             }
+            // 3. 【标注渲染】【损坏交付】相交像素只合成一次，块内其他像素不写回最终画布
+            write(painter.canvas(), &tile, (x, y), visible, blend);
         }
     }
 }
@@ -141,7 +130,7 @@ fn ordered(
             editors,
             filters,
             active_text_id,
-        );
+        )
     });
 }
 
@@ -162,7 +151,10 @@ fn pending(req: &mut RenderRequest<'_>) {
         false,
         |painter, global, editors| {
             if !intersects(pending.damage_bbox(false), global) {
-                return;
+                return false;
+            }
+            if crate::features::filter::focus::inside_hole(pending, global, 2.0 / painter.scale()) {
+                return false;
             }
             if tail && let crate::types::AnnotationShape::Pen { points } = &pending.shape {
                 annotations::draw_pen_active_tail(
@@ -172,6 +164,17 @@ fn pending(req: &mut RenderRequest<'_>) {
                     pending.color,
                     pending.stroke_width,
                 );
+            } else if crate::features::filter::focus::enabled(pending) {
+                painter.clipped_scene(Some(global), |painter| {
+                    annotations::draw_annotation(
+                        painter,
+                        pending,
+                        false,
+                        editors,
+                        filters,
+                        active_text_id,
+                    );
+                });
             } else {
                 annotations::draw_annotation(
                     painter,
@@ -182,6 +185,7 @@ fn pending(req: &mut RenderRequest<'_>) {
                     active_text_id,
                 );
             }
+            true
         },
     );
 }

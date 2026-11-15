@@ -24,7 +24,7 @@ The keys below are the defaults; all of them can be changed, see [Shortcuts](sho
 | Text | `T` | Text with font, size, bold, italic and background |
 | Number | `N` | Auto-incrementing numbered badge |
 | Numbered arrow | `Shift+N` | Arrow with a number, counted separately |
-| Redact | `M`, `X` | Pixelate, blur, grayscale, invert or brighten a region |
+| Redact | `M`, `X` | Pixelate, blur, grayscale, invert, brighten or focus a region |
 | Magnifier | `Z` | Persistent loupe that enlarges part of the image |
 | Ruler | `U` | Measure length or angle |
 | Laser | `G` | Temporary stroke for presentations |
@@ -54,6 +54,9 @@ counter.
 
 **Redact.** The effect is computed from the original capture, never from other annotations. The
 strength ranges from 4 to 48 and sets the block size or the blur radius in image pixels.
+The effect menu also offers **Focus** and **Ellipse focus**. They darken the surrounding image
+and preserve the inside without a coloured outline. Strength controls the surrounding darkness;
+`R` sets the corner radius for rectangular focus. Move, resize and rotate with the pick tool.
 
 **Magnifier.** Drag to create a source frame and a lens. Both frames can be moved separately;
 resizing one resizes the other so the zoom factor stays fixed. The lens is round or rectangular

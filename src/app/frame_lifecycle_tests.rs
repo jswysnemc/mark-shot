@@ -57,7 +57,6 @@ impl Harness {
             0.0,
             AnnotationShape::Rectangle {
                 radius: 0.0,
-                focus: false,
                 fixed_ratio: false,
                 start,
                 end,
@@ -84,6 +83,53 @@ fn equal(actual: &Harness, expected: &Harness) {
     {
         let difference = first.iter().zip(second).position(|(a, b)| a != b);
         assert_eq!(difference, None, "native output {monitor} differs");
+    }
+}
+
+/// 【聚焦回归】【原生场景交付】无参数，对照移动时的局部原生帧和完整原生帧，覆盖两种形状与分数比例
+#[test]
+fn native_focus_drag_keeps_partial_scene_pixels_and_releases_filter_cache() {
+    use crate::features::filter::{FilterMode, RegionFilter};
+    for scale in [1.0, 1.2] {
+        for mode in [FilterMode::Focus, FilterMode::FocusEllipse] {
+            let mut actual = Harness::new(scale, false);
+            let mut expected = Harness::new(scale, false);
+            for harness in [&mut actual, &mut expected] {
+                harness.state.ui_hidden = true;
+                harness.state.region_rendering.native_scene = true;
+                harness.state.selected_tool = Tool::Pick;
+                let mut filter =
+                    RegionFilter::new((180.0, 190.0), (400.0, 330.0), 14.0, mode).unwrap();
+                filter.rotation = 0.37;
+                let mut annotation =
+                    support::annotation(1, 0.0, AnnotationShape::Redact { filter });
+                annotation.frozen_bounds = harness.state.selection.zone;
+                harness.state.annotations.push(annotation);
+                harness.state.select_annotation_ids([1]);
+                harness.render(1, false);
+                support::pointer(
+                    &mut harness.state,
+                    (290.0, 260.0),
+                    Some((MouseButton::Left, true)),
+                    &mut 0,
+                );
+                harness.render(1, false);
+            }
+            equal(&actual, &expected);
+            for position in [(295.0, 265.0), (300.0, 270.0), (290.0, 260.0)] {
+                for harness in [&mut actual, &mut expected] {
+                    support::pointer(&mut harness.state, position, None, &mut 0);
+                }
+                expected
+                    .state
+                    .damage_local(0, expected.state.placements[0].rect().unwrap());
+                actual.render(1, false);
+                expected.render(1, false);
+                equal(&actual, &expected);
+                assert_eq!(actual.state.filters.retained_bytes(), 0);
+                assert!(!actual.state.region_rendering.cached_annotations);
+            }
+        }
     }
 }
 

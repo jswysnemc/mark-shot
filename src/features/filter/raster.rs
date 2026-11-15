@@ -20,6 +20,9 @@ pub struct FilterKey {
 impl FilterKey {
     /// 【滤镜】【缓存参数】以 image、filter 创建冻结原图缓存键；旋转不改变源像素，空区域返回空值
     pub fn new(image: FrozenImage<'_>, filter: RegionFilter) -> Option<Self> {
+        if filter.mode.is_focus() {
+            return None;
+        }
         let grid = image.native_grid()?;
         Some(Self {
             grid,
@@ -147,7 +150,10 @@ impl PixelView<'_> {
 
 /// 【滤镜】【原图块生成】按 image、key 为 core 生成滤镜块和一像素插值留量；只在模糊时读取区域外像素
 pub fn render_tile(image: FrozenImage<'_>, key: FilterKey, core: IntRect) -> Option<Tile> {
-    if core.width() > TILE_PIXELS as u32 || core.height() > TILE_PIXELS as u32 {
+    if key.mode.is_focus()
+        || core.width() > TILE_PIXELS as u32
+        || core.height() > TILE_PIXELS as u32
+    {
         return None;
     }
     let at = core.make_outset(1, 1)?.intersect(&key.region)?;

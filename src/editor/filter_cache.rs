@@ -22,6 +22,10 @@ pub struct FilterCache {
 impl FilterCache {
     /// 【滤镜】【缓存准备】按 id、filter、image 生成或复用原图区域；返回是否新增缓存，过大区域交给按需分块绘制
     pub fn prepare(&mut self, id: u64, filter: RegionFilter, image: FrozenImage<'_>) -> bool {
+        if filter.mode.is_focus() {
+            self.remove(id);
+            return false;
+        }
         let Some(key) = FilterKey::new(image, filter) else {
             self.remove(id);
             return false;

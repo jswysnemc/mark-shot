@@ -18,8 +18,8 @@ fn render(source: &Pixmap, filter: RegionFilter, scale: f32, opacity: f32, cache
         source,
         Rect::from_xywh(0.0, 0.0, source.width() as f32, source.height() as f32).unwrap(),
     );
-    let raster =
-        cached.then(|| Raster::new(image, FilterKey::new(image, filter).unwrap()).unwrap());
+    let raster = (cached && !filter.mode.is_focus())
+        .then(|| Raster::new(image, FilterKey::new(image, filter).unwrap()).unwrap());
     let mut output = Pixmap::new(
         (source.width() as f32 * scale).round() as u32,
         (source.height() as f32 * scale).round() as u32,
@@ -52,7 +52,7 @@ fn rounded_filter_clips_corners_in_cached_and_direct_output() {
     pixels::same(&result, &render(&source, filter, 1.0, 1.0, true));
 }
 
-/// 【滤镜测试】【缓存与分块】五模式在旋转和分数缩放下，缓存与按需分块结果逐像素一致
+/// 【滤镜测试】【缓存与分块】普通滤镜缓存与分块结果一致，聚焦始终直接生成遮罩
 #[test]
 fn cached_and_uncached_draws_match_at_rotated_fractional_scales() {
     let source = pixels::image(700, 640);
@@ -214,7 +214,6 @@ fn filters_sample_frozen_pixels_and_keep_annotation_order() {
         id: 1,
         shape: AnnotationShape::Rectangle {
             radius: 0.0,
-            focus: false,
             fixed_ratio: false,
             start: (20.0, 20.0),
             end: (140.0, 80.0),

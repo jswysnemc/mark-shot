@@ -21,6 +21,7 @@ pub(super) fn lookup(source: &str) -> Option<&'static str> {
         "Edit" => "编辑",
         "Reselect" => "重选区",
         "Focus" => "聚焦",
+        "Ellipse focus" => "椭圆聚焦",
         "Pin image" => "置顶图片",
         "Close" => "关闭",
         "Translate" => "翻译",

@@ -9,6 +9,12 @@ pub(crate) use region::reclaim_region;
 mod copy;
 pub(crate) use copy::copy_changed;
 
+/// 【前景缓存】【零值检查】按 bytes 分段检查全部字节是否为零，返回判断结果，不写入透明页
+pub(crate) fn is_zero(bytes: &[u8]) -> bool {
+    let (blocks, tail) = bytes.as_chunks::<64>();
+    blocks.iter().all(|block| *block == [0; 64]) && tail.iter().all(|byte| *byte == 0)
+}
+
 /// 【前景缓存】【稀疏页策略】按pixmap限制自有内部页的透明大页分配，无返回值，不改像素；避免少量扫描行写入占有整块大页
 pub(crate) fn prepare_sparse(pixmap: &mut Pixmap) {
     #[cfg(target_os = "linux")]

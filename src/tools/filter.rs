@@ -42,7 +42,7 @@ impl ToolBehavior for FilterTool {
             let mut annotation = Annotation {
                 style_scale: 1.0,
                 rotation_degrees: 0.0,
-                frozen_bounds: None,
+                frozen_bounds: Some(space.bounds),
                 id: state.next_id,
                 shape: AnnotationShape::Redact { filter },
                 color,
@@ -94,9 +94,9 @@ impl ToolBehavior for FilterTool {
                         filter.end.1
                     );
                 }
-                state
-                    .damage_rects
-                    .push(DamageZone::Global(annotation.damage_bbox(false)));
+                state.damage_rects.push(DamageZone::Global(
+                    crate::features::filter::focus::interaction_bounds(&annotation, false),
+                ));
                 state.annotations.push(annotation);
                 state.prev_pending = None;
             }
@@ -113,17 +113,22 @@ impl ToolBehavior for FilterTool {
         let Some(annotation) = state.pending.as_mut() else {
             return;
         };
-        state
-            .damage_rects
-            .push(DamageZone::Global(annotation.damage_bbox(false)));
+        state.damage_rects.push(DamageZone::Global(
+            crate::features::filter::focus::interaction_bounds(annotation, false),
+        ));
         let AnnotationShape::Redact { filter } = &mut annotation.shape else {
             return;
         };
+        let first_focus = filter.mode.is_focus() && filter.rect().is_none();
         filter.end = point;
         annotation.update_bbox();
-        state
-            .damage_rects
-            .push(DamageZone::Global(annotation.damage_bbox(false)));
+        // 1. 【聚焦滤镜】【首次遮罩】第一次形成孔洞时绘制整个外围，后续调整只更新新旧孔洞
+        let damage = if first_focus {
+            annotation.damage_bbox(false)
+        } else {
+            crate::features::filter::focus::interaction_bounds(annotation, false)
+        };
+        state.damage_rects.push(DamageZone::Global(damage));
     }
 
     /// 【滤镜】【工具退出】取消 state 中未提交区域并释放临时缓存；dirty_mask 返回新旧绘制范围，无返回值

@@ -8,14 +8,16 @@ use tiny_skia::{Color, IntRect, Pixmap, Rect};
 /// 【滤镜测试】【模式中心像素】返回原图颜色二百、一百、五十在 mode 与十四强度下的参考 RGBA
 fn expected(mode: FilterMode) -> [u8; 4] {
     match mode {
-        FilterMode::Pixelate | FilterMode::Blur => [200, 100, 50, 255],
+        FilterMode::Pixelate | FilterMode::Blur | FilterMode::Focus | FilterMode::FocusEllipse => {
+            [200, 100, 50, 255]
+        }
         FilterMode::Grayscale => [126, 126, 126, 255],
         FilterMode::Invert => [55, 155, 205, 255],
         FilterMode::Brighten => [213, 136, 98, 255],
     }
 }
 
-/// 【滤镜测试】【原图分辨率】五模式导出保留一千六百乘九百原始尺寸，未修改像素与透明度不变
+/// 【滤镜测试】【原图分辨率】所有效果导出保留原始尺寸，普通滤镜不修改区域外像素，聚焦只压暗外围
 #[test]
 fn native_file_exports_preserve_resolution_alpha_and_mode_pixels() {
     for mode in FilterMode::ALL {
@@ -55,7 +57,12 @@ fn native_file_exports_preserve_resolution_alpha_and_mode_pixels() {
         assert_eq!(output.dimensions(), (1600, 900));
         assert_eq!(output.get_pixel(500, 400).0, expected(mode), "{mode:?}");
         for (x, y) in [(5, 5), (1599, 899), (1100, 720)] {
-            assert_eq!(output.get_pixel(x, y).0, [0, 0, 255, 128]);
+            if mode.is_focus() {
+                let pixel = output.get_pixel(x, y).0;
+                assert!(pixel[2] < 255 && pixel[3] > 128, "{mode:?}");
+            } else {
+                assert_eq!(output.get_pixel(x, y).0, [0, 0, 255, 128]);
+            }
         }
     }
 }

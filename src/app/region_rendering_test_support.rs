@@ -81,6 +81,12 @@ pub(crate) fn paint_current(state: &mut EditorState, dirty: Option<Rect>, hidden
     state.selection.prev_zone = state.selection.zone;
 }
 
+/// 【区域绘制测试】【帧末清理】按 state 执行生产帧末清理，避免测试重复绘制已完成的界面损坏，无返回值
+pub(crate) fn finish_frame(state: &mut EditorState) {
+    let pacing = super::frame_render::Pacing::new(state.placements.len());
+    super::frame_render::clear_frame_state(state, &mut 0, &pacing);
+}
+
 /// 【区域绘制测试】【指针输入】按state、position、button及pressed分派真实指针与按钮，dirty返回重绘掩码，无返回值
 pub(crate) fn pointer(
     state: &mut EditorState,

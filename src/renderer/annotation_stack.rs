@@ -191,7 +191,7 @@ pub(crate) fn draw_ordered<'a, I>(
     if multiply {
         // 1. 【荧光笔】【有序绘制】乘法混合读取当前局部底图，完成后直接覆盖当前损坏范围
         painter.clipped(dirty, |local| {
-            draw_visible(local, ordered, global, editors, filters, active_text_id)
+            draw_visible(local, ordered, global, editors, filters, active_text_id);
         });
     } else if let Some(mut temporary) = Pixmap::new(width, height) {
         // 2. 【标注渲染】【有序绘制】普通标注继续使用与持久缓存相同的透明合成，保证草稿和提交后的舍入一致
@@ -207,7 +207,7 @@ pub(crate) fn draw_ordered<'a, I>(
     }
 }
 
-/// 【标注渲染】【可见成员】按ordered顺序将与global相交的实际正文绘入local，editors、filters和active_text_id提供内容，无返回值
+/// 【标注渲染】【可见成员】按ordered顺序绘制与global相交的正文，local、editors、filters和active_text_id提供内容，返回是否存在实际贡献的成员
 pub(super) fn draw_visible<'a>(
     local: &mut Painter<'_>,
     ordered: impl Iterator<Item = &'a Annotation>,
@@ -215,8 +215,12 @@ pub(super) fn draw_visible<'a>(
     editors: &mut HashMap<u64, Editor<'static>>,
     filters: &HashMap<u64, crate::features::filter::raster::Raster>,
     active_text_id: Option<u64>,
-) {
+) -> bool {
+    let mut painted = false;
     for annotation in ordered {
+        if crate::features::filter::focus::inside_hole(annotation, global, 2.0 / local.scale()) {
+            continue;
+        }
         let bounds = super::annotation_style::damage(
             annotation,
             local.window_units(),
@@ -228,14 +232,29 @@ pub(super) fn draw_visible<'a>(
             && bounds.top() < global.bottom()
             && bounds.bottom() > global.top()
         {
-            annotations::draw_annotation(
-                local,
-                annotation,
-                false,
-                editors,
-                filters,
-                active_text_id,
-            );
+            painted = true;
+            if crate::features::filter::focus::enabled(annotation) {
+                local.clipped_scene(Some(global), |local| {
+                    annotations::draw_annotation(
+                        local,
+                        annotation,
+                        false,
+                        editors,
+                        filters,
+                        active_text_id,
+                    );
+                });
+            } else {
+                annotations::draw_annotation(
+                    local,
+                    annotation,
+                    false,
+                    editors,
+                    filters,
+                    active_text_id,
+                );
+            }
         }
     }
+    painted
 }

@@ -21,6 +21,10 @@ pub fn draw(
     if !filter.valid() || !opacity.is_finite() || opacity <= 0.0 {
         return;
     }
+    if filter.mode.is_focus() {
+        super::focus::draw(painter, filter, opacity);
+        return;
+    }
     let scale = painter.scale();
     if !scale.is_finite() || scale <= 0.0 {
         return;
@@ -156,7 +160,7 @@ fn draw_core(
 }
 
 /// 【滤镜】【输出像素边界】把 rect 按 scale、phase 映射到固定输出网格；返回向外对齐范围，空区域返回空值
-fn pixel_bounds(rect: Rect, scale: f32, phase: (f64, f64)) -> Option<IntRect> {
+pub(super) fn pixel_bounds(rect: Rect, scale: f32, phase: (f64, f64)) -> Option<IntRect> {
     Rect::from_ltrb(
         (f64::from(rect.left()) * f64::from(scale) - phase.0) as f32,
         (f64::from(rect.top()) * f64::from(scale) - phase.1) as f32,

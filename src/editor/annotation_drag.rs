@@ -134,9 +134,10 @@ pub fn commit_drag_if_changed(state: &mut EditorState) {
             state.redo_stack.clear();
         }
         state.layer_damage_rects.push(ann.damage_bbox(false));
-        state
-            .damage_rects
-            .push(DamageZone::Global(ann.damage_bbox(true)));
+        // 1. 【聚焦滤镜】【拖动提交】草稿与持久正文几何相同，交接只更新孔洞与控制框
+        state.damage_rects.push(DamageZone::Global(
+            crate::features::filter::focus::interaction_bounds(&ann, true),
+        ));
         state.annotations.insert(insert_idx, ann);
         state.prev_pending = None;
         state.select_annotation_index(Some(insert_idx));
@@ -238,9 +239,9 @@ pub fn apply_annotation_drag(state: &mut EditorState, global: (f64, f64)) {
         if orig_index < state.annotations.len() {
             let ann = state.annotations.remove(orig_index);
             state.layer_damage_rects.push(ann.damage_bbox(false));
-            state
-                .damage_rects
-                .push(DamageZone::Global(ann.damage_bbox(true)));
+            state.damage_rects.push(DamageZone::Global(
+                crate::features::filter::focus::interaction_bounds(&ann, true),
+            ));
             state.pending = Some(ann.clone());
             state.prev_pending = Some(ann);
         } else {
@@ -252,9 +253,9 @@ pub fn apply_annotation_drag(state: &mut EditorState, global: (f64, f64)) {
         return;
     };
 
-    state
-        .damage_rects
-        .push(DamageZone::Global(ann.damage_bbox(true)));
+    state.damage_rects.push(DamageZone::Global(
+        crate::features::filter::focus::interaction_bounds(ann, true),
+    ));
 
     // 2. 【标注】【更新拖动】普通手势和专用工具均以开始时的几何快照计算，不累计旋转或缩放误差
     if let (Some(before), Some(bounds)) = (filter_geometry, filter_bounds) {
@@ -360,9 +361,9 @@ pub fn apply_annotation_drag(state: &mut EditorState, global: (f64, f64)) {
         }
     }
 
-    state
-        .damage_rects
-        .push(DamageZone::Global(ann.damage_bbox(true)));
+    state.damage_rects.push(DamageZone::Global(
+        crate::features::filter::focus::interaction_bounds(ann, true),
+    ));
 
     // 3. 【取色标注】【拖动采样】引线指向点变化后刷新原图颜色，属性栏与标签保持一致
     if let Some(color) = crate::features::color_sample::sampling::refresh(

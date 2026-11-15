@@ -6,7 +6,7 @@ use mark_shot::features::filter::{
 use mark_shot::renderer::FrozenImage;
 use tiny_skia::{Pixmap, Rect};
 
-/// 【滤镜测试】【模式兼容】五模式保持原版编号，名称与整数配置都可读取，未知值不误选
+/// 【滤镜测试】【模式兼容】原有模式编号保持不变，聚焦追加编号，名称与整数配置都可读取，未知值不误选
 #[test]
 fn modes_keep_reference_ids_and_stable_names() {
     for (index, mode) in FilterMode::ALL.into_iter().enumerate() {
@@ -23,7 +23,7 @@ fn modes_keep_reference_ids_and_stable_names() {
     assert_eq!(FilterMode::default(), FilterMode::Pixelate);
     assert_eq!(FilterMode::from_pixelate(false), FilterMode::Blur);
     assert_eq!(FilterMode::parse("other"), None);
-    assert_eq!(FilterMode::parse("5"), None);
+    assert_eq!(FilterMode::parse("7"), None);
 }
 
 /// 【滤镜测试】【强度范围】默认十四，范围四至四十八，非有限值使用默认强度

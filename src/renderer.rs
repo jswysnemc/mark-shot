@@ -4,6 +4,7 @@ pub(crate) use capture_composite::composite_precise;
 pub use capture_composite::{capture_scale, composite};
 pub(crate) mod pixel_bounds;
 
+mod annotation_tile_blend;
 mod annotation_tiles;
 mod background_restore;
 mod canvas_navigation;

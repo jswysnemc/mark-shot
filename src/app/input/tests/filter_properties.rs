@@ -11,7 +11,7 @@ use crate::types::MouseButton;
 use crate::ui::panel::{AnimatedPanel, UiPanel};
 use crate::ui::settings_panel::{SettingsAction, SettingsWidget, StepperRange};
 
-/// 【滤镜测试】【模式完整】五个模式都可以键盘确认，确认不会导出或生成无标注历史
+/// 【滤镜测试】【模式完整】所有效果都可以键盘确认，确认不会导出或生成无标注历史
 #[test]
 fn every_filter_mode_can_be_confirmed_without_exporting() {
     let mut dirty = 0;
@@ -157,5 +157,5 @@ fn filter_picker_fits_a_compact_window_and_keeps_all_options_reachable() {
     );
     key(&mut state, "End", &mut dirty);
     key(&mut state, "Enter", &mut dirty);
-    assert_eq!(state.tool_settings.filter_mode, FilterMode::Brighten);
+    assert_eq!(state.tool_settings.filter_mode, FilterMode::FocusEllipse);
 }

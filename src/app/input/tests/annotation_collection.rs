@@ -13,7 +13,6 @@ pub(super) fn group() -> EditorState {
     second.id = 17;
     second.shape = AnnotationShape::Rectangle {
         radius: 0.0,
-        focus: false,
         fixed_ratio: false,
         start: (340.0, 250.0),
         end: (420.0, 310.0),

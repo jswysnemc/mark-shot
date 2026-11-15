@@ -1,4 +1,4 @@
-//! 【滤镜】【选择交互】管理五模式弹层的输入和生命周期，复用统一布局、命中和动画
+//! 【滤镜】【选择交互】管理效果弹层的输入和生命周期，复用统一布局、命中和动画
 
 use crate::editor::{EditorState, filter_edits};
 use crate::features::filter::FilterMode;
@@ -64,6 +64,14 @@ pub fn toggle(state: &mut EditorState, dirty_mask: &mut u32) {
     super::number::close(state, dirty_mask);
     super::line::close(state, dirty_mask);
     state.filter_popover.open = !state.filter_popover.open;
+    if state.filter_popover.open {
+        // 1. 【滤镜】【菜单字形】仅在打开菜单时准备实际标签字形，避免每帧重复加载
+        let language = crate::ui::language::Language::current();
+        let labels = FilterMode::ALL
+            .map(|mode| language.text(mode.label()))
+            .join("");
+        crate::fonts::ui_fallback::ensure_text(&mut state.text.font_system, &labels);
+    }
     state.filter_popover.hovered = None;
     state.filter_popover.cancel_scroll();
     state.filter_popover.dirty = true;
