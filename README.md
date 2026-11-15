@@ -5,7 +5,7 @@
   <p><strong>English</strong> | <a href="README.zh-CN.md">简体中文</a></p>
   <p>
     <a href="https://github.com/jswysnemc/mark-shot/releases">
-      <img src="https://img.shields.io/github/v/release/jswysnemc/mark-shot?include_prereleases=true&color=6da0f2&labelColor=4a5054&label=release&style=flat-square&logo=github" alt="Release" />
+      <img src="https://img.shields.io/github/v/release/jswysnemc/mark-shot?color=6da0f2&labelColor=4a5054&label=release&style=flat-square&logo=github" alt="Release" />
     </a>
     <a href="https://gitter.im/mark-shot/community">
       <img src="https://img.shields.io/badge/gitter-join%20chat-46bc99?labelColor=4a5054&style=flat-square&logo=gitter" alt="Gitter" />
