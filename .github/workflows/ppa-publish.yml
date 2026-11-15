@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       upstream_tag:
-        description: Official stable native tag, for example native-v0.2.0
+        description: Official stable native tag, for example v0.2.0
         required: true
         type: string
       ppa_revision:
@@ -65,7 +65,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PPA_BUILD_DEPENDENCY_PPA: ${{ vars.PPA_BUILD_DEPENDENCY_PPA }}
         run: |
-          [[ "$NATIVE_TAG" =~ ^native-v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$NATIVE_TAG" =~ ^(native-)?v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           [[ "$PPA_REVISION" =~ ^[1-9][0-9]*$ ]]
           arguments=()
           source_ref="$MANUAL_REF"

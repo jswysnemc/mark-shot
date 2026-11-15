@@ -2,11 +2,11 @@ name: Native Release
 
 on:
   push:
-    tags: ['native-v*']
+    tags: ['v*', 'native-v*']
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing native tag to publish or retry
+        description: Existing version tag to publish or retry, for example v0.2.0
         required: true
         type: string
 

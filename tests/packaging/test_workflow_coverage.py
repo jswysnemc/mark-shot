@@ -72,7 +72,7 @@ class WorkflowCoverage(unittest.TestCase):
             "flatpak",
         }
         self.assertEqual(set(data["jobs"]["publish"]["needs"]), expected)
-        self.assertEqual(data["on"]["push"]["tags"], ["native-v*"])
+        self.assertEqual(data["on"]["push"]["tags"], ["v*", "native-v*"])
         for job in expected - {"context", "verify"}:
             self.assertNotIn("upload_to_release", data["jobs"][job]["with"])
         for name in (
@@ -103,6 +103,16 @@ class WorkflowCoverage(unittest.TestCase):
             if step.get("name") == "Publish validated AUR metadata"
         )
         self.assertIn("inputs.push_to_aur", step["if"])
+
+    def test_source_aur_upload_requires_explicit_manual_request(self):
+        """【正式发布】【渠道顺序】无传参，推送正式标签只生成源码元数据，不提前上传 AUR，无返回值"""
+        step = next(
+            step
+            for step in workflow("aur-publish")["jobs"]["aur"]["steps"]
+            if step.get("name") == "Publish validated AUR metadata"
+        )
+        self.assertIn("github.event_name == 'workflow_dispatch'", step["if"])
+        self.assertIn("inputs.publish", step["if"])
 
     def test_deleted_branches_are_not_workflow_triggers(self):
         """【原生构建】【分支同步】无传参，禁止发布和构建入口依赖已删除分支，无返回值"""
@@ -272,7 +282,7 @@ class WorkflowCoverage(unittest.TestCase):
             self.assertEqual({item["arch"] for item in rows}, {"x86_64", "aarch64"})
 
     def test_manual_runs_do_not_publish_by_default(self):
-        """【原生发布】【保护测试】无传参，验证手动发布开关默认关闭且标签不接受 Qt v 前缀，无返回值"""
+        """【原生发布】【保护测试】无传参，验证手动发布开关默认关闭且支持正式与旧预览标签，无返回值"""
         for name in MIGRATED:
             data = workflow(name)
             inputs = data["on"].get("workflow_dispatch") or {}
@@ -281,7 +291,7 @@ class WorkflowCoverage(unittest.TestCase):
                     self.assertEqual(field.get("default"), "false", name)
             push = data["on"].get("push") or {}
             if "tags" in push:
-                self.assertEqual(push["tags"], ["native-v*"], name)
+                self.assertEqual(push["tags"], ["v*", "native-v*"], name)
 
     def test_no_qt_build_toolchain_or_plugins(self):
         """【原生构建】【工具链测试】无传参，检查迁移入口不依赖 Qt 构建或旧插件路径，无返回值"""

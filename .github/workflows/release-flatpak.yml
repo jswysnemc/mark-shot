@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Native version tag, for example native-v0.2.0
+        description: Native version tag, for example v0.2.0
         required: true
         type: string
       checkout_ref:
@@ -28,7 +28,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   context:
-    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'native-v')
+    if: github.event_name != 'release' || (startsWith(github.event.release.tag_name, 'v') || startsWith(github.event.release.tag_name, 'native-v'))
     uses: ./.github/workflows/native-release-context.yml
     with:
       tag: ${{ inputs.tag || '' }}

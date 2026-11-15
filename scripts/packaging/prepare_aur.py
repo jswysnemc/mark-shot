@@ -16,7 +16,7 @@ def prepare(
     repository, destination = Path(repository), Path(destination)
     if not re.fullmatch(r"[1-9][0-9]*", revision):
         raise ValueError("pkgrel must be a positive integer")
-    if not re.fullmatch(r"native-v[0-9]+\.[0-9]+\.[0-9]+", context.tag):
+    if not re.fullmatch(r"(?:native-)?v[0-9]+\.[0-9]+\.[0-9]+", context.tag):
         raise ValueError("AUR publication requires a stable native version")
     template = (
         repository / "packaging/aur" / ("PKGBUILD-bin.in" if binary else "PKGBUILD.in")

@@ -30,6 +30,7 @@ The keys below are the defaults; all of them can be changed, see [Shortcuts](sho
 | Laser | `G` | Temporary stroke for presentations |
 | Eyedropper | `I` | Pick a colour from the image |
 | OCR | `O` | Recognize text in the selection |
+| Recording | Toolbar | Record the selected screen region; adjust parameters in the property bar |
 
 ## Tool details
 
@@ -67,6 +68,10 @@ of the saved image and are not recorded in the undo history.
 ## Editing annotations
 
 Press `V` and click an annotation to select it. A dashed frame with handles appears.
+
+Rectangle, ellipse and marker selection frames leave space outside the stroke so its colour and
+width remain visible. Dragging a handle resizes the annotation body without adding that space to
+the saved geometry.
 
 | Action | How |
 | --- | --- |

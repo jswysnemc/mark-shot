@@ -21,8 +21,8 @@ Mark Shot freezes the screen, lets you select a region, annotate it, and then co
 recognize, translate or upload the result. It is written in Rust and draws its own interface in
 software, so it does not depend on Qt, GTK or a web view.
 
-> **Status.** `main` contains the native Rust rewrite. The current prerelease is
-> [0.2.0-preview.7](https://github.com/jswysnemc/mark-shot/releases/tag/native-v0.2.0-preview.7).
+> **Status.** `main` contains the native Rust rewrite. The current release is
+> [0.2.0](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.0).
 > The 0.1.x packages contain the earlier Qt implementation, preserved on
 > [`qt-old`](https://github.com/jswysnemc/mark-shot/tree/qt-old).
 > Linux on Wayland and X11 is the primary target. The Windows build runs, but
@@ -55,7 +55,7 @@ Details and known limits are in [Platform support](docs/platform-support.md).
 
 ## Install
 
-Download [0.2.0-preview.7](https://github.com/jswysnemc/mark-shot/releases/tag/native-v0.2.0-preview.7)
+Download [0.2.0](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.0)
 and choose a package for your distribution and architecture. The release page contains a collapsed
 file list with SHA-256 values; checksum files are not separate assets. See
 [Installation](docs/installation.md) for download verification and the available formats.

@@ -10,6 +10,10 @@ can also be edited by hand.
 Open it with `mark-shot --settings`, `Ctrl+,` in the editor, or the settings button on the
 toolbar.
 
+Opening settings from the capture editor closes the selection and capture window first.
+Inherited tools, colours and folders show their effective values. Resetting a field removes its
+override; opening and confirming an unchanged default does not save it as an explicit value.
+
 | Page | Content |
 | --- | --- |
 | Appearance | Theme, language, tray icon |

@@ -49,7 +49,8 @@ def repository(directory):
     commit = subprocess.check_output(
         ["git", "-C", str(directory), "rev-parse", "HEAD"], text=True
     ).strip()
-    subprocess.run(["git", "-C", str(directory), "tag", "native-v0.2.0"], check=True)
+    for tag in ("v0.2.0", "native-v0.2.0"):
+        subprocess.run(["git", "-C", str(directory), "tag", tag], check=True)
     return commit
 
 
@@ -119,15 +120,16 @@ class ReleaseSources(unittest.TestCase):
                 )
             self.assertEqual((root / "debian/control").read_text(), control)
 
-    def test_only_native_tags_and_matching_versions(self):
-        """【原生发布】【边界测试】无传参，拒绝 Qt 标签、错误版本及无效引用，无返回值"""
+    def test_version_tags_require_native_source_and_matching_versions(self):
+        """【原生发布】【边界测试】无传参，接受正式及旧标签，拒绝错误版本和无效引用，无返回值"""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "repo"
             commit = repository(root)
-            context = resolve(root, "native-v0.2.0", commit, publish=True)
-            self.assertEqual(context.commit, commit)
-            self.assertTrue(context.publish)
-            for tag in ("v0.2.0", "native-v0.3.0", "native-v../../bad"):
+            for tag in ("v0.2.0", "native-v0.2.0"):
+                context = resolve(root, tag, commit, publish=True)
+                self.assertEqual(context.commit, commit)
+                self.assertTrue(context.publish)
+            for tag in ("v0.1.62", "v0.3.0", "native-v0.3.0", "v../../bad", "0.2.0"):
                 with self.assertRaises(ValueError):
                     resolve(root, tag, commit)
             with self.assertRaises(ValueError):
@@ -149,8 +151,9 @@ class ReleaseSources(unittest.TestCase):
                 ],
                 check=True,
             )
-            with self.assertRaises(ValueError):
-                resolve(root, "native-v0.2.0", "HEAD", publish=True)
+            for tag in ("v0.2.0", "native-v0.2.0"):
+                with self.assertRaises(ValueError):
+                    resolve(root, tag, "HEAD", publish=True)
 
     def test_qt_source_is_rejected(self):
         """【原生发布】【源码测试】无传参，拒绝具有 Cargo.toml 但没有原生模块的提交，无返回值"""
@@ -176,8 +179,9 @@ class ReleaseSources(unittest.TestCase):
                 ],
                 check=True,
             )
-            with self.assertRaises(ValueError):
-                resolve(root, "native-v0.2.0", "HEAD")
+            for tag in ("v0.2.0", "native-v0.2.0"):
+                with self.assertRaises(ValueError):
+                    resolve(root, tag, "HEAD")
 
     def test_debian_components_and_source_reconstruction(self):
         """【原生源码】【组件测试】无传参，验证上游、vendor、媒体和固定字体组件可由 dpkg-source 重建，无返回值"""

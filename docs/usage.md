@@ -80,6 +80,9 @@ overlap enough, a hint asks you to scroll back slowly.
 
 A pinned image is a small window that stays above other windows.
 
+Editing an image uses a single toolbar with minimize, maximize and close controls at its right.
+Opening the editor from a pin hides the source pin until editing finishes or is cancelled.
+
 | Start from | How |
 | --- | --- |
 | The editor | `Ctrl+P` or the pin button |

@@ -12,7 +12,7 @@ src/
     wayland/           Capture protocols, overlay, windows, pins, clipboard, text input
     x11/               X11 capture, windows, clipboard, XIM
     windows/           Win32 capture, windows, clipboard
-    window_detection/  Window geometry sources: niri, Sway, X11, Windows
+    window_detection/  Window geometry sources: niri, Sway, KDE, X11, Windows
   editor/              Editing state, undo history, damage tracking, caches
   renderer/            Annotation, text and pixel compositing; output images
   tools/               Input behaviour of each annotation tool
@@ -124,7 +124,8 @@ python3 scripts/packaging/install_linux.py \
 
 The per-format scripts `package_deb.py`, `package_rpm.py`, `package_pacman.py`,
 `package_appimage.py`, `package_flatpak.py` and `package_portable.py` turn that tree into a
-package. `native-release.yml` handles `native-v*` tags, calls the existing `release-*.yml`
+package. `native-release.yml` handles `v*` tags, including the official `v0.2.0` release, and
+accepts legacy `native-v*` tags for preview retries. It calls the existing `release-*.yml`
 workflows and waits for all verification and package jobs before publishing. `windows-build.yml`
 produces the Windows archive. Per-format manual runs produce Actions artifacts rather than a
 partial GitHub Release. Stable AUR metadata publication requires an explicit manual request.

@@ -2,10 +2,10 @@
 
 [English](../installation.md) | **简体中文**
 
-当前原生预发布为
-[0.2.0-preview.7](https://github.com/jswysnemc/mark-shot/releases/tag/native-v0.2.0-preview.7)。
+当前正式版为
+[0.2.0](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.0)。
 0.1.x 安装包属于此前的 Qt 实现，源码保留在 `qt-old` 分支。
-本次预发布不更新 AUR 或 PPA 稳定渠道。
+AUR 和 PPA 元数据使用独立发布流程，需要显式执行。
 
 ## 下载预编译安装包
 
@@ -16,8 +16,8 @@ Arch 安装包、AppImage、Flatpak、Linux 便携归档和 Windows x86_64 归�
 Linux x86_64 便携归档解压后应保留完整目录：
 
 ```sh
-tar -xzf mark-shot-native-0.2.0-preview.7-linux-x86_64.tar.gz
-./mark-shot-native-0.2.0-preview.7-linux-x86_64/mark-shot
+tar -xzf mark-shot-native-0.2.0-linux-x86_64.tar.gz
+./mark-shot-native-0.2.0-linux-x86_64/mark-shot
 ```
 
 ARM64 使用 `linux-aarch64` 归档。Windows 解压完整 ZIP 后运行 `mark-shot.exe`，
@@ -29,17 +29,17 @@ ARM64 使用 `linux-aarch64` 归档。Windows 解压完整 ZIP 后运行 `mark-s
 摘要文件和内部 JSON 元数据不再作为独立发布资产上传。
 
 ```sh
-sha256sum mark-shot-native-0.2.0-preview.7-linux-x86_64.tar.gz
+sha256sum mark-shot-native-0.2.0-linux-x86_64.tar.gz
 ```
 
 Windows 使用 PowerShell：
 
 ```powershell
-Get-FileHash .\mark-shot-native-0.2.0-preview.7-windows-x86_64-msvc.zip -Algorithm SHA256
+Get-FileHash .\mark-shot-native-0.2.0-windows-x86_64-msvc.zip -Algorithm SHA256
 ```
 
 发布文件名用 `.` 替换 `~`，以符合 GitHub 资产命名规则。
-Debian 和 RPM 包内版本仍保留预发布排序规则。
+文件名规范化不改变安装包内容或包内版本。
 
 ## 环境要求
 
@@ -151,7 +151,7 @@ Mark Shot 不使用 Qt、GTK 或 WebView，也不启动 `grim`、`wl-copy`、`xc
 
 ## 安装包
 
-发布 `native-v*` 标签后，发布流程会构建下列安装包。每个 Linux 安装包都包含可执行文件、媒体库和许可声明。
+发布 `v*` 标签后，发布流程会构建下列安装包。每个 Linux 安装包都包含可执行文件、媒体库和许可声明。
 
 | 格式 | 目标 | 文件名 |
 | --- | --- | --- |

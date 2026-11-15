@@ -14,10 +14,15 @@ A source build needs the media library first, see
 | --- | --- |
 | Command line | `mark-shot --record` opens the controller; `mark-shot --record-select` goes straight to region selection |
 | Tray | Screen recording → Start recording |
-| Editor | `Ctrl+Shift+R` for video, `Ctrl+Shift+G` for GIF |
+| Editor | Select the recording tool, or use `Ctrl+Shift+R` for video and `Ctrl+Shift+G` for GIF |
 
 In the controller, choose the format, audio source, quality, frame rate and countdown, then click
 **Start recording**. **Select region** lets you draw the area, which must lie within one monitor.
+
+In the editor, recording keeps the current selection and shows format, frame rate, countdown,
+audio, quality, encoder and cursor options in the compact tool settings bar. Selecting the tool
+does not start capture. Click **Start recording** or press `Enter` to submit the selected region
+and the current parameters. These parameters apply to this recording without changing defaults.
 
 ## Controlling a recording
 

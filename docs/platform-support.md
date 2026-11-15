@@ -28,7 +28,7 @@ On Linux the session type decides the protocol. A Wayland session uses Wayland e
 | Region and full-screen capture | Yes | Yes | Yes, through the portal | Yes | Yes |
 | Multi-monitor capture | Yes | Yes | Yes | Yes | Yes |
 | Active window capture (`-w`) | niri only, requires copying | Yes | No | Yes | Yes |
-| Window snapping while selecting | niri and Sway | No | No | Yes | Yes |
+| Window snapping while selecting | niri and Sway | Yes | No | Yes | Yes |
 | Interface region detection | Yes | Yes | Yes | Yes | Yes |
 | Pinned images always on top | With layer-shell | With layer-shell | No | Yes | Yes |
 | Global shortcut | Portal | Portal | Portal | Yes | Yes |
@@ -56,7 +56,9 @@ needs a desktop-specific source.
 
 - Capture uses KWin's ScreenShot2 interface. Set `kde_kwin_screenshot = false` in `[capture]` to
   use the desktop portal instead.
-- A complete interactive regression run has not been done on KDE Wayland yet.
+- KWin supplies visible window geometry and stacking through a temporary snapshot script.
+- KDE Wayland VM regression covers capture, annotation, pin editing, settings, recording, scrolling
+  capture and shortcuts, including window detection with image detection disabled.
 
 ### GNOME
 
@@ -67,14 +69,17 @@ needs a desktop-specific source.
 - There is no public interface for the active window or for window geometry, so `-w` and window
   snapping report that they are unsupported.
 - The tray needs an extension that provides StatusNotifierItem.
+- GNOME Wayland VM regression covers portal capture, annotation, pin editing, settings, recording,
+  scrolling capture, shortcuts and large PNG transfers through Xwayland.
 
 ### X11
 
 - Captures use physical pixels and are not resampled per monitor DPI.
 - The active window capture contains the visible client area of the foreground window.
 - Always-on-top pins use `_NET_WM_STATE_ABOVE`; the window manager decides whether to honour it.
-- Monitor hotplug during a capture and mixed-DPI hardware have not been verified. KDE on X11 and
-  Xfce have not had desktop-specific regression runs.
+- Xfce 4.20 / Xorg 21.1.26 VM regression covers capture, client geometry, pointer, annotation,
+  pins, settings, shortcuts, recording, scrolling capture and large clipboard transfers.
+- Monitor hotplug, mixed-DPI hardware, KDE X11 and older GNOME Xorg remain unverified.
 
 ### Windows
 

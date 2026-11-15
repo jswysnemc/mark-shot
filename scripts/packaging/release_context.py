@@ -29,11 +29,10 @@ def git(root, *arguments):
 
 def resolve(root, tag, reference, publish=False):
     """【原生发布】【上下文校验】按 root、tag、reference 和 publish 返回确认过的原生发布上下文"""
-    if not tag.startswith("native-v"):
-        raise ValueError(
-            "native releases require a native-v tag; Qt v* tags are not accepted"
-        )
-    package_version = version(tag.removeprefix("native-v"))
+    match = re.fullmatch(r"(?:native-)?v(.+)", tag)
+    if match is None:
+        raise ValueError("release tags require a v prefix")
+    package_version = version(match.group(1))
     if (
         not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./+-]*", reference)
         or ".." in reference

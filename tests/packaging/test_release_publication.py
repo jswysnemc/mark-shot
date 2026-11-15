@@ -116,6 +116,35 @@ class ReleasePublication(unittest.TestCase):
             publish(self.root, self.context, self.notes, "owner/project")
         command.assert_not_called()
 
+    def test_stable_version_is_published_as_latest_after_verification(self):
+        """【正式发布】【版本状态】无传参，核对 v 标签正式版完整校验后公开并设为最新版，无返回值"""
+        self.context = Context("v0.2.0", "0.2.0", "a" * 40, True)
+        finalize(self.asset, "0.2.0", "x86_64", self.context.commit, "portable")
+        self.metadata.update(tag_name="v0.2.0", prerelease=False)
+        self.metadata["assets"] = [self.remote_asset()]
+
+        def response(endpoint, method="GET", payload=None, missing_ok=False):
+            """【正式发布】【响应样本】按 endpoint、method、payload 和 missing_ok 返回校验后状态，拒绝预发布标记"""
+            if missing_ok:
+                return None
+            if "?per_page=" in endpoint:
+                return []
+            if method in ("POST", "PATCH"):
+                self.assertFalse(payload["prerelease"])
+                self.assertEqual(payload["make_latest"], "true")
+            if method == "POST":
+                self.assertTrue(payload["draft"])
+                return {**self.metadata, "assets": []}
+            if method == "PATCH":
+                self.assertFalse(payload["draft"])
+            return {**self.metadata, **(payload or {})}
+
+        with (
+            patch("publish_assets.request", side_effect=response),
+            patch("release_api.subprocess.run"),
+        ):
+            publish(self.root, self.context, self.notes, "owner/project")
+
     def test_mismatched_existing_asset_stops_before_publication(self):
         """【原生发布】【不可变门槛】无传参，已有文件摘要不同时拒绝上传和公开，无返回值"""
         self.metadata["assets"] = [self.remote_asset("sha256:" + "b" * 64)]
