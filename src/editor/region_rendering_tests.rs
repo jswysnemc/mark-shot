@@ -109,6 +109,7 @@ fn dense_scene_frame_cost_is_measured_through_the_editor_entry() {
                 0.0,
                 AnnotationShape::Rectangle {
                     radius: 0.0,
+                    focus: false,
                     fixed_ratio: false,
                     start: (x, y),
                     end: (x + 57.375, y + 53.875),

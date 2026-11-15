@@ -24,6 +24,7 @@ pub(super) enum Task {
     Copy(String),
     Pin(String),
     Edit(String),
+    Reselect(String),
     Delete(String),
     Clear,
     Prune(usize),
@@ -54,6 +55,7 @@ impl Task {
             Self::Copy(_) => "Copy",
             Self::Pin(_) => "Pin",
             Self::Edit(_) => "Edit",
+            Self::Reselect(_) => "Reselect",
             Self::Delete(_) => "Delete",
             Self::Clear => "Clear",
             Self::Prune(_) => "Prune",
@@ -280,6 +282,7 @@ fn execute(store: &Store, task: Task, cancelled: &AtomicBool) -> Response {
                 .map_err(|error| io::Error::other(error.to_string()))
         }),
         Task::Edit(name) => super::transport::spawn_edit(store, &name),
+        Task::Reselect(name) => super::transport::spawn_reselect(store, &name),
         Task::Delete(name) => store.remove(&name),
         Task::Clear => store.clear(),
         Task::Prune(limit) => store.prune(limit),

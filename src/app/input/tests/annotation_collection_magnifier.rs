@@ -55,6 +55,7 @@ fn prepared(members: &Value, scale: f32) -> EditorState {
     overlap.id = 91;
     overlap.shape = AnnotationShape::Rectangle {
         radius: 0.0,
+        focus: false,
         fixed_ratio: false,
         start: (510.0, 35.0),
         end: (615.0, 105.0),

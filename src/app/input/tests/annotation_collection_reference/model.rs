@@ -50,12 +50,14 @@ pub(super) fn decode(value: &Value) -> Annotation {
     let shape = match tool {
         3 => AnnotationShape::Rectangle {
             radius: 0.0,
+            focus: false,
             fixed_ratio: false,
             start,
             end,
             filled: false,
         },
         4 => AnnotationShape::Circle {
+            focus: false,
             fixed_ratio: false,
             start,
             end,

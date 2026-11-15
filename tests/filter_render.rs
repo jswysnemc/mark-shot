@@ -214,6 +214,7 @@ fn filters_sample_frozen_pixels_and_keep_annotation_order() {
         id: 1,
         shape: AnnotationShape::Rectangle {
             radius: 0.0,
+            focus: false,
             fixed_ratio: false,
             start: (20.0, 20.0),
             end: (140.0, 80.0),

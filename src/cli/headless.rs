@@ -70,7 +70,7 @@ async fn capture(
     method: &dyn crate::backend::CaptureMethod,
     outputs: &[Output],
     options: &CaptureOptions,
-) -> AppResult<(Vec<u8>, u32, u32, f32)> {
+) -> AppResult<(Vec<u8>, u32, u32, f32, Option<Vec<u8>>)> {
     let visibility = crate::backend::capture_visibility::Guard::begin(
         crate::config::preferences::current()
             .capture
@@ -102,11 +102,18 @@ async fn capture(
     }
     let (pixmap, _, scale) = crate::renderer::composite(&captures, &placements, region, None)
         .ok_or("cannot composite the requested region")?;
+    let original = if crate::config::history::current().enabled && options.region.is_some() {
+        crate::renderer::composite(&captures, &placements, bounds, None)
+            .map(|(image, _, _)| crate::utils::encode_png(&image))
+    } else {
+        None
+    };
     Ok((
         crate::utils::encode_png(&pixmap),
         pixmap.width(),
         pixmap.height(),
         scale,
+        original,
     ))
 }
 
@@ -176,14 +183,18 @@ pub(super) async fn run(options: &CaptureOptions) -> AppResult {
             }
         };
         let selected: Vec<_> = indices.iter().map(|index| all[*index].clone()).collect();
-        let result =
-            capture(&*method, &selected, options)
-                .await
-                .and_then(|(png, width, height, scale)| {
-                    capture_output::write(&path, &png)?;
-                    crate::features::capture_history::remember(&png, scale, &output);
-                    Ok((width, height))
-                });
+        let result = capture(&*method, &selected, options).await.and_then(
+            |(png, width, height, scale, original)| {
+                capture_output::write(&path, &png)?;
+                crate::features::capture_history::remember_with_original(
+                    &png,
+                    scale,
+                    &output,
+                    Some(original.as_deref().unwrap_or(&png)),
+                );
+                Ok((width, height))
+            },
+        );
         let (width, height, error) = match result {
             Ok((width, height)) => (width, height, None),
             Err(error) => (0, 0, Some(error.to_string())),

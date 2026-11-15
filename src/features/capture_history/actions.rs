@@ -17,6 +17,9 @@ impl HistoryWindow {
                 .model
                 .selected()
                 .is_some_and(|entry| self.model.preview(&entry.name).is_some()),
+            Control::Reselect => self.model.selected().is_some_and(|entry| {
+                entry.has_original && self.model.preview(&entry.name).is_some()
+            }),
             Control::Clear => !self.model.entries.is_empty(),
             _ => true,
         }
@@ -48,6 +51,10 @@ impl HistoryWindow {
             },
             Control::Edit => match name {
                 Some(name) => Task::Edit(name),
+                None => return WindowAction::None,
+            },
+            Control::Reselect => match name {
+                Some(name) => Task::Reselect(name),
                 None => return WindowAction::None,
             },
             Control::Save => match name {

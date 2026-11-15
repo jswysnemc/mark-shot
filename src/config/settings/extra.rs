@@ -116,6 +116,14 @@ pub(super) const ENTRIES: &[Entry] = &[
     field!(
         Pinned,
         "pinned",
+        "file_paths_to_image",
+        "将文件路径贴为文字图片",
+        "Pin file paths as text images",
+        Kind::Toggle
+    ),
+    field!(
+        Pinned,
+        "pinned",
         "always_on_top",
         "贴图始终置顶",
         "Keep pins on top",
@@ -240,13 +248,5 @@ pub(super) const ENTRIES: &[Entry] = &[
         "日志文件位置",
         "Log file path",
         Kind::Text
-    ),
-    field!(
-        Advanced,
-        "about",
-        "version",
-        "版本与应用信息",
-        "Version and application information",
-        Kind::Link(Page::About)
     ),
 ];

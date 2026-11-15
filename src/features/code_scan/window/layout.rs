@@ -42,7 +42,7 @@ impl Layout {
             buttons: [
                 (Control::Copy, rect(14.0, h - 42.0, 132.0, 28.0)),
                 (Control::CopyAll, rect(w - 154.0, h - 42.0, 140.0, 28.0)),
-                (Control::Close, rect(w - 86.0, 8.0, 72.0, 26.0)),
+                (Control::Close, rect(w - 42.0, 8.0, 28.0, 28.0)),
             ],
         }
     }

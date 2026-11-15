@@ -15,6 +15,7 @@ use std::sync::mpsc::{self, Receiver};
 
 pub(super) struct ResultWindow {
     fonts: UiFonts,
+    icons: crate::renderer::Icons,
     cache: cosmic_text::SwashCache,
     editor: TextEditor,
     bytes: Option<Vec<u8>>,
@@ -38,6 +39,12 @@ impl ResultWindow {
         let mut fonts = UiFonts::with_system_family("Sans Serif");
         let editor = TextEditor::new("", &mut fonts);
         Self {
+            icons: [(
+                crate::ui::icons::CLOSE,
+                usvg::Tree::from_str(crate::ui::icons::CLOSE, &usvg::Options::default())
+                    .expect("valid close icon"),
+            )]
+            .into(),
             fonts,
             editor,
             cache: cosmic_text::SwashCache::new(),

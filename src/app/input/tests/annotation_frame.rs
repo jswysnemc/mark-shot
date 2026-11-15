@@ -21,12 +21,14 @@ fn rectangular_frames_preserve_stroke_pixels_at_each_window_scale() {
                     end: (280.0, 210.0),
                     radius: 0.0,
                     filled: false,
+                    focus: false,
                     fixed_ratio: false,
                 },
                 AnnotationShape::Circle {
                     start: (180.0, 130.0),
                     end: (280.0, 210.0),
                     filled: false,
+                    focus: false,
                     fixed_ratio: false,
                 },
                 AnnotationShape::Marker {

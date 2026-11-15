@@ -16,6 +16,71 @@ use crate::{
 use serde_json::json;
 use std::time::Duration;
 
+/// 【翻译测试回归】【自定义原文】无参数，通过原生窗口事件编辑多行原文，真实请求使用草稿，恢复按钮还原示例
+#[test]
+fn editable_sample_reaches_translation_request_and_can_be_reset() {
+    use crate::{
+        backend::window::KeyInput,
+        keys::{Key, Mods},
+    };
+    let server = Server::start(Some((200, r#"{"output":[]}"#.into())));
+    let mut state = preferences(&server);
+    let area = Layout::new(&state).preview.source;
+    let position = (f64::from(area.left() + 20.0), f64::from(area.top() + 14.0));
+    for pressed in [true, false] {
+        state.event(WindowEvent::PointerButton {
+            position,
+            button: LEFT_BUTTON,
+            pressed,
+        });
+    }
+    state.event(WindowEvent::Key(KeyInput {
+        key: Some(Key::Char('a')),
+        text: String::new(),
+        mods: Mods {
+            ctrl: true,
+            ..Default::default()
+        },
+    }));
+    state.event(WindowEvent::Key(KeyInput {
+        key: None,
+        text: "Custom first line".into(),
+        mods: Mods::default(),
+    }));
+    state.event(WindowEvent::Key(KeyInput {
+        key: Some(Key::Enter),
+        text: String::new(),
+        mods: Mods::default(),
+    }));
+    state.event(WindowEvent::Key(KeyInput {
+        key: None,
+        text: "Custom second line".into(),
+        mods: Mods::default(),
+    }));
+    assert_eq!(
+        state.translation.preview.source.text("zh"),
+        "Custom first line\nCustom second line"
+    );
+    click_test(&mut state);
+    let request = server.seen.recv_timeout(Duration::from_secs(2)).unwrap();
+    assert!(request.contains("Custom first line") && request.contains("Custom second line"));
+    assert!(!request.contains("meeting starts"));
+    finish(&mut state);
+    let reset = Layout::new(&state).preview.reset;
+    let position = (
+        f64::from(reset.left() + 10.0),
+        f64::from(reset.top() + 12.0),
+    );
+    for pressed in [true, false] {
+        state.event(WindowEvent::PointerButton {
+            position,
+            button: LEFT_BUTTON,
+            pressed,
+        });
+    }
+    assert_eq!(state.translation.preview.source.text("zh"), SOURCE);
+}
+
 /// 【翻译测试回归】【窗口构造】按 server 创建临时配置及设置窗口，显式虚构密钥避免读取真实凭据
 fn preferences(server: &Server) -> Preferences {
     let mut state = Preferences::new(false).unwrap();

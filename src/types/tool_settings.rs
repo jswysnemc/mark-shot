@@ -111,6 +111,7 @@ pub struct ToolSettings {
     pub outline: bool,
     pub outline_color: Color,
     pub fill: bool,
+    pub focus: bool,
     pub corner_radius: f32,
     pub fixed_ratio: bool,
     pub marker_shape: crate::types::MarkerShape,
@@ -193,6 +194,7 @@ impl Default for ToolSettings {
                 .unwrap_or(tools.font.outline_color)
                 .color(),
             fill: saved.fill.unwrap_or(tools.fill),
+            focus: saved.focus.unwrap_or(false),
             corner_radius: crate::features::shape::radius(saved.corner_radius.unwrap_or(0.0)),
             fixed_ratio: saved.fixed_ratio.unwrap_or(false),
             marker_shape: saved.marker_shape.unwrap_or(tools.marker.shape),

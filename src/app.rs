@@ -34,6 +34,7 @@ mod actions;
 mod delay;
 mod file_canvas_theme;
 mod finish;
+mod history_source;
 mod image_export;
 mod image_setup;
 pub(crate) mod image_window;
@@ -106,6 +107,7 @@ pub struct Launch {
     pub speed: bool,
     pub shot_at: Option<Instant>,
     pub image: Option<PathBuf>,
+    pub reselect: bool,
     pub fullscreen: bool,
     pub display_names: Vec<String>,
     pub include_cursor: bool,
@@ -218,8 +220,8 @@ async fn make_screenshot(
     if let Some(color) = launch.default_color {
         editor_state.tool_settings.color = color.color();
     }
-    editor_state.fullscreen_scope = launch.fullscreen || launch.image.is_some();
-    if launch.fullscreen || launch.image.is_some() {
+    editor_state.fullscreen_scope = launch.fullscreen || launch.image.is_some() && !launch.reselect;
+    if launch.fullscreen || launch.image.is_some() && !launch.reselect {
         if editor_state.selection.zone.is_none() {
             editor_state.selection.zone = get_full_workspace_rect(&editor_state.placements);
         }
@@ -276,7 +278,7 @@ async fn make_screenshot(
             drop(editor_state);
             drop(overlay);
             crate::utils::memory::release_unused();
-            return crate::features::preferences::run(false);
+            return crate::features::preferences::spawn();
         }
 
         if scroll_mode {

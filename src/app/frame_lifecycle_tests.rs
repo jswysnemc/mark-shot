@@ -57,6 +57,7 @@ impl Harness {
             0.0,
             AnnotationShape::Rectangle {
                 radius: 0.0,
+                focus: false,
                 fixed_ratio: false,
                 start,
                 end,

@@ -199,6 +199,7 @@ pub enum ToggleField {
     Italic,
     Outline,
     Fill,
+    Focus,
     MarkerFill,
     MagnifierRectangle,
     FixedRatio,
@@ -336,6 +337,10 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
                 visual: ToggleVisual::Checkbox { label: "Fill" },
                 field: ToggleField::Fill,
             },
+            SettingsWidget::Toggle {
+                visual: ToggleVisual::Checkbox { label: "Focus" },
+                field: ToggleField::Focus,
+            },
             FIXED_RATIO,
             CORNER_RADIUS,
         ],
@@ -352,6 +357,10 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
             SettingsWidget::Toggle {
                 visual: ToggleVisual::Checkbox { label: "Fill" },
                 field: ToggleField::Fill,
+            },
+            SettingsWidget::Toggle {
+                visual: ToggleVisual::Checkbox { label: "Focus" },
+                field: ToggleField::Focus,
             },
         ],
         Tool::Redact => &[

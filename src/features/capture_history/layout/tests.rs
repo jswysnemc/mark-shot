@@ -8,7 +8,7 @@ fn compact_history_keeps_controls_and_split_panes_accessible() {
     for width in [440, 620, 720, 1280] {
         for status in [0.0, 19.0, 38.0] {
             let layout = Layout::with_options((width, 480), 190.0, status);
-            assert_eq!(layout.buttons.len(), 8);
+            assert_eq!(layout.buttons.len(), 9);
             assert!(
                 layout
                     .buttons
@@ -20,6 +20,7 @@ fn compact_history_keeps_controls_and_split_panes_accessible() {
             for control in [
                 Control::Copy,
                 Control::Edit,
+                Control::Reselect,
                 Control::Pin,
                 Control::Save,
                 Control::Delete,
@@ -31,7 +32,7 @@ fn compact_history_keeps_controls_and_split_panes_accessible() {
                     .unwrap()
                     .1;
                 assert_eq!(bounds.height(), 26.0);
-                assert!(bounds.width() <= 82.0 && bounds.bottom() < layout.list.y());
+                assert!(bounds.width() <= 84.0 && bounds.bottom() < layout.list.y());
                 assert_eq!(
                     layout.control((f64::from(bounds.x() + 1.0), f64::from(bounds.y() + 1.0))),
                     Some(control)

@@ -23,6 +23,7 @@ pub struct Entry {
     pub bytes: u64,
     pub scale: f32,
     pub search: String,
+    pub has_original: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -51,7 +52,11 @@ impl Store {
             return Ok(Vec::new());
         };
         let mut entries = Vec::new();
-        for (name, bytes) in directory.owned()? {
+        for (name, bytes) in directory
+            .owned()?
+            .into_iter()
+            .filter(|(name, _)| identity::timestamp(name).is_some())
+        {
             if bytes > self.byte_limit.min(png_metadata::PNG_BYTE_LIMIT) {
                 continue;
             }
@@ -59,10 +64,12 @@ impl Store {
                 .read(&name)
                 .and_then(|mut file| png_metadata::inspect(&mut file));
             if let Ok(info) = info {
+                let original_bytes = super::originals::bytes(&directory, &name);
                 entries.push(Entry {
                     created: identity::timestamp(&name).unwrap(),
                     name,
-                    bytes,
+                    bytes: bytes.saturating_add(original_bytes),
+                    has_original: original_bytes > 0,
                     width: info.width,
                     height: info.height,
                     scale: info.scale,
@@ -75,29 +82,66 @@ impl Store {
 
     /// 【截图历史】【完成图记录】保存 png、scale 和 search，再按 limit 与容量淘汰最旧项；返回新记录
     pub fn append(&self, png: &[u8], scale: f32, search: &str, limit: usize) -> io::Result<Entry> {
+        self.append_with_original(png, scale, search, limit, None)
+    }
+
+    /// 【截图历史】【成对存储】按 png、scale、search、limit 与 original 原子提交完成图，原图先落盘，失败回收；返回新记录
+    pub fn append_with_original(
+        &self,
+        png: &[u8],
+        scale: f32,
+        search: &str,
+        limit: usize,
+        original: Option<&[u8]>,
+    ) -> io::Result<Entry> {
         if limit == 0 {
             return Err(io::Error::other("history limit must be positive"));
         }
         let prepared = Prepared::new(png, scale, search)?;
-        if prepared.len() > self.byte_limit {
+        let source = original
+            .map(|png| Prepared::new(png, scale, ""))
+            .transpose()?;
+        let total_bytes = prepared
+            .len()
+            .saturating_add(source.as_ref().map_or(0, Prepared::len));
+        if total_bytes > self.byte_limit {
             return Err(io::Error::other("screenshot exceeds history storage limit"));
         }
         // 1. 【截图历史】【记录事务】在锁内生成递增名称，临时文件始终位于固定目录
         let directory = Directory::open(&self.directory, true)?
             .ok_or_else(|| io::Error::other("cannot create history directory"))?;
         let _lock = directory.lock()?;
-        let previous = directory.owned()?;
+        let previous: Vec<_> = directory
+            .owned()?
+            .into_iter()
+            .filter(|(name, _)| identity::timestamp(name).is_some())
+            .collect();
         let name = identity::next(
             Utc::now(),
             previous
                 .first()
                 .and_then(|entry| identity::timestamp(&entry.0)),
         )?;
-        let mut file = tempfile::NamedTempFile::new_in(directory.path())?;
-        prepared.write(&mut file)?;
-        file.as_file().sync_all()?;
-        file.persist_noclobber(directory.path().join(&name))
-            .map_err(|error| error.error)?;
+        let original_name = super::originals::name(&name).expect("valid generated identity");
+        if let Some(source) = &source {
+            let mut file = tempfile::NamedTempFile::new_in(directory.path())?;
+            source.write(&mut file)?;
+            file.as_file().sync_all()?;
+            file.persist_noclobber(directory.path().join(&original_name))
+                .map_err(|error| error.error)?;
+        }
+        let completed = (|| -> io::Result<()> {
+            let mut file = tempfile::NamedTempFile::new_in(directory.path())?;
+            prepared.write(&mut file)?;
+            file.as_file().sync_all()?;
+            file.persist_noclobber(directory.path().join(&name))
+                .map_err(|error| error.error)?;
+            Ok(())
+        })();
+        if let Err(error) = completed {
+            directory.remove(&original_name)?;
+            return Err(error);
+        }
         directory.sync()?;
         // 2. 【截图历史】【容量淘汰】新记录成功落盘后才删除旧项，超大截图不会破坏已有历史
         retain(&directory, limit, self.byte_limit)?;
@@ -105,7 +149,8 @@ impl Store {
         Ok(Entry {
             created: identity::timestamp(&name).unwrap(),
             name,
-            bytes: prepared.len(),
+            bytes: total_bytes,
+            has_original: source.is_some(),
             width: prepared.info.width,
             height: prepared.info.height,
             scale: prepared.info.scale,
@@ -142,6 +187,13 @@ impl Store {
         Ok((png, info.scale))
     }
 
+    /// 【截图历史】【完整原图读取】按完成图 name 返回关联原图及设备比例，沿用普通文件、有界读取和 PNG 校验
+    pub fn read_original(&self, name: &str) -> io::Result<(Vec<u8>, f32)> {
+        let name = super::originals::name(name)
+            .ok_or_else(|| io::Error::other("invalid history identity"))?;
+        self.read(&name)
+    }
+
     /// 【截图历史】【删除记录】在锁内删除 name；不存在视为成功，非法身份和链接返回错误
     pub fn remove(&self, name: &str) -> io::Result<()> {
         if identity::timestamp(name).is_none() {
@@ -151,7 +203,7 @@ impl Store {
             return Ok(());
         };
         let _lock = directory.lock()?;
-        directory.remove(name)?;
+        super::originals::remove(&directory, name)?;
         directory.sync()
     }
 
@@ -184,10 +236,18 @@ impl Store {
 /// 【截图历史】【保留前缀】保留 directory 中最新 limit 项并满足 byte_limit；调用方必须已经持锁
 fn retain(directory: &Directory, limit: usize, byte_limit: u64) -> io::Result<()> {
     let mut total = 0_u64;
-    for (index, (name, bytes)) in directory.owned()?.iter().enumerate() {
-        total = total.saturating_add(*bytes);
+    super::originals::prune_orphans(directory)?;
+    for (index, (name, bytes)) in directory
+        .owned()?
+        .into_iter()
+        .filter(|(name, _)| identity::timestamp(name).is_some())
+        .enumerate()
+    {
+        total = total
+            .saturating_add(bytes)
+            .saturating_add(super::originals::bytes(directory, &name));
         if index >= limit.min(200) || total > byte_limit {
-            directory.remove(name)?;
+            super::originals::remove(directory, &name)?;
         }
     }
     Ok(())

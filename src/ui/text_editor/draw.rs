@@ -64,6 +64,29 @@ impl TextEditor {
         self.draw_at(fonts, cache, canvas, rect, None, scale, focused, 0.0);
     }
 
+    /// 【界面控件】【多行裁切】按 fonts、cache、canvas 和 rect 绘制正文，viewport 限制可见区域，scale 与 focused 指定显示状态，无返回值
+    pub fn draw_clipped(
+        &mut self,
+        fonts: &mut FontSystem,
+        cache: &mut SwashCache,
+        canvas: &mut Pixmap,
+        rect: Rect,
+        viewport: Rect,
+        scale: f32,
+        focused: bool,
+    ) {
+        self.draw_at(
+            fonts,
+            cache,
+            canvas,
+            rect,
+            Some(viewport),
+            scale,
+            focused,
+            0.0,
+        );
+    }
+
     /// 【界面控件】【横向字段】在 rect 内绘制不换行字段，offset 保存横向视区；自动保持光标可见
     pub fn draw_single_line(
         &mut self,

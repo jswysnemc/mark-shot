@@ -159,7 +159,18 @@ pub fn apply_toggle_field(
             ToggleField::Bold => ts.bold = new_value,
             ToggleField::Italic => ts.italic = new_value,
             ToggleField::Outline => ts.outline = new_value,
-            ToggleField::Fill => ts.fill = new_value,
+            ToggleField::Fill => {
+                ts.fill = new_value;
+                if new_value {
+                    ts.focus = false;
+                }
+            }
+            ToggleField::Focus => {
+                ts.focus = new_value;
+                if new_value {
+                    ts.fill = false;
+                }
+            }
             ToggleField::MarkerFill => ts.marker_filled = new_value,
             ToggleField::MagnifierRectangle | ToggleField::FixedRatio => {}
         },
@@ -170,9 +181,25 @@ pub fn apply_toggle_field(
                 *outline = new_value.then_some(outline_color)
             }
             (
-                AnnotationShape::Rectangle { filled, .. } | AnnotationShape::Circle { filled, .. },
+                AnnotationShape::Rectangle { filled, focus, .. }
+                | AnnotationShape::Circle { filled, focus, .. },
                 ToggleField::Fill,
-            ) => *filled = new_value,
+            ) => {
+                *filled = new_value;
+                if new_value {
+                    *focus = false;
+                }
+            }
+            (
+                AnnotationShape::Rectangle { filled, focus, .. }
+                | AnnotationShape::Circle { filled, focus, .. },
+                ToggleField::Focus,
+            ) => {
+                *focus = new_value;
+                if new_value {
+                    *filled = false;
+                }
+            }
             (AnnotationShape::Marker { filled, .. }, ToggleField::MarkerFill) => {
                 *filled = new_value
             }

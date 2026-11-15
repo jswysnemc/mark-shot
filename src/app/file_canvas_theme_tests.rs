@@ -27,6 +27,7 @@ fn light_dark_round_trip_preserves_original_alpha_annotations_and_export() {
                 0.0,
                 crate::types::AnnotationShape::Rectangle {
                     radius: 0.0,
+                    focus: false,
                     fixed_ratio: false,
                     start: (250.0, 180.0),
                     end: (350.0, 240.0),

@@ -104,6 +104,7 @@ fn clear_confirmation_defaults_to_cancel_and_blocks_click_through() {
         height: 2,
         bytes: 20,
         scale: 1.0,
+        has_original: false,
         search: String::new(),
     }]);
     state.control(Control::Clear);

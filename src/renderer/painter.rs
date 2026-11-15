@@ -262,13 +262,18 @@ impl<'a> Painter<'a> {
         }
     }
 
+    /// 【渲染】【路径填充】按 path 和 color 使用非零绕组规则填充，无返回值
     pub fn fill_path(&mut self, path: &Path, color: impl Into<Color>) {
+        self.fill_path_rule(path, color, FillRule::Winding);
+    }
+
+    /// 【渲染】【填充规则】按 path、color 和 rule 填充当前变换下的路径，无返回值
+    pub fn fill_path_rule(&mut self, path: &Path, color: impl Into<Color>, rule: FillRule) {
         let mut paint = Paint::default();
         paint.set_color(color.into());
         paint.anti_alias = true;
         let transform = self.transform();
-        self.canvas
-            .fill_path(path, &paint, FillRule::Winding, transform, None);
+        self.canvas.fill_path(path, &paint, rule, transform, None);
     }
 
     pub fn stroke_path(&mut self, path: &Path, color: impl Into<Color>, stroke: &Stroke) {

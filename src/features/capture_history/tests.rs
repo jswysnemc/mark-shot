@@ -1,6 +1,7 @@
 //! 【截图历史测试】【入口】存储安全与无损 PNG 的独立回归
 
 mod metadata;
+mod originals;
 mod preview;
 mod storage;
 

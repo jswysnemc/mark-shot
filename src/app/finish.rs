@@ -85,6 +85,7 @@ pub async fn finish_capture(
             .map(|rect| (rect.left().round() as i32, rect.top().round() as i32)),
         true,
         pin_translation,
+        super::history_source::png(editor_state),
     )
     .await;
     Ok(())
@@ -92,7 +93,7 @@ pub async fn finish_capture(
 
 /// 【截图】【完成交付】记录最终 png 后按 outputs 贴图、保存与复制；scale 为设备比例，dir 为输出目录，search 为搜索文字
 pub async fn deliver(png: Vec<u8>, scale: f32, outputs: Outputs, dir: Option<&Path>, search: &str) {
-    deliver_positioned(png, scale, outputs, dir, search, None, false, None).await;
+    deliver_positioned(png, scale, outputs, dir, search, None, false, None, None).await;
 }
 
 /// 【截图】【定位交付】按 position 恢复贴图位置，其余保存、复制与历史流程保持相同
@@ -105,6 +106,7 @@ async fn deliver_positioned(
     position: Option<(i32, i32)>,
     user_image: bool,
     pin_translation: Option<super::selection_translation::handoff::Image>,
+    original: Option<Vec<u8>>,
 ) {
     // 1. 【图像导出】【共享图片】只在用户保存或复制时合成一次外框，贴图与标准输出始终使用原图
     let exported = match crate::features::export_image::for_delivery(
@@ -123,7 +125,12 @@ async fn deliver_positioned(
             return;
         }
     };
-    crate::features::capture_history::remember(&exported, scale, search);
+    crate::features::capture_history::remember_with_original(
+        &exported,
+        scale,
+        search,
+        Some(original.as_deref().unwrap_or(&png)),
+    );
     if outputs.pin {
         let result = if let Some(image) = pin_translation {
             crate::backend::pin::spawn_translated(&image.png, scale, position, &image.seed)

@@ -95,6 +95,8 @@ shadow_offset_y = 28
 shadow_opacity = 0.32
 
 [pinned]
+# 复制文件时，允许把路径转为文字贴图；图片文件首次仍直接显示图片
+file_paths_to_image = true
 always_on_top = true
 border_enabled = true
 border_color = "#5EEAD4"

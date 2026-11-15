@@ -12,11 +12,12 @@ use tiny_skia::Rect;
 
 pub(in crate::features::preferences::translation) const HEIGHT: f32 = 278.0;
 
-pub(in crate::features::preferences::translation) struct Layout {
+pub(in crate::features::preferences) struct Layout {
     pub bounds: Rect,
     pub test: Rect,
     pub copy: Rect,
     pub source: Rect,
+    pub reset: Rect,
     pub result: Rect,
 }
 
@@ -24,6 +25,7 @@ impl Layout {
     /// 【翻译测试】【区域布局】按 bounds 生成紧凑原文和结果区域，按钮与标题互不覆盖
     pub fn new(bounds: Rect) -> Self {
         Self {
+            reset: rect(bounds.right() - 126.0, bounds.top() + 54.0, 112.0, 24.0),
             bounds,
             test: rect(bounds.right() - 110.0, bounds.top() + 4.0, 96.0, 26.0),
             copy: rect(bounds.right() - 210.0, bounds.top() + 4.0, 92.0, 26.0),
@@ -40,6 +42,16 @@ impl Layout {
                 100.0,
             ),
         }
+    }
+
+    /// 【翻译测试】【原文输入区域】无参数，返回框内文本坐标，绘制、鼠标和输入法共用此范围
+    pub fn source_input(&self) -> Rect {
+        rect(
+            self.source.left() + 8.0,
+            self.source.top() + 6.0,
+            self.source.width() - 16.0,
+            self.source.height() - 12.0,
+        )
     }
 
     /// 【翻译测试】【结果滚动条】按 preview 返回结果区域的溢出滚动几何，短结果不显示轨道
@@ -126,7 +138,7 @@ pub(in crate::features::preferences::translation) fn draw(
             20.0,
         ),
         if chinese {
-            "预制原文"
+            "测试原文（可编辑）"
         } else {
             "Sample text"
         },
@@ -174,6 +186,9 @@ pub(in crate::features::preferences::translation) fn draw(
             bounds.width() - 12.0,
             bounds.height() - 12.0,
         );
+        if bounds == layout.source && preview.source.editor.is_some() {
+            continue;
+        }
         painter.clipped_scene(Some(clip), |painter| {
             painter.text_buffer(
                 buffer,

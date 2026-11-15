@@ -164,6 +164,12 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
             });
             (Some(file), Command::Editor(launch))
         }
+        Command::HistoryReselectSnapshot => {
+            let (file, mut launch) =
+                crate::features::capture_history::transport::edit_from_stdin()?;
+            launch.reselect = true;
+            (Some(file), Command::Editor(launch))
+        }
         Command::HistorySnapshot => {
             let (file, launch) = crate::features::capture_history::transport::edit_from_stdin()?;
             (Some(file), Command::Editor(launch))

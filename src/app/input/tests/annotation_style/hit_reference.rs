@@ -38,12 +38,14 @@ fn annotation(scene: &Scene) -> crate::types::Annotation {
     let shape = match scene.index {
         0 => AnnotationShape::Rectangle {
             radius: 0.0,
+            focus: false,
             fixed_ratio: false,
             start,
             end,
             filled: false,
         },
         1 => AnnotationShape::Circle {
+            focus: false,
             fixed_ratio: false,
             start,
             end,

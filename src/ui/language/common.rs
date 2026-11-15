@@ -19,6 +19,8 @@ pub(super) fn lookup(source: &str) -> Option<&'static str> {
         "Copy failed" => "复制失败",
         "Cancel" => "取消",
         "Edit" => "编辑",
+        "Reselect" => "重选区",
+        "Focus" => "聚焦",
         "Pin image" => "置顶图片",
         "Close" => "关闭",
         "Translate" => "翻译",

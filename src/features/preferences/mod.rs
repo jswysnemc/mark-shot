@@ -1,5 +1,6 @@
 //! 【设置窗口】【独立入口】复用原生窗口与控件，配置修改逐项保存，下次截图读取最新值
 
+mod about;
 mod catalog;
 mod colors;
 mod draw;

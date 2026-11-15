@@ -5,6 +5,57 @@ use crate::backend::window::{WindowContent, WindowEvent};
 
 mod effective;
 
+/// 【设置回归】【整行编辑】无参数，常规和最小窗口下编辑路径不会挤压输入框，绘制和按钮命中共用坐标
+#[test]
+fn path_editing_uses_full_row_at_all_supported_widths() {
+    use super::window::Control;
+    for width in [640, 900, 1200] {
+        let mut state = Preferences::new(false).unwrap();
+        state.size.0 = width;
+        state.page = Page::Storage;
+        let index = entry("save.directory");
+        state.activate(Control::Row(index));
+        let layout = super::layout::Layout::new(&state);
+        let row = layout.rows.iter().find(|row| row.index == index).unwrap();
+        let input = super::layout::editor_rect(row);
+        assert!(input.width() >= 280.0);
+        assert!(input.top() > row.bounds.top() + 50.0);
+        for (control, rect) in [
+            (
+                Control::Reset(index),
+                super::layout::reset_rect(row.control),
+            ),
+            (Control::Apply, super::layout::apply_rect(row.control)),
+        ] {
+            assert_eq!(
+                layout.hit(
+                    &state,
+                    (f64::from(rect.left() + 10.0), f64::from(rect.top() + 10.0))
+                ),
+                Some(control)
+            );
+        }
+    }
+}
+
+/// 【设置回归】【底部展开】无参数，视口底部可见行展开后自动滚动，编辑区及按钮保持完整可见
+#[test]
+fn editing_a_bottom_row_reveals_its_expanded_input() {
+    use super::window::Control;
+    let mut state = Preferences::new(false).unwrap();
+    state.size = (900, 420);
+    state.page = Page::Storage;
+    let index = entry("save.directory");
+    let layout = super::layout::Layout::new(&state);
+    let row = layout.rows.iter().find(|row| row.index == index).unwrap();
+    state.scroll = (row.bounds.bottom() - layout.viewport.bottom()).max(0.0) as usize;
+    state.activate(Control::Row(index));
+    let layout = super::layout::Layout::new(&state);
+    let row = layout.rows.iter().find(|row| row.index == index).unwrap();
+    assert!(row.control.top() >= layout.viewport.top());
+    assert!(row.control.bottom() <= layout.viewport.bottom());
+}
+
 /// 【设置回归】【全局绑定】无参数，全局快捷键按单个组合保存，清除只禁用全局监听，不修改编辑器绑定
 #[test]
 fn global_shortcut_records_one_chord_without_replacing_editor_bindings() {

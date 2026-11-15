@@ -19,6 +19,7 @@ impl HistoryWindow {
             [
                 Control::Copy,
                 Control::Edit,
+                Control::Reselect,
                 Control::Pin,
                 Control::Save,
                 Control::Delete,

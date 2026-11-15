@@ -11,6 +11,7 @@ pub(super) enum Control {
     Enabled,
     Copy,
     Edit,
+    Reselect,
     Pin,
     Save,
     Delete,
@@ -25,6 +26,7 @@ impl Control {
             Self::Enabled => "Keep screenshot history",
             Self::Copy => "Copy",
             Self::Edit => "Edit",
+            Self::Reselect => "Reselect",
             Self::Pin => "Pin",
             Self::Save => "Save As",
             Self::Delete => "Delete",
@@ -83,11 +85,12 @@ impl Layout {
                 rect(width - 127.0, height - 33.0 - inset, 119.0, 26.0),
             ),
         ];
-        let widths = [68.0, 66.0, 62.0, 82.0, 72.0];
+        let widths = [54.0, 54.0, 84.0, 54.0, 78.0, 72.0];
         let mut x = 8.0;
         for (control, button_width) in [
             Control::Copy,
             Control::Edit,
+            Control::Reselect,
             Control::Pin,
             Control::Save,
             Control::Delete,

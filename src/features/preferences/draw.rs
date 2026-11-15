@@ -58,7 +58,7 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
         .map(|group| group.title)
         .collect::<Vec<_>>()
         .join(" ");
-    state.fonts.ensure_text(&format!("{labels} {group_labels} {} {} 保存 恢复 实际导出预览 已添加外框 原图 外框关闭 按下快捷键 浅色 深色 Windows 系统 OCR 未找到匹配设置 清空搜索或尝试其他关键词 截图 标注 文字识别 翻译 原生窗口，无需浏览器运行环境", values.join(" "), state.resource_note));
+    state.fonts.ensure_text(&format!("{labels} {group_labels} {} {} 保存 恢复 实际导出预览 已添加外框 原图 外框关闭 按下快捷键 浅色 深色 Windows 系统 OCR 未找到匹配设置 清空搜索或尝试其他关键词 截图 标注 文字识别 翻译 原生窗口，无需浏览器运行环境 版本 操作系统 桌面环境 窗口管理器 合成器 显示协议 未识别", values.join(" "), state.resource_note));
     if layout.toolbar_preview.is_some() {
         state.fonts.ensure_text(
             "位置预览 跟随选区 屏幕顶部 屏幕底部 屏幕左侧 屏幕右侧 选区 主栏 侧栏 属性栏",
@@ -286,46 +286,16 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
                 }
             }
             if state.page == Page::About && state.search.text().is_empty() {
-                let area = rect(
-                    layout.viewport.left(),
-                    layout.viewport.top(),
-                    layout.viewport.width() - 14.0,
-                    170.0,
-                );
-                widgets::panel(painter, area, "Mark Shot");
-                painter.text(
+                super::about::draw(
+                    painter,
                     rect(
-                        area.left() + 16.0,
-                        area.top() + 49.0,
-                        area.width() - 32.0,
-                        30.0,
+                        layout.viewport.left(),
+                        layout.viewport.top() - state.scroll as f32,
+                        layout.viewport.width(),
+                        layout.viewport.height(),
                     ),
-                    concat!("Mark Shot ", env!("CARGO_PKG_VERSION")),
-                    TextStyle::new(16.0, palette.text).weight(cosmic_text::Weight::SEMIBOLD),
-                );
-                painter.text(
-                    rect(
-                        area.left() + 16.0,
-                        area.top() + 87.0,
-                        area.width() - 32.0,
-                        24.0,
-                    ),
-                    if chinese {
-                        "截图 · 标注 · 文字识别 · 翻译"
-                    } else {
-                        "Capture · Annotate · OCR · Translate"
-                    },
-                    TextStyle::new(12.0, palette.text),
-                );
-                painter.text(
-                    rect(
-                        area.left() + 16.0,
-                        area.top() + 118.0,
-                        area.width() - 32.0,
-                        24.0,
-                    ),
-                    "GitHub: https://github.com/jswysnemc/mark-shot",
-                    TextStyle::new(11.0, palette.muted),
+                    chinese,
+                    &state.about,
                 );
             } else if layout.rows.is_empty() {
                 painter.text(

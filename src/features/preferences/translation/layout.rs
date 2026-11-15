@@ -19,6 +19,8 @@ pub(in crate::features::preferences) enum Hit {
     Models,
     Test,
     CopyTest,
+    Source,
+    ResetSource,
 }
 
 pub(super) struct Row {
@@ -36,7 +38,7 @@ pub(in crate::features::preferences) struct Layout {
     pub(super) scrollbar: Option<scrollbar::Geometry>,
     pub(super) capacity: usize,
     pub(super) maximum: usize,
-    pub(super) preview: super::preview::draw::Layout,
+    pub(in crate::features::preferences) preview: super::preview::draw::Layout,
 }
 
 pub(super) use super::super::layout::rect;
@@ -108,6 +110,8 @@ impl Layout {
         ));
         self.controls.push((Hit::Test, self.preview.test));
         self.controls.push((Hit::CopyTest, self.preview.copy));
+        self.controls.push((Hit::ResetSource, self.preview.reset));
+        self.controls.push((Hit::Source, self.preview.source));
         top += super::preview::draw::HEIGHT + 16.0;
         let mut fields = state.translation.fields();
         fields.retain(|field| *field != Field::Provider);

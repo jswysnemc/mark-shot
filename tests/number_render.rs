@@ -304,6 +304,7 @@ fn rectangle(id: u64, rect: Rect, color: Color) -> Annotation {
         id,
         shape: AnnotationShape::Rectangle {
             radius: 0.0,
+            focus: false,
             fixed_ratio: false,
             start: (rect.left(), rect.top()),
             end: (rect.right(), rect.bottom()),

@@ -1,6 +1,6 @@
 //! 【设置窗口】【分类目录】按使用任务组织设置，字段名与运行时配置保持一致
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Page {
     Appearance,
     Capture,
@@ -17,7 +17,7 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Appearance,
         Self::Capture,
         Self::Recording,
@@ -29,6 +29,7 @@ impl Page {
         Self::Pinned,
         Self::Integrations,
         Self::Advanced,
+        Self::About,
     ];
     /// 【设置窗口】【分类标题】按 chinese 返回当前分类名称，无副作用
     pub fn title(self, chinese: bool) -> &'static str {

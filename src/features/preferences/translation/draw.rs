@@ -67,12 +67,13 @@ pub(in crate::features::preferences) fn draw(
         .iter()
         .find(|(field, _)| *field == Field::Target)
         .map_or("", |(_, text)| text.as_str());
+    let source_text = state.translation.preview.source.text(target);
     let preview_text = super::preview::draw::prepare(
         &mut state.translation.preview,
         &layout.preview,
         chinese,
         &mut state.fonts,
-        super::preview::sample(target),
+        &source_text,
     );
     let metadata = model.map_or_else(
         || {
@@ -111,7 +112,7 @@ pub(in crate::features::preferences) fn draw(
         .collect::<Vec<_>>()
         .join(" ");
     state.fonts.ensure_text(&format!("{labels} {service_labels} {panel_labels} 查询模型 取消查询 选择模型 保存 显示 隐藏 使用默认值 {}", values.iter().map(|(_, text)| text.as_str()).collect::<Vec<_>>().join(" ")));
-    state.fonts.ensure_text("翻译测试 测试翻译 取消测试 复制详情 预制原文 测试成功 译文 测试失败 错误详情 测试中 测试结果 测试当前查看的服务");
+    state.fonts.ensure_text("翻译测试 测试翻译 取消测试 复制详情 测试原文（可编辑） 恢复默认原文 测试成功 译文 测试失败 错误详情 测试中 测试结果 测试当前查看的服务");
     let mut editor_rect = None;
     {
         let mut painter = Painter::new(canvas)
@@ -141,6 +142,13 @@ pub(in crate::features::preferences) fn draw(
                 let hovered = hover == Some(*hit) || state.translation.focus == Some(*hit);
                 let mut enabled = true;
                 let label: String = match *hit {
+                    Hit::Source => continue,
+                    Hit::ResetSource => if chinese {
+                        "恢复默认原文"
+                    } else {
+                        "Reset sample"
+                    }
+                    .into(),
                     Hit::Test => match (chinese, state.translation.preview.busy()) {
                         (true, true) => "取消测试",
                         (true, false) => "测试翻译",
@@ -325,6 +333,20 @@ pub(in crate::features::preferences) fn draw(
             rect,
             scale,
             !state.search_focus,
+        );
+    }
+    let area = layout.preview.source_input();
+    if area.intersect(&layout.viewport).is_some()
+        && let Some(editor) = &mut state.translation.preview.source.editor
+    {
+        editor.draw_clipped(
+            &mut state.fonts,
+            &mut state.cache,
+            canvas,
+            area,
+            layout.viewport,
+            scale,
+            state.translation.preview.source.focused,
         );
     }
 }

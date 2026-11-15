@@ -6,6 +6,7 @@ use std::{io, sync::Arc};
 pub struct Snapshot {
     pub png: Arc<Vec<u8>>,
     pub scale: f32,
+    pub original: Option<Arc<Vec<u8>>>,
     pub search: String,
     pub(crate) record_history: bool,
 }
@@ -20,6 +21,7 @@ impl Snapshot {
         crate::features::capture_history::png_metadata::verify(io::Cursor::new(&png))?;
         Ok(Self {
             png: Arc::new(png),
+            original: None,
             scale,
             search,
             record_history: true,
@@ -29,7 +31,12 @@ impl Snapshot {
     /// 【截图另存为】【成功记录】按最新历史策略记录已经保存的快照；取消或保存失败时不得调用
     pub(super) fn remember(&self) {
         if self.record_history {
-            crate::features::capture_history::remember(&self.png, self.scale, &self.search);
+            crate::features::capture_history::remember_with_original(
+                &self.png,
+                self.scale,
+                &self.search,
+                self.original.as_deref().map(Vec::as_slice),
+            );
         }
     }
 }

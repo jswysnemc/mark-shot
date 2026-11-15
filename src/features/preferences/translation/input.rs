@@ -242,6 +242,11 @@ fn edit_pointer(
 /// 【翻译设置】【控件执行】按 hit 修改 state，保存成功才切换服务或退出字段编辑
 fn activate(state: &mut Preferences, hit: Hit) {
     match hit {
+        Hit::Source => super::preview::source::activate(state),
+        Hit::ResetSource => {
+            state.translation.preview.source = Default::default();
+            state.translation.preview.reset();
+        }
         Hit::Test => {
             if state.translation.preview.busy() {
                 state.translation.preview.cancel();
@@ -363,6 +368,9 @@ pub(in crate::features::preferences) fn event(
     event: &WindowEvent,
 ) -> Option<WindowAction> {
     let layout = Layout::new(state);
+    if let Some(action) = super::preview::source::event(state, &layout, event) {
+        return Some(action);
+    }
     match event {
         WindowEvent::Wake => {
             let preview_changed = state.translation.preview.poll();

@@ -18,8 +18,6 @@ use nix::{
     unistd::{UnlinkatFlags, unlinkat},
 };
 
-use super::identity;
-
 pub(super) struct Directory {
     file: File,
 }
@@ -76,7 +74,7 @@ impl Directory {
             let Ok(name) = item.file_name().into_string() else {
                 continue;
             };
-            if identity::timestamp(&name).is_none() {
+            if !super::originals::valid(&name) {
                 continue;
             }
             if let Ok(stat) = fstatat(&self.file, name.as_str(), AtFlags::AT_SYMLINK_NOFOLLOW)
@@ -92,7 +90,7 @@ impl Directory {
 
     /// 【截图历史】【文件打开】只读 name 指定的合法普通历史文件；通过目录描述符拒绝路径穿越和链接
     pub fn read(&self, name: &str) -> io::Result<File> {
-        if identity::timestamp(name).is_none() {
+        if !super::originals::valid(name) {
             return Err(io::Error::other("invalid history identity"));
         }
         let file = File::from(openat(
@@ -109,7 +107,7 @@ impl Directory {
 
     /// 【截图历史】【文件删除】删除合法 name；不存在视为成功，特殊文件和链接返回错误
     pub fn remove(&self, name: &str) -> io::Result<()> {
-        if identity::timestamp(name).is_none() {
+        if !super::originals::valid(name) {
             return Err(io::Error::other("invalid history identity"));
         }
         match fstatat(&self.file, name, AtFlags::AT_SYMLINK_NOFOLLOW) {

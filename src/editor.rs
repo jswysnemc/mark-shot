@@ -410,11 +410,12 @@ impl EditorState {
         for (i, placement) in self.placements.iter().enumerate() {
             let offset = placement.offset();
             let pad = ann.visual_pad();
+            let body = ann.damage_bbox(false);
             let visual = Rect::from_ltrb(
-                ann.bbox.left() - offset.0 - pad,
-                ann.bbox.top() - offset.1 - pad,
-                ann.bbox.right() - offset.0 + pad,
-                ann.bbox.bottom() - offset.1 + pad,
+                body.left() - offset.0 - pad,
+                body.top() - offset.1 - pad,
+                body.right() - offset.0 + pad,
+                body.bottom() - offset.1 + pad,
             );
             if let (Some(vis), Some(mon)) = (visual, placement.rect())
                 && rects_overlap(&vis, &mon)

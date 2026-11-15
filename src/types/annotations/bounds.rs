@@ -189,6 +189,11 @@ impl Annotation {
     }
     /// 【标注】【重绘范围】根据 is_selected 决定是否包含操作框；返回完整逻辑重绘区域
     pub fn damage_bbox(&self, is_selected: bool) -> Rect {
+        if crate::features::shape::focus::enabled(self)
+            && let Some(bounds) = self.frozen_bounds
+        {
+            return bounds;
+        }
         if let AnnotationShape::Redact { filter } = self.shape {
             let body = self
                 .bbox

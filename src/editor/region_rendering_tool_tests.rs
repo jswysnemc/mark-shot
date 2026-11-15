@@ -21,6 +21,7 @@ fn compare(shape: AnnotationShape, cached_pixels: bool) {
                     13.0,
                     AnnotationShape::Rectangle {
                         radius: 0.0,
+                        focus: false,
                         fixed_ratio: false,
                         start: (90.375, 60.625),
                         end: (561.125, 401.875),

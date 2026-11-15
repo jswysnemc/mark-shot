@@ -41,11 +41,12 @@ pub(super) struct Preferences {
     pub(super) desktop_status: crate::features::desktop::status::Status,
     pub(super) color_edit: Option<super::colors::Edit>,
     pub resource_note: String,
+    pub about: super::about::Information,
     #[cfg(test)]
     test_directory: Option<tempfile::TempDir>,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum Control {
     Close,
     Back,
@@ -125,6 +126,7 @@ impl Preferences {
             frame_preview: Default::default(),
             theme_watch: None,
             resource_note: String::new(),
+            about: super::about::Information::detect(),
             #[cfg(test)]
             test_directory: None,
         })
@@ -486,6 +488,8 @@ impl Preferences {
                         };
                         field.select_all(&mut self.fonts);
                         self.editing = Some((index, field));
+                        // 1. 【设置窗口】【编辑可见】字段展开后重新计算视口，底部输入框完整显示
+                        self.reveal_row(index);
                     }
                 }
             }

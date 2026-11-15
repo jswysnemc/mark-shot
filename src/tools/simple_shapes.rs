@@ -45,7 +45,9 @@ impl ToolBehavior for SimpleShapeTool {
             state.adopt_annotation_style(&mut ann);
             ann.update_bbox();
 
-            state.damage_rects.push(DamageZone::Global(ann.bbox));
+            state
+                .damage_rects
+                .push(DamageZone::Global(ann.damage_bbox(false)));
             state.pending = Some(ann.clone());
             state.prev_pending = Some(ann);
         } else if let Some(ann) = state.pending.take() {
@@ -65,7 +67,9 @@ impl ToolBehavior for SimpleShapeTool {
         let canvas_point = state.canvas_point();
         let space = crate::tools::drawing_space::DrawingSpace::from_editor(state);
         if let Some(ann) = state.pending.as_mut() {
-            state.damage_rects.push(DamageZone::Global(ann.bbox));
+            state
+                .damage_rects
+                .push(DamageZone::Global(ann.damage_bbox(false)));
 
             let pos = (canvas_point.0 as f32, canvas_point.1 as f32);
             let start = ann.shape.start_point();
@@ -82,7 +86,9 @@ impl ToolBehavior for SimpleShapeTool {
             ann.shape = (self.make_shape)(start, end, &self.settings);
             ann.update_bbox();
 
-            state.damage_rects.push(DamageZone::Global(ann.bbox));
+            state
+                .damage_rects
+                .push(DamageZone::Global(ann.damage_bbox(false)));
         }
     }
 }

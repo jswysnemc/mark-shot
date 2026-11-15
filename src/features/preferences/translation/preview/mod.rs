@@ -1,6 +1,7 @@
 //! 【翻译测试】【请求状态】使用正式翻译任务测试当前查看的服务，不改变已启用服务
 
 pub(super) mod draw;
+pub(in crate::features::preferences) mod source;
 
 use crate::{
     backend::window::WindowWake,
@@ -22,7 +23,7 @@ pub(super) fn sample(target: &str) -> &'static str {
 }
 
 #[derive(Default)]
-pub(super) enum ResultState {
+pub(in crate::features::preferences) enum ResultState {
     #[default]
     Idle,
     Running,
@@ -32,8 +33,9 @@ pub(super) enum ResultState {
 }
 
 #[derive(Default)]
-pub(super) struct Preview {
+pub(in crate::features::preferences) struct Preview {
     pub result: ResultState,
+    pub source: source::Source,
     task: Option<Task>,
     started: Option<Instant>,
     pub elapsed: Option<f32>,
@@ -77,7 +79,7 @@ impl Preview {
         let task = Self::config(root, provider).and_then(|config| {
             Task::start_request(
                 &config,
-                Request::text(sample(&config.target_language)),
+                Request::text(&self.source.text(&config.target_language)),
                 &config.target_language,
                 path,
                 move || {
@@ -137,7 +139,11 @@ impl Preview {
 
     /// 【翻译测试】【配置失效】无参数，清理旧任务及结果，防止服务、模型或参数变化后继续展示旧测试结论
     pub fn reset(&mut self) {
-        *self = Self::default();
+        let source = std::mem::take(&mut self.source);
+        *self = Self {
+            source,
+            ..Self::default()
+        };
     }
 
     /// 【翻译测试】【可复制结果】无参数，返回是否有译文或错误详情

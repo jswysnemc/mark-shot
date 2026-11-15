@@ -36,7 +36,9 @@ fn snapshot(state: &mut EditorState) -> AppResult<Snapshot> {
         String::new()
     };
     let exported = crate::features::export_image::current(&png)?.into_owned();
-    Ok(Snapshot::new(exported, scale, search)?)
+    let mut snapshot = Snapshot::new(exported, scale, search)?;
+    snapshot.original = super::history_source::png(state).map(std::sync::Arc::new);
+    Ok(snapshot)
 }
 
 /// 【截图另存为】【界面恢复】在 overlay 重建 state 的冻结背景；不重新捕获桌面，不改变标注或撤销记录

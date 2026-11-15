@@ -137,11 +137,16 @@ impl Layout {
             }
             let numeric = entry.step().is_some();
             let compact = numeric || entry.section == "export.image_frame";
-            let stacked = width < 520.0 && matches!(entry.kind, Kind::Text) && !numeric;
+            let editing = state
+                .editing
+                .as_ref()
+                .is_some_and(|(active, _)| *active == index);
+            let stacked =
+                (width < 520.0 || editing) && matches!(entry.kind, Kind::Text) && !numeric;
             let height = if compact {
                 44.0
             } else if stacked {
-                84.0
+                96.0
             } else if matches!(entry.kind, Kind::Shortcut) {
                 48.0
             } else {
@@ -158,7 +163,7 @@ impl Layout {
             };
             let control = rect(
                 viewport.left() + width - control_width - 16.0,
-                top + if stacked { 44.0 } else { (height - 28.0) / 2.0 },
+                top + if stacked { 54.0 } else { (height - 28.0) / 2.0 },
                 control_width,
                 28.0,
             );
@@ -193,7 +198,12 @@ impl Layout {
                 );
             }
         }
-        let height = (top - viewport.top() + state.scroll as f32).ceil() as usize;
+        let height = if state.page == super::catalog::Page::About && state.search.text().is_empty()
+        {
+            288
+        } else {
+            (top - viewport.top() + state.scroll as f32).ceil() as usize
+        };
         Self {
             viewport,
             rows,

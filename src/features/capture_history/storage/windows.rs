@@ -1,6 +1,5 @@
 //! 【Windows截图历史】【固定目录】目录句柄拒绝重解析且禁止删除共享，历史文件只接受合法单链接普通文件
 
-use super::identity;
 use std::{
     fs::{self, File, OpenOptions},
     io,
@@ -60,7 +59,7 @@ impl Directory {
             let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
                 continue;
             };
-            if identity::timestamp(&name).is_none() {
+            if !super::originals::valid(&name) {
                 continue;
             }
             if let Ok(file) = self.read(&name) {
@@ -72,7 +71,7 @@ impl Directory {
     }
     /// 【Windows截图历史】【原图打开】按name返回普通单链接只读文件，拒绝路径穿越与重解析目标
     pub fn read(&self, name: &str) -> io::Result<File> {
-        if identity::timestamp(name).is_none() {
+        if !super::originals::valid(name) {
             return Err(io::Error::other("invalid history identity"));
         }
         let file = crate::utils::platform::open_regular(&self.path().join(name), false)?;

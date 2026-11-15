@@ -275,6 +275,11 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
                             | AnnotationShape::Circle { filled, .. },
                             ToggleField::Fill,
                         ) => *filled,
+                        (
+                            AnnotationShape::Rectangle { focus, .. }
+                            | AnnotationShape::Circle { focus, .. },
+                            ToggleField::Focus,
+                        ) => *focus,
                         (AnnotationShape::Marker { filled, .. }, ToggleField::MarkerFill) => {
                             *filled
                         }
@@ -292,6 +297,7 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
                         ToggleField::Italic => editor_state.tool_settings.italic,
                         ToggleField::Outline => editor_state.tool_settings.outline,
                         ToggleField::Fill => editor_state.tool_settings.fill,
+                        ToggleField::Focus => editor_state.tool_settings.focus,
                         ToggleField::MarkerFill => editor_state.tool_settings.marker_filled,
                         ToggleField::MagnifierRectangle => {
                             editor_state.tool_settings.magnifier_shape

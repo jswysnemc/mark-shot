@@ -35,6 +35,7 @@ pub(super) fn draw(state: &mut ResultWindow, canvas: &mut tiny_skia::Pixmap, sca
     {
         let mut painter = Painter::new(canvas)
             .with_scale(scale)
+            .with_icons(&state.icons)
             .with_text(&mut state.fonts, &mut state.cache);
         painter.text(
             layout.title,
@@ -52,6 +53,16 @@ pub(super) fn draw(state: &mut ResultWindow, canvas: &mut tiny_skia::Pixmap, sca
                 Control::CopyAll => !state.editor.is_empty(),
                 Control::Close => true,
             };
+            if *control == Control::Close {
+                painter.icon(
+                    crate::ui::icons::CLOSE,
+                    16.0,
+                    area.left() + 6.0,
+                    area.top() + 6.0,
+                    palette.text,
+                );
+                continue;
+            }
             controls::button(
                 &mut painter,
                 *area,

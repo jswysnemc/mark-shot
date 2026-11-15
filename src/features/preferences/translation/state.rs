@@ -19,7 +19,7 @@ pub(in crate::features::preferences) struct State {
     pub(super) focus: Option<super::layout::Hit>,
     pub(super) models: Vec<String>,
     pub(super) task: Option<models::Task>,
-    pub(super) preview: super::preview::Preview,
+    pub(in crate::features::preferences) preview: super::preview::Preview,
     pub(super) pressed: Option<super::layout::Hit>,
     pub(super) drag: Option<crate::ui::scrollbar::Drag>,
     pub(in crate::features::preferences) wake: Option<WindowWake>,

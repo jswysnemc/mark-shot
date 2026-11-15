@@ -11,6 +11,7 @@ mod jobs;
 mod layout;
 mod list_draw;
 mod model;
+mod originals;
 pub mod png_metadata;
 mod preview;
 use crate::ui::scrollbar;
@@ -30,12 +31,17 @@ pub use store::{Entry, Store};
 
 /// 【截图历史】【自动记录】按最新设置保存已完成 png，scale 为设备比例、search 为可选搜索文字；失败仅记录错误
 pub fn remember(png: &[u8], scale: f32, search: &str) {
+    remember_with_original(png, scale, search, None);
+}
+
+/// 【截图历史】【原图记录】按 png、scale、search 与 original 保存完成图及可重选的完整原图，失败记录错误
+pub fn remember_with_original(png: &[u8], scale: f32, search: &str, original: Option<&[u8]>) {
     let settings = crate::config::history::current();
     if !settings.enabled {
         return;
     }
     let result = settings.path().and_then(|path| {
-        Store::new(path, settings.byte_limit()).append(
+        Store::new(path, settings.byte_limit()).append_with_original(
             png,
             scale,
             if settings.index_annotations {
@@ -44,6 +50,7 @@ pub fn remember(png: &[u8], scale: f32, search: &str) {
                 ""
             },
             settings.limit,
+            original,
         )
     });
     match result {

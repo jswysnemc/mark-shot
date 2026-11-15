@@ -84,6 +84,7 @@ pub enum Command {
     RecordingControl(String),
     HistoryEdit(String),
     HistorySnapshot,
+    HistoryReselectSnapshot,
     PinOcrSnapshot { copy: bool },
     PinFile(PathBuf),
     PinClipboard,
@@ -216,7 +217,8 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
         return Err("conflicting recording options / 录制参数冲突".into());
     }
     let history_edit: Option<String> = args.opt_value_from_str("--history-edit")?;
-    let history_snapshot = args.contains("--history-edit-snapshot");
+    let history_reselect = args.contains("--history-reselect-snapshot");
+    let history_snapshot = args.contains("--history-edit-snapshot") || history_reselect;
     let pin_ocr_copy = args.contains(crate::features::pinned_image::actions::OCR_COPY_ARG);
     let pin_ocr_snapshot =
         args.contains(crate::features::pinned_image::actions::OCR_ARG) || pin_ocr_copy;
@@ -402,7 +404,11 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
     } else if let Some(name) = history_edit {
         Command::HistoryEdit(name)
     } else if history_snapshot {
-        Command::HistorySnapshot
+        if history_reselect {
+            Command::HistoryReselectSnapshot
+        } else {
+            Command::HistorySnapshot
+        }
     } else if pin_ocr_snapshot {
         Command::PinOcrSnapshot { copy: pin_ocr_copy }
     } else if let Some(path) = pin_image {
@@ -419,6 +425,7 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
             speed,
             shot_at,
             image,
+            reselect: false,
             fullscreen,
             display_names: displays,
             include_cursor,

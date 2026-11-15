@@ -16,6 +16,7 @@ section!(Save {
 });
 
 section!(Pinned {
+    file_paths_to_image: bool = true,
     always_on_top: bool = true,
     border_enabled: bool = true,
     border_color: Rgba = rgb(94, 234, 212),

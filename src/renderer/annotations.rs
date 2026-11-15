@@ -39,6 +39,7 @@ pub fn draw_annotation(
     filters: &HashMap<u64, crate::features::filter::raster::Raster>,
     active_text_id: Option<u64>,
 ) {
+    crate::features::shape::focus::draw(p, ann);
     let painted = if matches!(ann.shape, AnnotationShape::Text { .. }) {
         p.fonts.as_mut().map(|fonts| {
             let editor = crate::tools::text::ensure_text_editor(ann, text_editors, fonts.system);

@@ -32,6 +32,13 @@ pub(super) fn spawn_edit(store: &Store, name: &str) -> io::Result<()> {
     crate::utils::spawn_self(&args, &png).map_err(|error| io::Error::other(error.to_string()))
 }
 
+/// 【截图历史】【重选区启动】按 store 与 name 读取完整原图，通过有界快照交接到区域选择模式，返回启动结果
+pub(super) fn spawn_reselect(store: &Store, name: &str) -> io::Result<()> {
+    let (png, _) = store.read_original(name)?;
+    crate::utils::spawn_self(&["--history-reselect-snapshot"], &png)
+        .map_err(|error| io::Error::other(error.to_string()))
+}
+
 /// 【截图历史】【编辑快照】读取合法 name 到私有临时文件；返回保持文件生命周期的句柄与图片编辑参数
 pub fn edit_snapshot(name: &str) -> io::Result<(Snapshot, Launch)> {
     let settings = history::current();
