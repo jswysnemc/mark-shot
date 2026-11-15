@@ -18,14 +18,12 @@ fn path_editing_uses_full_row_at_all_supported_widths() {
         let layout = super::layout::Layout::new(&state);
         let row = layout.rows.iter().find(|row| row.index == index).unwrap();
         let input = super::layout::editor_rect(row);
+        let edit = super::layout::text_edit(row.control);
         assert!(input.width() >= 280.0);
         assert!(input.top() > row.bounds.top() + 50.0);
         for (control, rect) in [
-            (
-                Control::Reset(index),
-                super::layout::reset_rect(row.control),
-            ),
-            (Control::Apply, super::layout::apply_rect(row.control)),
+            (Control::Reset(index), edit.reset),
+            (Control::Apply, edit.save),
         ] {
             assert_eq!(
                 layout.hit(

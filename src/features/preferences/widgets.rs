@@ -144,7 +144,7 @@ pub(super) fn button(
         } else {
             palette.border
         },
-        6.0,
+        if bounds.height() <= 24.0 { 4.0 } else { 6.0 },
     );
     let label = controls::fit_label(painter, label, 12.0, bounds.width() - 16.0);
     painter.text(

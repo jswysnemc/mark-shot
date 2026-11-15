@@ -244,7 +244,12 @@ impl Layout {
                 .as_ref()
                 .is_some_and(|(index, _)| *index == row.index)
             {
-                if contains(reset_rect(row.control), point) {
+                let reset = if matches!(ENTRIES[row.index].kind, Kind::Text) {
+                    text_edit(row.control).reset
+                } else {
+                    reset_rect(row.control)
+                };
+                if contains(reset, point) {
                     return Some(Control::Reset(row.index));
                 }
                 if matches!(ENTRIES[row.index].kind, Kind::Shortcut)
@@ -258,7 +263,7 @@ impl Layout {
                 .as_ref()
                 .is_some_and(|(index, _)| *index == row.index)
                 && matches!(ENTRIES[row.index].kind, Kind::Text)
-                && contains(apply_rect(row.control), point)
+                && contains(text_edit(row.control).save, point)
             {
                 return Some(Control::Apply);
             }
@@ -311,12 +316,44 @@ pub(super) fn editor_rect(row: &Row) -> Rect {
             26.0,
         )
     } else {
-        rect(
-            row.control.left() + 8.0,
-            row.control.top() + 1.0,
-            row.control.width() - 110.0,
-            26.0,
-        )
+        text_edit(row.control).input
+    }
+}
+
+pub(super) struct TextEdit {
+    pub field: Rect,
+    pub input: Rect,
+    pub reset: Rect,
+    pub save: Rect,
+}
+
+/// 【设置窗口】【编辑行布局】按 control 分配独立输入框及右侧操作，返回绘制和命中区域；按钮高度较低并垂直居中
+pub(super) fn text_edit(control: Rect) -> TextEdit {
+    let button_width = 48.0;
+    let button_height = 22.0;
+    let gap = 8.0;
+    let field = rect(
+        control.left(),
+        control.top(),
+        control.width() - button_width * 2.0 - gap * 2.0,
+        control.height(),
+    );
+    let button_top = control.top() + (control.height() - button_height) / 2.0;
+    TextEdit {
+        input: rect(
+            field.left() + 8.0,
+            field.top() + 1.0,
+            field.width() - 16.0,
+            field.height() - 2.0,
+        ),
+        field,
+        reset: rect(field.right() + gap, button_top, button_width, button_height),
+        save: rect(
+            control.right() - button_width,
+            button_top,
+            button_width,
+            button_height,
+        ),
     }
 }
 

@@ -195,16 +195,28 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
                 } else if matches!(entry.kind, Kind::Color) {
                     super::colors::draw(painter, row.control, &state.values, row.index, focused);
                 } else if editing {
-                    widgets::field(painter, row.control, "", true, false);
+                    let shortcut = matches!(entry.kind, Kind::Shortcut);
+                    let edit = layout::text_edit(row.control);
+                    widgets::field(
+                        painter,
+                        if shortcut { row.control } else { edit.field },
+                        "",
+                        true,
+                        false,
+                    );
                     widgets::button(
                         painter,
-                        layout::reset_rect(row.control),
+                        if shortcut {
+                            layout::reset_rect(row.control)
+                        } else {
+                            edit.reset
+                        },
                         if chinese { "恢复" } else { "Reset" },
                         false,
                         hover == Some(Control::Reset(row.index)),
                         true,
                     );
-                    if matches!(entry.kind, Kind::Shortcut) {
+                    if shortcut {
                         widgets::button(
                             painter,
                             layout::apply_rect(row.control),
@@ -234,10 +246,9 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
                             TextStyle::new(12.0, palette.accent).center(),
                         );
                     } else {
-                        let apply = layout::apply_rect(row.control);
                         widgets::button(
                             painter,
-                            apply,
+                            edit.save,
                             if chinese { "保存" } else { "Save" },
                             true,
                             hover == Some(Control::Apply),
