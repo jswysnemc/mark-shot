@@ -59,6 +59,9 @@ docs/                  对外发布的文档
 
 提交的修改需要通过与 `Native Rust Build` 工作流相同的检查：
 
+Linux 工作区测试需要 `dbus-daemon`：KDE 回归测试启动独立的私有总线，不使用桌面会话。
+最小构建容器需要安装该程序，Debian 已在 `Build-Depends` 中显式声明。
+
 ```sh
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings

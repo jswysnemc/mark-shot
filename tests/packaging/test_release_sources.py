@@ -91,7 +91,7 @@ class ReleaseSources(unittest.TestCase):
                 self.assertEqual(source.read_bytes(), before)
 
     def test_ci_toolchain_check_keeps_source_constraints(self):
-        """【原生打包】【工具链测试】无传参，确认 CI 分离校验不改正式源码约束，拒绝 Rust 1.93，无返回值"""
+        """【原生打包】【工具链测试】无传参，确认 CI 保留私有总线测试依赖和正式源码约束，拒绝 Rust 1.93，无返回值"""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             shutil.copytree(ROOT / "debian", root / "debian")
@@ -101,6 +101,7 @@ class ReleaseSources(unittest.TestCase):
             self.assertNotIn("rustc", dependencies)
             self.assertNotIn("cargo", dependencies)
             self.assertIn("libpipewire-0.3-dev", dependencies)
+            self.assertIn("dbus-daemon", dependencies.split(", "))
             with patch(
                 "debian_build_dependencies.subprocess.check_output",
                 return_value="cargo 1.93.1 (test)\n",

@@ -10,6 +10,7 @@ Build-Depends:
  libclang-dev,
  pkg-config,
  python3 (>= 3.11),
+ dbus-daemon,
  libwayland-dev,
  libxkbcommon-dev,
  libxkbcommon-x11-dev,

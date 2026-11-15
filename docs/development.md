@@ -65,6 +65,9 @@ See [Installation](installation.md) for dependencies and build commands. A debug
 
 A change is expected to pass the same checks as the `Native Rust Build` workflow:
 
+Linux workspace tests need `dbus-daemon`: KDE regression tests start a private bus without using
+the desktop session. Install it in minimal build containers; Debian declares it in `Build-Depends`.
+
 ```sh
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
