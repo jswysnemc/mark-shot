@@ -5,6 +5,10 @@
 These are the default bindings inside the editor. The global shortcut that starts a capture is
 separate; see [Desktop integration](desktop-integration.md).
 
+During Windows screenshot selection, `Tab` switches between the whole window and detected
+controls. This contextual key requires both region and window detection; it does not apply while
+typing, dragging, or editing a confirmed selection. The scroll wheel switches control hierarchy.
+
 ## Finishing and general actions
 
 | Action | Default | Configuration key |

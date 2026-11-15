@@ -9,6 +9,9 @@ use crate::{
 };
 use tiny_skia::{Color, Pixmap, Rect};
 
+#[path = "native_tests.rs"]
+mod native_cases;
+
 /// 【截图区域识别回归】【遮挡顺序】无参数，图像分析完成后仍选择最前窗口，后台较小窗口不能覆盖真实层级
 #[test]
 fn completed_image_analysis_does_not_select_an_occluded_window() {

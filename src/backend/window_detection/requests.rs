@@ -5,20 +5,24 @@ use std::sync::{
     Condvar, Mutex,
     atomic::{AtomicU64, Ordering},
 };
+use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy)]
 pub(crate) struct Request {
     pub revision: u64,
     pub point: (i32, i32),
+    created: Instant,
 }
 pub(crate) struct Hit {
     pub point: (i32, i32),
     pub path: Vec<PixelRect>,
+    pub refined: bool,
 }
 #[derive(Default)]
 struct Pending {
     request: Option<Request>,
     result: Option<Hit>,
+    refinement: Option<Request>,
     stopped: bool,
 }
 #[derive(Default)]
@@ -33,9 +37,14 @@ impl Queue {
     pub fn request(&self, point: (i32, i32)) {
         let mut state = self.pending.lock().unwrap();
         let revision = self.revision.fetch_add(1, Ordering::Relaxed) + 1;
-        state.request = Some(Request { revision, point });
+        state.request = Some(Request {
+            revision,
+            point,
+            created: Instant::now(),
+        });
         state.result = None;
-        self.changed.notify_one();
+        state.refinement = None;
+        self.changed.notify_all();
     }
     /// 【控件识别】【等待请求】无参数，阻塞到最新请求或关闭，返回待处理请求，不消耗空闲CPU
     pub fn next(&self) -> Option<Request> {
@@ -55,6 +64,14 @@ impl Queue {
     }
     /// 【控件识别】【结果发布】按request与path替换本次结果，只接受最新代次，返回是否需要唤醒界面
     pub fn publish(&self, request: Request, path: Vec<PixelRect>) -> bool {
+        self.publish_path(request, path, false)
+    }
+    /// 【控件识别】【补充发布】按request与path交付完整补充路径，返回是否需要唤醒界面，过期结果直接丢弃
+    pub fn publish_refinement(&self, request: Request, path: Vec<PixelRect>) -> bool {
+        self.publish_path(request, path, true)
+    }
+    /// 【控件识别】【阶段发布】按request、path与refined保存最新结果，返回是否仍属于当前代次
+    fn publish_path(&self, request: Request, path: Vec<PixelRect>, refined: bool) -> bool {
         let mut state = self.pending.lock().unwrap();
         if state.stopped || self.cancelled(request) {
             return false;
@@ -62,8 +79,48 @@ impl Queue {
         state.result = Some(Hit {
             point: request.point,
             path,
+            refined,
         });
         true
+    }
+    /// 【控件识别】【停留预约】按request预约未完成目标的补充查询，无返回值，新的指针会撤销预约
+    pub fn refine(&self, request: Request) {
+        let mut state = self.pending.lock().unwrap();
+        if !state.stopped && !self.cancelled(request) {
+            state.refinement = Some(request);
+            self.changed.notify_all();
+        }
+    }
+    /// 【控件识别】【停留等待】按quiet等待预约目标保持稳定，返回可补充请求，移动或关闭会立即重新判断
+    pub fn next_refinement(&self, quiet: Duration) -> Option<Request> {
+        let mut state = self.pending.lock().unwrap();
+        loop {
+            if state.stopped {
+                return None;
+            }
+            if let Some(request) = state.refinement {
+                if self.cancelled(request) {
+                    state.refinement = None;
+                    continue;
+                }
+                let remaining = quiet.saturating_sub(request.created.elapsed());
+                if remaining.is_zero() {
+                    return state.refinement.take();
+                }
+                state = self.changed.wait_timeout(state, remaining).unwrap().0;
+            } else {
+                state = self.changed.wait(state).unwrap();
+            }
+        }
+    }
+    /// 【控件识别】【目标撤销】无参数，取消当前探测与预约但保留工作线程，整窗模式不继续访问组件接口
+    pub fn cancel(&self) {
+        let mut state = self.pending.lock().unwrap();
+        state.request = None;
+        state.result = None;
+        state.refinement = None;
+        self.revision.fetch_add(1, Ordering::Relaxed);
+        self.changed.notify_all();
     }
     /// 【控件识别】【结果接收】无参数，取走最新完整路径或返回空值，不等待服务进程
     pub fn take(&self) -> Option<Hit> {
@@ -75,8 +132,9 @@ impl Queue {
         state.stopped = true;
         state.request = None;
         state.result = None;
+        state.refinement = None;
         self.revision.fetch_add(1, Ordering::Relaxed);
-        self.changed.notify_one();
+        self.changed.notify_all();
     }
 }
 
@@ -105,5 +163,29 @@ mod tests {
         assert!(queue.cancelled(last));
         assert!(queue.next().is_none());
         assert!(!queue.publish(last, vec![rect]));
+    }
+
+    /// 【控件识别测试】【停留代次】无参数，验证移动替代旧补充预约，停止后不保留任何阶段结果
+    #[test]
+    fn refinement_only_processes_the_current_target() {
+        let queue = Queue::default();
+        queue.request((10, 20));
+        let old = queue.next().unwrap();
+        queue.refine(old);
+        queue.request((30, 40));
+        let current = queue.next().unwrap();
+        queue.refine(old);
+        queue.refine(current);
+        assert_eq!(
+            queue.next_refinement(Duration::ZERO).unwrap().point,
+            (30, 40)
+        );
+        assert!(!queue.publish_refinement(old, vec![]));
+        assert!(queue.publish_refinement(current, vec![]));
+        assert!(queue.take().unwrap().refined);
+        queue.cancel();
+        assert!(queue.cancelled(current));
+        queue.stop();
+        assert!(queue.next_refinement(Duration::ZERO).is_none());
     }
 }

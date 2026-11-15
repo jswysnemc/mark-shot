@@ -167,6 +167,12 @@ pub fn handle_key(
     let claimed = ((special.is_some() || text.is_some()) && typing(editor_state))
         || (matches!(special, Some(SpecialKey::Up | SpecialKey::Down))
             && hovers_stepper(editor_state));
+    if !claimed
+        && !typing(editor_state)
+        && super::super::region_detection::keyboard::key(editor_state, chord, dirty_mask)
+    {
+        return;
+    }
     if !claimed && let Some(action) = chord.and_then(|c| keys::map().lookup(c)) {
         super::super::actions::run(editor_state, action, dirty_mask);
         return;

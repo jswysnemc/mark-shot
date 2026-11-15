@@ -37,9 +37,10 @@ On Linux the session type decides the protocol. A Wayland session uses Wayland e
 
 Text input methods are supported through text-input-v3 on Wayland and XIM on X11.
 
-"Interface region detection" finds rectangles in the frozen image. It works everywhere, but it
-does not know what a control is. "Window snapping" uses real window geometry from the desktop and
-needs a desktop-specific source.
+"Interface region detection" finds rectangles in the frozen image on every platform. Windows
+additionally uses UI Automation control boundaries and ancestor paths when both region and window
+detection are enabled. "Window snapping" uses real window geometry from the desktop and needs a
+desktop-specific source.
 
 ## Notes per environment
 
@@ -86,6 +87,8 @@ needs a desktop-specific source.
 - Capture, editing, the clipboard, saving, pinning, OCR and recording are implemented with native
   Windows interfaces.
 - Window snapping uses the window list, DWM frame bounds and UI Automation.
+- Control selection uses cached UI Automation paths, with a separate worker for slow-provider
+  refinement. `Tab` selects the whole window; the wheel selects enclosing or nested controls.
 - Verification so far relies on automated runs under Wine and on cross-compilation checks.
   Behaviour on real Windows hardware, mixed-DPI monitor setups and system input methods has not
   been fully verified. Treat the Windows build as experimental.

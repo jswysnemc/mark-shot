@@ -17,6 +17,13 @@ Run `mark-shot`. The screen freezes and a selection overlay appears.
 
 `Esc` or a right click during selection cancels the capture.
 
+On Windows, with both `[region_detection].enabled` and `[window_detection].enabled` turned on,
+system control boundaries take precedence over image candidates. The deepest detected control is
+selected first. Scroll upward to select its enclosing containers and window, or downward to return
+to an inner control. `Tab` switches between the whole window and controls during selection. Slow
+control providers are queried further after the pointer stops; this preserves a region explicitly
+chosen with the wheel. Pressing the mouse locks the highlighted region for that click.
+
 ### Finishing
 
 | Action | Key | Result |

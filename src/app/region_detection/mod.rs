@@ -2,9 +2,12 @@
 
 pub(crate) mod draw;
 mod geometry;
+#[cfg(any(target_os = "windows", test))]
+mod hit_path;
 pub(crate) mod input;
+pub(crate) mod keyboard;
 pub(crate) mod motion;
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", test))]
 mod native;
 mod state;
 pub(crate) mod task;

@@ -9,7 +9,7 @@ use crate::{
 };
 
 /// 【截图区域识别】【选择阶段】按 state 判断是否仍处于普通截图范围选择，返回候选输入是否可用
-fn selecting(state: &EditorState) -> bool {
+pub(super) fn selecting(state: &EditorState) -> bool {
     state.region_detection.space.is_some()
         && state.file_canvas.is_none()
         && state.selected_tool == Tool::Selection
@@ -31,7 +31,7 @@ pub(crate) fn refresh(state: &mut EditorState, dirty: &mut u32) {
         return;
     }
     let region = &mut state.region_detection;
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", test))]
     if let Some(rect) = region
         .native
         .as_mut()
@@ -69,7 +69,7 @@ pub(crate) fn sync(state: &mut EditorState, dirty: &mut u32) {
     state.region_detection.pressed = None;
     state.region_detection.cursor.reset();
     state.region_detection.worker = None;
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", test))]
     {
         state.region_detection.native = None;
     }
@@ -124,7 +124,7 @@ pub(crate) fn scroll(state: &mut EditorState, event: ScrollEvent, dirty: &mut u3
         return false;
     }
     let region = &mut state.region_detection;
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", test))]
     if let Some(rect) = region
         .native
         .as_mut()

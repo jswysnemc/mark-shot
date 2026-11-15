@@ -9,6 +9,8 @@ mod niri;
 pub(crate) mod requests;
 #[cfg(target_os = "linux")]
 mod sway;
+#[cfg(any(target_os = "windows", test))]
+pub(crate) mod uia;
 #[cfg(target_os = "windows")]
 pub(crate) mod windows;
 

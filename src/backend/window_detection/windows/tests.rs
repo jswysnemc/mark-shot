@@ -1,6 +1,7 @@
 //! 【Windows控件测试】【真实控件】在隔离桌面创建Win32控件，验证UIA物理边界、缓存及覆盖层排除
 
 use super::automation::Automation;
+use crate::backend::window_detection::uia::Policy;
 use crate::features::region_detection::PixelRect;
 use windows_sys::Win32::{Foundation::RECT, UI::WindowsAndMessaging::*};
 
@@ -115,12 +116,28 @@ fn native_controls_under_overlay_keep_exact_bounds_and_reuse_cache() {
         let mut automation = Automation::new().expect("UI Automation initialization");
         for rect in [button, other] {
             let point = (rect.left + 8, rect.top + 8);
-            let mut path = Vec::new();
-            for _attempt in 0..3 {
-                if automation.query(handle, bounds, point, || false, |result| path = result) {
-                    break;
-                }
-            }
+            let initial = automation.query_with_policy(
+                handle,
+                bounds,
+                point,
+                Policy::foreground(),
+                || false,
+                |_| {},
+            );
+            let mut path = if initial.stop.refinable() {
+                automation
+                    .query_with_policy(
+                        handle,
+                        bounds,
+                        point,
+                        Policy::refinement(),
+                        || false,
+                        |_| {},
+                    )
+                    .path
+            } else {
+                initial.path
+            };
             assert_eq!(
                 path.first(),
                 Some(&rect),
@@ -129,7 +146,16 @@ fn native_controls_under_overlay_keep_exact_bounds_and_reuse_cache() {
             let calls = automation.calls;
             let started = std::time::Instant::now();
             for _ in 0..100 {
-                automation.query(handle, bounds, point, || false, |result| path = result);
+                path = automation
+                    .query_with_policy(
+                        handle,
+                        bounds,
+                        point,
+                        Policy::foreground(),
+                        || false,
+                        |_| {},
+                    )
+                    .path;
             }
             assert_eq!(
                 automation.calls, calls,

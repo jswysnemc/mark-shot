@@ -12,7 +12,7 @@ pub(super) struct Press {
 
 #[derive(Default)]
 pub(crate) struct State {
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", test))]
     pub(super) native: Option<super::native::Native>,
     pub(super) space: Option<Space>,
     pub(super) windows: Vec<Window>,
@@ -27,7 +27,7 @@ pub(crate) struct State {
 impl State {
     /// 【截图区域识别】【层级可用】无参数，返回滚轮是否可以在包含层级之间切换候选区域
     pub(crate) fn layered(&self) -> bool {
-        #[cfg(target_os = "windows")]
+        #[cfg(any(target_os = "windows", test))]
         if self.native.is_some() {
             return true;
         }
