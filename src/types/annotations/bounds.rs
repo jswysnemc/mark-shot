@@ -326,7 +326,8 @@ impl Annotation {
         .unwrap_or(self.bbox);
         let mut body = self.rotated_bounds(body);
         if is_selected
-            && let Some(frame) = crate::features::annotation_selection::chrome::bounds(self)
+            && let Some(frame) =
+                crate::features::annotation_selection::frame::bounds(self, Default::default())
             && let Some(frame) = frame.outset(pad, pad)
         {
             body = body.join(&self.rotated_bounds(frame)).unwrap_or(body);

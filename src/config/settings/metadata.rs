@@ -3,8 +3,8 @@ use super::{Entry, Kind};
 use serde_json::Value;
 
 impl Entry {
-    /// 【应用设置】【字段说明】按 source、chinese 返回实际来源和帮助，避免把继承值误标为已保存值
-    pub fn note(&self, source: &Value, chinese: bool) -> String {
+    /// 【应用设置】【字段说明】按 source、values、chinese 返回字段说明；未显式配置时显示实际值，返回可读文案
+    pub fn note(&self, source: &Value, values: &Value, chinese: bool) -> String {
         if matches!(self.kind, Kind::Link(_)) {
             return self.help(chinese).into();
         }
@@ -42,19 +42,25 @@ impl Entry {
         }
         let source = if super::super::settings_store::explicit(source, &path) {
             if chinese {
-                "配置文件"
+                "配置文件".into()
             } else {
-                "Configuration file"
+                "Configuration file".into()
             }
-        } else if chinese {
-            "继承默认值"
         } else {
-            "Inherited default"
+            format!(
+                "{}: {}",
+                if chinese {
+                    "当前值"
+                } else {
+                    "Current value"
+                },
+                self.display_label(values, chinese)
+            )
         };
         if let Some((minimum, maximum)) = self.range() {
             format!("{source} · {minimum}–{maximum}")
         } else {
-            source.into()
+            source
         }
     }
 }

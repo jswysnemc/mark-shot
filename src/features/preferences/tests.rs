@@ -3,6 +3,8 @@
 use super::{catalog::Page, window::Preferences};
 use crate::backend::window::{WindowContent, WindowEvent};
 
+mod effective;
+
 /// 【设置回归】【全局绑定】无参数，全局快捷键按单个组合保存，清除只禁用全局监听，不修改编辑器绑定
 #[test]
 fn global_shortcut_records_one_chord_without_replacing_editor_bindings() {

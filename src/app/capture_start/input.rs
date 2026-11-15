@@ -65,8 +65,16 @@ pub(crate) fn button(
 pub(crate) fn shortcut(state: &mut EditorState, action: crate::keys::Action, dirty: &mut u32) {
     use crate::keys::Action;
     let control = match action {
-        Action::RecordVideo if state.capture_start.visible && available(state) => Control::Video,
-        Action::RecordGif if state.capture_start.visible && available(state) => Control::Gif,
+        Action::RecordVideo
+            if super::super::panels::recording::available(state) && !state.tool_active =>
+        {
+            Control::Video
+        }
+        Action::RecordGif
+            if super::super::panels::recording::available(state) && !state.tool_active =>
+        {
+            Control::Gif
+        }
         Action::RecordPause if state.capture_start.polls_recording() => Control::Pause,
         Action::RecordStop if state.capture_start.polls_recording() => Control::Stop,
         _ => return,
@@ -78,14 +86,12 @@ pub(crate) fn shortcut(state: &mut EditorState, action: crate::keys::Action, dir
 fn activate(state: &mut EditorState, control: Control, dirty: &mut u32) {
     match control {
         Control::Video | Control::Gif if state.capture_start.can_record() => {
-            state.capture_start.recording = Some(if control == Control::Gif {
+            let format = if control == Control::Gif {
                 Format::Gif
             } else {
                 Format::Video
-            });
-            state.mode = Mode::Region;
-            state.ui_hidden = true;
-            crate::app::select_tool(state, crate::tools::Tool::Selection, dirty);
+            };
+            super::super::panels::recording::select(state, format, dirty);
         }
         Control::Region => {
             state.capture_start.recording = None;

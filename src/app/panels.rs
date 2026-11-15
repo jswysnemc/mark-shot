@@ -8,6 +8,7 @@ pub mod marker;
 pub mod model;
 pub mod number;
 pub mod radial_palette;
+pub(crate) mod recording;
 pub mod ruler;
 pub mod settings;
 pub mod text;

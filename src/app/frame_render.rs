@@ -284,7 +284,11 @@ pub(super) fn render_monitor(
     let collection_bounds = editor_state.collection_bounds();
     let drawing_space = crate::tools::drawing_space::DrawingSpace::from_editor(editor_state);
     let dirty = dirty_rect.as_ref();
-    let toolbar = panel_to_draw(&mut editor_state.toolbar, i, dirty);
+    let toolbar = if editor_state.image_window.enabled {
+        None
+    } else {
+        panel_to_draw(&mut editor_state.toolbar, i, dirty)
+    };
     let action_toolbar = panel_to_draw(&mut editor_state.action_toolbar, i, dirty);
     let settings_panel = panel_to_draw(&mut editor_state.settings_panel, i, dirty);
     let font_panel = panel_to_draw(&mut editor_state.font_panel, i, dirty);
@@ -456,6 +460,7 @@ pub(super) fn render_monitor(
     crate::features::color_sample::inspector_draw::draw(editor_state, i, dirty_rect);
     crate::ui::image_window::draw(editor_state, i);
     crate::ui::capture_start::draw::draw(editor_state, i);
+    super::panels::recording::draw(editor_state, i);
 
     damage
 }

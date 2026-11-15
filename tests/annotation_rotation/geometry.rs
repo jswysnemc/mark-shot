@@ -8,7 +8,7 @@ fn point(value: &serde_json::Value) -> (f64, f64) {
     (value[0].as_f64().unwrap(), value[1].as_f64().unwrap())
 }
 
-/// 【普通标注旋转验证】【实际控制点】72个生产Qt参考逐项核对标注四角与旋转点，无参数、无返回值
+/// 【普通标注旋转验证】【实际控制点】72个生产Qt参考加上描边外留白，核对旋转后四角与旋转点，无参数、无返回值
 #[test]
 fn annotation_pose_matches_all_production_qt_rectangle_controls() {
     let reference: serde_json::Value = serde_json::from_str(include_str!(
@@ -27,13 +27,27 @@ fn annotation_pose_matches_all_production_qt_rectangle_controls() {
         .unwrap();
         let mut annotation = rectangle(bounds);
         annotation.rotation_degrees = sample["angle"].as_f64().unwrap();
-        for (actual, expected) in annotation
+        let radians = annotation.rotation_degrees.to_radians();
+        let (sin, cos) = radians.sin_cos();
+        let padding = f64::from(annotation.stroke_width) * 0.5 + 6.0;
+        let offsets = [
+            (-padding, -padding),
+            (padding, -padding),
+            (padding, padding),
+            (-padding, padding),
+        ];
+        for ((actual, expected), offset) in annotation
             .generic_frame_corners()
             .unwrap()
             .into_iter()
             .zip(sample["corners"].as_array().unwrap())
+            .zip(offsets)
         {
             let expected = point(expected);
+            let expected = (
+                expected.0 + offset.0 * cos - offset.1 * sin,
+                expected.1 + offset.0 * sin + offset.1 * cos,
+            );
             assert!(
                 (f64::from(actual.0) - expected.0).abs() < 0.0001,
                 "{sample}"
@@ -45,6 +59,7 @@ fn annotation_pose_matches_all_production_qt_rectangle_controls() {
         }
         let actual = annotation.generic_rotation_handle().unwrap().1;
         let expected = point(&sample["rotation"]);
+        let expected = (expected.0 + padding * sin, expected.1 - padding * cos);
         assert!(
             (f64::from(actual.0) - expected.0).abs() < 0.0001,
             "{sample}"

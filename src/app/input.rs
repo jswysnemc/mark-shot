@@ -512,6 +512,13 @@ pub(crate) fn handle_canvas_pointer_button(
 
 /// 【界面】【工具切换】在 editor_state 中切换到 tool 并结束旧手势与弹层；dirty_mask 返回重绘显示器
 pub fn select_tool(editor_state: &mut EditorState, tool: Tool, dirty_mask: &mut u32) {
+    if tool == Tool::Recording && !super::panels::recording::available(editor_state) {
+        return;
+    }
+    super::panels::recording::close(editor_state, dirty_mask);
+    if tool != Tool::Recording {
+        editor_state.capture_start.recording = None;
+    }
     editor_state.input.clicks.clear();
     if editor_state.selected_tool != tool {
         editor_state.selection.creating = false;
@@ -554,7 +561,9 @@ pub fn select_tool(editor_state: &mut EditorState, tool: Tool, dirty_mask: &mut 
     // TODO:  better handling  of  cross  monitor ocr
     // i think there must be a visual indicator, that
     // ocr worked in ONE monitor, but  not  the other
-    if editor_state.selection.zone.is_none() && tool != Tool::Selection && tool != Tool::Ocr {
+    if editor_state.selection.zone.is_none()
+        && !matches!(tool, Tool::Selection | Tool::Ocr | Tool::Recording)
+    {
         editor_state.selection.zone = get_full_workspace_rect(&editor_state.placements);
         mark_all_dirty(dirty_mask, editor_state.placements.len());
     }

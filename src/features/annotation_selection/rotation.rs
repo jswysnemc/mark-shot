@@ -81,6 +81,9 @@ pub(crate) fn window_connector_in_bounds(
     window: crate::features::annotation_style::window::WindowUnits,
     allowed: Option<tiny_skia::Rect>,
 ) -> Option<(Point, Point)> {
+    if annotation.uses_generic_rotation() {
+        return annotation.generic_rotation_handle_in_window(window);
+    }
     if let AnnotationShape::Ruler { measurement } = annotation.shape {
         return crate::features::ruler::window_chrome::connector(
             measurement,

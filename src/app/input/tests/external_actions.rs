@@ -138,3 +138,38 @@ fn toolbar_integrations_enable_only_implemented_actions_and_repeat_click_closes(
     );
     assert!(state.external_panel.kind.is_none() && state.external_action_requested.is_none());
 }
+
+/// 【外部动作输入测试】【滚动方向】向下滚轮显示后续选项，向上返回前面，像素与刻度遵守相同方向
+#[test]
+fn external_menu_wheel_down_reveals_later_items_and_up_returns() {
+    use crate::types::ScrollEvent;
+    for scroll in [ScrollEvent::wheel(-120), ScrollEvent::pixels(0.0, -80.0)] {
+        let mut state = editor();
+        install(&mut state);
+        let action = state.external_panel.actions[0].clone();
+        state.external_panel.actions = vec![action; 20];
+        state.external_panel.layout = Some(Layout::new(
+            Kind::Extensions,
+            20,
+            90.0,
+            36.0,
+            (640.0, 480.0),
+        ));
+        pointer(&mut state, 50.0, 128.0, &mut 0);
+        let before = state.external_panel.thumb().unwrap().top();
+        super::super::handle_axis_scroll(&mut state, scroll, &mut 0);
+        assert!(
+            state.external_panel.offset > 0.0,
+            "向下滚动必须显示后续选项: {scroll:?}"
+        );
+        assert!(state.external_panel.thumb().unwrap().top() > before);
+        let up = if scroll.vertical.value120 != 0 {
+            ScrollEvent::wheel(120)
+        } else {
+            ScrollEvent::pixels(0.0, 80.0)
+        };
+        super::super::handle_axis_scroll(&mut state, up, &mut 0);
+        assert_eq!(state.external_panel.offset, 0.0);
+        assert!(state.pending.is_none() && state.external_action_requested.is_none());
+    }
+}

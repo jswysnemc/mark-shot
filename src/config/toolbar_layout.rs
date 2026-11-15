@@ -154,6 +154,22 @@ mod items {
             })
             .collect::<Result<Vec<_>, D::Error>>()?;
         validate(&items).map_err(serde::de::Error::custom)?;
+        // 1. 【工具栏配置】【旧默认升级】仅为旧版完整默认列表补充录屏按钮，保留用户自定义顺序
+        let legacy = ITEMS
+            .iter()
+            .copied()
+            .filter(|item| {
+                !matches!(
+                    item,
+                    ToolbarItem::Button(crate::ui::toolbar::ToolbarButton::Tool(
+                        crate::tools::Tool::Recording
+                    ))
+                )
+            })
+            .collect::<Vec<_>>();
+        if items == legacy {
+            return Ok(ITEMS.to_vec());
+        }
         Ok(items)
     }
 }

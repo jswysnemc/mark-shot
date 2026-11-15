@@ -245,9 +245,10 @@ pub fn scroll(state: &mut EditorState, scroll: ScrollEvent, dirty: &mut u32) -> 
         .external_panel
         .contains(state.input.pointer.monitor_idx, state.input.pointer.local)
     {
+        // 1. 【外部动作】【滚动方向】轴正值表示向上，列表偏移增大表示向下，因此减去轴位移
         let action = state
             .external_panel
-            .scroll_to(state.external_panel.offset + scroll.legacy_y());
+            .scroll_to(state.external_panel.offset - scroll.legacy_y());
         event(state, action, dirty);
     }
     true

@@ -22,6 +22,7 @@ pub struct Toolbar {
     pub dock_override: Option<crate::config::capture::ToolbarPosition>,
     pub dock_monitor: Option<usize>,
     pub secondary: bool,
+    pub window_bar: bool,
     pub orientation: Orientation,
     pub cells: Vec<Rect>,
     pub disabled: Vec<usize>,
@@ -64,6 +65,7 @@ pub struct ToolbarLook {
     disabled: Vec<usize>,
     orientation: Orientation,
     items: Vec<ToolbarItem>,
+    window_bar: bool,
 }
 
 impl Default for Toolbar {
@@ -180,6 +182,7 @@ impl Toolbar {
             dock_override: None,
             dock_monitor: None,
             secondary: false,
+            window_bar: false,
             orientation: Orientation::Horizontal,
             cells: Vec::new(),
             disabled: Vec::new(),
@@ -237,6 +240,7 @@ impl Toolbar {
             disabled: self.disabled.clone(),
             orientation: self.orientation,
             items: self.items.clone(),
+            window_bar: self.window_bar,
         }
     }
 

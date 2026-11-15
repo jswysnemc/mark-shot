@@ -19,13 +19,37 @@ impl Guard {
         Self::in_directory(&super::directory()?, Duration::from_millis(1500))
     }
 
+    /// 【贴图编辑】【定向隐藏】按 pid 隐藏交接编辑的贴图进程，返回生命周期守卫；其他窗口继续显示
+    pub fn hide_process(pid: u32) -> io::Result<Self> {
+        Self::scoped(
+            &super::directory()?,
+            Duration::from_millis(1500),
+            &format!("window-{pid}-"),
+            &format!("process:{pid}"),
+        )
+    }
+
     /// 【截图窗口】【确认等待】按 directory 和 timeout 等待存活窗口确认，超时释放租约并返回错误
     pub(super) fn in_directory(directory: &Path, timeout: Duration) -> io::Result<Self> {
-        let windows = super::records(directory, "window-")?;
+        Self::scoped(directory, timeout, "window-", "capture")
+    }
+
+    /// 【截图窗口】【范围租约】按 directory、timeout、prefix 和 request 等待目标窗口隐藏，返回守卫；释放后恢复
+    pub(super) fn scoped(
+        directory: &Path,
+        timeout: Duration,
+        prefix: &str,
+        request: &str,
+    ) -> io::Result<Self> {
+        let windows = super::records(directory, prefix)?;
         if windows.is_empty() {
             return Ok(Self { _lease: None });
         }
-        let lease = super::record(directory, "lease-")?;
+        let lease_prefix = request
+            .strip_prefix("process:")
+            .map(|pid| format!("lease-process-{pid}-"))
+            .unwrap_or_else(|| "lease-".into());
+        let lease = super::record(directory, &lease_prefix)?;
         let name = lease
             .path()
             .file_name()
@@ -33,14 +57,14 @@ impl Guard {
             .to_string_lossy()
             .into_owned();
         // 1. 【截图窗口】【锁就绪通知】创建事件可能早于文件锁，写入一次以确保窗口看到完整租约
-        lease.as_file().write_all(b"capture")?;
+        lease.as_file().write_all(request.as_bytes())?;
         let guard = Self {
             _lease: Some(lease),
         };
         let deadline = Instant::now() + timeout;
         let mut settled = None;
         loop {
-            let windows = super::records(directory, "window-")?;
+            let windows = super::records(directory, prefix)?;
             let ready = windows.iter().all(|window| {
                 if !super::active(window) {
                     return true;

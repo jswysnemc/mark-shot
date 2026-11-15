@@ -11,6 +11,10 @@ pub fn run_settings_action(
     dirty_mask: &mut u32,
 ) {
     match action {
+        SettingsAction::Recording(parameter) => {
+            super::super::recording::toggle(editor_state, parameter, dirty_mask)
+        }
+        SettingsAction::StartRecording => super::super::recording::start(editor_state, dirty_mask),
         SettingsAction::ColorFormats => {
             crate::features::color_sample::inspector::open(editor_state, dirty_mask)
         }

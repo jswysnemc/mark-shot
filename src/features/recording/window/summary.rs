@@ -36,6 +36,7 @@ mod tests {
             display: "eDP-2".into(),
             crop: Some([614, 403, 1040, 824]),
             format: None,
+            config: None,
         };
         assert_eq!(target(&value, true), "eDP-2 · 1040×824 +614+403");
         value.crop = None;

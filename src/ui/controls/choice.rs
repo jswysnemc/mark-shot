@@ -42,7 +42,7 @@ impl Choice {
     }
 
     /// 【界面控件】【菜单范围】按 size 计算窗口内的菜单位置，下面空间不足时放在选择框上方，返回范围
-    fn bounds(&self, size: (u32, u32)) -> Rect {
+    pub(crate) fn bounds(&self, size: (u32, u32)) -> Rect {
         let width = self.anchor.width().min(size.0 as f32 - 16.0).max(1.0);
         let height = self.labels.len() as f32 * ROW + PAD * 2.0;
         let top = if self.anchor.bottom() + 4.0 + height <= size.1 as f32 - 2.0 {

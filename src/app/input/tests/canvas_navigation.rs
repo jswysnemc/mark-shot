@@ -285,7 +285,10 @@ fn selected_controls_and_delete_button_follow_the_screen_view() {
     select_tool(&mut state, Tool::Pick, &mut dirty);
     state.select_annotation_index(Some(0));
     let view = state.canvas_transform();
-    let corner = view.to_screen((300.0, 220.0));
+    let corner = annotation
+        .generic_frame_corners_in_window(state.hit_window_units())
+        .unwrap()[0];
+    let corner = view.to_screen((f64::from(corner.0), f64::from(corner.1)));
     let point = view.to_canvas((corner.0 + 25.0, corner.1 + 25.0));
     assert_eq!(
         state.canvas_handle(&annotation, point),

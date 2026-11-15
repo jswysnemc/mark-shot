@@ -285,6 +285,7 @@ mod tests {
             display: "DP-1".into(),
             crop: Some([1, 2, 3, 4]),
             format: Some(Format::Gif),
+            config: None,
         };
         assert_eq!(
             choose(Row::Source, 0, &mut config, &mut target),

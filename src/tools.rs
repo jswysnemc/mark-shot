@@ -43,6 +43,7 @@ use crate::types::{CursorIcon, MouseButton, SpecialKey, StrokeGroup, ToolSetting
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum::EnumIter)]
 pub enum Tool {
     Selection,
+    Recording,
     Rectangle,
     Arrow,
     Circle,
@@ -141,7 +142,7 @@ pub fn dispatch_move(
 ) {
     let global = state.canvas_transform().to_canvas(global);
     match tool {
-        Tool::Selection => SelectionTool.on_move(state, global, dirty_mask),
+        Tool::Selection | Tool::Recording => SelectionTool.on_move(state, global, dirty_mask),
         Tool::Pick => PickTool.on_move(state, global, dirty_mask),
         Tool::Eyedropper => EyedropperTool.on_move(state, global, dirty_mask),
         Tool::Text => TextTool.on_move(state, global, dirty_mask),
@@ -174,7 +175,9 @@ pub fn dispatch_button(
     dirty_mask: &mut u32,
 ) {
     match tool {
-        Tool::Selection => SelectionTool.on_button(state, button, pressed, dirty_mask),
+        Tool::Selection | Tool::Recording => {
+            SelectionTool.on_button(state, button, pressed, dirty_mask)
+        }
         Tool::Pick => PickTool.on_button(state, button, pressed, dirty_mask),
         Tool::Eyedropper => EyedropperTool.on_button(state, button, pressed, dirty_mask),
         Tool::Text => TextTool.on_button(state, button, pressed, dirty_mask),
@@ -203,6 +206,7 @@ pub fn dispatch_button(
 // yet its still a `Tool`, since after ocr user can highlight  text and  copy
 pub fn dispatch_activate(tool: Tool, state: &mut EditorState, dirty_mask: &mut u32) {
     match tool {
+        Tool::Recording => crate::app::activate_recording_tool(state, dirty_mask),
         Tool::Ocr => OcrTool.on_activate(state, dirty_mask),
         Tool::Eyedropper => EyedropperTool.on_activate(state, dirty_mask),
         Tool::Ruler => RulerTool.on_activate(state, dirty_mask),
@@ -252,7 +256,7 @@ pub fn dispatch_key(tool: Tool, state: &mut EditorState, key: SpecialKey, dirty_
 
 pub fn dispatch_cursor(tool: Tool, state: &EditorState) -> CursorIcon {
     match tool {
-        Tool::Selection => SelectionTool.cursor(state),
+        Tool::Selection | Tool::Recording => SelectionTool.cursor(state),
         Tool::Pick => PickTool.cursor(state),
         Tool::Text => TextTool.cursor(state),
         Tool::Ocr => OcrTool.cursor(state),

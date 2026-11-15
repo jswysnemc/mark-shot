@@ -27,18 +27,28 @@ fn describe(host: &Shared, config: &Recording) -> String {
     )
 }
 
-/// 【录制窗口】【启动】按 target 打开准备窗口，开始后关闭界面转入后台，返回配置、独占锁或平台窗口错误
+/// 【录制窗口】【启动】按 target 进入录制流程，有本次参数时跳过准备窗口，返回配置、独占锁或平台错误
 ///
-/// 录制失败或倒计时被取消时回到准备窗口，成功保存后进程退出
+/// 独立入口取消或失败时回到准备窗口；工具入口取消后退出，失败返回错误；保存成功后退出
 pub(super) fn run(target: Target) -> crate::AppResult {
+    let mut initial = target.config.clone();
+    let from_tool = initial.is_some();
+    if let Some(config) = &initial {
+        config.validate()?;
+    }
     let host: Shared = Rc::new(RefCell::new(Host::new(target)?));
     let fonts = fonts::shared();
     let mut failure = None;
     loop {
         // 1. 【录制窗口】【准备阶段】用户确认选项；直接关闭或转去框选区域时结束本进程
-        setup::run(host.clone(), fonts.clone(), failure.take())?;
-        let Some(config) = host.borrow_mut().take_request() else {
-            return Ok(());
+        let config = if let Some(config) = initial.take() {
+            config
+        } else {
+            setup::run(host.clone(), fonts.clone(), failure.take())?;
+            let Some(config) = host.borrow_mut().take_request() else {
+                return Ok(());
+            };
+            config
         };
         host.borrow_mut().prepare(&config);
         // 2. 【录制窗口】【倒计时阶段】只在设置了倒计时时显示小组件；取消回到准备窗口，小组件故障不阻止录制
@@ -53,6 +63,9 @@ pub(super) fn run(target: Target) -> crate::AppResult {
                 Ok(true) => std::thread::sleep(SETTLE),
                 Ok(false) => {
                     host.borrow_mut().reset();
+                    if from_tool {
+                        return Ok(());
+                    }
                     continue;
                 }
                 Err(error) => log::error!("【录制窗口】【倒计时小组件】{error}"),
@@ -60,6 +73,9 @@ pub(super) fn run(target: Target) -> crate::AppResult {
         }
         // 3. 【录制窗口】【后台阶段】没有任何界面，暂停、继续和停止来自截图界面、托盘或命令行
         if let Err(error) = host.borrow_mut().start(config) {
+            if from_tool {
+                return Err(error.into());
+            }
             failure = Some(error);
             continue;
         }
@@ -69,13 +85,18 @@ pub(super) fn run(target: Target) -> crate::AppResult {
                 background::finished(&status);
                 return Ok(());
             }
+            "cancelled" if from_tool => return Ok(()),
             "cancelled" => {}
             _ => {
-                failure = Some(if status.detail.is_empty() {
+                let error = if status.detail.is_empty() {
                     status.phase.clone()
                 } else {
                     status.detail.clone()
-                });
+                };
+                if from_tool {
+                    return Err(error.into());
+                }
+                failure = Some(error);
             }
         }
         // 4. 【录制窗口】【返回准备】取消或失败后释放已结束的会话，保留目标供再次开始

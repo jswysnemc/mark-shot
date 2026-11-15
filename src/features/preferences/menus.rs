@@ -20,12 +20,27 @@ pub(super) fn setting(state: &mut Preferences, index: usize) {
         .map(|value| {
             OptionItem::new(
                 *value,
-                ENTRIES[index].option_label(value, state.chinese()),
+                if value.is_empty() && ENTRIES[index].section == "startup" {
+                    let mut defaults = state.values.clone();
+                    defaults["startup"][ENTRIES[index].key] = serde_json::Value::Null;
+                    format!(
+                        "{} ({})",
+                        ENTRIES[index].display_label(&defaults, state.chinese()),
+                        if state.chinese() { "默认" } else { "default" }
+                    )
+                } else {
+                    ENTRIES[index].option_label(value, state.chinese()).into()
+                },
                 "",
             )
         })
         .collect();
-    let value = state.value(index);
+    let configured = ENTRIES[index].configured_display(&state.values);
+    let value = if configured.is_empty() {
+        configured
+    } else {
+        state.value(index)
+    };
     let mut menu = Dropdown::new(
         Target::Setting(index),
         row.control,

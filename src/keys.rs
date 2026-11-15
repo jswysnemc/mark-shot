@@ -119,6 +119,7 @@ pub const ACTIONS: &[(&str, Action, &[&str])] = &[
     ("size_up", Action::SizeUp, &["]"]),
     ("size_down", Action::SizeDown, &["["]),
     ("tool_selection", Action::Tool(Tool::Selection), &["S"]),
+    ("tool_recording", Action::Tool(Tool::Recording), &[]),
     ("tool_pick", Action::Tool(Tool::Pick), &["V"]),
     ("tool_ocr", Action::Tool(Tool::Ocr), &["O"]),
     ("tool_eyedropper", Action::Tool(Tool::Eyedropper), &["I"]),

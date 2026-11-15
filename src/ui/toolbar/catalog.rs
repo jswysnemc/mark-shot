@@ -41,6 +41,12 @@ macro_rules! entry {
 
 pub const ENTRIES: &[Entry] = &[
     entry!(
+        "recording",
+        Button::Tool(Tool::Recording),
+        "录屏",
+        "Recording"
+    ),
+    entry!(
         "selection",
         Button::Tool(Tool::Selection),
         "调整选区",

@@ -6,6 +6,7 @@ use super::Tool;
 pub(crate) fn parse(value: &str) -> Result<Tool, String> {
     match value.to_ascii_lowercase().as_str() {
         "move" | "selection" => Ok(Tool::Selection),
+        "record" | "recording" => Ok(Tool::Recording),
         "select" | "pick" => Ok(Tool::Pick),
         "pen" => Ok(Tool::Pen),
         "highlighter" | "highlight" => Ok(Tool::Highlighter),

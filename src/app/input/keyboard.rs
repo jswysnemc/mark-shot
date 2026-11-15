@@ -88,6 +88,9 @@ pub fn handle_key(
         super::super::theme_switch::toggle(editor_state, dirty_mask);
         return;
     }
+    if super::super::panels::recording::input::key(editor_state, chord, dirty_mask) {
+        return;
+    }
     if super::super::selection_translation::input::key(editor_state, chord, dirty_mask) {
         return;
     }

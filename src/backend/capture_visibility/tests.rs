@@ -55,3 +55,39 @@ fn unlocked_crash_leftover_does_not_keep_windows_hidden() {
     assert!(path.exists());
     assert!(!watch.requested().unwrap());
 }
+
+/// 【贴图编辑测试】【定向隔离】无参数，验证目标窗口隐藏并恢复，其他进程租约及窗口不会误隐藏或阻塞交接
+#[test]
+fn scoped_edit_lease_hides_only_the_origin_and_restores_it_on_drop() {
+    use std::io::Write;
+    let directory = tempfile::tempdir().unwrap();
+    let mut watch = Watch::in_directory(directory.path(), || {}).unwrap();
+    let other_pid = std::process::id().saturating_add(1);
+    let other_window = record(directory.path(), &format!("window-{other_pid}-")).unwrap();
+    let mut other_lease = record(directory.path(), &format!("lease-process-{other_pid}-")).unwrap();
+    assert!(!watch.requested().unwrap());
+    write!(other_lease.as_file_mut(), "process:{other_pid}").unwrap();
+    assert!(!watch.requested().unwrap());
+    drop(other_lease);
+    let path = directory.path().to_owned();
+    let worker = std::thread::spawn(move || {
+        Guard::scoped(
+            &path,
+            Duration::from_secs(2),
+            &format!("window-{}-", std::process::id()),
+            &format!("process:{}", std::process::id()),
+        )
+        .unwrap()
+    });
+    let deadline = std::time::Instant::now() + Duration::from_secs(1);
+    while !watch.requested().unwrap() {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    watch.applied().unwrap();
+    let guard = worker.join().unwrap();
+    assert!(watch.requested().unwrap());
+    drop(guard);
+    assert!(!watch.requested().unwrap());
+    drop(other_window);
+}

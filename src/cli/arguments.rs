@@ -427,7 +427,8 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
             file_default_tool,
             default_color,
             record_select,
-            record_format: record_target.and_then(|target| target.format),
+            record_format: record_target.as_ref().and_then(|target| target.format),
+            record_config: record_target.and_then(|target| target.config),
             code_scan,
         })
     };

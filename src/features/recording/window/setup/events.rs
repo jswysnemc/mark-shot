@@ -36,6 +36,7 @@ impl Setup {
                         // 1. 【录制设置】【重新框选】当前窗口先交出目标与配置，选区完成后由新进程再次打开本窗口
                         Outcome::SelectRegion => {
                             self.save()?;
+                            self.target.config = Some(self.config.clone());
                             self.host.borrow_mut().set_target(self.target.clone());
                             let target = serde_json::to_string(&self.target)?;
                             crate::utils::spawn_self(

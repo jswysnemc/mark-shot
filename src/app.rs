@@ -45,13 +45,6 @@ mod ocr;
 mod panels;
 pub(crate) mod selection_history;
 
-/// 【工具栏配置】【设置返回】按 config 重置 state 工具栏位置与缓存，后续面板刷新负责实际排版
-pub(crate) fn configure_toolbar(
-    state: &mut EditorState,
-    config: &crate::config::toolbar_layout::ToolbarLayout,
-) {
-    panels::toolbar::configure(state, config, true);
-}
 mod pointer_history;
 #[cfg(test)]
 pub(crate) mod region_rendering_test_support;
@@ -66,6 +59,7 @@ pub(crate) mod text_menu_surface;
 pub(crate) use init::{build_captures, build_placements, load_icons_cache};
 pub(crate) use input::select_tool;
 pub(crate) use input::text_reedit;
+pub(crate) use panels::recording::activate as activate_recording_tool;
 
 use crate::backend::ScreenOverlay;
 use crate::backend::{FRAME_FALLBACK, initialize_overlay};
@@ -103,6 +97,7 @@ pub struct Launch {
     pub code_scan: bool,
     pub record_select: bool,
     pub record_format: Option<crate::features::recording::Format>,
+    pub record_config: Option<crate::config::recording::Recording>,
     pub mode: Mode,
     pub one_monitor: bool,
     pub all_outputs: bool,
@@ -193,6 +188,15 @@ async fn make_screenshot(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut prof = Profiler::new(launch.speed);
 
+    // 1. 【贴图编辑】【窗口交接】编辑期间只隐藏来源贴图，守卫随本次编辑退出释放，失败和取消也恢复置顶状态
+    let _pin_visibility = launch
+        .image
+        .as_ref()
+        .and_then(|_| std::env::var("MARK_SHOT_PIN_OWNER_PID").ok())
+        .and_then(|pid| pid.parse::<u32>().ok())
+        .map(crate::backend::capture_visibility::Guard::hide_process)
+        .transpose()?;
+
     // scrolling capture needs its own connection to grab frames
     let scroll_conn = conn.clone();
     let (mut editor_state, mut overlay) = if launch.image.is_some() {
@@ -225,6 +229,11 @@ async fn make_screenshot(
     if launch.mode == Mode::Ocr && editor_state.mode == Mode::Editor {
         // 1. 首次显示模型引导；已下载模型时直接识别本地原图
         select_tool(&mut editor_state, Tool::Ocr, &mut 0);
+    }
+    if let Some(format) = editor_state.capture_start.recording
+        && capture_start::initialize_recording_tool(&mut editor_state, format)
+    {
+        select_tool(&mut editor_state, Tool::Recording, &mut 0);
     }
     if editor_state.region() {
         editor_state.ui_hidden = true;
@@ -259,6 +268,16 @@ async fn make_screenshot(
             &editor_state.color_popover.initial_history,
             !editor_state.magnifier.hidden,
         );
+
+        if editor_state.preferences_requested {
+            // 1. 【设置窗口】【结束截图】先关闭选区窗口和后台资源，再打开独立设置窗口
+            overlay.suspend()?;
+            editor_state.ocr.models.shutdown();
+            drop(editor_state);
+            drop(overlay);
+            crate::utils::memory::release_unused();
+            return crate::features::preferences::run(false);
+        }
 
         if scroll_mode {
             if let Some((image, display)) =
@@ -313,7 +332,7 @@ async fn make_screenshot(
             }
             return Ok(());
         }
-        if editor_state.capture_start.recording.is_some() {
+        if editor_state.recording_tool.request.is_some() {
             let target =
                 crate::features::recording::selection::selected(&editor_state, overlay.as_ref())?;
             drop(editor_state);

@@ -33,6 +33,9 @@ pub(in crate::app) enum UiHit {
 
 /// 【界面】【界面命中】按弹层优先级检查 editor_state 中显示器本地 local；返回命中类别
 pub(in crate::app) fn hit_test_ui(editor_state: &EditorState, local: (f64, f64)) -> UiHit {
+    if editor_state.recording_tool.menu.is_some() {
+        return UiHit::SettingsBackground;
+    }
     if editor_state.font_panel.open {
         return if editor_state.input.pointer.monitor_idx == editor_state.font_panel.monitor_idx
             && editor_state.font_panel.hit_test(local)
@@ -151,6 +154,9 @@ pub(in crate::app) fn hit_test_ui(editor_state: &EditorState, local: (f64, f64))
 
 /// 【界面】【光标选择】依据 editor_state 的弹层、按钮和工具状态返回光标类型
 pub fn compute_cursor(editor_state: &EditorState) -> CursorIcon {
+    if editor_state.recording_tool.menu.is_some() {
+        return CursorIcon::Pointer;
+    }
     if let Some(control) = crate::app::capture_start::input::hit(editor_state) {
         return if control == crate::ui::capture_start::Control::Background {
             CursorIcon::Default
@@ -159,13 +165,7 @@ pub fn compute_cursor(editor_state: &EditorState) -> CursorIcon {
         };
     }
     if editor_state.image_window.enabled
-        && let Some(hit) = crate::ui::image_window::hit(
-            (
-                editor_state.placements[0].size.0 as u32,
-                editor_state.placements[0].size.1 as u32,
-            ),
-            editor_state.input.pointer.local,
-        )
+        && let Some(hit) = crate::app::image_window::input::hit(editor_state)
     {
         use crate::{backend::window::WindowEdge, ui::image_window::Hit};
         return match hit {

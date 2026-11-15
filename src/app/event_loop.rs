@@ -58,6 +58,9 @@ pub(super) fn run_overlay(
             pacing = Pacing::new(editor_state.captures.len());
         }
         match event {
+            OverlayEvent::EscapePressed if editor_state.recording_tool.menu.is_some() => {
+                super::panels::recording::close(editor_state, &mut dirty_mask);
+            }
             OverlayEvent::EscapePressed if editor_state.color_inspector.panel.is_some() => {
                 crate::features::color_sample::inspector::close(editor_state, &mut dirty_mask);
             }
@@ -131,34 +134,6 @@ pub(super) fn run_overlay(
             pointer_wait = None;
             panels::toolbar::update_toolbar(editor_state, &mut dirty_mask);
             apply_damage_rects(editor_state, &mut dirty_mask);
-        }
-
-        if editor_state.preferences_requested {
-            editor_state.preferences_requested = false;
-            crate::editor::text_session::commit(editor_state, &mut dirty_mask);
-            overlay.suspend()?;
-            visibility.pause();
-            let before = crate::config::preferences::current();
-            let result = crate::features::preferences::run(false);
-            overlay.resume()?;
-            crate::features::preferences::runtime::apply(
-                editor_state,
-                &before,
-                &crate::config::preferences::current(),
-                &mut dirty_mask,
-            );
-            if let Err(error) = result {
-                log::error!("【设置窗口】【编辑器返回】{error}");
-                editor_state.toasts.show_text(
-                    crate::ui::toast::ToastKind::SettingsFailed,
-                    error.to_string(),
-                    &mut editor_state.text.font_system,
-                );
-            }
-            super::theme_switch::refresh(editor_state, &mut dirty_mask);
-            pacing = Pacing::new(editor_state.captures.len());
-            editor_state.annotations_dirty = true;
-            pointer_wait = None;
         }
 
         if editor_state.save_as_requested {
@@ -374,6 +349,8 @@ pub(super) fn handle_event(editor_state: &mut EditorState, ev: OverlayEvent, dir
         }
         OverlayEvent::FocusLost { monitor_idx } => {
             editor_state.capture_start.pressed = None;
+            super::panels::recording::close(editor_state, dirty_mask);
+            editor_state.recording_tool.release_owner = None;
             super::canvas_navigation::input::focus_lost(editor_state, dirty_mask);
             super::annotation_collection::input::focus_lost(editor_state, dirty_mask);
             super::selection_size::apply::commit(editor_state, dirty_mask);

@@ -8,6 +8,20 @@ use crate::utils::get_overlapping_monitors;
 use tiny_skia::Rect;
 
 impl EditorState {
+    /// 【标注选框】【窗口损坏】按annotation与selected返回专用正文或类矩形选框范围，未选普通标注返回空值
+    fn annotation_window_damage(&self, annotation: &Annotation, selected: bool) -> Option<Rect> {
+        self.ruler_window_damage(annotation, selected).or_else(|| {
+            if selected {
+                crate::features::annotation_selection::frame::editing_bounds(
+                    annotation,
+                    self.hit_window_units(),
+                )
+            } else {
+                None
+            }
+        })
+    }
+
     pub fn monitor_dirty_rect(&self, monitor_idx: usize) -> Option<Rect> {
         let placement = &self.placements[monitor_idx];
         let mut dirty: Option<Rect> = None;
@@ -119,7 +133,7 @@ impl EditorState {
 
         if !is_pen_drawing {
             if let Some(ann) = &self.pending {
-                let area = self.ruler_window_damage(ann, self.ann_drag.is_some());
+                let area = self.annotation_window_damage(ann, self.ann_drag.is_some());
                 let pad = if area.is_some() {
                     0.0
                 } else {
@@ -131,7 +145,7 @@ impl EditorState {
                 );
             }
             if let Some(ann) = &self.prev_pending {
-                let area = self.ruler_window_damage(ann, self.ann_drag.is_some());
+                let area = self.annotation_window_damage(ann, self.ann_drag.is_some());
                 let pad = if area.is_some() {
                     0.0
                 } else {
@@ -147,7 +161,7 @@ impl EditorState {
             && let Some(ann_idx) = self.selected_annotation_index()
             && let Some(ann) = self.annotations.get(ann_idx)
         {
-            let area = self.ruler_window_damage(ann, true);
+            let area = self.annotation_window_damage(ann, true);
             let pad = if area.is_some() {
                 0.0
             } else {

@@ -1,4 +1,4 @@
-//! 【图片窗口】【输入归属】标题栏和工具栏空白拖动交给窗口管理器，按钮和画布维持各自输入
+//! 【图片窗口】【输入归属】合并工具栏空白拖动交给窗口管理器，工具按钮和画布维持各自输入
 
 use crate::{
     editor::EditorState,
@@ -14,12 +14,27 @@ fn size(state: &EditorState) -> (u32, u32) {
     )
 }
 
-/// 【图片窗口】【指针反馈】按 state 更新标题栏悬停，dirty 返回重绘；返回是否阻止画布处理
+/// 【图片窗口】【合并栏命中】按state返回窗口操作，工具按钮内部交给工具输入处理
+pub(crate) fn hit(state: &EditorState) -> Option<Hit> {
+    let point = state.input.pointer.local;
+    let hit = image_window::layout::hit(
+        size(state),
+        image_window::layout::bar_height(state.toolbar.size.1),
+        point,
+    );
+    if hit == Some(Hit::Move) && state.toolbar.hit_test(point).1.is_some() {
+        None
+    } else {
+        hit
+    }
+}
+
+/// 【图片窗口】【指针反馈】按 state 更新窗口按钮悬停，dirty 返回重绘；返回是否阻止画布处理
 pub(crate) fn pointer(state: &mut EditorState, dirty: &mut u32) -> bool {
     if !state.image_window.enabled {
         return false;
     }
-    let hit = image_window::hit(size(state), state.input.pointer.local);
+    let hit = hit(state);
     if state.image_window.hovered != hit {
         state.image_window.hovered = hit;
         crate::editor::dirty::mark_all_dirty(dirty, 1);
@@ -55,7 +70,7 @@ pub(crate) fn button(
     if canvas_gesture(state) {
         return false;
     }
-    let mut hit = image_window::hit(size(state), state.input.pointer.local);
+    let mut hit = hit(state);
     if hit.is_none() && state.toolbar.hit_test(state.input.pointer.local) == (true, None) {
         hit = Some(Hit::Move);
     }
@@ -79,6 +94,7 @@ pub(crate) fn button(
     }
     if pressed && let Some(hit) = hit {
         state.image_window.pressed = Some(hit);
+        crate::editor::dirty::mark_all_dirty(dirty, 1);
         state.image_window.action = match hit {
             Hit::Move => Some(Action::Move),
             Hit::Resize(edge) => Some(Action::Resize(edge)),

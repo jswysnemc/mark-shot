@@ -16,6 +16,9 @@ pub(super) fn draw(
     rect: Rect,
     tint: Rgba,
 ) {
+    if super::recording::draw(painter, panel, action, rect, tint) {
+        return;
+    }
     let preview = Rect::from_xywh(
         rect.left() + 4.0,
         rect.top(),

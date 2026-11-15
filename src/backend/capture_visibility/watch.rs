@@ -42,7 +42,7 @@ impl Watch {
         watcher
             .watch(directory, notify::RecursiveMode::NonRecursive)
             .map_err(io::Error::other)?;
-        let window = super::record(directory, "window-")?;
+        let window = super::record(directory, &format!("window-{}-", std::process::id()))?;
         let ack = window.path().with_extension("ack");
         Ok(Self {
             directory: directory.to_owned(),
@@ -57,6 +57,13 @@ impl Watch {
     /// 【截图窗口】【隐藏请求】无参数，刷新活跃租约并返回期望显隐；错误向上传递，避免错误确认截图
     pub fn requested(&mut self) -> io::Result<bool> {
         self.requested = super::records(&self.directory, "lease-")?;
+        let target = format!("lease-process-{}-", std::process::id());
+        self.requested.retain(|path| {
+            path.file_name().is_some_and(|name| {
+                let name = name.to_string_lossy();
+                !name.starts_with("lease-process-") || name.starts_with(&target)
+            })
+        });
         Ok(!self.requested.is_empty())
     }
 

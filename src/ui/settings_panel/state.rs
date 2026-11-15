@@ -45,6 +45,8 @@ pub struct SettingsPanel {
     pub arrow_style: crate::features::arrow::ArrowStyle,
     pub line_style: crate::features::line::LineStyle,
     pub filter_mode: crate::features::filter::FilterMode,
+    pub(crate) recording: crate::config::recording::Recording,
+    pub(crate) recording_ready: bool,
 
     /// Scroll accumulator for scrollable fields (hex/rgba)
     /// Keeps scroll fractional state separate from raw events to avoid
@@ -100,6 +102,8 @@ impl SettingsPanel {
             arrow_style: crate::features::arrow::ArrowStyle::Fletched,
             line_style: crate::features::line::LineStyle::Solid,
             filter_mode: crate::features::filter::FilterMode::Pixelate,
+            recording: crate::config::recording::Recording::default(),
+            recording_ready: false,
         }
     }
 

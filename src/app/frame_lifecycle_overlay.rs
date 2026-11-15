@@ -15,6 +15,7 @@ pub(super) struct Overlay {
     pub(super) frames: Vec<Vec<u8>>,
     pub(super) sizes: Vec<(u32, u32)>,
     pub(super) sent: usize,
+    wake: crate::backend::task_wake::Source,
 }
 
 impl Overlay {
@@ -32,6 +33,7 @@ impl Overlay {
                 .map(|canvas| (canvas.width(), canvas.height()))
                 .collect(),
             sent: 0,
+            wake: crate::backend::task_wake::Source::new().unwrap(),
         }
     }
 
@@ -65,6 +67,10 @@ impl Overlay {
 }
 
 impl ScreenOverlay for Overlay {
+    /// 【帧生命周期测试】【任务通知】无参数，返回本次测试拥有的通知句柄，不连接真实桌面
+    fn task_wake(&mut self) -> AppResult<crate::backend::task_wake::Wake> {
+        Ok(self.wake.wake())
+    }
     /// 【帧生命周期测试】【场景交付】按 monitor/frame 执行各平台共用的软件场景合成，返回实际像素结果
     fn stage_capture_scene(
         &mut self,

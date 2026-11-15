@@ -66,3 +66,23 @@ fn legacy_fullscreen_fields_do_not_override_the_two_bars() {
     assert!(serialized.get("fullscreen").is_none());
     assert!(serialized.get("fullscreen_vertical").is_none());
 }
+
+/// 【工具栏回归】【录屏默认升级】旧完整默认主栏自动加入录屏，用户明确配置的精简主栏保持原样
+#[test]
+fn legacy_default_main_gains_recording_without_changing_custom_layouts() {
+    let legacy = ITEMS
+        .iter()
+        .copied()
+        .filter(|item| catalog::id(*item) != "recording")
+        .collect::<Vec<_>>();
+    let old = serde_json::to_value(ToolbarLayout {
+        main: legacy,
+        ..Default::default()
+    })
+    .unwrap();
+    let upgraded: ToolbarLayout = serde_json::from_value(old).unwrap();
+    assert_eq!(upgraded.main, ITEMS);
+    let custom: ToolbarLayout =
+        serde_json::from_value(json!({"main":["selection","rectangle"]})).unwrap();
+    assert_eq!(custom.main, list(&["selection", "rectangle"]));
+}

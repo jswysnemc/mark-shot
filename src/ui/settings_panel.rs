@@ -2,6 +2,7 @@ mod action_icon;
 mod docking;
 mod draw;
 mod layout;
+pub(crate) mod recording;
 mod state;
 mod widgets;
 

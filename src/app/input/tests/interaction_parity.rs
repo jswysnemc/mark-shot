@@ -8,33 +8,16 @@ use crate::{
 };
 use cosmic_text::Edit;
 
-/// 【设置回归】【会话生效】无参数，真实编辑器应用输出、放大预览和工具配置时保留原图与历史
+/// 【设置回归】【截图退出】设置快捷键请求独立窗口并取消截图，不触发导出或新增撤销记录，无参数、无返回值
 #[test]
-fn preference_changes_apply_without_replacing_the_capture() {
-    let mut state = text_editor();
-    let before = crate::config::Config::default();
-    let mut after = before.clone();
-    after.general.to = crate::types::Outputs::parse("s").unwrap();
-    after.startup.selection_loupe = Some(false);
-    after.startup.normal_tool = Some("pen".into());
-    let annotations = state.annotations.clone();
-    crate::features::preferences::runtime::apply(&mut state, &before, &after, &mut 0);
-    assert_eq!(state.to, after.general.to);
-    assert!(state.magnifier.hidden);
-    assert_eq!(state.after_selection_tool, Tool::Pen);
-    assert_eq!(state.annotations, annotations);
-}
-
-/// 【设置回归】【编辑保留】设置快捷键只请求窗口，保持原件、选区、标注和撤销记录，无参数、无返回值
-#[test]
-fn settings_request_preserves_the_current_capture() {
+fn settings_request_cancels_the_current_capture() {
     let mut state = text_editor();
     let before = state.annotations.clone();
     let zone = state.selection.zone;
     let history = state.undo_stack.len();
     key(&mut state, "Ctrl+,", &mut 0);
     assert!(state.preferences_requested);
-    assert!(!state.cancel && state.finish.is_none());
+    assert!(state.cancel && state.finish.is_none());
     assert_eq!(state.annotations, before);
     assert_eq!(state.selection.zone, zone);
     assert_eq!(state.undo_stack.len(), history);

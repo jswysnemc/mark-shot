@@ -7,14 +7,14 @@ pub const OCR_COPY_ARG: &str = "--pin-ocr-copy-snapshot";
 
 /// 【贴图】【编辑交接】将 png 交给独立编辑或 OCR 进程；ocr 决定模式，返回启动结果
 pub fn open(png: &[u8], ocr: bool) -> AppResult {
-    crate::utils::spawn_self(
-        &[if ocr {
-            OCR_ARG
-        } else {
-            "--history-edit-snapshot"
-        }],
-        png,
-    )
+    if !ocr {
+        return crate::utils::spawn_self_with_env(
+            &["--history-edit-snapshot"],
+            png,
+            &[("MARK_SHOT_PIN_OWNER_PID", &std::process::id().to_string())],
+        );
+    }
+    crate::utils::spawn_self(&[OCR_ARG], png)
 }
 
 /// 【贴图】【另存为】以原始 png 打开统一对话框；返回保存、取消或失败结果，不写入重复历史

@@ -34,6 +34,8 @@ pub const COPY: &str = include_str!("../../assets/icons/mark-shot/copy.svg");
 pub const GLOBE: &str = include_str!("../../assets/icons/globe.svg");
 pub const DOWNLOAD: &str = include_str!("../../assets/icons/download.svg");
 pub const CLOSE: &str = include_str!("../../assets/icons/mark-shot/cancel.svg");
+pub const WINDOW_MINIMIZE: &str = include_str!("../../assets/icons/mark-shot/window-minimize.svg");
+pub const WINDOW_MAXIMIZE: &str = include_str!("../../assets/icons/mark-shot/window-maximize.svg");
 pub const CHEVRON_DOWN: &str = include_str!("../../assets/icons/mark-shot/chevron-down.svg");
 pub const TRASH: &str = include_str!("../../assets/icons/trash.svg");
 pub const CHECK: &str = include_str!("../../assets/icons/check.svg");
@@ -50,6 +52,7 @@ pub fn get_svg_for_tool(tool: Tool) -> (&'static str, f32) {
     let size = &crate::config::get().toolbar.icons;
     match tool {
         Tool::Selection => (SELECTION, size.selection),
+        Tool::Recording => (VIDEO, size.selection),
         Tool::Pick => (PICK, size.pick),
         Tool::Eyedropper => (EYEDROPPER, size.eyedropper),
         Tool::Text => (TEXT, size.text),
@@ -98,6 +101,8 @@ pub const EXTRA_ICONS: &[&str] = &[
     GLOBE,
     DOWNLOAD,
     CLOSE,
+    WINDOW_MINIMIZE,
+    WINDOW_MAXIMIZE,
     CHEVRON_DOWN,
     TRASH,
     CHECK,

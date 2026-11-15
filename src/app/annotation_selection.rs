@@ -47,7 +47,8 @@ fn rect(state: &EditorState, monitor: usize) -> Option<Rect> {
     state
         .canvas_local_rect(annotation.damage_bbox(false), monitor)?
         .intersect(&placement.rect()?)?;
-    let mut frame = chrome::bounds(annotation)?;
+    let mut frame =
+        crate::features::annotation_selection::frame::bounds(annotation, state.hit_window_units())?;
     let mut radial = true;
     let degrees = match annotation.shape {
         AnnotationShape::Redact { filter } => filter.rotation,

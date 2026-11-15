@@ -30,6 +30,7 @@ pub(crate) use values::stepper_value;
 
 /// 【属性面板】【面板同步】根据 editor_state 同步属性内容与可见位置；dirty_mask 返回重绘显示器，无返回值
 pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u32) {
+    super::recording::sync(editor_state, dirty_mask);
     if crate::editor::annotation_collection::properties::active(editor_state) {
         let text = crate::ui::annotation_collection::layout::title(
             editor_state.selected_annotation_ids().len(),
@@ -121,6 +122,7 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
     let downloading = editor_state.ocr.models.is_downloading();
 
     let new_source = match selected_ann {
+        _ if editor_state.selected_tool == Tool::Recording => SettingsSource::Tool(Tool::Recording),
         _ if no_model => SettingsSource::OcrNoModel { downloading },
         _ if scanning => SettingsSource::OcrScanning,
         _ if awaiting => SettingsSource::OcrAwaiting { downloading },
@@ -316,8 +318,10 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
     }
 
     let arranged = editor_state.settings_panel.arrange(available_width);
-    let should_be_visible =
-        !new_widgets.is_empty() && !editor_state.tool_active && !editor_state.ui_hidden;
+    let should_be_visible = !new_widgets.is_empty()
+        && !editor_state.tool_active
+        && !editor_state.ui_hidden
+        && (editor_state.selected_tool != Tool::Recording || editor_state.selection.zone.is_some());
 
     if should_be_visible {
         let (pos, monitor_idx) = compute_settings_placement(editor_state);

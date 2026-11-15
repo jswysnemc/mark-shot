@@ -12,6 +12,8 @@ pub(crate) mod selection;
 #[cfg(target_os = "linux")]
 mod session;
 pub(crate) mod status_query;
+pub(crate) mod tool_options;
+pub(crate) mod tool_state;
 mod window;
 
 use serde::{Deserialize, Serialize};
@@ -23,6 +25,9 @@ pub struct Target {
     pub crop: Option<[u32; 4]>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub format: Option<Format>,
+    /// 小工具栏明确提交的本次参数；存在时跳过独立准备窗口
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<crate::config::recording::Recording>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]

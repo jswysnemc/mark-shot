@@ -32,6 +32,7 @@ pub enum ToastKind {
     UploadFeedback,
     TranslationFeedback,
     SelectionTooSmall,
+    RecordingFeedback,
 }
 
 #[derive(Clone, Copy)]
@@ -87,6 +88,7 @@ impl ToastKind {
                 fade_out,
             },
             ToastKind::SaveAsFailed
+            | ToastKind::RecordingFeedback
             | ToastKind::ExternalActionFailed
             | ToastKind::UploadFeedback
             | ToastKind::TranslationFeedback => ToastSpec {

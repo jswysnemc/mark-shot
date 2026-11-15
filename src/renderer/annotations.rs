@@ -57,14 +57,14 @@ pub fn draw_annotation(
 
 /// 【标注渲染】【编辑控制框】仅把 ann 的控制点绘入 p，不绘制正文或修改数据，无返回值
 pub fn draw_annotation_handles_only(p: &mut Painter, ann: &Annotation) {
-    if let Some(corners) = ann.generic_frame_corners() {
+    if let Some(corners) = ann.generic_frame_corners_in_window(p.window_units()) {
         let draw = crate::ui::annotation_selection::draw::frame;
         draw(p, corners, 1.0);
         for point in crate::features::annotation_selection::chrome::handles(corners) {
             crate::ui::annotation_selection::draw::square(p, point, 1.0);
         }
-        if let Some((top, handle)) = ann.generic_rotation_handle() {
-            crate::ui::annotation_selection::draw::rotation(p, top, handle, 1.0);
+        if let Some((top, handle)) = ann.generic_rotation_handle_in_window(p.window_units()) {
+            crate::ui::annotation_selection::draw::rotation_points(p, top, handle, 1.0);
         }
         if ann.shape.line().is_some() {
             super::line_handles::anchors(p, ann);

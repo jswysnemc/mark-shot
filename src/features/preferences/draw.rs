@@ -47,7 +47,7 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
             format!(
                 "{} {}",
                 entry.label(chinese),
-                entry.note(&state.source, chinese)
+                entry.note(&state.source, &state.values, chinese)
             )
         })
         .collect::<Vec<_>>()
@@ -110,7 +110,7 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
                 } else if entry.section == "ocr" && entry.key == "resources" {
                     state.resource_note.clone()
                 } else {
-                    entry.note(&state.source, chinese)
+                    entry.note(&state.source, &state.values, chinese)
                 };
                 let help = controls::fit_label(
                     painter,

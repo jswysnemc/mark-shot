@@ -23,16 +23,17 @@ fn rectangle() -> Annotation {
     }
 }
 
-/// 【标注选框测试】【原版缩放点】实际绘制的上边中点应为9像素橙色方块，四角分段线不能替代缩放点
+/// 【标注选框测试】【描边留白】实际上边缩放点在描边外保留六像素，正文边缘不再被橙色控制框覆盖
 #[test]
 fn ordinary_annotation_uses_orange_square_handle_on_its_actual_bounds() {
     let mut canvas = Pixmap::new(260, 220).unwrap();
     draw_annotation_handles_only(&mut Painter::new(&mut canvas), &rectangle());
-    let pixel = canvas.pixel(130, 80).unwrap().demultiply();
+    let pixel = canvas.pixel(130, 72).unwrap().demultiply();
     assert_eq!(
         (pixel.red(), pixel.green(), pixel.blue(), pixel.alpha()),
         (251, 146, 60, 255)
     );
+    assert_eq!(canvas.pixel(130, 80).unwrap().alpha(), 0);
 }
 
 /// 【标注选框测试】【分数局部恢复】实际画笔选框在完整画布与部分损坏缓冲必须逐字节一致，不涉及历史或正文重采样

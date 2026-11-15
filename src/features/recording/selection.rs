@@ -21,8 +21,31 @@ pub(crate) fn selected(
     Ok(Some(Target {
         display: crate::backend::output_selection::name(output, index),
         crop: Some(crop),
-        format: state.capture_start.recording,
+        format: state
+            .recording_tool
+            .request
+            .as_ref()
+            .map(|config| {
+                if config.format == "gif" {
+                    super::Format::Gif
+                } else {
+                    super::Format::Video
+                }
+            })
+            .or(state.capture_start.recording),
+        config: state.recording_tool.request.clone(),
     }))
+}
+
+/// 【录制选区】【开始校验】按 state 返回当前单屏物理区域，缺少选区、跨屏或尺寸不足返回错误
+pub(crate) fn validate_region(
+    state: &crate::editor::EditorState,
+) -> crate::AppResult<(usize, [u32; 4])> {
+    let region = state
+        .selection
+        .zone
+        .ok_or("请选择录制区域 / Select a recording region")?;
+    region_crop(region, &state.placements)
 }
 
 /// 【录制选区】【区域换算】按全局逻辑 region 和 placements 返回所属表面序号及物理裁剪区域，跨屏返回错误

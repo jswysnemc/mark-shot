@@ -186,6 +186,7 @@ record_stop = "Ctrl+Shift+E"
 size_up = "]"
 size_down = "["
 tool_selection = "S"
+tool_recording = []
 tool_pick = "V"
 tool_ocr = "O"
 tool_eyedropper = "I"
@@ -225,7 +226,7 @@ resize_down_fast = "Alt+Shift+Down"
 main = [
     "selection", "pick", "separator", "pen", "line", "highlighter", "separator",
     "rectangle", "circle", "marker", "arrow", "separator", "text", "number", "redact",
-    "magnifier", "ruler", "laser", "eyedropper", "separator", "clear", "undo", "redo",
+    "magnifier", "ruler", "laser", "eyedropper", "recording", "separator", "clear", "undo", "redo",
 ]
 actions = [
     "scope", "separator", "open_with", "extensions", "scroll", "pin", "ocr", "scan_code", "translate",

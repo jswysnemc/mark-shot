@@ -56,7 +56,9 @@ impl Setup {
     /// 【录制设置】【配置读取】无参数，从当前偏好重新生成选项，本次指定的格式继续生效
     fn reload(&mut self) {
         self.config = crate::config::preferences::current().recording.clone();
-        if let Some(format) = self.target.format {
+        if self.target.config.is_none()
+            && let Some(format) = self.target.format
+        {
             self.config.format = format.resolve(&self.config.format);
         }
     }
@@ -98,6 +100,9 @@ pub(super) fn run(host: Shared, fonts: fonts::Shared, failure: Option<String>) -
         choice: None,
     };
     setup.reload();
+    if let Some(config) = &setup.target.config {
+        setup.config = config.clone();
+    }
     window::run(
         WindowSpec {
             title: "Mark Shot — Recording".into(),

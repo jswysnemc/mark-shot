@@ -11,7 +11,6 @@ mod layout;
 mod menus;
 mod navigation;
 mod recovery;
-pub(crate) mod runtime;
 mod scrolling;
 mod sections;
 mod shell;

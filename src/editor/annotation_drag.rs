@@ -68,7 +68,8 @@ pub fn handle_hit_test_for_annotation(ann: &Annotation, pos: (f64, f64)) -> Sele
             true,
         );
     }
-    let bbox = crate::features::annotation_selection::chrome::bounds(ann).unwrap_or(ann.bbox);
+    let bbox = crate::features::annotation_selection::frame::bounds(ann, Default::default())
+        .unwrap_or(ann.bbox);
     if let Some((_, handle)) = ann.generic_rotation_handle() {
         let tolerance = crate::config::get().input.handle_hit_width * 0.5 * 1.4;
         if (pos.0 - f64::from(handle.0)).hypot(pos.1 - f64::from(handle.1)) <= f64::from(tolerance)

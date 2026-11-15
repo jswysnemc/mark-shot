@@ -182,12 +182,12 @@ impl Entry {
                 "Inspect installation, download runtime and language models",
             ),
             ("startup", "default_color") => (
-                "#RRGGBB 或 #RRGGBBAA；留空继承工具颜色",
-                "#RRGGBB or #RRGGBBAA; empty inherits tool color",
+                "#RRGGBB 或 #RRGGBBAA；恢复后使用当前工具颜色",
+                "#RRGGBB or #RRGGBBAA; reset uses the current tool color",
             ),
             ("startup", "default_tool" | "fullscreen_default_tool") => (
-                "留空沿用上级默认工具",
-                "Empty inherits the common default tool",
+                "显示此截图入口实际使用的工具",
+                "Shows the tool used by this capture entry point",
             ),
             ("upload", "command") => (
                 "主动上传时执行；环境变量可覆盖",
@@ -459,7 +459,11 @@ pub(super) const BASE: &[Entry] = &[
 /// 【设置窗口】【选项文案】将稳定配置 value 转为易读文案，chinese 控制界面语言，未知值原样显示
 pub fn value_label(value: &str, chinese: bool) -> &str {
     if !chinese {
-        return value;
+        return if value.is_empty() {
+            "Not configured"
+        } else {
+            value
+        };
     }
     match value {
         "system" => "跟随系统",
@@ -475,7 +479,7 @@ pub fn value_label(value: &str, chinese: bool) -> &str {
         "sp" => "保存并贴图",
         "csp" => "复制、保存并贴图",
         "at-launch" => "截图时启动",
-        "" => "继承默认",
+        "" => "未配置",
         "highlighter" => "荧光笔",
         "laser" => "激光笔",
         "marker" => "标记",

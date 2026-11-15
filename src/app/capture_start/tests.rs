@@ -92,7 +92,9 @@ fn mode_buttons_do_not_select_the_desktop_underneath() {
     for (control, format) in [(Control::Video, Format::Video), (Control::Gif, Format::Gif)] {
         click(&mut state, control);
         assert_eq!(state.capture_start.recording, Some(format));
-        assert_eq!(state.mode, Mode::Region);
+        assert_eq!(state.mode, Mode::Editor);
+        assert_eq!(state.selected_tool, crate::tools::Tool::Recording);
+        assert!(!state.ui_hidden);
         assert!(state.selection.zone.is_none() && state.finish.is_none());
         assert!(!state.input.mouse_down && !state.tool_active);
     }
@@ -115,9 +117,9 @@ fn fullscreen_selects_current_output_and_dismisses_intro() {
     assert!(!state.capture_start.visible);
 }
 
-/// 【截图起始测试】【实际拖选】在画布拖动形成选区后，起始控件消失，释放仍到达选区工具且完成录制交接
+/// 【截图起始测试】【实际拖选】形成选区后起始控件消失，录屏工具保留区域供小工具栏调整，不提前交接
 #[test]
-fn gif_selection_finishes_and_keeps_requested_format() {
+fn gif_selection_stays_editable_and_keeps_requested_format() {
     let mut state = editor();
     click(&mut state, Control::Gif);
     crate::app::input::handle_pointer_move(&mut state, 0, 80.0, 120.0, &mut 0);
@@ -128,7 +130,8 @@ fn gif_selection_finishes_and_keeps_requested_format() {
     crate::app::input::handle_pointer_button(&mut state, MouseButton::Left, false, &mut 0);
     sync(&mut state, &mut 0);
     assert!(!state.capture_start.visible);
-    assert!(state.finish.is_some());
+    assert!(state.finish.is_none() && state.recording_tool.request.is_none());
+    assert!(state.settings_panel.visible);
     assert_eq!(state.capture_start.recording, Some(Format::Gif));
     assert!(!state.input.mouse_down && !state.tool_active);
 }
@@ -164,7 +167,7 @@ fn active_recording_does_not_start_another_session() {
     assert!(state.selection.zone.is_some());
 }
 
-/// 【截图起始测试】【录制快捷键】快捷键与顶部按钮进入相同的录制选区模式，选区形成后不再响应
+/// 【截图起始测试】【录制快捷键】快捷键与顶部按钮选择相同录屏工具，选区形成后仍可进入
 #[test]
 fn recording_shortcuts_match_the_top_buttons() {
     use crate::keys::Action;
@@ -175,13 +178,14 @@ fn recording_shortcuts_match_the_top_buttons() {
     ] {
         crate::app::actions::run(&mut state, action, &mut 0);
         assert_eq!(state.capture_start.recording, Some(format));
-        assert_eq!(state.mode, Mode::Region);
+        assert_eq!(state.mode, Mode::Editor);
     }
     click(&mut state, Control::Region);
     click(&mut state, Control::Fullscreen);
     assert!(!state.capture_start.visible);
     crate::app::actions::run(&mut state, Action::RecordVideo, &mut 0);
-    assert!(state.capture_start.recording.is_none());
+    assert_eq!(state.capture_start.recording, Some(Format::Video));
+    assert_eq!(state.selected_tool, crate::tools::Tool::Recording);
 }
 
 /// 【截图起始测试】【无效拖选】不足八像素的拖动不构成有效选区，起始入口继续可用

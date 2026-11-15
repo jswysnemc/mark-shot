@@ -156,7 +156,7 @@ impl Preferences {
         self.page == Page::Translation && self.search.text().is_empty()
     }
 
-    /// 【设置窗口】【显示取值】按 index 返回当前设置文字，未覆盖快捷键显示默认组合，空选项显示首个可选值
+    /// 【设置窗口】【显示取值】按 index 返回当前实际设置文字，未覆盖字段解析默认工具、颜色和目录，无文件写入
     pub fn value(&self, index: usize) -> String {
         ENTRIES[index].display(&self.values)
     }

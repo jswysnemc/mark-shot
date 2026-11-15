@@ -233,7 +233,12 @@ pub fn selected(annotation: &Annotation, point: Point, window: WindowUnits) -> S
             return SelectionHandle::LinePoint(index);
         }
     }
-    unrotated_bounds(annotation).map_or(SelectionHandle::None, |bounds| {
+    let bounds = if super::frame::padded(annotation) {
+        super::frame::bounds(annotation, window)
+    } else {
+        unrotated_bounds(annotation)
+    };
+    bounds.map_or(SelectionHandle::None, |bounds| {
         bounds_drag(bounds, local, window)
     })
 }

@@ -100,6 +100,7 @@ pub const ITEMS: &[ToolbarItem] = &[
     I(B::Tool(Tool::Ruler)),
     I(B::Tool(Tool::Laser)),
     I(B::Tool(Tool::Eyedropper)),
+    I(B::Tool(Tool::Recording)),
     S,
     I(B::Clear),
     I(B::Undo),

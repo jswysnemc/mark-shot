@@ -11,19 +11,31 @@ use crate::{
 
 /// 【截图起始】【启动配置】按 state 和 launch 设置可见性及本次录制类型，不影响文件编辑和专用识别入口
 pub(super) fn initialize(state: &mut EditorState, launch: &super::Launch) {
+    if let Some(config) = &launch.record_config {
+        state.recording_tool.config = config.clone();
+    }
     state.capture_start.recording_controls = launch.image.is_none()
         && !launch.code_scan
         && matches!(launch.mode, Mode::Editor | Mode::Region);
     state.capture_start.visible = state.capture_start.recording_controls && !launch.fullscreen;
     state.capture_start.recording = launch.record_format.or_else(|| {
         launch.record_select.then(|| {
-            if crate::config::preferences::current().recording.format == "gif" {
+            if state.recording_tool.config.format == "gif" {
                 Format::Gif
             } else {
                 Format::Video
             }
         })
     });
+}
+
+/// 【截图起始】【录屏参数】按 state 与 format 初始化命令行指定的格式，返回是否可进入录屏工具
+pub(super) fn initialize_recording_tool(state: &mut EditorState, format: Format) -> bool {
+    if !super::panels::recording::available(state) {
+        return false;
+    }
+    state.recording_tool.config.format = format.resolve(&state.recording_tool.config.format);
+    true
 }
 
 /// 【截图起始】【控件损坏】按 state 标记所有输出上入口和提示的边界，dirty 返回需要重绘的输出
@@ -97,6 +109,9 @@ pub(super) fn poll(state: &mut EditorState, dirty: &mut u32) {
                 damage(state, dirty);
             }
         }
+    }
+    if state.selected_tool == crate::tools::Tool::Recording {
+        super::panels::settings::update_settings_panel(state, dirty);
     }
     placement::sync(state, dirty);
 }

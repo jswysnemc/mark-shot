@@ -3,6 +3,9 @@
 mod capture;
 mod catalog;
 mod desktop;
+mod effective;
+#[cfg(test)]
+mod effective_tests;
 mod extra;
 mod metadata;
 mod recording;
@@ -47,6 +50,13 @@ impl Entry {
             return label;
         }
         match (self.section, self.key, value) {
+            ("save", "month_format", "") => {
+                if chinese {
+                    "不使用子目录"
+                } else {
+                    "No subfolder"
+                }
+            }
             ("general", "to", "") => {
                 if chinese {
                     "不执行完成操作"
@@ -84,8 +94,13 @@ impl Entry {
         }
     }
 
-    /// 【应用设置】【显示值】从 values 读取有效字段，缺失时使用结构默认值，返回可编辑文本
+    /// 【应用设置】【显示值】按 values 解析字段实际生效值，返回工具名称、颜色、路径或普通配置文本
     pub fn display(&self, values: &Value) -> String {
+        effective::resolve(self, values, self.configured_display(values))
+    }
+
+    /// 【应用设置】【编辑值】按 values 返回配置文本，缺失字段使用结构默认值，保留空值以免编辑时写入派生值
+    pub fn configured_display(&self, values: &Value) -> String {
         if matches!(self.kind, Kind::Link(_)) {
             return String::new();
         }
@@ -116,6 +131,11 @@ impl Entry {
                 .join(" / "),
             value => value.to_string(),
         }
+    }
+
+    /// 【应用设置】【显示文案】按 values 和 chinese 返回实际字段标签，空文本使用明确含义，不显示继承占位
+    pub fn display_label(&self, values: &Value, chinese: bool) -> String {
+        self.option_label(&self.display(values), chinese).into()
     }
 
     /// 【应用设置】【输入解码】按字段类型将 text 转为配置值，返回范围或格式错误，不写文件

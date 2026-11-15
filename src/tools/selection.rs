@@ -107,6 +107,7 @@ impl ToolBehavior for SelectionTool {
                 state.input.drag_start.is_some() && state.selection.zone.is_some();
             crate::app::selection_history::record(state);
             if first_selection
+                && state.selected_tool != crate::tools::Tool::Recording
                 && !state.region()
                 && state.after_selection_tool != crate::tools::Tool::Selection
             {
@@ -117,7 +118,11 @@ impl ToolBehavior for SelectionTool {
             let fresh = state.input.drag_start.is_some();
             state.input.drag_start = None;
             state.selection.set_drag(SelectionHandle::None, None, None);
-            if state.region() && fresh && state.selection.zone.is_some() {
+            if state.region()
+                && state.selected_tool != crate::tools::Tool::Recording
+                && fresh
+                && state.selection.zone.is_some()
+            {
                 state.finish = Some(state.to);
             }
         }

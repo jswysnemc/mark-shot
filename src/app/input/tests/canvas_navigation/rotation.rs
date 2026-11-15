@@ -68,11 +68,14 @@ fn ordinary_rotation_keeps_the_window_gap_and_pointer_target() {
             let mut dirty = 0;
             select_tool(&mut state, Tool::Pick, &mut dirty);
             let annotation = rectangle(degrees);
-            let (top, handle) = annotation.generic_rotation_handle().unwrap();
+            let (top, direction) = annotation
+                .generic_rotation_handle_in_window(state.hit_window_units())
+                .unwrap();
+            let (_, handle) = annotation.generic_rotation_handle().unwrap();
             state.annotations.push(annotation.clone());
             state.select_annotation_index(Some(0));
             let view = state.canvas_transform();
-            let screen = screen_handle(top, handle, view);
+            let screen = screen_handle(top, direction, view);
             let point = view.to_canvas(screen);
             assert_eq!(
                 state.canvas_handle(&annotation, point),
@@ -104,11 +107,14 @@ fn rotation_pixels_use_the_fixed_window_position_and_damage_grid() {
     for scale in [1.0, 1.5, 2.0] {
         let mut state = navigated(2.0, scale);
         let annotation = rectangle(45.0);
-        let (top, handle) = annotation.generic_rotation_handle().unwrap();
+        let (top, direction) = annotation
+            .generic_rotation_handle_in_window(state.hit_window_units())
+            .unwrap();
+        let (_, handle) = annotation.generic_rotation_handle().unwrap();
         state.annotations.push(annotation);
         state.select_annotation_index(Some(0));
         let view = state.canvas_transform();
-        let screen = screen_handle(top, handle, view);
+        let screen = screen_handle(top, direction, view);
         draw(&mut state, None);
         let canvas = &state.canvas[0];
         let pixel = canvas
@@ -140,6 +146,31 @@ fn rotation_pixels_use_the_fixed_window_position_and_damage_grid() {
     }
 }
 
+/// 【画布导航测试】【缩小重绘】扩大后的选框和旋转圆点在低倍率下仍全部纳入生产损坏范围
+#[test]
+fn padded_frame_damage_contains_rotation_controls_at_low_zoom() {
+    for zoom in [0.1, 0.25, 0.5, 2.0] {
+        let mut state = navigated(zoom, 1.5);
+        let annotation = rectangle(0.0);
+        let (_, rotation) = annotation
+            .generic_rotation_handle_in_window(state.hit_window_units())
+            .unwrap();
+        state.annotations.push(annotation);
+        state.select_annotation_index(Some(0));
+        state.selection.prev_zone = state.selection.zone;
+        state.damage_rects.clear();
+        let dirty = state.monitor_dirty_rect(0).unwrap();
+        let screen = state
+            .canvas_transform()
+            .to_screen((f64::from(rotation.0), f64::from(rotation.1)));
+        assert!(
+            f64::from(dirty.top()) <= screen.1 - 8.0,
+            "zoom={zoom}, dirty={dirty:?}"
+        );
+        assert!(f64::from(dirty.left()) <= screen.0 - 8.0);
+        assert!(f64::from(dirty.right()) >= screen.0 + 8.0);
+    }
+}
 /// 【画布导航测试】【群组窗口间隔】放大和缩小后，群组旋转点仍在上边26窗口像素处，实际按下开始共同旋转
 #[test]
 fn collection_rotation_uses_the_same_screen_gap() {

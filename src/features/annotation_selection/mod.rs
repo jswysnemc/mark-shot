@@ -2,4 +2,5 @@
 
 pub mod body_hit;
 pub mod chrome;
+pub(crate) mod frame;
 pub mod rotation;

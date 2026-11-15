@@ -31,7 +31,9 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
     let bounds = state.placements[monitor].size;
     let available = (bounds.0 as f32 - 16.0, bounds.1 as f32 - 16.0);
     let side_bounds = state.placements[side_monitor].size;
-    let hidden = state.selection.zone.is_none() || state.tool_active || state.ui_hidden;
+    let hidden = state.ui_hidden
+        || (!state.image_window.enabled && (state.selection.zone.is_none() || state.tool_active));
+    state.toolbar.window_bar = state.image_window.enabled;
     let old_main = state.toolbar.rect();
     let old_main_monitor = state.toolbar.monitor_idx;
     let old_side = state.action_toolbar.rect();
@@ -65,36 +67,33 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
             (!state.fullscreen_scope).then_some(state.action_toolbar.size),
         )
     });
-    let main_position = dock_positions
-        .map(|positions| positions.0)
-        .or(state.toolbar.user_position)
-        .unwrap_or_else(|| {
-            if state.fullscreen_scope && state.file_canvas.is_some() {
-                return (
-                    (bounds.0 as f32 - state.toolbar.size.0) / 2.0,
-                    if state.image_window.enabled {
-                        crate::ui::image_window::TITLE_HEIGHT + crate::ui::image_window::INSET
-                    } else {
-                        12.0
-                    },
-                );
-            }
-            let rect = selection.unwrap_or_else(|| {
-                Rect::from_xywh(0.0, 0.0, bounds.0 as f32, bounds.1 as f32).unwrap()
-            });
-            let x = (rect.left() + rect.width() / 2.0 - state.toolbar.size.0 / 2.0)
-                .clamp(8.0, (bounds.0 as f32 - state.toolbar.size.0 - 8.0).max(8.0));
-            let below = rect.bottom() + 8.0;
-            let y = if below + state.toolbar.size.1 <= bounds.1 as f32 - 8.0 {
-                below
-            } else {
-                rect.top() - state.toolbar.size.1 - 8.0
-            };
-            (
-                x,
-                y.clamp(8.0, (bounds.1 as f32 - state.toolbar.size.1 - 8.0).max(8.0)),
-            )
-        });
+    let main_position = if state.image_window.enabled {
+        super::super::image_window::layout::toolbar_position()
+    } else {
+        dock_positions
+            .map(|positions| positions.0)
+            .or(state.toolbar.user_position)
+            .unwrap_or_else(|| {
+                if state.fullscreen_scope && state.file_canvas.is_some() {
+                    return ((bounds.0 as f32 - state.toolbar.size.0) / 2.0, 12.0);
+                }
+                let rect = selection.unwrap_or_else(|| {
+                    Rect::from_xywh(0.0, 0.0, bounds.0 as f32, bounds.1 as f32).unwrap()
+                });
+                let x = (rect.left() + rect.width() / 2.0 - state.toolbar.size.0 / 2.0)
+                    .clamp(8.0, (bounds.0 as f32 - state.toolbar.size.0 - 8.0).max(8.0));
+                let below = rect.bottom() + 8.0;
+                let y = if below + state.toolbar.size.1 <= bounds.1 as f32 - 8.0 {
+                    below
+                } else {
+                    rect.top() - state.toolbar.size.1 - 8.0
+                };
+                (
+                    x,
+                    y.clamp(8.0, (bounds.1 as f32 - state.toolbar.size.1 - 8.0).max(8.0)),
+                )
+            })
+    };
     place(&mut state.toolbar, monitor, main_position, bounds, hidden);
     let side_position = dock_positions
         .map(|positions| positions.1)
@@ -194,9 +193,23 @@ pub(crate) fn configure(
         (&mut state.toolbar, profile),
         (&mut state.action_toolbar, Profile::Actions),
     ] {
-        let items = profile.items(config);
-        if toolbar.items != *items || toolbar.profile != profile || reset {
-            toolbar.items = items.to_vec();
+        let items = if state.image_window.enabled && profile == Profile::Fullscreen {
+            super::super::image_window::layout::toolbar_items(config)
+        } else {
+            profile
+                .items(config)
+                .iter()
+                .copied()
+                .filter(|item| {
+                    !matches!(
+                        item,
+                        ToolbarItem::Button(ToolbarButton::Tool(crate::tools::Tool::Recording))
+                    ) || (state.capture_start.recording_controls && state.file_canvas.is_none())
+                })
+                .collect::<Vec<_>>()
+        };
+        if toolbar.items != items || toolbar.profile != profile || reset {
+            toolbar.items = items.clone();
             toolbar.profile = profile;
             toolbar.orientation = if profile.vertical(config) {
                 crate::ui::toolbar::Orientation::Vertical
@@ -259,13 +272,20 @@ fn place(
     hidden: bool,
 ) {
     // 1. 【截图工具栏】【边界收敛】手动放置后尺寸仍可能变化，按本栏显示器重新限制整个矩形
+    let inset = if toolbar.window_bar {
+        crate::ui::image_window::layout::BAR_INSET
+    } else {
+        8.0
+    };
+    let vertical_inset = if toolbar.window_bar { 0.0 } else { inset };
     let position = (
         position
             .0
-            .clamp(8.0, (bounds.0 as f32 - toolbar.size.0 - 8.0).max(8.0)),
-        position
-            .1
-            .clamp(8.0, (bounds.1 as f32 - toolbar.size.1 - 8.0).max(8.0)),
+            .clamp(inset, (bounds.0 as f32 - toolbar.size.0 - inset).max(inset)),
+        position.1.clamp(
+            vertical_inset,
+            (bounds.1 as f32 - toolbar.size.1 - vertical_inset).max(vertical_inset),
+        ),
     );
     if toolbar.user_position.is_some() {
         toolbar.user_position = Some(position);

@@ -2,7 +2,7 @@
 
 use super::{geometry, resize};
 use crate::{
-    features::annotation_selection::chrome,
+    features::annotation_selection::{chrome, frame},
     types::{Annotation, AnnotationShape, SelectionHandle, SignedRect},
 };
 use tiny_skia::Rect;
@@ -148,10 +148,15 @@ pub(crate) fn dragged(
     }
     // 3. 【普通标注】【反向缩放】先反旋转鼠标，再按原版未旋转矩形计算八方向缩放
     let old = chrome::bounds(before)?;
+    let pointer = if frame::padded(before) {
+        frame::resize_pointer(before, handle, start, current)
+    } else {
+        before.to_unrotated((point.0 as f32, point.1 as f32))
+    };
     let target = resize::resized(
         old,
         handle,
-        before.to_unrotated((point.0 as f32, point.1 as f32)),
+        pointer,
         options.bounds,
         options.pixel_scale,
         options.keep_aspect,

@@ -24,6 +24,7 @@ fn private_native_recording_pause_resume() {
         display: std::env::var("MARK_SHOT_TEST_OUTPUT").unwrap_or_default(),
         crop: Some([20, 40, 320, 240]),
         format: None,
+        config: None,
     };
     let status = std::sync::Arc::new(std::sync::Mutex::new(super::super::Status::default()));
     let (send, receive) = std::sync::mpsc::channel();

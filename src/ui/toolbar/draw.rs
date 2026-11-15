@@ -9,14 +9,26 @@ pub fn draw_toolbar(p: &mut Painter, toolbar: &mut Toolbar) {
     let Some(rect) = toolbar.rect() else { return };
     let mut cache = toolbar.toolbar_pixmap.take();
     let look = toolbar.look();
-    p.panel(
-        &mut cache,
-        (rect.left(), rect.top()),
-        toolbar.size,
-        toolbar.opacity,
-        toolbar.drawn_look.as_ref() != Some(&look),
-        |p| content(p, toolbar),
-    );
+    let redraw = toolbar.drawn_look.as_ref() != Some(&look);
+    if toolbar.window_bar {
+        p.panel_unframed(
+            &mut cache,
+            (rect.left(), rect.top()),
+            toolbar.size,
+            toolbar.opacity,
+            redraw,
+            |p| content(p, toolbar),
+        );
+    } else {
+        p.panel(
+            &mut cache,
+            (rect.left(), rect.top()),
+            toolbar.size,
+            toolbar.opacity,
+            redraw,
+            |p| content(p, toolbar),
+        );
+    }
     toolbar.toolbar_pixmap = cache;
     toolbar.drawn_look = Some(look);
 }
@@ -40,9 +52,11 @@ fn border(p: &mut Painter, rect: Rect, radius: f32, color: Rgba) {
 /// 【截图工具栏】【内容绘制】将 toolbar 的本地按钮、分组和握柄绘入 p
 fn content(p: &mut Painter, toolbar: &Toolbar) {
     let cfg = &crate::config::get().toolbar;
-    let rect = Rect::from_xywh(0.5, 0.5, toolbar.size.0 - 1.0, toolbar.size.1 - 1.0).unwrap();
-    p.fill_rounded(rect, 11.0, cfg.background.get());
-    border(p, rect, 11.0, crate::theme::color::border());
+    if !toolbar.window_bar {
+        let rect = Rect::from_xywh(0.5, 0.5, toolbar.size.0 - 1.0, toolbar.size.1 - 1.0).unwrap();
+        p.fill_rounded(rect, 11.0, cfg.background.get());
+        border(p, rect, 11.0, crate::theme::color::border());
+    }
     let grip = toolbar.grip();
     for row in 0..3 {
         for column in 0..2 {

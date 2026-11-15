@@ -71,6 +71,8 @@ pub enum ToggleVisual {
 /// 【属性面板】【动作类型】只触发操作，不保存开关或数值状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingsAction {
+    Recording(crate::features::recording::tool_options::Parameter),
+    StartRecording,
     OcrRescan,
     OcrCopyAll,
     OcrOpenResult,
@@ -212,6 +214,7 @@ impl ToggleField {
 /// 【属性面板】【工具控件】依据 tool 返回颜色、尺寸和样式等属性控件
 pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
     match tool {
+        Tool::Recording => super::recording::WIDGETS,
         Tool::Number => &[
             SettingsWidget::ColorSwatch(ColorTarget::Main),
             SettingsWidget::Action {
@@ -537,6 +540,19 @@ impl PanelItem for SettingsWidget {
                     | SettingsAction::FilterModes,
                 ..
             } => cfg.icon_button_size + 16.0,
+            SettingsWidget::Action {
+                action: SettingsAction::Recording(parameter),
+                ..
+            } => match parameter {
+                crate::features::recording::tool_options::Parameter::Audio => 124.0,
+                crate::features::recording::tool_options::Parameter::Encoder => 112.0,
+                crate::features::recording::tool_options::Parameter::Countdown => 112.0,
+                _ => 96.0,
+            },
+            SettingsWidget::Action {
+                action: SettingsAction::StartRecording,
+                ..
+            } => 128.0,
             SettingsWidget::Action { .. } => cfg.icon_button_size,
             SettingsWidget::Stepper { .. } => cfg.stepper_width,
             SettingsWidget::Toggle { visual, .. } => match visual {

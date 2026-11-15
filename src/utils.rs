@@ -415,12 +415,21 @@ pub fn copy_swizzled(dst: &mut [u8], src: &[u8]) {
 
 /// 【辅助进程】【独立调用】将 args 和 stdin 交给独立应用进程；返回启动及输入结果，终端中断不影响辅助窗口
 pub fn spawn_self(args: &[&str], stdin: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-    spawn_self_with(args, stdin, std::process::Stdio::null(), None).map(|_| ())
+    spawn_self_with(args, stdin, std::process::Stdio::null(), None, &[]).map(|_| ())
+}
+
+/// 【辅助进程】【环境交接】按 args、stdin 和 environment 启动独立进程，返回启动结果；环境只作用于该子进程
+pub fn spawn_self_with_env(
+    args: &[&str],
+    stdin: &[u8],
+    environment: &[(&str, &str)],
+) -> crate::AppResult {
+    spawn_self_with(args, stdin, std::process::Stdio::null(), None, environment).map(|_| ())
 }
 
 /// 【辅助进程】【桌面激活】按args启动窗口并交付一次性的token，不修改常驻进程环境，返回启动结果
 pub fn spawn_self_activated(args: &[&str], token: Option<&str>) -> crate::AppResult {
-    spawn_self_with(args, &[], std::process::Stdio::null(), token).map(|_| ())
+    spawn_self_with(args, &[], std::process::Stdio::null(), token, &[]).map(|_| ())
 }
 
 /// 【辅助进程】【就绪交接】将 args、stdin 交给独立进程，在 timeout 内等待首行；返回就绪结果或错误
@@ -431,7 +440,7 @@ pub fn spawn_self_ready(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use std::io::BufRead;
 
-    let stdout = spawn_self_with(args, stdin, std::process::Stdio::piped(), None)?
+    let stdout = spawn_self_with(args, stdin, std::process::Stdio::piped(), None, &[])?
         .ok_or("child has no stdout")?;
 
     let (tx, rx) = std::sync::mpsc::channel();
@@ -456,12 +465,16 @@ fn spawn_self_with(
     stdin: &[u8],
     stdout: std::process::Stdio,
     activation_token: Option<&str>,
+    environment: &[(&str, &str)],
 ) -> Result<Option<std::process::ChildStdout>, Box<dyn std::error::Error>> {
     use std::io::Write;
     use std::process::{Command, Stdio};
 
     let mut command = Command::new(std::env::current_exe()?);
     command.args(args);
+    // 1. 【贴图编辑】【单次身份】隐藏来源不能随编辑器后续启动的复制、设置或其他窗口继续传播
+    command.env_remove("MARK_SHOT_PIN_OWNER_PID");
+    command.envs(environment.iter().copied());
     if let Some(token) = activation_token {
         command.env("XDG_ACTIVATION_TOKEN", token);
     }

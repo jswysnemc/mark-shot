@@ -85,6 +85,9 @@ pub fn run(editor_state: &mut EditorState, action: Action, dirty_mask: &mut u32)
             crate::ui::external_panel::Kind::Extensions,
             dirty_mask,
         ),
+        Action::Accept if editor_state.selected_tool == Tool::Recording => {
+            super::panels::recording::start(editor_state, dirty_mask);
+        }
         Action::Accept => {
             if !tool_copy(editor_state, dirty_mask) && !editor_state.to.is_empty() {
                 editor_state.finish = Some(editor_state.to);
@@ -164,7 +167,11 @@ pub fn run(editor_state: &mut EditorState, action: Action, dirty_mask: &mut u32)
         Action::ToggleMagnifier => toggle_magnifier(editor_state, dirty_mask),
         Action::ToggleTheme => super::theme_switch::toggle(editor_state, dirty_mask),
         Action::ScrollCapture => begin_scroll_capture(editor_state, dirty_mask),
-        Action::Settings => editor_state.preferences_requested = true,
+        Action::Settings => {
+            editor_state.preferences_requested = true;
+            editor_state.cancel = true;
+            editor_state.finish = None;
+        }
         Action::ClearAnnotations | Action::ToggleScope | Action::ToggleToolbarLayout => {
             use crate::ui::toolbar::ToolbarButton;
             let button = match action {
