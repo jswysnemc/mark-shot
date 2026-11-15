@@ -5,7 +5,7 @@ use crate::{
     editor::EditorState,
     features::recording::Format,
     types::{Mode, MouseButton},
-    ui::capture_start::{Control, layout},
+    ui::capture_start::{Control, hints, layout},
 };
 
 /// 【截图起始】【交互可用】按 state 返回起始控件是否接受输入，已选区或画布拖动时不拦截
@@ -29,8 +29,14 @@ pub(crate) fn hit(state: &EditorState) -> Option<Control> {
 /// 【截图起始】【指针移动】按 state 更新悬停并清除底层候选，dirty 返回重绘，返回是否消费移动
 pub(crate) fn pointer(state: &mut EditorState, dirty: &mut u32) -> bool {
     let hovered = hit(state).map(|control| (state.input.pointer.monitor_idx, control));
-    if state.capture_start.hovered != hovered {
+    // 1. 【截图起始】【悬停让位】提示仍按固定边界检测，隐藏后不会因边界消失而来回闪烁
+    let monitor = state.input.pointer.monitor_idx;
+    let hint_hovered = hints::bounds(state, monitor)
+        .filter(|rect| crate::ui::selection_size::state::contains(*rect, state.input.pointer.local))
+        .map(|_| monitor);
+    if state.capture_start.hovered != hovered || state.capture_start.hint_hovered != hint_hovered {
         state.capture_start.hovered = hovered;
+        state.capture_start.hint_hovered = hint_hovered;
         damage(state, dirty);
     }
     hovered.is_some() || state.capture_start.pressed.is_some()

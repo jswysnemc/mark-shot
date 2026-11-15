@@ -8,6 +8,77 @@ use crate::{
 };
 use tiny_skia::Rect;
 
+const REPOSITORY_URL: &str = "https://github.com/jswysnemc/mark-shot";
+const REPOSITORY_LABEL: &str = "github.com/jswysnemc/mark-shot";
+
+/// 【应用信息】【滚动区域】按 state 返回关于页绘制坐标，链接命中与绘制共用滚动偏移
+pub(super) fn viewport(state: &super::window::Preferences) -> Rect {
+    let viewport = super::layout::viewport(state);
+    rect(
+        viewport.left(),
+        viewport.top() - state.scroll as f32,
+        viewport.width(),
+        viewport.height(),
+    )
+}
+
+/// 【应用信息】【链接区域】按 viewport 返回 GitHub 地址的紧凑点击范围，窄窗口限制到面板内
+pub(super) fn repository_rect(viewport: Rect) -> Rect {
+    rect(
+        viewport.left() + 16.0,
+        viewport.top() + 251.0,
+        (viewport.width() - 46.0).min(220.0),
+        26.0,
+    )
+}
+
+/// 【应用信息】【浏览器打开】无参数，用系统默认浏览器打开固定仓库地址，返回启动结果
+pub(super) fn open_repository() -> crate::AppResult {
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::{Command, Stdio};
+        // 1. 【应用信息】【浏览器启动】仓库地址作为独立参数交付系统打开程序
+        let mut child = Command::new("xdg-open")
+            .arg(REPOSITORY_URL)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()?;
+        // 2. 【应用信息】【进程回收】后台等待退出，避免阻塞设置窗口
+        std::thread::spawn(move || {
+            if let Err(error) = child.wait() {
+                log::error!("【应用信息】【打开仓库】浏览器启动进程回收失败: {error}");
+            }
+        });
+        Ok(())
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use windows_sys::Win32::{
+            UI::Shell::ShellExecuteW, UI::WindowsAndMessaging::SW_SHOWNORMAL,
+        };
+        // 1. 【应用信息】【链接编码】按系统接口要求构造带终止符的地址和打开动作
+        let url: Vec<_> = REPOSITORY_URL.encode_utf16().chain([0]).collect();
+        let action: Vec<_> = "open".encode_utf16().chain([0]).collect();
+        // 2. 【应用信息】【浏览器启动】通过系统地址关联选择默认浏览器
+        let result = unsafe {
+            ShellExecuteW(
+                std::ptr::null_mut(),
+                action.as_ptr(),
+                url.as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+        // 3. 【应用信息】【结果校验】系统错误码返回给设置窗口的统一状态提示
+        if result as isize <= 32 {
+            return Err(format!("cannot open repository URL: {}", result as isize).into());
+        }
+        Ok(())
+    }
+}
+
 /// 【应用信息】【环境读取】按 keys 顺序读取非空环境变量，返回值或明确的未识别提示
 fn environment(keys: &[&str]) -> String {
     keys.iter()
@@ -142,8 +213,14 @@ impl Information {
     }
 }
 
-/// 【应用信息】【页面绘制】按 painter、viewport 和 chinese 绘制紧凑信息行，无返回值
-pub(super) fn draw(painter: &mut Painter<'_>, viewport: Rect, chinese: bool, info: &Information) {
+/// 【应用信息】【页面绘制】按 painter、viewport 和 chinese 绘制 info 中的紧凑信息行，hovered 控制仓库链接下划线，无返回值
+pub(super) fn draw(
+    painter: &mut Painter<'_>,
+    viewport: Rect,
+    chinese: bool,
+    info: &Information,
+    hovered: bool,
+) {
     let palette = Palette::current();
     let rows = [
         (
@@ -202,14 +279,15 @@ pub(super) fn draw(painter: &mut Painter<'_>, viewport: Rect, chinese: bool, inf
             TextStyle::new(12.0, palette.text),
         );
     }
-    painter.text(
-        rect(
-            area.left() + 16.0,
-            area.bottom() - 37.0,
-            area.width() - 32.0,
-            26.0,
-        ),
-        "github.com/jswysnemc/mark-shot",
-        TextStyle::new(11.0, palette.muted),
-    );
+    let link = repository_rect(viewport);
+    let label = controls::fit_label(painter, REPOSITORY_LABEL, 11.0, link.width());
+    painter.text(link, &label, TextStyle::new(11.0, palette.accent));
+    if hovered {
+        let width = painter.measure(&label, 11.0).min(link.width());
+        painter.fill_rounded(
+            rect(link.left(), link.top() + 21.0, width, 1.0),
+            0.0,
+            palette.accent,
+        );
+    }
 }

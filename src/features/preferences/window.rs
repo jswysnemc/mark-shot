@@ -56,6 +56,7 @@ pub(super) enum Control {
     Search,
     Apply,
     ConfigPath,
+    Repository,
     Scrollbar,
     Reset(usize),
     Clear(usize),
@@ -222,6 +223,16 @@ impl Preferences {
         if self.toolbar_page() || self.translation_page() {
             return None;
         }
+        if self.page == Page::About
+            && self.search.text().is_empty()
+            && contains(super::layout::viewport(self), point)
+            && contains(
+                super::about::repository_rect(super::about::viewport(self)),
+                point,
+            )
+        {
+            return Some(Control::Repository);
+        }
         super::layout::Layout::new(self).hit(self, point)
     }
 
@@ -375,6 +386,19 @@ impl Preferences {
         }
         match control {
             Control::Close | Control::Scrollbar => {}
+            Control::Repository => {
+                if let Err(error) = super::about::open_repository() {
+                    log::error!("【应用信息】【打开仓库】{error}");
+                    self.status = format!(
+                        "{}: {error}",
+                        if self.chinese() {
+                            "无法打开浏览器"
+                        } else {
+                            "Cannot open browser"
+                        }
+                    );
+                }
+            }
             Control::Back => {
                 self.back();
             }

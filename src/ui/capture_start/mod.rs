@@ -30,6 +30,7 @@ pub(crate) struct State {
     pub stop_requested: bool,
     pub recording: Option<Format>,
     pub hovered: Option<(usize, Control)>,
+    pub hint_hovered: Option<usize>,
     pub pressed: Option<(usize, Control)>,
     pub status: Status,
     pub query: Query,

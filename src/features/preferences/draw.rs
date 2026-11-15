@@ -31,6 +31,7 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
     let chinese = state.chinese();
     let palette = Palette::current();
     let layout = Layout::new(state);
+    let about_viewport = super::about::viewport(state);
     let toolbar_position = super::toolbar_preview::position(&state.values);
     if layout.preview.is_some() {
         state
@@ -299,14 +300,10 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
             if state.page == Page::About && state.search.text().is_empty() {
                 super::about::draw(
                     painter,
-                    rect(
-                        layout.viewport.left(),
-                        layout.viewport.top() - state.scroll as f32,
-                        layout.viewport.width(),
-                        layout.viewport.height(),
-                    ),
+                    about_viewport,
                     chinese,
                     &state.about,
+                    hover == Some(Control::Repository),
                 );
             } else if layout.rows.is_empty() {
                 painter.text(

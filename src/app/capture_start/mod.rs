@@ -63,6 +63,7 @@ pub(crate) fn sync(state: &mut EditorState, dirty: &mut u32) {
     {
         state.capture_start.visible = false;
         state.capture_start.hovered = None;
+        state.capture_start.hint_hovered = None;
         state.capture_start.pressed = None;
         damage(state, dirty);
     }

@@ -6,16 +6,35 @@ use crate::{
     keys::{self, Action},
     renderer::{Painter, text::TextStyle},
     theme::window::Palette,
-    ui::controls,
+    ui::{controls, language::Language},
 };
+use tiny_skia::Rect;
 
 /// 键位列宽上限，说明文字在同一列对齐
 const KEY_COLUMN: f32 = 92.0;
+/// 提示底色透明度，保留文字对比度并透出截图内容
+const SURFACE_ALPHA: u8 = 200;
+/// 键帽与边框透明度，避免形成不透明色块
+const KEYCAP_ALPHA: u8 = 176;
+const BORDER_ALPHA: u8 = 160;
 
 /// 一条提示：按键显示文本与动作说明
 pub(crate) struct Hint {
     pub key: String,
     pub title: &'static str,
+}
+
+/// 【截图起始】【提示边界】按 state 与 monitor 返回实际提示范围，悬停隐藏仍保留网格边界，起始阶段结束后返回空值
+pub(crate) fn bounds(state: &EditorState, monitor: usize) -> Option<Rect> {
+    if !state.capture_start.visible {
+        return None;
+    }
+    let groups = groups(state, Language::current() == Language::Chinese);
+    layout::hint_grid(
+        state.placements[monitor].size,
+        (groups.0.len(), groups.1.len()),
+    )
+    .map(|grid| grid.bounds)
 }
 
 /// 【截图起始】【提示内容】按 state 和 cn 返回选择组与录制组提示，未绑定或当前无效的动作不出现
@@ -107,7 +126,15 @@ pub(crate) fn draw(
     groups: &(Vec<Hint>, Vec<Hint>),
     palette: Palette,
 ) {
-    // 1. 【截图起始】【列顺序】两列时选择组在左，单列时选择组在上，超出高度的条目已由网格裁剪
+    // 1. 【截图起始】【半透明材质】背景、细边和键帽透出截图内容，文字保持不透明以保证可读性
+    controls::frame(
+        painter,
+        grid.bounds,
+        palette.base.with_alpha(SURFACE_ALPHA),
+        palette.border.with_alpha(BORDER_ALPHA),
+        8.0,
+    );
+    // 2. 【截图起始】【列顺序】两列时选择组在左，单列时选择组在上，超出高度的条目已由网格裁剪
     let mut rows: Vec<(usize, usize, &Hint)> = Vec::new();
     if grid.columns == 2 {
         for (column, group) in [&groups.0, &groups.1].into_iter().enumerate() {
@@ -128,7 +155,7 @@ pub(crate) fn draw(
     for (column, row, hint) in rows {
         let cell = layout::hint_cell(grid, column, row);
         let key_column = KEY_COLUMN.min(cell.width() * 0.55);
-        // 2. 【截图起始】【键位键帽】按键文本放在浅色圆角块内，与说明文字区分开
+        // 3. 【截图起始】【键位键帽】按键文本放在半透明圆角块内，与说明文字区分开
         let key = controls::fit_label(painter, &hint.key, 10.0, key_column - 12.0);
         let key_width = (painter.measure(&key, 10.0) + 10.0).min(key_column - 4.0);
         let cap = rect(
@@ -137,7 +164,7 @@ pub(crate) fn draw(
             key_width,
             (cell.height() - 4.0).min(16.0),
         );
-        painter.fill_rounded(cap, 4.0, palette.alternate);
+        painter.fill_rounded(cap, 4.0, palette.alternate.with_alpha(KEYCAP_ALPHA));
         painter.text(cap, &key, TextStyle::new(10.0, palette.text).center());
         let title = controls::fit_label(painter, hint.title, 11.0, cell.width() - key_column - 4.0);
         painter.text(
@@ -148,7 +175,7 @@ pub(crate) fn draw(
                 cell.height(),
             ),
             &title,
-            TextStyle::new(11.0, palette.muted),
+            TextStyle::new(11.0, palette.text),
         );
     }
 }
