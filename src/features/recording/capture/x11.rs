@@ -27,6 +27,10 @@ impl Capture {
     /// 【X11录制】【来源建立】按 display、target 和 cursor 固定显示器并创建共享段，返回初始化错误
     pub fn new(display: Display, target: &Target, cursor: bool) -> Result<Self, String> {
         let setup = || -> crate::AppResult<Self> {
+            // 1. 【X11录制】【光标协议】每个新连接先协商 XFixes，后续 GetCursorImage 才能按已启用版本读取
+            if cursor {
+                display.connection.xfixes_query_version(5, 0)?.reply()?;
+            }
             let outputs = display.outputs()?;
             let output = super::choose(&outputs, target)?;
             let (width, height) = output

@@ -120,7 +120,7 @@ impl Overlay {
                 } else if pressed && matches!(event.detail, 4 | 5) {
                     self.pending
                         .push_back(OverlayEvent::Scroll(ScrollEvent::wheel(
-                            if event.detail == 4 { -120 } else { 120 },
+                            if event.detail == 4 { 120 } else { -120 },
                         )));
                 }
                 self.pending.pop_front()

@@ -9,13 +9,14 @@ use std::error::Error;
 use std::os::fd::{AsFd, OwnedFd};
 
 use async_trait::async_trait;
-use tokio::sync::OnceCell;
 use zbus::zvariant::{Fd, OwnedValue, Value};
 use zbus::{Connection, proxy};
 
 use crate::backend::CaptureMethod;
 use crate::types::{Capture, CaptureResult, MonitorFrame, Output, StreamInfo};
 use crate::utils::{premultiply, to_rgba};
+
+mod connection;
 
 // async_trait requires the whole future graph to be Send; std::error::Error
 // alone isn't Send, so all internal helpers use this bound instead and only
@@ -67,7 +68,7 @@ struct Shot {
 const READ_CHUNK: u64 = 256 * 1024;
 
 pub struct KdeMethod {
-    conn: OnceCell<Connection>,
+    conn: connection::RuntimeConnection,
     include_cursor: bool,
 }
 
@@ -85,15 +86,14 @@ impl KdeMethod {
     /// 【KWin】【捕获初始化】创建按需连接的捕获后端；include_cursor 控制指针合成
     pub fn with_cursor(include_cursor: bool) -> Self {
         Self {
-            conn: OnceCell::new(),
+            conn: connection::RuntimeConnection::default(),
             include_cursor,
         }
     }
 
-    async fn session_bus(&self) -> Result<&Connection, BoxErr> {
-        self.conn
-            .get_or_try_init(|| async { Connection::session().await.map_err(BoxErr::from) })
-            .await
+    /// 【KWin捕获】【总线交接】无参数，返回当前异步运行时的连接，避免预读首帧后沿用界面接收任务
+    async fn session_bus(&self) -> Result<Connection, BoxErr> {
+        self.conn.get().await.map_err(BoxErr::from)
     }
 }
 
@@ -268,7 +268,7 @@ async fn capture_one(
 
 #[async_trait]
 impl CaptureMethod for KdeMethod {
-    /// 【持续捕获】【KWin会话】按 outputs 创建复用系统总线的捕获后端，返回固定目标会话
+    /// 【持续捕获】【KWin会话】按 outputs 创建复用当前运行时总线的捕获后端，返回固定目标会话
     async fn open_session(
         &self,
         outputs: &[Output],
@@ -276,7 +276,7 @@ impl CaptureMethod for KdeMethod {
         Box<dyn crate::backend::capture_session::CaptureSession>,
     > {
         let method = Self::with_cursor(self.include_cursor);
-        method.session_bus().await?;
+        let _ = method.session_bus().await?;
         Ok(crate::backend::capture_session::repeated(
             Box::new(method),
             outputs,
@@ -284,7 +284,8 @@ impl CaptureMethod for KdeMethod {
     }
     async fn capture_frame(&self, outputs: &[Output]) -> Result<CaptureResult, Box<dyn Error>> {
         let inner = async {
-            let proxy = ScreenShot2Proxy::new(self.session_bus().await?).await?;
+            let connection = self.session_bus().await?;
+            let proxy = ScreenShot2Proxy::new(&connection).await?;
 
             // one CaptureScreen call per monitor, all concurrent
             let futs = outputs.iter().map(|o| {
@@ -339,7 +340,8 @@ impl CaptureMethod for KdeMethod {
 
     async fn capture_active_window(&self) -> Result<Capture, Box<dyn Error>> {
         let inner = async {
-            let proxy = ScreenShot2Proxy::new(self.session_bus().await?).await?;
+            let connection = self.session_bus().await?;
+            let proxy = ScreenShot2Proxy::new(&connection).await?;
             capture_one(&proxy, Target::ActiveWindow, None, self.include_cursor).await
         };
         let shot = inner.await.map_err(|e: BoxErr| -> Box<dyn Error> { e })?;
@@ -357,7 +359,8 @@ impl CaptureMethod for KdeMethod {
     /// since connecting to zbus take some time, and can be completed ahead
     /// of the timing for getting screenshot
     async fn prepare(&self) -> Result<(), Box<dyn Error>> {
-        self.session_bus()
+        let _ = self
+            .session_bus()
             .await
             .map_err(|e| -> Box<dyn Error> { e })?;
         Ok(())

@@ -2,6 +2,8 @@
 
 mod geometry;
 #[cfg(target_os = "linux")]
+mod kde;
+#[cfg(target_os = "linux")]
 mod niri;
 #[cfg(any(target_os = "windows", test))]
 pub(crate) mod requests;
@@ -43,6 +45,12 @@ pub async fn snapshot(connection: &Connection) -> Vec<Window> {
             niri::snapshot(connection, path.as_ref()).await
         } else if let Some(path) = std::env::var_os("SWAYSOCK") {
             sway::snapshot(connection, path.as_ref()).await
+        } else if std::env::var("XDG_CURRENT_DESKTOP").is_ok_and(|desktop| {
+            desktop
+                .split(':')
+                .any(|name| name.eq_ignore_ascii_case("KDE"))
+        }) {
+            kde::snapshot(connection).await
         } else {
             Ok(Vec::new())
         }

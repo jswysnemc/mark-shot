@@ -2,11 +2,11 @@
 
 mod read;
 mod serve;
+mod transfer;
 pub use read::read;
 pub use serve::serve;
 
 pub const LIMIT: usize = 128 * 1024 * 1024;
-const CHUNK: usize = 64 * 1024;
 
 /// 【Linux剪贴板】【协议选择】无参数，根据真实会话及数据控制能力选择X11，返回探测错误
 pub fn use_x11() -> crate::AppResult<bool> {

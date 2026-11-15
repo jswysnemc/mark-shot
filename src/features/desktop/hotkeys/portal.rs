@@ -1,8 +1,31 @@
 //! 【全局快捷键】【Wayland门户】系统决定最终按键，不通过Xwayland模拟全局注册
 
 use super::super::{Action, Reporter};
-use ashpd::desktop::global_shortcuts::{GlobalShortcuts, NewShortcut};
+use ashpd::desktop::global_shortcuts::{GlobalShortcuts, NewShortcut, Shortcut};
 use futures::StreamExt;
+
+#[cfg(test)]
+#[path = "portal_tests.rs"]
+mod tests;
+
+/// 【全局快捷键】【绑定状态】按 shortcuts 向 reporter 交付截图快捷键状态，返回是否具有实际按键绑定
+fn report_binding(shortcuts: &[Shortcut], reporter: &Reporter) -> bool {
+    if let Some(shortcut) = shortcuts
+        .iter()
+        .find(|shortcut| shortcut.id() == "screenshot")
+        .filter(|shortcut| !shortcut.trigger_description().trim().is_empty())
+    {
+        reporter.status(super::super::status::Registration::Registered(
+            shortcut.trigger_description().into(),
+        ));
+        true
+    } else {
+        reporter.status(super::super::status::Registration::Failed(
+            "No screenshot shortcut is assigned; configure it in the desktop's global shortcut settings".into(),
+        ));
+        false
+    }
+}
 
 /// 【全局快捷键】【门户触发文本】按shortcut转换为XDG快捷键语法，返回规范组合或解析错误
 fn trigger(shortcut: &str) -> Result<String, String> {
@@ -57,14 +80,12 @@ pub(super) async fn run(shortcut: &str, reporter: &Reporter) -> Result<(), Strin
             )
             .await?
             .response()?;
-        let actual = response
-            .shortcuts()
-            .iter()
-            .find(|shortcut| shortcut.id() == "screenshot")
-            .ok_or("portal did not bind screenshot")?;
-        reporter.status(super::super::status::Registration::Registered(
-            actual.trigger_description().into(),
-        ));
+        // 1. 【全局快捷键】【空绑定恢复】门户可能保留取消授权后的空绑定，仅首次响应请求系统配置
+        if !report_binding(response.shortcuts(), reporter) && portal.version() >= 2
+            && let Err(error) = portal.configure_shortcuts(&session, None, Default::default()).await
+        {
+            log::error!("【全局快捷键】【系统配置】无法打开快捷键配置: {error}");
+        }
         loop {
             tokio::select! {
                 _ = closed.next() => return Err("global shortcut session closed by the desktop".into()),
@@ -78,11 +99,8 @@ pub(super) async fn run(shortcut: &str, reporter: &Reporter) -> Result<(), Strin
                 }
                 event = changed.next() => {
                     let Some(event) = event else { break; };
-                    if let Some(shortcut) = event.shortcuts().iter().find(|shortcut| shortcut.id() == "screenshot") {
-                        reporter.status(super::super::status::Registration::Registered(shortcut.trigger_description().into()));
-                    } else {
-                        return Err("screenshot shortcut removed by the desktop".into());
-                    }
+                    // 2. 【全局快捷键】【绑定更新】保持会话以接收系统配置恢复，后续空绑定不重复弹出配置
+                    report_binding(event.shortcuts(), reporter);
                 }
             }
         }

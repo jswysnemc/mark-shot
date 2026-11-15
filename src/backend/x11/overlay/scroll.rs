@@ -49,6 +49,10 @@ impl Overlay {
         let origin = self.outputs[*output].info.location;
         let position = (origin.0 + frame.bounds.x(), origin.1 + frame.bounds.y());
         let size = (u16::try_from(frame.size.0)?, u16::try_from(frame.size.1)?);
+        // 1. 【X11滚动截图】【窗口交接】全屏覆盖层退出后创建独立局部窗口，保留输出索引和原窗口输入焦点
+        if surface.pixels.is_empty() {
+            *surface = Surface::new(self.display.clone(), position, frame.size, true)?;
+        }
         self.display
             .connection
             .configure_window(

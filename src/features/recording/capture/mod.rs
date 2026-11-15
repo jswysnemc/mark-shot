@@ -4,6 +4,8 @@ pub(super) mod pipewire;
 mod portal;
 mod wayland;
 mod x11;
+#[cfg(test)]
+mod x11_tests;
 
 use crate::{
     backend::{self, session::Session},

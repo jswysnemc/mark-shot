@@ -1,6 +1,6 @@
 //! 【X11剪贴板】【数据拥有者】确认所有权后通知父进程，持续服务至其他应用接管
 
-use super::{CHUNK, LIMIT};
+use super::{LIMIT, transfer};
 use crate::backend::x11::{connection::Display, surface::Surface};
 use std::{
     collections::HashMap,
@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 use x11rb::{
-    connection::Connection,
+    connection::{Connection, RequestConnection},
     protocol::{Event, xproto::*},
     wrapper::ConnectionExt as _,
 };
@@ -22,6 +22,8 @@ struct Transfer {
 /// 【X11剪贴板】【独立服务】按text与primary读取有界标准输入并服务选择区，返回接管结束或协议错误
 pub fn serve(text: bool, primary: bool) -> crate::AppResult {
     let display = Display::connect()?;
+    // 1. 【X11剪贴板】【协议上限】按服务器能力保留属性头空间，避免可直接交付的数据进入增量协议
+    let chunk = transfer::chunk_size(display.connection.maximum_request_bytes())?;
     let surface = Surface::new(display.clone(), (0, 0), (1, 1), true)?;
     let selection = if primary {
         AtomEnum::PRIMARY.into()
@@ -54,6 +56,13 @@ pub fn serve(text: bool, primary: bool) -> crate::AppResult {
     {
         return Err("X11 clipboard ownership was not granted".into());
     }
+    log::info!(
+        "【X11剪贴板】【开始服务】类型={}，数据={}字节，属性载荷={}字节，增量={}",
+        if text { "UTF-8" } else { "PNG" },
+        bytes.len(),
+        chunk,
+        bytes.len() > chunk
+    );
     writeln!(std::io::stdout())?;
     std::io::stdout().flush()?;
     let mut transfers = HashMap::<(Window, Atom), Transfer>::new();
@@ -90,7 +99,7 @@ pub fn serve(text: bool, primary: bool) -> crate::AppResult {
                     } else if event.target == target
                         || text && [utf8_mime, plain].contains(&event.target)
                     {
-                        if bytes.len() <= CHUNK {
+                        if bytes.len() <= chunk {
                             display
                                 .connection
                                 .change_property8(
@@ -155,7 +164,7 @@ pub fn serve(text: bool, primary: bool) -> crate::AppResult {
                 Event::PropertyNotify(event) if event.state == Property::DELETE => {
                     let key = (event.window, event.atom);
                     if let Some(transfer) = transfers.get_mut(&key) {
-                        let end = (transfer.offset + CHUNK).min(bytes.len());
+                        let end = (transfer.offset + chunk).min(bytes.len());
                         let result = display
                             .connection
                             .change_property8(

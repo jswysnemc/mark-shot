@@ -1,10 +1,14 @@
 //! 【X11覆盖层】【资源状态】每个显示器拥有独立截图窗口，像素交付前保持隐藏
 
 mod events;
+#[cfg(test)]
+mod events_tests;
 mod image_window;
 mod popup;
 mod presentation;
 mod scroll;
+#[cfg(test)]
+mod scroll_tests;
 mod text_input;
 
 use super::{connection::Display, surface::Surface};
