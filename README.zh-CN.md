@@ -111,6 +111,10 @@ mark-shot --settings         # 打开设置
 报告缺陷时请附上桌面环境、显示协议和 `mark-shot --version` 的输出。
 [开发说明](docs/zh-CN/development.md)列出了提交修改前需要通过的检查。
 
+## 友情链接
+
+- [LINUX DO](https://linux.do/)
+
 ## 许可
 
 Mark Shot 采用 [MIT](LICENSE-MIT) 或 [Apache-2.0](LICENSE-APACHE) 双许可，可任选其一。
