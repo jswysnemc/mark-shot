@@ -178,6 +178,12 @@ pub(crate) fn command(state: &mut EditorState, button: ToolbarButton, dirty: &mu
             state.line_session.clear();
             if !state.annotations.is_empty() {
                 state.push_undo();
+                // 1. 【标注清除】【旧图恢复】删除前登记正文及控制框范围，聚焦遮罩覆盖整个冻结画布
+                for annotation in &state.annotations {
+                    state.damage_rects.push(crate::editor::DamageZone::Global(
+                        annotation.damage_bbox(true),
+                    ));
+                }
                 state.annotations.clear();
                 state.select_annotation_index(None);
                 state.number_sequence = Default::default();

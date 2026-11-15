@@ -11,6 +11,8 @@ mod annotation_selection;
 mod annotation_style;
 mod canvas_navigation;
 mod capture_actions;
+#[cfg(target_os = "linux")]
+mod clear_annotations;
 mod color;
 mod color_sample;
 mod cursor_magnifier;
