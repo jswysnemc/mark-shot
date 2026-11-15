@@ -286,6 +286,10 @@ pub(super) fn poll_timeout(editor_state: &EditorState) -> Option<Duration> {
         let remaining = deadline.saturating_duration_since(Instant::now());
         timeout = Some(timeout.map_or(remaining, |other| other.min(remaining)));
     }
+    if let Some(deadline) = editor_state.toolbar_tooltip.deadline() {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        timeout = Some(timeout.map_or(remaining, |other| other.min(remaining)));
+    }
     if let Some(deadline) = editor_state
         .text_session
         .as_ref()
@@ -348,6 +352,7 @@ pub(super) fn handle_event(editor_state: &mut EditorState, ev: OverlayEvent, dir
             editor_state.input.keyboard_focus = Some(monitor_idx)
         }
         OverlayEvent::FocusLost { monitor_idx } => {
+            panels::tooltip::close(editor_state, dirty_mask);
             editor_state.capture_start.pressed = None;
             super::panels::recording::close(editor_state, dirty_mask);
             editor_state.recording_tool.release_owner = None;
@@ -496,6 +501,7 @@ pub(super) fn tick_panels(editor_state: &mut EditorState, dirty_mask: &mut u32) 
         dirty_mask,
     );
     panels::settings::tick_stepper_arrow_hold(editor_state, dirty_mask);
+    panels::tooltip::tick(editor_state, Instant::now(), dirty_mask);
 
     let toast_place = {
         let idx = editor_state.input.pointer.monitor_idx;

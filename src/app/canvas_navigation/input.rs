@@ -112,6 +112,7 @@ pub(crate) fn handle_pointer_move(
     let (monitor, lx, ly) =
         crate::utils::global_point_to_local(&state.placements, global, monitor, (x, y));
     state.input.pointer = PointerState::new(monitor, (lx, ly), global);
+    crate::app::panels::tooltip::pointer_move(state, Instant::now(), dirty);
     if crate::app::panels::recording::input::pointer(state, dirty) {
         return;
     }
@@ -200,6 +201,9 @@ pub(crate) fn handle_pointer_button(
     pressed: bool,
     dirty: &mut u32,
 ) {
+    if pressed {
+        crate::app::panels::tooltip::close(state, dirty);
+    }
     if crate::app::panels::recording::input::button(state, button, pressed, dirty) {
         return;
     }

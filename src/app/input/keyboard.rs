@@ -60,6 +60,7 @@ pub fn handle_key(
     text: Option<String>,
     dirty_mask: &mut u32,
 ) {
+    crate::app::panels::tooltip::close(editor_state, dirty_mask);
     if editor_state.color_inspector.panel.is_some()
         && chord.is_some_and(|chord| chord.key == keys::Key::Escape)
     {

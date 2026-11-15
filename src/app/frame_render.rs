@@ -327,6 +327,7 @@ pub(super) fn render_monitor(
             is_mag_monitor,
             toolbar,
             action_toolbar,
+            toolbar_tooltip: Some(&mut editor_state.toolbar_tooltip),
             settings_panel,
             font_panel,
             external_panel,

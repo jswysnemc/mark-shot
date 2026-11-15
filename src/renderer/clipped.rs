@@ -5,6 +5,26 @@ use tiny_skia::{Pixmap, Rect};
 use super::{Painter, rect_bounds, scale_rect};
 
 impl Painter<'_> {
+    /// 【界面渲染】【有界裁切】按 panel 和 dirty 限制 draw 的面板范围，无返回值；隐藏或不相交面板不分配缓冲
+    pub fn clipped_panel(
+        &mut self,
+        panel: Option<Rect>,
+        dirty: Option<Rect>,
+        draw: impl FnOnce(&mut Painter<'_>),
+    ) {
+        let Some(panel) = panel else { return };
+        // 1. 【界面渲染】【视觉边界】只保留面板与细边附近的损坏，避免大范围画布更新分配整块界面缓冲
+        let clip = if let Some(dirty) = dirty {
+            let Some(clip) = dirty.intersect(&panel.outset(2.0, 2.0).unwrap_or(panel)) else {
+                return;
+            };
+            Some(clip)
+        } else {
+            None
+        };
+        self.clipped(clip, draw);
+    }
+
     /// 【局部绘制】【场景裁切】按 area 场景逻辑坐标限制 draw，返回值为空；嵌套缓冲先扣除当前原点，不改变 clipped 的本地坐标约定
     pub fn clipped_scene(&mut self, area: Option<Rect>, draw: impl FnOnce(&mut Painter<'_>)) {
         let Some(area) = area else {

@@ -13,5 +13,6 @@ pub mod ruler;
 pub mod settings;
 pub mod text;
 pub mod toolbar;
+pub(crate) mod tooltip;
 
 pub(crate) mod toolbar_docking;

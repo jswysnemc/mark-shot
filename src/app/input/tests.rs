@@ -56,6 +56,7 @@ mod text_reedit;
 mod text_session;
 mod text_size_policy;
 mod text_storage;
+mod toolbar_tooltip;
 mod upload;
 mod wheel_preview;
 

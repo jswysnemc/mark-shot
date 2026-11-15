@@ -66,6 +66,7 @@ use crate::types::SelectionEdges;
 use crate::types::annotations::Annotation;
 use crate::ui::color_popover::ColorPickerPopover;
 use crate::ui::magnifier::MagnifierState;
+use crate::ui::panel::UiPanel;
 use crate::ui::settings_panel::SettingsPanel;
 use crate::ui::toolbar::Toolbar;
 use cosmic_text::{Editor, FontSystem, SwashCache};
@@ -99,6 +100,7 @@ pub struct RenderRequest<'a> {
     pub is_mag_monitor: bool,
     pub toolbar: Option<&'a mut Toolbar>,
     pub action_toolbar: Option<&'a mut Toolbar>,
+    pub toolbar_tooltip: Option<&'a mut crate::ui::tooltip::State>,
     pub settings_panel: Option<&'a mut SettingsPanel>,
     pub font_panel: Option<&'a mut crate::ui::font_panel::FontPanel>,
     pub external_panel: Option<&'a mut crate::ui::external_panel::ExternalPanel>,
@@ -265,23 +267,30 @@ pub(crate) fn render_frame_with_navigation(
     if let Some(tb) = req.toolbar.as_deref_mut()
         && tb.dirty
     {
-        crate::ui::toolbar::draw_toolbar(&mut p, tb);
+        // 1. 【工具提示】【局部面板恢复】提示损坏可能只覆盖面板一部分，范围外不重复叠加半透明缓存
+        p.clipped_panel(tb.rect(), dirty_rect.copied(), |p| {
+            crate::ui::toolbar::draw_toolbar(p, tb)
+        });
     }
     if let Some(tb) = req.action_toolbar.as_deref_mut()
         && tb.dirty
     {
-        crate::ui::toolbar::draw_toolbar(&mut p, tb);
+        p.clipped_panel(tb.rect(), dirty_rect.copied(), |p| {
+            crate::ui::toolbar::draw_toolbar(p, tb)
+        });
     }
 
     if let Some(settings) = req.settings_panel.as_deref_mut()
         && settings.dirty
     {
-        crate::ui::settings_panel::draw_settings_panel(
-            &mut p,
-            settings,
-            req.current_color,
-            req.outline_color,
-        );
+        p.clipped_panel(settings.rect(), dirty_rect.copied(), |p| {
+            crate::ui::settings_panel::draw_settings_panel(
+                p,
+                settings,
+                req.current_color,
+                req.outline_color,
+            );
+        });
     }
     if let Some(overlay) = selection_size
         .as_ref()
@@ -390,6 +399,9 @@ pub(crate) fn render_frame_with_navigation(
     }
     if !req.toasts.items.is_empty() {
         crate::ui::toast::draw_toasts(&mut p, req.toasts, req.monitor_idx, dirty_rect);
+    }
+    if let Some(tooltip) = req.toolbar_tooltip.as_deref_mut() {
+        crate::ui::tooltip::draw(&mut p, tooltip, req.monitor_idx, dirty_rect.copied());
     }
 }
 // ***************************/

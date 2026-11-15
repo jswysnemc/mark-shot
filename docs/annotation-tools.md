@@ -6,6 +6,9 @@ After a region is selected, the main toolbar holds the drawing tools and the act
 finish actions. A property bar next to the toolbar shows the settings of the current tool. Both
 toolbars can be rearranged in **Settings → Toolbar**.
 
+Hover over a toolbar button for half a second to see its name and current shortcut.
+The hint follows custom bindings, stays within the screen, and closes when you move away or click.
+
 The keys below are the defaults; all of them can be changed, see [Shortcuts](shortcuts.md).
 
 ## Tools
