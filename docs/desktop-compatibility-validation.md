@@ -24,7 +24,7 @@
 
 ## 已执行验证
 
-- Rust 工作区全部通过，主库 1291 项；另有需要特定环境的忽略项。
+- Rust 工作区 1705 项通过，包含主库 1291 项；另有需要特定环境的忽略项。
 - Linux 和 Windows 全目标 Clippy，开启 `-D warnings`。
 - Python 验证工具 238 项、打包合同测试 69 项通过。
 - 私有 Xvfb 在 1280×800 和 1366×768 下验证 125%、175% 与 110 DPI 的真实截图场景。
@@ -33,16 +33,19 @@
 - 私有 Wayland 会话实际报价 PNG、BMP、x-bmp；各格式重复接收两次，核对尺寸与像素。
 - 私有 Wine 窗口验证 GUI 子系统、四边配置颜色、原图中心像素，以及其他贴图持有焦点时取消截图。
 - Windows Paddle 使用官方摘要验证的 ONNX Runtime 1.28.0，12、16、24 像素中英文样本逐字匹配，原图坐标有效。
+- 私有 Wine 的合成 WM_HOTKEY 动作到窗口显示为 543 毫秒，静默十五秒后为 385 毫秒；不等待未就绪的准备任务。
 
 主要证据保存在 `target/desktop-*.log`、`target/desktop-x11-validation.json`、
 `target/desktop-wayland-clipboard/clipboard-validation.json`、
-`target/desktop-regressions-standby/desktop-regressions.json` 和
-`target/windows-ocr-fixtures-final/ocr-fixtures.json`。
+`target/desktop-regressions-final/desktop-regressions.json` 和
+`target/windows-ocr-fixtures-final/ocr-fixtures.json` 和
+`target/background-regressions-final/background-regressions.json`。
 
 ## 验证范围
 
 Wine 使用隔离前缀和私有 Xvfb，没有连接用户桌面。Wine 不能代表真实 Windows 系统 OCR、
-系统睡眠、长期空闲后的工作集回收或实际桌面快捷键冲突。中英文样本计时包含进程和模型初始化，
+系统睡眠、长期空闲后的工作集回收或实际桌面快捷键冲突。合成 WM_HOTKEY 验证动作分派，
+没有声称 Wine 的 PrintScreen 按键注入已通过。中英文样本计时包含进程和模型初始化，
 不能作为 Windows 系统 OCR 与 Paddle 的速度对比。
 
 VirtualBox Windows 客户机尚未直接验证；已验证它所需的 BMP 来源及重复传输。
