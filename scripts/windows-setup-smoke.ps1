@@ -9,14 +9,15 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'windows-smoke.ps1')
+. (Join-Path $PSScriptRoot 'windows-registry-entry.ps1')
 $root = Split-Path $PSScriptRoot -Parent
 $evidence = Join-Path $root 'target/windows-evidence/setup'
 $testId = [guid]::NewGuid().ToString('N')
 $temporary = Join-Path $root "target/setup-smoke-$testId"
 $installed = Join-Path $temporary 'install with spaces'
-$runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
-$original = Get-ItemPropertyValue -Path $runKey -Name MarkShot -ErrorAction SilentlyContinue
-$originalKind = if ($null -eq $original) { 'String' } else { (Get-Item $runKey).GetValueKind('MarkShot').ToString() }
+$runSubKey = 'Software\Microsoft\Windows\CurrentVersion\Run'
+$runKey = "HKCU:\$runSubKey"
+$original = Get-WindowsRegistryEntry -SubKey $runSubKey -Name MarkShot
 New-Item -ItemType Directory -Force $evidence, $temporary | Out-Null
 
 function Invoke-SetupProcess {
@@ -54,19 +55,22 @@ try {
     New-ItemProperty -Path $runKey -Name MarkShot -Value "`"$installed\mark-shot.exe`" --background" -PropertyType String -Force | Out-Null
     Invoke-SetupProcess -File $uninstaller -Arguments @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$evidence/uninstall.log")
     if (Test-Path (Join-Path $installed 'mark-shot.exe')) { throw 'Uninstall left the application executable behind.' }
-    if ($null -ne (Get-ItemPropertyValue -Path $runKey -Name MarkShot -ErrorAction SilentlyContinue)) { throw 'Uninstall left its login startup entry behind.' }
+    if ($null -ne (Get-WindowsRegistryEntry -SubKey $runSubKey -Name MarkShot)) { throw 'Uninstall left its login startup entry behind.' }
     Invoke-SetupProcess -File $Installer -Arguments $arguments
     $other = '"C:\Other Location\mark-shot.exe" --background'
     New-ItemProperty -Path $runKey -Name MarkShot -Value $other -PropertyType String -Force | Out-Null
     Invoke-SetupProcess -File $uninstaller -Arguments @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$evidence/uninstall-other.log")
-    if ((Get-ItemPropertyValue -Path $runKey -Name MarkShot) -ne $other) { throw 'Uninstall removed another installation startup entry.' }
+    $remaining = Get-WindowsRegistryEntry -SubKey $runSubKey -Name MarkShot
+    if ($null -eq $remaining -or $remaining.Value -ne $other) { throw 'Uninstall removed another installation startup entry.' }
 }
 finally {
     # 3. 【Windows安装】【测试恢复】恢复测试前用户注册，删除本次隔离安装目录
     if ($null -eq $original) {
-        Remove-ItemProperty -Path $runKey -Name MarkShot -ErrorAction SilentlyContinue
+        if ($null -ne (Get-WindowsRegistryEntry -SubKey $runSubKey -Name MarkShot)) {
+            Remove-ItemProperty -Path $runKey -Name MarkShot
+        }
     } else {
-        New-ItemProperty -Path $runKey -Name MarkShot -Value $original -PropertyType $originalKind -Force | Out-Null
+        New-ItemProperty -Path $runKey -Name MarkShot -Value $original.Value -PropertyType $original.Kind -Force | Out-Null
     }
     if (Test-Path $temporary) { Remove-Item -LiteralPath $temporary -Recurse -Force }
 }

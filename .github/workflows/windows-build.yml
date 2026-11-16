@@ -102,6 +102,9 @@ jobs:
       - name: Run Windows unit tests
         run: ./scripts/windows-test.ps1
 
+      - name: Verify optional registry values and original types
+        run: ./scripts/windows-registry-entry-test.ps1
+
       - name: Download media library
         uses: actions/download-artifact@v4
         with:
