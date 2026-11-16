@@ -67,7 +67,9 @@ def _build(repository, package_version, arch, commit, destination, workspace):
         raise ValueError("RPM build must produce one binary and one source package")
     # 1. 【RPM兼容性】【发布门槛】实际产物必须遵守稳定版依赖基线，禁止把开发版共享库要求发布给用户
     requirements = verify(binaries[0])
-    (repository / "target/packaging-rpm-requires.txt").write_text(requirements)
+    evidence = repository / "target/packaging-rpm-requires.txt"
+    evidence.parent.mkdir(parents=True, exist_ok=True)
+    evidence.write_text(requirements)
     for item, kind in ((binaries[0], "rpm"), (sources[0], "srpm")):
         name = (
             item.name
