@@ -27,6 +27,7 @@
 - Rust 工作区 1705 项通过，包含主库 1291 项；另有需要特定环境的忽略项。
 - Linux 和 Windows 全目标 Clippy，开启 `-D warnings`。
 - Python 验证工具 238 项、打包合同测试 69 项通过。
+- Windows 目标配置、快捷键、状态和边框单元测试 37 项在私有 Wine 通过。真实 Windows CI 的单元测试、Clippy、录制导出和完整包验证也通过。
 - 私有 Xvfb 在 1280×800 和 1366×768 下验证 125%、175% 与 110 DPI 的真实截图场景。
 - X11 真实事件验证连续位置使用最新采样，按下、移动、松开保持坐标和分派顺序。
 - 1366×768、175% 全屏导出逐字节一致，没有多出的透明列或丢失的末列。
@@ -49,7 +50,9 @@ Wine 使用隔离前缀和私有 Xvfb，没有连接用户桌面。Wine 不能�
 不能作为 Windows 系统 OCR 与 Paddle 的速度对比。
 
 VirtualBox Windows 客户机尚未直接验证；已验证它所需的 BMP 来源及重复传输。
-RPM 的共享库门槛需要在 Fedora 构建工作流中对真实产物检查，字符串回归不能替代实际安装验证。
+Fedora 43 的 x86_64 和 aarch64 真实 RPM 均完成依赖检查和安装验证。两个架构的最高所需 glibc 符号为
+`GLIBC_2.39`，OpenSSL ABI 为 3，所需 OpenSSL 符号版本为 `OPENSSL_3.0.0`。原始依赖记录保存在
+`target/desktop-rpm-x86-evidence/packaging-rpm-requires.txt` 和对应 ARM 目录。
 
 ## PR 与 Issue 处理依据
 
@@ -62,3 +65,15 @@ RPM 的共享库门槛需要在 Fedora 构建工作流中对真实产物检查�
 - #158 的跨 PID 命名空间身份检查已有修复，保留 UID 校验。
 - #155、#157 来自旧 Qt 包；Rust 原生版不依赖该 Qt 插件或旧 FFmpeg soname。
 - #154 的官方政策与替代服务比较见[翻译替代方案](zh-CN/translation-alternatives.md)。
+
+## 持续集成与验证产物
+
+| 验证 | 结果与产物 |
+| --- | --- |
+| Linux x86_64 / aarch64 测试、编译、媒体与完整包 | [全流程通过](https://github.com/jswysnemc/mark-shot/actions/runs/43906579322) |
+| Fedora 43 x86_64 / aarch64 RPM、源码 RPM、依赖和安装 | [全流程通过](https://github.com/jswysnemc/mark-shot/actions/runs/43906579405) |
+| Windows MSVC 单元测试、Clippy、媒体、编译和独立包 | [全流程通过](https://github.com/jswysnemc/mark-shot/actions/runs/43909311592) |
+
+Linux 和 RPM 验证固定在 `6822446`；Windows 验证固定在 `13e84cf`，包含共享字体目录及平台默认模板修正。
+后续 RPM 自定义输出目录修正只补充证据目录创建，已执行 RPM 工作目录与兼容性回归。
+这些工作流生成验证产物，没有发布新版本或修改既有发布附件。
