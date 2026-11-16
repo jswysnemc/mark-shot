@@ -3,7 +3,10 @@
 use std::{
     fs::File,
     io::{self, Read, Write},
-    os::{fd::AsRawFd, unix::fs::FileExt},
+    os::{
+        fd::{AsRawFd, OwnedFd},
+        unix::fs::FileExt,
+    },
     path::Path,
 };
 
@@ -67,6 +70,23 @@ impl ImageSource {
         release_pages(&self.file, 0, self.bytes)?;
         Ok(())
     }
+
+    /// 【图片剪贴板】【发送到 fd】清除接收端带来的 O_NONBLOCK 后完整发送，返回传输结果
+    pub(super) fn send_fd(&self, fd: impl Into<OwnedFd>) -> io::Result<()> {
+        // 接收端常用 pipe2(O_NONBLOCK) 建管道，标志随 fd 传到数据源；未清掉时 pipe 写满
+        // 会让 write_all 直接返回 EAGAIN 并中止，剪贴板里只剩半张 PNG。发送跑在独立
+        // 线程，阻塞写安全。
+        let file = File::from(fd.into());
+        let flags = nix::fcntl::OFlag::from_bits_truncate(nix::fcntl::fcntl(
+            &file,
+            nix::fcntl::FcntlArg::F_GETFL,
+        )?);
+        nix::fcntl::fcntl(
+            &file,
+            nix::fcntl::FcntlArg::F_SETFL(flags & !nix::fcntl::OFlag::O_NONBLOCK),
+        )?;
+        self.send(&file)
+    }
 }
 
 /// 【图片剪贴板】【缓存回收】将 file 已完成的 offset、bytes 范围交还文件缓存，返回系统结果，不删除图片内容
@@ -110,5 +130,36 @@ mod tests {
             }
         });
         assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 0);
+    }
+
+    /// 【图片剪贴板测试】【非阻塞管道】接收端交来的 fd 带 O_NONBLOCK 时仍完整发送；无返回值
+    #[test]
+    fn file_source_completes_transfer_over_nonblocking_fd() {
+        let directory = tempfile::tempdir().unwrap();
+        let expected: Vec<u8> = (0..RELEASE_BATCH as usize + 913)
+            .map(|index| (index * 53) as u8)
+            .collect();
+        let source = ImageSource::receive(expected.as_slice(), directory.path()).unwrap();
+
+        // 复现 Wayland 客户端的管道：写端非阻塞，标志随 fd 一起传到数据源
+        let (read_end, write_end) = nix::unistd::pipe().unwrap();
+        let flags = nix::fcntl::OFlag::from_bits_truncate(
+            nix::fcntl::fcntl(&write_end, nix::fcntl::FcntlArg::F_GETFL).unwrap(),
+        );
+        nix::fcntl::fcntl(
+            &write_end,
+            nix::fcntl::FcntlArg::F_SETFL(flags | nix::fcntl::OFlag::O_NONBLOCK),
+        )
+        .unwrap();
+
+        let reader = std::thread::spawn(move || {
+            let mut file = File::from(read_end);
+            let mut received = Vec::new();
+            file.read_to_end(&mut received).unwrap();
+            received
+        });
+
+        source.send_fd(write_end).unwrap();
+        assert_eq!(reader.join().unwrap(), expected);
     }
 }
