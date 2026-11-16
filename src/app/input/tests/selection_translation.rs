@@ -272,6 +272,7 @@ fn handoff_rescales_seed_when_the_remaining_selection_uses_a_lower_scale_output(
         position: (640, 0),
         size: (320, 240),
         scale: 2.0,
+        native_size: None,
     });
     state.selection.zone = Rect::from_xywh(600.0, 100.0, 100.0, 100.0);
     translated(&mut state);

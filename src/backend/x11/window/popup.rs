@@ -17,7 +17,7 @@ impl Node {
         }
         for node in nodes {
             let id = node.id;
-            let Some(frame) = self.content.popup_frame_for(id, 1.0) else {
+            let Some(frame) = self.content.popup_frame_for(id, self.scale) else {
                 continue;
             };
             crate::types::popup::validate(&frame)?;
@@ -43,12 +43,12 @@ impl Node {
                 } => (parent_width - 2.0, row_top - item_inset),
             };
             let position = (
-                (i32::from(origin.0) + offset.0.round() as i32).clamp(
+                (i32::from(origin.0) + (offset.0 * self.scale).round() as i32).clamp(
                     0,
                     (i32::from(display.screen().width_in_pixels) - frame.pixel_size.0 as i32)
                         .max(0),
                 ),
-                (i32::from(origin.1) + offset.1.round() as i32).clamp(
+                (i32::from(origin.1) + (offset.1 * self.scale).round() as i32).clamp(
                     0,
                     (i32::from(display.screen().height_in_pixels) - frame.pixel_size.1 as i32)
                         .max(0),
@@ -84,8 +84,8 @@ impl Node {
             Event::MotionNotify(event) => (
                 event.event,
                 PopupEvent::Pointer {
-                    x: event.event_x.into(),
-                    y: event.event_y.into(),
+                    x: f64::from(event.event_x) / f64::from(self.scale),
+                    y: f64::from(event.event_y) / f64::from(self.scale),
                 },
             ),
             Event::LeaveNotify(event) => (event.event, PopupEvent::Leave),
@@ -94,8 +94,8 @@ impl Node {
                     (
                         event.event,
                         PopupEvent::Button {
-                            x: event.event_x.into(),
-                            y: event.event_y.into(),
+                            x: f64::from(event.event_x) / f64::from(self.scale),
+                            y: f64::from(event.event_y) / f64::from(self.scale),
                             button,
                             pressed: event.response_type == BUTTON_PRESS_EVENT,
                         },

@@ -12,8 +12,9 @@ impl Overlay {
         let display = &self.display;
         let mut hints = [0u32; 18];
         hints[0] = 1 << 4;
-        hints[5] = self.image_minimum.0;
-        hints[6] = self.image_minimum.1;
+        let minimum = crate::types::px_size(self.image_minimum, display.ui_scale);
+        hints[5] = minimum.0;
+        hints[6] = minimum.1;
         display.connection.change_property32(
             PropMode::REPLACE,
             surface.window,

@@ -39,10 +39,10 @@ pub fn snapshot(display: &Display) -> crate::AppResult<Vec<Window>> {
                 .translate_coordinates(client, root, 0, 0)?
                 .reply()?;
             Ok(tiny_skia::Rect::from_xywh(
-                position.dst_x.into(),
-                position.dst_y.into(),
-                geometry.width.into(),
-                geometry.height.into(),
+                f32::from(position.dst_x) / display.ui_scale,
+                f32::from(position.dst_y) / display.ui_scale,
+                f32::from(geometry.width) / display.ui_scale,
+                f32::from(geometry.height) / display.ui_scale,
             )
             .map(|rect| Window {
                 rect,

@@ -71,15 +71,21 @@ impl Node {
                 Some(WindowEvent::KeyRelease(self.keyboard.key(&event, false)))
             }
             Event::MotionNotify(event) => {
-                self.pointer = (event.event_x.into(), event.event_y.into());
+                self.pointer = (
+                    f64::from(event.event_x) / f64::from(self.scale),
+                    f64::from(event.event_y) / f64::from(self.scale),
+                );
                 self.drag_to((event.root_x, event.root_y))?;
                 Some(WindowEvent::PointerMove {
                     position: self.pointer,
                 })
             }
             Event::ButtonPress(event) | Event::ButtonRelease(event) => {
-                let pressed = event.response_type == BUTTON_PRESS_EVENT;
-                self.pointer = (event.event_x.into(), event.event_y.into());
+                let pressed = event.response_type & 0x7f == BUTTON_PRESS_EVENT;
+                self.pointer = (
+                    f64::from(event.event_x) / f64::from(self.scale),
+                    f64::from(event.event_y) / f64::from(self.scale),
+                );
                 if !pressed {
                     self.drag = None;
                 }
@@ -133,7 +139,10 @@ impl Node {
                     self.surface.size = (event.width, event.height);
                     self.dirty = true;
                     Some(WindowEvent::Resize {
-                        size: (event.width.into(), event.height.into()),
+                        size: super::super::density::logical(
+                            (event.width.into(), event.height.into()),
+                            self.scale,
+                        ),
                     })
                 } else {
                     None

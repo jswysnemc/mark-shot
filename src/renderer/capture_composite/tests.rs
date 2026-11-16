@@ -24,6 +24,7 @@ fn desktop(scale: f32, logical: (i32, i32)) -> (Capture, Placement) {
             size: logical,
             position: (0, 0),
             scale: 1.5,
+            native_size: None,
         },
     )
 }
@@ -59,4 +60,31 @@ fn fractional_native_crops_keep_frozen_pixels() {
             }
         }
     }
+}
+
+/// 【截图裁切回归】【全屏末列】无参数，检查1366像素屏幕在175%下完整导出尺寸和末列，没有额外透明列，无返回值
+#[test]
+fn fractional_fullscreen_export_keeps_exact_native_grid() {
+    let mut pixels = Pixmap::new(1366, 768).unwrap();
+    pixels.fill(tiny_skia::Color::from_rgba8(17, 81, 153, 255));
+    let capture = Capture {
+        pixmap: pixels.into(),
+        scale: 1.75,
+    };
+    let placement = Placement {
+        size: (781, 439),
+        position: (0, 0),
+        scale: 1.75,
+        native_size: Some((1366, 768)),
+    };
+    let region = Rect::from_xywh(0.0, 0.0, 781.0, 439.0).unwrap();
+    let (actual, _, _) = composite_precise(
+        std::slice::from_ref(&capture),
+        std::slice::from_ref(&placement),
+        region,
+        None,
+    )
+    .unwrap();
+    assert_eq!((actual.width(), actual.height()), (1366, 768));
+    assert_eq!(actual.data(), capture.pixmap.data());
 }

@@ -8,6 +8,7 @@ import tempfile
 
 from artifact_metadata import architecture, finalize, source_sha, version
 from prepare_source import prepare
+from rpm_compatibility import verify
 
 
 def package(repository, package_version, arch, commit, destination):
@@ -64,6 +65,9 @@ def _build(repository, package_version, arch, commit, destination, workspace):
     sources = list((top / "SRPMS").glob("mark-shot-*.src.rpm"))
     if len(binaries) != 1 or len(sources) != 1:
         raise ValueError("RPM build must produce one binary and one source package")
+    # 1. 【RPM兼容性】【发布门槛】实际产物必须遵守稳定版依赖基线，禁止把开发版共享库要求发布给用户
+    requirements = verify(binaries[0])
+    (repository / "target/packaging-rpm-requires.txt").write_text(requirements)
     for item, kind in ((binaries[0], "rpm"), (sources[0], "srpm")):
         name = (
             item.name

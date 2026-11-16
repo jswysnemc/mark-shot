@@ -14,6 +14,7 @@ fn screens(screens: &[(i32, i32, i32, i32)]) -> EditorState {
             position: (x, y),
             size: (width, height),
             scale: 1.0,
+            native_size: None,
         })
         .collect();
     state

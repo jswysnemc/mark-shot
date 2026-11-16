@@ -326,6 +326,7 @@ fn multiple_outputs_share_navigation_and_map_canvas_damage() {
         position: (0, 0),
         size: (640, 480),
         scale: 1.5,
+        native_size: None,
     });
     state.captures.push(crate::types::Capture {
         pixmap: Pixmap::new(960, 720).unwrap().into(),

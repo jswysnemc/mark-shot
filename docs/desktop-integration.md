@@ -36,7 +36,7 @@ the command.
 
 ## Built-in global shortcut and tray icon
 
-Both are off by default and are switched on in the settings window:
+Both are off by default on Linux. Windows enables the tray and PrintScreen shortcut by default. These can be changed in the settings window:
 
 - **Settings → Shortcuts** enables the global capture shortcut. Click the key field and press the
   combination. The default is `PrintScreen`.
@@ -84,7 +84,7 @@ For example, in niri:
 spawn-at-startup "mark-shot" "--background"
 ```
 
-The command exits immediately when both features are disabled.
+On Linux, the command exits immediately when both features are disabled.
 
 ## Editor window type
 
@@ -116,3 +116,7 @@ mark-shot picture.png
 
 Mark Shot sends a desktop notification when a capture is saved or fails. Disable them in the
 settings window, in `[notifications]`, or for one run with `--nonotify`.
+
+On Windows, launching the executable without arguments starts the background service without a console or capture window.
+Use `--capture` for immediate capture. Explicit background startup restores the tray if both saved switches are disabled.
+A one-shot standby process prepares fonts, reads current settings only after activation, and is replaced after capture.

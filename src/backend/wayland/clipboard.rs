@@ -1,5 +1,6 @@
 pub mod daemon;
 pub mod ext_data_control;
+mod image_formats;
 mod image_service;
 mod image_source;
 

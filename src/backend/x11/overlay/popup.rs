@@ -22,14 +22,18 @@ impl Overlay {
             .get(frame.monitor_idx)
             .ok_or("X11 popup output missing")?
             .1;
-        let left = (i32::from(parent.position.0) + frame.anchor.0.round() as i32).clamp(
-            0,
-            (i32::from(self.display.screen().width_in_pixels) - frame.pixel_size.0 as i32).max(0),
-        );
-        let top = (i32::from(parent.position.1) + frame.anchor.1.round() as i32).clamp(
-            0,
-            (i32::from(self.display.screen().height_in_pixels) - frame.pixel_size.1 as i32).max(0),
-        );
+        let left = (i32::from(parent.position.0) + (frame.anchor.0 * frame.scale).round() as i32)
+            .clamp(
+                0,
+                (i32::from(self.display.screen().width_in_pixels) - frame.pixel_size.0 as i32)
+                    .max(0),
+            );
+        let top = (i32::from(parent.position.1) + (frame.anchor.1 * frame.scale).round() as i32)
+            .clamp(
+                0,
+                (i32::from(self.display.screen().height_in_pixels) - frame.pixel_size.1 as i32)
+                    .max(0),
+            );
         if !self.popup.as_ref().is_some_and(|(id, surface)| {
             *id == frame.id
                 && surface.size == (frame.pixel_size.0 as u16, frame.pixel_size.1 as u16)
@@ -40,8 +44,8 @@ impl Overlay {
                 id: frame.id,
                 event: PopupEvent::Configured {
                     position: (
-                        left - i32::from(parent.position.0),
-                        top - i32::from(parent.position.1),
+                        ((left - i32::from(parent.position.0)) as f32 / frame.scale).round() as i32,
+                        ((top - i32::from(parent.position.1)) as f32 / frame.scale).round() as i32,
                     ),
                 },
             });
@@ -66,8 +70,8 @@ impl Overlay {
             Event::MotionNotify(event) => (
                 event.event,
                 PopupEvent::Pointer {
-                    x: event.event_x.into(),
-                    y: event.event_y.into(),
+                    x: f64::from(event.event_x) / f64::from(self.display.ui_scale),
+                    y: f64::from(event.event_y) / f64::from(self.display.ui_scale),
                 },
             ),
             Event::LeaveNotify(event) => (event.event, PopupEvent::Leave),
@@ -76,8 +80,8 @@ impl Overlay {
                     (
                         event.event,
                         PopupEvent::Button {
-                            x: event.event_x.into(),
-                            y: event.event_y.into(),
+                            x: f64::from(event.event_x) / f64::from(self.display.ui_scale),
+                            y: f64::from(event.event_y) / f64::from(self.display.ui_scale),
                             button,
                             pressed: event.response_type == BUTTON_PRESS_EVENT,
                         },

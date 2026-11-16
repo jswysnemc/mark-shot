@@ -15,7 +15,7 @@ fn image_window_reserves_chrome_and_keeps_all_tools_on_one_row() {
     state.image_window.enabled = true;
     state.fullscreen_scope = true;
     state.selection.zone = Some(state.file_canvas.as_ref().unwrap().viewport);
-    resize(&mut state, size, &mut 0);
+    resize(&mut state, size, None, &mut 0);
     let cells = &state.toolbar.cells;
     assert!(cells.iter().all(|cell| cell.top() == cells[0].top()));
     assert!(state.toolbar.size.0 + 16.0 <= size.0 as f32);
@@ -65,7 +65,7 @@ fn merged_bar_routes_tools_window_controls_and_drag_separately() {
     state.image_window.enabled = true;
     state.fullscreen_scope = true;
     state.selection.zone = Some(state.file_canvas.as_ref().unwrap().viewport);
-    resize(&mut state, size, &mut 0);
+    resize(&mut state, size, None, &mut 0);
     let index = state
         .toolbar
         .items
@@ -214,7 +214,7 @@ fn resize_preserves_source_annotations_and_export() {
         .unwrap()
         .0;
     for size in [(900, 600), (480, 320), (640, 480)] {
-        resize(&mut state, size, &mut 0);
+        resize(&mut state, size, None, &mut 0);
         super::super::region_rendering_test_support::paint(&mut state, None, false);
         assert_eq!(state.placements[0].size, (size.0 as i32, size.1 as i32));
         assert_eq!(state.canvas[0].width(), (size.0 as f32 * 1.25) as u32);

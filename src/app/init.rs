@@ -88,6 +88,7 @@ pub(super) fn build_layers_with_transparency(
     super::layers::build_with_transparency(placements, transparent)
 }
 
+/// 【截图初始化】【显示布局】按 outputs 与 hidpi 返回逻辑位置、比例和原生像素网格，不从取整逻辑尺寸推算捕获大小
 pub fn build_placements(outputs: &[Output], hidpi: bool) -> Vec<Placement> {
     outputs
         .iter()
@@ -102,8 +103,31 @@ pub fn build_placements(outputs: &[Output], hidpi: bool) -> Vec<Placement> {
                     .unwrap_or((0, 0))
             }),
             scale: if hidpi { o.scale() } else { 1.0 },
+            native_size: native_pixel_size(o, hidpi),
         })
         .collect()
+}
+
+/// 【截图初始化】【原生网格】按 output 与 hidpi 返回 X11 或 Windows 原生表面尺寸，Wayland 缓冲仍采用合成器逻辑尺寸
+fn native_pixel_size(output: &Output, hidpi: bool) -> Option<(u32, u32)> {
+    #[cfg(target_os = "linux")]
+    if output.wl_output.is_some() {
+        return None;
+    }
+    if !hidpi {
+        return None;
+    }
+    output
+        .info
+        .modes
+        .iter()
+        .find(|mode| mode.current)
+        .map(|mode| {
+            (
+                mode.dimensions.0.max(1) as u32,
+                mode.dimensions.1.max(1) as u32,
+            )
+        })
 }
 
 pub fn load_icons_cache() -> HashMap<&'static str, Tree> {

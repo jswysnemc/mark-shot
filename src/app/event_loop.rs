@@ -52,9 +52,17 @@ pub(super) fn run_overlay(
 
         let event = overlay.next_event(timeout)?;
         if let Some(size) = overlay.image_window_size()
-            && editor_state.placements[0].size != (size.0 as i32, size.1 as i32)
+            && (editor_state.placements[0].size != (size.0 as i32, size.1 as i32)
+                || overlay
+                    .image_window_pixel_size()
+                    .is_some_and(|pixels| pixels != editor_state.placements[0].px_size()))
         {
-            super::image_window::resize(editor_state, size, &mut dirty_mask);
+            super::image_window::resize(
+                editor_state,
+                size,
+                overlay.image_window_pixel_size(),
+                &mut dirty_mask,
+            );
             pacing = Pacing::new(editor_state.captures.len());
         }
         match event {

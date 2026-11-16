@@ -11,11 +11,11 @@ pub struct Desktop {
 }
 
 impl Default for Desktop {
-    /// 【桌面集成】【默认配置】无参数，返回需要用户启用的桌面功能和推荐截图按键
+    /// 【桌面集成】【默认配置】无参数，Windows 默认启用托盘和截图按键，其他平台保留显式启用方式
     fn default() -> Self {
         Self {
-            tray_enabled: false,
-            shortcuts_enabled: false,
+            tray_enabled: cfg!(target_os = "windows"),
+            shortcuts_enabled: cfg!(target_os = "windows"),
             screenshot_shortcut: "PrintScreen".into(),
         }
     }

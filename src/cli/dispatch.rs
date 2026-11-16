@@ -25,6 +25,12 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
         _ => {}
     }
 
+    #[cfg(target_os = "windows")]
+    if matches!(&options.command, Command::Internal { kind, .. } if kind == crate::features::desktop::standby::ARG)
+    {
+        return crate::features::desktop::standby::run(options);
+    }
+
     // 1. 【内存生命周期】【启动顺序】创建字体和捕获线程前设置大对象策略，辅助进程也使用同一分配规则
     crate::utils::memory::configure();
     // 2. 【命令行】【运行配置】初始化配置后再启动日志，命令行覆盖只影响当前进程

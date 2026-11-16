@@ -346,24 +346,20 @@ pub fn apply_handle_drag(orig: &Rect, handle: SelectionHandle, delta: (f64, f64)
     }
 }
 
+/// 【截图布局】【完整边界】按 placements 合并真实逻辑范围，返回工作区或空值，不把原生像素边缘取整到逻辑整数
 pub fn get_full_workspace_rect(placements: &[Placement]) -> Option<Rect> {
-    if placements.is_empty() {
-        return None;
-    }
-
-    let mut min_x = i32::MAX;
-    let mut min_y = i32::MAX;
-    let mut max_x = i32::MIN;
-    let mut max_y = i32::MIN;
-
-    for p in placements {
-        min_x = min_x.min(p.position.0);
-        min_y = min_y.min(p.position.1);
-        max_x = max_x.max(p.position.0 + p.size.0);
-        max_y = max_y.max(p.position.1 + p.size.1);
-    }
-
-    Rect::from_ltrb(min_x as f32, min_y as f32, max_x as f32, max_y as f32)
+    placements
+        .iter()
+        .filter_map(|placement| {
+            let local = placement.rect()?;
+            Rect::from_xywh(
+                placement.position.0 as f32,
+                placement.position.1 as f32,
+                local.width(),
+                local.height(),
+            )
+        })
+        .reduce(|bounds, rect| bounds.join(&rect).unwrap_or(bounds))
 }
 
 /// pixels swap

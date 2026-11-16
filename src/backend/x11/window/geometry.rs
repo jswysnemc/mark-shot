@@ -94,7 +94,7 @@ impl Node {
             drag.size,
             delta,
             drag.edge,
-            self.spec.minimum,
+            crate::types::px_size(self.spec.minimum, self.scale),
         );
         self.surface
             .display

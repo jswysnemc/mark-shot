@@ -11,11 +11,13 @@ fn outputs() -> [Placement; 2] {
             position: (-1280, -100),
             size: (1280, 720),
             scale: 1.5,
+            native_size: None,
         },
         Placement {
             position: (0, 0),
             size: (1536, 864),
             scale: 1.25,
+            native_size: None,
         },
     ]
 }

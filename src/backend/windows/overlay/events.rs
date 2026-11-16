@@ -233,7 +233,10 @@ impl Overlay {
                 self.collect(event);
             }
             if let Some(event) = self.pending.pop_front() {
-                return Ok(event);
+                return Ok(crate::backend::pointer_coalescing::coalesce(
+                    event,
+                    &mut self.pending,
+                ));
             }
             if let Some(watch) = &self.theme {
                 match watch.changed() {

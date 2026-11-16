@@ -42,7 +42,7 @@ pub fn prepare_text(fonts: &mut cosmic_text::FontSystem, panel: &ModelPopover) {
     if crate::ui::language::Language::current() == crate::ui::language::Language::Chinese {
         crate::fonts::ui_fallback::ensure_text(
             fonts,
-            "引擎与资源自行选择下载不会自动推理库使用系统语言包无需本地模型手动一次安装后可离线识别已其他语言展开收起就绪需安装模型中文日文英文拉丁西里尔阿拉伯希腊韩语泰语",
+            "引擎与资源自行选择下载不会自动推理库使用系统语言包无需本地模型手动一次安装后可离线识别已其他语言展开收起就绪需安装模型中文日文英文拉丁西里尔阿拉伯希腊韩语泰语推荐适合简单单语言文本",
         );
     }
     crate::fonts::ui_fallback::ensure_text(fonts, &panel.setup.message);
@@ -160,18 +160,18 @@ pub fn draw(p: &mut Painter, panel: &ModelPopover) {
                     "Windows OCR"
                 },
                 if chinese {
-                    "使用系统语言包，无需下载推理库"
+                    "使用系统语言包，适合简单单语言文本"
                 } else {
-                    "Use installed Windows language packs"
+                    "Installed language packs; simple single-language text"
                 },
                 panel.setup.engine == Engine::System,
             ),
             (true, 1) => (
                 ModelPopoverElement::PaddleEngine,
                 if chinese {
-                    "本地模型 OCR"
+                    "本地模型 OCR（推荐）"
                 } else {
-                    "Local model OCR"
+                    "Local model OCR (recommended)"
                 },
                 if chinese {
                     "手动下载推理库和语言模型"

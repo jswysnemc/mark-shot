@@ -12,6 +12,7 @@ use crate::{
     types::popup::{PopupEvent, PopupFrame},
 };
 mod actions;
+mod border;
 mod popup;
 mod text;
 mod translation;
@@ -145,6 +146,8 @@ impl WindowContent for Pin {
             None,
         );
         self.draw_text(canvas);
+        // 1. 【原生贴图】【显示边框】仅装饰预览，复制、保存和识别仍读取独立原图
+        border::draw(canvas, scale, &crate::config::preferences::current().pinned);
         self.feedback
             .draw(canvas, scale, &mut self.fonts, &mut self.cache);
     }

@@ -73,6 +73,7 @@ pub(in crate::app) fn editor() -> EditorState {
         position: (0, 0),
         size: (640, 480),
         scale: 1.0,
+        native_size: None,
     };
     let mut image = Pixmap::new(640, 480).unwrap();
     image.fill(Color::from_rgba8(30, 34, 38, 255));

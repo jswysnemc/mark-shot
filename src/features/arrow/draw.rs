@@ -28,7 +28,10 @@ pub fn draw(
             let [dx, dy] = crate::config::get().annotations.shadow.offset;
             if dx.is_finite()
                 && dy.is_finite()
-                && let Some(shadow) = path.clone().transform(Transform::from_translate(dx, dy))
+                && let Some(shadow) = path.clone().transform(Transform::from_translate(
+                    painter.window_units().canvas(dx),
+                    painter.window_units().canvas(dy),
+                ))
             {
                 crate::renderer::fixed_path::fill(painter, &shadow, shadow_color);
             }

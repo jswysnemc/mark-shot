@@ -19,7 +19,7 @@ fn normal_at(points: &[Point], index: usize) -> Point {
     normal(normalized(sub(after, before)))
 }
 
-/// 【箭头】【圆头尾帽】沿切线反方向从 tail_left 绕到 tail_right，保持固定笔宽的圆滑尾部
+/// 【箭头】【圆头尾帽】按 start、tangent、normal、left、right 与 half 向 builder 添加圆滑尾部，无返回值
 fn tail_cap(
     builder: &mut PathBuilder,
     start: Point,

@@ -44,6 +44,18 @@ pub fn bundled() -> FontSystem {
 
 /// 【字体】【后台字库】读取系统字体并返回字库，供界面初始化完成后的后台线程使用
 pub fn system() -> Database {
+    #[cfg(target_os = "windows")]
+    {
+        static SYSTEM: std::sync::OnceLock<Database> = std::sync::OnceLock::new();
+        // 1. 【Windows字体】【会话复用】待命进程预热一次系统字库，激活后克隆描述，不保留截图图像
+        SYSTEM.get_or_init(load_system).clone()
+    }
+    #[cfg(not(target_os = "windows"))]
+    load_system()
+}
+
+/// 【字体】【系统枚举】无参数，读取一次系统字体描述并返回字库，不创建窗口
+fn load_system() -> Database {
     let mut db = Database::new();
     db.load_system_fonts();
     db

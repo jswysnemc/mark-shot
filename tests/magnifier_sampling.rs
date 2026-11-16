@@ -70,11 +70,13 @@ fn desktop_sampling_respects_offsets_scales_and_uncovered_gaps() {
             position: (-4, 10),
             size: (2, 2),
             scale: 2.0,
+            native_size: None,
         },
         Placement {
             position: (0, 10),
             size: (2, 2),
             scale: 1.5,
+            native_size: None,
         },
     ];
     let source = FrozenImage::desktop(&captures, &placements);

@@ -12,16 +12,20 @@ use x11rb::{
 pub struct Display {
     pub connection: Arc<XCBConnection>,
     pub screen: usize,
+    pub ui_scale: f32,
 }
 
 impl Display {
     /// 【X11连接】【环境连接】无参数，连接DISPLAY并读取默认屏幕，返回认证或连接错误
     pub fn connect() -> crate::AppResult<Self> {
         let (connection, screen) = XCBConnection::connect(None)?;
-        Ok(Self {
+        let mut display = Self {
             connection: Arc::new(connection),
             screen,
-        })
+            ui_scale: 1.0,
+        };
+        display.ui_scale = super::density::read(&display);
+        Ok(display)
     }
 
     /// 【X11连接】【屏幕描述】无参数，返回连接默认屏幕的资源与像素格式
@@ -104,6 +108,16 @@ impl Display {
                     ),
                 ),
             });
+        }
+        // 1. 【X11界面】【坐标分离】显示器保留原生 location 和模式尺寸，逻辑布局按系统分数比例换算
+        for output in &mut outputs {
+            let size = output.info.logical_size.unwrap();
+            let logical = super::density::logical((size.0 as u32, size.1 as u32), self.ui_scale);
+            output.info.logical_size = Some((logical.0 as i32, logical.1 as i32));
+            output.info.logical_position = Some((
+                (output.info.location.0 as f32 / self.ui_scale).round() as i32,
+                (output.info.location.1 as f32 / self.ui_scale).round() as i32,
+            ));
         }
         Ok(outputs)
     }

@@ -46,7 +46,20 @@ impl Overlay {
         {
             self.keyboard.reset();
         }
-        self.ime.sync(window, snapshot)?;
+        let physical = snapshot.map(|snapshot| {
+            let mut physical = snapshot.clone();
+            let scale = self.display.ui_scale;
+            physical.cursor_rect = snapshot.cursor_rect.map(|(x, y, width, height)| {
+                (
+                    (x as f32 * scale).round() as i32,
+                    (y as f32 * scale).round() as i32,
+                    (width as f32 * scale).ceil().max(1.0) as i32,
+                    (height as f32 * scale).ceil().max(1.0) as i32,
+                )
+            });
+            physical
+        });
+        self.ime.sync(window, physical.as_ref())?;
         self.text_snapshot = snapshot.cloned();
         Ok(())
     }

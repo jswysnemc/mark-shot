@@ -15,13 +15,9 @@ pub enum Engine {
 }
 
 impl Default for Engine {
-    /// 【识别引擎】【平台默认】无参数，Windows 首次要求选择，其他平台显示本地模型安装入口
+    /// 【识别引擎】【平台默认】无参数，各平台默认推荐本地模型，系统引擎保留为明确选择
     fn default() -> Self {
-        if cfg!(target_os = "windows") {
-            Self::Ask
-        } else {
-            Self::Paddle
-        }
+        Self::Paddle
     }
 }
 
@@ -81,8 +77,7 @@ pub fn build(
         Source::System => {
             #[cfg(target_os = "windows")]
             {
-                super::windows_backend::languages()?;
-                Ok(Box::new(super::windows_backend::NativeBackend))
+                Ok(Box::new(super::windows_backend::NativeBackend::new()?))
             }
             #[cfg(not(target_os = "windows"))]
             {

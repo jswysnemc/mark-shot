@@ -8,7 +8,9 @@ use windows::{
     Win32::System::WinRT::{RO_INIT_MULTITHREADED, RoInitialize, RoUninitialize},
 };
 
-pub struct NativeBackend;
+pub struct NativeBackend {
+    engine: OcrEngine,
+}
 struct Apartment(bool);
 
 impl Apartment {
@@ -44,10 +46,31 @@ pub fn languages() -> Result<Vec<String>, String> {
         if names.is_empty() {
             return Err("请在 Windows 语言设置中安装 OCR 语言包 / Install an OCR language pack in Windows language settings".into());
         }
-        OcrEngine::TryCreateFromUserProfileLanguages().map_err(|error| format!("请在 Windows 语言设置中启用已安装的 OCR 语言 / Enable an installed OCR language in Windows language settings: {error}"))?;
         Ok(names)
     };
     query().map_err(|error| error.to_string())
+}
+
+impl NativeBackend {
+    /// 【Windows识别】【引擎准备】无参数，优先使用用户语言，缺少匹配时选择已安装语言，返回可跨工作线程复用的引擎
+    pub fn new() -> Result<Self, OcrError> {
+        let _apartment = Apartment::enter()?;
+        if let Ok(engine) = OcrEngine::TryCreateFromUserProfileLanguages() {
+            return Ok(Self { engine });
+        }
+        // 1. 【Windows识别】【语言回退】系统有 OCR 包但用户配置不匹配时仍建立引擎，避免把已安装误报为不可用
+        let available = OcrEngine::AvailableRecognizerLanguages()?;
+        for index in 0..available.Size()? {
+            if let Ok(engine) = OcrEngine::TryCreateFromLanguage(&available.GetAt(index)?) {
+                log::info!(
+                    "【Windows识别】【语言回退】使用已安装语言 {}",
+                    engine.RecognizerLanguage()?.LanguageTag()?
+                );
+                return Ok(Self { engine });
+            }
+        }
+        Err("系统 OCR 没有可用语言包，请安装语言包或选择本地模型 / Install an OCR language pack or select local model OCR".into())
+    }
 }
 
 impl OcrBackend for NativeBackend {
@@ -61,11 +84,17 @@ impl OcrBackend for NativeBackend {
             return Err(super::CANCELLED.into());
         }
         let _apartment = Apartment::enter()?;
-        let engine = OcrEngine::TryCreateFromUserProfileLanguages().map_err(|error| format!("系统 OCR 没有匹配的语言包，请在 Windows 语言设置中安装 / No matching Windows OCR language pack: {error}"))?;
+        let engine = &self.engine;
         let limit = OcrEngine::MaxImageDimension()?;
         let pixels = image::RgbImage::from_raw(image.width, image.height, image.rgb)
             .ok_or("Invalid OCR image")?;
-        let scale = (limit as f32 / image.width.max(image.height).max(1) as f32).min(1.0);
+        // 1. 【Windows识别】【小字放大】小型文本选区适度放大，提高细小字形可辨性，同时遵守系统图像上限
+        let preferred = if image.height < 160 && image.width < 1200 {
+            2.0
+        } else {
+            1.0
+        };
+        let scale = (limit as f32 / image.width.max(image.height).max(1) as f32).min(preferred);
         let width = ((image.width as f32 * scale).round() as u32).max(1);
         let height = ((image.height as f32 * scale).round() as u32).max(1);
         let pixels = if width == image.width && height == image.height {
@@ -82,7 +111,7 @@ impl OcrBackend for NativeBackend {
         for pixel in pixels.pixels() {
             bytes.extend_from_slice(&[pixel[2], pixel[1], pixel[0], 255]);
         }
-        // 1. 【Windows识别】【图像交接】通过 WinRT 缓冲复制 BGRA，不暴露指向临时 Rust 内存的指针
+        // 2. 【Windows识别】【图像交接】通过 WinRT 缓冲复制 BGRA，不暴露指向临时 Rust 内存的指针
         let writer = DataWriter::new()?;
         writer.WriteBytes(&bytes)?;
         let bitmap = SoftwareBitmap::CreateWithAlpha(
@@ -92,7 +121,22 @@ impl OcrBackend for NativeBackend {
             BitmapAlphaMode::Ignore,
         )?;
         bitmap.CopyFromBuffer(&writer.DetachBuffer()?)?;
-        let result = engine.RecognizeAsync(&bitmap)?.join()?;
+        let operation = engine.RecognizeAsync(&bitmap)?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        // 3. 【Windows识别】【有界等待】系统服务失去响应时取消任务，取消截图后及时释放识别线程与缓冲
+        while operation.Status()?.0 == 0 {
+            if cancelled() || std::time::Instant::now() >= deadline {
+                let _ = operation.Cancel();
+                return Err(if cancelled() {
+                    super::CANCELLED
+                } else {
+                    "系统 OCR 超时，请选择本地模型 / Windows OCR timed out; select local model OCR"
+                }
+                .into());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let result = operation.GetResults()?;
         if cancelled() {
             return Err(super::CANCELLED.into());
         }
@@ -118,7 +162,7 @@ impl OcrBackend for NativeBackend {
             if let Some(bounds) = bounds
                 && !text.is_empty()
             {
-                // 2. 【Windows识别】【字符选区】系统只提供词级矩形，逐字符边界使用行内插值，不声明精确字符定位
+                // 4. 【Windows识别】【字符选区】系统只提供词级矩形，逐字符边界使用行内插值，不声明精确字符定位
                 let count = text.chars().count();
                 let char_x = (0..=count)
                     .map(|index| bounds.left() + bounds.width() * index as f32 / count as f32)

@@ -65,10 +65,13 @@ daemon_idle_secs = 900    # 0 keeps the daemon running
 | `at-launch` | The engine is built at every launch |
 | `daemon` | A background process keeps the engine ready and exits after the idle time |
 
-On Windows, the first OCR asks which engine to use: **Windows OCR**, which uses the language packs
-installed in the system and downloads nothing, or **local model OCR**, which works as described
-above. The choice is stored in `ocr.engine` (`ask`, `system` or `paddle`) and can be changed on the
-OCR settings page.
+Local model OCR is the default on every platform (`ocr.engine = "paddle"`). Windows also supports
+an explicit **Windows OCR** choice using installed system OCR language packs. Existing `ask` and
+`system` settings are preserved and can be changed on the OCR settings page.
+
+The system engine reuses its recognizer and enlarges small text regions. Recognition is cancelled
+after fifteen seconds with guidance to use local models. System language packs and the WinRT
+service still affect recognition quality.
 
 ## Translation
 

@@ -49,6 +49,11 @@ fn request(image: OcrImage, source: Source, cancel: &AtomicBool) -> AppResult<Oc
         .stdin(Stdio::from(input))
         .stdout(Stdio::from(output.try_clone()?));
     command.stderr(crate::logging::open_log_file().map_or_else(Stdio::null, Stdio::from));
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW);
+    }
     #[cfg(target_os = "linux")]
     {
         use std::{io, os::unix::process::CommandExt};

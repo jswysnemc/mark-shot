@@ -1,22 +1,19 @@
-//! 【Wayland覆盖层】【移动合并】保留最终坐标及有界真实轨迹，不增加逐点重绘
+//! 【截图覆盖层】【移动合并】保留最终坐标及有界真实轨迹，不增加逐点重绘
 
 use crate::types::{OverlayEvent, pointer_motion::PointerMotion};
 use std::collections::VecDeque;
 
 const MAX_HISTORY: usize = 128;
 
-/// 【Wayland覆盖层】【轨迹合并】把range按实际输入顺序纳入history，仅移除相邻重复采样，无返回值
+/// 【截图覆盖层】【轨迹合并】把range按实际输入顺序纳入history，仅移除相邻重复采样，无返回值
 fn include(history: &mut Vec<PointerMotion>, range: PointerMotion) {
     if history.last() != Some(&range) {
         history.push(range);
     }
 }
 
-/// 【Wayland覆盖层】【连续移动】合并 first 后排队的移动与帧回调，返回最后坐标和完整范围，按钮及焦点事件保持顺序
-pub(in crate::backend::wayland::overlay) fn coalesce(
-    first: OverlayEvent,
-    events: &mut VecDeque<OverlayEvent>,
-) -> OverlayEvent {
+/// 【截图覆盖层】【连续移动】合并 first 后排队的移动与帧回调，返回最后坐标和完整范围，按钮及焦点事件保持顺序
+pub(crate) fn coalesce(first: OverlayEvent, events: &mut VecDeque<OverlayEvent>) -> OverlayEvent {
     let OverlayEvent::PointerMove {
         monitor_idx,
         x,
@@ -27,11 +24,11 @@ pub(in crate::backend::wayland::overlay) fn coalesce(
         return first;
     };
     let mut latest = (monitor_idx, x, y);
-    // 1. 【Wayland覆盖层】【范围保留】只在发生合并时分配范围列表，普通单次移动不增加堆分配
+    // 1. 【截图覆盖层】【范围保留】只在发生合并时分配范围列表，普通单次移动不增加堆分配
     while let Some(OverlayEvent::PointerMove { .. } | OverlayEvent::FrameDone { .. }) =
         events.front()
     {
-        // 2. 【Wayland覆盖层】【有界处理】高密度非共线输入分批分派，按钮及未消费坐标继续保留队列顺序
+        // 2. 【截图覆盖层】【有界处理】高密度非共线输入分批分派，按钮及未消费坐标继续保留队列顺序
         if let Some(OverlayEvent::PointerMove {
             history: previous, ..
         }) = events.front()

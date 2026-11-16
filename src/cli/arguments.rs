@@ -188,6 +188,25 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
         }
     }
 
+    #[cfg(target_os = "windows")]
+    if args.contains(crate::features::desktop::standby::ARG) {
+        let rest = args.finish();
+        if !rest.is_empty() {
+            return Err("capture standby accepts no additional arguments".into());
+        }
+        return Ok(Arguments {
+            command: Command::Internal {
+                kind: crate::features::desktop::standby::ARG.into(),
+                args: vec![],
+            },
+            config,
+            no_notify,
+            debug,
+            debug_log,
+            xdg_window,
+        });
+    }
+
     // 2. 解析捕获范围和编辑行为，最终只允许执行一种主命令
     let capture_to = path(&mut args, "--capture-to")?;
     let list_displays = args.contains("--list-displays");

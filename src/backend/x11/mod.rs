@@ -4,6 +4,7 @@ pub mod capture;
 pub mod clipboard;
 pub mod connection;
 mod cursor;
+pub(crate) mod density;
 mod input;
 mod input_method;
 pub mod overlay;

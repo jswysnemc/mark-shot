@@ -89,6 +89,10 @@ class RpmWorkspace(unittest.TestCase):
                     ),
                     patch("package_rpm.prepare", side_effect=prepare),
                     patch("package_rpm.subprocess.run", side_effect=build),
+                    patch(
+                        "package_rpm.verify",
+                        return_value="libc.so.6(GLIBC_2.42)(64bit)\nlibssl.so.3()(64bit)\n",
+                    ),
                 ):
                     asset = package(ROOT, "0.2.0", "aarch64", commit, output)
                 self.assertEqual(asset.read_bytes(), commit.encode())

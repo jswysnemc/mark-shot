@@ -4,6 +4,8 @@ pub struct Placement {
     pub size: (i32, i32),
     pub position: (i32, i32),
     pub scale: f32,
+    /// 捕获或原生窗口提供的真实像素尺寸，避免分数缩放取整后增加或丢失边缘像素
+    pub native_size: Option<(u32, u32)>,
 }
 
 impl Placement {
@@ -12,11 +14,20 @@ impl Placement {
         (self.position.0 as f32, self.position.1 as f32)
     }
 
+    /// 【截图布局】【逻辑边界】无参数，返回真实像素对应的本地逻辑范围，保留非整除缩放的边缘
     pub fn rect(&self) -> Option<tiny_skia::Rect> {
-        tiny_skia::Rect::from_xywh(0.0, 0.0, self.size.0 as f32, self.size.1 as f32)
+        let (width, height) = self.native_size.map_or(
+            (self.size.0 as f32, self.size.1 as f32),
+            |(width, height)| (width as f32 / self.scale, height as f32 / self.scale),
+        );
+        tiny_skia::Rect::from_xywh(0.0, 0.0, width, height)
     }
 
+    /// 【截图布局】【物理尺寸】无参数，返回真实像素网格；没有原生尺寸时按逻辑尺寸和比例换算
     pub fn px_size(&self) -> (u32, u32) {
+        if let Some(size) = self.native_size {
+            return size;
+        }
         let (w, h) = self.size;
         px_size((w.max(1) as u32, h.max(1) as u32), self.scale)
     }

@@ -47,7 +47,10 @@ impl Overlay {
             return Ok(());
         }
         let origin = self.outputs[*output].info.location;
-        let position = (origin.0 + frame.bounds.x(), origin.1 + frame.bounds.y());
+        let position = (
+            origin.0 + (frame.bounds.x() as f32 * frame.scale).round() as i32,
+            origin.1 + (frame.bounds.y() as f32 * frame.scale).round() as i32,
+        );
         let size = (u16::try_from(frame.size.0)?, u16::try_from(frame.size.1)?);
         // 1. 【X11滚动截图】【窗口交接】全屏覆盖层退出后创建独立局部窗口，保留输出索引和原窗口输入焦点
         if surface.pixels.is_empty() {
@@ -112,8 +115,8 @@ impl Overlay {
         let (output, surface) = &self.surfaces[index];
         let origin = self.outputs[*output].info.location;
         (
-            f64::from(i32::from(surface.position.0) - origin.0),
-            f64::from(i32::from(surface.position.1) - origin.1),
+            f64::from(i32::from(surface.position.0) - origin.0) / f64::from(self.display.ui_scale),
+            f64::from(i32::from(surface.position.1) - origin.1) / f64::from(self.display.ui_scale),
         )
     }
 }

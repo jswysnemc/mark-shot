@@ -148,6 +148,13 @@ impl ScreenOverlay for Overlay {
         for (index, (_, window)) in self.surfaces.iter_mut().enumerate() {
             if self.staged[index] {
                 window.present()?;
+                if index == 0
+                    && self.image_size.is_none()
+                    && self.scroll.monitor.is_none()
+                    && let Err(error) = window.capture_escape()
+                {
+                    log::info!("【Windows截图】【取消按键】{error}");
+                }
                 self.staged[index] = false;
             }
         }

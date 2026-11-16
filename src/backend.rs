@@ -5,6 +5,7 @@ pub mod capture_visibility;
 pub mod notify;
 pub mod output_selection;
 mod platform;
+pub(crate) mod pointer_coalescing;
 pub mod session;
 pub mod task_wake;
 #[cfg(target_os = "linux")]
@@ -82,6 +83,10 @@ pub trait ScreenOverlay {
     }
     /// 【图片编辑】【实际窗口】返回合成器确认的逻辑尺寸，非图片窗口返回空值
     fn image_window_size(&self) -> Option<(u32, u32)> {
+        None
+    }
+    /// 【图片编辑】【原生网格】无参数，返回实际窗口像素尺寸；未知时调用方按逻辑尺寸换算
+    fn image_window_pixel_size(&self) -> Option<(u32, u32)> {
         None
     }
     /// 【图片窗口】【系统交互】按 action 和按下 serial 执行窗口管理操作，返回后端结果，不改变图片内容

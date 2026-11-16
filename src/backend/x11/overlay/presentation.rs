@@ -128,6 +128,13 @@ impl ScreenOverlay for Overlay {
     fn image_window_size(&self) -> Option<(u32, u32)> {
         self.image_size
     }
+    /// 【X11图片编辑】【原生网格】无参数，返回当前客户区物理尺寸，非图片窗口返回空值
+    fn image_window_pixel_size(&self) -> Option<(u32, u32)> {
+        self.image_size?;
+        self.surfaces
+            .first()
+            .map(|(_, surface)| (surface.size.0.into(), surface.size.1.into()))
+    }
     /// 【X11覆盖层】【背景模式】按enabled接收模式请求；X11始终需要调用方完整合成，返回真实启用状态
     fn set_composited_background(&mut self, _enabled: bool) -> bool {
         true
@@ -149,9 +156,16 @@ impl ScreenOverlay for Overlay {
                 .outputs
                 .get(target)
                 .ok_or("invalid X11 display target")?;
-            let dimensions = output.info.logical_size.ok_or("X11 output size missing")?;
+            let dimensions = output
+                .info
+                .modes
+                .iter()
+                .find(|mode| mode.current)
+                .ok_or("X11 output mode missing")?
+                .dimensions;
             let size = self
                 .image_size
+                .map(|size| crate::types::px_size(size, self.display.ui_scale))
                 .unwrap_or((dimensions.0 as u32, dimensions.1 as u32));
             self.surfaces.push((
                 target,
@@ -207,9 +221,9 @@ impl ScreenOverlay for Overlay {
     fn discovered_outputs(&self) -> &[Output] {
         &self.outputs
     }
-    /// 【X11覆盖层】【像素网格】无参数，X11采用物理坐标，返回无需额外缩放
+    /// 【X11覆盖层】【像素网格】无参数，界面采用逻辑坐标，返回按原生像素比例绘制
     fn hidpi(&self) -> bool {
-        false
+        true
     }
     /// 【X11覆盖层】【帧状态】按monitor_idx返回表面是否存在，X11提交不等待合成器回调
     fn ready(&self, monitor_idx: usize) -> bool {
@@ -226,7 +240,13 @@ impl ScreenOverlay for Overlay {
             .ok()?;
         self.outputs.iter().position(|output| {
             let (left, top) = output.info.location;
-            let (width, height) = output.info.logical_size.unwrap_or_default();
+            let (width, height) = output
+                .info
+                .modes
+                .iter()
+                .find(|mode| mode.current)
+                .map(|mode| mode.dimensions)
+                .unwrap_or_default();
             i32::from(pointer.root_x) >= left
                 && i32::from(pointer.root_x) < left + width
                 && i32::from(pointer.root_y) >= top
@@ -279,11 +299,12 @@ impl ScreenOverlay for Overlay {
         let rectangles = rect
             .into_iter()
             .filter_map(|(left, top, width, height)| {
+                let scale = self.display.ui_scale;
                 Some(Rectangle {
-                    x: left.try_into().ok()?,
-                    y: top.try_into().ok()?,
-                    width: width.try_into().ok()?,
-                    height: height.try_into().ok()?,
+                    x: ((left as f32 * scale).round() as i32).try_into().ok()?,
+                    y: ((top as f32 * scale).round() as i32).try_into().ok()?,
+                    width: ((width as f32 * scale).round() as u32).try_into().ok()?,
+                    height: ((height as f32 * scale).round() as u32).try_into().ok()?,
                 })
             })
             .collect::<Vec<_>>();

@@ -62,6 +62,13 @@ pub(super) unsafe extern "system" fn procedure(
     debug_assert_eq!(context.owner, std::thread::current().id());
     let id = context.id;
     let event = match message {
+        WM_HOTKEY if wparam == super::window::ESCAPE_HOTKEY as usize => Some(Event::Key {
+            id,
+            code: 0x1b,
+            pressed: true,
+            repeated: false,
+            modifiers: Default::default(),
+        }),
         WM_SETTINGCHANGE | WM_THEMECHANGED => Some(Event::Theme { id }),
         WM_CLOSE => Some(Event::Close { id }),
         WM_SETFOCUS | WM_KILLFOCUS => Some(Event::Focus {

@@ -37,7 +37,16 @@ impl Node {
                 self.text_cause,
             )
         {
-            self.ime.sync(self.surface.window, Some(&snapshot))?;
+            let mut physical = snapshot.clone();
+            physical.cursor_rect = snapshot.cursor_rect.map(|(x, y, width, height)| {
+                (
+                    (x as f32 * self.scale).round() as i32,
+                    (y as f32 * self.scale).round() as i32,
+                    (width as f32 * self.scale).ceil().max(1.0) as i32,
+                    (height as f32 * self.scale).ceil().max(1.0) as i32,
+                )
+            });
+            self.ime.sync(self.surface.window, Some(&physical))?;
             self.text_snapshot = Some(snapshot);
             self.text_cause = ChangeCause::Other;
         }

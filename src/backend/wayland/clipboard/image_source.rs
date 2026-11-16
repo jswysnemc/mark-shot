@@ -8,6 +8,7 @@ use std::{
         unix::fs::FileExt,
     },
     path::Path,
+    sync::OnceLock,
 };
 
 const CHUNK: usize = 64 * 1024;
@@ -16,6 +17,7 @@ const RELEASE_BATCH: u64 = 4 * 1024 * 1024;
 pub(super) struct ImageSource {
     file: File,
     pub(super) bytes: u64,
+    bitmap: OnceLock<Result<File, String>>,
 }
 
 impl ImageSource {
@@ -44,16 +46,25 @@ impl ImageSource {
         file.sync_data()?;
         release_pages(&file, released, bytes - released)?;
         advise(&file, 0, 0, nix::libc::POSIX_FADV_RANDOM)?;
-        Ok(Self { file, bytes })
+        Ok(Self {
+            file,
+            bytes,
+            bitmap: OnceLock::new(),
+        })
     }
 
     /// 【图片剪贴板】【数据发送】按独立文件偏移把完整 PNG 写入 output，返回传输结果，多次粘贴不共享读取位置
     pub(super) fn send(&self, mut output: impl Write) -> io::Result<()> {
+        Self::send_file(&self.file, self.bytes, &mut output)
+    }
+
+    /// 【图片剪贴板】【文件传输】按 file 与 bytes 从独立偏移完整发送到 output，返回传输结果
+    fn send_file(file: &File, bytes: u64, mut output: impl Write) -> io::Result<()> {
         let mut buffer = [0; CHUNK];
         let mut offset = 0;
         let mut released = 0;
-        while offset < self.bytes {
-            let count = self.file.read_at(&mut buffer, offset)?;
+        while offset < bytes {
+            let count = file.read_at(&mut buffer, offset)?;
             if count == 0 {
                 return Err(io::Error::new(
                     io::ErrorKind::UnexpectedEof,
@@ -63,19 +74,17 @@ impl ImageSource {
             output.write_all(&buffer[..count])?;
             offset += count as u64;
             if offset - released >= RELEASE_BATCH {
-                release_pages(&self.file, released, offset - released)?;
+                release_pages(file, released, offset - released)?;
                 released = offset;
             }
         }
-        release_pages(&self.file, 0, self.bytes)?;
+        release_pages(file, 0, bytes)?;
         Ok(())
     }
 
-    /// 【图片剪贴板】【发送到 fd】清除接收端带来的 O_NONBLOCK 后完整发送，返回传输结果
-    pub(super) fn send_fd(&self, fd: impl Into<OwnedFd>) -> io::Result<()> {
-        // 接收端常用 pipe2(O_NONBLOCK) 建管道，标志随 fd 传到数据源；未清掉时 pipe 写满
-        // 会让 write_all 直接返回 EAGAIN 并中止，剪贴板里只剩半张 PNG。发送跑在独立
-        // 线程，阻塞写安全。
+    /// 【图片剪贴板】【发送到 fd】清除 fd 的非阻塞标志后按 mime 完整发送对应图像，返回传输结果
+    pub(super) fn send_fd(&self, fd: impl Into<OwnedFd>, mime: &str) -> io::Result<()> {
+        // 1. 【图片剪贴板】【管道配置】发送线程清除接收端传入的非阻塞标志，避免写满管道时中止图片
         let file = File::from(fd.into());
         let flags = nix::fcntl::OFlag::from_bits_truncate(nix::fcntl::fcntl(
             &file,
@@ -85,7 +94,20 @@ impl ImageSource {
             &file,
             nix::fcntl::FcntlArg::F_SETFL(flags & !nix::fcntl::OFlag::O_NONBLOCK),
         )?;
-        self.send(&file)
+        match mime {
+            super::image_formats::PNG => self.send(&file),
+            super::image_formats::BMP | super::image_formats::X_BMP => {
+                // 2. 【图片剪贴板】【按需缓存】并发请求只编码一次，驻留服务持有匿名文件而非完整位图堆缓冲
+                let bitmap = self.bitmap.get_or_init(|| {
+                    super::image_formats::bitmap(&self.file).map_err(|error| error.to_string())
+                });
+                let bitmap = bitmap
+                    .as_ref()
+                    .map_err(|error| io::Error::other(error.clone()))?;
+                Self::send_file(bitmap, bitmap.metadata()?.len(), &file)
+            }
+            _ => Err(io::Error::other("unsupported clipboard image format")),
+        }
     }
 }
 
@@ -141,7 +163,7 @@ mod tests {
             .collect();
         let source = ImageSource::receive(expected.as_slice(), directory.path()).unwrap();
 
-        // 复现 Wayland 客户端的管道：写端非阻塞，标志随 fd 一起传到数据源
+        // 1. 【图片剪贴板测试】【接收端管道】模拟带非阻塞标志的真实传输描述符
         let (read_end, write_end) = nix::unistd::pipe().unwrap();
         let flags = nix::fcntl::OFlag::from_bits_truncate(
             nix::fcntl::fcntl(&write_end, nix::fcntl::FcntlArg::F_GETFL).unwrap(),
@@ -159,7 +181,9 @@ mod tests {
             received
         });
 
-        source.send_fd(write_end).unwrap();
+        source
+            .send_fd(write_end, super::super::image_formats::PNG)
+            .unwrap();
         assert_eq!(reader.join().unwrap(), expected);
     }
 }

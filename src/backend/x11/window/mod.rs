@@ -1,6 +1,8 @@
 //! 【X11普通窗口】【内容运行时】设置、OCR和贴图共享原生输入、模态窗口及菜单生命周期
 
 mod capture_visibility;
+#[cfg(test)]
+mod density_tests;
 mod events;
 mod geometry;
 mod popup;
@@ -18,6 +20,7 @@ use x11rb::{
 use geometry::Drag;
 
 struct Node {
+    scale: f32,
     surface: Surface,
     content: Box<dyn WindowContent>,
     spec: WindowSpec,
@@ -49,18 +52,29 @@ impl Node {
             spec.size.0.max(spec.minimum.0),
             spec.size.1.max(spec.minimum.1),
         );
-        let position = content.initial_position().unwrap_or((
-            (i32::from(display.screen().width_in_pixels) - size.0 as i32).max(0) / 2,
-            (i32::from(display.screen().height_in_pixels) - size.1 as i32).max(0) / 2,
-        ));
+        let logical_size = size;
+        let size = crate::types::px_size(size, display.ui_scale);
+        let position = content
+            .initial_position()
+            .map(|(x, y)| {
+                (
+                    (x as f32 * display.ui_scale).round() as i32,
+                    (y as f32 * display.ui_scale).round() as i32,
+                )
+            })
+            .unwrap_or((
+                (i32::from(display.screen().width_in_pixels) - size.0 as i32).max(0) / 2,
+                (i32::from(display.screen().height_in_pixels) - size.1 as i32).max(0) / 2,
+            ));
         let surface = Surface::new(display.clone(), position, size, false)?;
         surface.title(&spec.title)?;
         let mut hints = [0u32; 18];
         hints[0] = (1 << 2) | (1 << 4);
         hints[1] = position.0 as u32;
         hints[2] = position.1 as u32;
-        hints[5] = spec.minimum.0;
-        hints[6] = spec.minimum.1;
+        let minimum = crate::types::px_size(spec.minimum, display.ui_scale);
+        hints[5] = minimum.0;
+        hints[6] = minimum.1;
         display.connection.change_property32(
             PropMode::REPLACE,
             surface.window,
@@ -81,8 +95,9 @@ impl Node {
                 .contains(&display.atom("_NET_WM_STATE_ABOVE")?),
         );
         content.connected(WindowWake::x11(wake.wake()));
-        content.event(WindowEvent::Resize { size });
+        content.event(WindowEvent::Resize { size: logical_size });
         Ok(Self {
+            scale: display.ui_scale,
             keyboard: super::input::Keyboard::new(&display)?,
             ime: super::input_method::InputMethod::new(&display),
             focus: None,
@@ -140,13 +155,16 @@ impl Node {
                 size.0.max(self.spec.minimum.0),
                 size.1.max(self.spec.minimum.1),
             );
-            let native = (u16::try_from(size.0)?, u16::try_from(size.1)?);
+            let physical = crate::types::px_size(size, self.scale);
+            let native = (u16::try_from(physical.0)?, u16::try_from(physical.1)?);
             if native != self.surface.size {
                 display
                     .connection
                     .configure_window(
                         self.surface.window,
-                        &ConfigureWindowAux::new().width(size.0).height(size.1),
+                        &ConfigureWindowAux::new()
+                            .width(physical.0)
+                            .height(physical.1),
                     )?
                     .check()?;
                 self.surface.size = native;
@@ -156,8 +174,10 @@ impl Node {
         }
         if let Some((offset_x, offset_y)) = self.content.take_position_offset() {
             let position = (
-                i32::from(self.surface.position.0) + offset_x.round() as i32,
-                i32::from(self.surface.position.1) + offset_y.round() as i32,
+                i32::from(self.surface.position.0)
+                    + (offset_x * f64::from(self.scale)).round() as i32,
+                i32::from(self.surface.position.1)
+                    + (offset_y * f64::from(self.scale)).round() as i32,
             );
             display
                 .connection
@@ -201,7 +221,7 @@ impl Node {
         if self.dirty {
             let mut frame = Pixmap::new(self.surface.size.0.into(), self.surface.size.1.into())
                 .ok_or("X11 window allocation failed")?;
-            self.content.draw(&mut frame, 1.0);
+            self.content.draw(&mut frame, self.scale);
             let first = !self.surface.mapped;
             self.surface.present(frame.data())?;
             self.dirty = false;

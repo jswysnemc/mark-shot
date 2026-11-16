@@ -31,7 +31,10 @@ pub struct Window {
     hwnd: HWND,
     context: Box<Context>,
     shown: bool,
+    escape_hotkey: bool,
 }
+
+pub(super) const ESCAPE_HOTKEY: i32 = 0x4d53;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Cursor {
@@ -134,6 +137,7 @@ impl Window {
                 hwnd,
                 context,
                 shown: false,
+                escape_hotkey: false,
             })
         }
     }
@@ -298,6 +302,10 @@ impl Window {
                 );
             }
             self.shown = true;
+            // 1. 【Windows窗口】【首帧激活】用户触发窗口取得键盘焦点，非激活弹层保持所属窗口输入
+            if self.context.activate {
+                self.focus();
+            }
         }
         Ok(())
     }
@@ -320,10 +328,41 @@ impl Window {
 
     /// 【Windows窗口】【暂时隐藏】无参数，隐藏当前表面，保留原生位图和窗口身份，无返回值
     pub fn hide(&mut self) {
+        self.release_escape();
         unsafe {
             ShowWindow(self.hwnd, SW_HIDE);
         }
         self.shown = false;
+    }
+
+    /// 【Windows截图】【取消按键】无参数，为可见截图临时注册 Escape，返回注册错误，焦点受系统限制时仍可取消
+    pub fn capture_escape(&mut self) -> io::Result<()> {
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+            MOD_NOREPEAT, RegisterHotKey, VK_ESCAPE,
+        };
+        if !self.escape_hotkey && self.shown {
+            if unsafe {
+                RegisterHotKey(self.hwnd, ESCAPE_HOTKEY, MOD_NOREPEAT, u32::from(VK_ESCAPE))
+            } == 0
+            {
+                return Err(super::last_error());
+            }
+            self.escape_hotkey = true;
+        }
+        Ok(())
+    }
+
+    /// 【Windows截图】【取消释放】无参数，隐藏或销毁截图时注销临时按键，不影响随后其他应用的 Escape
+    fn release_escape(&mut self) {
+        if self.escape_hotkey {
+            unsafe {
+                windows_sys::Win32::UI::Input::KeyboardAndMouse::UnregisterHotKey(
+                    self.hwnd,
+                    ESCAPE_HOTKEY,
+                )
+            };
+            self.escape_hotkey = false;
+        }
     }
 
     /// 【Windows窗口】【缓冲回收】无参数，释放隐藏表面的唯一DIB，下一次提交重新按所需尺寸分配
@@ -405,6 +444,7 @@ impl Drop for Window {
     /// 【Windows窗口】【线程内关闭】无参数，先销毁HWND，再由字段释放固定地址状态和位图，无返回值
     fn drop(&mut self) {
         debug_assert_eq!(self.context.owner, std::thread::current().id());
+        self.release_escape();
         unsafe {
             windows_sys::Win32::UI::Input::Ime::ImmAssociateContext(
                 self.hwnd,

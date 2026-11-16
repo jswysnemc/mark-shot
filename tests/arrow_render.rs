@@ -197,7 +197,7 @@ fn coordinate_and_device_scaling_match_with_equivalent_window_units() {
                 pattern,
                 4.0,
                 Color::BLACK,
-                Color::TRANSPARENT,
+                Color::from_rgba8(0, 0, 0, 90),
             );
             draw::draw(
                 &mut Painter::new(&mut original).with_window_units(
@@ -208,7 +208,7 @@ fn coordinate_and_device_scaling_match_with_equivalent_window_units() {
                 pattern,
                 8.0,
                 Color::BLACK,
-                Color::TRANSPARENT,
+                Color::from_rgba8(0, 0, 0, 90),
             );
             assert!(original.data() == viewport.data(), "{style:?} {pattern:?}");
         }

@@ -8,7 +8,7 @@ use crate::features::line::{
     polyline::{Polyline, normal},
 };
 
-/// 【箭头】【缺口比例】返回直箭头缺口到尖端的距离比例，非法配置回退到三分之二
+/// 【箭头】【缺口比例】无参数，返回直箭头缺口到尖端的距离比例，非法配置回退到三分之二
 fn notch_ratio() -> f32 {
     let value = crate::config::get().annotations.arrow.head_notch;
     if value.is_finite() {
@@ -18,7 +18,7 @@ fn notch_ratio() -> f32 {
     }
 }
 
-/// 【箭头】【直箭头路径】把圆头箭身和内凹实心头部合成闭合路径；退化输入返回空值
+/// 【箭头】【直箭头路径】按 line、metrics、style、line_style、width 与 scale 合成圆头箭身和内凹头部，返回闭合路径或空值
 pub(super) fn path(
     line: &Polyline,
     metrics: HeadMetrics,
@@ -27,6 +27,7 @@ pub(super) fn path(
     width: f32,
     scale: f32,
 ) -> Option<Path> {
+    // 1. 【箭头】【箭身合成】按缺口位置裁切中线，保持线型和实际窗口笔宽
     let notch = metrics.length * notch_ratio();
     let start = if style.bidirectional() { notch } else { 0.0 };
     let center = line.section(start, line.length - notch);
@@ -36,6 +37,7 @@ pub(super) fn path(
         &center, line_style, width, scale,
     )?);
     let end = *line.points.last()?;
+    // 2. 【箭头】【头部合成】终点始终绘制头部，双向样式增加起点头部
     dart(
         &mut builder,
         end,
@@ -59,7 +61,7 @@ pub(super) fn path(
     builder.finish()
 }
 
-/// 【箭头】【内凹头部】按 tip、direction、barbs、notch 构造同一绕向的实心箭头，窄边与箭身相接
+/// 【箭头】【内凹头部】按 tip、direction、barbs、notch 与 half_width 向 builder 添加实心箭头，无返回值
 fn dart(
     builder: &mut PathBuilder,
     tip: Point,

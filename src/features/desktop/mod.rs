@@ -1,11 +1,15 @@
 //! 【桌面集成】【常驻服务】托盘和全局按键独立注册，配置变化后释放旧资源再建立新注册
 
 mod actions;
+#[cfg(target_os = "windows")]
+mod capture_worker;
 mod delayed_capture;
 mod hotkeys;
 #[cfg(target_os = "windows")]
 mod native_thread;
 pub mod recording;
+#[cfg(target_os = "windows")]
+pub(crate) mod standby;
 pub mod status;
 mod tray;
 
@@ -90,6 +94,12 @@ pub fn ensure() -> crate::AppResult {
 pub fn run() -> crate::AppResult {
     let path = std::path::absolute(crate::config::preferences::path()?)?;
     let root = status::directory(&path)?;
+    #[cfg(target_os = "windows")]
+    if !crate::config::preferences::current().desktop.enabled() {
+        // 1. 【Windows启动】【后台入口】用户明确启动后台时恢复托盘入口，快捷键开关仍采用保存值
+        crate::config::preferences::write(&path, "desktop", "tray_enabled", true.into())?;
+        crate::config::preferences::reload(&path)?;
+    }
     let lock = OpenOptions::new()
         .read(true)
         .write(true)
@@ -112,6 +122,8 @@ async fn serve(path: &Path, root: &Path) -> crate::AppResult {
     let parent = path.parent().ok_or("configuration has no parent")?;
     std::fs::create_dir_all(parent)?;
     let (sender, mut receiver) = mpsc::unbounded_channel();
+    #[cfg(target_os = "windows")]
+    let capture_worker = capture_worker::Worker::new()?;
     let changes = sender.clone();
     let watched = path.to_path_buf();
     let recording_path = root.join(recording::FILE);
@@ -292,7 +304,15 @@ async fn serve(path: &Path, root: &Path) -> crate::AppResult {
                 let Some(args) = action.arguments() else {
                     continue;
                 };
-                if let Err(error) = crate::utils::spawn_self_activated(args, token.as_deref()) {
+                #[cfg(target_os = "windows")]
+                let result = if matches!(action, Action::Capture | Action::Fullscreen) {
+                    capture_worker.submit(action)
+                } else {
+                    crate::utils::spawn_self_activated(args, token.as_deref())
+                };
+                #[cfg(not(target_os = "windows"))]
+                let result = crate::utils::spawn_self_activated(args, token.as_deref());
+                if let Err(error) = result {
                     log::error!("【桌面集成】【启动操作】{error}");
                 }
             }

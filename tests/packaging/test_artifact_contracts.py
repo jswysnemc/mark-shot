@@ -125,6 +125,10 @@ class ArtifactContracts(unittest.TestCase):
                         "package_rpm.prepare", return_value={"source_archive": source}
                     ),
                     patch("package_rpm.subprocess.run", side_effect=build),
+                    patch(
+                        "package_rpm.verify",
+                        return_value="libc.so.6(GLIBC_2.42)(64bit)\nlibssl.so.3()(64bit)\n",
+                    ),
                 ):
                     rpm(ROOT, "0.2.0", arch, COMMIT, destination)
                 names.append(next(destination.glob("*.src.rpm")).name)

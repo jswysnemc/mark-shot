@@ -42,11 +42,11 @@ jobs:
         include:
           - arch: x86_64
             runner: ubuntu-24.04
-            image: 'fedora:latest'
+            image: 'fedora:43'
             target: fedora
           - arch: aarch64
             runner: ubuntu-24.04-arm
-            image: 'fedora:latest'
+            image: 'fedora:43'
             target: fedora
     uses: ./.github/workflows/native-linux-package.yml
     with:

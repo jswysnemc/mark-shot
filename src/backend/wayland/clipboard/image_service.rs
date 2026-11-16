@@ -1,5 +1,6 @@
 //! 【图片剪贴板】【协议服务】通过 ext 或 wlr 数据控制协议提供文件来源，保持 PNG 与 KDE 图片提示 MIME
 
+use super::image_formats;
 use super::image_source::ImageSource;
 use std::{
     collections::HashSet,
@@ -20,7 +21,6 @@ use wayland_protocols_wlr::data_control::v1::client::{
     zwlr_data_control_offer_v1 as wlr_offer, zwlr_data_control_source_v1 as wlr_source,
 };
 
-const PNG: &str = "image/png";
 const KDE_IMAGE: &str = "x-kde-force-image-copy";
 
 struct State {
@@ -63,7 +63,9 @@ pub(super) fn serve(primary: bool) -> Result<(), Box<dyn std::error::Error>> {
             );
             let device = manager.get_data_device(&seat, &handle, global.name);
             let source = manager.create_data_source(&handle, global.name);
-            source.offer(PNG.into());
+            for mime in image_formats::TYPES {
+                source.offer(mime.into());
+            }
             source.offer(KDE_IMAGE.into());
             if primary {
                 device.set_primary_selection(Some(&source));
@@ -85,7 +87,9 @@ pub(super) fn serve(primary: bool) -> Result<(), Box<dyn std::error::Error>> {
             );
             let device = manager.get_data_device(&seat, &handle, global.name);
             let source = manager.create_data_source(&handle, global.name);
-            source.offer(PNG.into());
+            for mime in image_formats::TYPES {
+                source.offer(mime.into());
+            }
             source.offer(KDE_IMAGE.into());
             if primary {
                 device.set_primary_selection(Some(&source));
@@ -127,10 +131,10 @@ macro_rules! data_control_dispatch {
             /// 【图片剪贴板】【来源事件】按 event 独立发送文件或结束 seat，data 为当前来源；无返回值
             fn event(state: &mut Self, data: &$source::$source_type, event: $source::Event, seat: &u32, _: &Connection, _: &QueueHandle<Self>) {
                 match event {
-                    $source::Event::Send { mime_type, fd } if mime_type == PNG => {
+                    $source::Event::Send { mime_type, fd } if image_formats::TYPES.contains(&mime_type.as_str()) => {
                         let image = Arc::clone(&state.image);
                         let result = std::thread::Builder::new().name("clipboard-send".into()).spawn(move || {
-                            if let Err(error) = image.send_fd(fd) {
+                            if let Err(error) = image.send_fd(fd, &mime_type) {
                                 log::info!("【图片剪贴板】【发送结束】{error}");
                             }
                         });

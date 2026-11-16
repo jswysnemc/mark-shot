@@ -132,6 +132,7 @@ fn captured_field_drag_uses_global_coordinates_across_outputs() {
         position: (640, 0),
         size: (640, 480),
         scale: 1.5,
+        native_size: None,
     });
     let point = center(&state);
     pointer(&mut state, point.0, point.1, &mut 0);

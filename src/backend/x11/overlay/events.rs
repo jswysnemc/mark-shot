@@ -19,7 +19,10 @@ impl Overlay {
             if let Some(event) = self.pending.pop_front() {
                 return Ok(event);
             }
-            while let Some(event) = self.display.connection.poll_for_event()? {
+            while let Some(event) = self.deferred.take().map_or_else(
+                || self.display.connection.poll_for_event(),
+                |event| Ok(Some(event)),
+            )? {
                 self.keyboard.update(&self.display, &event)?;
                 if self.ime.filter(&event) {
                     self.collect_ime()?;
@@ -41,7 +44,7 @@ impl Overlay {
                     continue;
                 }
                 if let Some(event) = self.translate(event)? {
-                    return Ok(event);
+                    return self.latest_motion(event);
                 }
             }
             let timeout =
@@ -58,6 +61,33 @@ impl Overlay {
                 return Ok(OverlayEvent::Tick);
             }
         }
+    }
+
+    /// 【X11跟随】【积压合并】按 first 合并已到达的连续移动，返回最新坐标与真实轨迹，非移动消息保持原有顺序
+    fn latest_motion(&mut self, first: OverlayEvent) -> crate::AppResult<OverlayEvent> {
+        if !matches!(first, OverlayEvent::PointerMove { .. })
+            || self.popup.is_some()
+            || !self.pending.is_empty()
+        {
+            return Ok(first);
+        }
+        let mut moves = std::collections::VecDeque::new();
+        // 1. 【X11跟随】【有界读取】一次最多消费六十四个采样，按钮、键盘、失焦消息留到下一次分派
+        for _ in 0..63 {
+            let Some(event) = self.display.connection.poll_for_event()? else {
+                break;
+            };
+            if !matches!(event, Event::MotionNotify(_)) {
+                self.deferred = Some(event);
+                break;
+            }
+            if let Some(event) = self.translate(event)? {
+                moves.push_back(event);
+            }
+        }
+        Ok(crate::backend::pointer_coalescing::coalesce(
+            first, &mut moves,
+        ))
     }
 
     /// 【X11覆盖层】【协议分派】按event查找目标表面并转换输入，返回业务事件或已消费状态
@@ -83,13 +113,14 @@ impl Overlay {
             return Ok(None);
         };
         let offset = self.input_offset(index);
+        let scale = f64::from(self.display.ui_scale);
         let result = match event {
             Event::MotionNotify(event) => {
                 self.cursor_output = Some(index);
                 Some(OverlayEvent::PointerMove {
                     monitor_idx: index,
-                    x: f64::from(event.event_x) + offset.0,
-                    y: f64::from(event.event_y) + offset.1,
+                    x: f64::from(event.event_x) / scale + offset.0,
+                    y: f64::from(event.event_y) / scale + offset.1,
                     history: Vec::new(),
                 })
             }
@@ -97,17 +128,18 @@ impl Overlay {
                 self.cursor_output = Some(index);
                 Some(OverlayEvent::PointerMove {
                     monitor_idx: index,
-                    x: f64::from(event.event_x) + offset.0,
-                    y: f64::from(event.event_y) + offset.1,
+                    x: f64::from(event.event_x) / scale + offset.0,
+                    y: f64::from(event.event_y) / scale + offset.1,
                     history: Vec::new(),
                 })
             }
             Event::ButtonPress(event) | Event::ButtonRelease(event) => {
-                let pressed = event.response_type == x11rb::protocol::xproto::BUTTON_PRESS_EVENT;
+                let pressed =
+                    event.response_type & 0x7f == x11rb::protocol::xproto::BUTTON_PRESS_EVENT;
                 self.pending.push_back(OverlayEvent::PointerMove {
                     monitor_idx: index,
-                    x: f64::from(event.event_x) + offset.0,
-                    y: f64::from(event.event_y) + offset.1,
+                    x: f64::from(event.event_x) / scale + offset.0,
+                    y: f64::from(event.event_y) / scale + offset.1,
                     history: Vec::new(),
                 });
                 if let Some(button) = input::button(event.detail) {
@@ -161,8 +193,13 @@ impl Overlay {
                 None
             }
             Event::ConfigureNotify(event) if self.image_size.is_some() => {
-                let size = (u32::from(event.width), u32::from(event.height));
-                if self.image_size != Some(size) {
+                let size = super::super::density::logical(
+                    (event.width.into(), event.height.into()),
+                    self.display.ui_scale,
+                );
+                if self.image_size != Some(size)
+                    || self.surfaces[index].1.size != (event.width, event.height)
+                {
                     self.image_size = Some(size);
                     self.surfaces[index].1.size = (event.width, event.height);
                     Some(OverlayEvent::CanvasResized { size })

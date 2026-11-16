@@ -85,11 +85,14 @@ impl CaptureMethod for Method {
         );
         let mut frames = Vec::new();
         for (output, monitor) in outputs.iter().enumerate() {
-            let size = monitor.info.logical_size.ok_or("X11 output has no size")?;
-            let position = monitor
+            let size = monitor
                 .info
-                .logical_position
-                .unwrap_or(monitor.info.location);
+                .modes
+                .iter()
+                .find(|mode| mode.current)
+                .ok_or("X11 output has no mode")?
+                .dimensions;
+            let position = monitor.info.location;
             frames.push(MonitorFrame {
                 output,
                 pixels: self.rectangle(position, size)?,
@@ -98,8 +101,8 @@ impl CaptureMethod for Method {
                 pw_stride: size.0 as u32 * 4,
                 info: StreamInfo {
                     node_id: 0,
-                    size: Some(size),
-                    position: Some(position),
+                    size: monitor.info.logical_size,
+                    position: monitor.info.logical_position,
                 },
             });
         }

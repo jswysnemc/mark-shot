@@ -34,6 +34,7 @@ pub(super) fn prepare(
     if window && let Some(size) = overlay.image_window_size() {
         placement.position = (0, 0);
         placement.size = (size.0 as i32, size.1 as i32);
+        placement.native_size = overlay.image_window_pixel_size();
         let viewport = layout::viewport(size);
         let navigation = crate::features::canvas_navigation::model::Navigation::new(
             (file.original.width(), file.original.height()),
@@ -53,17 +54,24 @@ pub(super) fn prepare(
     Ok(())
 }
 
-/// 【图片编辑】【画布调整】按 size 重建 state 的窗口资源，dirty 返回完整损坏；保留原件、选择、历史和当前缩放，无返回值
-pub(super) fn resize(state: &mut EditorState, size: (u32, u32), dirty: &mut u32) {
+/// 【图片编辑】【画布调整】按 size 与 native_size 重建 state 的逻辑及物理窗口资源，dirty 返回完整损坏；保留原件和标注，无返回值
+pub(super) fn resize(
+    state: &mut EditorState,
+    size: (u32, u32),
+    native_size: Option<(u32, u32)>,
+    dirty: &mut u32,
+) {
     if state.file_canvas.is_none()
         || size.0 == 0
         || size.1 == 0
-        || state.placements[0].size == (size.0 as i32, size.1 as i32)
+        || (state.placements[0].size == (size.0 as i32, size.1 as i32)
+            && native_size.is_none_or(|size| state.placements[0].px_size() == size))
     {
         return;
     }
     state.ensure_navigation();
     state.placements[0].size = (size.0 as i32, size.1 as i32);
+    state.placements[0].native_size = native_size;
     let viewport = if state.image_window.enabled {
         layout::viewport(size)
     } else {
