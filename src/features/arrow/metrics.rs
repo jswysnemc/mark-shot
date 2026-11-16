@@ -39,13 +39,36 @@ pub(crate) fn rendered_metrics(
         0.0
     };
     let body_half_width = width * 0.5;
-    if style.open() {
-        let length = (total_length * 0.32)
-            .clamp(width * 2.6, width * 6.0)
-            .min(total_length * if style.bidirectional() { 0.42 } else { 1.0 });
+    if style.direct() {
+        let arrow = &crate::config::get().annotations.arrow;
+        let positive = |value: f32, fallback: f32| {
+            if value.is_finite() && value > 0.0 {
+                value
+            } else {
+                fallback
+            }
+        };
+        let max_ratio = if style.bidirectional() {
+            0.42
+        } else {
+            positive(arrow.head_max, 0.6)
+        };
+        let length = (width * positive(arrow.head_length, 4.0))
+            .max(positive(arrow.head_min, 12.0) * scale)
+            .min(total_length * max_ratio);
         HeadMetrics {
             length,
-            half_width: length * 0.62,
+            half_width: length * positive(arrow.head_width, 0.5),
+            body_half_width,
+        }
+    } else if style.open() {
+        // KDE 原版：头部两段线与箭杆成 30 度，长度随笔宽增长且至少八像素
+        let head = (width * 3.0).max(8.0 * scale);
+        let length =
+            (head * 0.866_025_4).min(total_length * if style.bidirectional() { 0.42 } else { 1.0 });
+        HeadMetrics {
+            length,
+            half_width: head * 0.5,
             body_half_width,
         }
     } else {

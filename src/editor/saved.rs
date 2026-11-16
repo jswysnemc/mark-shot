@@ -33,6 +33,7 @@ struct File {
     outline_color: Option<String>,
     fill: Option<bool>,
     corner_radius: Option<f32>,
+    rectangle_radius: Option<f32>,
     fixed_ratio: Option<bool>,
     marker_shape: Option<String>,
     marker_filled: Option<bool>,
@@ -41,6 +42,7 @@ struct File {
     magnifier_zoom: Option<f32>,
     number_style: Option<String>,
     arrow_style: Option<String>,
+    direct_head_migrated: Option<bool>,
     arrow_line_style: Option<String>,
     line_style: Option<String>,
     magnifier: Option<bool>,
@@ -91,6 +93,7 @@ pub struct Saved {
     pub outline_color: Option<Rgba>,
     pub fill: Option<bool>,
     pub corner_radius: Option<f32>,
+    pub rectangle_radius: Option<f32>,
     pub fixed_ratio: Option<bool>,
     pub marker_shape: Option<crate::types::MarkerShape>,
     pub marker_filled: Option<bool>,
@@ -145,6 +148,7 @@ fn load() -> Saved {
             recent_colors.push(color);
         }
     }
+    let arrow_style = saved_arrow_style(&file);
 
     Saved {
         color: file.color.as_deref().and_then(parse_color),
@@ -165,6 +169,7 @@ fn load() -> Saved {
         outline_color: file.outline_color.as_deref().and_then(parse_color),
         fill: file.fill,
         corner_radius: file.corner_radius,
+        rectangle_radius: file.rectangle_radius,
         fixed_ratio: file.fixed_ratio,
         marker_shape: file.marker_shape.as_deref().and_then(parse_marker_shape),
         marker_filled: file.marker_filled,
@@ -175,7 +180,7 @@ fn load() -> Saved {
             .and_then(parse_magnifier_shape),
         magnifier_zoom: file.magnifier_zoom.filter(|value| value.is_finite()),
         number_style: file.number_style.as_deref().and_then(parse_number_style),
-        arrow_style: file.arrow_style.as_deref().and_then(parse_arrow_style),
+        arrow_style,
         arrow_line_style: file.arrow_line_style.as_deref().and_then(parse_line_style),
         line_style: file.line_style.as_deref().and_then(parse_line_style),
         magnifier: file.magnifier,
@@ -243,6 +248,17 @@ fn parse_number_style(value: &str) -> Option<crate::features::number::NumberStyl
     style
 }
 
+/// 【箭头】【旧偏好迁移】旧版本保存的 KDE 头部一次性迁移到直箭头，写入标记后保留用户后续选择
+fn saved_arrow_style(file: &File) -> Option<crate::features::arrow::ArrowStyle> {
+    let style = file.arrow_style.as_deref().and_then(parse_arrow_style);
+    if file.direct_head_migrated != Some(true)
+        && style == Some(crate::features::arrow::ArrowStyle::Kde)
+    {
+        return Some(crate::features::arrow::ArrowStyle::Direct);
+    }
+    style
+}
+
 /// 【箭头】【头部偏好】将 value 转为头部样式；未知值单独忽略并记录原因，返回样式或空值
 fn parse_arrow_style(value: &str) -> Option<crate::features::arrow::ArrowStyle> {
     let style = crate::features::arrow::ArrowStyle::parse(value);
@@ -304,6 +320,7 @@ pub fn save(
         outline_color: Some(hex(settings.outline_color)),
         fill: Some(settings.fill),
         corner_radius: Some(settings.corner_radius),
+        rectangle_radius: Some(settings.rectangle_radius),
         fixed_ratio: Some(settings.fixed_ratio),
         marker_shape: Some(settings.marker_shape.key().to_string()),
         marker_filled: Some(settings.marker_filled),
@@ -312,6 +329,7 @@ pub fn save(
         magnifier_zoom: Some(settings.magnifier_zoom),
         number_style: Some(settings.number_style.key().to_string()),
         arrow_style: Some(settings.arrow_style.key().to_string()),
+        direct_head_migrated: Some(true),
         arrow_line_style: Some(settings.arrow_line_style.key().to_string()),
         line_style: Some(settings.line_style.key().to_string()),
         magnifier: None,
@@ -478,6 +496,19 @@ mod tests {
         for excluded in ["controls", "selected_point", "pending", "line_session"] {
             assert!(!text.contains(excluded));
         }
+    }
+
+    /// 【箭头偏好】【旧值迁移】旧版本保存的 KDE 头部只迁移一次，之后用户重新选择 KDE 仍被保留
+    #[test]
+    fn old_kde_preference_migrates_to_direct_once() {
+        use crate::features::arrow::ArrowStyle;
+        let mut file = File {
+            arrow_style: Some("kde".into()),
+            ..File::default()
+        };
+        assert_eq!(saved_arrow_style(&file), Some(ArrowStyle::Direct));
+        file.direct_head_migrated = Some(true);
+        assert_eq!(saved_arrow_style(&file), Some(ArrowStyle::Kde));
     }
 
     /// 【序号偏好】【独立笔宽】旧全局笔宽不覆盖新增序号默认值，明确的序号分组笔宽仍可读取

@@ -36,6 +36,7 @@ pub(super) fn draw(
                 *line_style,
                 ann.stroke_width,
                 ann.color,
+                ann.shadow_color,
             );
         }
         AnnotationShape::Rectangle {

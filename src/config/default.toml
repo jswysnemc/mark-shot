@@ -423,6 +423,8 @@ spread = 1.5
 falloff = 1.2
 # the pen gets a halo instead of a drop shadow, this much wider than the stroke
 pen_halo = 3.0
+# arrows and rectangles use this fraction of the shadow colour alpha
+shape_alpha = 0.55
 
 # The frame around a selected annotation.
 [annotations.handles]
@@ -441,7 +443,9 @@ head_min = 12.0
 # the head takes at most this ratio of the arrow
 head_max = 0.6
 # half the head width, ratio of its length
-head_width = 0.55
+head_width = 0.5
+# notch distance from the tip, ratio of the head length
+head_notch = 0.667
 
 [annotations.numbered]
 # circle radius, ratio of the stroke width
@@ -472,6 +476,8 @@ outline_width = 0.04
 # 【标注】【默认颜色】沿用原版红色，序号白色文字保持可见；已有保存颜色仍优先
 color = "#FF4D4D"
 fill = false
+# initial corner radius of rectangles, in image pixels; R can still change it
+rectangle_radius = 8.0
 
 [tools.stroke]
 width = 12.0
@@ -531,7 +537,7 @@ style = "arabic"
 
 [tools.arrow]
 width = 3.0
-style = "fletched"
+style = "direct"
 line_style = "solid"
 
 [tools.line]

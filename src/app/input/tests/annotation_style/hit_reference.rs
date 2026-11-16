@@ -1,7 +1,10 @@
 //! 【标注命中测试】【生产矩阵】完整Qt入口的实际输出与编辑器首次选择共用同一组原图样本
 
 use super::*;
-use crate::{features::ruler::RulerGeometry, types::AnnotationShape};
+use crate::{
+    features::{arrow::ArrowStyle, ruler::RulerGeometry},
+    types::AnnotationShape,
+};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -85,7 +88,7 @@ fn annotation(scene: &Scene) -> crate::types::Annotation {
             } else {
                 AnnotationShape::Arrow {
                     line,
-                    style: Default::default(),
+                    style: ArrowStyle::Fletched,
                     line_style: Default::default(),
                 }
             }

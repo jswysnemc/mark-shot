@@ -1,4 +1,4 @@
-//! 【箭头】【头部类型】保持原版四种样式编号，头部与箭身线型独立组合
+//! 【箭头】【头部类型】保留原版四种样式编号，并新增 PixPin 风格的直箭头头部
 
 use serde::{Deserialize, Serialize};
 
@@ -6,19 +6,23 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 #[repr(usize)]
 pub enum ArrowStyle {
-    #[default]
     Fletched,
     Kde,
     BidirectionalFletched,
     BidirectionalKde,
+    #[default]
+    Direct,
+    BidirectionalDirect,
 }
 
 impl ArrowStyle {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 6] = [
         Self::Fletched,
         Self::Kde,
         Self::BidirectionalFletched,
         Self::BidirectionalKde,
+        Self::Direct,
+        Self::BidirectionalDirect,
     ];
 
     /// 【箭头】【头部标识】返回当前头部的稳定配置名称
@@ -28,6 +32,8 @@ impl ArrowStyle {
             Self::Kde => "kde",
             Self::BidirectionalFletched => "bidirectional_fletched",
             Self::BidirectionalKde => "bidirectional_kde",
+            Self::Direct => "direct",
+            Self::BidirectionalDirect => "bidirectional_direct",
         }
     }
 
@@ -38,6 +44,8 @@ impl ArrowStyle {
             Self::Kde => "KDE",
             Self::BidirectionalFletched => "Double fletched",
             Self::BidirectionalKde => "Double KDE",
+            Self::Direct => "Direct",
+            Self::BidirectionalDirect => "Double direct",
         }
     }
 
@@ -48,17 +56,27 @@ impl ArrowStyle {
             "kde" | "open" | "1" => Some(Self::Kde),
             "bidirectional_fletched" | "double_fletched" | "2" => Some(Self::BidirectionalFletched),
             "bidirectional_kde" | "double_kde" | "3" => Some(Self::BidirectionalKde),
+            "direct" | "dart" | "4" => Some(Self::Direct),
+            "bidirectional_direct" | "double_direct" | "5" => Some(Self::BidirectionalDirect),
             _ => None,
         }
     }
 
     /// 【箭头】【双向判断】返回当前头部是否绘制两个尖端
     pub fn bidirectional(self) -> bool {
-        matches!(self, Self::BidirectionalFletched | Self::BidirectionalKde)
+        matches!(
+            self,
+            Self::BidirectionalFletched | Self::BidirectionalKde | Self::BidirectionalDirect
+        )
     }
 
     /// 【箭头】【开口判断】返回当前头部是否为 KDE 开口形状
     pub fn open(self) -> bool {
         matches!(self, Self::Kde | Self::BidirectionalKde)
+    }
+
+    /// 【箭头】【直箭头判断】返回当前头部是否使用内凹的实心直箭头
+    pub fn direct(self) -> bool {
+        matches!(self, Self::Direct | Self::BidirectionalDirect)
     }
 }

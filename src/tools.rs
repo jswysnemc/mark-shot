@@ -117,7 +117,7 @@ fn simple_shape(tool: Tool, settings: &ToolSettings) -> SimpleShapeTool {
                 start,
                 end,
                 filled: ts.fill,
-                radius: ts.corner_radius,
+                radius: ts.rectangle_radius,
                 fixed_ratio: ts.fixed_ratio,
             },
             Tool::Circle => |start, end, ts| AnnotationShape::Circle {

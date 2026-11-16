@@ -102,6 +102,17 @@ fn marker_defaults_and_overrides_remain_independent() {
     assert_eq!(config.tools.laser, defaults.tools.laser);
 }
 
+/// 【配置测试】【圆角默认】新建框形标注使用少量圆角，配置可覆盖且不改变其他工具
+#[test]
+fn rectangle_corner_radius_defaults_and_overrides_are_independent() {
+    let defaults = Config::default();
+    assert_eq!(defaults.tools.rectangle_radius, 8.0);
+    let configured = read("[tools]\nrectangle_radius = 12.5\n");
+    assert_eq!(configured.tools.rectangle_radius, 12.5);
+    assert_eq!(configured.tools.stroke, defaults.tools.stroke);
+    assert_eq!(configured.tools.arrow, defaults.tools.arrow);
+}
+
 /// 【配置测试】【序号默认】独立序号使用原版三像素笔宽、阿拉伯数字与红色默认色，保留其他工具参数
 #[test]
 fn standalone_number_defaults_and_overrides_are_independent() {
@@ -131,7 +142,7 @@ fn arrow_and_line_styles_have_independent_reference_defaults_and_overrides() {
     let defaults = Config::default();
     assert_eq!(defaults.tools.arrow.width, 3.0);
     assert_eq!(defaults.tools.line.width, 3.0);
-    assert_eq!(defaults.tools.arrow.style, ArrowStyle::Fletched);
+    assert_eq!(defaults.tools.arrow.style, ArrowStyle::Direct);
     assert_eq!(defaults.tools.arrow.line_style, LineStyle::Solid);
     assert_eq!(defaults.tools.line.style, LineStyle::Solid);
     let config = read(
@@ -156,7 +167,7 @@ fn invalid_line_fields_fall_back_independently_and_widths_remain_finite() {
         "[tools.arrow]\nwidth = 60.0\nstyle = \"missing\"\nline_style = \"dotted\"\n[tools.line]\nwidth = nan\nstyle = \"dashed\"\n",
     );
     assert_eq!(config.tools.arrow.width, 60.0);
-    assert_eq!(config.tools.arrow.style, ArrowStyle::Fletched);
+    assert_eq!(config.tools.arrow.style, ArrowStyle::Direct);
     assert_eq!(config.tools.arrow.line_style, LineStyle::Dotted);
     assert_eq!(config.tools.line.width, 3.0);
     assert_eq!(config.tools.line.style, LineStyle::Dashed);

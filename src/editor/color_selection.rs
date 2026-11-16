@@ -90,7 +90,12 @@ fn apply_selection(
             .layer_damage_rects
             .push(state.annotations[i].damage_bbox(false));
         match target {
-            ColorTarget::Main => state.annotations[i].color = color,
+            ColorTarget::Main => {
+                let annotation = &mut state.annotations[i];
+                annotation.color = color;
+                annotation.shadow_color =
+                    super::annotation_style::shadow_for_shape(&annotation.shape, color);
+            }
             ColorTarget::Outline => {
                 if let AnnotationShape::Text { outline, .. } = &mut state.annotations[i].shape {
                     *outline = Some(color);
@@ -119,6 +124,7 @@ fn apply_selection(
         && let Some(draft) = &mut state.pending
     {
         draft.color = color;
+        draft.shadow_color = super::annotation_style::shadow_for_shape(&draft.shape, color);
     }
     if target == ColorTarget::TextBackground
         && let Some(draft) = &mut state.pending

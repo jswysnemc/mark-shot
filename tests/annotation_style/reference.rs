@@ -1,7 +1,7 @@
 //! 【标注样式测试】【像素度量】比较真实Qt图像测得的边界和颜色，不使用复制的尺寸公式
 
 use mark_shot::{
-    features::{line::LineSkeleton, number::NumberMark},
+    features::{arrow::ArrowStyle, line::LineSkeleton, number::NumberMark},
     renderer::{Painter, draw_annotation},
     types::{Annotation, AnnotationShape},
 };
@@ -43,7 +43,7 @@ fn annotation(sample: &Sample) -> Annotation {
         },
         "arrow" => AnnotationShape::Arrow {
             line,
-            style: Default::default(),
+            style: ArrowStyle::Fletched,
             line_style: Default::default(),
         },
         "ellipse" => AnnotationShape::Circle {

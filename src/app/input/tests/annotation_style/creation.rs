@@ -16,7 +16,14 @@ fn every_persistent_tool_stores_image_width_after_file_fit_and_movement() {
             close(annotation.style_scale, scale, (size, tool));
             close(annotation.stroke_width, 6.0 * scale, (size, tool));
             close(annotation.image_stroke_width(), 6.0, (size, tool));
-            assert_eq!(annotation.shadow_color, Color::TRANSPARENT, "{tool:?}");
+            if matches!(
+                annotation.shape,
+                AnnotationShape::Arrow { .. } | AnnotationShape::Rectangle { .. }
+            ) {
+                assert!(annotation.shadow_color.alpha() > 0.0, "{tool:?}");
+            } else {
+                assert_eq!(annotation.shadow_color, Color::TRANSPARENT, "{tool:?}");
+            }
             match annotation.shape {
                 AnnotationShape::Number { mark } => close(mark.style_scale, scale, tool),
                 AnnotationShape::Magnifier { magnifier } => {

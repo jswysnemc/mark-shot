@@ -4,30 +4,53 @@ use super::{
     EditorState,
     edits::{active_annotation_idx, commit_settings_change},
 };
+use crate::tools::Tool;
 use crate::types::AnnotationShape;
+
+/// 【框形属性】【矩形目标】按选中标注或当前工具返回半径是否写入矩形专用默认值
+fn rectangle_target(state: &EditorState) -> bool {
+    active_annotation_idx(state).map_or(state.selected_tool == Tool::Rectangle, |index| {
+        matches!(
+            state.annotations[index].shape,
+            AnnotationShape::Rectangle { .. }
+        )
+    })
+}
 
 /// 【框形属性】【半径读取】返回 state 当前标注或默认工具的原图像素半径
 pub fn radius(state: &EditorState) -> f32 {
-    active_annotation_idx(state)
-        .and_then(|index| match &state.annotations[index].shape {
+    if let Some(index) = active_annotation_idx(state) {
+        match &state.annotations[index].shape {
             AnnotationShape::Rectangle { radius, .. } | AnnotationShape::Marker { radius, .. } => {
-                Some(*radius)
+                return *radius;
             }
-            AnnotationShape::Magnifier { magnifier } => Some(magnifier.radius),
-            AnnotationShape::Redact { filter } => Some(filter.radius),
-            _ => None,
-        })
-        .unwrap_or(state.tool_settings.corner_radius)
+            AnnotationShape::Magnifier { magnifier } => return magnifier.radius,
+            AnnotationShape::Redact { filter } => return filter.radius,
+            _ => {}
+        }
+    }
+    if state.selected_tool == Tool::Rectangle {
+        state.tool_settings.rectangle_radius
+    } else {
+        state.tool_settings.corner_radius
+    }
 }
 
 /// 【框形属性】【半径写入】将 value 应用到 state 的工具与标注；record 控制撤销，dirty 返回重绘范围
 pub fn set_radius(state: &mut EditorState, value: f32, record: bool, dirty: &mut u32) {
     let value = crate::features::shape::radius(value);
+    let rectangle = rectangle_target(state);
     commit_settings_change(
         state,
         radius(state) != value,
         record,
-        |tools| tools.corner_radius = value,
+        |tools| {
+            if rectangle {
+                tools.rectangle_radius = value;
+            } else {
+                tools.corner_radius = value;
+            }
+        },
         |annotation| match &mut annotation.shape {
             AnnotationShape::Rectangle { radius, .. } | AnnotationShape::Marker { radius, .. } => {
                 *radius = value
