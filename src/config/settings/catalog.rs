@@ -90,6 +90,10 @@ impl Entry {
                 "GIF 在停止后转换，不含音频；转换失败保留原始视频",
                 "GIF is converted after stopping, without audio; failed exports keep the video",
             ),
+            ("recording", "keep_controls_visible") => (
+                "下次录制生效；隐藏后录制继续，可再次进入截图界面或通过托盘暂停、继续和停止",
+                "Applies next recording; hidden controls leave recording active. Open capture or use the tray to pause, resume or stop",
+            ),
             ("recording", _) => (
                 "下次录制生效；从托盘的屏幕录制入口开始",
                 "Applies to the next session; start from the tray Recording action",

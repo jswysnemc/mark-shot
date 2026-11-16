@@ -29,6 +29,8 @@ pub enum Notice<'a> {
     Saved(PathBuf),
     /// 录制成品已发布到 `PathBuf`
     RecordingSaved(PathBuf),
+    /// 【录制通知】【控制入口】控制面板隐藏后提示截图界面和托盘入口
+    RecordingControlsHidden,
     /// Contains `Some(PathBuf)`
     /// if the copied image was also saved to disk,
     /// otherwise the PNG itself, previewed if notif daemon can show it.
@@ -62,6 +64,12 @@ impl<'a> Notice<'a> {
                 false,
                 Some(path),
             ),
+            Notice::RecordingControlsHidden => {
+                let chinese = crate::ui::language::Language::current()
+                    == crate::ui::language::Language::Chinese;
+                let (summary, body) = recording_controls_hidden(chinese);
+                (summary, body.into(), false, None)
+            }
             Notice::Copied(Some(path), _) => (
                 "Screenshot copied",
                 format!("Also saved to {}", path.display()),
@@ -96,6 +104,21 @@ impl<'a> Notice<'a> {
             file,
             png,
         }
+    }
+}
+
+/// 【录制通知】【隐藏提示】按 chinese 返回标题与控制入口说明，不包含文件或错误标记
+fn recording_controls_hidden(chinese: bool) -> (&'static str, &'static str) {
+    if chinese {
+        (
+            "录制控制面板已隐藏",
+            "录制继续进行。可再次进入截图界面，或通过托盘暂停、继续和停止录制。",
+        )
+    } else {
+        (
+            "Recording controls hidden",
+            "Recording continues. Open the capture interface again or use the tray to pause, resume and stop recording.",
+        )
     }
 }
 
@@ -148,5 +171,24 @@ pub fn send_blocking(notice: Notice<'_>) {
             let n = notice.spec();
             eprintln!("{}: {}", n.summary, n.body);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 【录制通知测试】【隐藏文案】双语提示都明确录制继续，并列出截图界面和托盘控制入口
+    #[test]
+    fn hidden_controls_notice_explains_both_control_entries() {
+        let (title, body) = recording_controls_hidden(true);
+        assert!(title.contains("已隐藏"));
+        assert!(body.contains("录制继续") && body.contains("截图界面") && body.contains("托盘"));
+        let (title, body) = recording_controls_hidden(false);
+        assert!(title.contains("hidden"));
+        assert!(body.contains("continues") && body.contains("capture") && body.contains("tray"));
+        let notice = Notice::RecordingControlsHidden.spec();
+        assert!(!notice.error);
+        assert!(notice.file.is_none() && notice.png.is_none());
     }
 }

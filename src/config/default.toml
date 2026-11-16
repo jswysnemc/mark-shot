@@ -31,6 +31,8 @@ countdown = 3
 # off | system | microphone
 audio = "off"
 cursor = true
+# 【屏幕录制】【控制面板】持续显示暂停、停止和隐藏按钮；隐藏后可从截图界面或托盘控制
+keep_controls_visible = false
 # 【屏幕录制】【保存目录】留空使用系统视频目录中的 Mark Shot 文件夹
 directory = ""
 

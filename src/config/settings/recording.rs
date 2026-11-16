@@ -34,6 +34,11 @@ pub(super) fn entries() -> Vec<Entry> {
         ),
         ("cursor", ("录制鼠标指针", "Include cursor"), Kind::Toggle),
         (
+            "keep_controls_visible",
+            ("持续显示录制控制面板", "Keep recording controls visible"),
+            Kind::Toggle,
+        ),
+        (
             "directory",
             ("录制保存目录", "Recording directory"),
             Kind::Text,

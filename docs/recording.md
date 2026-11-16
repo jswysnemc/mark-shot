@@ -26,15 +26,24 @@ and the current parameters. These parameters apply to this recording without cha
 
 ## Controlling a recording
 
-| Action | Controller or key | Command |
+| Action | Capture interface or control panel | Command |
 | --- | --- | --- |
 | Pause, resume | Pause button, `Ctrl+Shift+P` | `mark-shot --pause-recording`, `mark-shot --resume-recording` |
 | Stop and save | Stop button, `Ctrl+Shift+E` | `mark-shot --stop-recording` |
 | Query state | | `mark-shot --recording-status` prints JSON |
 
+Enable **Recording → Keep recording controls visible** to show a compact panel with recording
+time, pause/resume, stop and hide buttons. The option is off by default and applies to the next
+recording. The preparation window closes when recording starts.
+
+Hiding the panel, pressing `Esc` in it or closing it keeps recording active. A four-second hint
+explains how to open the capture interface again or use the tray to pause, resume and stop.
+This hint also appears when desktop notifications are disabled. The listed keyboard shortcuts
+work inside the capture interface.
+
 Paused time is not part of the result. Stopping during the countdown cancels the recording.
-Closing the controller stops and saves first. Only one recording can run per configuration and
-desktop session; control commands must use the same `--config` as the recording.
+Only one recording can run per configuration and desktop session; control commands must use
+the same `--config` as the recording.
 
 ## Output
 
@@ -64,6 +73,7 @@ gif_fps = 12
 countdown = 3           # seconds
 audio = "off"           # off | system | microphone
 cursor = true
+keep_controls_visible = false
 directory = ""          # empty uses the videos folder
 ```
 
@@ -89,3 +99,6 @@ Audio is either the system sound or the default microphone; the two are not mixe
 - On portal-based desktops the recorded source must match the monitor you selected. If it does
   not, region cropping is refused instead of recording the wrong area.
 - On Windows an MP4 that was interrupted by a forced termination may not be recoverable.
+- The panel and hidden-controls hint request capture exclusion on supported Windows versions.
+  Linux screen capture includes visible windows; hide the panel or move it outside the selected
+  recording region when it should not appear in the result.

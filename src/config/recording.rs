@@ -2,6 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(test)]
+#[path = "tests/recording.rs"]
+mod tests;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Recording {
@@ -13,6 +17,8 @@ pub struct Recording {
     pub countdown: u32,
     pub audio: String,
     pub cursor: bool,
+    /// 【录制配置】【控制面板】是否在录制期间持续显示可隐藏的小面板
+    pub keep_controls_visible: bool,
     pub directory: String,
 }
 
@@ -28,6 +34,7 @@ impl Default for Recording {
             countdown: 3,
             audio: "off".into(),
             cursor: true,
+            keep_controls_visible: false,
             directory: String::new(),
         }
     }

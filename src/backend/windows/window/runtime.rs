@@ -61,6 +61,12 @@ impl Surface {
             },
             queue,
         )?;
+        if content.exclude_from_capture() {
+            // 1. 【Windows独立窗口】【采集排除】首帧前应用系统属性，旧系统不支持时保留可操作的面板
+            if let Err(error) = window.set_capture_excluded(true) {
+                log::info!("【Windows独立窗口】【采集排除】系统未接受窗口采集排除: {error}");
+            }
+        }
         content.event(WindowEvent::Resize { size: spec.size });
         let canvas = Pixmap::new(size.0, size.1).ok_or("cannot allocate Windows content frame")?;
         Ok(Self {

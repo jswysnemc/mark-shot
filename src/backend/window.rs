@@ -170,6 +170,11 @@ pub trait WindowContent {
         false
     }
 
+    /// 【原生窗口】【采集排除】无参数，返回是否请求系统排除此窗口的屏幕采集；默认 false，支持能力由平台决定
+    fn exclude_from_capture(&self) -> bool {
+        false
+    }
+
     /// 【原生窗口】【置顶能力】通知 supported 是否可使用真实置顶角色，内容不得把不支持的请求显示为已成功，无返回值
     fn stacking_supported(&mut self, _supported: bool) {}
     /// 【原生窗口】【内容期限】返回下一次单次唤醒的绝对期限，无参数；到期 Wake 后须消费或更新，默认无期限及周期工作

@@ -241,6 +241,7 @@ impl Entry {
             ),
             ("ui" | "keys", _) => ("已保存，立即生效", "Saved; applies immediately"),
             ("log", _) => ("已保存，下次启动生效", "Saved; applies next launch"),
+            ("recording", _) => ("已保存，下次录制生效", "Saved; applies next recording"),
             ("general", "to") | ("startup", "selection_loupe" | "normal_tool") => (
                 "已保存，关闭设置后生效",
                 "Saved; applies when settings close",

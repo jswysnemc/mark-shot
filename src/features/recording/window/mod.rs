@@ -1,6 +1,7 @@
 //! 【录制窗口】【流程编排】准备窗口、倒计时小组件与后台会话顺序衔接，界面关闭后录制继续
 
 mod background;
+mod control_panel;
 mod countdown;
 mod fonts;
 mod host;
@@ -71,7 +72,8 @@ pub(super) fn run(target: Target) -> crate::AppResult {
                 Err(error) => log::error!("【录制窗口】【倒计时小组件】{error}"),
             }
         }
-        // 3. 【录制窗口】【后台阶段】没有任何界面，暂停、继续和停止来自截图界面、托盘或命令行
+        // 3. 【录制窗口】【会话启动】外层持有宿主，控制面板关闭不释放录制线程与命令服务
+        let keep_controls_visible = config.keep_controls_visible;
         if let Err(error) = host.borrow_mut().start(config) {
             if from_tool {
                 return Err(error.into());
@@ -79,6 +81,15 @@ pub(super) fn run(target: Target) -> crate::AppResult {
             failure = Some(error);
             continue;
         }
+        if keep_controls_visible {
+            if let Err(error) = control_panel::run(host.clone(), fonts.clone()) {
+                log::error!("【录制窗口】【控制面板】{error}");
+                control_panel::notify_hidden(&host, fonts.clone());
+            }
+        } else {
+            control_panel::notify_hidden(&host, fonts.clone());
+        }
+        // 4. 【录制窗口】【后台等待】隐藏面板后继续等待同一会话，截图界面与托盘仍可控制录制
         let status = background::wait(&host);
         match status.phase.as_str() {
             "finished" => {
@@ -99,7 +110,7 @@ pub(super) fn run(target: Target) -> crate::AppResult {
                 failure = Some(error);
             }
         }
-        // 4. 【录制窗口】【返回准备】取消或失败后释放已结束的会话，保留目标供再次开始
+        // 5. 【录制窗口】【返回准备】取消或失败后释放已结束的会话，保留目标供再次开始
         host.borrow_mut().reset();
     }
 }

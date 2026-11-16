@@ -152,6 +152,20 @@ impl Window {
         self.hwnd as isize
     }
 
+    /// 【Windows窗口】【采集排除】按 excluded 设置当前窗口的屏幕采集属性，返回系统结果；首帧显示前调用
+    pub fn set_capture_excluded(&self, excluded: bool) -> io::Result<()> {
+        let affinity = if excluded {
+            WDA_EXCLUDEFROMCAPTURE
+        } else {
+            WDA_NONE
+        };
+        if unsafe { SetWindowDisplayAffinity(self.hwnd, affinity) } == 0 {
+            Err(super::last_error())
+        } else {
+            Ok(())
+        }
+    }
+
     /// 【Windows图片窗口】【可调整边框】无参数，启用系统移动缩放与最小最大化，自绘客户区保留全部尺寸，返回系统错误
     pub fn enable_image_frame(&mut self) -> io::Result<()> {
         self.context.image_window.set(true);
