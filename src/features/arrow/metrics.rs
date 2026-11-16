@@ -62,12 +62,13 @@ pub(crate) fn rendered_metrics(
             body_half_width,
         }
     } else if style.open() {
-        let length = (total_length * 0.32)
-            .clamp(width * 2.6, width * 6.0)
-            .min(total_length * if style.bidirectional() { 0.42 } else { 1.0 });
+        // KDE 原版：头部两段线与箭杆成 30 度，长度随笔宽增长且至少八像素
+        let head = (width * 3.0).max(8.0 * scale);
+        let length =
+            (head * 0.866_025_4).min(total_length * if style.bidirectional() { 0.42 } else { 1.0 });
         HeadMetrics {
             length,
-            half_width: length * 0.62,
+            half_width: head * 0.5,
             body_half_width,
         }
     } else {
