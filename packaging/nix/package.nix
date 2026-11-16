@@ -56,11 +56,14 @@ rustPlatform.buildRustPackage {
   '';
 
   preCheck = ''
-    # 3. 【Nix验证】【环境隔离】测试只写临时配置目录，参考字体使用固定归档与 Nix 字体配置
+    # 3. 【Nix验证】【环境隔离】测试只写私有 XDG 目录，窗口登记不访问只读 HOME 或主机运行目录
     export XDG_CONFIG_HOME="$TMPDIR/mark-shot-test/config"
     export XDG_DATA_HOME="$TMPDIR/mark-shot-test/data"
     export XDG_STATE_HOME="$TMPDIR/mark-shot-test/state"
-    mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME"
+    export XDG_CACHE_HOME="$TMPDIR/mark-shot-test/cache"
+    export XDG_RUNTIME_DIR="$TMPDIR/mark-shot-test/runtime"
+    mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME" "$XDG_RUNTIME_DIR"
+    chmod 700 "$XDG_RUNTIME_DIR"
     python scripts/ci-reference-fonts.py --archive ${dependencies.referenceFontArchive} \
       --base-config ${dependencies.testFontConfig} --root "$TMPDIR/mark-shot-test/fonts"
     export FONTCONFIG_FILE="$TMPDIR/mark-shot-test/fonts/fonts.conf"
