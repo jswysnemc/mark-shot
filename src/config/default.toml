@@ -14,8 +14,9 @@ language = ""
 
 [desktop]
 # 【桌面集成】【常驻注册】启用后独立后台服务持有注册，设置保存后立即生效
-tray_enabled = false
-shortcuts_enabled = false
+# 【桌面集成】【平台默认】Windows 默认开启两项，Linux 默认关闭；取消以下注释可显式关闭
+# tray_enabled = false
+# shortcuts_enabled = false
 # 【桌面集成】【全局截图】X11与Windows直接注册；Wayland由系统门户确认实际绑定
 screenshot_shortcut = "PrintScreen"
 
