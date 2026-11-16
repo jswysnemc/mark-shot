@@ -3,7 +3,7 @@
 use tiny_skia::{Path, PathBuilder};
 
 use super::{
-    ArrowStyle, fletched,
+    ArrowStyle, direct, fletched,
     metrics::{self, HeadMetrics, triangle},
 };
 use crate::features::line::{
@@ -43,6 +43,16 @@ pub(crate) fn outline_rendered(
         return None;
     }
     let metrics = metrics::rendered_metrics(line.length, width, limits_scale, style);
+    if style.direct() {
+        return direct::path(
+            &line,
+            metrics,
+            style,
+            line_style,
+            width,
+            skeleton.style_scale,
+        );
+    }
     if !style.open() && line_style == LineStyle::Solid {
         return fletched::path(&line, metrics, style);
     }
@@ -121,7 +131,7 @@ fn head_triangles(line: &Polyline, metrics: HeadMetrics, style: ArrowStyle) -> V
 }
 
 /// 【箭头】【箭身路径】用 points 构造开放折线，返回路径或空值
-fn polyline_path(points: &[Point]) -> Option<Path> {
+pub(super) fn polyline_path(points: &[Point]) -> Option<Path> {
     let first = points.first()?;
     let mut builder = PathBuilder::new();
     builder.move_to(first.0, first.1);

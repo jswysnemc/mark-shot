@@ -32,6 +32,7 @@ fn render(
         pattern,
         width,
         color,
+        Color::TRANSPARENT,
     );
     image
 }
@@ -159,6 +160,7 @@ fn fractional_scale_clips_match_the_full_render_exactly() {
                 pattern,
                 7.35,
                 color,
+                Color::TRANSPARENT,
             );
             let mut clipped = Pixmap::new(region.width(), region.height()).unwrap();
             draw::draw(
@@ -170,6 +172,7 @@ fn fractional_scale_clips_match_the_full_render_exactly() {
                 pattern,
                 7.35,
                 color,
+                Color::TRANSPARENT,
             );
             assert!(
                 clipped.data() == full.clone_rect(region).unwrap().data(),
@@ -194,6 +197,7 @@ fn coordinate_and_device_scaling_match_with_equivalent_window_units() {
                 pattern,
                 4.0,
                 Color::BLACK,
+                Color::TRANSPARENT,
             );
             draw::draw(
                 &mut Painter::new(&mut original).with_window_units(
@@ -204,6 +208,7 @@ fn coordinate_and_device_scaling_match_with_equivalent_window_units() {
                 pattern,
                 8.0,
                 Color::BLACK,
+                Color::TRANSPARENT,
             );
             assert!(original.data() == viewport.data(), "{style:?} {pattern:?}");
         }
@@ -226,6 +231,7 @@ fn huge_curves_render_into_small_visible_canvases() {
         LineStyle::Solid,
         12.0,
         Color::BLACK,
+        Color::TRANSPARENT,
     );
     assert!(
         image
@@ -290,4 +296,78 @@ fn head_styles_keep_reference_configuration_ids() {
         assert_eq!(ArrowStyle::parse(&index.to_string()), Some(style));
     }
     assert_eq!(ArrowStyle::parse("unknown"), None);
+}
+
+/// 【箭头测试】【圆滑尾部】实线燕尾箭头使用固定笔宽的圆头箭身，直线不再从尾尖扩张成细楔形
+#[test]
+fn solid_fletched_arrow_keeps_a_rounded_tail() {
+    let line = LineSkeleton::new((60.0, 100.0), (460.0, 100.0)).unwrap();
+    let mut image = Pixmap::new(520, 200).unwrap();
+    draw::draw(
+        &mut Painter::new(&mut image),
+        &line,
+        ArrowStyle::Fletched,
+        LineStyle::Solid,
+        12.0,
+        Color::BLACK,
+        Color::TRANSPARENT,
+    );
+    // 1. 【箭头测试】【圆头】笔宽十二时尾部半径六，起点后两像素和起点后方四像素都保留圆头覆盖
+    assert!(image.pixel(62, 104).unwrap().alpha() > 128);
+    assert!(image.pixel(62, 96).unwrap().alpha() > 128);
+    assert!(image.pixel(56, 100).unwrap().alpha() > 128);
+}
+
+/// 【箭头测试】【轻微投影】启用阴影颜色后，箭头下方出现独立的深色偏移层，正文颜色不被阴影稀释
+#[test]
+fn arrow_shadow_is_offset_below_the_body() {
+    let line = LineSkeleton::new((60.0, 100.0), (460.0, 100.0)).unwrap();
+    let color = Color::from_rgba8(255, 30, 20, 255);
+    let shadow = mark_shot::renderer::shadow_color_for(color);
+    let mut image = Pixmap::new(520, 200).unwrap();
+    draw::draw(
+        &mut Painter::new(&mut image),
+        &line,
+        ArrowStyle::Fletched,
+        LineStyle::Solid,
+        8.0,
+        color,
+        shadow,
+    );
+    let [_, dy] = mark_shot::config::get().annotations.shadow.offset;
+    assert!(dy > 0.0);
+    let x = (line.start.0 + line.end.0) as u32 / 2;
+    let below = image
+        .pixel(x, (100.0 + 4.0 + dy * 0.5).round() as u32)
+        .unwrap()
+        .demultiply();
+    assert!(below.alpha() > 0, "no shadow below the arrow: {below:?}");
+    assert!(below.red() < 120, "shadow should stay dark: {below:?}");
+    let body = image.pixel(x, 100).unwrap().demultiply();
+    assert_eq!(
+        (body.red(), body.green(), body.blue(), body.alpha()),
+        (255, 30, 20, 255)
+    );
+}
+
+/// 【箭头测试】【直箭头缺口】直箭头头部使用内凹实心轮廓，箭身接入缺口中心，三角形背面不残留填充
+#[test]
+fn direct_head_keeps_the_concave_notch_behind_the_barbs() {
+    let line = LineSkeleton::new((60.0, 100.0), (460.0, 100.0)).unwrap();
+    let mut image = Pixmap::new(520, 200).unwrap();
+    draw::draw(
+        &mut Painter::new(&mut image),
+        &line,
+        ArrowStyle::Direct,
+        LineStyle::Solid,
+        8.0,
+        Color::BLACK,
+        Color::TRANSPARENT,
+    );
+    // 1. 【箭头测试】【缺口】笔宽八时头部长度三十二、半宽十六，箭杆两侧的缺口保持透明而外侧尖角填满
+    assert!(image.pixel(450, 100).unwrap().alpha() > 200);
+    assert!(image.pixel(434, 92).unwrap().alpha() > 128);
+    assert!(image.pixel(434, 108).unwrap().alpha() > 128);
+    assert_eq!(image.pixel(430, 92).unwrap().alpha(), 0);
+    assert_eq!(image.pixel(430, 108).unwrap().alpha(), 0);
 }

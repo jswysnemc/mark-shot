@@ -2,6 +2,7 @@
 
 use crate::{
     features::{
+        arrow::ArrowStyle,
         filter::{FilterMode, RegionFilter},
         line::LineSkeleton,
         magnifier::{Magnifier, MagnifierShape},
@@ -153,7 +154,7 @@ pub(super) fn decode(value: &Value) -> Annotation {
             } else {
                 AnnotationShape::Arrow {
                     line,
-                    style: Default::default(),
+                    style: ArrowStyle::Fletched,
                     line_style: Default::default(),
                 }
             }

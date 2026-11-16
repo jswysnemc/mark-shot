@@ -10,12 +10,44 @@ use crate::features::line::{
     Point,
     polyline::{Polyline, normal, normalized, sub},
 };
+use crate::renderer::paths::KAPPA;
 
 /// 【箭头】【采样法线】返回 points 在 index 处的单位法线，两端使用相邻线段，中间使用中心差分
 fn normal_at(points: &[Point], index: usize) -> Point {
     let before = points[index.saturating_sub(1)];
     let after = points[(index + 1).min(points.len() - 1)];
     normal(normalized(sub(after, before)))
+}
+
+/// 【箭头】【圆头尾帽】沿切线反方向从 tail_left 绕到 tail_right，保持固定笔宽的圆滑尾部
+fn tail_cap(
+    builder: &mut PathBuilder,
+    start: Point,
+    tangent: Point,
+    normal: Point,
+    left: Point,
+    right: Point,
+    half: f32,
+) {
+    let back = (-tangent.0 * half, -tangent.1 * half);
+    let middle = (start.0 + back.0, start.1 + back.1);
+    let k = KAPPA * half;
+    builder.cubic_to(
+        left.0 - tangent.0 * k,
+        left.1 - tangent.1 * k,
+        middle.0 - normal.0 * k,
+        middle.1 - normal.1 * k,
+        middle.0,
+        middle.1,
+    );
+    builder.cubic_to(
+        middle.0 + normal.0 * k,
+        middle.1 + normal.1 * k,
+        right.0 - tangent.0 * k,
+        right.1 - tangent.1 * k,
+        right.0,
+        right.1,
+    );
 }
 
 /// 【箭头】【燕尾路径】以 line、metrics 和 style 生成闭合实心轮廓；返回路径或空值，不改变中心线
@@ -32,25 +64,19 @@ pub(super) fn path(line: &Polyline, metrics: HeadMetrics, style: ArrowStyle) -> 
     let end_normal = normal(line.tangent(line.length));
     let start_base = shaft[0];
     let end_base = *shaft.last()?;
+    let half = metrics.body_half_width;
     let mut builder = PathBuilder::new();
-    builder.move_to(start.0, start.1);
     if bidirectional {
+        builder.move_to(start.0, start.1);
         add(
             &mut builder,
             offset(start_base, start_normal, -metrics.half_width),
         );
-        add(
-            &mut builder,
-            offset(start_base, start_normal, -metrics.body_half_width),
-        );
+        add(&mut builder, offset(start_base, start_normal, -half));
         for index in 1..shaft.len() {
             add(
                 &mut builder,
-                offset(
-                    shaft[index],
-                    normal_at(&shaft, index),
-                    -metrics.body_half_width,
-                ),
+                offset(shaft[index], normal_at(&shaft, index), -half),
             );
         }
         add(
@@ -62,18 +88,11 @@ pub(super) fn path(line: &Polyline, metrics: HeadMetrics, style: ArrowStyle) -> 
             &mut builder,
             offset(end_base, end_normal, metrics.half_width),
         );
-        add(
-            &mut builder,
-            offset(end_base, end_normal, metrics.body_half_width),
-        );
+        add(&mut builder, offset(end_base, end_normal, half));
         for index in (0..shaft.len() - 1).rev() {
             add(
                 &mut builder,
-                offset(
-                    shaft[index],
-                    normal_at(&shaft, index),
-                    metrics.body_half_width,
-                ),
+                offset(shaft[index], normal_at(&shaft, index), half),
             );
         }
         add(
@@ -81,15 +100,14 @@ pub(super) fn path(line: &Polyline, metrics: HeadMetrics, style: ArrowStyle) -> 
             offset(start_base, start_normal, metrics.half_width),
         );
     } else {
-        // 1. 【箭头】【燕尾路径】单向箭头从零宽尾部开始，曲线两侧使用各自采样法线
+        // 1. 【箭头】【圆头箭身】单向箭头从圆头尾帽开始，箭身保持固定笔宽而不是收成尖楔
+        let tail_normal = normal_at(&shaft, 0);
+        let tail_right = offset(shaft[0], tail_normal, half);
+        builder.move_to(tail_right.0, tail_right.1);
         for index in 1..shaft.len() {
             add(
                 &mut builder,
-                offset(
-                    shaft[index],
-                    normal_at(&shaft, index),
-                    metrics.body_half_width,
-                ),
+                offset(shaft[index], normal_at(&shaft, index), half),
             );
         }
         add(
@@ -104,13 +122,20 @@ pub(super) fn path(line: &Polyline, metrics: HeadMetrics, style: ArrowStyle) -> 
         for index in (1..shaft.len()).rev() {
             add(
                 &mut builder,
-                offset(
-                    shaft[index],
-                    normal_at(&shaft, index),
-                    -metrics.body_half_width,
-                ),
+                offset(shaft[index], normal_at(&shaft, index), -half),
             );
         }
+        let tail_left = offset(shaft[0], tail_normal, -half);
+        add(&mut builder, tail_left);
+        tail_cap(
+            &mut builder,
+            start,
+            line.tangent(0.0),
+            tail_normal,
+            tail_left,
+            tail_right,
+            half,
+        );
     }
     builder.close();
     builder.finish()

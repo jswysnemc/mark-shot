@@ -4,6 +4,7 @@ use tiny_skia::{Color, Rect};
 
 use crate::editor::{DamageZone, EditorState};
 use crate::features::line::{LineSkeleton, clamped_width, geometry};
+use crate::renderer::shadow_color_for;
 use crate::tools::{ToolBehavior, drawing_space::DrawingSpace};
 use crate::types::{Annotation, AnnotationShape, MouseButton, StrokeGroup};
 
@@ -58,7 +59,11 @@ impl ToolBehavior for LineTool {
                 id: state.next_id,
                 shape,
                 color: state.tool_settings.color,
-                shadow_color: Color::TRANSPARENT,
+                shadow_color: if self.arrow {
+                    shadow_color_for(state.tool_settings.color)
+                } else {
+                    Color::TRANSPARENT
+                },
                 stroke_width: clamped_width(state.tool_settings.stroke(group), 1.0),
                 bbox: Rect::from_xywh(point.0, point.1, 1.0, 1.0).unwrap(),
             };

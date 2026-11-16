@@ -12,7 +12,7 @@ fn drawing(tool: Tool, ratio: bool) -> EditorState {
     state.selected_tool = tool;
     state.selection.zone = tiny_skia::Rect::from_xywh(0.0, 0.0, 640.0, 480.0);
     state.tool_settings.fixed_ratio = ratio;
-    state.tool_settings.corner_radius = 12.0;
+    state.tool_settings.rectangle_radius = 12.0;
     pointer(&mut state, 250.0, 250.0, &mut 0);
     super::super::handle_pointer_button(&mut state, MouseButton::Left, true, &mut 0);
     pointer(&mut state, 390.0, 300.0, &mut 0);
@@ -70,5 +70,5 @@ fn radius_and_ratio_are_undoable_and_export_scaling_preserves_pixels() {
     state.undo(&mut 0);
     state.undo(&mut 0);
     assert_eq!(state.annotations[0], original);
-    assert_eq!(state.tool_settings.corner_radius, 25.0);
+    assert_eq!(state.tool_settings.rectangle_radius, 25.0);
 }

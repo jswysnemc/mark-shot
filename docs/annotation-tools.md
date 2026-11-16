@@ -17,7 +17,7 @@ The keys below are the defaults; all of them can be changed, see [Shortcuts](sho
 | Pen | `P` | Freehand stroke |
 | Highlighter | `H` | Translucent freehand stroke |
 | Line | `D` | Straight or curved line; solid, dashed or dotted |
-| Arrow | `A` | Arrow with four head styles and three shaft styles |
+| Arrow | `A` | Arrow with six head styles and three shaft styles |
 | Rectangle | `R` | Outline or filled rectangle with optional rounded corners |
 | Ellipse | `C` | Outline or filled ellipse |
 | Marker | `K` | One of 24 preset shapes |
@@ -36,11 +36,13 @@ The keys below are the defaults; all of them can be changed, see [Shortcuts](sho
 
 **Line and arrow.** Hold `Shift` to snap the direction to 45 degree steps. With the pick tool,
 double-click the path to insert a control point and drag it to bend the line; `Delete` removes the
-selected control point. Arrow heads are filled or open, single or double ended.
+selected control point. Arrow heads offer a direct notched head, a filled triangle and an open
+line head, single or double ended; the direct head is the default. Arrows use a rounded shaft and
+carry a light drop shadow.
 
 **Rectangle and ellipse.** Hold `Shift` while dragging for a square or a circle. The `1:1` switch
 in the property bar makes that permanent, and `R` sets the corner radius of rectangles in image
-pixels.
+pixels. New rectangles start with a small radius and a light drop shadow.
 
 **Text.** Click to place the caret and type. `Enter` starts a new line; `Esc`, `Ctrl+Enter` or a
 click outside commits the text. The font panel offers search, a point size from 8 to 300, bold and

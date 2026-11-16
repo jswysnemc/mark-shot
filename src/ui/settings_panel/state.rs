@@ -99,7 +99,7 @@ impl SettingsPanel {
             marker_filled: true,
             ruler_mode: crate::features::ruler::RulerMode::Length,
             number_style: crate::features::number::NumberStyle::Arabic,
-            arrow_style: crate::features::arrow::ArrowStyle::Fletched,
+            arrow_style: crate::features::arrow::ArrowStyle::Direct,
             line_style: crate::features::line::LineStyle::Solid,
             filter_mode: crate::features::filter::FilterMode::Pixelate,
             recording: crate::config::recording::Recording::default(),

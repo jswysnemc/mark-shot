@@ -11,7 +11,7 @@ use crate::features::{
 use crate::tools::Tool;
 use crate::types::{AnnotationShape, MouseButton, SelectionHandle, StrokeGroup};
 
-/// 【线条测试】【创建组合】四种头部和三种线型通过真实手势提交，直线与旧编号箭头笔宽分组不变
+/// 【线条测试】【创建组合】六种头部和三种线型通过真实手势提交，直线与旧编号箭头笔宽分组不变
 #[test]
 fn every_arrow_head_and_pattern_is_committed_by_the_shared_line_tool() {
     let mut dirty = 0;
@@ -47,8 +47,8 @@ fn every_arrow_head_and_pattern_is_committed_by_the_shared_line_tool() {
             matches!(state.annotations.last().unwrap().shape, AnnotationShape::Line { style, .. } if style == pattern)
         );
     }
-    assert_eq!(state.annotations.len(), 15);
-    assert_eq!(state.undo_stack.len(), 15);
+    assert_eq!(state.annotations.len(), 21);
+    assert_eq!(state.undo_stack.len(), 21);
     assert_eq!(state.tool_settings.stroke(StrokeGroup::Numbered), 11.0);
     assert_eq!(StrokeGroup::Arrow as usize, 2);
     assert_eq!(StrokeGroup::Line as usize, 3);

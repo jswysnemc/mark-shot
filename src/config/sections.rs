@@ -266,6 +266,7 @@ section!(Shadow {
     spread: f32 = 1.5,
     falloff: f32 = 1.2,
     pen_halo: f32 = 3.0,
+    shape_alpha: f32 = 0.55,
 });
 
 section!(Handles {
@@ -281,7 +282,8 @@ section!(Arrow {
     head_length: f32 = 4.0,
     head_min: f32 = 12.0,
     head_max: f32 = 0.6,
-    head_width: f32 = 0.55,
+    head_width: f32 = 0.5,
+    head_notch: f32 = 0.667,
 });
 
 section!(Numbered {
@@ -374,7 +376,7 @@ section!(NumberTool {
 
 section!(ArrowTool {
     width: f32 = 3.0,
-    style: crate::features::arrow::ArrowStyle = crate::features::arrow::ArrowStyle::Fletched,
+    style: crate::features::arrow::ArrowStyle = crate::features::arrow::ArrowStyle::Direct,
     line_style: crate::features::line::LineStyle = crate::features::line::LineStyle::Solid,
 });
 
@@ -386,6 +388,7 @@ section!(LineTool {
 section!(Tools {
     color: Rgba = rgb(255, 77, 77),
     fill: bool = false,
+    rectangle_radius: f32 = 8.0,
     stroke: Stroke = Stroke::default(),
     font: Font = Font::default(),
     redact: Redact = Redact::default(),
