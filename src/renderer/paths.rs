@@ -3,7 +3,10 @@ use crate::theme::{Rgba, color, stroke};
 /// 4/3*(sqrt(2)-1).
 pub const KAPPA: f32 = 0.552_284_8;
 
-use tiny_skia::{Color, PathBuilder, Pixmap, Rect, Stroke, Transform};
+use tiny_skia::{
+    Color, FillRule, FilterQuality, Paint, Path, PathBuilder, Pixmap, PixmapPaint, Rect, Stroke,
+    Transform,
+};
 
 use super::Painter;
 
@@ -280,4 +283,125 @@ impl From<usvg::Color> for Rgba {
     fn from(c: usvg::Color) -> Self {
         Rgba(c.red, c.green, c.blue, 255)
     }
+}
+
+/// 【阴影绘制】【发散阴影】把 path 的填充或描边轮廓偏移到右下并模糊，再合成到画布
+pub fn blurred_shadow(
+    painter: &mut Painter<'_>,
+    path: &Path,
+    stroke: Option<&Stroke>,
+    color: Color,
+) {
+    let shadow = &crate::config::get().annotations.shadow;
+    let [dx, dy] = shadow.offset;
+    if !dx.is_finite() || !dy.is_finite() || color.alpha() <= 0.0 {
+        return;
+    }
+    let scale = painter.scale();
+    if !scale.is_finite() || scale <= 0.0 {
+        return;
+    }
+    let shadow_transform = painter.transform_shifted(dx, dy);
+    let resolution = 1.0 / scale;
+    let silhouette = match stroke {
+        Some(stroke) => {
+            let Some(path) = path.stroke(stroke, resolution) else {
+                return;
+            };
+            path
+        }
+        None => path.clone(),
+    };
+    let blur = if shadow.blur.is_finite() && shadow.blur > 0.0 {
+        (shadow.blur * scale).clamp(1.0, 64.0)
+    } else {
+        0.0
+    };
+    if blur < 1.0 {
+        let mut paint = Paint::default();
+        paint.set_color(color);
+        paint.anti_alias = true;
+        painter.canvas().fill_path(
+            &silhouette,
+            &paint,
+            FillRule::Winding,
+            shadow_transform,
+            None,
+        );
+        return;
+    }
+    let Some(device) = silhouette.transform(shadow_transform) else {
+        return;
+    };
+    let Some(bounds) = device.bounds().outset(blur + 2.0, blur + 2.0) else {
+        return;
+    };
+    let canvas = painter.canvas();
+    let Some(visible) = Rect::from_xywh(0.0, 0.0, canvas.width() as f32, canvas.height() as f32)
+    else {
+        return;
+    };
+    let Some(bounds) = bounds
+        .intersect(&visible)
+        .and_then(|bounds| bounds.round_out())
+    else {
+        return;
+    };
+    let (width, height) = (bounds.width(), bounds.height());
+    if width == 0 || height == 0 {
+        return;
+    }
+    let Some(local) = device.transform(Transform::from_translate(
+        -(bounds.x() as f32),
+        -(bounds.y() as f32),
+    )) else {
+        return;
+    };
+    let Some(mut mask) = Pixmap::new(width, height) else {
+        return;
+    };
+    let mut paint = Paint::default();
+    paint.set_color(color);
+    paint.anti_alias = true;
+    mask.fill_path(
+        &local,
+        &paint,
+        FillRule::Winding,
+        Transform::identity(),
+        None,
+    );
+    let pixels: Vec<u32> = mask
+        .pixels()
+        .iter()
+        .map(|pixel| u32::from_be_bytes([pixel.alpha(), pixel.red(), pixel.green(), pixel.blue()]))
+        .collect();
+    let Ok(blurred) =
+        shot_image::blur::gaussian_owned(pixels, width as i32, height as i32, blur.round() as i32)
+    else {
+        return;
+    };
+    let Some(mut shadow_image) = Pixmap::new(width, height) else {
+        return;
+    };
+    for (output, pixel) in shadow_image
+        .data_mut()
+        .as_chunks_mut::<4>()
+        .0
+        .iter_mut()
+        .zip(blurred.pixels())
+    {
+        let [alpha, red, green, blue] = pixel.to_be_bytes();
+        output.copy_from_slice(&[red, green, blue, alpha]);
+    }
+    painter.canvas().draw_pixmap(
+        bounds.x(),
+        bounds.y(),
+        shadow_image.as_ref(),
+        &PixmapPaint {
+            quality: FilterQuality::Nearest,
+            ..Default::default()
+        },
+        Transform::identity(),
+        None,
+    );
 }

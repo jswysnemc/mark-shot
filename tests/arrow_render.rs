@@ -348,6 +348,16 @@ fn arrow_shadow_is_offset_below_the_body() {
         (body.red(), body.green(), body.blue(), body.alpha()),
         (255, 30, 20, 255)
     );
+    let blur = mark_shot::config::get().annotations.shadow.blur;
+    let tail = image
+        .pixel(x, (100.0 + 4.0 + dy + blur * 0.5).round() as u32)
+        .unwrap()
+        .demultiply();
+    assert!(tail.alpha() > 0, "no diffuse shadow tail: {tail:?}");
+    assert!(
+        tail.alpha() < below.alpha(),
+        "diffuse tail should be lighter than the core: {tail:?} vs {below:?}"
+    );
 }
 
 /// 【箭头测试】【直箭头缺口】直箭头头部使用内凹实心轮廓，箭身接入缺口中心，三角形背面不残留填充

@@ -1,7 +1,7 @@
 mod body;
 mod shadow;
+use shadow::transforms_for;
 pub use shadow::{selection_chrome_pad, shadow_color_for, visual_pad};
-use shadow::{stroke_segment_with_shadow, transforms_for};
 mod handles;
 use handles::draw_text_box;
 mod shapes;

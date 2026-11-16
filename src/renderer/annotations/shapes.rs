@@ -100,19 +100,9 @@ pub(super) fn fill_with_shadow(
     color: Color,
     shadow_color: Color,
 ) {
-    let (transform, shadow_transform) = transforms_for(p);
+    crate::renderer::paths::blurred_shadow(p, path, None, shadow_color);
 
-    let mut shadow_paint = Paint::default();
-    shadow_paint.set_color(shadow_color);
-    shadow_paint.anti_alias = true;
-    p.canvas.fill_path(
-        path,
-        &shadow_paint,
-        FillRule::Winding,
-        shadow_transform,
-        None,
-    );
-
+    let transform = p.transform();
     let mut paint = Paint::default();
     paint.set_color(color);
     paint.anti_alias = true;

@@ -414,7 +414,10 @@ nudge_fast = 10.0
 
 [annotations.shadow]
 color = "#10161782"
-offset = [0.0, 3.0]
+# shifted to the right and bottom
+offset = [4.0, 4.0]
+# gaussian-like blur radius for the soft shadow, in image pixels
+blur = 8.0
 layers = 2
 spread = 1.5
 # how fast each next layer fades

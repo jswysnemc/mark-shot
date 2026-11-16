@@ -235,6 +235,11 @@ pub mod shadow {
     /// How far the shadow reaches past a stroke, for the damaged zone calculation.
     pub fn width_bonus() -> f32 {
         let shadow = &crate::config::get().annotations.shadow;
-        shadow.layers as f32 * shadow.spread + 1.0
+        let blur = if shadow.blur.is_finite() {
+            shadow.blur.max(0.0)
+        } else {
+            0.0
+        };
+        (shadow.layers as f32 * shadow.spread).max(blur * 2.0) + 1.0
     }
 }
