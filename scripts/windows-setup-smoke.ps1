@@ -10,6 +10,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'windows-smoke.ps1')
 . (Join-Path $PSScriptRoot 'windows-registry-entry.ps1')
+. (Join-Path $PSScriptRoot 'windows-setup-uninstaller.ps1')
 $root = Split-Path $PSScriptRoot -Parent
 $evidence = Join-Path $root 'target/windows-evidence/setup'
 $testId = [guid]::NewGuid().ToString('N')
@@ -49,7 +50,7 @@ try {
         if ((Get-FileHash $file -Algorithm SHA256).Hash -ne $expected) { throw "Installed file mismatch: $file" }
     }
     Invoke-WindowsHelp -PackageDirectory $installed -OutputPath (Join-Path $evidence 'installed-help.txt')
-    $uninstaller = Join-Path $installed 'unins000.exe'
+    $uninstaller = Get-WindowsSetupUninstaller -InstallDirectory $installed
     # 2. 【Windows安装】【所属清理】卸载必须删除本目录启动值，保留设置与其他安装位置的启动项
     if (-not (Test-Path $runKey)) { New-Item -Path $runKey | Out-Null }
     New-ItemProperty -Path $runKey -Name MarkShot -Value "`"$installed\mark-shot.exe`" --background" -PropertyType String -Force | Out-Null
@@ -57,6 +58,7 @@ try {
     if (Test-Path (Join-Path $installed 'mark-shot.exe')) { throw 'Uninstall left the application executable behind.' }
     if ($null -ne (Get-WindowsRegistryEntry -SubKey $runSubKey -Name MarkShot)) { throw 'Uninstall left its login startup entry behind.' }
     Invoke-SetupProcess -File $Installer -Arguments $arguments
+    $uninstaller = Get-WindowsSetupUninstaller -InstallDirectory $installed
     $other = '"C:\Other Location\mark-shot.exe" --background'
     New-ItemProperty -Path $runKey -Name MarkShot -Value $other -PropertyType String -Force | Out-Null
     Invoke-SetupProcess -File $uninstaller -Arguments @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$evidence/uninstall-other.log")

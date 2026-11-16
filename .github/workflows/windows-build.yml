@@ -105,6 +105,9 @@ jobs:
       - name: Verify optional registry values and original types
         run: ./scripts/windows-registry-entry-test.ps1
 
+      - name: Verify registered uninstaller selection after reinstall
+        run: ./scripts/windows-setup-uninstaller-test.ps1
+
       - name: Download media library
         uses: actions/download-artifact@v4
         with:
