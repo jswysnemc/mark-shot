@@ -21,7 +21,7 @@ Mark Shot 冻结屏幕画面，由用户框选区域并添加标注，然后复�
 程序使用 Rust 编写，界面由自身的软件渲染器绘制，不依赖 Qt、GTK 或 WebView。
 
 > **当前状态。** `main` 为原生 Rust 重写版本，当前正式版为
-> [0.2.0](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.0)。
+> [0.2.1](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.1)。
 > 0.1.x 安装包属于此前的 Qt 实现，源码保留在
 > [`qt-old`](https://github.com/jswysnemc/mark-shot/tree/qt-old) 分支。
 > Linux 的 Wayland 与 X11 是主要目标平台。Windows 版本可以运行，但尚未在真实 Windows 设备上完成全部验证。
@@ -53,7 +53,7 @@ Mark Shot 冻结屏幕画面，由用户框选区域并添加标注，然后复�
 
 ## 安装
 
-下载 [0.2.0](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.0)，
+下载 [0.2.1](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.1)，
 按发行版和架构选择安装包。发布页面的折叠列表展示文件及 SHA-256，摘要文件不再作为独立资产上传。
 校验方法和可用格式见[安装说明](docs/zh-CN/installation.md)。
 
@@ -93,6 +93,7 @@ mark-shot --settings         # 打开设置
 | 文档 | 内容 |
 | --- | --- |
 | [安装说明](docs/zh-CN/installation.md) | 构建依赖、构建步骤、媒体库、安装包 |
+| [Nix](docs/zh-CN/nix.md) | 原生软件包、开发环境和 Flake 验证 |
 | [使用说明](docs/zh-CN/usage.md) | 截图方式、完成截图、贴图、历史、扫码、上传、命令行 |
 | [标注工具](docs/zh-CN/annotation-tools.md) | 全部工具、选中后的编辑操作、导出外框 |
 | [快捷键](docs/zh-CN/shortcuts.md) | 默认按键及修改方法 |

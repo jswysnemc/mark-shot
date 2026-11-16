@@ -79,7 +79,7 @@ else
   echo "Unsupported media platform: $platform" >&2
   exit 1
 fi
-export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
+export PKG_CONFIG_PATH="$prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 # 2. 【媒体构建】【最小依赖】一次链接共用媒体代码，库以 LGPL 配置构建，不启用 GPL 或 nonfree
 (cd "$build_root/ffmpeg"; "$sources/ffmpeg-9.0/configure" "${flags[@]}"; make -j"$jobs"; make install)
 if grep -Eq '^#define CONFIG_(GPL|NONFREE) 1' "$build_root/ffmpeg/config.h"; then

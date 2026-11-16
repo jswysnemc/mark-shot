@@ -59,6 +59,7 @@ jobs:
     uses: ./.github/workflows/windows-build.yml
     with:
       checkout_ref: ${{ needs.context.outputs.source_sha }}
+      package_version: ${{ needs.context.outputs.version }}
       sign: true
     secrets: inherit
   collect-windows:
@@ -83,6 +84,9 @@ jobs:
           asset="target/packages/mark-shot-native-$PACKAGE_VERSION-windows-x86_64-msvc.zip"
           cp target/windows-download/*.zip "$asset"
           python3 scripts/packaging/artifact_metadata.py "$asset" --version "$PACKAGE_VERSION" --arch x86_64 --source-sha "$SOURCE_SHA" --format windows
+          setup="target/packages/mark-shot-native-$PACKAGE_VERSION-windows-x86_64-msvc-setup.exe"
+          cp target/windows-download/*-setup.exe "$setup"
+          python3 scripts/packaging/artifact_metadata.py "$setup" --version "$PACKAGE_VERSION" --arch x86_64 --source-sha "$SOURCE_SHA" --format windows-setup
       - uses: actions/upload-artifact@v4
         with:
           name: native-portable-windows-x86_64

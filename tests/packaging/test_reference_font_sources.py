@@ -99,6 +99,15 @@ class ReferenceFontSources(unittest.TestCase):
                 )
                 self.assertEqual((config.parent / "OFL.txt").read_bytes(), license)
                 self.assertIn(str(config.parent / "ttf"), config.read_text())
+                nix_config = FONTS.prepare(
+                    root / "nix/fonts",
+                    archive=source,
+                    base_config=Path("/nix/store/fonts&base/fonts.conf"),
+                )
+                self.assertIn(
+                    "<include>/nix/store/fonts&amp;base/fonts.conf</include>",
+                    nix_config.read_text(),
+                )
                 with self.assertRaises(FileNotFoundError):
                     FONTS.prepare(root / "missing", archive=root / "missing.zip")
                 source.write_bytes(b"tampered source")

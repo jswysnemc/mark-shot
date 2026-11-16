@@ -98,6 +98,10 @@ impl Entry {
                 "下次录制生效；从托盘的屏幕录制入口开始",
                 "Applies to the next session; start from the tray Recording action",
             ),
+            ("desktop", "autostart") => (
+                "登录系统后自动在后台启动；关闭后移除当前用户的启动项",
+                "Starts in the background after signing in; disabling removes the current user's startup entry",
+            ),
             ("desktop", "tray_enabled") => (
                 "后台保留截图、贴图、设置和退出菜单；需要桌面提供托盘区域",
                 "Keeps capture, pin, settings and quit actions available in the desktop tray",

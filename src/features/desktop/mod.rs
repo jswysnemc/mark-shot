@@ -94,9 +94,9 @@ pub fn ensure() -> crate::AppResult {
 pub fn run() -> crate::AppResult {
     let path = std::path::absolute(crate::config::preferences::path()?)?;
     let root = status::directory(&path)?;
-    #[cfg(target_os = "windows")]
+    crate::features::autostart::reconcile(&path);
     if !crate::config::preferences::current().desktop.enabled() {
-        // 1. 【Windows启动】【后台入口】用户明确启动后台时恢复托盘入口，快捷键开关仍采用保存值
+        // 1. 【桌面启动】【后台入口】明确启动后台时恢复托盘入口，快捷键开关仍采用保存值
         crate::config::preferences::write(&path, "desktop", "tray_enabled", true.into())?;
         crate::config::preferences::reload(&path)?;
     }

@@ -10,6 +10,9 @@ on:
       sign:
         type: boolean
         default: false
+      package_version:
+        type: string
+        default: ''
     secrets:
       WINDOWS_CODESIGN_CERTIFICATE_BASE64:
         required: false
@@ -146,6 +149,23 @@ jobs:
           WINDOWS_CODESIGN_TIMESTAMP_URL: ${{ vars.WINDOWS_CODESIGN_TIMESTAMP_URL }}
         run: ./scripts/windows-package.ps1 -SourceSha $env:NATIVE_SOURCE_SHA -Sign:($env:SIGN_PACKAGE -eq 'true')
 
+      - name: Install Inno Setup compiler
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.4.exe'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_4/innosetup-6.7.4.exe' -OutFile $installer
+          if ((Get-AuthenticodeSignature $installer).Status -ne 'Valid') { throw 'Invalid Inno Setup compiler signature.' }
+          $process = Start-Process $installer -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Inno Setup installation failed: $($process.ExitCode)" }
+
+      - name: Build and verify Windows setup installer
+        env:
+          PACKAGE_VERSION: ${{ inputs.package_version || '' }}
+          SIGN_PACKAGE: ${{ inputs.sign || false }}
+          WINDOWS_CODESIGN_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CODESIGN_CERTIFICATE_BASE64 }}
+          WINDOWS_CODESIGN_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_CERTIFICATE_PASSWORD }}
+          WINDOWS_CODESIGN_TIMESTAMP_URL: ${{ vars.WINDOWS_CODESIGN_TIMESTAMP_URL }}
+        run: ./scripts/windows-setup.ps1 -SourceSha $env:NATIVE_SOURCE_SHA -Version $env:PACKAGE_VERSION -Sign:($env:SIGN_PACKAGE -eq 'true')
+
       - name: Upload Windows build (not a release)
         uses: actions/upload-artifact@v4
         with:
@@ -153,6 +173,8 @@ jobs:
           path: |
             target/mark-shot-native-windows-x86_64-msvc.zip
             target/mark-shot-native-windows-x86_64-msvc.zip.sha256
+            target/mark-shot-native-windows-x86_64-msvc-setup.exe
+            target/mark-shot-native-windows-x86_64-msvc-setup.exe.sha256
           if-no-files-found: error
 
       - name: Upload verification evidence

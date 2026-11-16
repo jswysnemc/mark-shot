@@ -64,7 +64,13 @@ screenshot_shortcut = "Ctrl+Shift+S"
 启用托盘或全局快捷键后，由一个轻量的后台服务持有注册。打开设置窗口或编辑器时服务自动启动，
 窗口关闭后继续运行。在托盘菜单中选择**退出**会停止服务，关闭两个开关也会停止服务。
 
-Mark Shot 不会把自身加入登录启动项。如果希望登录后立即使用托盘和快捷键，请在会话启动时运行服务：
+在**设置 → 外观与语言 → 开机启动**中启用开关，登录系统后会自动启动后台服务。
+该开关默认关闭，保存时立即更新当前用户的启动项；关闭后移除启动项。
+Windows 使用 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 中的 `MarkShot` 值；
+Linux 使用 `~/.config/autostart/io.github.jswysnemc.MarkShot.desktop`，设置了 `XDG_CONFIG_HOME` 时使用对应目录。
+启动项保留当前配置文件路径；AppImage 使用原始镜像文件。Flatpak 版本暂不支持此开关。
+
+也可以在会话启动时手动运行服务：
 
 ```sh
 mark-shot --background
@@ -76,8 +82,8 @@ mark-shot --background
 spawn-at-startup "mark-shot" "--background"
 ```
 
-Linux 上两项功能都关闭时，该命令立即退出。Windows 无参数启动会进入后台，不打开截图窗口或控制台；
-若保存设置中两个开关都关闭，明确启动后台时会恢复托盘入口。使用 `--capture` 直接进入截图。
+若保存设置中两个开关都关闭，明确启动后台时会恢复托盘入口。
+Windows 无参数启动会进入后台，不打开截图窗口或控制台；使用 `--capture` 直接进入截图。
 
 Windows 后台会提前准备一次性截图进程，触发后才读取最新配置。取消或完成截图后会准备下一次，
 待命期间不捕获屏幕。

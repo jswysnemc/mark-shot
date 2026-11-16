@@ -74,8 +74,8 @@ def source_archive(root, archive=None):
     return destination
 
 
-def prepare(root, archive=None):
-    """【CI字体】【私有安装】在 root 准备固定字体及隔离配置，archive 可指定离线来源，返回配置路径，不修改系统字体"""
+def prepare(root, archive=None, base_config=Path("/etc/fonts/fonts.conf")):
+    """【CI字体】【私有安装】按 root、archive 和 base_config 准备固定字体及隔离配置，返回配置路径，不修改系统字体"""
     archive = source_archive(root, archive)
     font_dir = root / "ttf"
     font_dir.mkdir(exist_ok=True)
@@ -100,7 +100,7 @@ def prepare(root, archive=None):
     config.write_text(f'''<?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
 <fontconfig>
-  <include>/etc/fonts/fonts.conf</include>
+  <include>{escape(str(base_config))}</include>
   <dir>{escape(str(font_dir))}</dir>
   <cachedir>{escape(str(root / "cache"))}</cachedir>
   <selectfont>
@@ -162,13 +162,14 @@ def main():
     parser.add_argument("--root", type=Path, default=Path("target/ci-private/fonts"))
     parser.add_argument("--github-env", type=Path, help="append FONTCONFIG_FILE to this env file")
     parser.add_argument("--archive", type=Path, help="use only this verified offline source archive")
+    parser.add_argument("--base-config", type=Path, default=Path("/etc/fonts/fonts.conf"), help="base fontconfig configuration for isolated builds")
     parser.add_argument("--download-only", action="store_true", help="prepare the archive and its license without installing fonts")
     args = parser.parse_args()
     if args.download_only:
         archive = source_archive(args.root.resolve(), args.archive)
         print(f"archive={archive}")
         return
-    config = prepare(args.root.resolve(), args.archive)
+    config = prepare(args.root.resolve(), args.archive, args.base_config)
     verify(config)
     if args.github_env:
         with args.github_env.open("a", encoding="utf-8") as output:

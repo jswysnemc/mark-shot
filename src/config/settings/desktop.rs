@@ -6,6 +6,13 @@ pub(super) const ENTRIES: &[Entry] = &[
     Entry {
         page: Page::Appearance,
         section: "desktop",
+        key: "autostart",
+        labels: ("开机启动", "Launch at login"),
+        kind: Kind::Toggle,
+    },
+    Entry {
+        page: Page::Appearance,
+        section: "desktop",
         key: "tray_enabled",
         labels: ("显示系统托盘图标", "Show system tray icon"),
         kind: Kind::Toggle,

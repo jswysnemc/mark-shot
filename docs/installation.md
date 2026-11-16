@@ -3,7 +3,7 @@
 **English** | [简体中文](zh-CN/installation.md)
 
 The current release is
-[0.2.0](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.0).
+[0.2.1](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.1).
 The 0.1.x packages contain the earlier Qt implementation, preserved on `qt-old`.
 AUR and PPA metadata publication uses separate, explicit release workflows.
 
@@ -17,8 +17,8 @@ library and license notices; Rust is only needed for source builds.
 For the Linux x86_64 portable archive, keep the extracted directory intact:
 
 ```sh
-tar -xzf mark-shot-native-0.2.0-linux-x86_64.tar.gz
-./mark-shot-native-0.2.0-linux-x86_64/mark-shot
+tar -xzf mark-shot-native-0.2.1-linux-x86_64.tar.gz
+./mark-shot-native-0.2.1-linux-x86_64/mark-shot
 ```
 
 Use the `linux-aarch64` archive on ARM64. On Windows, extract the complete ZIP and run
@@ -30,13 +30,13 @@ Expand **Files and SHA-256** on the release page and compare the complete digest
 Checksum files and internal JSON metadata are not separate release assets.
 
 ```sh
-sha256sum mark-shot-native-0.2.0-linux-x86_64.tar.gz
+sha256sum mark-shot-native-0.2.1-linux-x86_64.tar.gz
 ```
 
 On Windows, use PowerShell:
 
 ```powershell
-Get-FileHash .\mark-shot-native-0.2.0-windows-x86_64-msvc.zip -Algorithm SHA256
+Get-FileHash .\mark-shot-native-0.2.1-windows-x86_64-msvc.zip -Algorithm SHA256
 ```
 
 Release filenames use `.` instead of `~` to comply with GitHub asset naming. Package contents and internal versions remain unchanged by filename normalization.
@@ -88,6 +88,9 @@ sudo pacman -S --needed base-devel clang pkgconf git python curl wayland libxkbc
 ```
 
 ## Build
+
+Nix users can build the native application with `nix build` or enter the development environment
+with `nix develop`. See [Nix](nix.md) for package contents, verification and NixOS configuration.
 
 ```sh
 git clone https://github.com/jswysnemc/mark-shot.git
@@ -168,6 +171,12 @@ Linux package contains the executable, the media library and the license notices
 | Flatpak bundle | x86_64 | `mark-shot-native-<version>-linux-x86_64.flatpak` |
 | Portable archive | Linux x86_64 and aarch64 | `mark-shot-native-<version>-linux-<arch>.tar.gz` |
 | Windows archive | x86_64 MSVC | `mark-shot-native-<version>-windows-x86_64-msvc.zip` |
+| Windows installer | x86_64 MSVC | `mark-shot-native-<version>-windows-x86_64-msvc-setup.exe` |
+
+The Windows build workflow generates both the portable ZIP and a Setup installer. Setup installs
+for the current user in `%LOCALAPPDATA%\Programs\Mark Shot`, includes the same runtime libraries,
+and creates Start menu entries for the application and preferences. Its uninstaller preserves
+user preferences and removes login startup registration only when it points to that installation.
 
 Installed packages use this layout:
 

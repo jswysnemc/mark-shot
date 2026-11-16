@@ -3,7 +3,7 @@
 [English](../installation.md) | **简体中文**
 
 当前正式版为
-[0.2.0](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.0)。
+[0.2.1](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.1)。
 0.1.x 安装包属于此前的 Qt 实现，源码保留在 `qt-old` 分支。
 AUR 和 PPA 元数据使用独立发布流程，需要显式执行。
 
@@ -16,8 +16,8 @@ Arch 安装包、AppImage、Flatpak、Linux 便携归档和 Windows x86_64 归�
 Linux x86_64 便携归档解压后应保留完整目录：
 
 ```sh
-tar -xzf mark-shot-native-0.2.0-linux-x86_64.tar.gz
-./mark-shot-native-0.2.0-linux-x86_64/mark-shot
+tar -xzf mark-shot-native-0.2.1-linux-x86_64.tar.gz
+./mark-shot-native-0.2.1-linux-x86_64/mark-shot
 ```
 
 ARM64 使用 `linux-aarch64` 归档。Windows 解压完整 ZIP 后运行 `mark-shot.exe`，
@@ -29,13 +29,13 @@ ARM64 使用 `linux-aarch64` 归档。Windows 解压完整 ZIP 后运行 `mark-s
 摘要文件和内部 JSON 元数据不再作为独立发布资产上传。
 
 ```sh
-sha256sum mark-shot-native-0.2.0-linux-x86_64.tar.gz
+sha256sum mark-shot-native-0.2.1-linux-x86_64.tar.gz
 ```
 
 Windows 使用 PowerShell：
 
 ```powershell
-Get-FileHash .\mark-shot-native-0.2.0-windows-x86_64-msvc.zip -Algorithm SHA256
+Get-FileHash .\mark-shot-native-0.2.1-windows-x86_64-msvc.zip -Algorithm SHA256
 ```
 
 发布文件名用 `.` 替换 `~`，以符合 GitHub 资产命名规则。
@@ -87,6 +87,9 @@ sudo pacman -S --needed base-devel clang pkgconf git python curl wayland libxkbc
 ```
 
 ## 构建
+
+Nix 用户可以通过 `nix build` 构建原生程序，或通过 `nix develop` 进入开发环境。
+软件包内容、验证命令和 NixOS 配置见 [Nix](nix.md)。
 
 ```sh
 git clone https://github.com/jswysnemc/mark-shot.git
@@ -163,6 +166,11 @@ Mark Shot 不使用 Qt、GTK 或 WebView，也不启动 `grim`、`wl-copy`、`xc
 | Flatpak 单文件包 | x86_64 | `mark-shot-native-<版本>-linux-x86_64.flatpak` |
 | 便携归档 | Linux x86_64 与 aarch64 | `mark-shot-native-<版本>-linux-<架构>.tar.gz` |
 | Windows 归档 | x86_64 MSVC | `mark-shot-native-<版本>-windows-x86_64-msvc.zip` |
+| Windows 安装器 | x86_64 MSVC | `mark-shot-native-<版本>-windows-x86_64-msvc-setup.exe` |
+
+Windows 构建工作流同时生成 ZIP 便携包和 Setup 安装包。安装包以当前用户权限安装到
+`%LOCALAPPDATA%\Programs\Mark Shot`，包含相同运行依赖，并创建程序与设置的开始菜单入口。
+卸载保留用户配置，仅在开机启动项指向本安装目录时移除注册。
 
 安装后的目录布局如下：
 

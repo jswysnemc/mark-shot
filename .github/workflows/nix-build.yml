@@ -1,0 +1,60 @@
+name: Nix Rust Build
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      checkout_ref:
+        type: string
+        default: ''
+  pull_request:
+    paths: ['flake.nix', 'flake.lock', 'packaging/nix/**', 'packaging/desktop/**', 'Cargo.*', 'rust-toolchain.toml', 'build.rs', 'src/**', 'crates/**', 'assets/**', 'tests/**', 'scripts/media/**', 'scripts/packaging/**', 'scripts/ci-reference-fonts.py', 'release/about.toml', 'release/license-notices.hbs', '.github/workflows/nix-build.yml']
+  push:
+    branches: [main]
+    paths: ['flake.nix', 'flake.lock', 'packaging/nix/**', 'packaging/desktop/**', 'Cargo.*', 'rust-toolchain.toml', 'build.rs', 'src/**', 'crates/**', 'assets/**', 'tests/**', 'scripts/media/**', 'scripts/packaging/**', 'scripts/ci-reference-fonts.py', 'release/about.toml', 'release/license-notices.hbs', '.github/workflows/nix-build.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nix-build-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  linux:
+    name: Nix ${{ matrix.system }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-24.04
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            max-jobs = 2
+            cores = 2
+      - name: Verify native Nix package
+        run: nix flake check --no-write-lock-file --print-build-logs --show-trace
+      - name: Record built package and runtime closure
+        run: |
+          nix build .#mark-shot --no-write-lock-file
+          mkdir -p target/nix-evidence
+          nix path-info --json .#mark-shot > target/nix-evidence/package.json
+          nix-store --query --requisites "$(readlink -f result)" > target/nix-evidence/closure.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mark-shot-nix-${{ matrix.system }}
+          path: target/nix-evidence/
+          if-no-files-found: error

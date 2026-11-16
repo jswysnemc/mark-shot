@@ -70,13 +70,17 @@ pub fn write_fields(path: &Path, section: &str, fields: &[(&str, Value)]) -> io:
             validate(section, key, value)?;
         }
     }
-    super::settings_store::write(
-        path,
-        &fields
-            .iter()
-            .map(|(key, value)| (format!("{section}.{key}"), value.clone()))
-            .collect::<Vec<_>>(),
-    )
+    let updates = fields
+        .iter()
+        .map(|(key, value)| (format!("{section}.{key}"), value.clone()))
+        .collect::<Vec<_>>();
+    let persist = || super::settings_store::write(path, &updates);
+    if section == "desktop"
+        && let Some((_, value)) = fields.iter().find(|(key, _)| *key == "autostart")
+    {
+        return crate::features::autostart::save(path, value.as_bool().unwrap_or(false), persist);
+    }
+    persist()
 }
 
 /// 【设置窗口】【输入校验】校验 section、key 对应的 value，拒绝会导致保存路径错误的日期格式及非法快捷键

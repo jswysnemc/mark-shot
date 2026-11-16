@@ -3,6 +3,7 @@
 use super::{catalog::Page, window::Preferences};
 use crate::backend::window::{WindowContent, WindowEvent};
 
+mod autostart;
 mod effective;
 
 /// 【设置回归】【整行编辑】无参数，常规和最小窗口下编辑路径不会挤压输入框，绘制和按钮命中共用坐标

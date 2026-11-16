@@ -5,6 +5,7 @@ pub mod annotation_rotation;
 pub mod annotation_selection;
 pub mod annotation_style;
 pub mod arrow;
+pub(crate) mod autostart;
 pub mod canvas_navigation;
 pub mod capture_history;
 pub mod code_scan;

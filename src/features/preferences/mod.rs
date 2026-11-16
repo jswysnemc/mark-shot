@@ -33,5 +33,6 @@ pub fn spawn() -> crate::AppResult {
 
 /// 【设置窗口】【原生运行】按 ready 决定是否确认首帧，返回窗口运行结果；不初始化截图或识别任务
 pub fn run(ready: bool) -> crate::AppResult {
+    crate::features::autostart::reconcile(&crate::config::preferences::path()?);
     window::run(ready)
 }

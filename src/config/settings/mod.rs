@@ -235,6 +235,10 @@ impl Entry {
     /// 【应用设置】【生效说明】按 chinese 返回保存后生效阶段，界面提示与注册字段共用
     pub fn effect(&self, chinese: bool) -> &'static str {
         let labels = match (self.section, self.key) {
+            ("desktop", "autostart") => (
+                "已保存，开机启动设置立即生效",
+                "Saved; login startup registration updated",
+            ),
             ("desktop", _) => (
                 "已保存，正在更新桌面注册",
                 "Saved; updating desktop registration",

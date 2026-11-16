@@ -13,6 +13,8 @@ theme = "light"
 language = ""
 
 [desktop]
+# 【开机启动】【登录注册】默认关闭；设置窗口立即更新当前用户的 Windows 启动项或 Linux XDG 自动启动文件
+autostart = false
 # 【桌面集成】【常驻注册】启用后独立后台服务持有注册，设置保存后立即生效
 # 【桌面集成】【平台默认】Windows 默认开启两项，Linux 默认关闭；取消以下注释可显式关闭
 # tray_enabled = false

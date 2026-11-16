@@ -22,7 +22,7 @@ recognize, translate or upload the result. It is written in Rust and draws its o
 software, so it does not depend on Qt, GTK or a web view.
 
 > **Status.** `main` contains the native Rust rewrite. The current release is
-> [0.2.0](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.0).
+> [0.2.1](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.1).
 > The 0.1.x packages contain the earlier Qt implementation, preserved on
 > [`qt-old`](https://github.com/jswysnemc/mark-shot/tree/qt-old).
 > Linux on Wayland and X11 is the primary target. The Windows build runs, but
@@ -55,7 +55,7 @@ Details and known limits are in [Platform support](docs/platform-support.md).
 
 ## Install
 
-Download [0.2.0](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.0)
+Download [0.2.1](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.1)
 and choose a package for your distribution and architecture. The release page contains a collapsed
 file list with SHA-256 values; checksum files are not separate assets. See
 [Installation](docs/installation.md) for download verification and the available formats.
@@ -97,6 +97,7 @@ pins and `Esc` cancels.
 | Document | Content |
 | --- | --- |
 | [Installation](docs/installation.md) | Build dependencies, building, the media library, packages |
+| [Nix](docs/nix.md) | Native package, development shell and Flake checks |
 | [Usage](docs/usage.md) | Capture modes, finishing a capture, pinning, history, scanning, upload, command line |
 | [Annotation tools](docs/annotation-tools.md) | Every tool, selection editing and the export frame |
 | [Shortcuts](docs/shortcuts.md) | Default key bindings and how to change them |

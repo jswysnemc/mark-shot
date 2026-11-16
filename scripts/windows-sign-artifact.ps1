@@ -14,7 +14,13 @@ if ([string]::IsNullOrWhiteSpace($CertificateBase64)) {
     return
 }
 if ([string]::IsNullOrWhiteSpace($TimestampUrl)) { $TimestampUrl = 'http://timestamp.digicert.com' }
-if (-not (Test-Path $Path -PathType Container)) { throw "Artifact directory not found: $Path" }
+if (-not (Test-Path $Path)) { throw "Signing input not found: $Path" }
+$directory = Test-Path $Path -PathType Container
+$files = if ($directory) {
+    @('mark-shot.exe', 'media/markshot-media.dll') | ForEach-Object { Join-Path $Path $_ }
+} else {
+    @($Path)
+}
 $tool = Get-Command signtool.exe -ErrorAction SilentlyContinue
 $signTool = if ($tool) { $tool.Source } else {
     $kits = "${env:ProgramFiles(x86)}/Windows Kits/10/bin"
@@ -26,22 +32,23 @@ if (-not $signTool) { throw 'signtool.exe was not found' }
 $certificate = Join-Path ([IO.Path]::GetTempPath()) "mark-shot-$([guid]::NewGuid().ToString('N')).pfx"
 try {
     [IO.File]::WriteAllBytes($certificate, [Convert]::FromBase64String($CertificateBase64))
-    foreach ($relative in @('mark-shot.exe', 'media/markshot-media.dll')) {
-        $file = Join-Path $Path $relative
-        if (-not (Test-Path $file -PathType Leaf)) { throw "Signing input missing: $relative" }
+    foreach ($file in $files) {
+        if (-not (Test-Path $file -PathType Leaf)) { throw "Signing input missing: $file" }
         $arguments = @('sign', '/fd', 'SHA256', '/tr', $TimestampUrl, '/td', 'SHA256', '/f', $certificate)
         if (-not [string]::IsNullOrWhiteSpace($CertificatePassword)) { $arguments += @('/p', $CertificatePassword) }
         & $signTool @arguments $file
-        if ($LASTEXITCODE -ne 0) { throw "Signing failed: $relative" }
+        if ($LASTEXITCODE -ne 0) { throw "Signing failed: $file" }
         & $signTool verify /pa $file
-        if ($LASTEXITCODE -ne 0) { throw "Signature verification failed: $relative" }
+        if ($LASTEXITCODE -ne 0) { throw "Signature verification failed: $file" }
     }
     # 1. 【原生发布】【媒体摘要】签名会改变动态库字节，重新写入媒体包摘要
-    $media = Join-Path $Path 'media'
-    $hashes = foreach ($name in @('markshot-media.dll', 'MEDIA-SOURCES.tar.xz')) {
-        '{0}  {1}' -f (Get-FileHash (Join-Path $media $name) -Algorithm SHA256).Hash.ToLowerInvariant(), $name
+    if ($directory) {
+        $media = Join-Path $Path 'media'
+        $hashes = foreach ($name in @('markshot-media.dll', 'MEDIA-SOURCES.tar.xz')) {
+            '{0}  {1}' -f (Get-FileHash (Join-Path $media $name) -Algorithm SHA256).Hash.ToLowerInvariant(), $name
+        }
+        $hashes | Set-Content (Join-Path $media 'SHA256SUMS') -Encoding ascii
     }
-    $hashes | Set-Content (Join-Path $media 'SHA256SUMS') -Encoding ascii
 }
 finally {
     if (Test-Path $certificate) { Remove-Item $certificate -Force }

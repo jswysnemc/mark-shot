@@ -21,6 +21,7 @@ PACKAGE_SUFFIXES = (
     ".AppImage",
     ".flatpak",
     ".zip",
+    "-setup.exe",
 )
 
 

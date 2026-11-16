@@ -101,7 +101,7 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
                         - if numeric_editing { 46.0 } else { 0.0 }
                 };
                 let label = controls::fit_label(painter, entry.label(chinese), 12.0, text_width);
-                let note = if entry.section == "desktop" {
+                let note = if entry.section == "desktop" && entry.key != "autostart" {
                     let message = if entry.key == "tray_enabled" {
                         &state.desktop_status.tray
                     } else {

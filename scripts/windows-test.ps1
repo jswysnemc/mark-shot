@@ -43,6 +43,8 @@ try {
     $env:PATH = "$(Join-Path $root 'target/x86_64-pc-windows-msvc/debug');$oldPath"
     Invoke-UnitTests 'image-stitch' @('-p', 'shot-image', '-p', 'shot-stitch')
     $groups = @(
+        'features::autostart::',
+        'features::preferences::tests::autostart::',
         'features::desktop::hotkeys::windows::tests::',
         'features::desktop::status::tests::',
         'features::desktop::tray::',

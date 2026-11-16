@@ -62,7 +62,7 @@ pub(super) fn description(page: Page, chinese: bool) -> &'static str {
 pub(super) fn group(entry: &Entry) -> (u8, &'static str, &'static str) {
     match entry.page {
         Page::Keys if entry.section == "desktop" => (0, "全局截图", "Global screenshot"),
-        Page::Appearance if entry.section == "desktop" => (2, "系统托盘", "System tray"),
+        Page::Appearance if entry.section == "desktop" => (2, "启动与托盘", "Startup & tray"),
         Page::Storage if entry.section == "history" => (1, "截图历史", "History"),
         Page::Storage => (0, "文件保存", "Saved files"),
         Page::Pinned if entry.section == "pinned" => (0, "贴图", "Pins"),

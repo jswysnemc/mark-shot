@@ -71,8 +71,14 @@ registration. It starts automatically with the settings window or the editor, an
 after they close. Choosing **Quit** in the tray menu stops it; turning both switches off stops it
 as well.
 
-Mark Shot does not add itself to your login items. To have the tray and the shortcut available
-right after login, start the service from your session:
+Enable **Settings → Appearance → Launch at login** to start the background service after signing
+in. This switch is off by default and updates the current user's startup entry immediately.
+Windows uses a `MarkShot` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`;
+Linux uses `~/.config/autostart/io.github.jswysnemc.MarkShot.desktop` (or `XDG_CONFIG_HOME`).
+The entry preserves the current configuration path; AppImage uses its original image file.
+Disabling the switch removes the entry. Flatpak does not support this switch yet.
+
+You can also start the service from your session configuration:
 
 ```sh
 mark-shot --background
@@ -84,7 +90,7 @@ For example, in niri:
 spawn-at-startup "mark-shot" "--background"
 ```
 
-On Linux, the command exits immediately when both features are disabled.
+Explicit background startup restores the tray if both saved switches are disabled.
 
 ## Editor window type
 

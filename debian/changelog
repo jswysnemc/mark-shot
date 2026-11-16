@@ -1,3 +1,10 @@
+mark-shot (0.2.1-1) unstable; urgency=medium
+
+  * Add login startup preferences and native Nix packaging.
+  * Improve desktop capture, clipboard and Fedora package compatibility.
+
+ -- Mark Shot maintainers <snemc@qq.com>  Tue, 17 Nov 2026 05:45:00 +0900
+
 mark-shot (0.2.0-1) unstable; urgency=medium
 
   * Package the native Rust application and its offline build sources.

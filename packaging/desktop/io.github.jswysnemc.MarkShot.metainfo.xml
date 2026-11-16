@@ -15,5 +15,8 @@
   <url type="bugtracker">https://github.com/jswysnemc/mark-shot/issues</url>
   <developer id="io.github.jswysnemc"><name>jswysnemc</name></developer>
   <content_rating type="oars-1.1"/>
-  <releases><release version="0.2.0" type="development" date="2026-11-13"/></releases>
+  <releases>
+    <release version="0.2.1" type="stable" date="2026-11-17"/>
+    <release version="0.2.0" type="stable" date="2026-11-13"/>
+  </releases>
 </component>

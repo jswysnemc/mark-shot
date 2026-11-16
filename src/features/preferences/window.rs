@@ -279,6 +279,7 @@ impl Preferences {
         }
         let applied = self.publish();
         if section == "desktop"
+            && key != "autostart"
             && !cfg!(test)
             && let Err(error) = crate::features::desktop::ensure()
         {
