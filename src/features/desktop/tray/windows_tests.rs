@@ -48,6 +48,76 @@ fn action(actions: &mut mpsc::UnboundedReceiver<Event>) -> Option<Action> {
     result
 }
 
+/// 【系统托盘测试】【实际延时选项】无参数，原生菜单交付全部预设秒数，取消入口随最新计划状态和语言更新；无返回值
+#[test]
+fn native_popup_delivers_all_delays_and_updates_cancel_state() {
+    let (window, states, mut actions) = fixture();
+    let chinese = vec![
+        ("1 秒后", true),
+        ("3 秒后", true),
+        ("5 秒后", true),
+        ("10 秒后", true),
+        ("30 秒后", true),
+        ("", false),
+        ("取消延时截图", false),
+    ];
+    // 1. 【系统托盘测试】【预设交付】通过真实右键回调逐个选择延迟，不直接调用菜单动作
+    for (position, seconds) in [1, 3, 5, 10, 30].into_iter().enumerate() {
+        window
+            .open(Expected {
+                submenu_position: 3,
+                title: "延时截图",
+                items: chinese.clone(),
+                selected: Some(position),
+            })
+            .unwrap_or_else(|error| panic!("delay={seconds}: {error}"));
+        assert_eq!(action(&mut actions), Some(Action::Delay(seconds)));
+    }
+    window
+        .open(Expected {
+            submenu_position: 3,
+            title: "延时截图",
+            items: chinese,
+            selected: None,
+        })
+        .expect("cancel action stays disabled without a schedule");
+    assert_eq!(action(&mut actions), None);
+    // 2. 【系统托盘测试】【取消状态】重新打开菜单读取最新语言与待执行状态，再选择取消动作
+    states.send_modify(|state| {
+        state.language = Language::English;
+        state.delayed = true;
+    });
+    let mut english = vec![
+        ("After 1 second", true),
+        ("After 3 seconds", true),
+        ("After 5 seconds", true),
+        ("After 10 seconds", true),
+        ("After 30 seconds", true),
+        ("", false),
+        ("Cancel Delayed Capture", true),
+    ];
+    window
+        .open(Expected {
+            submenu_position: 3,
+            title: "Delayed Capture",
+            items: english.clone(),
+            selected: Some(6),
+        })
+        .expect("choose enabled cancel action after the separator");
+    assert_eq!(action(&mut actions), Some(Action::CancelDelay));
+    states.send_modify(|state| state.delayed = false);
+    english[6].1 = false;
+    window
+        .open(Expected {
+            submenu_position: 3,
+            title: "Delayed Capture",
+            items: english,
+            selected: None,
+        })
+        .expect("cancel action becomes disabled after cancellation");
+    assert_eq!(action(&mut actions), None);
+}
+
 /// 【系统托盘测试】【实际录制切换】无参数，同一原生窗口连续打开最新菜单，按键选择对应开始、暂停、继续和停止动作
 #[test]
 fn native_popup_uses_latest_recording_snapshot_and_delivers_commands() {
@@ -127,6 +197,7 @@ fn native_popup_uses_latest_recording_snapshot_and_delivers_commands() {
         states.send_modify(|state| state.recording = recording);
         window
             .open(Expected {
+                submenu_position: 4,
                 title,
                 items,
                 selected: Some(selected),
@@ -142,6 +213,7 @@ fn native_popup_cancel_and_language_change_preserve_menu_lifecycle() {
     let (window, states, mut actions) = fixture();
     window
         .open(Expected {
+            submenu_position: 4,
             title: "屏幕录制",
             items: vec![("开始录制", true)],
             selected: None,
@@ -154,6 +226,7 @@ fn native_popup_cancel_and_language_change_preserve_menu_lifecycle() {
     });
     window
         .open(Expected {
+            submenu_position: 4,
             title: "Recording Paused",
             items: vec![("Resume Recording", true), ("Stop and Save", true)],
             selected: Some(0),

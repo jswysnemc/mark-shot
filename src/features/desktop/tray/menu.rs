@@ -1,6 +1,6 @@
 //! 【系统托盘】【菜单模型】沿用 Qt 菜单顺序、延时子菜单和启用状态，平台只负责展示与回调
 
-use super::super::Action;
+use super::super::{Action, delayed_capture::PRESET_SECONDS};
 use crate::ui::language::Language;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,13 +33,14 @@ pub(super) fn entries(state: State) -> Vec<Item> {
         action,
         enabled: true,
     };
-    let mut delays: Vec<_> = [3, 5, 10]
+    let mut delays: Vec<_> = PRESET_SECONDS
         .into_iter()
         .map(|seconds| Item::Action {
             label: if chinese {
                 format!("{seconds} 秒后")
             } else {
-                format!("After {seconds} seconds")
+                let unit = if seconds == 1 { "second" } else { "seconds" };
+                format!("After {seconds} {unit}")
             },
             action: Action::Delay(seconds),
             enabled: true,
@@ -111,15 +112,25 @@ mod tests {
                 let Item::Submenu { items, .. } = &menu[3] else {
                     panic!("missing delay submenu")
                 };
-                assert_eq!(items.len(), 5);
-                for (item, seconds) in items.iter().zip([3, 5, 10]) {
+                assert_eq!(items.len(), 7);
+                for (item, seconds) in items.iter().zip([1, 3, 5, 10, 30]) {
                     assert!(
                         matches!(item, Item::Action { action: Action::Delay(value), enabled: true, .. } if *value == seconds)
                     );
+                    if let Item::Action { label, .. } = item {
+                        let expected = if language == Language::Chinese {
+                            format!("{seconds} 秒后")
+                        } else if seconds == 1 {
+                            "After 1 second".into()
+                        } else {
+                            format!("After {seconds} seconds")
+                        };
+                        assert_eq!(label, &expected);
+                    }
                 }
-                assert_eq!(items[3], Item::Separator);
+                assert_eq!(items[5], Item::Separator);
                 assert!(
-                    matches!(items[4], Item::Action { action: Action::CancelDelay, enabled, .. } if enabled == delayed)
+                    matches!(items[6], Item::Action { action: Action::CancelDelay, enabled, .. } if enabled == delayed)
                 );
             }
         }

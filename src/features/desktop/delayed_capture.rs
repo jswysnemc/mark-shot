@@ -2,15 +2,18 @@
 
 use std::time::{Duration, Instant};
 
+/// 【托盘延时】【预设秒数】菜单展示与计划校验共用的截图等待时间
+pub(super) const PRESET_SECONDS: [u64; 5] = [1, 3, 5, 10, 30];
+
 #[derive(Default)]
 pub(super) struct Schedule {
     deadline: Option<Instant>,
 }
 
 impl Schedule {
-    /// 【托盘延时】【计划替换】按 seconds 和 now 保存新的期限，菜单预设以外的值不创建计划
+    /// 【托盘延时】【计划替换】按 seconds 和 now 保存新期限，预设以外的值不改变已有计划；无返回值
     pub fn replace(&mut self, seconds: u64, now: Instant) {
-        if matches!(seconds, 3 | 5 | 10) {
+        if PRESET_SECONDS.contains(&seconds) {
             self.deadline = now.checked_add(Duration::from_secs(seconds));
         }
     }
@@ -47,6 +50,35 @@ impl Schedule {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 【托盘延时测试】【预设期限】无参数，所有预设均在指定期限触发一次，期限之前不提前触发；无返回值
+    #[test]
+    fn every_preset_runs_once_at_its_deadline() {
+        let now = Instant::now();
+        for seconds in PRESET_SECONDS {
+            let mut schedule = Schedule::default();
+            schedule.replace(seconds, now);
+            assert!(schedule.pending());
+            assert!(!schedule.take_due(now + Duration::from_secs(seconds - 1)));
+            assert!(schedule.take_due(now + Duration::from_secs(seconds)));
+            assert!(!schedule.pending());
+            assert!(!schedule.take_due(now + Duration::from_secs(seconds + 1)));
+        }
+    }
+
+    /// 【托盘延时测试】【非法预设】无参数，非预设秒数不创建新计划，也不覆盖已有期限；无返回值
+    #[test]
+    fn unsupported_delays_do_not_replace_an_existing_schedule() {
+        let now = Instant::now();
+        for seconds in [0, 2, 15, u64::MAX] {
+            let mut schedule = Schedule::default();
+            schedule.replace(seconds, now);
+            assert!(!schedule.pending());
+            schedule.replace(3, now);
+            schedule.replace(seconds, now + Duration::from_secs(1));
+            assert!(schedule.take_due(now + Duration::from_secs(3)));
+        }
+    }
 
     /// 【托盘延时测试】【替换与取消】无参数，旧计划不触发、取消后不触发、正常期限仅触发一次
     #[test]

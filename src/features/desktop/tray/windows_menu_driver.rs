@@ -15,7 +15,9 @@ use windows_sys::Win32::{
 const TIMER: usize = 1;
 
 pub(super) struct Expected {
+    pub submenu_position: usize,
     pub title: &'static str,
+    /// 【系统托盘测试】【菜单项目】空标签表示分隔符，其他项目同时记录启用状态
     pub items: Vec<(&'static str, bool)>,
     pub selected: Option<usize>,
 }
@@ -23,7 +25,7 @@ pub(super) struct Expected {
 struct Session {
     expected: Expected,
     root: HMENU,
-    recording: HMENU,
+    submenu: HMENU,
     submenu_opened: bool,
     error: Option<String>,
     trace: Vec<String>,
@@ -85,8 +87,8 @@ impl Session {
             "opening"
         } else if handle == self.root {
             "root"
-        } else if handle == self.recording {
-            "recording"
+        } else if handle == self.submenu {
+            "selected-submenu"
         } else if handle == unsafe { GetSubMenu(self.root, 3) } {
             "delay"
         } else {
@@ -97,28 +99,34 @@ impl Session {
         ));
     }
 
-    /// 【系统托盘测试】【菜单检查】按 handle 读取录制标题、操作及禁用标记，返回结构或属性不符合预期的错误
+    /// 【系统托盘测试】【菜单检查】按 handle 读取目标子菜单标题、操作、分隔符及禁用标记，返回预期不符的错误
     fn inspect(&mut self, handle: HMENU) -> Result<(), String> {
         self.root = handle;
-        self.recording = unsafe { GetSubMenu(handle, 4) };
-        if self.recording.is_null() {
-            return Err("native recording submenu is missing".into());
+        self.submenu = unsafe { GetSubMenu(handle, self.expected.submenu_position as i32) };
+        if self.submenu.is_null() {
+            return Err("native submenu is missing".into());
         }
-        let title = text(handle, 4)?;
+        let title = text(handle, self.expected.submenu_position as u32)?;
         if title != self.expected.title {
-            return Err(format!("unexpected native recording title: {title}"));
+            return Err(format!("unexpected native submenu title: {title}"));
         }
-        if unsafe { GetMenuItemCount(self.recording) } != self.expected.items.len() as i32 {
-            return Err("unexpected native recording action count".into());
+        if unsafe { GetMenuItemCount(self.submenu) } != self.expected.items.len() as i32 {
+            return Err("unexpected native submenu item count".into());
         }
         for (position, &(expected_label, expected_enabled)) in
             self.expected.items.iter().enumerate()
         {
-            let label = text(self.recording, position as u32)?;
-            let flags = unsafe { GetMenuState(self.recording, position as u32, MF_BYPOSITION) };
+            let flags = unsafe { GetMenuState(self.submenu, position as u32, MF_BYPOSITION) };
             if flags == u32::MAX {
                 return Err("cannot read native recording action state".into());
             }
+            if expected_label.is_empty() {
+                if flags & MF_SEPARATOR == 0 {
+                    return Err("native submenu separator is missing".into());
+                }
+                continue;
+            }
+            let label = text(self.submenu, position as u32)?;
             let enabled = flags & (MF_GRAYED | MF_DISABLED) == 0;
             if label != expected_label || enabled != expected_enabled {
                 return Err(format!(
@@ -132,18 +140,25 @@ impl Session {
     /// 【系统托盘测试】【菜单导航】按 window 和 handle 核验弹出菜单并排队选择，返回通知或按键投递错误
     fn popup(&mut self, window: HWND, handle: HMENU) -> Result<(), String> {
         if self.root.is_null() {
-            // 1. 【系统托盘测试】【根菜单】首个方向键建立末项选择，再向上越过分隔符到达录制子菜单
+            // 1. 【系统托盘测试】【根菜单】从首项定位目标子菜单，延时与录制入口之前均没有分隔符
             self.inspect(handle)?;
             if self.expected.selected.is_none() {
                 return keys(window, &[VK_ESCAPE]);
             }
-            keys(window, &[VK_UP, VK_UP, VK_UP, VK_UP, VK_RIGHT])
-        } else if handle == self.recording {
-            // 2. 【系统托盘测试】【录制子菜单】启用项等待系统交付动作，禁用项尝试回车后取消
+            let mut input = vec![VK_HOME];
+            input.extend(std::iter::repeat_n(VK_DOWN, self.expected.submenu_position));
+            input.push(VK_RIGHT);
+            keys(window, &input)
+        } else if handle == self.submenu {
+            // 2. 【系统托盘测试】【子菜单选择】方向键跳过分隔符，启用项交付动作，禁用项回车后取消
             self.submenu_opened = true;
             let selected = self.expected.selected.ok_or("unexpected submenu opening")?;
             let mut input = vec![VK_HOME];
-            input.extend(std::iter::repeat_n(VK_DOWN, selected));
+            let steps = self.expected.items[..selected]
+                .iter()
+                .filter(|(label, _)| !label.is_empty())
+                .count();
+            input.extend(std::iter::repeat_n(VK_DOWN, steps));
             input.push(VK_RETURN);
             if !self.expected.items[selected].1 {
                 input.extend([VK_ESCAPE, VK_ESCAPE]);
@@ -246,10 +261,9 @@ impl Window {
 
     /// 【系统托盘测试】【实际弹出】按 expected 触发生产右键回调，返回菜单属性、导航或资源回收错误
     pub(super) fn open(&self, expected: Expected) -> Result<(), String> {
-        if expected
-            .selected
-            .is_some_and(|position| position >= expected.items.len())
-        {
+        if expected.selected.is_some_and(|position| {
+            position >= expected.items.len() || expected.items[position].0.is_empty()
+        }) {
             return Err("selected native menu action is out of range".into());
         }
         if unsafe { SetTimer(self.handle, TIMER, 5000, None) } == 0 {
@@ -259,7 +273,7 @@ impl Window {
             *cell.borrow_mut() = Some(Session {
                 expected,
                 root: std::ptr::null_mut(),
-                recording: std::ptr::null_mut(),
+                submenu: std::ptr::null_mut(),
                 submenu_opened: false,
                 error: None,
                 trace: Vec::new(),
@@ -292,9 +306,9 @@ impl Window {
         if session.root.is_null()
             || (session.expected.selected.is_some() && !session.submenu_opened)
         {
-            return Err("native recording menu was not opened".into());
+            return Err("native submenu was not opened".into());
         }
-        if unsafe { IsMenu(session.root) != 0 || IsMenu(session.recording) != 0 } {
+        if unsafe { IsMenu(session.root) != 0 || IsMenu(session.submenu) != 0 } {
             return Err("native menu handles were not released".into());
         }
         Ok(())
