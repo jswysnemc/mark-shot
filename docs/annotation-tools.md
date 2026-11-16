@@ -4,7 +4,8 @@
 
 After a region is selected, the main toolbar holds the drawing tools and the action toolbar holds
 finish actions. A property bar next to the toolbar shows the settings of the current tool. Both
-toolbars can be rearranged in **Settings → Toolbar**.
+toolbars can be rearranged in **Settings → Toolbar**. Hovering a button for about half a second
+shows its name and shortcut in a tooltip.
 
 The keys below are the defaults; all of them can be changed, see [Shortcuts](shortcuts.md).
 

@@ -6,6 +6,7 @@ mod items;
 mod layout;
 pub mod metrics;
 mod state;
+pub mod tooltip;
 
 pub use draw::*;
 pub use items::*;

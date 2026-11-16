@@ -167,6 +167,8 @@ pub struct EditorState {
 
     pub toolbar: Toolbar,
     pub action_toolbar: Toolbar,
+    /// the toolbar button tooltip currently on screen, if any
+    pub tooltip: Option<crate::ui::toolbar::tooltip::Tooltip>,
     /// 【截图工具栏】【拖动状态】面板类型及指针相对面板左上角的位置
     pub toolbar_drag: Option<(bool, (f32, f32))>,
     pub scope_before_fullscreen: Option<Rect>,
@@ -311,6 +313,7 @@ impl EditorState {
 
             toolbar: Toolbar::new(),
             action_toolbar: Toolbar::actions(),
+            tooltip: None,
             toolbar_drag: None,
             scope_before_fullscreen: None,
             fullscreen_scope: false,

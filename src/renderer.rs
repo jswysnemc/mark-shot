@@ -143,6 +143,8 @@ pub struct RenderRequest<'a> {
     pub ocr_scan: Option<(Rect, f32)>,
     pub monitor_idx: usize,
     pub toasts: &'a crate::ui::toast::Toasts,
+    /// toolbar button tooltip to draw on this monitor, if any
+    pub tooltip: &'a Option<crate::ui::toolbar::tooltip::Tooltip>,
     /// logical size of the monitor; canvas / scale is off by a fraction,
     /// and the loupe would flip at another spot than its damage does
     pub size: (f32, f32),
@@ -271,6 +273,12 @@ pub(crate) fn render_frame_with_navigation(
     {
         crate::ui::toolbar::draw_toolbar(&mut p, tb);
     }
+    crate::ui::toolbar::tooltip::draw_tooltip(
+        &mut p,
+        req.tooltip.as_ref(),
+        req.monitor_idx,
+        dirty_rect,
+    );
 
     if let Some(settings) = req.settings_panel.as_deref_mut()
         && settings.dirty

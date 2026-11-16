@@ -286,6 +286,17 @@ pub(super) fn poll_timeout(editor_state: &EditorState) -> Option<Duration> {
         let remaining = deadline.saturating_duration_since(Instant::now());
         timeout = Some(timeout.map_or(remaining, |other| other.min(remaining)));
     }
+    for (owner, toolbar) in [
+        (false, &editor_state.toolbar),
+        (true, &editor_state.action_toolbar),
+    ] {
+        if let Some(deadline) =
+            crate::ui::toolbar::tooltip::deadline(editor_state.tooltip.as_ref(), owner, toolbar)
+        {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            timeout = Some(timeout.map_or(remaining, |other| other.min(remaining)));
+        }
+    }
     if let Some(deadline) = editor_state
         .text_session
         .as_ref()
@@ -455,6 +466,7 @@ pub(super) fn tick_panels(editor_state: &mut EditorState, dirty_mask: &mut u32) 
         &mut editor_state.damage_rects,
         dirty_mask,
     );
+    panels::toolbar::sync_tooltips(editor_state, dirty_mask);
     tick_panel_animation(
         &mut editor_state.color_popover,
         &mut editor_state.damage_rects,

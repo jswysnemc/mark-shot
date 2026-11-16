@@ -39,6 +39,8 @@ pub struct Toolbar {
     pub selected: Option<usize>,
     pub translating: bool,
     pub hovered: Option<usize>,
+    /// when the current `hovered` was set; the tooltip delay counts from it
+    pub hover_started: Option<Instant>,
     pub to: Outputs,
     pub marker_shape: crate::types::MarkerShape,
     pub marker_filled: bool,
@@ -118,6 +120,9 @@ impl HoverablePanel for Toolbar {
         self.hovered
     }
     fn set_hovered(&mut self, hover: Self::Hover) {
+        if self.hovered != hover {
+            self.hover_started = hover.map(|_| Instant::now());
+        }
         self.hovered = hover;
     }
 }
@@ -198,6 +203,7 @@ impl Toolbar {
             selected: Some(0),
             translating: false,
             hovered: None,
+            hover_started: None,
             to: Outputs::default(),
             marker_shape: crate::types::MarkerShape::default(),
             marker_filled: true,

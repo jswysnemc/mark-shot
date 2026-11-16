@@ -1,9 +1,11 @@
 //! 【截图工具栏】【定位同步】主栏跟随选区下缘，副栏优先避让到右侧，空选区不显示
 
+use std::time::Instant;
+
 use crate::{
     editor::{EditorState, dirty::mark_all_dirty},
     ui::{
-        panel::{UiPanel, sync_panel_hover, sync_panel_rect},
+        panel::{UiPanel, emit_panel_damage, sync_panel_hover, sync_panel_rect},
         toolbar::{Toolbar, ToolbarButton, ToolbarItem},
     },
 };
@@ -172,9 +174,77 @@ pub fn update_toolbar(state: &mut EditorState, dirty: &mut u32) {
         };
         sync_panel_hover(toolbar, hovered, &mut state.damage_rects, dirty);
     }
+    sync_tooltips(state, dirty);
     if main_layout || side_layout {
         mark_all_dirty(dirty, state.placements.len());
     }
+}
+
+/// 【悬停提示】【同步】按双栏悬停与延迟维护唯一气泡；显示、移动或隐藏时为新旧区域发出 damage
+pub fn sync_tooltips(state: &mut EditorState, dirty: &mut u32) {
+    let cn = crate::ui::language::Language::current() == crate::ui::language::Language::Chinese;
+    let now = Instant::now();
+    for (owner, toolbar) in [
+        (false, &mut state.toolbar),
+        (true, &mut state.action_toolbar),
+    ] {
+        let want = tooltip_target(toolbar, now).and_then(|index| {
+            let text = crate::ui::toolbar::tooltip::text(toolbar.items[index], cn)?;
+            let text_w = crate::renderer::measure_line_width(
+                &text,
+                crate::theme::font::label(),
+                &mut state.text.font_system,
+            );
+            let size = state.placements[toolbar.monitor_idx].size;
+            let rect = crate::ui::toolbar::tooltip::bubble_rect(
+                toolbar,
+                index,
+                text_w,
+                (size.0 as f32, size.1 as f32),
+            )?;
+            Some((index, rect, text))
+        });
+        let unchanged = match (&want, &state.tooltip) {
+            (None, None) => true,
+            (None, Some(tip)) => tip.owner_actions != owner,
+            (Some((index, rect, _)), Some(tip)) => {
+                tip.owner_actions == owner && tip.index == *index && tip.rect == *rect
+            }
+            (Some(_), None) => false,
+        };
+        if unchanged {
+            continue;
+        }
+        if let Some(tip) = state.tooltip.take() {
+            emit_panel_damage(tip.rect, tip.monitor_idx, &mut state.damage_rects, dirty);
+        }
+        if let Some((index, rect, text)) = want {
+            emit_panel_damage(rect, toolbar.monitor_idx, &mut state.damage_rects, dirty);
+            state.tooltip = Some(crate::ui::toolbar::tooltip::Tooltip {
+                owner_actions: owner,
+                index,
+                monitor_idx: toolbar.monitor_idx,
+                rect,
+                text,
+            });
+        }
+    }
+}
+
+/// 【悬停提示】【目标判定】按 hovered、disabled 与悬停时长返回应显示气泡的按钮下标
+fn tooltip_target(toolbar: &Toolbar, now: Instant) -> Option<usize> {
+    let index = toolbar.hovered?;
+    if toolbar.interferes
+        || toolbar.window_bar
+        || toolbar.disabled.contains(&index)
+        || !matches!(toolbar.items.get(index), Some(ToolbarItem::Button(_)))
+        || toolbar
+            .hover_started
+            .is_none_or(|t| now.duration_since(t) < crate::ui::toolbar::tooltip::TOOLTIP_DELAY)
+    {
+        return None;
+    }
+    Some(index)
 }
 
 /// 【工具栏配置】【会话同步】按 config 应用 state 当前场景按钮，reset 清除旧位置并应用方向，不修改标注
@@ -218,6 +288,7 @@ pub(crate) fn configure(
             };
             toolbar.selected = items.iter().position(|item| matches!(item, ToolbarItem::Button(ToolbarButton::Tool(tool)) if *tool == state.selected_tool));
             toolbar.hovered = None;
+            toolbar.hover_started = None;
             toolbar.disabled.clear();
             toolbar.user_position = None;
             if reset {

@@ -395,6 +395,7 @@ pub(super) fn render_monitor(
             ocr_scan: frame.scan_badge,
             monitor_idx: i,
             toasts: &editor_state.toasts,
+            tooltip: &editor_state.tooltip,
             size: (
                 editor_state.placements[i].size.0 as f32,
                 editor_state.placements[i].size.1 as f32,
