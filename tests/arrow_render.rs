@@ -381,3 +381,49 @@ fn direct_head_keeps_the_concave_notch_behind_the_barbs() {
     assert_eq!(image.pixel(430, 92).unwrap().alpha(), 0);
     assert_eq!(image.pixel(430, 108).unwrap().alpha(), 0);
 }
+
+/// 【箭头测试】【阴影分块】带模糊阴影的局部画布与完整画布裁切逐字节一致，不产生分块接缝
+#[test]
+fn fractional_scale_shadow_clips_match_the_full_render_exactly() {
+    let mut line = LineSkeleton::new((33.4, 55.7), (510.6, 207.3)).unwrap();
+    line.controls.push((275.25, 289.1));
+    let region = IntRect::from_xywh(173, 131, 211, 157).unwrap();
+    let color = Color::from_rgba8(200, 40, 70, 160);
+    let shadow = mark_shot::renderer::shadow_color_for(color);
+    for style in [ArrowStyle::Direct, ArrowStyle::Kde, ArrowStyle::Fletched] {
+        let mut full = Pixmap::new(720, 440).unwrap();
+        draw::draw(
+            &mut Painter::new(&mut full).with_scale(1.25),
+            &line,
+            style,
+            LineStyle::Solid,
+            9.0,
+            color,
+            shadow,
+        );
+        let mut clipped = Pixmap::new(region.width(), region.height()).unwrap();
+        draw::draw(
+            &mut Painter::new(&mut clipped)
+                .with_scale(1.25)
+                .with_origin((region.x() as f32 / 1.25, region.y() as f32 / 1.25)),
+            &line,
+            style,
+            LineStyle::Solid,
+            9.0,
+            color,
+            shadow,
+        );
+        let expected = full.clone_rect(region).unwrap();
+        let worst = clipped
+            .data()
+            .iter()
+            .zip(expected.data())
+            .map(|(actual, expected)| actual.abs_diff(*expected))
+            .max()
+            .unwrap_or(0);
+        assert!(
+            worst <= 1,
+            "{style:?}: shadow clipped redraw differs by {worst}"
+        );
+    }
+}

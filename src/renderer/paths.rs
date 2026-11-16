@@ -337,12 +337,17 @@ pub fn blurred_shadow(
         return;
     };
     let canvas = painter.canvas();
-    let Some(visible) = Rect::from_xywh(0.0, 0.0, canvas.width() as f32, canvas.height() as f32)
+    let Some(canvas_rect) =
+        Rect::from_xywh(0.0, 0.0, canvas.width() as f32, canvas.height() as f32)
     else {
         return;
     };
+    // 1. 【阴影绘制】【分块一致】临时缓冲向画布外扩模糊半径，分块边界也能读到相邻像素
+    let Some(render_area) = canvas_rect.outset(blur * 2.0 + 4.0, blur * 2.0 + 4.0) else {
+        return;
+    };
     let Some(bounds) = bounds
-        .intersect(&visible)
+        .intersect(&render_area)
         .and_then(|bounds| bounds.round_out())
     else {
         return;
