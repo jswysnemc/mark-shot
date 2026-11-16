@@ -13,14 +13,10 @@ pub(super) struct Record {
     pub index: u32,
 }
 
-/// 【Windows字体】【目录缓存】无参数，返回系统字体元数据，启动时不调用，不保留所有字体的字形缓存
+/// 【Windows字体】【目录缓存】无参数，返回共享预热字体元数据，不重复枚举系统目录，不保留全部字形缓存
 fn database() -> &'static Database {
     static FONTS: OnceLock<Database> = OnceLock::new();
-    FONTS.get_or_init(|| {
-        let mut fonts = Database::new();
-        fonts.load_system_fonts();
-        fonts
-    })
+    FONTS.get_or_init(crate::fonts::system)
 }
 
 /// 【Windows字体】【家族记录】无参数，返回文件家族与索引，实际字形仍按预览需求加载
