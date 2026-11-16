@@ -232,9 +232,11 @@ pub mod anim {
 // ==========================================
 
 pub mod shadow {
-    /// How far the shadow reaches past a stroke, for the damaged zone calculation.
+    /// 【标注主题】【阴影扩展】无参数，返回包含完整滤波支持范围的窗口逻辑描边增量
     pub fn width_bonus() -> f32 {
         let shadow = &crate::config::get().annotations.shadow;
-        shadow.layers as f32 * shadow.spread + 1.0
+        (shadow.layers as f32 * shadow.spread)
+            .max(crate::renderer::blurred_shadow::padding(shadow.blur) * 2.0)
+            + 1.0
     }
 }

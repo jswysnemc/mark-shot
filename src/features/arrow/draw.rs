@@ -1,6 +1,6 @@
 //! 【箭头】【正文绘制】在固定像素块中绘制组合轮廓，不重复叠加半透明箭头
 
-use tiny_skia::{Color, Transform};
+use tiny_skia::Color;
 
 use super::{ArrowStyle, path};
 use crate::features::line::{LineSkeleton, LineStyle};
@@ -25,16 +25,7 @@ pub fn draw(
         painter.window_units().canvas(1.0),
     ) {
         if shadow_color.alpha() > 0.0 {
-            let [dx, dy] = crate::config::get().annotations.shadow.offset;
-            if dx.is_finite()
-                && dy.is_finite()
-                && let Some(shadow) = path.clone().transform(Transform::from_translate(
-                    painter.window_units().canvas(dx),
-                    painter.window_units().canvas(dy),
-                ))
-            {
-                crate::renderer::fixed_path::fill(painter, &shadow, shadow_color);
-            }
+            crate::renderer::blurred_shadow::draw(painter, &path, None, shadow_color);
         }
         crate::renderer::fixed_path::fill(painter, &path, color);
     }

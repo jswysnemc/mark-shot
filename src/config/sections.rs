@@ -262,7 +262,8 @@ section!(Selection {
 
 section!(Shadow {
     color: Rgba = CRUST.with_alpha(130),
-    offset: [f32; 2] = [0.0, 3.0],
+    offset: [f32; 2] = [4.0, 4.0],
+    blur: f32 = 8.0,
     layers: usize = 2,
     spread: f32 = 1.5,
     falloff: f32 = 1.2,

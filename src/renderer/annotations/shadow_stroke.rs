@@ -2,6 +2,7 @@
 
 use super::*;
 
+/// 【渲染】【阴影描边】将 path 以 color、stroke_width、line_cap 和 line_join 绘入 p，shadow_color 控制柔和阴影，无返回值
 pub(super) fn stroke_with_shadow(
     p: &mut Painter,
     path: &tiny_skia::Path,
@@ -11,7 +12,7 @@ pub(super) fn stroke_with_shadow(
     line_join: LineJoin,
     shadow_color: Color,
 ) {
-    let (transform, shadow_transform) = transforms_for(p);
+    let transform = p.transform();
 
     let mut paint = Paint::default();
     paint.set_color(color);
@@ -22,15 +23,6 @@ pub(super) fn stroke_with_shadow(
     stroke.line_cap = line_cap;
     stroke.line_join = line_join;
 
-    let base_shadow_color = shadow_color;
-
-    stroke_segment_with_shadow(
-        p,
-        path,
-        &paint,
-        &stroke,
-        base_shadow_color,
-        transform,
-        shadow_transform,
-    );
+    crate::renderer::blurred_shadow::draw(p, path, Some(&stroke), shadow_color);
+    p.canvas.stroke_path(path, &paint, &stroke, transform, None);
 }

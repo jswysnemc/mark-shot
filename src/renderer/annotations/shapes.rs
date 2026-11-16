@@ -94,25 +94,16 @@ pub(super) fn fill_circle(
     }
 }
 
+/// 【渲染】【阴影填充】将 path 以 color 填入 p，先绘制 shadow_color 对应的柔和阴影，无返回值
 pub(super) fn fill_with_shadow(
     p: &mut Painter,
     path: &tiny_skia::Path,
     color: Color,
     shadow_color: Color,
 ) {
-    let (transform, shadow_transform) = transforms_for(p);
+    crate::renderer::blurred_shadow::draw(p, path, None, shadow_color);
 
-    let mut shadow_paint = Paint::default();
-    shadow_paint.set_color(shadow_color);
-    shadow_paint.anti_alias = true;
-    p.canvas.fill_path(
-        path,
-        &shadow_paint,
-        FillRule::Winding,
-        shadow_transform,
-        None,
-    );
-
+    let transform = p.transform();
     let mut paint = Paint::default();
     paint.set_color(color);
     paint.anti_alias = true;

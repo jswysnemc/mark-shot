@@ -17,7 +17,13 @@ pub(super) fn draw(
     annotation: &Annotation,
     body: impl FnMut(&mut Painter<'_>),
 ) {
-    draw_region(painter, annotation.damage_bbox(false), body);
+    let bounds = super::annotation_style::damage(
+        annotation,
+        painter.window_units(),
+        painter.drawing_bounds(),
+        painter.ruler_projection(),
+    );
+    draw_region(painter, bounds, body);
 }
 
 /// 【标注绘制】【固定区域】按painter、bounds和body绘制固定物理网格，任意局部裁切保持相同栅格结果，无返回值
@@ -69,3 +75,7 @@ pub(crate) fn draw_region(
         }
     }
 }
+
+#[cfg(test)]
+#[path = "rotation_tiles_shadow_tests.rs"]
+mod shadow_tests;

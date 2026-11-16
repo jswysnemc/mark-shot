@@ -49,6 +49,9 @@ pub(super) fn damage(
     };
     let mut extra =
         (window.canvas(minimum) - annotation.stroke_width).max(0.0) / 2.0 + window.canvas(2.0);
+    // 1. 【标注样式】【阴影单位】窗口单位大于画布单位时，额外包含稳定窗口阴影的实际范围
+    let shadow_pad = super::visual_pad(annotation.stroke_width) - annotation.stroke_width / 2.0;
+    extra += (window.canvas(shadow_pad) - shadow_pad).max(0.0);
     if matches!(annotation.shape, AnnotationShape::Arrow { .. }) {
         extra = extra.max(window.canvas(20.0));
     }

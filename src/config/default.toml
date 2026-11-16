@@ -417,7 +417,10 @@ nudge_fast = 10.0
 
 [annotations.shadow]
 color = "#10161782"
-offset = [0.0, 3.0]
+# 向右下偏移，单位为窗口逻辑像素
+offset = [4.0, 4.0]
+# 柔和阴影的模糊尺寸，单位为窗口逻辑像素；零表示不模糊
+blur = 8.0
 layers = 2
 spread = 1.5
 # how fast each next layer fades

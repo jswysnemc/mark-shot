@@ -17,14 +17,14 @@
 | 非整除缩放增加边缘像素 | X11/Windows 保留原生网格和精确逻辑边缘；Wayland 保留原有缓冲契约与不兼容回退 |
 | VirtualBox 接收不到图片 | Wayland 来源只提供 PNG；新增按需 BMP 与 x-bmp，缓存匿名文件并保留原 PNG |
 | RPM 要求 OpenSSL 4 / glibc 2.44 | 不再使用滚动的 Fedora latest；固定 Fedora 43，实际产物检查 OpenSSL 3 / glibc ≤2.42 |
-| PR #162 缩放后的阴影偏移错误 | 阴影偏移统一换算到窗口单位，使用非透明阴影验证不同绘制比例下的等价结果 |
+| PR #162 缩放后的阴影偏移错误 | 偏移和模糊统一换算到窗口单位，旋转分块共用扩展后的重绘边界 |
 
 待命进程不会预先固定配置或保存的标注偏好。准备线程就绪等待最多十秒，失败回收子进程；动作线程不等待准备，未就绪时立即使用普通启动；
 任务开始之后发生错误不会自动重复截图。待命期间不捕获屏幕，不进行周期绘制。
 
 ## 已执行验证
 
-- Rust 工作区 1705 项通过，包含主库 1291 项；另有需要特定环境的忽略项。
+- Rust 工作区 1711 项通过，包含主库 1292 项；另有需要特定环境的忽略项。
 - Linux 和 Windows 全目标 Clippy，开启 `-D warnings`。
 - Python 验证工具 238 项、打包合同测试 69 项通过。
 - Windows 目标配置、快捷键、状态和边框单元测试 37 项在私有 Wine 通过。真实 Windows CI 的单元测试、Clippy、录制导出和完整包验证也通过。
@@ -35,6 +35,7 @@
 - 私有 Wine 窗口验证 GUI 子系统、四边配置颜色、原图中心像素，以及其他贴图持有焦点时取消截图。
 - Windows Paddle 使用官方摘要验证的 ONNX Runtime 1.28.0，12、16、24 像素中英文样本逐字匹配，原图坐标有效。
 - 私有 Wine 的合成 WM_HOTKEY 动作到窗口显示为 543 毫秒，静默十五秒后为 385 毫秒；不等待未就绪的准备任务。
+- #162 最终绘制、旋转和导出回归 34 项通过；模糊阴影的局部与完整绘制每个预乘通道至多一级误差。
 
 主要证据保存在 `target/desktop-*.log`、`target/desktop-x11-validation.json`、
 `target/desktop-wayland-clipboard/clipboard-validation.json`、
@@ -65,6 +66,27 @@ Fedora 43 的 x86_64 和 aarch64 真实 RPM 均完成依赖检查和安装验证
 - #158 的跨 PID 命名空间身份检查已有修复，保留 UID 校验。
 - #155、#157 来自旧 Qt 包；Rust 原生版不依赖该 Qt 插件或旧 FFmpeg soname。
 - #154 的官方政策与替代服务比较见[翻译替代方案](zh-CN/translation-alternatives.md)。
+
+## PR #162 后续阴影审查
+
+后续两个提交增加高斯模糊阴影，但共享实现丢失主分支的窗口单位换算，并按整个可见外框分配模糊缓冲。
+合并时保留柔化效果，把阴影绘制拆成独立模块，以 128 像素核心块处理；外部支持像素参与滤波，合成时仅提交核心区。
+空心框内部跳过模糊，模糊结果复用掩码，临时内存不随完整路径或画布外框增长。
+本机发布模式对 3840×2160 空心框执行十次绘制；将核心块从 512 调整为 128 像素后，平均耗时从 144.58 降至 72.45 毫秒。
+该结果是本机图形绘制测量，不代表 Windows 实际快捷键延迟。
+
+| 审查轴 | 发现与处理 |
+| --- | --- |
+| 规范 | 补齐参数、返回值与编号步骤注释；阴影实现从通用路径文件拆出 |
+| 行为 | 恢复偏移和模糊的窗口单位换算；旋转分块入口使用同一实际重绘范围 |
+
+实际回归覆盖三十二像素模糊的填充和描边、窄条带、跨块裁剪、画布边缘、超大路径的小视区，以及按正式损坏范围删除标注后的完整清除。
+旋转回归比较完整场景和分块绘制，覆盖四倍窗口单位、三种绘制比例与三个跨块偏移。
+证据保存在 `target/shadow-workspace-final-tests.log`、`target/shadow-focused-final-tests.log` 和
+`target/shadow-4k-final-measurement.log`。
+最终实现还完成 Windows MSVC 发布模式交叉编译，核对可执行文件为 x86_64、Windows GUI 子系统。
+两平台最终 Clippy 均使用 `-D warnings`，记录位于 `target/shadow-linux-final-clippy.log`、
+`target/shadow-windows-final-clippy.log` 和 `target/shadow-windows-final-release.log`。
 
 ## 持续集成与验证产物
 

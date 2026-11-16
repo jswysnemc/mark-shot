@@ -7,6 +7,7 @@ pub(crate) mod pixel_bounds;
 mod annotation_tile_blend;
 mod annotation_tiles;
 mod background_restore;
+pub mod blurred_shadow;
 mod canvas_navigation;
 mod dimming;
 pub(crate) mod editor_text;
