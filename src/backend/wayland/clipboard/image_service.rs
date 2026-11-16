@@ -3,7 +3,6 @@
 use super::image_source::ImageSource;
 use std::{
     collections::HashSet,
-    fs::File,
     io::{self, Write},
     sync::Arc,
 };
@@ -131,7 +130,7 @@ macro_rules! data_control_dispatch {
                     $source::Event::Send { mime_type, fd } if mime_type == PNG => {
                         let image = Arc::clone(&state.image);
                         let result = std::thread::Builder::new().name("clipboard-send".into()).spawn(move || {
-                            if let Err(error) = image.send(File::from(fd)) {
+                            if let Err(error) = image.send_fd(fd) {
                                 log::info!("【图片剪贴板】【发送结束】{error}");
                             }
                         });
