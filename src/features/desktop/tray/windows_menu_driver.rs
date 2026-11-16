@@ -140,20 +140,20 @@ impl Session {
     /// 【系统托盘测试】【菜单导航】按 window 和 handle 核验弹出菜单并排队选择，返回通知或按键投递错误
     fn popup(&mut self, window: HWND, handle: HMENU) -> Result<(), String> {
         if self.root.is_null() {
-            // 1. 【系统托盘测试】【根菜单】从首项定位目标子菜单，延时与录制入口之前均没有分隔符
+            // 1. 【系统托盘测试】【根菜单】鼠标打开的菜单尚未选中项目，首次 Down 选中首项；Windows 不处理此处的 Home
             self.inspect(handle)?;
             if self.expected.selected.is_none() {
                 return keys(window, &[VK_ESCAPE]);
             }
-            let mut input = vec![VK_HOME];
+            let mut input = vec![VK_DOWN];
             input.extend(std::iter::repeat_n(VK_DOWN, self.expected.submenu_position));
             input.push(VK_RIGHT);
             keys(window, &input)
         } else if handle == self.submenu {
-            // 2. 【系统托盘测试】【子菜单选择】方向键跳过分隔符，启用项交付动作，禁用项回车后取消
+            // 2. 【系统托盘测试】【子菜单选择】Right 打开子菜单后系统已选中首项，后续 Down 跳过分隔符，禁用项回车后取消
             self.submenu_opened = true;
             let selected = self.expected.selected.ok_or("unexpected submenu opening")?;
-            let mut input = vec![VK_HOME];
+            let mut input = Vec::new();
             let steps = self.expected.items[..selected]
                 .iter()
                 .filter(|(label, _)| !label.is_empty())
