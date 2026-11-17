@@ -356,7 +356,7 @@ fn reconcile(streams: Vec<StreamInfo>, outputs: &[Output]) -> Result<Vec<(usize,
     let mut matched = match_sources(streams, &positions)?;
     // 1. 【Portal捕获】【逻辑尺寸】Portal视频尺寸可以是物理像素，裁切比例必须来自原生输出逻辑尺寸
     for (index, info) in &mut matched {
-        info.size = outputs[*index].info.logical_size.or(info.size);
+        info.size = outputs[*index].logical_size().or(info.size);
         info.position = Some(positions[*index]);
     }
     Ok(matched)

@@ -17,7 +17,7 @@ pub(super) fn size<'a>(
             let scale = if hidpi { output.scale() } else { 1.0 };
             let logical = panel.map_or_else(
                 || {
-                    let (width, height) = output.info.logical_size.unwrap_or((0, 0));
+                    let (width, height) = output.logical_size().unwrap_or((0, 0));
                     (width.max(0) as u32, height.max(0) as u32)
                 },
                 |rect| (rect.width().ceil() as u32, rect.height().ceil() as u32),

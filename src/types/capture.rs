@@ -53,10 +53,34 @@ pub struct Output {
 
 #[cfg(target_os = "linux")]
 impl Output {
-    /// physical pixels per logical one
-    /// (compoared by longer side to avoid issues with rotated)
-    ///
-    /// not using preferred scale because it is sent late
+    /// 【Linux输出】【逻辑尺寸】优先返回 xdg-output 逻辑尺寸，沙箱缺失扩展时按当前物理模式、旋转方向与整数缩放换算
+    pub fn logical_size(&self) -> Option<(i32, i32)> {
+        if let Some(logical) = self.info.logical_size {
+            return Some(logical);
+        }
+        let mode = self.info.modes.iter().find(|mode| mode.current)?;
+        let (width, height) = if matches!(
+            self.info.transform,
+            wl_output::Transform::_90
+                | wl_output::Transform::_270
+                | wl_output::Transform::Flipped90
+                | wl_output::Transform::Flipped270
+        ) {
+            (mode.dimensions.1, mode.dimensions.0)
+        } else {
+            mode.dimensions
+        };
+        if width <= 0 || height <= 0 {
+            return None;
+        }
+        let factor = self.info.scale_factor.max(1);
+        Some((
+            (width + factor - 1) / factor,
+            (height + factor - 1) / factor,
+        ))
+    }
+
+    /// 【Linux输出】【缩放比例】按较长边比较物理模式与逻辑尺寸计算一百二十分之一精度比例，缺失模式时采用整数缩放因子
     pub fn scale(&self) -> f32 {
         let physical = self
             .info
@@ -64,12 +88,12 @@ impl Output {
             .iter()
             .find(|m| m.current)
             .map(|m| m.dimensions.0.max(m.dimensions.1));
-        let logical = self.info.logical_size.map(|(w, h)| w.max(h));
+        let logical = self.logical_size().map(|(w, h)| w.max(h));
         let (Some(physical), Some(logical)) = (physical, logical) else {
-            return 1.0;
+            return (self.info.scale_factor.max(1) as f32).clamp(0.25, 8.0);
         };
         if physical <= 0 || logical <= 0 {
-            return 1.0;
+            return (self.info.scale_factor.max(1) as f32).clamp(0.25, 8.0);
         }
         let scale = (physical as f32 / logical as f32 * 120.0).round() / 120.0;
         // to be sure it won't take a lot of space
@@ -112,4 +136,28 @@ impl Capture {
 
 pub struct CaptureResult {
     pub frames: Vec<MonitorFrame>,
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod output_tests {
+    use super::*;
+
+    /// 【Linux输出测试】【无xdg-output回退】沙箱隐藏 xdg-output 时仍按物理模式、旋转方向和整数缩放推导逻辑尺寸与比例
+    #[test]
+    fn missing_xdg_output_derives_logical_size_and_scale_from_wl_output() {
+        let mut info = SctkOutputInfo::x11(1, "eDP-1".into(), (0, 0), (2560, 1600));
+        info.logical_size = None;
+        info.scale_factor = 2;
+        let output = Output {
+            wl_output: None,
+            info,
+        };
+        assert_eq!(output.logical_size(), Some((1280, 800)));
+        assert_eq!(output.scale(), 2.0);
+
+        let mut rotated = output.clone();
+        rotated.info.transform = wl_output::Transform::_90;
+        assert_eq!(rotated.logical_size(), Some((800, 1280)));
+        assert_eq!(rotated.scale(), 2.0);
+    }
 }

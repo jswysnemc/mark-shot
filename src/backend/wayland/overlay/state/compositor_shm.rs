@@ -105,6 +105,24 @@ impl OverlayState {
         if sd.shm_buffer.is_some() && sd.width == w && sd.height == h {
             return;
         }
+        // 1. 【截图覆盖层】【视口复用】固定物理捕获缓冲已分配时仅更新逻辑目标尺寸与坐标映射，避免尺寸变化破坏在途帧缓冲
+        if sd.shm_buffer.is_some() && sd.capture_buffer_size.is_some() {
+            sd.width = w;
+            sd.height = h;
+            sd.sync_capture_canvas_rect();
+            sd.apply_input(&self.compositor_state);
+            if let Some(viewport) = &sd.viewport {
+                viewport.set_destination(w.max(1) as i32, h.max(1) as i32);
+            }
+            if let Some(background) = &sd.background
+                && let Some(viewport) = &background.viewport
+            {
+                viewport.set_destination(w.max(1) as i32, h.max(1) as i32);
+                background.surface.commit();
+            }
+            sd.surface.commit();
+            return;
+        }
         // creating buffers and attaching
         let pool = &mut self.pool;
         let transparent_parent = sd.scroll_layer.is_some()
@@ -114,6 +132,8 @@ impl OverlayState {
             );
         let (bw, bh) = if transparent_parent && sd.viewport.is_some() {
             (1, 1)
+        } else if let Some(capture_px) = sd.capture_buffer_size {
+            capture_px
         } else {
             crate::types::px_size((w, h), sd.scale)
         };
@@ -137,10 +157,16 @@ impl OverlayState {
         sd.apply_input(&self.compositor_state);
         // viewport maps buffer, which is is in physical pixels, back to the logical size
         if let Some(viewport) = &sd.viewport {
-            viewport.set_destination(w as i32, h as i32);
+            viewport.set_destination(w.max(1) as i32, h.max(1) as i32);
+        }
+        if let Some(background) = &sd.background
+            && let Some(viewport) = &background.viewport
+        {
+            viewport.set_destination(w.max(1) as i32, h.max(1) as i32);
+            background.surface.commit();
         }
         if defer_image_frame {
-            // 1. 【图片窗口】【完整交付】调整尺寸后的槽位必须先由画布完整绘制，不能提交池中残留像素
+            // 2. 【图片窗口】【完整交付】调整尺寸后的槽位必须先由画布完整绘制，不能提交池中残留像素
             sd.waiting_release = false;
             sd.frame_sent = None;
         } else if transparent_parent {
@@ -148,11 +174,13 @@ impl OverlayState {
                 .buffer
                 .attach_to(&sd.surface)
                 .expect("newly created buffer is inactive");
+            sd.bootstrap_buffer = None;
         } else {
             shm_buffer
                 .buffer
                 .attach_to(&sd.surface)
                 .expect("newly created buffer is inactive");
+            sd.bootstrap_buffer = None;
             sd.waiting_release = true;
         }
         if !defer_image_frame {
@@ -165,5 +193,6 @@ impl OverlayState {
         sd.buffer_history = Default::default();
         sd.width = w;
         sd.height = h;
+        sd.sync_capture_canvas_rect();
     }
 }

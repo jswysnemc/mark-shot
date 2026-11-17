@@ -94,14 +94,7 @@ pub fn build_placements(outputs: &[Output], hidpi: bool) -> Vec<Placement> {
         .iter()
         .map(|o| Placement {
             position: o.info.logical_position.unwrap_or(o.info.location),
-            size: o.info.logical_size.unwrap_or_else(|| {
-                o.info
-                    .modes
-                    .iter()
-                    .find(|m| m.current)
-                    .map(|m| m.dimensions)
-                    .unwrap_or((0, 0))
-            }),
+            size: o.logical_size().unwrap_or((0, 0)),
             scale: if hidpi { o.scale() } else { 1.0 },
             native_size: native_pixel_size(o, hidpi),
         })

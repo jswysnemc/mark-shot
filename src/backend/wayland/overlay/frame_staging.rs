@@ -156,6 +156,7 @@ impl WaylandOverlay {
         surface.frame_sent = Some(Instant::now());
         surface.waiting_release = true;
         surface.surface.commit();
+        surface.bootstrap_buffer = None;
         crate::backend::wayland::activation::activate(&runtime.globals, &qh, &surface.surface);
         Ok(())
     }

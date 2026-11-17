@@ -45,6 +45,17 @@ impl Output {
         }
     }
 
+    /// 【Windows输出】【逻辑尺寸】优先读取逻辑尺寸描述，缺失时采用当前物理模式尺寸
+    pub fn logical_size(&self) -> Option<(i32, i32)> {
+        self.info.logical_size.or_else(|| {
+            self.info
+                .modes
+                .iter()
+                .find(|mode| mode.current)
+                .map(|mode| mode.dimensions)
+        })
+    }
+
     /// 【Windows输出】【像素比例】无参数，返回统一物理桌面坐标比例，原图捕获与导出不经过DPI重采样
     pub fn scale(&self) -> f32 {
         1.0

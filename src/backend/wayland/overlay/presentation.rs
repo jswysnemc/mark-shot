@@ -49,7 +49,7 @@ impl WaylandOverlay {
                 let scale = if hidpi { o.scale() } else { 1.0 };
                 (
                     o.wl_output.clone().expect("Wayland overlay output"),
-                    o.info.logical_size.unwrap_or((0, 0)),
+                    o.logical_size().unwrap_or((0, 0)),
                     scale,
                 )
             })
@@ -150,6 +150,11 @@ impl WaylandOverlay {
                                 mapped: false,
                                 input: InputRegion::Nothing,
                                 canvas_rect: None,
+                                capture_logical_size: None,
+                                capture_buffer_size: None,
+                                fullscreen_output: None,
+                                bootstrap_size: None,
+                                bootstrap_buffer: None,
                                 scroll_frame: None,
                                 scroll_stamps: Default::default(),
                                 width: 1,
@@ -225,6 +230,12 @@ impl WaylandOverlay {
 
             let scroll_layer =
                 (scrolling.is_some() && matches!(&role, Role::Layer(_))).then(Default::default);
+            let capture_surface = rt.state.image_window.is_none() && panel_rect.is_none();
+            let capture_logical_size = capture_surface.then_some((w.max(1), h.max(1)));
+            let capture_buffer_size = (capture_surface && viewport.is_some())
+                .then(|| crate::types::px_size((w.max(1), h.max(1)), scale));
+            let fullscreen_output =
+                (capture_surface && matches!(&role, Role::Window(_))).then_some(wl_output);
             rt.state.surfaces.insert(
                 i,
                 SurfaceData {
@@ -240,6 +251,11 @@ impl WaylandOverlay {
                     mapped: false,
                     input: InputRegion::Full,
                     canvas_rect: panel_rect,
+                    capture_logical_size,
+                    capture_buffer_size,
+                    fullscreen_output,
+                    bootstrap_size: None,
+                    bootstrap_buffer: None,
                     scroll_frame: None,
                     scroll_stamps: Default::default(),
                     width: w,
@@ -264,12 +280,43 @@ impl WaylandOverlay {
         }
 
         let deadline = Instant::now() + CONFIGURE_TIMEOUT;
+        let mut bootstrap_rounds = 0u8;
         while rt.state.surfaces.values().any(|sd| sd.shm_buffer.is_none()) {
             // freezes untill configure_surface create necessary buffers in state/compositor_shm.rs
             // if we continue without waiting compositor response, app will crash
             rt.event_queue.roundtrip(&mut rt.state)?;
             if let Some(e) = rt.state.configure_error.take() {
                 return Err(format!("can't allocate overlay buffer: {e}").into());
+            }
+            // 2. 【截图覆盖层】【窗口兜底】若合成器在透明映射引导后仍未发送全屏配置，采用当前窗口尺寸与视口缩放完成初始化
+            if rt.state.surfaces.values().any(|sd| sd.shm_buffer.is_none())
+                && rt
+                    .state
+                    .surfaces
+                    .values()
+                    .filter(|sd| sd.shm_buffer.is_none())
+                    .all(|sd| sd.bootstrap_size.is_some())
+            {
+                bootstrap_rounds = bootstrap_rounds.saturating_add(1);
+                if bootstrap_rounds > 2 {
+                    let pending: Vec<_> = rt
+                        .state
+                        .surfaces
+                        .values()
+                        .filter_map(|sd| {
+                            sd.shm_buffer
+                                .is_none()
+                                .then(|| (sd.surface.clone(), sd.bootstrap_size))
+                        })
+                        .collect();
+                    for (surface, fallback) in pending {
+                        rt.state.configure_surface(&surface, fallback);
+                    }
+                    if let Some(e) = rt.state.configure_error.take() {
+                        return Err(format!("can't allocate overlay buffer: {e}").into());
+                    }
+                    break;
+                }
             }
             if Instant::now() > deadline {
                 return Err("compositor didn't configure the overlay windows".into());
