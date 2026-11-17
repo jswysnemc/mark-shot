@@ -86,6 +86,7 @@ jobs:
         run: python3 scripts/packaging/install_linux.py --destination target/package-stage --arch "$PACKAGE_ARCH" --source-sha "$SOURCE_SHA"
       - name: Build requested package
         run: |
+          rm -rf target/packages target/pacman-check target/portable-check
           case "$PACKAGE_KIND" in
             deb) python3 scripts/packaging/package_deb.py --stage target/package-stage --version "$PACKAGE_VERSION" --arch "$PACKAGE_ARCH" --target "$PACKAGE_TARGET" --source-sha "$SOURCE_SHA" ;;
             pacman|portable) python3 "scripts/packaging/package_$PACKAGE_KIND.py" --stage target/package-stage --version "$PACKAGE_VERSION" --arch "$PACKAGE_ARCH" --source-sha "$SOURCE_SHA" ;;
@@ -113,7 +114,8 @@ jobs:
                 pacman -U --noconfirm target/packages/*.pkg.tar.zst
                 bash debian/tests/smoke
               else
-                mkdir target/pacman-check
+                rm -rf target/pacman-check
+                mkdir -p target/pacman-check
                 tar --zstd -xf target/packages/*.pkg.tar.zst -C target/pacman-check
                 target/pacman-check/usr/bin/mark-shot --version
                 target/pacman-check/usr/bin/mark-shot --help
@@ -121,7 +123,8 @@ jobs:
               fi
               ;;
             portable)
-              mkdir target/portable-check
+              rm -rf target/portable-check
+              mkdir -p target/portable-check
               tar -xzf target/packages/*.tar.gz -C target/portable-check
               commands=(target/portable-check/*/mark-shot)
               test "${#commands[@]}" = 1
