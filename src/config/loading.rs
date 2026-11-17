@@ -369,4 +369,7 @@ pub fn pass_to(command: &mut std::process::Command) {
     if let Some(path) = OVERRIDE_PATH.get() {
         command.arg(CONFIG_ARG).arg(path);
     }
+    if let Some(level) = super::runtime_overrides::log_level() {
+        command.env("MARK_SHOT_LOG", level);
+    }
 }

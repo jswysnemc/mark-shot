@@ -44,6 +44,7 @@ pub mod draw;
 pub mod engine_choice;
 pub mod layout;
 pub mod lookalikes;
+pub mod mirror;
 pub mod model_integrity;
 pub mod models;
 pub mod paddle_backend;

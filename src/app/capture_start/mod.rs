@@ -14,11 +14,14 @@ pub(super) fn initialize(state: &mut EditorState, launch: &super::Launch) {
     if let Some(config) = &launch.record_config {
         state.recording_tool.config = config.clone();
     }
+    let capture_cfg = &crate::config::preferences::current().capture;
     state.capture_start.recording_controls = launch.image.is_none()
         && !launch.code_scan
         && matches!(launch.mode, Mode::Editor | Mode::Region);
-    state.capture_start.visible = state.capture_start.recording_controls && !launch.fullscreen;
-    state.capture_start.show_hints = crate::config::preferences::current().capture.show_hints;
+    state.capture_start.visible = state.capture_start.recording_controls
+        && !launch.fullscreen
+        && (capture_cfg.show_start_bar || launch.record_format.is_some() || launch.record_select);
+    state.capture_start.show_hints = capture_cfg.show_hints;
     state.capture_start.recording = launch.record_format.or_else(|| {
         launch.record_select.then(|| {
             if state.recording_tool.config.format == "gif" {

@@ -190,6 +190,10 @@ impl Entry {
                 "查看安装状态、下载推理库与其他语言",
                 "Inspect installation, download runtime and language models",
             ),
+            ("ocr", "download_mirror") => (
+                "加速推理库与语言包下载，镜像异常时自动回退 GitHub 直连并校验 SHA-256",
+                "Accelerates runtime and model downloads with SHA-256 verification and direct fallback",
+            ),
             ("startup", "default_color") => (
                 "#RRGGBB 或 #RRGGBBAA；恢复后使用当前工具颜色",
                 "#RRGGBB or #RRGGBBAA; reset uses the current tool color",
@@ -434,6 +438,14 @@ pub(super) const BASE: &[Entry] = &[
         "识别引擎运行方式",
         "Engine lifetime",
         Kind::Choice(&["on-demand", "at-launch", "daemon"])
+    ),
+    entry!(
+        Ocr,
+        "ocr",
+        "download_mirror",
+        "识别资源下载源",
+        "Resource download source",
+        Kind::Choice(&["", "https://ghfast.top/", "https://gh-proxy.com/"])
     ),
     entry!(
         Ocr,

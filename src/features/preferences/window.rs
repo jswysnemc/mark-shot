@@ -176,7 +176,7 @@ impl Preferences {
                         && !(entry.section == "ocr"
                             && ((entry.key == "engine" && !cfg!(target_os = "windows"))
                                 || (self.values["ocr"]["engine"] == "system"
-                                    && matches!(entry.key, "mode" | "device"))))
+                                    && matches!(entry.key, "mode" | "device" | "download_mirror"))))
                 } else {
                     entry.search_text().to_lowercase().contains(&query)
                 }

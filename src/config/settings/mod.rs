@@ -71,6 +71,27 @@ impl Entry {
                     "Windows OCR"
                 }
             }
+            ("ocr", "download_mirror", "") => {
+                if chinese {
+                    "GitHub 官方直连"
+                } else {
+                    "GitHub Direct"
+                }
+            }
+            ("ocr", "download_mirror", "https://ghfast.top/") => {
+                if chinese {
+                    "镜像加速 (ghfast.top)"
+                } else {
+                    "GitHub Mirror (ghfast.top)"
+                }
+            }
+            ("ocr", "download_mirror", "https://gh-proxy.com/") => {
+                if chinese {
+                    "镜像加速 (gh-proxy.com)"
+                } else {
+                    "GitHub Mirror (gh-proxy.com)"
+                }
+            }
             _ => value_label(value, chinese),
         }
     }

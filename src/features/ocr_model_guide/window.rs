@@ -26,6 +26,7 @@ struct Guide {
     pressed: Option<ModelPopoverElement>,
     size: (u32, u32),
     deadline: Option<Instant>,
+    auto_close: bool,
 }
 
 impl Guide {
@@ -41,8 +42,8 @@ impl Guide {
         let fit = f64::from(self.fit());
         (position.0 / fit, position.1 / fit)
     }
-    /// 【识别模型】【界面状态】按 models 和 completion 创建复用模型面板，返回静止状态，不自动下载
-    fn new(models: OcrModels, completion: Arc<OnceLock<Source>>) -> Self {
+    /// 【识别模型】【界面状态】按 models、completion 与 auto_close 创建复用模型面板，返回静止状态，不自动下载
+    fn new(models: OcrModels, completion: Arc<OnceLock<Source>>, auto_close: bool) -> Self {
         let mut panel = ModelPopover::new();
         panel.open = true;
         panel.opacity = 1.0;
@@ -59,6 +60,7 @@ impl Guide {
             pressed: None,
             size,
             deadline: None,
+            auto_close,
         };
         result.sync();
         result
@@ -109,9 +111,11 @@ impl Guide {
         WindowAction::Redraw
     }
 
-    /// 【识别安装】【完整准备】无参数，仅当所选引擎全部资源就绪时完成引导，不隐式安装缺少的资源
+    /// 【识别安装】【完整准备】无参数，仅在首次引导模式且所选引擎全部资源就绪时自动关闭，资源管理模式保持打开
     fn complete(&mut self) -> WindowAction {
-        if let Some(source) = engine_choice::source(&self.models) {
+        if self.auto_close
+            && let Some(source) = engine_choice::source(&self.models)
+        {
             let _ = self.completion.set(source);
             WindowAction::Close
         } else {
@@ -266,7 +270,7 @@ impl WindowContent for Guide {
 /// 【识别模型】【原生执行】按 models 打开独立窗口，返回明确选择的模型文件，窗口管理器关闭视为取消
 pub(super) fn run(models: OcrModels) -> crate::AppResult<Option<Source>> {
     let completion = Arc::new(OnceLock::new());
-    let content = Guide::new(models, completion.clone());
+    let content = Guide::new(models, completion.clone(), true);
     let size = content.size;
     window::run(
         WindowSpec {
@@ -280,9 +284,9 @@ pub(super) fn run(models: OcrModels) -> crate::AppResult<Option<Source>> {
     Ok(completion.get().cloned())
 }
 
-/// 【识别模型】【设置入口】无参数，创建资源管理模态窗口，允许查看已安装模型和下载其他语言
+/// 【识别模型】【设置入口】无参数，创建资源管理模态窗口，允许持续下载多门语言与切换当前识别语言
 pub(crate) fn dialog() -> window::WindowDialog {
-    let content = Guide::new(OcrModels::load(), Arc::new(OnceLock::new()));
+    let content = Guide::new(OcrModels::load(), Arc::new(OnceLock::new()), false);
     window::WindowDialog {
         id: 0x4f4352,
         spec: WindowSpec {

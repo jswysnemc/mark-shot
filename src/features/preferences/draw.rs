@@ -59,7 +59,7 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
         .map(|group| group.title)
         .collect::<Vec<_>>()
         .join(" ");
-    state.fonts.ensure_text(&format!("{labels} {group_labels} {} {} 保存 恢复 实际导出预览 已添加外框 原图 外框关闭 按下快捷键 浅色 深色 Windows 系统 OCR 未找到匹配设置 清空搜索或尝试其他关键词 截图 标注 文字识别 翻译 原生窗口，无需浏览器运行环境 版本 操作系统 桌面环境 窗口管理器 合成器 显示协议 未识别", values.join(" "), state.resource_note));
+    state.fonts.ensure_text(&format!("{labels} {group_labels} {} {} 保存 恢复 实际导出预览 已添加外框 原图 外框关闭 按下快捷键 浅色 深色 Windows 系统 OCR 管理语言包与运行库 配置工具栏布局 配置此服务 打开 未找到匹配设置 清空搜索或尝试其他关键词 截图 标注 文字识别 翻译 原生窗口，无需浏览器运行环境 版本 操作系统 桌面环境 窗口管理器 合成器 显示协议 未识别", values.join(" "), state.resource_note));
     if layout.toolbar_preview.is_some() {
         state.fonts.ensure_text(
             "位置预览 跟随选区 屏幕顶部 屏幕底部 屏幕左侧 屏幕右侧 选区 主栏 侧栏 属性栏",
@@ -278,12 +278,40 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
                     }
                 } else if matches!(entry.kind, Kind::Toggle) {
                     widgets::switch(painter, row.control, values[row.index] == "true", focused);
-                } else {
-                    let label = if matches!(entry.kind, Kind::Link(_)) {
-                        if chinese { "打开" } else { "Open" }
-                    } else {
-                        entry.option_label(&values[row.index], chinese)
+                } else if matches!(entry.kind, Kind::Link(_)) {
+                    let link_label = match (entry.section, entry.key) {
+                        ("ocr", "resources") => {
+                            if chinese {
+                                "管理语言包与运行库"
+                            } else {
+                                "Manage models & runtime"
+                            }
+                        }
+                        ("toolbar_layout", "layout") => {
+                            if chinese {
+                                "配置工具栏布局"
+                            } else {
+                                "Configure toolbar"
+                            }
+                        }
+                        ("translation", _) => {
+                            if chinese {
+                                "配置此服务"
+                            } else {
+                                "Configure service"
+                            }
+                        }
+                        _ => {
+                            if chinese {
+                                "打开"
+                            } else {
+                                "Open"
+                            }
+                        }
                     };
+                    widgets::action_link(painter, row.control, link_label, focused);
+                } else {
+                    let label = entry.option_label(&values[row.index], chinese);
                     if matches!(entry.kind, Kind::Choice(_)) {
                         widgets::select(
                             painter,

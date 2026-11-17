@@ -65,6 +65,8 @@ overlay = "auto"
 freeze_scope = "all-screens"
 # 【截图行为】【自身窗口】仅捕获期间隐藏，完成、失败或捕获进程退出后恢复
 hide_own_windows = true
+# 【截图行为】【起始模式栏】关闭后不显示顶部选择/全屏/视频/GIF入口，直接拖选截图
+show_start_bar = true
 # 【截图行为】【快捷提示】显示截图起始阶段左下角的快捷键说明面板
 show_hints = true
 # 【截图行为】【KDE 后端】关闭后使用桌面门户，不调用 KWin ScreenShot2
@@ -616,6 +618,8 @@ command = ""
 # 【识别引擎】【手动选择】各平台默认推荐 paddle；system 仅 Windows 支持，已有显式选择保持不变
 # engine = "paddle"
 # 【识别资源】【手动安装】模型与推理库均需在 OCR 面板明确点击下载
+# 【识别资源】【下载镜像】留空直连 GitHub，可配置镜像前缀如 https://ghfast.top/
+download_mirror = ""
 threads = 4
 # 【文字识别】【结果窗口】主 OCR 命令识别后打开可编辑窗口；关闭后保留截图内逐字选择
 result_panel = true

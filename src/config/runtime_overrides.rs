@@ -53,6 +53,14 @@ impl Overrides {
     }
 }
 
+/// 【应用设置】【命令行日志】无参数，返回命令行显式覆盖的日志级别字符串，未指定时返回空值
+pub(crate) fn log_level() -> Option<String> {
+    OVERRIDES
+        .get()
+        .and_then(|overrides| overrides.level.as_ref())
+        .and_then(Clone::clone)
+}
+
 /// 【应用设置】【命令行来源】按 path 返回该字段是否受显式启动参数覆盖，不读取配置文件
 pub(crate) fn contains(path: &str) -> bool {
     OVERRIDES.get().is_some_and(|overrides| match path {

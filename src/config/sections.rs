@@ -483,6 +483,8 @@ section!(OcrFilter {
 section!(Ocr {
     engine: crate::ocr::engine_choice::Engine = crate::ocr::engine_choice::Engine::default(),
     mode: Mode = Mode::OnDemand,
+    #[serde(alias = "downloadMirror")]
+    download_mirror: String = String::new(),
     result_panel: bool = true,
     threads: usize = 4,
     device: Device = Device::Auto,

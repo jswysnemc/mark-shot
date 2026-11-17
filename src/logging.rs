@@ -94,6 +94,11 @@ pub fn init(process: Process) {
         log_panics();
     }
     if process == Process::Overlay {
+        if stderr_level >= LevelFilter::Info
+            && let Some(path) = log_file_path()
+        {
+            log::info!("【应用启动】【诊断日志】日志文件={}", path.display());
+        }
         crate::config::log_warnings();
     }
 }

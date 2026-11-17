@@ -128,9 +128,11 @@ pub fn download(
         return Ok(());
     }
     let stopped = AtomicBool::new(false);
-    crate::ocr::download::fetch(
+    let original = format!("{}/{}", super::manifest::BASE_URL, dist.archive.file);
+    let urls = crate::ocr::mirror::candidates(&original);
+    crate::ocr::download::fetch_candidates(
         &crate::ocr::download::agent(),
-        &format!("{}/{}", super::manifest::BASE_URL, dist.archive.file),
+        &urls,
         &dist.archive,
         root,
         cancel,
@@ -148,6 +150,11 @@ pub fn download(
     }
     fs::rename(stage.path(), &installed).map_err(|error| error.to_string())?;
     let _ = fs::remove_file(root.join(dist.archive.file));
+    log::info!(
+        "【识别运行库】【安装完成】平台={}，安装目录={}",
+        dist.platform,
+        installed.display()
+    );
     progress(100);
     Ok(())
 }

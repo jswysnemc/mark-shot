@@ -18,7 +18,7 @@ use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
 
 use super::models::{Asset, BASE_URL, on_disk};
 
-const CHUNK: usize = 64 * 1024;
+const CHUNK: usize = 256 * 1024;
 const STOPPED: &str = "stopped: the program is closing";
 
 pub struct Job {
@@ -182,8 +182,9 @@ fn fetch_model(
     let mut finished = 0;
     let mut shown = 0;
     for asset in missing {
-        let url = format!("{BASE_URL}/{}", asset.file);
-        fetch(agent, &url, asset, &job.dir, &job.cancel, stop, |got| {
+        let original = format!("{BASE_URL}/{}", asset.file);
+        let urls = super::mirror::candidates(&original);
+        fetch_candidates(agent, &urls, asset, &job.dir, &job.cancel, stop, |got| {
             let percent = ((finished + got) * 100 / total.max(1)) as u8;
             if percent != shown {
                 shown = percent;
@@ -193,6 +194,38 @@ fn fetch_model(
         finished += asset.size;
     }
     Ok(())
+}
+
+/// 【识别模型】【多源下载】依次尝试 urls 候选地址执行下载，取消或退出立即终止，镜像失败自动回退后续源
+pub fn fetch_candidates(
+    agent: &ureq::Agent,
+    urls: &[String],
+    asset: &Asset,
+    dir: &Path,
+    cancel: &AtomicBool,
+    stop: &AtomicBool,
+    mut progress: impl FnMut(u64),
+) -> Result<(), String> {
+    let mut last_error = String::from("no download URL configured");
+    for (index, url) in urls.iter().enumerate() {
+        match fetch(agent, url, asset, dir, cancel, stop, &mut progress) {
+            Ok(()) => return Ok(()),
+            Err(error) => {
+                if stop.load(Ordering::Relaxed) || cancel.load(Ordering::Relaxed) {
+                    return Err(error);
+                }
+                if index + 1 < urls.len() {
+                    log::info!(
+                        "【识别模型】【镜像回退】文件={}，失败原因={}，切换备用源",
+                        asset.file,
+                        error
+                    );
+                }
+                last_error = error;
+            }
+        }
+    }
+    Err(last_error)
 }
 
 pub fn fetch(
@@ -230,6 +263,13 @@ pub fn fetch(
     }
 
     if have < asset.size {
+        log::info!(
+            "【识别模型】【开始下载】文件={}，总计={}字节，已缓存={}字节，目标目录={}，地址={url}",
+            asset.file,
+            asset.size,
+            have,
+            dir.display()
+        );
         let mut request = agent.get(url);
         if have > 0 {
             request = request.header("Range", format!("bytes={have}-"));
@@ -238,7 +278,12 @@ pub fn fetch(
         if stopped() {
             return Err(STOPPED.into());
         }
-        match response.status().as_u16() {
+        let status = response.status().as_u16();
+        log::info!(
+            "【识别模型】【下载响应】文件={}，状态码=HTTP {status}，地址={url}",
+            asset.file
+        );
+        match status {
             206 => {}
             // if server ignored Range
             200 => {
@@ -287,7 +332,14 @@ pub fn fetch(
     }
     file.sync_all().map_err(err)?;
     drop(file);
-    fs::rename(&part_path, dir.join(asset.file)).map_err(err)
+    let destination = dir.join(asset.file);
+    fs::rename(&part_path, &destination).map_err(err)?;
+    log::info!(
+        "【识别模型】【下载完成】文件={}，校验通过并写入={}",
+        asset.file,
+        destination.display()
+    );
+    Ok(())
 }
 
 /// 【识别模型】【校验和】流式读取 file 并比较 expected；返回是否一致，不把整个模型载入内存

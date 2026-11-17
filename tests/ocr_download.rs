@@ -143,3 +143,29 @@ fn engine_validation_detects_same_size_corruption() {
     assert!(error.reason.contains("SHA-256"));
     assert_eq!(error.path, path);
 }
+
+/// 【模型下载测试】【镜像回退】验证主镜像返回错误状态码时自动回退备用地址并完成 SHA-256 校验
+#[test]
+fn mirror_failure_falls_back_to_secondary_url_and_verifies_checksum() {
+    let directory = tempfile::tempdir().unwrap();
+    let (mirror_url, mirror_server) = server("502 Bad Gateway", b"", "");
+    let (direct_url, direct_server) = server("200 OK", b"abc", "");
+    let candidates = vec![mirror_url, direct_url];
+    download::fetch_candidates(
+        &download::agent(),
+        &candidates,
+        &ASSET,
+        directory.path(),
+        &AtomicBool::new(false),
+        &AtomicBool::new(false),
+        |_| {},
+    )
+    .unwrap();
+    mirror_server.join().unwrap();
+    direct_server.join().unwrap();
+    assert_eq!(
+        std::fs::read(directory.path().join(ASSET.file)).unwrap(),
+        b"abc"
+    );
+    model_integrity::verify_asset(&directory.path().join(ASSET.file), &ASSET).unwrap();
+}

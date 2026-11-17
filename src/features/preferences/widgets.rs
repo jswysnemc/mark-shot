@@ -294,3 +294,62 @@ pub(super) fn select(
         },
     );
 }
+
+/// 【设置窗口】【动作入口按钮】按 bounds、label 和 hovered 绘制带右侧箭头指示的页面与弹窗跳转按钮
+pub(super) fn action_link(painter: &mut Painter<'_>, bounds: Rect, label: &str, hovered: bool) {
+    let palette = Palette::current();
+    controls::frame(
+        painter,
+        bounds,
+        if hovered {
+            palette.pressed
+        } else {
+            palette.window
+        },
+        if hovered {
+            palette.accent
+        } else {
+            palette.border
+        },
+        6.0,
+    );
+    let label = controls::fit_label(painter, label, 12.0, bounds.width() - 36.0);
+    painter.text(
+        rect(
+            bounds.left() + 11.0,
+            bounds.top(),
+            bounds.width() - 34.0,
+            bounds.height(),
+        ),
+        &label,
+        TextStyle::new(
+            12.0,
+            if hovered {
+                palette.accent
+            } else {
+                palette.text
+            },
+        )
+        .weight(cosmic_text::Weight::MEDIUM),
+    );
+    let middle = bounds.top() + bounds.height() / 2.0;
+    let mut arrow = tiny_skia::PathBuilder::new();
+    arrow.move_to(bounds.right() - 18.0, middle - 4.0);
+    arrow.line_to(bounds.right() - 14.0, middle);
+    arrow.line_to(bounds.right() - 18.0, middle + 4.0);
+    painter.stroke_path(
+        &arrow.finish().unwrap(),
+        if hovered {
+            palette.accent
+        } else {
+            palette.muted
+        }
+        .color(),
+        &tiny_skia::Stroke {
+            width: 1.5,
+            line_cap: tiny_skia::LineCap::Round,
+            line_join: tiny_skia::LineJoin::Round,
+            ..Default::default()
+        },
+    );
+}
