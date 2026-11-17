@@ -1,4 +1,4 @@
-//! 【滚动截图】【面板布局】固定控制尺寸并优先避让选区，空间不足时明确报告重叠
+//! 【滚动截图】【面板布局】紧凑无边框极简尺寸并优先避让选区，空间不足时明确报告重叠
 
 use super::PanelButton;
 use tiny_skia::Rect;
@@ -11,13 +11,13 @@ pub struct PanelLayout {
     pub fits_without_overlap: bool,
 }
 
-pub const PANEL_WIDTH: f32 = 340.0;
-const PADDING: f32 = 12.0;
+pub const PANEL_WIDTH: f32 = 316.0;
+const PADDING: f32 = 10.0;
 const GAP: f32 = 12.0;
-const STATUS_HEIGHT: f32 = 22.0;
-const CONTROL_HEIGHT: f32 = 54.0;
-const BUTTON_WIDTH: f32 = 40.0;
-const BUTTON_HEIGHT: f32 = 36.0;
+const STATUS_HEIGHT: f32 = 20.0;
+const CONTROL_HEIGHT: f32 = 48.0;
+const BUTTON_WIDTH: f32 = 38.0;
+const BUTTON_HEIGHT: f32 = 34.0;
 const SHEET: [PanelButton; 6] = [
     PanelButton::ToggleAxis,
     PanelButton::TogglePause,
@@ -27,7 +27,7 @@ const SHEET: [PanelButton; 6] = [
     PanelButton::Cancel,
 ];
 
-/// 【滚动截图】【面板定位】按 local_region、monitor_size 和 preview_size 返回布局，使用左右上下四处候选避让
+/// 【滚动截图】【面板定位】按 local_region、monitor_size 和 preview_size 返回极简布局，使用左右上下四处候选避让
 pub fn layout(
     local_region: Rect,
     monitor_size: (f32, f32),
@@ -53,8 +53,8 @@ pub fn constrained_layout(
     let width = PANEL_WIDTH.min(available_width);
     let chrome = STATUS_HEIGHT + CONTROL_HEIGHT + PADDING * 4.0;
     let image_height = preview_size
-        .map_or(96.0, |(w, h)| {
-            (h as f32 * (width - PADDING * 2.0) / w.max(1) as f32).clamp(96.0, 420.0)
+        .map_or(104.0, |(w, h)| {
+            (h as f32 * (width - PADDING * 2.0) * 0.78 / w.max(1) as f32).clamp(104.0, 400.0)
         })
         .min((available_height - chrome - GAP * 2.0).max(1.0));
     let height = (chrome + image_height).min(available_height);
@@ -67,7 +67,7 @@ pub fn constrained_layout(
         )
         .unwrap()
     };
-    // 1. 【滚动截图】【捕获避让】仅接受完整位于输出内且不与选区相交的候选
+    // 1. 仅接受完整位于输出内且不与选区相交的候选区域
     let candidates = [
         (local_region.right() + GAP, local_region.top()),
         (local_region.left() - GAP - width, local_region.top()),
@@ -95,23 +95,23 @@ pub fn constrained_layout(
         image_height,
     );
     let row_y = rect.bottom() - PADDING - CONTROL_HEIGHT;
-    // 2. 【滚动截图】【紧凑控件】普通输出保持原版四十乘三十六尺寸，极窄输出按可用宽度缩小
-    let row_scale = (inner_width / 316.0).min(1.0);
-    let mut x = rect.left() + PADDING + 7.0 * row_scale;
+    // 2. 用纯留白区分捕获控制组与结果操作组，极窄合成器下按比例等比收敛
+    let row_scale = (inner_width / 296.0).min(1.0);
+    let mut x = rect.left() + PADDING + 8.0 * row_scale;
     let buttons = SHEET
         .into_iter()
         .map(|button| {
             let button_rect = Rect::from_xywh(
                 x,
-                row_y + 9.0,
+                row_y + 7.0,
                 BUTTON_WIDTH * row_scale,
-                BUTTON_HEIGHT.min((height - 18.0).max(1.0)),
+                BUTTON_HEIGHT.min((height - 16.0).max(1.0)),
             )
             .unwrap();
             x += (BUTTON_WIDTH
-                + 7.0
-                + if button == PanelButton::ToggleAxis {
-                    4.0
+                + 9.0
+                + if button == PanelButton::TogglePause {
+                    7.0
                 } else {
                     0.0
                 })

@@ -145,3 +145,87 @@ fn constrained_panel_keeps_original_output_coordinates_and_accessible_controls()
         }
     }
 }
+
+/// 【滚动截图测试】【主副双预览常驻】验证首帧未溢出与长图溢出在纵横双轴下均保留主细节预览和副全景预览
+#[test]
+fn dual_previews_remain_present_from_initial_frame_through_long_scroll() {
+    let area = Rect::from_xywh(10.0, 40.0, 296.0, 180.0).unwrap();
+    for axis in [shot_stitch::Axis::Vertical, shot_stitch::Axis::Horizontal] {
+        for dims in [(400, 180), (400, 1600), (1600, 180)] {
+            let view = panel::preview::layout(area, dims, axis).unwrap();
+            let overview = view.overview.expect("secondary overview preview preserved");
+            assert!(view.detail.intersect(&overview).is_none());
+            assert!(panel::preview::overview_rect(&view, dims).is_some());
+        }
+    }
+}
+
+/// 【滚动截图测试】【极简无边框与平色识别】验证极简无边框面板四角透明无描边且满足 Wayland 平色定位采样
+#[cfg(target_os = "linux")]
+#[test]
+fn borderless_minimal_panel_preserves_transparent_corners_and_scroll_stamp() {
+    use crate::{
+        backend::wayland::utils::scroll_stamp::Stamp, renderer::Painter,
+        scroll::session::ScrollSession,
+    };
+    use cosmic_text::SwashCache;
+    use tiny_skia::Pixmap;
+
+    let mut fonts = crate::fonts::bundled();
+    let mut cache = SwashCache::new();
+    let mut icons = crate::renderer::Icons::new();
+    for svg in [
+        crate::ui::icons::SCROLL,
+        crate::ui::icons::SCROLL_PAUSE,
+        crate::ui::icons::PEN,
+        crate::ui::icons::SAVE,
+        crate::ui::icons::COPY,
+        crate::ui::icons::CLOSE,
+    ] {
+        icons.insert(
+            svg,
+            usvg::Tree::from_str(svg, &usvg::Options::default()).unwrap(),
+        );
+    }
+    let sel = region(400.0, 300.0);
+
+    for scale in [1.0_f32, 1.5, 2.0] {
+        let mut session = ScrollSession::new(sel, 0).unwrap();
+        for with_frame in [false, true] {
+            if with_frame {
+                let img =
+                    shot_image::Image::from_pixels(400, 900, vec![0xff334155; 360_000]).unwrap();
+                session.push(img);
+            }
+            let dims = {
+                let (w, h) = session.stitcher.dimensions();
+                (w > 0 && h > 0).then_some((w as u32, h as u32))
+            };
+            let layout = panel::layout(sel, (1920.0, 1080.0), dims);
+            let bounds = layout.rect.round_out().unwrap();
+            let size = crate::types::px_size((bounds.width(), bounds.height()), scale);
+            let mut canvas = Pixmap::new(size.0, size.1).unwrap();
+            let mut preview = panel::preview::PreviewState::new();
+            let mut painter = Painter::new(&mut canvas)
+                .with_scale(scale)
+                .with_origin((bounds.x() as f32, bounds.y() as f32))
+                .with_icons(&icons)
+                .with_text(&mut fonts, &mut cache);
+            panel::draw(
+                &mut painter,
+                &mut session,
+                &layout,
+                None,
+                None,
+                &mut preview,
+            );
+
+            assert_eq!(canvas.pixel(0, 0).unwrap().alpha(), 0);
+            assert_eq!(canvas.pixel(size.0 - 1, 0).unwrap().alpha(), 0);
+            assert!(
+                Stamp::new(canvas.data(), size, scale).is_some(),
+                "Stamp::new must succeed for scale={scale}, with_frame={with_frame}"
+            );
+        }
+    }
+}

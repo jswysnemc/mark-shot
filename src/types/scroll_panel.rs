@@ -6,5 +6,4 @@ pub struct ScrollPanelFrame<'a> {
     pub bounds: tiny_skia::IntRect,
     pub region: tiny_skia::Rect,
     pub scale: f32,
-    pub border: tiny_skia::Color,
 }

@@ -25,15 +25,3 @@ pub(crate) fn contains(rect: tiny_skia::Rect, point: (f64, f64)) -> bool {
         && point.1 >= rect.top() as f64
         && point.1 <= rect.bottom() as f64
 }
-
-/// 【滚动截图】【细边绘制】在 p 中按 rect 与 color 绘制一逻辑像素矩形边线，无返回值
-fn border(p: &mut crate::renderer::Painter, rect: tiny_skia::Rect, color: crate::theme::Rgba) {
-    p.stroke_path(
-        &tiny_skia::PathBuilder::from_rect(rect),
-        color,
-        &tiny_skia::Stroke {
-            width: 1.0,
-            ..Default::default()
-        },
-    );
-}

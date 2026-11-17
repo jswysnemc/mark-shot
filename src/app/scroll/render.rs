@@ -59,7 +59,7 @@ pub(super) fn paint(
         if crate::ui::language::Language::current() == crate::ui::language::Language::Chinese {
             crate::fonts::ui_fallback::ensure_text(
                 &mut state.text.font_system,
-                "等待滚动正在捕获已暂停捕获错误未找到重叠区域区域已调整",
+                "等待滚动正在捕获已暂停捕获已暂停捕获错误重叠不足，请缓慢回退正在移动区域区域已调整",
             );
         }
         let mut painter = Painter::new(canvas)
@@ -86,7 +86,7 @@ pub(super) fn paint(
         )
     });
     overlay.set_input_rect(idx, input);
-    // 1. 【滚动截图】【局部交付】控制像素与原图区域分别交给后端，边线不再依赖整屏画布
+    // 1. 【滚动截图】【局部交付】仅提交无边框极简控制面板像素，不在捕获区周围绘制边框
     overlay.stage_scroll_panel(
         idx,
         &crate::types::scroll_panel::ScrollPanelFrame {
@@ -95,9 +95,6 @@ pub(super) fn paint(
             bounds,
             region: run.session.region,
             scale: state.placements[idx].scale,
-            border: crate::theme::toolbar::Palette::current()
-                .active_border
-                .color(),
         },
     )?;
     overlay.flush()?;

@@ -41,7 +41,6 @@ fn resized_scroll_panel_keeps_uploaded_server_pixels() {
                     bounds,
                     region,
                     scale: 1.0,
-                    border: tiny_skia::Color::BLACK,
                 },
             )
             .unwrap();

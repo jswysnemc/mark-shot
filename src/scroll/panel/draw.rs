@@ -1,4 +1,4 @@
-//! 【滚动截图】【面板绘制】原版状态行和六按钮使用共用主题令牌
+//! 【滚动截图】【极简面板绘制】去除全部面板与预览描边，保留语义状态头、主副双预览与轻量图标栏
 
 use super::{
     PanelButton, PanelLayout,
@@ -7,10 +7,14 @@ use super::{
 use crate::{
     renderer::{Painter, text::TextStyle},
     scroll::session::ScrollSession,
-    theme::toolbar::Palette,
-    ui::icons,
+    theme::{Rgba, toolbar::Palette},
+    ui::{controls, icons},
 };
+use cosmic_text::Weight;
 use shot_stitch::Axis;
+
+const CARD_RADIUS: f32 = 11.0;
+const BUTTON_RADIUS: f32 = 8.5;
 
 /// 【滚动截图】【状态文字】按 status 返回当前界面语言文案，无其他参数
 pub fn status_text(status: &str) -> &str {
@@ -30,7 +34,18 @@ pub fn status_text(status: &str) -> &str {
     }
 }
 
-/// 【滚动截图】【完整面板】将 session 和 state 按 layout 绘制到 p，hovered 与 pressed 表达按钮事务，无返回值
+/// 【滚动截图】【状态指示色】按 session 当前捕获、暂停或告警状态返回极简圆点颜色
+fn status_dot_color(session: &ScrollSession, palette: &Palette) -> Rgba {
+    if session.status == "Capture error" {
+        Rgba(239, 68, 68, 255)
+    } else if session.paused || session.status.starts_with("No overlap") {
+        Rgba(245, 158, 11, 255)
+    } else {
+        palette.slider_end
+    }
+}
+
+/// 【滚动截图】【完整面板】将 session 和 state 按无边框极简 layout 绘制到 p，hovered 与 pressed 表达按钮事务，无返回值
 pub fn draw(
     p: &mut Painter,
     session: &mut ScrollSession,
@@ -40,93 +55,108 @@ pub fn draw(
     state: &mut PreviewState,
 ) {
     let palette = Palette::current();
-    p.fill_rounded(layout.rect, 10.0, palette.list_fill);
-    p.panel_border(
-        layout.rect.left(),
-        layout.rect.top(),
-        layout.rect.width(),
-        layout.rect.height(),
-        10.0,
-        1.0,
-    );
+    // 1. 绘制无描边极简不透明圆角底板，保障无层协议下平色定位锚点稳定
+    p.fill_rounded(layout.rect, CARD_RADIUS, palette.list_fill);
+
+    // 2. 绘制顶部语义圆点、自适应截断状态文本与右对齐尺寸读数
+    let dot_cy = layout.status.top() + layout.status.height() * 0.5;
     p.fill_circle(
         layout.status.left() + 4.0,
-        layout.status.top() + 11.5,
-        3.0,
-        palette.slider_end,
+        dot_cy,
+        2.75,
+        status_dot_color(session, &palette),
     );
     let metric = session.length_label();
-    let metric_width = p.measure(&metric, 12.0) + 10.0;
-    let status_rect = tiny_skia::Rect::from_xywh(
-        layout.status.left() + 15.0,
+    let metric_text_w = p.measure(&metric, 11.5);
+    let metric_width = (metric_text_w + 8.0).min(layout.status.width() * 0.48);
+    if let Some(status_rect) = tiny_skia::Rect::from_xywh(
+        layout.status.left() + 13.0,
         layout.status.top(),
         (layout.status.width() - metric_width - 15.0).max(1.0),
         layout.status.height(),
-    )
-    .unwrap();
-    let label = status_text(&session.status);
-    p.text(
-        status_rect,
-        label,
-        TextStyle::new(12.0, palette.strong_text),
-    );
-    let metric_rect = tiny_skia::Rect::from_xywh(
-        layout.status.right() - metric_width,
+    ) {
+        let fitted =
+            controls::fit_label(p, status_text(&session.status), 11.5, status_rect.width());
+        p.text(
+            status_rect,
+            &fitted,
+            TextStyle::new(11.5, palette.strong_text).weight(Weight::MEDIUM),
+        );
+    }
+    let metric_w = metric_text_w.ceil().max(1.0);
+    if let Some(metric_rect) = tiny_skia::Rect::from_xywh(
+        (layout.status.right() - metric_w).max(layout.status.left()),
         layout.status.top(),
-        metric_width,
+        metric_w,
         layout.status.height(),
-    )
-    .unwrap();
-    p.text(
-        metric_rect,
-        &metric,
-        TextStyle::new(12.0, palette.muted_text),
-    );
+    ) {
+        p.text(
+            metric_rect,
+            &metric,
+            TextStyle::new(11.5, palette.muted_text),
+        );
+    }
+
+    // 3. 绘制无边框主细节预览与副全景概览（未入帧时保持双槽极简占位，避免跳变）
     if let Some(area) = layout.preview {
-        p.fill_rounded(area, 0.0, palette.list_fill);
+        let horizontal = session.axis() == Axis::Horizontal;
         if let Some(view) = preview::layout(area, session.stitcher.dimensions(), session.axis())
             && let Some(image) = session.source()
         {
             preview::draw(p, image, &view, state, session.capture_range);
+        } else if let Some((detail, overview)) = preview::split_slots(area, horizontal) {
+            preview::draw_tracks(p, detail, overview);
         }
-        super::border(p, area, palette.separator);
     }
+
+    // 4. 绘制底部无边框轻量操作胶囊按钮，保存按钮维持实心主色以兼顾平色识别样本
     for (button, rect) in &layout.buttons {
         let enabled = is_button_enabled(*button, session);
         let active = enabled && hovered == Some(*button);
+        let down = active && pressed == Some(*button);
         let tint = if !enabled {
-            palette.muted_text.with_alpha(90)
+            if *button == PanelButton::Save {
+                palette.primary_text.with_alpha(190)
+            } else {
+                palette.muted_text.with_alpha(92)
+            }
         } else if *button == PanelButton::Save {
             palette.primary_text
         } else if active && *button == PanelButton::Cancel {
             palette.danger_hover_text
+        } else if *button == PanelButton::TogglePause && session.paused {
+            palette.slider_end
         } else {
             palette.text
         };
+
         if *button == PanelButton::Save {
             p.fill_rounded(
                 *rect,
-                9.0,
+                BUTTON_RADIUS,
                 if active {
                     palette.primary_hover_top
                 } else {
                     palette.primary_top
                 },
             );
+        } else if down {
+            p.fill_rounded(*rect, BUTTON_RADIUS, palette.pressed_fill);
         } else if active {
             p.fill_rounded(
                 *rect,
-                9.0,
-                if pressed == Some(*button) {
-                    palette.pressed_fill
-                } else if *button == PanelButton::Cancel {
+                BUTTON_RADIUS,
+                if *button == PanelButton::Cancel {
                     palette.danger_hover_fill
                 } else {
                     palette.soft_hover_fill
                 },
             );
+        } else if *button == PanelButton::TogglePause && session.paused {
+            p.fill_rounded(*rect, BUTTON_RADIUS, palette.active_fill);
         }
-        let size = rect.width().min(22.0);
+
+        let size = (rect.width() * 0.5).clamp(13.0, 19.0);
         p.icon(
             button_icon(*button, session),
             size,

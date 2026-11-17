@@ -1,8 +1,17 @@
-//! 【滚动截图】【预览导航】按原图坐标浏览细节，概览标记与拖动共用同一映射
+//! 【滚动截图】【双预览导航】始终保留主细节预览与副全景概览，采用无边框极简圆角呈现
 
-use crate::renderer::Painter;
+use crate::{
+    renderer::{Painter, paths::rounded_rect_path},
+    theme::toolbar::Palette,
+};
 use shot_stitch::Axis;
-use tiny_skia::{Pixmap, PremultipliedColorU8, Rect};
+use tiny_skia::{
+    BlendMode, FillRule, Paint, PathBuilder, Pixmap, PremultipliedColorU8, Rect, Transform,
+};
+
+const SPLIT_GAP: f32 = 8.0;
+const DETAIL_RADIUS: f32 = 6.0;
+const OVERVIEW_RADIUS: f32 = 5.0;
 
 #[derive(Default)]
 pub struct PreviewState {
@@ -46,43 +55,46 @@ impl PreviewState {
     }
 }
 
-/// 【滚动截图】【细节布局】按 area、dimensions 与 axis 返回原版八二分栏或分行及可浏览长度
+/// 【滚动截图】【双槽分区】按 area 与 horizontal 切分主预览槽与副概览槽，无描边纯留白间隔
+pub(super) fn split_slots(area: Rect, horizontal: bool) -> Option<(Rect, Option<Rect>)> {
+    if area.width() < 28.0 || area.height() < 28.0 {
+        return Some((area, None));
+    }
+    if horizontal {
+        let detail_h = ((area.height() - SPLIT_GAP).max(1.0) * 0.76)
+            .round()
+            .max(1.0);
+        let detail = Rect::from_xywh(area.left(), area.top(), area.width(), detail_h)?;
+        let overview = Rect::from_xywh(
+            area.left(),
+            area.top() + detail_h + SPLIT_GAP,
+            area.width(),
+            (area.height() - detail_h - SPLIT_GAP).max(1.0),
+        );
+        Some((detail, overview))
+    } else {
+        let detail_w = ((area.width() - SPLIT_GAP).max(1.0) * 0.78)
+            .round()
+            .max(1.0);
+        let detail = Rect::from_xywh(area.left(), area.top(), detail_w, area.height())?;
+        let overview = Rect::from_xywh(
+            area.left() + detail_w + SPLIT_GAP,
+            area.top(),
+            (area.width() - detail_w - SPLIT_GAP).max(1.0),
+            area.height(),
+        );
+        Some((detail, overview))
+    }
+}
+
+/// 【滚动截图】【细节布局】按 area、dimensions 与 axis 返回始终保留主副双预览的几何与可浏览长度
 pub fn layout(area: Rect, dimensions: (i32, i32), axis: Axis) -> Option<PreviewLayout> {
     let (w, h) = dimensions;
     if w <= 0 || h <= 0 {
         return None;
     }
     let horizontal = axis == Axis::Horizontal;
-    let overflow = if horizontal {
-        w as f32 * area.height() / h as f32 > area.width()
-    } else {
-        h as f32 * area.width() / w as f32 > area.height()
-    };
-    let (detail, overview) = if !overflow {
-        (area, None)
-    } else if horizontal {
-        let height = (area.height() - 10.0).max(1.0) * 0.8;
-        (
-            Rect::from_xywh(area.left(), area.top(), area.width(), height)?,
-            Rect::from_xywh(
-                area.left(),
-                area.top() + height + 10.0,
-                area.width(),
-                (area.height() - height - 10.0).max(1.0),
-            ),
-        )
-    } else {
-        let width = (area.width() - 10.0).max(1.0) * 0.8;
-        (
-            Rect::from_xywh(area.left(), area.top(), width, area.height())?,
-            Rect::from_xywh(
-                area.left() + width + 10.0,
-                area.top(),
-                (area.width() - width - 10.0).max(1.0),
-                area.height(),
-            ),
-        )
-    };
+    let (detail, overview) = split_slots(area, horizontal)?;
     let scale = if horizontal {
         detail.height() / h as f32
     } else {
@@ -105,16 +117,19 @@ pub fn layout(area: Rect, dimensions: (i32, i32), axis: Axis) -> Option<PreviewL
     })
 }
 
-/// 【滚动截图】【概览矩形】按 layout 和 dimensions 等比适配完整长图，返回实际图像范围
+/// 【滚动截图】【概览矩形】按 layout 和 dimensions 等比适配完整长图，返回副预览内的实际图像范围
 pub fn overview_rect(layout: &PreviewLayout, dimensions: (i32, i32)) -> Option<Rect> {
     let area = layout.overview?;
     let (w, h) = (dimensions.0 as f32, dimensions.1 as f32);
+    if w <= 0.0 || h <= 0.0 {
+        return None;
+    }
     let factor = (area.width() / w).min(area.height() / h);
     Rect::from_xywh(
         area.left() + (area.width() - w * factor) / 2.0,
         area.top() + (area.height() - h * factor) / 2.0,
-        w * factor,
-        h * factor,
+        (w * factor).max(1.0),
+        (h * factor).max(1.0),
     )
 }
 
@@ -128,7 +143,17 @@ pub fn scrub_at(position: (f64, f64), rect: Rect, layout: &PreviewLayout, offset
     fraction * (layout.max_scrub + layout.viewport) - offset
 }
 
-/// 【滚动截图】【预览绘制】按 image、layout 与 state 只分配可见像素，使用 p 的设备比例，不复制整幅长图
+/// 【滚动截图】【双槽底板】在 p 中按 detail 与 overview 绘制无描边极简柔和底槽，无返回值
+pub(super) fn draw_tracks(p: &mut Painter, detail: Rect, overview: Option<Rect>) {
+    let palette = Palette::current();
+    let well = palette.control_fill.with_alpha(180);
+    p.fill_rounded(detail, DETAIL_RADIUS, well);
+    if let Some(track) = overview {
+        p.fill_rounded(track, OVERVIEW_RADIUS, well);
+    }
+}
+
+/// 【滚动截图】【预览绘制】按 image、layout 与 state 绘制无边框主细节预览与副全景概览，无返回值
 pub fn draw(
     p: &mut Painter,
     image: shot_stitch::StitchedView<'_>,
@@ -137,12 +162,35 @@ pub fn draw(
     capture_range: Option<(i32, i32)>,
 ) {
     state.sync(layout);
+    // 1. 绘制无边框柔和底槽并在主预览区居中或满幅呈现当前浏览切片
+    draw_tracks(p, layout.detail, layout.overview);
     let origin = if layout.horizontal {
         (state.scrub, 0.0)
     } else {
         (0.0, state.scrub)
     };
-    draw_image(p, image, layout.detail, layout.scale, origin);
+    let detail_target = if layout.horizontal {
+        let vis_w = (image.width() as f32 * layout.scale).min(layout.detail.width());
+        Rect::from_xywh(
+            layout.detail.left() + (layout.detail.width() - vis_w) * 0.5,
+            layout.detail.top(),
+            vis_w.max(1.0),
+            layout.detail.height(),
+        )
+        .unwrap_or(layout.detail)
+    } else {
+        let vis_h = (image.height() as f32 * layout.scale).min(layout.detail.height());
+        Rect::from_xywh(
+            layout.detail.left(),
+            layout.detail.top() + (layout.detail.height() - vis_h) * 0.5,
+            layout.detail.width(),
+            vis_h.max(1.0),
+        )
+        .unwrap_or(layout.detail)
+    };
+    draw_image(p, image, detail_target, layout.scale, origin, DETAIL_RADIUS);
+
+    // 2. 在副预览槽内绘制完整长图缩略及轻量捕获区间与当前视口指示
     if let Some(rect) = overview_rect(layout, (image.width(), image.height())) {
         draw_image(
             p,
@@ -150,8 +198,9 @@ pub fn draw(
             rect,
             rect.width() / image.width() as f32,
             (0.0, 0.0),
+            4.0,
         );
-        let length = layout.max_scrub + layout.viewport;
+        let length = (layout.max_scrub + layout.viewport).max(1.0);
         if let Some(range) = capture_range {
             super::capture_marker::draw(p, rect, length, layout.horizontal, range);
         }
@@ -159,7 +208,7 @@ pub fn draw(
             Rect::from_xywh(
                 rect.left() + rect.width() * state.scrub / length,
                 rect.top(),
-                rect.width() * layout.viewport / length,
+                (rect.width() * layout.viewport / length).max(3.0),
                 rect.height(),
             )
         } else {
@@ -167,13 +216,13 @@ pub fn draw(
                 rect.left(),
                 rect.top() + rect.height() * state.scrub / length,
                 rect.width(),
-                rect.height() * layout.viewport / length,
+                (rect.height() * layout.viewport / length).max(3.0),
             )
         };
-        if let Some(marker) = marker {
-            p.fill_rounded(marker, 0.0, crate::theme::Rgba(45, 212, 191, 45));
+        if let Some(marker) = marker.and_then(|m| m.intersect(&rect)) {
+            p.fill_rounded(marker, 0.0, crate::theme::Rgba(45, 212, 191, 42));
             p.stroke_path(
-                &tiny_skia::PathBuilder::from_rect(marker),
+                &PathBuilder::from_rect(marker),
                 crate::theme::Rgba(45, 212, 191, 235),
                 &tiny_skia::Stroke {
                     width: 2.0,
@@ -184,13 +233,46 @@ pub fn draw(
     }
 }
 
-/// 【滚动截图】【局部光栅】按 rect、factor 与 origin 从 image 采样可见区域并绘制到 p，无返回值
+/// 【滚动截图】【圆角遮罩】将局部光栅 pixels 外侧四角裁切为 radius 物理像素圆角，无返回值
+fn clip_pixmap_corners(pixels: &mut Pixmap, radius: f32) {
+    let w = pixels.width() as f32;
+    let h = pixels.height() as f32;
+    let r = radius.min(w * 0.5).min(h * 0.5);
+    if r < 1.0 || w < 4.0 || h < 4.0 {
+        return;
+    }
+    let Some(bounds) = Rect::from_xywh(0.0, 0.0, w, h) else {
+        return;
+    };
+    let Some(inner) = rounded_rect_path(&bounds, r, true, true, true, true) else {
+        return;
+    };
+    let mut pb = PathBuilder::new();
+    pb.push_rect(bounds);
+    pb.push_path(&inner);
+    if let Some(mask) = pb.finish() {
+        pixels.fill_path(
+            &mask,
+            &Paint {
+                blend_mode: BlendMode::DestinationOut,
+                anti_alias: true,
+                ..Default::default()
+            },
+            FillRule::EvenOdd,
+            Transform::identity(),
+            None,
+        );
+    }
+}
+
+/// 【滚动截图】【局部光栅】按 rect、factor、origin 与 radius 从 image 采样可见区域并绘制圆角图像到 p，无返回值
 fn draw_image(
     p: &mut Painter,
     image: shot_stitch::StitchedView<'_>,
     rect: Rect,
     factor: f32,
     origin: (f32, f32),
+    radius: f32,
 ) {
     let scale = p.scale();
     let width = (rect.width() * scale).round().max(1.0) as u32;
@@ -218,6 +300,7 @@ fn draw_image(
             .unwrap();
         }
     }
+    clip_pixmap_corners(&mut pixels, radius * scale);
     let (x, y) = p.to_px(rect.left(), rect.top());
     p.draw_pixmap(x.round() as i32, y.round() as i32, &pixels);
 }

@@ -1,9 +1,8 @@
-//! 【滚动截图】【局部子表面】透明父表面负责输入，面板和四条边线只保存自身像素
+//! 【滚动截图】【局部子表面】透明父表面负责输入，仅由无边框面板子表面承载自身像素
 
 use super::state::OverlayState;
 use crate::{
     backend::wayland::utils::shm::{ShmBuffer, create_shm_buffer},
-    renderer::Painter,
     types::scroll_panel::ScrollPanelFrame,
 };
 use smithay_client_toolkit::{
@@ -11,7 +10,7 @@ use smithay_client_toolkit::{
     shm::slot::SlotPool,
     subcompositor::SubcompositorState,
 };
-use tiny_skia::{Color, IntRect, Pixmap, Rect};
+use tiny_skia::IntRect;
 use wayland_client::{
     QueueHandle,
     protocol::{wl_subsurface::WlSubsurface, wl_surface::WlSurface},
@@ -90,49 +89,10 @@ impl Drop for Sprite {
 #[derive(Default)]
 pub(crate) struct ScrollLayer {
     panel: Option<Sprite>,
-    edges: Vec<Sprite>,
-    outline: Option<(Rect, f32, Color)>,
-}
-
-/// 【滚动截图】【边线区域】按region返回位于原图之外的四个窄条边界，保留旧描边宽度与五逻辑像素间隔
-fn edge_bounds(region: Rect) -> [Rect; 4] {
-    let outer = region.outset(5.0, 5.0).unwrap();
-    let left = outer.left() - 2.0;
-    let top = outer.top() - 2.0;
-    [
-        Rect::from_xywh(left, top, outer.width() + 4.0, 4.0).unwrap(),
-        Rect::from_xywh(left, outer.bottom() - 2.0, outer.width() + 4.0, 4.0).unwrap(),
-        Rect::from_xywh(left, top + 4.0, 4.0, (outer.height() - 4.0).max(1.0)).unwrap(),
-        Rect::from_xywh(
-            outer.right() - 2.0,
-            top + 4.0,
-            4.0,
-            (outer.height() - 4.0).max(1.0),
-        )
-        .unwrap(),
-    ]
-}
-
-/// 【滚动截图】【边线像素】按bounds、region、scale和color绘制旧边框的窄缓冲，返回像素，不创建完整输出画布
-fn edge_pixels(bounds: IntRect, region: Rect, scale: f32, color: Color) -> Option<Pixmap> {
-    let size = crate::types::px_size((bounds.width(), bounds.height()), scale);
-    let mut pixels = Pixmap::new(size.0, size.1)?;
-    Painter::new(&mut pixels)
-        .with_scale(scale)
-        .with_origin((bounds.x() as f32, bounds.y() as f32))
-        .stroke_path(
-            &tiny_skia::PathBuilder::from_rect(region.outset(5.0, 5.0)?),
-            color,
-            &tiny_skia::Stroke {
-                width: 2.0,
-                ..Default::default()
-            },
-        );
-    Some(pixels)
 }
 
 impl ScrollLayer {
-    /// 【滚动截图】【浮层局部绘制】按parent及协议对象将frame面板和边线提交到pool，返回协议结果，父表面保留原输出输入坐标
+    /// 【滚动截图】【浮层局部绘制】按 parent 及协议对象将无边框 frame 面板提交到 pool，返回协议结果，捕获区保持纯净无描边
     pub(super) fn paint(
         &mut self,
         parent: &WlSurface,
@@ -143,6 +103,7 @@ impl ScrollLayer {
         qh: &QueueHandle<OverlayState>,
         frame: &ScrollPanelFrame<'_>,
     ) -> crate::AppResult {
+        // 1. 按需创建承载极简控制面板的无输入子表面
         if self.panel.is_none() {
             self.panel = Some(Sprite::new(
                 parent,
@@ -152,35 +113,11 @@ impl ScrollLayer {
                 qh,
             )?);
         }
+        // 2. 提交控制面板局部像素，不在选区外侧附加边框子表面
         self.panel
             .as_mut()
             .unwrap()
             .paint(frame.pixels, frame.size, frame.bounds, pool)?;
-        let key = (frame.region, frame.scale, frame.border);
-        if self.outline != Some(key) {
-            while self.edges.len() < 4 {
-                self.edges.push(Sprite::new(
-                    parent,
-                    compositor,
-                    subcompositor,
-                    viewporter,
-                    qh,
-                )?);
-            }
-            // 1. 【滚动截图】【独立边线】只在区域、比例或主题变化时更新边线，捕获范围内保持透明
-            for (sprite, area) in self.edges.iter_mut().zip(edge_bounds(frame.region)) {
-                let bounds = area.round_out().ok_or("invalid scroll edge bounds")?;
-                let pixels = edge_pixels(bounds, frame.region, frame.scale, frame.border)
-                    .ok_or("cannot allocate scroll edge")?;
-                sprite.paint(
-                    pixels.data(),
-                    (pixels.width(), pixels.height()),
-                    bounds,
-                    pool,
-                )?;
-            }
-            self.outline = Some(key);
-        }
         Ok(())
     }
 }

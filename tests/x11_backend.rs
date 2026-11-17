@@ -169,7 +169,6 @@ async fn scroll_panel_releases_focus_and_rejects_covered_frames() {
                 bounds: panel.round_out().unwrap(),
                 region,
                 scale: 1.0,
-                border: tiny_skia::Color::BLACK,
             },
         )
         .unwrap();
