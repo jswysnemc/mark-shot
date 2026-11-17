@@ -65,6 +65,8 @@ overlay = "auto"
 freeze_scope = "all-screens"
 # 【截图行为】【自身窗口】仅捕获期间隐藏，完成、失败或捕获进程退出后恢复
 hide_own_windows = true
+# 【截图行为】【快捷提示】显示截图起始阶段左下角的快捷键说明面板
+show_hints = true
 # 【截图行为】【KDE 后端】关闭后使用桌面门户，不调用 KWin ScreenShot2
 kde_kwin_screenshot = true
 # 【截图行为】【快捷动作】none | copy | save | save-as | pin | cancel，中键拖动始终平移

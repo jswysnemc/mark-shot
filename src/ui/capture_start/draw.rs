@@ -32,17 +32,21 @@ pub(crate) fn draw(state: &mut EditorState, monitor: usize, dirty: Option<Rect>)
     let scale = state.placements[monitor].scale;
     let cn = Language::current() == Language::Chinese;
     let palette = Palette::current();
-    // 1. 【截图起始】【提示内容】先按当前绑定生成提示，再由布局决定列数与可见行数
-    let groups = hints::groups(state, cn);
-    let grid = (state.capture_start.visible && state.capture_start.hint_hovered != Some(monitor))
-        .then(|| layout::hint_grid(size, (groups.0.len(), groups.1.len())))
-        .flatten();
+    // 1. 【截图起始】【提示内容】仅在启用提示时按当前绑定生成网格，关闭提示不预留也不绘制左下角面板
+    let show_hints = state.capture_start.visible && state.capture_start.show_hints;
+    let groups = show_hints.then(|| hints::groups(state, cn));
+    let grid = groups
+        .as_ref()
+        .filter(|_| state.capture_start.hint_hovered != Some(monitor))
+        .and_then(|groups| layout::hint_grid(size, (groups.0.len(), groups.1.len())));
     // 2. 【截图起始】【缺失字形】只准备本帧实际绘制的文字，避免手工维护字符表
     if cn {
         let mut glyphs = bar::glyphs(&state.capture_start, cn);
-        for hint in groups.0.iter().chain(&groups.1) {
-            glyphs.push_str(&hint.key);
-            glyphs.push_str(hint.title);
+        if let Some(groups) = &groups {
+            for hint in groups.0.iter().chain(&groups.1) {
+                glyphs.push_str(&hint.key);
+                glyphs.push_str(hint.title);
+            }
         }
         crate::fonts::ui_fallback::ensure_text(&mut state.text.font_system, &glyphs);
     }
@@ -62,9 +66,9 @@ pub(crate) fn draw(state: &mut EditorState, monitor: usize, dirty: Option<Rect>)
         bar::draw(painter, start, monitor, size, cn, palette);
     });
     // 4. 【截图起始】【低分辨率】面板按可见行数收缩，组合键列不随比例缩放被挤掉，高度不超过屏幕四分之一
-    if let Some(grid) = grid {
+    if let (Some(grid), Some(groups)) = (grid, &groups) {
         draw_area(&mut painter, grid.bounds, dirty, |painter| {
-            hints::draw(painter, &grid, &groups, palette);
+            hints::draw(painter, &grid, groups, palette);
         });
     }
 }

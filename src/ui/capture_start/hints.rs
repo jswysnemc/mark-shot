@@ -24,9 +24,9 @@ pub(crate) struct Hint {
     pub title: &'static str,
 }
 
-/// 【截图起始】【提示边界】按 state 与 monitor 返回实际提示范围，悬停隐藏仍保留网格边界，起始阶段结束后返回空值
+/// 【截图起始】【提示边界】按 state 与 monitor 返回实际提示范围，悬停隐藏仍保留网格边界，关闭提示或起始阶段结束后返回空值
 pub(crate) fn bounds(state: &EditorState, monitor: usize) -> Option<Rect> {
-    if !state.capture_start.visible {
+    if !state.capture_start.visible || !state.capture_start.show_hints {
         return None;
     }
     let groups = groups(state, Language::current() == Language::Chinese);

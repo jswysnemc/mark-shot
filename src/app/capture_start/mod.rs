@@ -18,6 +18,7 @@ pub(super) fn initialize(state: &mut EditorState, launch: &super::Launch) {
         && !launch.code_scan
         && matches!(launch.mode, Mode::Editor | Mode::Region);
     state.capture_start.visible = state.capture_start.recording_controls && !launch.fullscreen;
+    state.capture_start.show_hints = crate::config::preferences::current().capture.show_hints;
     state.capture_start.recording = launch.record_format.or_else(|| {
         launch.record_select.then(|| {
             if state.recording_tool.config.format == "gif" {
@@ -46,9 +47,11 @@ fn damage(state: &mut EditorState, dirty: &mut u32) {
             layout::top(size, true),
             layout::toolbar(size, &state.capture_start, monitor),
             layout::message(size),
-            layout::hints(size),
         ] {
             state.damage_local(monitor, rect);
+        }
+        if state.capture_start.show_hints {
+            state.damage_local(monitor, layout::hints(size));
         }
         crate::editor::dirty::mark_dirty(dirty, monitor);
     }

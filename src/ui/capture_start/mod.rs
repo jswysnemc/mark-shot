@@ -21,9 +21,9 @@ pub(crate) enum Control {
     Background,
 }
 
-#[derive(Default)]
 pub(crate) struct State {
     pub visible: bool,
+    pub show_hints: bool,
     pub recording_controls: bool,
     pub bar_tops: Vec<f32>,
     pub checked: bool,
@@ -35,6 +35,27 @@ pub(crate) struct State {
     pub status: Status,
     pub query: Query,
     pub message: String,
+}
+
+impl Default for State {
+    /// 【截图起始】【默认状态】无参数，返回默认启用左下角快捷键提示的起始界面状态
+    fn default() -> Self {
+        Self {
+            visible: false,
+            show_hints: true,
+            recording_controls: false,
+            bar_tops: Vec::new(),
+            checked: false,
+            stop_requested: false,
+            recording: None,
+            hovered: None,
+            hint_hovered: None,
+            pressed: None,
+            status: Status::default(),
+            query: Query::default(),
+            message: String::new(),
+        }
+    }
 }
 
 impl State {

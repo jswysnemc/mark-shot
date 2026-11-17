@@ -221,3 +221,27 @@ fn recording_target_is_backward_compatible_and_format_specific() {
     assert_eq!(Format::Video.resolve("gif"), "mp4");
     assert_eq!(Format::Video.resolve("mkv"), "mkv");
 }
+
+/// 【截图起始测试】【关闭快捷提示】关闭 show_hints 后不保留左下角悬停边界且不在面板区域写入任何像素
+#[test]
+fn disabled_hints_do_not_expose_bounds_or_paint_the_corner_panel() {
+    let mut state = editor();
+    assert!(crate::ui::capture_start::hints::bounds(&state, 0).is_some());
+    state.capture_start.show_hints = false;
+    assert!(crate::ui::capture_start::hints::bounds(&state, 0).is_none());
+    state.canvas[0].fill(tiny_skia::Color::TRANSPARENT);
+    crate::ui::capture_start::draw::draw(&mut state, 0, None);
+    let corner = layout::hints(state.placements[0].size);
+    let width = state.canvas[0].width() as usize;
+    for y in corner.top() as usize..corner.bottom() as usize {
+        for x in corner.left() as usize..corner.right() as usize {
+            assert_eq!(state.canvas[0].pixels()[y * width + x].alpha(), 0);
+        }
+    }
+    let top = layout::toolbar(state.placements[0].size, &state.capture_start, 0);
+    let top_pixels = (top.top() as usize..top.bottom() as usize).any(|y| {
+        (top.left() as usize..top.right() as usize)
+            .any(|x| state.canvas[0].pixels()[y * width + x].alpha() > 0)
+    });
+    assert!(top_pixels);
+}

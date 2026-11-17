@@ -51,6 +51,7 @@ fn native_capture_values_and_toolbar_validation_are_consistent() {
         &[
             ("capture.middle_click_action".into(), "copy".into()),
             ("capture.toolbar_position".into(), "left".into()),
+            ("capture.show_hints".into(), false.into()),
             ("toolbar.font_size".into(), 24.into()),
         ],
     )
@@ -58,6 +59,8 @@ fn native_capture_values_and_toolbar_validation_are_consistent() {
     let config = preferences::load(&path).unwrap();
     assert_eq!(config.capture.middle_click_action, ClickAction::Copy);
     assert_eq!(config.capture.toolbar_position, ToolbarPosition::Left);
+    assert!(!config.capture.show_hints);
+    assert!(Capture::default().show_hints);
     assert_eq!(config.toolbar.font_size, 24);
     assert!(preferences::write(&path, "toolbar", "icon_size", 49.into()).is_err());
     assert!(preferences::write(&path, "toolbar", "font_size", 7.into()).is_err());

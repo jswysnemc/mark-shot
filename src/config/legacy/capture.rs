@@ -45,6 +45,7 @@ pub(super) fn settings(root: &Value) -> Value {
             &["middle_click_action", "middleClickAction"],
         ),
         ("toolbar_position", &["toolbar_position", "toolbarPosition"]),
+        ("show_hints", &["show_hints", "showHints"]),
         ("kde_kwin_screenshot", &["kde_kwin_screenshot"]),
     ] {
         let value = values::first(source, aliases).or_else(|| {
@@ -58,7 +59,10 @@ pub(super) fn settings(root: &Value) -> Value {
             value
         };
         let Some(value) = value else { continue };
-        let value = if matches!(key, "hide_own_windows" | "kde_kwin_screenshot") {
+        let value = if matches!(
+            key,
+            "hide_own_windows" | "show_hints" | "kde_kwin_screenshot"
+        ) {
             values::boolean(value).map(Value::Bool)
         } else if value == &Value::Bool(false) && key.ends_with("click_action") {
             Some("none".into())

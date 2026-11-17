@@ -42,6 +42,14 @@ pub(super) fn entries() -> Vec<Entry> {
         (
             Page::Capture,
             "capture",
+            "show_hints",
+            "显示快捷键提示面板",
+            "Show shortcut hints",
+            Kind::Toggle,
+        ),
+        (
+            Page::Capture,
+            "capture",
             "kde_kwin_screenshot",
             "使用 KDE KWin 截图",
             "Use KDE KWin screenshots",
@@ -124,6 +132,10 @@ pub(super) fn help(key: &str, chinese: bool) -> Option<&'static str> {
         "hide_own_windows" => (
             "捕获桌面前临时隐藏贴图等自身窗口，捕获结束后恢复",
             "Temporarily hides application windows before capture and restores them afterward",
+        ),
+        "show_hints" => (
+            "截图起始阶段在屏幕左下角显示操作与快捷键提示",
+            "Shows operation and shortcut hints in the bottom-left corner when capture starts",
         ),
         "kde_kwin_screenshot" => (
             "关闭后 KDE 截图使用桌面门户，可能出现系统授权窗口",

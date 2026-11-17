@@ -48,11 +48,13 @@ pub struct Capture {
     pub middle_click_action: ClickAction,
     #[serde(alias = "toolbarPosition")]
     pub toolbar_position: ToolbarPosition,
+    #[serde(alias = "showHints")]
+    pub show_hints: bool,
     pub kde_kwin_screenshot: bool,
 }
 
 impl Default for Capture {
-    /// 【截图配置】【默认值】无参数，返回 Qt 的全屏冻结、双击复制及中键仅平移策略
+    /// 【截图配置】【默认值】无参数，返回 Qt 的全屏冻结、双击复制、显示提示及中键仅平移策略
     fn default() -> Self {
         Self {
             freeze_scope: FreezeScope::AllScreens,
@@ -60,6 +62,7 @@ impl Default for Capture {
             double_click_action: ClickAction::Copy,
             middle_click_action: ClickAction::None,
             toolbar_position: ToolbarPosition::Selection,
+            show_hints: true,
             kde_kwin_screenshot: true,
         }
     }
