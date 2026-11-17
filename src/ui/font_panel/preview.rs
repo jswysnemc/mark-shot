@@ -109,8 +109,9 @@ impl Preview {
                     }
                 }
             }
+            let menu_style = crate::ui::menu_style::MenuStyle::current();
             let color = if family.name == active {
-                palette.hover_text
+                menu_style.selected_text
             } else {
                 palette.text
             };

@@ -21,6 +21,7 @@ pub(crate) struct Menu {
     pub id: u64,
     pub control: Rect,
     position: (f32, f32),
+    current: Option<usize>,
     active: Option<usize>,
     first: usize,
     pressed: Option<usize>,
@@ -98,6 +99,7 @@ pub(crate) fn open(window: &mut ResultWindow) -> WindowAction {
         id: crate::features::text::input_method::focus::identity(),
         control,
         position: (control.x(), control.bottom()),
+        current: active,
         active,
         first: active.map_or(0, |index| index.saturating_sub(7)),
         pressed: None,
@@ -130,6 +132,7 @@ pub(crate) fn frame(window: &mut ResultWindow, scale: f32) -> Option<PopupFrame<
     let mut canvas = Pixmap::new(pixels.0, pixels.1)?;
     canvas.fill(tiny_skia::Color::TRANSPARENT);
     let colors = super::super::palette::Palette::current();
+    let style = crate::ui::menu_style::MenuStyle::current();
     let mut painter = Painter::new(&mut canvas)
         .with_scale(scale)
         .with_text(&mut window.fonts, &mut window.cache);
@@ -138,32 +141,38 @@ pub(crate) fn frame(window: &mut ResultWindow, scale: f32) -> Option<PopupFrame<
         Rect::from_xywh(0.0, 0.0, size.0, size.1).unwrap(),
         colors.base,
         colors.border,
-        0.0,
+        8.0,
     );
     let viewport = menu.viewport();
     painter.clipped(Some(viewport), |painter| {
         for index in menu.first..(menu.first + 8).min(9) {
             let row = Rect::from_xywh(
                 9.0,
-                6.0 + (index - menu.first) as f32 * 30.0,
+                5.0 + (index - menu.first) as f32 * 30.0,
                 size.0 - 24.0,
-                28.0,
+                30.0,
             )
             .unwrap();
-            let selected = menu.active == Some(index);
-            if selected {
-                painter.fill_rounded(row, 6.0, colors.accent);
-            }
-            let foreground = if selected {
-                colors.on_accent
+            let selected = menu.current == Some(index);
+            let hovered = menu.active == Some(index) && menu.active != menu.current;
+            let foreground = if selected || hovered {
+                crate::ui::menu_style::draw_row_pill(
+                    painter,
+                    row,
+                    2.0,
+                    crate::ui::menu_style::ITEM_RADIUS,
+                    selected,
+                    hovered,
+                    false,
+                )
             } else {
                 colors.text
             };
             let text_rect = Rect::from_xywh(
                 row.x() + 10.0,
-                row.y(),
+                row.y() + 1.0,
                 (row.width() - if selected { 38.0 } else { 20.0 }).max(1.0),
-                row.height(),
+                28.0,
             )
             .unwrap();
             painter.clipped_scene(Some(text_rect), |painter| {
@@ -185,7 +194,7 @@ pub(crate) fn frame(window: &mut ResultWindow, scale: f32) -> Option<PopupFrame<
                 if let Some(path) = path.finish() {
                     painter.stroke_path(
                         &path,
-                        foreground,
+                        style.accent,
                         &tiny_skia::Stroke {
                             width: 1.7,
                             line_cap: tiny_skia::LineCap::Round,
@@ -257,7 +266,15 @@ pub(crate) fn event(window: &mut ResultWindow, id: u64, event: PopupEvent) -> Wi
             let index = menu.item(x, y);
             menu.select(index)
         }
-        PopupEvent::Leave => false,
+        PopupEvent::Leave => {
+            if menu.active != menu.current {
+                menu.active = menu.current;
+                menu.dirty = true;
+                true
+            } else {
+                false
+            }
+        }
         PopupEvent::Scroll { delta } => {
             let next = if delta.1 > 0.0 {
                 1

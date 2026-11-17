@@ -101,35 +101,22 @@ pub(super) fn content(p: &mut Painter, panel: &mut FontPanel, palette: Palette) 
                 .as_ref()
                 .is_some_and(|catalog| catalog.families[*index].name == panel.family);
             let hovered = panel.hovered == Some(Hit::Family(*index));
-            let cell = Rect::from_xywh(
-                0.5,
-                row.top() - layout.list.top() + 1.5,
-                row.width() - 1.0,
-                row.height() - 3.0,
+            let slot = Rect::from_xywh(
+                0.0,
+                row.top() - layout.list.top(),
+                row.width(),
+                row.height(),
             )
             .unwrap();
-            if selected || hovered {
-                list.fill_rounded(
-                    cell,
-                    7.0,
-                    if selected {
-                        palette.hover_fill
-                    } else {
-                        palette.soft_hover_fill
-                    },
-                );
-                border(
-                    &mut list,
-                    cell,
-                    7.0,
-                    1.0,
-                    if selected {
-                        palette.hover_border
-                    } else {
-                        palette.soft_hover_border
-                    },
-                );
-            }
+            crate::ui::menu_style::draw_row_pill(
+                &mut list,
+                slot,
+                1.5,
+                crate::ui::menu_style::ITEM_RADIUS,
+                selected,
+                hovered,
+                false,
+            );
         }
         if let Some(catalog) = &panel.catalog
             && let Some(text) =
@@ -153,6 +140,7 @@ pub(super) fn content(p: &mut Painter, panel: &mut FontPanel, palette: Palette) 
         );
     }
     super::scrollbar::draw(p, panel, palette);
+    let menu_style = crate::ui::menu_style::MenuStyle::current();
     for (index, row) in &rows {
         if panel
             .catalog
@@ -166,7 +154,7 @@ pub(super) fn content(p: &mut Painter, panel: &mut FontPanel, palette: Palette) 
                 14.0,
                 row.left() + 10.0,
                 row.top() + 7.0,
-                palette.hover_text,
+                menu_style.accent,
             );
         }
     }

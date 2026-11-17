@@ -4,13 +4,17 @@ use crate::{
     backend::window::{LEFT_BUTTON, WindowEvent},
     keys::Key,
     renderer::{Painter, text::TextStyle},
-    theme::window::Palette,
-    ui::icons,
+    ui::{
+        icons,
+        menu_style::{self, ITEM_RADIUS, MenuStyle, POPUP_RADIUS},
+    },
 };
+use cosmic_text::Weight;
 use tiny_skia::Rect;
 
-const ROW: f32 = 28.0;
+const ROW: f32 = 30.0;
 const PAD: f32 = 6.0;
+const ROW_INSET_Y: f32 = 2.0;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ChoiceEvent {
@@ -25,6 +29,8 @@ pub struct Choice {
     labels: Vec<String>,
     selected: usize,
     focused: Option<usize>,
+    hovered: Option<usize>,
+    keyboard_active: bool,
     pressed: Option<usize>,
 }
 
@@ -37,6 +43,8 @@ impl Choice {
             labels,
             selected,
             focused: Some(selected),
+            hovered: None,
+            keyboard_active: false,
             pressed: None,
         }
     }
@@ -73,11 +81,11 @@ impl Choice {
         Some(((y - area.top() - PAD) / ROW) as usize).filter(|index| *index < self.labels.len())
     }
 
-    /// 【界面控件】【菜单绘制】用 painter 按 size 绘制当前值、候选与选项，无返回值，不生成整屏缓存
+    /// 【界面控件】【菜单绘制】用 painter 按 size 绘制带四像素垂直空隙的已选与悬停胶囊，无返回值
     pub fn draw(&self, painter: &mut Painter<'_>, size: (u32, u32)) {
         let area = self.bounds(size);
-        let palette = Palette::current();
-        super::frame(painter, area, palette.base, palette.border, 6.0);
+        let style = MenuStyle::current();
+        menu_style::draw_popup_frame(painter, area, POPUP_RADIUS);
         for (index, label) in self.labels.iter().enumerate() {
             let row = Rect::from_xywh(
                 area.left() + PAD,
@@ -86,41 +94,66 @@ impl Choice {
                 ROW,
             )
             .unwrap();
-            if self.focused == Some(index) || self.selected == index {
-                painter.fill_rounded(row, 4.0, palette.pressed);
-            }
-            if self.selected == index {
+            let selected = self.selected == index;
+            let active_hover = self.hovered == Some(index)
+                || (self.keyboard_active && self.focused == Some(index));
+            let ink = menu_style::draw_row_pill(
+                painter,
+                row,
+                ROW_INSET_Y,
+                ITEM_RADIUS,
+                selected,
+                active_hover,
+                false,
+            );
+            if selected {
                 painter.icon(
                     icons::CHECK,
                     12.0,
-                    row.left() + 6.0,
-                    row.top() + 8.0,
-                    palette.accent,
+                    row.left() + 8.0,
+                    row.top() + (ROW - 12.0) * 0.5,
+                    style.accent,
                 );
             }
-            let label = super::fit_label(painter, label, 12.0, row.width() - 32.0);
+            let label = super::fit_label(painter, label, 12.0, row.width() - 34.0);
             painter.text(
-                Rect::from_xywh(row.left() + 24.0, row.top(), row.width() - 28.0, ROW).unwrap(),
+                Rect::from_xywh(row.left() + 26.0, row.top(), row.width() - 30.0, ROW).unwrap(),
                 &label,
-                TextStyle::new(12.0, palette.text),
+                TextStyle::new(12.0, ink).weight(if selected {
+                    Weight::MEDIUM
+                } else {
+                    Weight::NORMAL
+                }),
             );
         }
     }
 
-    /// 【界面控件】【菜单输入】按 event 与 size 返回重绘、取消或选项，外部按下不传递给底层开始按钮
+    /// 【界面控件】【菜单输入】按 event 与 size 返回重绘、取消或选项，移出菜单清除悬停但保留键盘候选
     pub fn event(&mut self, event: &WindowEvent, size: (u32, u32)) -> ChoiceEvent {
         if self.labels.is_empty() {
             return ChoiceEvent::Closed;
         }
         match event {
             WindowEvent::PointerMove { position } => {
-                let Some(focused) = self.hit(*position, size) else {
-                    return ChoiceEvent::Keep;
-                };
-                if Some(focused) == self.focused {
+                let next_hover = self.hit(*position, size);
+                if let Some(hit) = next_hover {
+                    if self.hovered == Some(hit)
+                        && self.focused == Some(hit)
+                        && !self.keyboard_active
+                    {
+                        return ChoiceEvent::Keep;
+                    }
+                    self.hovered = Some(hit);
+                    self.focused = Some(hit);
+                    self.keyboard_active = false;
+                } else if self.hovered.take().is_none() {
                     return ChoiceEvent::Keep;
                 }
-                self.focused = Some(focused);
+            }
+            WindowEvent::PointerLeave => {
+                if self.hovered.take().is_none() {
+                    return ChoiceEvent::Keep;
+                }
             }
             WindowEvent::PointerButton {
                 position,
@@ -145,6 +178,8 @@ impl Choice {
                 }
                 Some(Key::Up | Key::Down | Key::Home | Key::End) => {
                     let current = self.focused.unwrap_or(self.selected);
+                    self.keyboard_active = true;
+                    self.hovered = None;
                     self.focused = Some(match input.key {
                         Some(Key::Up) => current.saturating_sub(1),
                         Some(Key::Down) => (current + 1).min(self.labels.len().saturating_sub(1)),
@@ -251,5 +286,58 @@ mod tests {
             choice.event(&key(Key::Enter), (400, 300)),
             ChoiceEvent::Selected(0)
         );
+    }
+
+    /// 【选择控件测试】【悬停与间隙】相邻胶囊保持四像素垂直空隙，指针移入移出独立更新悬停态且与已选项配色分离
+    #[test]
+    fn row_pills_keep_vertical_gap_and_hover_clears_on_leave() {
+        let mut choice = Choice::new(
+            Rect::from_xywh(92.0, 76.0, 292.0, 26.0).unwrap(),
+            vec!["关闭".into(), "3 秒".into(), "5 秒".into()],
+            0,
+        );
+        let area = choice.bounds((400, 300));
+        let row0 = Rect::from_xywh(
+            area.left() + PAD,
+            area.top() + PAD,
+            area.width() - PAD * 2.0,
+            ROW,
+        )
+        .unwrap();
+        let row1 = Rect::from_xywh(
+            area.left() + PAD,
+            area.top() + PAD + ROW,
+            area.width() - PAD * 2.0,
+            ROW,
+        )
+        .unwrap();
+        let pill0 = menu_style::pill_rect(row0, ROW_INSET_Y);
+        let pill1 = menu_style::pill_rect(row1, ROW_INSET_Y);
+        assert!((pill1.top() - pill0.bottom() - 4.0).abs() < f32::EPSILON);
+
+        let style = MenuStyle::current();
+        assert_ne!(style.selected_fill, style.hover_fill);
+
+        assert_eq!(choice.hovered, None);
+        assert_eq!(
+            choice.event(
+                &WindowEvent::PointerMove {
+                    position: (120.0, 154.0),
+                },
+                (400, 300),
+            ),
+            ChoiceEvent::Redraw
+        );
+        assert_eq!(choice.hovered, Some(1));
+        assert_eq!(
+            choice.event(
+                &WindowEvent::PointerMove {
+                    position: (20.0, 20.0),
+                },
+                (400, 300),
+            ),
+            ChoiceEvent::Redraw
+        );
+        assert_eq!(choice.hovered, None);
     }
 }

@@ -19,28 +19,30 @@ pub fn contains(rect: Rect, point: (f64, f64)) -> bool {
         && point.1 < f64::from(rect.bottom())
 }
 
-/// 【框选翻译】【列表绘制】在 p 绘制 popup 本地内容，不修改选择或保存配置
+/// 【框选翻译】【列表绘制】在 p 绘制带行间留白的语言下拉内容，区分已选语言与悬停候选
 pub fn popup(p: &mut Painter, popup: &Popup) {
-    let palette = Palette::current();
+    let style = crate::ui::menu_style::MenuStyle::current();
     let language = crate::ui::language::Language::current();
     let bounds = Rect::from_xywh(0.0, 0.0, popup.rect.width(), popup.rect.height()).unwrap();
-    controls::frame(p, bounds, palette.popup_fill, palette.popup_border, 10.0);
+    crate::ui::menu_style::draw_popup_frame(p, bounds, crate::ui::menu_style::POPUP_RADIUS);
     p.text(
         Rect::from_xywh(12.0, 4.0, bounds.width() - 24.0, 20.0).unwrap(),
         language.text("Translate to"),
-        TextStyle::new(13.0, palette.muted_text),
+        TextStyle::new(12.0, style.muted_text),
     );
     for (index, option) in popup.options.iter().enumerate() {
         let row = popup.row(index);
-        if index == popup.active {
-            controls::frame(
-                p,
-                row,
-                palette.soft_hover_fill,
-                palette.soft_hover_border,
-                7.0,
-            );
-        }
+        let selected = index == popup.current;
+        let hovered = index == popup.active && popup.active != popup.current;
+        let ink = crate::ui::menu_style::draw_row_pill(
+            p,
+            row,
+            1.5,
+            crate::ui::menu_style::ITEM_RADIUS,
+            selected,
+            hovered,
+            false,
+        );
         let label = controls::fit_label(
             p,
             crate::translation::language::display_for(option, language),
@@ -56,15 +58,15 @@ pub fn popup(p: &mut Painter, popup: &Popup) {
             )
             .unwrap(),
             &label,
-            TextStyle::new(13.0, palette.text),
+            TextStyle::new(13.0, ink),
         );
-        if index == popup.current {
+        if selected {
             p.icon(
                 icons::MARK_SHOT_CHECK,
                 13.0,
                 row.right() - 22.0,
                 row.top() + 6.5,
-                palette.hover_fill,
+                style.accent,
             );
         }
     }

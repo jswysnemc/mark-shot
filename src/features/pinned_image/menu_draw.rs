@@ -35,30 +35,24 @@ pub(crate) fn draw(
         .collect::<Vec<_>>()
         .join(" ");
     crate::fonts::ui_fallback::ensure_text(fonts, &text);
-    let palette = crate::theme::context_menu::Palette::current();
+    let style = crate::ui::menu_style::MenuStyle::current();
     let mut painter = Painter::new(canvas)
         .with_scale(scale)
         .with_icons(icons)
         .with_text(fonts, cache);
-    let frame = Rect::from_xywh(0.5, 0.5, size.0 as f32 - 1.0, size.1 as f32 - 1.0).unwrap();
-    painter.fill_rounded(frame, 8.0, palette.background);
-    if let Some(path) = crate::renderer::rounded_rect_path(&frame, 8.0, true, true, true, true) {
-        painter.stroke_path(
-            &path,
-            palette.border,
-            &Stroke {
-                width: 1.0,
-                ..Default::default()
-            },
-        );
-    }
+    let bounds = Rect::from_xywh(0.0, 0.0, size.0 as f32, size.1 as f32).unwrap();
+    crate::ui::menu_style::draw_popup_frame(
+        &mut painter,
+        bounds,
+        crate::ui::menu_style::POPUP_RADIUS,
+    );
     let mut top = menu::PADDING as f32;
     for (index, row) in rows.iter().enumerate() {
         if row.label.is_empty() {
             painter.fill_rounded(
                 Rect::from_xywh(8.0, top + 4.5, size.0 as f32 - 16.0, 1.0).unwrap(),
                 0.0,
-                palette.separator,
+                style.separator,
             );
             top += menu::SEPARATOR as f32;
             continue;
@@ -71,36 +65,22 @@ pub(crate) fn draw(
             menu::ROW as f32,
         )
         .unwrap();
-        if active {
-            painter.fill_rounded(
-                rect,
-                5.0,
-                if row.danger {
-                    palette.danger_hover_background
-                } else {
-                    palette.hover_background
-                },
-            );
-        }
+        let pill_ink = crate::ui::menu_style::draw_row_pill(
+            &mut painter,
+            rect,
+            1.5,
+            crate::ui::menu_style::ITEM_RADIUS,
+            row.checked && row.enabled,
+            active,
+            row.danger && row.enabled,
+        );
         let ink = if !row.enabled {
-            palette.disabled_text
-        } else if row.danger && active {
-            palette.danger_hover_text
-        } else if row.danger {
-            palette.danger_text
-        } else if active {
-            palette.hover_text
+            style.disabled_text
         } else {
-            palette.text
+            pill_ink
         };
         if row.checked {
-            painter.icon(
-                crate::ui::icons::CHECK,
-                14.0,
-                12.0,
-                top + 7.0,
-                palette.accent,
-            );
+            painter.icon(crate::ui::icons::CHECK, 14.0, 12.0, top + 7.0, style.accent);
         }
         painter.text(
             Rect::from_xywh(34.0, top, size.0 as f32 - 52.0, menu::ROW as f32).unwrap(),

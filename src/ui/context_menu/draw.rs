@@ -1,7 +1,7 @@
 //! 【上下文菜单】【缓存绘制】沿用原版深色玻璃、细边和圆角行，局部重绘不重复叠加透明背景
 
 use super::ContextMenu;
-use crate::{renderer::Painter, ui::text_properties::draw::border};
+use crate::renderer::Painter;
 use tiny_skia::{Color, IntRect, Pixmap, Rect};
 
 /// 【上下文菜单】【菜单绘制】将 menu 按 p 比例绘入 dirty 指定区域；缓存只在布局、比例或高亮变化时重建，无返回值
@@ -57,22 +57,11 @@ pub fn prepare(p: &mut Painter, menu: &mut ContextMenu) {
     menu.pixmap = Some(pixmap);
 }
 
-/// 【上下文菜单】【本地内容】按 menu 布局绘入 p，文案和快捷键使用相同字体，分隔线无交互背景，无返回值
+/// 【上下文菜单】【本地内容】按 menu 布局绘入 p，使用统一菜单外框与带行间留白的悬停胶囊，分隔线无交互背景
 fn content(p: &mut Painter, menu: &ContextMenu) {
-    let frame =
-        Rect::from_xywh(0.5, 0.5, menu.layout.size.0 - 1.0, menu.layout.size.1 - 1.0).unwrap();
-    p.fill_rounded(
-        frame,
-        8.0,
-        crate::theme::context_menu::Palette::current().background,
-    );
-    border(
-        p,
-        frame,
-        8.0,
-        1.0,
-        crate::theme::context_menu::Palette::current().border,
-    );
+    let style = crate::ui::menu_style::MenuStyle::current();
+    let bounds = Rect::from_xywh(0.0, 0.0, menu.layout.size.0, menu.layout.size.1).unwrap();
+    crate::ui::menu_style::draw_popup_frame(p, bounds, crate::ui::menu_style::POPUP_RADIUS);
     for (index, ((row, rect), text)) in menu
         .rows
         .iter()
@@ -90,30 +79,26 @@ fn content(p: &mut Painter, menu: &ContextMenu) {
                 )
                 .unwrap(),
                 0.0,
-                crate::theme::context_menu::Palette::current().separator,
+                style.separator,
             );
             continue;
         }
         let active = row.enabled && menu.active == Some(index);
-        if active {
-            p.fill_rounded(
-                *rect,
-                5.0,
-                crate::theme::context_menu::Palette::current().hover_background,
-            );
-        }
+        let pill_ink = crate::ui::menu_style::draw_row_pill(
+            p,
+            *rect,
+            1.5,
+            crate::ui::menu_style::ITEM_RADIUS,
+            false,
+            active,
+            false,
+        );
         let color = if !row.enabled {
-            crate::theme::context_menu::Palette::current().disabled_text
-        } else if active {
-            crate::theme::context_menu::Palette::current().hover_text
+            style.disabled_text
         } else {
-            crate::theme::context_menu::Palette::current().text
+            pill_ink
         };
-        let secondary = if row.enabled {
-            crate::theme::context_menu::Palette::current().secondary_text
-        } else {
-            color
-        };
+        let secondary = if row.enabled { style.muted_text } else { color };
         let top = rect.top() + (rect.height() - menu.layout.line_height) / 2.0;
         p.text_buffer(&text.label, (rect.left() + 8.0, top), color.into());
         p.text_buffer(

@@ -7,11 +7,15 @@ use super::{
 use crate::{
     renderer::{Painter, text::TextStyle},
     theme::window::Palette,
-    ui::{controls, icons},
+    ui::{
+        controls, icons,
+        menu_style::{self, ITEM_RADIUS, MenuStyle, POPUP_RADIUS},
+    },
 };
+use cosmic_text::Weight;
 use tiny_skia::Pixmap;
 
-/// 【设置下拉】【绘制入口】按 state 与 scale 把浮层绘入 canvas，当前值与键盘候选分别显示
+/// 【设置下拉】【绘制入口】按 state 与 scale 把浮层绘入 canvas，当前值与悬停候选分离显示并保留行间留白
 pub(in crate::features::preferences) fn draw(
     state: &mut Preferences,
     canvas: &mut Pixmap,
@@ -23,6 +27,7 @@ pub(in crate::features::preferences) fn draw(
     };
     let layout = Layout::new(menu, state.size);
     let palette = Palette::current();
+    let style = MenuStyle::current();
     let labels = menu
         .options
         .iter()
@@ -38,29 +43,23 @@ pub(in crate::features::preferences) fn draw(
         .with_text(&mut state.fonts, &mut state.cache);
     painter.fill_rounded(
         rect(
-            layout.bounds.left() - 2.0,
-            layout.bounds.top() + 3.0,
-            layout.bounds.width() + 4.0,
+            layout.bounds.left() - 1.0,
+            layout.bounds.top() + 2.5,
+            layout.bounds.width() + 2.0,
             layout.bounds.height() + 2.0,
         ),
-        9.0,
-        palette.alternate,
+        POPUP_RADIUS + 1.0,
+        style.popup_shadow,
     );
-    controls::frame(
-        &mut painter,
-        layout.bounds,
-        palette.base,
-        palette.border,
-        8.0,
-    );
+    menu_style::draw_popup_frame(&mut painter, layout.bounds, POPUP_RADIUS);
     if let Some(search) = layout.search {
-        controls::frame(&mut painter, search, palette.window, palette.accent, 5.0);
+        controls::frame(&mut painter, search, palette.window, palette.accent, 6.0);
         painter.icon(
             icons::MAGNIFIER,
             13.0,
             search.left() + 9.0,
             search.top() + 8.0,
-            palette.muted,
+            style.muted_text,
         );
         if menu
             .search
@@ -79,7 +78,7 @@ pub(in crate::features::preferences) fn draw(
                 } else {
                     "Search options…"
                 },
-                TextStyle::new(11.0, palette.muted),
+                TextStyle::new(11.0, style.muted_text),
             );
         }
     }
@@ -87,25 +86,23 @@ pub(in crate::features::preferences) fn draw(
         let option = &menu.options[*index];
         let selected = menu.selected == Some(*index);
         let hovered = layout.hit(state.pointer) == Some(Hit::Option(*index));
-        let focused = menu.cursor == Some(*index);
-        if hovered || focused || selected {
-            painter.fill_rounded(
-                *bounds,
-                5.0,
-                if selected || focused {
-                    palette.pressed
-                } else {
-                    palette.window
-                },
-            );
-        }
+        let focused = menu.cursor == Some(*index) && menu.cursor != menu.selected;
+        let ink = menu_style::draw_row_pill(
+            &mut painter,
+            *bounds,
+            2.0,
+            ITEM_RADIUS,
+            selected,
+            hovered || focused,
+            false,
+        );
         if selected {
             painter.icon(
                 icons::CHECK,
                 14.0,
                 bounds.left() + 9.0,
                 bounds.top() + 10.0,
-                palette.accent,
+                style.accent,
             );
         }
         let has_detail = !option.detail.is_empty();
@@ -118,14 +115,11 @@ pub(in crate::features::preferences) fn draw(
                 if has_detail { 18.0 } else { 34.0 },
             ),
             &title,
-            TextStyle::new(
-                12.0,
-                if selected {
-                    palette.accent
-                } else {
-                    palette.text
-                },
-            ),
+            TextStyle::new(12.0, ink).weight(if selected {
+                Weight::MEDIUM
+            } else {
+                Weight::NORMAL
+            }),
         );
         if has_detail {
             let detail =
@@ -138,7 +132,7 @@ pub(in crate::features::preferences) fn draw(
                     14.0,
                 ),
                 &detail,
-                TextStyle::new(10.0, palette.muted),
+                TextStyle::new(10.0, style.muted_text),
             );
         }
     }

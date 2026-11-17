@@ -18,6 +18,7 @@ pub(crate) mod image_window;
 pub mod language;
 pub mod line_properties;
 pub mod magnifier;
+pub(crate) mod menu_style;
 pub(crate) mod micro_badge;
 pub mod model_popover;
 pub mod panel;

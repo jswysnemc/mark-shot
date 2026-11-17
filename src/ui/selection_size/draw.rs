@@ -146,21 +146,27 @@ fn ratio_trigger(p: &mut Painter, layout: Layout, ratio: f64, language: Language
     );
 }
 
-/// 【选区尺寸】【比例列表内容】在 p 按 popup 与 language 绘制六行固定预设，活动行和当前行分别着色，无返回值
+/// 【选区尺寸】【比例列表内容】在 p 按 popup 与 language 绘制六行固定预设，活动行与已选行分离着色并留空隙
 pub(crate) fn popup(p: &mut Painter, popup: &Popup, language: Language) {
-    let colors = Colors::current();
-    background(
+    let style = crate::ui::menu_style::MenuStyle::current();
+    crate::ui::menu_style::draw_popup_frame(
         p,
         Rect::from_xywh(0.0, 0.0, popup.rect.width(), popup.rect.height()).unwrap(),
-        colors,
+        crate::ui::menu_style::POPUP_RADIUS,
     );
     for (index, (label, ratio)) in ratio::PRESETS.into_iter().enumerate() {
         let row = popup.row(index);
         let current = popup.current == Some(index);
-        if index == popup.active {
-            p.fill_rounded(row, 5.0, colors.hover);
-        }
-        let ink = if current { colors.accent } else { colors.text };
+        let hovered = index == popup.active && popup.current != Some(popup.active);
+        let ink = crate::ui::menu_style::draw_row_pill(
+            p,
+            row,
+            1.5,
+            6.0,
+            current,
+            hovered || (current && index == popup.active),
+            false,
+        );
         let top = row.top() + 6.0;
         glyphs::ratio(
             p,
@@ -183,7 +189,7 @@ pub(crate) fn popup(p: &mut Painter, popup: &Popup, language: Language) {
             glyphs::check(
                 p,
                 Rect::from_xywh(row.right() - 23.0, top, 14.0, 14.0).unwrap(),
-                colors.accent,
+                style.accent,
             );
         }
     }
