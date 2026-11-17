@@ -70,6 +70,67 @@ impl Overlay {
         surface.position = (position.0.try_into()?, position.1.try_into()?);
         surface.size = size;
         surface.present(frame.pixels)?;
+        // 2. 在选区外侧同步维护四条无输入选区描边窄条，不阻挡底层页面点击与滚轮
+        self.sync_scroll_edges(origin, frame)?;
+        Ok(())
+    }
+
+    /// 【X11滚动截图】【选区框同步】按 origin 与 frame 更新捕获区域外侧四条穿透式选区描边窗口，返回协议结果
+    fn sync_scroll_edges(
+        &mut self,
+        origin: (i32, i32),
+        frame: &crate::types::scroll_panel::ScrollPanelFrame<'_>,
+    ) -> crate::AppResult {
+        use x11rb::protocol::shape::{ConnectionExt as _, SK, SO};
+        let key = (frame.region, frame.scale, frame.border);
+        if self.scroll_outline == Some(key) {
+            return Ok(());
+        }
+        for old in self.scroll_edges.drain(..) {
+            let _ = self.display.connection.destroy_window(old.window);
+        }
+        let outer = frame.region.outset(5.0, 5.0).unwrap_or(frame.region);
+        let thickness = (2.0 * frame.scale).round().max(1.0) as u32;
+        let left = origin.0 + (outer.left() * frame.scale).round() as i32 - thickness as i32 / 2;
+        let top = origin.1 + (outer.top() * frame.scale).round() as i32 - thickness as i32 / 2;
+        let width = ((outer.width() * frame.scale).round() as u32 + thickness).max(1);
+        let height = ((outer.height() * frame.scale).round() as u32 + thickness).max(1);
+        let color = frame.border.to_color_u8();
+        let pixel = [color.red(), color.green(), color.blue(), 255];
+        let strips = [
+            ((left, top), (width, thickness)),
+            (
+                (left, top + height as i32 - thickness as i32),
+                (width, thickness),
+            ),
+            (
+                (left, top + thickness as i32),
+                (thickness, height.saturating_sub(thickness * 2).max(1)),
+            ),
+            (
+                (
+                    left + width as i32 - thickness as i32,
+                    top + thickness as i32,
+                ),
+                (thickness, height.saturating_sub(thickness * 2).max(1)),
+            ),
+        ];
+        for (pos, strip_size) in strips {
+            let mut edge = Surface::new(self.display.clone(), pos, strip_size, true)?;
+            let _ = self.display.connection.shape_rectangles(
+                SO::SET,
+                SK::INPUT,
+                ClipOrdering::UNSORTED,
+                edge.window,
+                0,
+                0,
+                &[],
+            );
+            let fill = pixel.repeat((strip_size.0 * strip_size.1) as usize);
+            edge.present(&fill)?;
+            self.scroll_edges.push(edge);
+        }
+        self.scroll_outline = Some(key);
         Ok(())
     }
 

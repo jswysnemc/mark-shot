@@ -33,6 +33,7 @@ fn paint(overlay: &mut Overlay) {
                 bounds: rect.round_out().unwrap(),
                 region: tiny_skia::Rect::from_xywh(100.0, 120.0, 300.0, 300.0).unwrap(),
                 scale: 1.0,
+                border: tiny_skia::Color::BLACK,
             },
         )
         .unwrap();
@@ -59,6 +60,7 @@ fn selected_region_starts_scroll_panel_on_its_original_output() {
                 bounds: rect.round_out().unwrap(),
                 region: tiny_skia::Rect::from_xywh(100.0, 120.0, 300.0, 300.0).unwrap(),
                 scale: 1.0,
+                border: tiny_skia::Color::BLACK,
             },
         )
         .unwrap();

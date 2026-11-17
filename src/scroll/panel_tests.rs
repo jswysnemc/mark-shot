@@ -41,17 +41,18 @@ fn preview_reserves_vertical_space_and_buttons_stay_inside() {
 }
 
 #[test]
-fn status_precedes_preview_and_controls_follow_the_image() {
+fn preview_precedes_status_lines_and_controls_follow_metadata() {
     let layout = panel::layout(region(400.0, 300.0), (1920.0, 1080.0), Some((132, 400)));
     let preview = layout.preview.unwrap();
-    assert!(preview.top() >= layout.status.bottom());
+    assert!(preview.bottom() <= layout.axis.top());
+    assert!(layout.axis.bottom() <= layout.status.top() + 0.5);
+    assert!(layout.status.bottom() <= layout.length.top() + 0.5);
     assert!(
         layout
             .buttons
             .iter()
-            .all(|(_, r)| r.top() >= preview.bottom())
+            .all(|(_, r)| r.top() >= layout.length.bottom())
     );
-    // both rows stay within panel bounds
     assert!(layout.status.right() <= layout.rect.right());
 }
 
@@ -160,13 +161,13 @@ fn dual_previews_remain_present_from_initial_frame_through_long_scroll() {
     }
 }
 
-/// 【滚动截图测试】【极简无边框与平色识别】验证极简无边框面板四角透明无描边且满足 Wayland 平色定位采样
+/// 【滚动截图测试】【外侧选区框与平色识别】验证选区外框位于捕获区外侧且面板满足 Wayland 平色定位采样
 #[cfg(target_os = "linux")]
 #[test]
-fn borderless_minimal_panel_preserves_transparent_corners_and_scroll_stamp() {
+fn scroll_panel_preserves_region_outline_and_scroll_stamp() {
     use crate::{
         backend::wayland::utils::scroll_stamp::Stamp, renderer::Painter,
-        scroll::session::ScrollSession,
+        scroll::session::ScrollSession, types::scroll_panel::edge_bounds,
     };
     use cosmic_text::SwashCache;
     use tiny_skia::Pixmap;
@@ -187,7 +188,10 @@ fn borderless_minimal_panel_preserves_transparent_corners_and_scroll_stamp() {
             usvg::Tree::from_str(svg, &usvg::Options::default()).unwrap(),
         );
     }
-    let sel = region(400.0, 300.0);
+    let sel = Rect::from_xywh(40.0, 40.0, 400.0, 300.0).unwrap();
+    for edge in edge_bounds(sel) {
+        assert!(edge.intersect(&sel).is_none());
+    }
 
     for scale in [1.0_f32, 1.5, 2.0] {
         let mut session = ScrollSession::new(sel, 0).unwrap();

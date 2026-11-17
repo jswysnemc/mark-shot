@@ -343,6 +343,10 @@ impl ScreenOverlay for Overlay {
                 .check()?;
             surface.mapped = false;
         }
+        for edge in &mut self.scroll_edges {
+            self.display.connection.unmap_window(edge.window)?.check()?;
+            edge.mapped = false;
+        }
         self.suspended = true;
         self.display.connection.flush()?;
         Ok(())
@@ -356,6 +360,11 @@ impl ScreenOverlay for Overlay {
                 .check()?;
             surface.mapped = true;
             surface.repaint()?;
+        }
+        for edge in &mut self.scroll_edges {
+            self.display.connection.map_window(edge.window)?.check()?;
+            edge.mapped = true;
+            edge.repaint()?;
         }
         self.suspended = false;
         Ok(())

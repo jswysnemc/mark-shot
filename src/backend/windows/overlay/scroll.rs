@@ -10,6 +10,8 @@ pub(super) struct State {
     pub rect: Option<tiny_skia::Rect>,
     pub hidden: bool,
     repaint_after: Option<Instant>,
+    pub edges: Vec<native::Window>,
+    pub outline: Option<(tiny_skia::Rect, f32, tiny_skia::Color)>,
 }
 
 impl Overlay {
@@ -102,6 +104,70 @@ impl Overlay {
         })?;
         window.update_bitmap(frame.size, |bitmap| bitmap.write_rgba(frame.pixels))?;
         self.staged[monitor_idx] = true;
+        // 1. 同步更新选区外侧四条鼠标穿透指示边线，捕获区域保持纯净透明
+        self.sync_scroll_edges(origin, frame)?;
+        Ok(())
+    }
+
+    /// 【Windows长截图】【选区框同步】按 origin 与 frame 创建或更新四条穿透式捕获区域边框窗口，返回系统结果
+    fn sync_scroll_edges(
+        &mut self,
+        origin: native::Bounds,
+        frame: &crate::types::scroll_panel::ScrollPanelFrame<'_>,
+    ) -> crate::AppResult {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GWL_EXSTYLE, GetWindowLongPtrW, SetWindowLongPtrW, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
+        };
+        let key = (frame.region, frame.scale, frame.border);
+        if self.scroll.outline == Some(key) {
+            return Ok(());
+        }
+        self.scroll.edges.clear();
+        for area in crate::types::scroll_panel::edge_bounds(frame.region) {
+            let Some(bounds) = area.round_out() else {
+                continue;
+            };
+            let Some(pixels) = crate::types::scroll_panel::edge_pixels(
+                bounds,
+                frame.region,
+                frame.scale,
+                frame.border,
+            ) else {
+                continue;
+            };
+            let px_left = (bounds.x() as f32 * frame.scale).round() as i32;
+            let px_top = (bounds.y() as f32 * frame.scale).round() as i32;
+            let mut edge = native::Window::new(
+                native::WindowOptions {
+                    title: "Mark Shot - Scroll Region".into(),
+                    bounds: native::Bounds {
+                        left: origin.left.saturating_add(px_left),
+                        top: origin.top.saturating_add(px_top),
+                        width: pixels.width(),
+                        height: pixels.height(),
+                    },
+                    minimum: (1, 1),
+                    topmost: true,
+                    activate: false,
+                    layered: true,
+                    owner: 0,
+                },
+                self.queue.clone(),
+            )?;
+            unsafe {
+                let hwnd = edge.handle() as _;
+                let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
+                SetWindowLongPtrW(
+                    hwnd,
+                    GWL_EXSTYLE,
+                    (ex | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW) as isize,
+                );
+            }
+            let _ = edge.set_capture_excluded(true);
+            edge.set_rgba((pixels.width(), pixels.height()), pixels.data())?;
+            self.scroll.edges.push(edge);
+        }
+        self.scroll.outline = Some(key);
         Ok(())
     }
 

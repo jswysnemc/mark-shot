@@ -1,16 +1,16 @@
-//! 【滚动截图】【局部子表面】透明父表面负责输入，仅由无边框面板子表面承载自身像素
+//! 【滚动截图】【局部子表面】透明父表面负责输入，面板与选区外侧四条边线各自持有独立局部像素
 
 use super::state::OverlayState;
 use crate::{
     backend::wayland::utils::shm::{ShmBuffer, create_shm_buffer},
-    types::scroll_panel::ScrollPanelFrame,
+    types::scroll_panel::{ScrollPanelFrame, edge_bounds, edge_pixels},
 };
 use smithay_client_toolkit::{
     compositor::{CompositorState, Region},
     shm::slot::SlotPool,
     subcompositor::SubcompositorState,
 };
-use tiny_skia::IntRect;
+use tiny_skia::{Color, IntRect, Rect};
 use wayland_client::{
     QueueHandle,
     protocol::{wl_subsurface::WlSubsurface, wl_surface::WlSurface},
@@ -27,7 +27,7 @@ struct Sprite {
 }
 
 impl Sprite {
-    /// 【滚动截图】【子表面创建】按parent和协议对象创建无输入子表面，返回角色或协议错误，不分配整屏像素
+    /// 【滚动截图】【子表面创建】按 parent 和协议对象创建无输入子表面，返回角色或协议错误，不分配整屏像素
     fn new(
         parent: &WlSurface,
         compositor: &CompositorState,
@@ -48,7 +48,7 @@ impl Sprite {
         })
     }
 
-    /// 【滚动截图】【局部像素】按pixels、size和bounds提交局部图像，pool提供共享存储，返回协议结果
+    /// 【滚动截图】【局部像素】按 pixels、size 和 bounds 提交局部图像，pool 提供共享存储，返回协议结果
     fn paint(
         &mut self,
         pixels: &[u8],
@@ -65,7 +65,7 @@ impl Sprite {
         if let Some(viewport) = &self.viewport {
             viewport.set_destination(bounds.width() as i32, bounds.height() as i32);
         }
-        // 1. 【滚动截图】【缓冲使用期】由工具包标记正在使用，服务端释放前不能重用同一像素槽位
+        // 1. 由共享池标记槽位正在使用，服务端释放前不复用同一像素槽位
         buffer.buffer.attach_to(&self.surface)?;
         self.surface
             .damage_buffer(0, 0, size.0 as i32, size.1 as i32);
@@ -89,10 +89,12 @@ impl Drop for Sprite {
 #[derive(Default)]
 pub(crate) struct ScrollLayer {
     panel: Option<Sprite>,
+    edges: Vec<Sprite>,
+    outline: Option<(Rect, f32, Color)>,
 }
 
 impl ScrollLayer {
-    /// 【滚动截图】【浮层局部绘制】按 parent 及协议对象将无边框 frame 面板提交到 pool，返回协议结果，捕获区保持纯净无描边
+    /// 【滚动截图】【浮层局部绘制】按 parent 及协议对象将 frame 面板与识别区域四边线框提交到 pool，返回协议结果
     pub(super) fn paint(
         &mut self,
         parent: &WlSurface,
@@ -103,7 +105,7 @@ impl ScrollLayer {
         qh: &QueueHandle<OverlayState>,
         frame: &ScrollPanelFrame<'_>,
     ) -> crate::AppResult {
-        // 1. 按需创建承载极简控制面板的无输入子表面
+        // 1. 提交控制面板子表面像素
         if self.panel.is_none() {
             self.panel = Some(Sprite::new(
                 parent,
@@ -113,11 +115,36 @@ impl ScrollLayer {
                 qh,
             )?);
         }
-        // 2. 提交控制面板局部像素，不在选区外侧附加边框子表面
         self.panel
             .as_mut()
             .unwrap()
             .paint(frame.pixels, frame.size, frame.bounds, pool)?;
+
+        // 2. 在选区外侧五逻辑像素处更新四条无输入选区边线，捕获区域内部保持纯净透明
+        let key = (frame.region, frame.scale, frame.border);
+        if self.outline != Some(key) {
+            while self.edges.len() < 4 {
+                self.edges.push(Sprite::new(
+                    parent,
+                    compositor,
+                    subcompositor,
+                    viewporter,
+                    qh,
+                )?);
+            }
+            for (sprite, area) in self.edges.iter_mut().zip(edge_bounds(frame.region)) {
+                let bounds = area.round_out().ok_or("invalid scroll edge bounds")?;
+                let pixels = edge_pixels(bounds, frame.region, frame.scale, frame.border)
+                    .ok_or("cannot allocate scroll edge")?;
+                sprite.paint(
+                    pixels.data(),
+                    (pixels.width(), pixels.height()),
+                    bounds,
+                    pool,
+                )?;
+            }
+            self.outline = Some(key);
+        }
         Ok(())
     }
 }

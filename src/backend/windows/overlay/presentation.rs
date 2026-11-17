@@ -315,12 +315,16 @@ impl ScreenOverlay for Overlay {
     fn task_wake(&mut self) -> crate::AppResult<task_wake::Wake> {
         Ok(self.wake.wake())
     }
-    /// 【Windows覆盖层】【隐藏暂停】无参数，先回收弹层再隐藏截图表面，返回结果，不释放原图
+    /// 【Windows覆盖层】【隐藏暂停】无参数，先回收弹层再隐藏截图表面与长截图选区框，返回结果，不释放原图
     fn suspend(&mut self) -> crate::AppResult {
         self.popup = None;
         for (_, window) in &mut self.surfaces {
             window.hide();
         }
+        for edge in &mut self.scroll.edges {
+            edge.hide();
+        }
+        self.scroll.outline = None;
         Ok(())
     }
     /// 【Windows覆盖层】【首帧恢复】无参数，等待共享业务重新提交全部像素，返回结果，避免显示暂停前缓存
