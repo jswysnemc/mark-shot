@@ -1,10 +1,6 @@
 //! 【原生窗口】【浮层拖动预览】保持被抓取主表面静止，通过无输入预览浮层按帧跟随指针以消除坐标振荡
 
-use super::{
-    layer_geometry::Geometry,
-    runtime::NativeWindow,
-    surface::SurfaceId,
-};
+use super::{layer_geometry::Geometry, runtime::NativeWindow, surface::SurfaceId};
 use crate::AppResult;
 use smithay_client_toolkit::{
     compositor::{FrameCallbackData, Region},
@@ -247,12 +243,9 @@ impl NativeWindow {
                 if preview.buffers.len() >= 3 {
                     return Ok(());
                 }
-                let (buffer, _) = self.pool.create_buffer(
-                    width,
-                    height,
-                    width * 4,
-                    wl_shm::Format::Argb8888,
-                )?;
+                let (buffer, _) =
+                    self.pool
+                        .create_buffer(width, height, width * 4, wl_shm::Format::Argb8888)?;
                 preview.buffers.push(buffer);
                 preview.buffers.len() - 1
             };

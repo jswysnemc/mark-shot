@@ -47,7 +47,10 @@ pub(super) fn target(state: &Preferences) -> Option<u64> {
 
 /// 【设置窗口】【候选矩形】将 area 约束在滚动视口 viewport 内，防止候选框漂移到窗口外侧
 fn clamp_to_viewport(area: Rect, viewport: Rect) -> Rect {
-    let top = area.top().clamp(viewport.top(), (viewport.bottom() - 4.0).max(viewport.top()));
+    let top = area.top().clamp(
+        viewport.top(),
+        (viewport.bottom() - 4.0).max(viewport.top()),
+    );
     rect(area.left(), top, area.width(), area.height())
 }
 
@@ -60,7 +63,11 @@ pub(super) fn snapshot(
     cause: ChangeCause,
 ) -> Option<Snapshot> {
     // 1. 【设置窗口】【下拉搜索】展开的可搜索下拉菜单优先持有输入法目标
-    if state.dropdown.as_ref().is_some_and(|menu| menu.search.is_some()) {
+    if state
+        .dropdown
+        .as_ref()
+        .is_some_and(|menu| menu.search.is_some())
+    {
         let bounds = state
             .dropdown
             .as_ref()
@@ -90,9 +97,14 @@ pub(super) fn snapshot(
             search.width() - 84.0,
             search.height() - 6.0,
         );
-        return state
-            .search
-            .input_snapshot(&mut state.fonts, area, focus, target_id, previous, cause);
+        return state.search.input_snapshot(
+            &mut state.fonts,
+            area,
+            focus,
+            target_id,
+            previous,
+            cause,
+        );
     }
     // 3. 【设置窗口】【翻译页面】分别处理多行测试原文与单行服务参数输入框
     if state.translation_page() {

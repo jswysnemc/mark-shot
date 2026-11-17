@@ -163,8 +163,10 @@ fn cursor_rect(state: &EditorState, monitor_idx: usize) -> Option<(i32, i32, i32
                 ))
             })
             .or_else(|| {
-                let point =
-                    view.to_screen((f64::from(start.0 + padding.0), f64::from(start.1 + padding.1)));
+                let point = view.to_screen((
+                    f64::from(start.0 + padding.0),
+                    f64::from(start.1 + padding.1),
+                ));
                 Some((
                     (point.0 - f64::from(placement.position.0)).floor() as i32,
                     (point.1 - f64::from(placement.position.1)).floor() as i32,
