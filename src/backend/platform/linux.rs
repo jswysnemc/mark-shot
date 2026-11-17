@@ -74,6 +74,58 @@ pub fn initialize_capture_with_cursor(
     }
 }
 
+/// 【Linux捕获】【提前授权】在读取显示器列表之前完成 Portal 授权，返回带挂载授权的捕获后端。
+///
+/// 用户先开机、再插外接屏或改显示器排列时，合成器要到授权窗口关闭前后才把新布局发过来，
+/// 而旧流程先读列表再授权，读到的就可能是上一版布局，绑定阶段会因位置对不上而失败。
+/// 提前授权把授权等待和布局稳定合并成一段：授权完成时再读列表，读到的就是当前布局。
+/// 原生协议可用（wlroots/niri/KDE 自有链路）或 MARK_SHOT_CAPTURE 强制指定后端时返回 None，
+/// 交给普通捕获链，避免多弹一次不必要的授权窗口。
+pub async fn prepare_portal_capture(
+    conn: &Session,
+    include_cursor: bool,
+) -> Option<Box<dyn CaptureMethod>> {
+    let Session::Wayland(connection) = conn else {
+        return None;
+    };
+    // 1. 【Linux捕获】【后端可用性】只有 Portal 是唯一选择时才提前授权，否则会多弹一次没必要的权限窗口
+    if wayland::capture::image_copy::supported(connection)
+        || wayland::capture::screencopy::supported(connection)
+        || std::env::var_os("NIRI_SOCKET").is_some()
+    {
+        return None;
+    }
+    if !std::env::var("MARK_SHOT_CAPTURE")
+        .unwrap_or_default()
+        .is_empty()
+    {
+        return None;
+    }
+    // 2. 【Linux捕获】【KDE例外】KDE 的 Portal 链路由 KWin 自己管理，在多显示器下一直正常，
+    //    没必要为它多弹一次权限窗口；只在真正需要 Portal 的桌面（GNOME 等）提前授权
+    let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
+    if desktop
+        .split(':')
+        .any(|part| part.eq_ignore_ascii_case("KDE"))
+    {
+        return None;
+    }
+    match wayland::capture::portal::authorize(include_cursor).await {
+        Ok(capture) => {
+            log::info!("【Linux捕获】【提前授权】Portal 授权已就绪，读取显示器列表");
+            Some(Box::new(
+                wayland::capture::portal::PortalMethod::with_cursor(include_cursor)
+                    .with_prepared(capture),
+            ))
+        }
+        Err(error) => {
+            // 3. 【Linux捕获】【授权失败】提前授权失败不改变原有行为，按普通链路再试一次，由普通流程决定最终错误
+            log::info!("【Linux捕获】【提前授权】跳过: {error}");
+            None
+        }
+    }
+}
+
 /// 【Wayland】【捕获分发】按conn和include_cursor选择原生或门户捕获，返回捕获链
 fn wayland_capture_with_cursor(conn: &Connection, include_cursor: bool) -> Box<dyn CaptureMethod> {
     let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
@@ -136,7 +188,9 @@ fn capture_method(name: &str, conn: &Connection, include_cursor: bool) -> Box<dy
             conn.clone(),
             include_cursor,
         )),
-        _ => Box::new(wayland::capture::portal::PortalMethod { include_cursor }),
+        _ => Box::new(wayland::capture::portal::PortalMethod::with_cursor(
+            include_cursor,
+        )),
     }
 }
 

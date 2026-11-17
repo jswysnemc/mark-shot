@@ -48,9 +48,7 @@ pub(super) async fn run(args: &[String]) -> mark_shot::AppResult {
         .first()
         .ok_or("private output required")?
         .clone();
-    let method = PortalMethod {
-        include_cursor: false,
-    };
+    let method = PortalMethod::with_cursor(false);
     let opened = method.open_session(&[output]).await;
     if args.iter().any(|arg| arg == "reject") {
         if opened.is_ok() {

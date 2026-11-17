@@ -17,7 +17,7 @@ pub mod windows;
 pub mod x11;
 pub use platform::{
     initialize_capture, initialize_capture_with_cursor, initialize_clipboard, initialize_notifier,
-    initialize_overlay, initialize_window_capture,
+    initialize_overlay, initialize_window_capture, prepare_portal_capture,
 };
 pub mod window_detection;
 
