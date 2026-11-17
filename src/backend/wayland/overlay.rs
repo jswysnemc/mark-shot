@@ -96,21 +96,11 @@ impl ScreenOverlay for WaylandOverlay {
     fn stage_capture_scene(
         &mut self,
         monitor_idx: usize,
-        mut frame: crate::types::capture_scene::Frame<'_>,
+        frame: crate::types::capture_scene::Frame<'_>,
     ) -> crate::AppResult {
-        let scale = self
-            .runtime
-            .state
-            .surfaces
-            .get(&monitor_idx)
-            .ok_or("capture surface is unavailable")?
-            .scale;
-        frame.selection = frame
-            .selection
-            .and_then(|rect| crate::renderer::scale_rect(&rect, scale));
-        frame.hovered = frame
-            .hovered
-            .and_then(|rect| crate::renderer::scale_rect(&rect, scale));
+        if !self.runtime.state.surfaces.contains_key(&monitor_idx) {
+            return Err("capture surface is unavailable".into());
+        }
         let damage = frame.damage;
         self.stage_with_pixels(
             monitor_idx,

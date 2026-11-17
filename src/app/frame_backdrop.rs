@@ -62,13 +62,17 @@ pub(super) fn stage(
             );
         }
         let placement = &editor.placements[monitor];
-        let local = |rect| crate::tools::selection::global_selection_to_local(&rect, placement);
-        let selection = editor.selection.zone.and_then(local);
+        // 1. 【截图场景】【物理对齐】前景、背景与损坏矩形均位于输出物理网格，选区与悬停同步换算避免非整数缩放错位及残留
+        let to_physical = |rect| {
+            crate::tools::selection::global_selection_to_local(&rect, placement)
+                .and_then(|local| crate::renderer::scale_rect(&local, placement.scale))
+        };
+        let selection = editor.selection.zone.and_then(to_physical);
         let hovered = editor
             .region_detection
             .hovered
             .filter(|_| editor.region_rendering.native_hover)
-            .and_then(local);
+            .and_then(to_physical);
         let opaque = !identity || editor.region_rendering.baked_background;
         overlay.stage_capture_scene(
             monitor,

@@ -63,3 +63,134 @@ fn native_scene_respects_reclamation_permission_after_successful_submission() {
     );
     assert!(overlay.frames[0] == native, "submitted scene changed");
 }
+
+/// 【原生背景测试】【非整数缩放移动】验证 125%/150%/175% 下区域框选与高亮范围严格重合，移动选区后不残留旧高亮孔洞
+#[cfg(target_os = "linux")]
+#[test]
+fn fractional_scale_selection_move_aligns_highlight_and_clears_previous_hole() {
+    use crate::{
+        app::{
+            frame_lifecycle_overlay::Overlay,
+            frame_render::{Pacing, clear_frame_state, render_dirty_monitors},
+            region_rendering_test_support as support,
+        },
+        tools::Tool,
+        types::MouseButton,
+    };
+
+    for scale in [1.25, 1.5, 1.75] {
+        let mut incremental = support::editor(scale, true);
+        let mut full_scene = support::editor(scale, true);
+        let mut legacy = support::editor(scale, true);
+        incremental.region_rendering.native_scene = true;
+        full_scene.region_rendering.native_scene = true;
+        for state in [&mut incremental, &mut full_scene, &mut legacy] {
+            state.ui_hidden = true;
+            state.selected_tool = Tool::Selection;
+            state.selection.zone = Rect::from_xywh(90.0, 70.0, 220.0, 160.0);
+        }
+        let mut inc_overlay = Overlay::new(&incremental.canvas, false);
+        let mut full_overlay = Overlay::new(&full_scene.canvas, false);
+        super::configure(&mut incremental, &mut inc_overlay, true);
+        super::configure(&mut full_scene, &mut full_overlay, true);
+        let mut inc_pacing = Pacing::new(1);
+        let mut full_pacing = Pacing::new(1);
+
+        let mut dirty = 1;
+        render_dirty_monitors(
+            &mut incremental,
+            &mut inc_overlay,
+            dirty,
+            true,
+            &mut inc_pacing,
+        )
+        .unwrap();
+        clear_frame_state(&mut incremental, &mut dirty, &inc_pacing);
+
+        // 1. 【原生背景测试】【拖动选区】连续移动选框验证局部损坏更新，旧高亮区域必须随移动完整恢复遮罩
+        for state in [&mut incremental, &mut full_scene, &mut legacy] {
+            support::pointer(
+                state,
+                (150.0, 120.0),
+                Some((MouseButton::Left, true)),
+                &mut 0,
+            );
+        }
+        let mut press_dirty = 1;
+        render_dirty_monitors(
+            &mut incremental,
+            &mut inc_overlay,
+            press_dirty,
+            true,
+            &mut inc_pacing,
+        )
+        .unwrap();
+        clear_frame_state(&mut incremental, &mut press_dirty, &inc_pacing);
+        incremental.damage_rects.clear();
+        full_scene.damage_rects.clear();
+
+        for target in [(210.0, 175.0), (290.0, 230.0), (120.0, 95.0)] {
+            let mut move_dirty = 0;
+            support::pointer(&mut incremental, target, None, &mut move_dirty);
+            support::pointer(&mut full_scene, target, None, &mut 0);
+            support::pointer(&mut legacy, target, None, &mut 0);
+            render_dirty_monitors(
+                &mut incremental,
+                &mut inc_overlay,
+                move_dirty,
+                true,
+                &mut inc_pacing,
+            )
+            .unwrap();
+            clear_frame_state(&mut incremental, &mut move_dirty, &inc_pacing);
+
+            let full_rect = full_scene.placements[0].rect().unwrap();
+            full_scene.damage_local(0, full_rect);
+            let mut full_dirty = 1;
+            render_dirty_monitors(
+                &mut full_scene,
+                &mut full_overlay,
+                full_dirty,
+                true,
+                &mut full_pacing,
+            )
+            .unwrap();
+            clear_frame_state(&mut full_scene, &mut full_dirty, &full_pacing);
+            assert_eq!(
+                inc_overlay.frames[0], full_overlay.frames[0],
+                "stale highlight remained at scale={scale}, target={target:?}"
+            );
+
+            // 2. 【原生背景测试】【传统遮罩对照】对比传统 dimmed 层全屏合成结果，确保物理像素高亮范围一致
+            support::paint(&mut legacy, None, true);
+            let mut legacy_rgba = legacy.canvas[0].clone();
+            crate::renderer::opaque_backdrop::compose(
+                &legacy.captures[0].pixmap,
+                &mut legacy_rgba,
+                None,
+            );
+            let max_diff = inc_overlay.frames[0]
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(legacy_rgba.data().as_chunks::<4>().0)
+                .map(|(bgra, rgba)| {
+                    [
+                        bgra[2].abs_diff(rgba[0]),
+                        bgra[1].abs_diff(rgba[1]),
+                        bgra[0].abs_diff(rgba[2]),
+                        bgra[3].abs_diff(rgba[3]),
+                    ]
+                    .into_iter()
+                    .max()
+                    .unwrap()
+                })
+                .max()
+                .unwrap();
+            assert!(
+                max_diff <= 2,
+                "highlight misaligned with selection border at scale={scale}: max_diff={max_diff}"
+            );
+        }
+    }
+}
