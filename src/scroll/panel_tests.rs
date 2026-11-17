@@ -14,7 +14,6 @@ fn panel_sits_right_of_the_region_when_there_is_room() {
 
 #[test]
 fn panel_flips_to_the_left_when_the_right_edge_is_used_up() {
-    // flips left when right space is less than panel width
     let layout = panel::layout(region(1900.0, 300.0), (1920.0, 1080.0), None);
     assert!(layout.rect.right() <= 1900.0);
     assert!(layout.rect.left() >= 0.0);
@@ -41,17 +40,15 @@ fn preview_reserves_vertical_space_and_buttons_stay_inside() {
 }
 
 #[test]
-fn preview_precedes_status_lines_and_controls_follow_metadata() {
+fn status_precedes_preview_and_controls_follow_the_image() {
     let layout = panel::layout(region(400.0, 300.0), (1920.0, 1080.0), Some((132, 400)));
     let preview = layout.preview.unwrap();
-    assert!(preview.bottom() <= layout.axis.top());
-    assert!(layout.axis.bottom() <= layout.status.top() + 0.5);
-    assert!(layout.status.bottom() <= layout.length.top() + 0.5);
+    assert!(preview.top() >= layout.status.bottom());
     assert!(
         layout
             .buttons
             .iter()
-            .all(|(_, r)| r.top() >= layout.length.bottom())
+            .all(|(_, r)| r.top() >= preview.bottom())
     );
     assert!(layout.status.right() <= layout.rect.right());
 }
@@ -109,6 +106,23 @@ fn toggle_axis_availability_before_and_after_growth() {
     ));
 }
 
+/// 【滚动截图测试】【拼接增量读数】验证状态栏数值在首帧显示总长度、新增拼接帧后追加 +N 增量
+#[test]
+fn metric_text_appends_positive_stitch_delta() {
+    use crate::scroll::session::ScrollSession;
+
+    let mut session = ScrollSession::new(region(120.0, 200.0), 0).unwrap();
+    assert_eq!(panel::metric_text(&session), "");
+
+    let first = shot_image::Image::from_pixels(120, 200, vec![0xff33_4155; 120 * 200]).unwrap();
+    assert!(session.push(first));
+    assert_eq!(panel::metric_text(&session), "200 px");
+
+    session.frame_count = 2;
+    session.last_append = 123;
+    assert_eq!(panel::metric_text(&session), "200 px +123");
+}
+
 /// 【滚动截图测试】【捕获避让】覆盖左右无空间但下方可放置和整屏重叠两种区域，保证可见性策略具备可靠输入
 #[test]
 fn placement_reports_overlap_and_uses_vertical_space() {
@@ -161,10 +175,10 @@ fn dual_previews_remain_present_from_initial_frame_through_long_scroll() {
     }
 }
 
-/// 【滚动截图测试】【外侧选区框与平色识别】验证选区外框位于捕获区外侧且面板满足 Wayland 平色定位采样
+/// 【滚动截图测试】【极简无边框、外侧选区框与平色识别】验证极简无边框面板四角透明、选区框不污染捕获区且满足 Wayland 平色定位采样
 #[cfg(target_os = "linux")]
 #[test]
-fn scroll_panel_preserves_region_outline_and_scroll_stamp() {
+fn borderless_minimal_panel_preserves_region_outline_and_scroll_stamp() {
     use crate::{
         backend::wayland::utils::scroll_stamp::Stamp, renderer::Painter,
         scroll::session::ScrollSession, types::scroll_panel::edge_bounds,
@@ -200,6 +214,7 @@ fn scroll_panel_preserves_region_outline_and_scroll_stamp() {
                 let img =
                     shot_image::Image::from_pixels(400, 900, vec![0xff334155; 360_000]).unwrap();
                 session.push(img);
+                session.last_append = 123;
             }
             let dims = {
                 let (w, h) = session.stitcher.dimensions();

@@ -59,7 +59,7 @@ pub(super) fn paint(
         if crate::ui::language::Language::current() == crate::ui::language::Language::Chinese {
             crate::fonts::ui_fallback::ensure_text(
                 &mut state.text.font_system,
-                "纵向滚动横向滚动等待滚动正在捕获已暂停捕获已暂停捕获错误重叠不足，请缓慢回退正在移动区域区域已调整等待首帧",
+                "等待滚动正在捕获已暂停捕获已暂停捕获错误重叠不足，请缓慢回退正在移动区域区域已调整",
             );
         }
         let mut painter = Painter::new(canvas)

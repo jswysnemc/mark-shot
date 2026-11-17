@@ -263,7 +263,7 @@ mod tests {
         let mut cache = SwashCache::new();
         let (zoom_w, zoom_h) = measure(&mut fonts, "125%", "", BadgeKind::Zoom, 240.0);
         assert_eq!(zoom_h, PILL_HEIGHT);
-        assert!(zoom_w >= 44.0 && zoom_w < 96.0);
+        assert!((44.0..96.0).contains(&zoom_w));
 
         let mut canvas = Pixmap::new(120, 48).unwrap();
         let mut painter = Painter::new(&mut canvas).with_text(&mut fonts, &mut cache);

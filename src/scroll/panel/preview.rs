@@ -1,4 +1,4 @@
-//! 【滚动截图】【双预览导航】参考 LumineCapture 焦点窗口并始终保留主细节预览与副全景概览
+//! 【滚动截图】【双预览导航】始终保留主细节预览与副全景概览，采用无边框极简圆角呈现
 
 use crate::{
     renderer::{Painter, paths::rounded_rect_path},
@@ -29,7 +29,7 @@ pub struct PreviewLayout {
 }
 
 impl PreviewState {
-    /// 【滚动截图】【跟随构造】返回初始自动跟随最新捕获区域的浏览状态，无参数
+    /// 【滚动截图】【跟随构造】返回初始跟随最新内容的浏览状态，无参数
     pub fn new() -> Self {
         Self {
             scrub: 0.0,
@@ -37,7 +37,7 @@ impl PreviewState {
         }
     }
 
-    /// 【滚动截图】【末端同步】按 layout 限制 scrub，跟随状态默认对齐末端，无返回值
+    /// 【滚动截图】【内容同步】按 layout 限制 scrub，跟随状态始终定位到末端，无返回值
     pub fn sync(&mut self, layout: &PreviewLayout) {
         self.scrub = if self.following {
             layout.max_scrub
@@ -46,27 +46,7 @@ impl PreviewState {
         };
     }
 
-    /// 【滚动截图】【焦点窗口同步】参考 LumineCapture 按 capture_range 双向跟随最新拼接区间，手动浏览时保持原偏移
-    pub fn sync_focus(&mut self, layout: &PreviewLayout, capture_range: Option<(i32, i32)>) {
-        if !self.following {
-            self.scrub = self.scrub.clamp(0.0, layout.max_scrub);
-            return;
-        }
-        if let Some((start, len)) = capture_range
-            && len > 0
-        {
-            let total = layout.max_scrub + layout.viewport;
-            self.scrub = preview_window(
-                total,
-                layout.viewport,
-                (start as f32, (start.saturating_add(len)) as f32),
-            );
-        } else {
-            self.scrub = layout.max_scrub;
-        }
-    }
-
-    /// 【滚动截图】【浏览定位】按 value 与 layout 更新原图坐标，返回是否变化，滑至末端时恢复自动跟随
+    /// 【滚动截图】【浏览定位】按 value 与 layout 更新原图坐标，返回是否变化，末端恢复跟随
     pub fn set(&mut self, value: f32, layout: &PreviewLayout) -> bool {
         let before = self.scrub;
         self.scrub = value.clamp(0.0, layout.max_scrub);
@@ -75,14 +55,7 @@ impl PreviewState {
     }
 }
 
-/// 【滚动截图】【焦点视口起点】按总长 rows、可视长度 visible 与最新帧区间 focus 计算主预览起始坐标
-pub fn preview_window(rows: f32, visible: f32, focus: (f32, f32)) -> f32 {
-    let at_most = (rows - visible).max(0.0);
-    let (top, bottom) = (focus.0.clamp(0.0, rows), focus.1.clamp(0.0, rows));
-    (bottom - visible).max(0.0).min(top).min(at_most)
-}
-
-/// 【滚动截图】【双槽切分】按 area 与 horizontal 切分主细节预览槽与副全景概览槽
+/// 【滚动截图】【双槽分区】按 area 与 horizontal 切分主预览槽与副概览槽，无描边纯留白间隔
 pub(super) fn split_slots(area: Rect, horizontal: bool) -> Option<(Rect, Option<Rect>)> {
     if area.width() < 28.0 || area.height() < 28.0 {
         return Some((area, None));
@@ -114,7 +87,7 @@ pub(super) fn split_slots(area: Rect, horizontal: bool) -> Option<(Rect, Option<
     }
 }
 
-/// 【滚动截图】【细节布局】按 area、dimensions 与 axis 返回常驻保留主副双预览的几何与可浏览范围
+/// 【滚动截图】【细节布局】按 area、dimensions 与 axis 返回始终保留主副双预览的几何与可浏览长度
 pub fn layout(area: Rect, dimensions: (i32, i32), axis: Axis) -> Option<PreviewLayout> {
     let (w, h) = dimensions;
     if w <= 0 || h <= 0 {
@@ -144,7 +117,7 @@ pub fn layout(area: Rect, dimensions: (i32, i32), axis: Axis) -> Option<PreviewL
     })
 }
 
-/// 【滚动截图】【概览矩形】按 layout 和 dimensions 等比适配完整长图，返回副预览内的图像矩形
+/// 【滚动截图】【概览矩形】按 layout 和 dimensions 等比适配完整长图，返回副预览内的实际图像范围
 pub fn overview_rect(layout: &PreviewLayout, dimensions: (i32, i32)) -> Option<Rect> {
     let area = layout.overview?;
     let (w, h) = (dimensions.0 as f32, dimensions.1 as f32);
@@ -160,7 +133,7 @@ pub fn overview_rect(layout: &PreviewLayout, dimensions: (i32, i32)) -> Option<R
     )
 }
 
-/// 【滚动截图】【概览定位】将 position 映射到 layout 原图长度，offset 保留按下时相对视口偏移，返回目标坐标
+/// 【滚动截图】【概览定位】将 position 映射到 layout 原图长度，offset 保留按下时相对可视窗口的位置，返回目标浏览坐标
 pub fn scrub_at(position: (f64, f64), rect: Rect, layout: &PreviewLayout, offset: f32) -> f32 {
     let fraction = if layout.horizontal {
         (position.0 as f32 - rect.left()) / rect.width()
@@ -170,17 +143,17 @@ pub fn scrub_at(position: (f64, f64), rect: Rect, layout: &PreviewLayout, offset
     fraction * (layout.max_scrub + layout.viewport) - offset
 }
 
-/// 【滚动截图】【双槽底板】在 p 中按 detail 与 overview 绘制主副双预览圆角底槽，无返回值
+/// 【滚动截图】【双槽底板】在 p 中按 detail 与 overview 绘制无描边极简柔和底槽，无返回值
 pub(super) fn draw_tracks(p: &mut Painter, detail: Rect, overview: Option<Rect>) {
     let palette = Palette::current();
-    let well = palette.control_fill.with_alpha(190);
+    let well = palette.control_fill.with_alpha(180);
     p.fill_rounded(detail, DETAIL_RADIUS, well);
     if let Some(track) = overview {
         p.fill_rounded(track, OVERVIEW_RADIUS, well);
     }
 }
 
-/// 【滚动截图】【预览绘制】按 image、layout 与 state 绘制主细节预览及副全景概览，无返回值
+/// 【滚动截图】【预览绘制】按 image、layout 与 state 绘制无边框主细节预览与副全景概览，无返回值
 pub fn draw(
     p: &mut Painter,
     image: shot_stitch::StitchedView<'_>,
@@ -188,8 +161,8 @@ pub fn draw(
     state: &mut PreviewState,
     capture_range: Option<(i32, i32)>,
 ) {
-    state.sync_focus(layout, capture_range);
-    // 1. 绘制主副双槽底板并在主预览区呈现焦点窗口切片
+    state.sync(layout);
+    // 1. 绘制无边框柔和底槽并在主预览区居中或满幅呈现当前浏览切片
     draw_tracks(p, layout.detail, layout.overview);
     let origin = if layout.horizontal {
         (state.scrub, 0.0)
@@ -199,7 +172,7 @@ pub fn draw(
     let detail_target = if layout.horizontal {
         let vis_w = (image.width() as f32 * layout.scale).min(layout.detail.width());
         Rect::from_xywh(
-            layout.detail.left(),
+            layout.detail.left() + (layout.detail.width() - vis_w) * 0.5,
             layout.detail.top(),
             vis_w.max(1.0),
             layout.detail.height(),
@@ -209,7 +182,7 @@ pub fn draw(
         let vis_h = (image.height() as f32 * layout.scale).min(layout.detail.height());
         Rect::from_xywh(
             layout.detail.left(),
-            layout.detail.top(),
+            layout.detail.top() + (layout.detail.height() - vis_h) * 0.5,
             layout.detail.width(),
             vis_h.max(1.0),
         )
@@ -217,7 +190,7 @@ pub fn draw(
     };
     draw_image(p, image, detail_target, layout.scale, origin, DETAIL_RADIUS);
 
-    // 2. 在副预览槽内等比绘制完整长图及捕获帧标记与当前视口框
+    // 2. 在副预览槽内绘制完整长图缩略及轻量捕获区间与当前视口指示
     if let Some(rect) = overview_rect(layout, (image.width(), image.height())) {
         draw_image(
             p,
@@ -247,7 +220,7 @@ pub fn draw(
             )
         };
         if let Some(marker) = marker.and_then(|m| m.intersect(&rect)) {
-            p.fill_rounded(marker, 0.0, crate::theme::Rgba(45, 212, 191, 45));
+            p.fill_rounded(marker, 0.0, crate::theme::Rgba(45, 212, 191, 42));
             p.stroke_path(
                 &PathBuilder::from_rect(marker),
                 crate::theme::Rgba(45, 212, 191, 235),

@@ -1,4 +1,4 @@
-//! 【滚动截图】【面板绘制】参考 LumineCapture 呈现顶部主副双预览、三行状态指标与紧凑操作按钮栏
+//! 【滚动截图】【极简面板绘制】去除全部面板与预览描边，保留语义状态头、拼接增量、主副双预览与轻量图标栏
 
 use super::{
     PanelButton, PanelLayout,
@@ -7,26 +7,14 @@ use super::{
 use crate::{
     renderer::{Painter, text::TextStyle},
     scroll::session::ScrollSession,
-    theme::{Rgba, radius, toolbar::Palette},
+    theme::{Rgba, toolbar::Palette},
     ui::{controls, icons},
 };
 use cosmic_text::Weight;
 use shot_stitch::Axis;
 
-const BUTTON_RADIUS: f32 = 8.0;
-const META_FONT: f32 = 11.5;
-
-/// 【滚动截图】【方向文字】按 axis 返回当前界面语言的滚动方向描述，无其他参数
-fn axis_text(axis: Axis) -> &'static str {
-    let chinese =
-        crate::ui::language::Language::current() == crate::ui::language::Language::Chinese;
-    match (axis, chinese) {
-        (Axis::Vertical, true) => "纵向滚动",
-        (Axis::Horizontal, true) => "横向滚动",
-        (Axis::Vertical, false) => "Vertical scrolling",
-        (Axis::Horizontal, false) => "Horizontal scrolling",
-    }
-}
+const CARD_RADIUS: f32 = 11.0;
+const BUTTON_RADIUS: f32 = 8.5;
 
 /// 【滚动截图】【状态文字】按 status 返回当前界面语言文案，无其他参数
 pub fn status_text(status: &str) -> &str {
@@ -46,7 +34,20 @@ pub fn status_text(status: &str) -> &str {
     }
 }
 
-/// 【滚动截图】【状态点配色】按 session 当前捕获、暂停或错误状态返回语义圆点色
+/// 【滚动截图】【拼接数值】按 session 当前总长度与最近新增像素生成读数文本，返回格式化字符串
+pub fn metric_text(session: &ScrollSession) -> String {
+    let base = session.length_label();
+    if base.is_empty() {
+        return base;
+    }
+    if session.frame_count > 1 && session.last_append() > 0 {
+        format!("{base} +{}", session.last_append())
+    } else {
+        base
+    }
+}
+
+/// 【滚动截图】【状态指示色】按 session 当前捕获、暂停或告警状态返回极简圆点颜色
 fn status_dot_color(session: &ScrollSession, palette: &Palette) -> Rgba {
     if session.status == "Capture error" {
         Rgba(239, 68, 68, 255)
@@ -57,7 +58,7 @@ fn status_dot_color(session: &ScrollSession, palette: &Palette) -> Rgba {
     }
 }
 
-/// 【滚动截图】【完整面板】将 session 和 state 按 layout 绘制到 p，hovered 与 pressed 表达按钮交互状态，无返回值
+/// 【滚动截图】【完整面板】将 session 和 state 按无边框极简 layout 绘制到 p，hovered 与 pressed 表达按钮事务，无返回值
 pub fn draw(
     p: &mut Painter,
     session: &mut ScrollSession,
@@ -67,11 +68,65 @@ pub fn draw(
     state: &mut PreviewState,
 ) {
     let palette = Palette::current();
-    let card_radius = radius::panel();
-    // 1. 绘制不透明面板圆角底色（保持平色定位采样可靠）
-    p.fill_rounded(layout.rect, card_radius, palette.list_fill);
+    // 1. 绘制无描边极简不透明圆角底板，保障无层协议下平色定位锚点稳定
+    p.fill_rounded(layout.rect, CARD_RADIUS, palette.list_fill);
 
-    // 2. 顶部绘制主细节预览与副全景概览，未入帧时保留双槽占位
+    // 2. 绘制顶部语义圆点、自适应截断状态文本与右对齐总长度及 +N 拼接增量读数
+    let dot_cy = layout.status.top() + layout.status.height() * 0.5;
+    p.fill_circle(
+        layout.status.left() + 4.0,
+        dot_cy,
+        2.75,
+        status_dot_color(session, &palette),
+    );
+    let raw_metric = metric_text(session);
+    let max_metric_w = (layout.status.width() * 0.52).max(1.0);
+    let metric = if raw_metric.is_empty() {
+        raw_metric
+    } else {
+        controls::fit_label(p, &raw_metric, 11.5, max_metric_w)
+    };
+    let metric_text_w = if metric.is_empty() {
+        0.0
+    } else {
+        p.measure(&metric, 11.5)
+    };
+    let metric_width = if metric_text_w > 0.0 {
+        (metric_text_w + 8.0).min(max_metric_w + 6.0)
+    } else {
+        0.0
+    };
+    if let Some(status_rect) = tiny_skia::Rect::from_xywh(
+        layout.status.left() + 13.0,
+        layout.status.top(),
+        (layout.status.width() - metric_width - 15.0).max(1.0),
+        layout.status.height(),
+    ) {
+        let fitted =
+            controls::fit_label(p, status_text(&session.status), 11.5, status_rect.width());
+        p.text(
+            status_rect,
+            &fitted,
+            TextStyle::new(11.5, palette.strong_text).weight(Weight::MEDIUM),
+        );
+    }
+    if !metric.is_empty() {
+        let metric_w = metric_text_w.ceil().max(1.0);
+        if let Some(metric_rect) = tiny_skia::Rect::from_xywh(
+            (layout.status.right() - metric_w).max(layout.status.left()),
+            layout.status.top(),
+            metric_w,
+            layout.status.height(),
+        ) {
+            p.text(
+                metric_rect,
+                &metric,
+                TextStyle::new(11.5, palette.muted_text),
+            );
+        }
+    }
+
+    // 3. 绘制无边框主细节预览与副全景概览（未入帧时保持双槽极简占位，避免跳变）
     if let Some(area) = layout.preview {
         let horizontal = session.axis() == Axis::Horizontal;
         if let Some(view) = preview::layout(area, session.stitcher.dimensions(), session.axis())
@@ -83,58 +138,7 @@ pub fn draw(
         }
     }
 
-    // 3. 参考 LumineCapture 绘制互不挤压的方向、状态和长度增量三行信息
-    let axis = controls::fit_label(p, axis_text(session.axis()), META_FONT, layout.axis.width());
-    p.text(
-        layout.axis,
-        &axis,
-        TextStyle::new(META_FONT, palette.strong_text).weight(Weight::MEDIUM),
-    );
-
-    let dot_cy = layout.status.top() + layout.status.height() * 0.5;
-    p.fill_circle(
-        layout.status.left() + 3.5,
-        dot_cy,
-        2.6,
-        status_dot_color(session, &palette),
-    );
-    if let Some(status_rect) = tiny_skia::Rect::from_xywh(
-        layout.status.left() + 11.0,
-        layout.status.top(),
-        (layout.status.width() - 11.0).max(1.0),
-        layout.status.height(),
-    ) {
-        let status = controls::fit_label(
-            p,
-            status_text(&session.status),
-            META_FONT,
-            status_rect.width(),
-        );
-        p.text(
-            status_rect,
-            &status,
-            TextStyle::new(META_FONT, palette.muted_text),
-        );
-    }
-
-    let mut length = session.length_label();
-    if length.is_empty() {
-        length = format!(
-            "{} × {} px",
-            session.region.width().round() as i32,
-            session.region.height().round() as i32
-        );
-    } else if session.last_append() > 0 {
-        length = format!("{length}  +{}", session.last_append());
-    }
-    let fitted_len = controls::fit_label(p, &length, META_FONT, layout.length.width());
-    p.text(
-        layout.length,
-        &fitted_len,
-        TextStyle::new(META_FONT, palette.strong_text),
-    );
-
-    // 4. 底部绘制六枚操作按钮并叠加一像素面板细边
+    // 4. 绘制底部无边框轻量操作胶囊按钮，保存按钮维持实心主色以兼顾平色识别样本
     for (button, rect) in &layout.buttons {
         let enabled = is_button_enabled(*button, session);
         let active = enabled && hovered == Some(*button);
@@ -181,7 +185,7 @@ pub fn draw(
             p.fill_rounded(*rect, BUTTON_RADIUS, palette.active_fill);
         }
 
-        let size = (rect.width() * 0.5).clamp(13.0, 20.0);
+        let size = (rect.width() * 0.5).clamp(13.0, 19.0);
         p.icon(
             button_icon(*button, session),
             size,
@@ -190,15 +194,6 @@ pub fn draw(
             tint,
         );
     }
-
-    p.panel_border(
-        layout.rect.left(),
-        layout.rect.top(),
-        layout.rect.width(),
-        layout.rect.height(),
-        card_radius,
-        1.0,
-    );
 }
 
 /// 【滚动截图】【按钮启用】按 button 和 session 返回操作可用状态，结果操作需要至少一帧

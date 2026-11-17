@@ -57,20 +57,22 @@ fn resolve_current() -> io::Result<Invocation> {
     let current = std::env::current_exe()?;
     #[cfg(target_os = "linux")]
     {
-        return Ok(resolve_from(
+        Ok(resolve_from(
             &current,
             std::env::var_os("APPIMAGE").as_deref(),
             std::env::var_os("APPDIR").as_deref(),
             std::env::var_os("OWD").as_deref(),
             std::env::var_os("LD_LIBRARY_PATH").as_deref(),
-        ));
+        ))
     }
     #[cfg(not(target_os = "linux"))]
-    Ok(Invocation {
-        program: current,
-        clear_appimage_env: false,
-        cleaned_library_path: None,
-    })
+    {
+        Ok(Invocation {
+            program: current,
+            clear_appimage_env: false,
+            cleaned_library_path: None,
+        })
+    }
 }
 
 /// 【辅助进程】【路径裁决】按 current、appimage、appdir、owd 与 ld_library_path 计算启动目标，返回解析结果
@@ -237,7 +239,8 @@ mod tests {
         // 1. 【辅助进程测试】【清理核对】确认临时挂载变量均已在子进程环境列表显式标记移除
         let removed: Vec<_> = command
             .get_envs()
-            .filter_map(|(key, value)| value.is_none().then(|| key.to_string_lossy().into_owned()))
+            .filter(|(_, value)| value.is_none())
+            .map(|(key, _)| key.to_string_lossy().into_owned())
             .collect();
         for expected in ["APPDIR", "ARGV0", "OWD", "LD_LIBRARY_PATH"] {
             assert!(removed.iter().any(|item| item == expected), "{expected}");

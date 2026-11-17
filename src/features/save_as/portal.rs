@@ -42,6 +42,7 @@ pub(super) fn is_document_portal_path(path: &Path) -> bool {
 }
 
 /// 【截图另存为】【URI转路径】解析门户返回的 file URI 并补齐缺失的 png 后缀，文档门户路径保持原名
+#[cfg(any(target_os = "linux", test))]
 pub(super) fn parse_selected_uri(uri: &str) -> crate::AppResult<PathBuf> {
     let parsed = url::Url::parse(uri).map_err(|err| format!("invalid portal URI: {err}"))?;
     if parsed.scheme() != "file" {

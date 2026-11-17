@@ -303,11 +303,8 @@ impl WaylandOverlay {
                         .state
                         .surfaces
                         .values()
-                        .filter_map(|sd| {
-                            sd.shm_buffer
-                                .is_none()
-                                .then(|| (sd.surface.clone(), sd.bootstrap_size))
-                        })
+                        .filter(|sd| sd.shm_buffer.is_none())
+                        .map(|sd| (sd.surface.clone(), sd.bootstrap_size))
                         .collect();
                     for (surface, fallback) in pending {
                         rt.state.configure_surface(&surface, fallback);

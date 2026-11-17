@@ -5,7 +5,7 @@ mod draw;
 mod layout;
 pub mod preview;
 
-pub use draw::{button_icon, draw, is_button_enabled};
+pub use draw::{button_icon, draw, is_button_enabled, metric_text};
 pub use layout::{PanelLayout, constrained_layout, hit_test, layout};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
