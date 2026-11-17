@@ -283,22 +283,8 @@ impl HistoryWindow {
     }
 }
 
-/// 【截图历史】【事件路由】将 event 交给 state，文件选择器和清空确认独占输入，返回窗口动作
+/// 【截图历史】【事件路由】将 event 交给 state，清空确认独占输入，返回窗口动作
 pub(super) fn event(state: &mut HistoryWindow, event: WindowEvent) -> WindowAction {
-    if state.picker.is_some() {
-        if let WindowEvent::Key(input) = &event {
-            state.ensure_fonts(&input.text);
-        }
-        if state.jobs.foreground() {
-            return WindowAction::None;
-        }
-        let action = state
-            .picker
-            .as_mut()
-            .unwrap()
-            .event(&event, &mut state.fonts);
-        return state.picker_action(action);
-    }
     match event {
         WindowEvent::Key(input) => state.key(input),
         WindowEvent::KeyRelease(input) => state.key_release(input),

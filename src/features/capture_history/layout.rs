@@ -1,9 +1,16 @@
 //! 【截图历史】【窗口布局】紧凑操作栏、可调水平分区与底部记录开关
 
-pub(super) use crate::ui::file_picker::layout::contains;
 use tiny_skia::Rect;
 
 pub(super) const ROW: f32 = 40.0;
+
+/// 【截图历史】【矩形命中】判断 point 是否落在左闭右开的逻辑矩形 rect 内，返回命中布尔值
+pub(super) fn contains(rect: Rect, point: (f64, f64)) -> bool {
+    point.0 >= f64::from(rect.left())
+        && point.0 < f64::from(rect.right())
+        && point.1 >= f64::from(rect.top())
+        && point.1 < f64::from(rect.bottom())
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Control {

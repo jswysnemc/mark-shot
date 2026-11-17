@@ -14,10 +14,9 @@ use crate::{
         WindowWake,
     },
     config::history::History,
-    ui::file_picker::{self, Picker},
 };
 use cosmic_text::SwashCache;
-use std::{io, sync::Arc};
+use std::io;
 use tiny_skia::Pixmap;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -42,8 +41,6 @@ pub(super) struct HistoryWindow {
     pub status: Option<String>,
     pub clear_dialog: Option<u64>,
     pub clear_dialog_pending: bool,
-    pub picker: Option<Picker>,
-    pub save_snapshot: Option<Arc<Vec<u8>>>,
     pub left_width: f32,
     pub splitter_drag: Option<Drag>,
     pub scrollbar_drag: Option<super::scrollbar::Drag>,
@@ -81,8 +78,6 @@ impl HistoryWindow {
             status: None,
             clear_dialog: None,
             clear_dialog_pending: false,
-            picker: None,
-            save_snapshot: None,
             left_width: 190.0,
             splitter_drag: None,
             scrollbar_drag: None,
@@ -120,11 +115,6 @@ impl HistoryWindow {
         )
     }
 
-    /// 【截图历史】【字体补充】text 包含非 ASCII 字符时加载系统字体；只执行一次，不初始化识别模型
-    pub fn ensure_fonts(&mut self, text: &str) {
-        self.fonts.ensure_text(text);
-    }
-
     /// 【截图历史】【后台提交】把 task 放入当前存储任务队列；返回是否接受，不阻塞界面等待结果
     pub fn request(&mut self, task: Task) -> bool {
         self.jobs.request(self.store.clone(), task)
@@ -152,7 +142,7 @@ impl HistoryWindow {
 
     /// 【截图历史】【预览安排】优先读取当前选择，再读取可见缩略图；已有缓存或失败项不重复读取
     pub fn previews(&mut self) {
-        if self.picker.is_some() || self.jobs.foreground() {
+        if self.jobs.foreground() {
             return;
         }
         let mut names = Vec::new();
@@ -227,35 +217,6 @@ impl HistoryWindow {
                         }
                     }
                 }
-                Response::Snapshot {
-                    name,
-                    result: Ok(png),
-                } => {
-                    let directory = dirs::picture_dir()
-                        .filter(|path| path.is_dir())
-                        .or_else(dirs::home_dir)
-                        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
-                    self.ensure_fonts(&directory.to_string_lossy());
-                    self.picker = Some(Picker::new(
-                        directory.clone(),
-                        &name,
-                        (self.layout.size.0 as u32, self.layout.size.1 as u32),
-                        &mut self.fonts,
-                    ));
-                    self.save_snapshot = Some(png);
-                    self.request(Task::Directory {
-                        path: directory,
-                        hidden: false,
-                    });
-                }
-                Response::Snapshot {
-                    result: Err(error), ..
-                } => self.error("Cannot read screenshot", error),
-                Response::Directory { path, result } => {
-                    if let Some(picker) = &mut self.picker {
-                        picker.apply(&path, result, &mut self.fonts);
-                    }
-                }
                 Response::Updated(Ok(settings)) => {
                     let prune = settings.limit != self.settings.limit;
                     self.settings = settings;
@@ -279,45 +240,21 @@ impl HistoryWindow {
                 Response::Updated(Err(error)) => {
                     self.error("Cannot update history settings", error);
                 }
+                Response::Cancelled => {}
                 Response::Done {
                     label,
                     result: Ok(()),
                 } => {
                     log::info!("【截图历史】【窗口操作】已完成: {label}");
                     self.status = Some(format!("{label} completed"));
-                    match label {
-                        "Clear" | "Delete" | "Prune" => self.refresh(),
-                        "Save" => {
-                            self.picker = None;
-                            self.save_snapshot = None;
-                            self.refresh();
-                        }
-                        "New folder" => {
-                            if let Some(picker) = &mut self.picker {
-                                picker.busy = false;
-                                picker.creating_folder = false;
-                                picker.filename.set(
-                                    &picker.previous_filename.take().unwrap_or_default(),
-                                    &mut self.fonts,
-                                    true,
-                                );
-                                let path = picker.directory.clone();
-                                let hidden = picker.hidden;
-                                picker.pending = Some(path.clone());
-                                self.request(Task::Directory { path, hidden });
-                            }
-                        }
-                        _ => {}
+                    if matches!(label, "Clear" | "Delete" | "Prune" | "Save") {
+                        self.refresh();
                     }
                 }
                 Response::Done {
                     label,
                     result: Err(error),
                 } => {
-                    if let Some(picker) = &mut self.picker {
-                        picker.busy = false;
-                        picker.status = Some(format!("{label} failed: {error}"));
-                    }
                     self.error(&format!("{label} failed"), error);
                 }
             }
@@ -392,9 +329,6 @@ impl WindowContent for HistoryWindow {
                     .model
                     .scroll
                     .min(self.model.visible.len().saturating_sub(self.layout.rows()));
-                if let Some(picker) = &mut self.picker {
-                    picker.layout = file_picker::layout::Layout::new(size);
-                }
                 self.previews();
                 WindowAction::Redraw
             }
@@ -404,7 +338,7 @@ impl WindowContent for HistoryWindow {
                 self.scrollbar_drag = None;
                 self.pressed = None;
                 self.keyboard_pressed = false;
-                if focused && self.picker.is_none() {
+                if focused {
                     self.refresh();
                 }
                 WindowAction::Redraw
@@ -412,18 +346,9 @@ impl WindowContent for HistoryWindow {
             event => super::input::event(self, event),
         }
     }
-    /// 【截图历史】【鼠标形状】按 position 返回文本或窗口调整指针；弹层阻止底层窗口调整
+    /// 【截图历史】【鼠标形状】按 position 返回窗口调整或按钮手型指针；确认弹窗阻塞底层调整
     fn cursor(&self, position: (f64, f64)) -> WindowCursor {
-        if let Some(picker) = &self.picker {
-            if picker.overwrite.is_none()
-                && (contains(picker.layout.path, position)
-                    || contains(picker.layout.filename, position))
-            {
-                WindowCursor::Text
-            } else {
-                WindowCursor::Default
-            }
-        } else if self.clear_dialog.is_some() {
+        if self.clear_dialog.is_some() {
             WindowCursor::Default
         } else if self.splitter_drag.is_some() {
             WindowCursor::HorizontalResize

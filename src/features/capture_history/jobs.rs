@@ -4,7 +4,7 @@ use super::{Entry, Store, preview};
 use crate::{
     backend::window::WindowWake,
     config::history::{History, Update},
-    ui::file_picker::{Listing, save::ExistingFile},
+    features::save_as::Outcome,
 };
 use std::{
     io,
@@ -28,24 +28,14 @@ pub(super) enum Task {
     Delete(String),
     Clear,
     Prune(usize),
-    Snapshot(String),
-    Save {
-        png: Arc<Vec<u8>>,
-        path: PathBuf,
-        expected: Option<ExistingFile>,
-    },
-    Directory {
-        path: PathBuf,
-        hidden: bool,
-    },
-    MakeFolder(PathBuf),
+    SaveAs(String),
     Settings(Update),
 }
 
 impl Task {
     /// 【截图历史】【任务优先级】返回是否为主动操作；列表与预览允许后续请求替换
     pub fn foreground(&self) -> bool {
-        !matches!(self, Self::List | Self::Preview(_) | Self::Directory { .. })
+        !matches!(self, Self::List | Self::Preview(_))
     }
     /// 【截图历史】【任务名称】返回短状态标签；不输出路径或截图文字
     fn label(&self) -> &'static str {
@@ -59,10 +49,7 @@ impl Task {
             Self::Delete(_) => "Delete",
             Self::Clear => "Clear",
             Self::Prune(_) => "Prune",
-            Self::Snapshot(_) => "Save",
-            Self::Save { .. } => "Save",
-            Self::Directory { .. } => "Folder",
-            Self::MakeFolder(_) => "New folder",
+            Self::SaveAs(_) => "Save",
             Self::Settings(_) => "Settings",
         }
     }
@@ -77,15 +64,8 @@ pub(super) enum Response {
         name: String,
         result: io::Result<Pixmap>,
     },
-    Snapshot {
-        name: String,
-        result: io::Result<Arc<Vec<u8>>>,
-    },
-    Directory {
-        path: PathBuf,
-        result: io::Result<Listing>,
-    },
     Updated(io::Result<History>),
+    Cancelled,
     Done {
         label: &'static str,
         result: io::Result<()>,
@@ -259,18 +239,28 @@ fn execute(store: &Store, task: Task, cancelled: &AtomicBool) -> Response {
                     .and_then(|file| preview::load(file, (800, 600), cancelled)),
             };
         }
-        Task::Directory { path, hidden } => {
-            return Response::Directory {
-                result: Listing::read(&path, hidden),
-                path,
-            };
-        }
         Task::Settings(update) => return Response::Updated(crate::config::history::update(update)),
-        Task::Snapshot(name) => {
-            return Response::Snapshot {
-                name: name.clone(),
-                result: store.read(&name).map(|(png, _)| Arc::new(png)),
+        Task::SaveAs(name) => {
+            let (png, _) = match store.read(&name) {
+                Ok(data) => data,
+                Err(error) => {
+                    return Response::Done {
+                        label,
+                        result: Err(error),
+                    };
+                }
             };
+            let directory = dirs::picture_dir()
+                .filter(|path| path.is_dir())
+                .or_else(dirs::home_dir)
+                .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+            let initial_path = directory.join(&name);
+            match crate::features::save_as::save_bytes(&png, &initial_path) {
+                Ok(Outcome::Saved(_)) => Ok(()),
+                Ok(Outcome::Cancelled) => return Response::Cancelled,
+                Ok(Outcome::Failed(err)) => Err(io::Error::other(err)),
+                Err(err) => Err(io::Error::other(err.to_string())),
+            }
         }
         Task::Copy(name) => store.read(&name).and_then(|(png, _)| {
             crate::backend::initialize_clipboard()
@@ -286,12 +276,6 @@ fn execute(store: &Store, task: Task, cancelled: &AtomicBool) -> Response {
         Task::Delete(name) => store.remove(&name),
         Task::Clear => store.clear(),
         Task::Prune(limit) => store.prune(limit),
-        Task::Save {
-            png,
-            path,
-            expected,
-        } => crate::ui::file_picker::save::write(&png, &path, expected),
-        Task::MakeFolder(path) => std::fs::create_dir(path),
     };
     Response::Done { label, result }
 }

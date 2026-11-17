@@ -9,7 +9,6 @@ pub mod color_popover;
 pub mod context_menu;
 pub mod controls;
 pub mod external_panel;
-pub mod file_picker;
 pub mod filter_properties;
 pub mod font_panel;
 pub mod fonts;

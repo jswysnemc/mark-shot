@@ -1,7 +1,7 @@
 //! 【截图历史】【窗口动作】选择操作、保存快照和配置更改
 
 use super::{jobs::Task, layout::Control, window::HistoryWindow};
-use crate::{backend::window::WindowAction, config::history::Update, ui::file_picker::Action};
+use crate::{backend::window::WindowAction, config::history::Update};
 
 impl HistoryWindow {
     /// 【截图历史】【操作资格】返回 control 是否可用；图像操作等待真实预览，空历史不能请求清空
@@ -58,7 +58,7 @@ impl HistoryWindow {
                 None => return WindowAction::None,
             },
             Control::Save => match name {
-                Some(name) => Task::Snapshot(name),
+                Some(name) => Task::SaveAs(name),
                 None => return WindowAction::None,
             },
             Control::Delete => match name {
@@ -75,44 +75,6 @@ impl HistoryWindow {
             }
         };
         self.request(task);
-        WindowAction::Redraw
-    }
-
-    /// 【截图历史】【文件选择结果】处理 action 的目录或保存请求；保存使用打开对话框时的快照，不重复记录
-    pub fn picker_action(&mut self, action: Action) -> WindowAction {
-        match action {
-            Action::None => return WindowAction::None,
-            Action::Redraw => {}
-            Action::Cancel => {
-                self.picker = None;
-                self.save_snapshot = None;
-                self.refresh();
-            }
-            Action::List { path, hidden } => {
-                self.request(Task::Directory { path, hidden });
-            }
-            Action::MakeFolder(path) => {
-                if self.request(Task::MakeFolder(path))
-                    && let Some(picker) = &mut self.picker
-                {
-                    picker.busy = true;
-                    picker.status = Some("Creating folder...".into());
-                }
-            }
-            Action::Save { path, expected } => {
-                if let Some(png) = self.save_snapshot.clone()
-                    && self.request(Task::Save {
-                        png,
-                        path,
-                        expected,
-                    })
-                    && let Some(picker) = &mut self.picker
-                {
-                    picker.busy = true;
-                    picker.status = Some("Saving screenshot...".into());
-                }
-            }
-        }
         WindowAction::Redraw
     }
 }

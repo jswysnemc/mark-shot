@@ -3,7 +3,7 @@
 use super::{chrome, layout::rect, window::HistoryWindow};
 use crate::{
     renderer::{Painter, text::TextStyle},
-    ui::{controls, file_picker},
+    ui::controls,
 };
 use tiny_skia::{FilterQuality, Pixmap, PixmapPaint, Rect, Transform};
 
@@ -72,9 +72,5 @@ pub(super) fn draw(state: &mut HistoryWindow, canvas: &mut Pixmap, scale: f32) {
                 label,
                 TextStyle::new(40.0 / 3.0, chrome::foreground()).center(),
             );
-    }
-    // 2. 【截图历史】【交互隔离】文件选择器最后绘制，清空确认由独立模态窗口处理
-    if let Some(picker) = &mut state.picker {
-        file_picker::draw::draw(picker, &mut state.fonts, &mut state.cache, canvas, scale);
     }
 }
