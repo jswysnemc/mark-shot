@@ -38,5 +38,9 @@ pub(crate) fn draw(state: &mut EditorState, monitor: usize) {
             state.image_window.pressed == Some(button),
         );
     }
-    crate::ui::window_frame::draw(&mut state.canvas[0], scale);
+    if cfg!(target_os = "windows") {
+        crate::ui::window_frame::draw_rectangular(&mut state.canvas[0], scale);
+    } else {
+        crate::ui::window_frame::draw(&mut state.canvas[0], scale);
+    }
 }

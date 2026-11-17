@@ -129,6 +129,11 @@ impl Drop for Guide {
 }
 
 impl WindowContent for Guide {
+    /// 【识别模型】【圆角外观】无参数，返回启用圆角外侧透明裁切
+    fn rounded_corners(&self) -> bool {
+        true
+    }
+
     /// 【识别模型】【明确确认】无参数，仅在资源已就绪且用户完成选择后报告确认，关闭和取消返回否
     fn dialog_accepted(&self) -> bool {
         self.completion.get().is_some()
@@ -142,25 +147,31 @@ impl WindowContent for Guide {
     fn draw(&mut self, canvas: &mut Pixmap, scale: f32) {
         canvas.fill(crate::theme::color::panel().into());
         let fit = self.fit();
-        let mut painter = Painter::new(canvas)
-            .with_scale(scale)
-            .with_icons(&self.icons)
-            .with_text(&mut self.fonts, &mut self.cache);
-        painter.text(
-            Rect::from_xywh(10.0, 0.0, (self.size.0 as f32 - 40.0).max(1.0), 28.0).unwrap(),
-            "Mark Shot / OCR",
-            TextStyle::new(12.0, crate::theme::color::foreground()),
-        );
-        painter.icon(
-            crate::ui::icons::CLOSE,
-            12.0,
-            self.size.0 as f32 - 21.0,
-            8.0,
-            crate::theme::color::foreground(),
-        );
-        self.panel.render_pos = (0.0, 28.0 / fit);
-        self.panel.position = self.panel.render_pos;
-        model_popover::draw_model_popover(&mut painter.with_scale(scale * fit), &mut self.panel);
+        {
+            let mut painter = Painter::new(canvas)
+                .with_scale(scale)
+                .with_icons(&self.icons)
+                .with_text(&mut self.fonts, &mut self.cache);
+            painter.text(
+                Rect::from_xywh(10.0, 0.0, (self.size.0 as f32 - 40.0).max(1.0), 28.0).unwrap(),
+                "Mark Shot / OCR",
+                TextStyle::new(12.0, crate::theme::color::foreground()),
+            );
+            painter.icon(
+                crate::ui::icons::CLOSE,
+                12.0,
+                self.size.0 as f32 - 21.0,
+                8.0,
+                crate::theme::color::foreground(),
+            );
+            self.panel.render_pos = (0.0, 28.0 / fit);
+            self.panel.position = self.panel.render_pos;
+            model_popover::draw_model_popover(
+                &mut painter.with_scale(scale * fit),
+                &mut self.panel,
+            );
+        }
+        crate::ui::window_frame::draw(canvas, scale);
     }
 
     /// 【识别模型】【输入处理】处理 event 的下载、选择、取消与进度，右键不能开始下载，返回窗口动作

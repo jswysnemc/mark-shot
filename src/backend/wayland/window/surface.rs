@@ -141,6 +141,9 @@ impl Surface {
             .as_mut()
             .ok_or("cannot allocate a window canvas")?;
         content.draw(canvas, self.scale);
+        if content.rounded_corners() {
+            crate::ui::window_frame::clip_rounded_surface(canvas, self.scale);
+        }
         let available = self
             .buffers
             .iter()

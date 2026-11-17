@@ -89,6 +89,11 @@ impl Setup {
 }
 
 impl WindowContent for Setup {
+    /// 【录制设置】【圆角外观】无参数，返回启用圆角外侧透明裁切
+    fn rounded_corners(&self) -> bool {
+        true
+    }
+
     /// 【录制设置】【按需尺寸】无参数，仅在展开或收起高级选项后请求新高度，不覆盖用户平时调整的宽度
     fn preferred_size(&self) -> Option<(u32, u32)> {
         self.requested_size

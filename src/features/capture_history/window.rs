@@ -353,6 +353,11 @@ impl WindowContent for HistoryWindow {
         WindowAction::Redraw
     }
 
+    /// 【截图历史】【圆角外观】无参数，返回启用圆角外侧透明裁切
+    fn rounded_corners(&self) -> bool {
+        true
+    }
+
     /// 【截图历史】【窗口连接】接入 wake 后开始按需列表读取；普通截图不创建此状态
     fn connected(&mut self, wake: WindowWake) {
         self.jobs.connect(wake);

@@ -144,67 +144,75 @@ impl Picker {
 }
 
 impl WindowContent for Picker {
+    /// 【颜色控件】【圆角外观】无参数，返回启用圆角外侧透明裁切
+    fn rounded_corners(&self) -> bool {
+        true
+    }
+
     /// 【颜色控件】【绘制窗口】按canvas和scale绘制现有取色器及统一输入、按钮，无返回值
     fn draw(&mut self, canvas: &mut Pixmap, scale: f32) {
         let palette = Palette::current();
         canvas.fill(palette.base.color());
-        let mut painter = Painter::new(canvas)
-            .with_scale(scale)
-            .with_text(&mut self.fonts, &mut self.cache);
-        painter.text(
-            Rect::from_xywh(12.0, 3.0, 200.0, 26.0).unwrap(),
-            if self.chinese {
-                "选择颜色"
-            } else {
-                "Color"
-            },
-            TextStyle::new(12.0, palette.text),
-        );
-        draw_color_popover(&mut painter, &mut self.picker);
-        let labels = if self.chinese {
-            ["恢复", "取消", "确定"]
-        } else {
-            ["Reset", "Cancel", "Apply"]
-        };
-        for (index, label) in labels.into_iter().enumerate() {
-            controls::button(
-                &mut painter,
-                button(index),
-                label,
-                index == 2,
-                self.pressed == Some(index),
-                true,
-            );
-        }
-        if self.error {
+        {
+            let mut painter = Painter::new(canvas)
+                .with_scale(scale)
+                .with_text(&mut self.fonts, &mut self.cache);
             painter.text(
-                Rect::from_xywh(12.0, 261.0, 200.0, 22.0).unwrap(),
+                Rect::from_xywh(12.0, 3.0, 200.0, 26.0).unwrap(),
                 if self.chinese {
-                    "颜色格式无效"
+                    "选择颜色"
                 } else {
-                    "Invalid color"
+                    "Color"
                 },
-                TextStyle::new(11.0, palette.text),
+                TextStyle::new(12.0, palette.text),
             );
+            draw_color_popover(&mut painter, &mut self.picker);
+            let labels = if self.chinese {
+                ["恢复", "取消", "确定"]
+            } else {
+                ["Reset", "Cancel", "Apply"]
+            };
+            for (index, label) in labels.into_iter().enumerate() {
+                controls::button(
+                    &mut painter,
+                    button(index),
+                    label,
+                    index == 2,
+                    self.pressed == Some(index),
+                    true,
+                );
+            }
+            if self.error {
+                painter.text(
+                    Rect::from_xywh(12.0, 261.0, 200.0, 22.0).unwrap(),
+                    if self.chinese {
+                        "颜色格式无效"
+                    } else {
+                        "Invalid color"
+                    },
+                    TextStyle::new(11.0, palette.text),
+                );
+            }
+            if self.editing {
+                let bounds = self.picker.hex_field_rect().unwrap();
+                controls::frame(&mut painter, bounds, palette.base, palette.accent, 6.0);
+                self.hex.draw(
+                    &mut self.fonts,
+                    &mut self.cache,
+                    canvas,
+                    Rect::from_xywh(
+                        bounds.left() + 8.0,
+                        bounds.top() + 3.0,
+                        bounds.width() - 16.0,
+                        bounds.height() - 6.0,
+                    )
+                    .unwrap(),
+                    scale,
+                    true,
+                );
+            }
         }
-        if self.editing {
-            let bounds = self.picker.hex_field_rect().unwrap();
-            controls::frame(&mut painter, bounds, palette.base, palette.accent, 6.0);
-            self.hex.draw(
-                &mut self.fonts,
-                &mut self.cache,
-                canvas,
-                Rect::from_xywh(
-                    bounds.left() + 8.0,
-                    bounds.top() + 3.0,
-                    bounds.width() - 16.0,
-                    bounds.height() - 6.0,
-                )
-                .unwrap(),
-                scale,
-                true,
-            );
-        }
+        crate::ui::window_frame::draw(canvas, scale);
     }
     /// 【颜色控件】【原生输入】按event更新共用组件，取消不交付颜色，返回绘制或关闭动作
     fn event(&mut self, event: WindowEvent) -> WindowAction {

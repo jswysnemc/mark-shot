@@ -17,6 +17,11 @@ struct HiddenNotice {
 }
 
 impl WindowContent for HiddenNotice {
+    /// 【录制隐藏提示】【圆角外观】无参数，返回启用圆角外侧透明裁切
+    fn rounded_corners(&self) -> bool {
+        true
+    }
+
     /// 【录制隐藏提示】【置顶请求】无参数，返回置顶显示，提示结束后自动消失
     fn always_on_top(&self) -> bool {
         true

@@ -8,6 +8,11 @@ use crate::{
 use std::time::Instant;
 
 impl WindowContent for Countdown {
+    /// 【录制倒计时】【圆角外观】无参数，返回启用圆角外侧透明裁切
+    fn rounded_corners(&self) -> bool {
+        true
+    }
+
     /// 【录制倒计时】【置顶请求】无参数，返回始终置顶，保证倒计时可见
     fn always_on_top(&self) -> bool {
         true

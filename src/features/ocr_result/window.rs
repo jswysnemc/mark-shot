@@ -481,6 +481,11 @@ impl WindowContent for ResultWindow {
         }
     }
 
+    /// 【文字识别】【圆角外观】无参数，返回启用圆角外侧透明裁切
+    fn rounded_corners(&self) -> bool {
+        true
+    }
+
     /// 【文字识别】【结果绘制】按 scale 绘制 canvas；页面共用同一窗口与编辑状态
     fn draw(&mut self, canvas: &mut Pixmap, scale: f32) {
         super::draw::draw(self, canvas, scale);

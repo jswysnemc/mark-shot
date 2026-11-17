@@ -28,6 +28,11 @@ impl ResultWindow {
 }
 
 impl WindowContent for ResultWindow {
+    /// 【扫码窗口】【圆角外观】无参数，返回启用圆角外侧透明裁切
+    fn rounded_corners(&self) -> bool {
+        true
+    }
+
     /// 【扫码窗口】【置顶来源】无参数，返回贴图交接要求的置顶状态，普通扫码保持普通窗口
     fn always_on_top(&self) -> bool {
         self.above_pin

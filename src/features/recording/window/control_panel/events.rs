@@ -64,6 +64,11 @@ impl Panel {
 }
 
 impl WindowContent for Panel {
+    /// 【录制控制面板】【圆角外观】无参数，返回启用圆角外侧透明裁切
+    fn rounded_corners(&self) -> bool {
+        true
+    }
+
     /// 【录制控制面板】【置顶请求】无参数，返回持续置顶，便于录制时操作
     fn always_on_top(&self) -> bool {
         true

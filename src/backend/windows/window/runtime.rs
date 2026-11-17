@@ -149,6 +149,9 @@ impl Surface {
         }
         self.canvas.fill(tiny_skia::Color::TRANSPARENT);
         self.content.draw(&mut self.canvas, self.scale);
+        if self.content.rounded_corners() {
+            crate::ui::window_frame::clip_rounded_surface(&mut self.canvas, self.scale);
+        }
         self.window.set_topmost(self.content.always_on_top())?;
         self.window.set_rgba(
             (self.canvas.width(), self.canvas.height()),

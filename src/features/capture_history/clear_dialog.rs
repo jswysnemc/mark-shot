@@ -108,9 +108,15 @@ impl ClearDialog {
 }
 
 impl WindowContent for ClearDialog {
+    /// 【截图历史】【圆角外观】无参数，返回启用圆角外侧透明裁切
+    fn rounded_corners(&self) -> bool {
+        true
+    }
+
     /// 【截图历史】【确认绘制】把本对话框按 scale 绘制到 canvas，复用统一控件，不绘制父窗口或额外标题
     fn draw(&mut self, canvas: &mut Pixmap, scale: f32) {
         super::clear_dialog_draw::draw(self, canvas, scale);
+        crate::ui::window_frame::draw(canvas, scale);
     }
 
     /// 【截图历史】【确认事件】按 event 更新只读焦点和释放事务，返回重绘或本窗口关闭，不处理父窗口快捷键

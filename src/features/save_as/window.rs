@@ -123,6 +123,11 @@ impl SaveWindow {
 }
 
 impl WindowContent for SaveWindow {
+    /// 【截图另存为】【圆角外观】无参数，返回启用圆角外侧透明裁切
+    fn rounded_corners(&self) -> bool {
+        true
+    }
+
     /// 【截图另存为】【通知接入】安装 wake 并创建默认保存目录；目录操作只在临时线程中执行
     fn connected(&mut self, wake: WindowWake) {
         self.jobs = Some(Jobs::new(wake, self.completion.clone()));
@@ -143,6 +148,7 @@ impl WindowContent for SaveWindow {
             canvas,
             scale,
         );
+        crate::ui::window_frame::draw(canvas, scale);
     }
 
     /// 【截图另存为】【事件处理】处理 event 并调度文件操作；保存期间只处理唤醒和尺寸，不产生重复请求

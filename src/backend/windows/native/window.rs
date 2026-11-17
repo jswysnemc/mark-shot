@@ -166,8 +166,20 @@ impl Window {
         }
     }
 
-    /// 【Windows图片窗口】【可调整边框】无参数，启用系统移动缩放与最小最大化，自绘客户区保留全部尺寸，返回系统错误
+    /// 【Windows图片窗口】【可调整边框】无参数，启用系统移动缩放与最小最大化并请求 DWM 原生圆角，自绘客户区保留全部尺寸，返回系统错误
     pub fn enable_image_frame(&mut self) -> io::Result<()> {
+        #[link(name = "dwmapi")]
+        unsafe extern "system" {
+            fn DwmSetWindowAttribute(
+                hwnd: HWND,
+                dw_attribute: u32,
+                pv_attribute: *const core::ffi::c_void,
+                cb_attribute: u32,
+            ) -> i32;
+        }
+        const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
+        const DWMWCP_ROUND: u32 = 2;
+
         self.context.image_window.set(true);
         unsafe {
             let style = GetWindowLongPtrW(self.hwnd, GWL_STYLE) as u32;
@@ -176,6 +188,15 @@ impl Window {
                 GWL_STYLE,
                 (style | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU) as isize,
             );
+            // 1. 请求桌面窗口管理器启用系统级平滑圆角，Windows 10 不支持该属性时自动忽略返回值
+            let preference = DWMWCP_ROUND;
+            let _ = DwmSetWindowAttribute(
+                self.hwnd,
+                DWMWA_WINDOW_CORNER_PREFERENCE,
+                (&preference as *const u32).cast(),
+                core::mem::size_of::<u32>() as u32,
+            );
+            // 2. 刷新非客户区指标，使客户区保持完整无系统标题栏布局
             if SetWindowPos(
                 self.hwnd,
                 std::ptr::null_mut(),

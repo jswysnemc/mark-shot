@@ -10,6 +10,11 @@ use crate::{
 };
 
 impl WindowContent for Preferences {
+    /// 【设置窗口】【圆角外观】无参数，返回启用圆角外侧透明裁切
+    fn rounded_corners(&self) -> bool {
+        true
+    }
+
     /// 【翻译测试】【输入目标】无参数，返回聚焦原文编辑器的稳定身份
     fn text_input_target(&self) -> Option<u64> {
         (self.translation_page() && self.translation.preview.source.focused)
