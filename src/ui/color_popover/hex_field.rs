@@ -46,12 +46,15 @@ pub(super) fn draw(p: &mut Painter, picker: &ColorPickerPopover, render: &HexRen
         crate::theme::toolbar::Palette::current().control_fill,
     );
     let editing = picker.fields.is_editing();
+    let hovered = picker.hovered == Some(super::ColorPopoverElement::Field(ColorField::Hex));
     tracks::border(
         p,
         inner,
         6.0,
         if editing {
             crate::theme::toolbar::Palette::current().focus_border
+        } else if hovered {
+            crate::theme::toolbar::Palette::current().hover_border
         } else {
             crate::theme::toolbar::Palette::current().control_border
         },

@@ -230,8 +230,21 @@ impl WindowContent for Picker {
                 if let Some(element) = self.dragging {
                     self.adjust(element, position);
                 } else {
+                    let hovered = self.picker.element_at(position);
+                    if self.picker.hovered != hovered {
+                        self.picker.hovered = hovered;
+                        self.picker.dirty = true;
+                        return WindowAction::Redraw;
+                    }
                     return WindowAction::None;
                 }
+            }
+            WindowEvent::PointerLeave => {
+                if self.picker.hovered.take().is_some() {
+                    self.picker.dirty = true;
+                    return WindowAction::Redraw;
+                }
+                return WindowAction::None;
             }
             WindowEvent::PointerButton {
                 position,

@@ -40,15 +40,18 @@ fn geometry_matches_the_qt_widget_tree() {
     geometry(layout::current((0.0, 0.0)), [8.0, 162.0, 26.0, 26.0]);
     geometry(layout::hex((0.0, 0.0)), [40.0, 162.0, 152.0, 26.0]);
     geometry(layout::content((0.0, 0.0)), [8.0, 8.0, 184.0, 212.0]);
-    for (index, x) in [8.0, 32.0, 56.0, 79.0, 103.0, 127.0, 150.0, 174.0]
-        .into_iter()
-        .enumerate()
-    {
-        geometry(
-            layout::history((0.0, 0.0), index).unwrap(),
-            [x, 194.0, 26.0, 26.0],
-        );
+    for (index, x) in layout::HISTORY_X.into_iter().enumerate() {
+        let swatch = layout::history((0.0, 0.0), index).unwrap();
+        geometry(swatch, [x, 196.0, 20.0, 20.0]);
+        if index > 0 {
+            let prev = layout::history((0.0, 0.0), index - 1).unwrap();
+            assert!(
+                swatch.left() - prev.right() >= 3.0,
+                "history swatches must keep a clean gap: {prev:?} vs {swatch:?}"
+            );
+        }
     }
+    assert_eq!(layout::history((0.0, 0.0), 7).unwrap().right(), 192.0);
     assert!(picker().rgba_field_rect(ColorField::A).is_none());
     assert!(!picker().eyedropper_hit((8.0, 175.0)));
 }
@@ -123,7 +126,7 @@ fn imported_colors_use_the_qt_integer_hue() {
     assert_eq!(picker.sv_square.alpha, 160);
 }
 
-/// 【取色器测试】【历史排列】只显示当前色与去重历史，当前色禁用，重叠按后绘色块命中，末项裁切
+/// 【取色器测试】【历史排列】只显示当前色与去重历史，当前色禁用，相邻色块间隙不误触，右端完整对齐不越界
 #[test]
 fn history_is_deduplicated_and_hit_testing_honors_qt_clipping() {
     let mut picker = picker();
@@ -133,11 +136,13 @@ fn history_is_deduplicated_and_hit_testing_honors_qt_clipping() {
     picker.history.insert(1, picker.history[0]);
     picker.refresh_palette();
     assert_eq!(picker.palette().len(), 8);
-    assert_eq!(picker.swatch_hit((20.0, 207.0)), None);
-    assert_eq!(picker.swatch_hit((33.0, 207.0)), Some(1));
-    assert_eq!(picker.swatch_hit((57.0, 207.0)), Some(2));
-    assert_eq!(picker.swatch_hit((191.0, 207.0)), Some(7));
-    assert_eq!(picker.swatch_hit((192.0, 207.0)), None);
+    assert_eq!(picker.swatch_hit((18.0, 206.0)), None);
+    assert_eq!(picker.swatch_hit((29.0, 206.0)), None);
+    assert_eq!(picker.swatch_hit((35.0, 206.0)), Some(1));
+    assert_eq!(picker.swatch_hit((53.0, 206.0)), None);
+    assert_eq!(picker.swatch_hit((60.0, 206.0)), Some(2));
+    assert_eq!(picker.swatch_hit((191.0, 206.0)), Some(7));
+    assert_eq!(picker.swatch_hit((192.0, 206.0)), None);
 }
 
 /// 【取色器测试】【主题底色】按 sample 核对宿主实际 RGBA，允许一单位预乘舍入；返回是否为未泄漏控件的底色

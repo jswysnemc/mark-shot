@@ -4,7 +4,8 @@ use tiny_skia::Rect;
 pub const WIDTH: f32 = 200.0;
 pub const HEIGHT: f32 = 228.0;
 pub const SWATCH_SIZE: f32 = 26.0;
-pub const HISTORY_X: [f32; 8] = [8.0, 32.0, 56.0, 79.0, 103.0, 127.0, 150.0, 174.0];
+pub const HISTORY_SWATCH_SIZE: f32 = 20.0;
+pub const HISTORY_X: [f32; 8] = [8.0, 31.0, 55.0, 78.0, 102.0, 125.0, 149.0, 172.0];
 
 /// 【属性取色】【矩形构造】返回 origin 平移后的 rect，本地几何不受分数缩放改变
 fn shifted(origin: (f32, f32), rect: (f32, f32, f32, f32)) -> Rect {
@@ -30,11 +31,14 @@ pub fn current(origin: (f32, f32)) -> Rect {
 pub fn hex(origin: (f32, f32)) -> Rect {
     shifted(origin, (40.0, 162.0, 152.0, 26.0))
 }
-/// 【属性取色】【历史颜色】返回 origin、index 对应实际矩形；Qt 的固定色块布局存在两像素重叠
+/// 【属性取色】【历史颜色】返回 origin、index 对应独立无重叠历史色块矩形，八项等距对齐左右边距
 pub fn history(origin: (f32, f32), index: usize) -> Option<Rect> {
-    HISTORY_X
-        .get(index)
-        .map(|x| shifted(origin, (*x, 194.0, 26.0, 26.0)))
+    HISTORY_X.get(index).map(|x| {
+        shifted(
+            origin,
+            (*x, 196.0, HISTORY_SWATCH_SIZE, HISTORY_SWATCH_SIZE),
+        )
+    })
 }
 /// 【属性取色】【控件裁切】返回 origin 对应的取色器子控件边界，最后一个历史色块按原版裁切
 pub fn content(origin: (f32, f32)) -> Rect {

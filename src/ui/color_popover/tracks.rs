@@ -42,30 +42,45 @@ fn gradient(
     p.canvas().fill_rect(rect, &paint, transform, mask);
 }
 
-/// 【属性取色】【透明棋盘】按 rect 与 mask 绘制五像素棋盘，尺寸和颜色与 Qt 取色器一致
+/// 【属性取色】【细边颜色】按当前明暗主题返回控件内边框颜色，保证浅色面板上白色与浅色区域边界清晰
+pub(super) fn hairline_color() -> Rgba {
+    if crate::theme::Mode::current() == crate::theme::Mode::Dark {
+        Rgba(255, 255, 255, 42)
+    } else {
+        Rgba(15, 23, 42, 34)
+    }
+}
+
+/// 【属性取色】【透明棋盘】按 rect 与 mask 绘制主题自适应四像素棋盘，浅色与深色模式均保持柔和对比
 pub(super) fn checkerboard(p: &mut Painter, rect: Rect, mask: Option<&Mask>) {
     let transform = p.transform();
+    let (light_cell, dark_cell) = if crate::theme::Mode::current() == crate::theme::Mode::Dark {
+        (Rgba(70, 76, 86, 255), Rgba(45, 50, 58, 255))
+    } else {
+        (Rgba(241, 245, 249, 255), Rgba(203, 213, 225, 255))
+    };
     let mut paint = Paint::default();
-    paint.set_color(Rgba(70, 76, 86, 255).color());
+    paint.set_color(light_cell.color());
     p.canvas().fill_rect(rect, &paint, transform, mask);
-    paint.set_color(Rgba(45, 50, 58, 255).color());
+    paint.set_color(dark_cell.color());
+    let cell_size = 4.0_f32;
     let mut row = 0;
     let mut y = rect.top();
     while y < rect.bottom() {
-        let mut x = rect.left() + if row % 2 == 0 { 5.0 } else { 0.0 };
+        let mut x = rect.left() + if row % 2 == 0 { cell_size } else { 0.0 };
         while x < rect.right() {
             if let Some(cell) = Rect::from_xywh(
                 x,
                 y,
-                5.0_f32.min(rect.right() - x),
-                5.0_f32.min(rect.bottom() - y),
+                cell_size.min(rect.right() - x),
+                cell_size.min(rect.bottom() - y),
             ) {
                 p.canvas().fill_rect(cell, &paint, transform, mask);
             }
-            x += 10.0;
+            x += cell_size * 2.0;
         }
         row += 1;
-        y += 5.0;
+        y += cell_size;
     }
 }
 
@@ -80,38 +95,51 @@ pub(super) fn mask(p: &mut Painter, rect: Rect, radius: f32) -> Option<Mask> {
 
 /// 【属性取色】【细边描绘】对 rect 绘制 radius 圆角及 color 单像素边，不使用旧主题双色边
 pub(super) fn border(p: &mut Painter, rect: Rect, radius: f32, color: Rgba) {
+    border_width(p, rect, radius, color, 1.0);
+}
+
+/// 【属性取色】【可调线宽描边】按 width 对 rect 绘制 radius 圆角边框，供默认态与悬停态复用
+pub(super) fn border_width(p: &mut Painter, rect: Rect, radius: f32, color: Rgba, width: f32) {
     if let Some(path) = path(rect, radius) {
         p.stroke_path(
             &path,
             color,
             &Stroke {
-                width: 1.0,
+                width,
                 ..Default::default()
             },
         );
     }
 }
 
-/// 【属性取色】【握柄绘制】在 center 绘制 fill 内核、白底与深色边；bounds 按 Qt 独立控件边界裁切握柄
-fn handle(p: &mut Painter, center: (f32, f32), fill: Color, bounds: Rect) {
+/// 【属性取色】【圆形握柄】按指定外环半径 outer_radius、内核半径 inner_radius 与描边宽度在 bounds 内绘制取色握柄
+fn handle_ring(
+    p: &mut Painter,
+    center: (f32, f32),
+    fill: Color,
+    bounds: Rect,
+    outer_radius: f32,
+    inner_radius: f32,
+    stroke_width: f32,
+) {
     let clip = mask(p, bounds, 0.0);
     let transform = p.transform();
     let mut paint = Paint {
         anti_alias: true,
         ..Default::default()
     };
-    paint.set_color(Rgba(255, 255, 255, 230).color());
+    paint.set_color(Rgba(255, 255, 255, 246).color());
     let mut builder = tiny_skia::PathBuilder::new();
-    builder.push_circle(center.0, center.1, 6.0);
+    builder.push_circle(center.0, center.1, outer_radius);
     if let Some(path) = builder.finish() {
         p.canvas()
             .fill_path(&path, &paint, FillRule::Winding, transform, clip.as_ref());
-        paint.set_color(Rgba(15, 17, 23, 220).color());
+        paint.set_color(Rgba(15, 23, 42, 196).color());
         p.canvas().stroke_path(
             &path,
             &paint,
             &Stroke {
-                width: 1.5,
+                width: stroke_width,
                 ..Default::default()
             },
             transform,
@@ -119,7 +147,7 @@ fn handle(p: &mut Painter, center: (f32, f32), fill: Color, bounds: Rect) {
         );
     }
     let mut builder = tiny_skia::PathBuilder::new();
-    builder.push_circle(center.0, center.1, 3.5);
+    builder.push_circle(center.0, center.1, inner_radius);
     if let Some(path) = builder.finish() {
         paint.set_color(fill);
         p.canvas()
@@ -137,7 +165,7 @@ fn sv(p: &mut Painter, picker: &mut ColorPickerPopover) {
         rect.height() - 1.0,
     )
     .unwrap();
-    let clip = mask(p, inner, 4.0);
+    let clip = mask(p, inner, 5.0);
     let transform = p.transform();
     let mut paint = Paint::default();
     paint.set_color(hsv_to_color(picker.sv_square.hue, 1.0, 1.0));
@@ -163,8 +191,8 @@ fn sv(p: &mut Painter, picker: &mut ColorPickerPopover) {
         false,
         clip.as_ref(),
     );
-    border(p, inner, 4.0, Rgba(255, 255, 255, 28));
-    handle(
+    border(p, inner, 5.0, hairline_color());
+    handle_ring(
         p,
         (
             inner.left() + picker.sv_square.sv.0 * inner.width(),
@@ -176,25 +204,29 @@ fn sv(p: &mut Painter, picker: &mut ColorPickerPopover) {
             picker.sv_square.sv.1,
         ),
         rect,
+        6.0,
+        3.5,
+        1.5,
     );
 }
 
-/// 【属性取色】【横向轨道】绘制 picker 的色相与 alpha，取样原点及握柄位置与 Qt 一致
+/// 【属性取色】【横向轨道】绘制 picker 的色相与 alpha，端点握柄与轨道圆弧同心且保持完整圆形不裁切
 pub(super) fn draw(p: &mut Painter, picker: &mut ColorPickerPopover) {
-    // 1. 【属性取色】【色阶区域】先绘制二维场，再绘制独立色相和透明度轨道
+    // 1. 先绘制二维明度饱和度场，再绘制横向色相与透明度胶囊轨道
     sv(p, picker);
     for (rect, alpha) in [
         (layout::hue((0.0, 0.0)), false),
         (layout::alpha((0.0, 0.0)), true),
     ] {
         let inner = Rect::from_xywh(
-            rect.left() + 1.0,
-            rect.top() + 1.5,
-            rect.width() - 2.0,
-            rect.height() - 3.0,
+            rect.left() + 0.5,
+            rect.top() + 1.0,
+            rect.width() - 1.0,
+            rect.height() - 2.0,
         )
         .unwrap();
-        let clip = mask(p, inner, inner.height() / 2.0);
+        let radius = inner.height() / 2.0;
+        let clip = mask(p, inner, radius);
         let base = hsv_to_color(
             picker.sv_square.hue,
             picker.sv_square.sv.0,
@@ -234,16 +266,21 @@ pub(super) fn draw(p: &mut Painter, picker: &mut ColorPickerPopover) {
             )
         };
         gradient(p, inner, stops, true, clip.as_ref());
-        border(p, inner, inner.height() / 2.0, Rgba(255, 255, 255, 26));
-        // 2. 【属性取色】【轨道握柄】显示坐标使用内部轨道，输入坐标仍使用完整控件宽度
-        handle(
+        border(p, inner, radius, hairline_color());
+        // 2. 握柄圆心沿胶囊两端圆心范围线性插值，保证零值与满值时圆环完整不被左右边界截断
+        let cap_pad = rect.height() / 2.0;
+        let travel = (rect.width() - cap_pad * 2.0).max(0.0);
+        handle_ring(
             p,
             (
-                inner.left() + fraction * inner.width(),
-                inner.top() + inner.height() / 2.0,
+                rect.left() + cap_pad + fraction.clamp(0.0, 1.0) * travel,
+                rect.top() + rect.height() / 2.0,
             ),
             fill,
             rect,
+            5.0,
+            2.8,
+            1.25,
         );
     }
 }
