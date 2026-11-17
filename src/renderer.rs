@@ -474,10 +474,30 @@ pub fn rebuild_annotations_layer(
         return;
     };
 
+    let last_focus = annotations
+        .iter()
+        .enumerate()
+        .rev()
+        .find(|(_, ann)| {
+            active_text_id != Some(ann.id) && crate::features::filter::focus::enabled(ann)
+        })
+        .map(|(idx, _)| idx);
+
     if dirty_rect.is_none() {
         crate::utils::transparent_pixmap::clear(p.canvas);
-        for ann in annotations {
+        for (idx, ann) in annotations.iter().enumerate() {
             if active_text_id == Some(ann.id) {
+                continue;
+            }
+            if crate::features::filter::focus::enabled(ann) {
+                if Some(idx) == last_focus {
+                    crate::features::filter::focus::draw_group(
+                        p,
+                        annotations
+                            .iter()
+                            .filter(|item| active_text_id != Some(item.id)),
+                    );
+                }
                 continue;
             }
             draw_annotation(p, ann, false, text_editors, filters, active_text_id);
@@ -507,8 +527,19 @@ pub fn rebuild_annotations_layer(
     let tmp_offset = (offset.0 + x0 as f32 / s, offset.1 + y0 as f32 / s);
     let mut tmp_painter = p.sub(&mut tmp).with_origin(tmp_offset);
 
-    for ann in annotations {
+    for (idx, ann) in annotations.iter().enumerate() {
         if active_text_id == Some(ann.id) {
+            continue;
+        }
+        if crate::features::filter::focus::enabled(ann) {
+            if Some(idx) == last_focus {
+                crate::features::filter::focus::draw_group(
+                    &mut tmp_painter,
+                    annotations
+                        .iter()
+                        .filter(|item| active_text_id != Some(item.id)),
+                );
+            }
             continue;
         }
         let bounds = annotation_style::damage(

@@ -35,10 +35,17 @@ pub(super) fn draw_layers(req: &mut RenderRequest<'_>) {
     } else {
         req.annotations
     };
-    if annotations
-        .iter()
-        .chain(req.pending)
-        .any(|annotation| matches!(annotation.shape, AnnotationShape::Highlighter { .. }))
+    let multi_focus = req
+        .pending
+        .is_some_and(crate::features::filter::focus::enabled)
+        && annotations
+            .iter()
+            .any(crate::features::filter::focus::enabled);
+    if multi_focus
+        || annotations
+            .iter()
+            .chain(req.pending)
+            .any(|annotation| matches!(annotation.shape, AnnotationShape::Highlighter { .. }))
     {
         // 1. 【荧光笔】【背景合成】乘法混合必须读取实际底图，按原顺序绘制当前损坏区域，透明缓存不能保存此效果
         draw_ordered(
@@ -207,18 +214,58 @@ pub(crate) fn draw_ordered<'a, I>(
     }
 }
 
-/// 【标注渲染】【可见成员】按ordered顺序绘制与global相交的正文，local、editors、filters和active_text_id提供内容，返回是否存在实际贡献的成员
-pub(super) fn draw_visible<'a>(
+/// 【标注渲染】【可见成员】按 ordered 顺序绘制与 global 相交的正文，多聚焦标注合并为单次并集遮罩，返回是否存在实际贡献
+pub(super) fn draw_visible<'a, I>(
     local: &mut Painter<'_>,
-    ordered: impl Iterator<Item = &'a Annotation>,
+    ordered: I,
     global: Rect,
     editors: &mut HashMap<u64, Editor<'static>>,
     filters: &HashMap<u64, crate::features::filter::raster::Raster>,
     active_text_id: Option<u64>,
-) -> bool {
+) -> bool
+where
+    I: IntoIterator<Item = &'a Annotation>,
+    I::IntoIter: Clone,
+{
+    let ordered = ordered.into_iter();
+    let last_focus = ordered
+        .clone()
+        .enumerate()
+        .filter(|(_, ann)| crate::features::filter::focus::enabled(ann))
+        .map(|(idx, _)| idx)
+        .last();
+    let inside_any_focus = last_focus.is_some()
+        && ordered.clone().any(|ann| {
+            crate::features::filter::focus::inside_hole(ann, global, 2.0 / local.scale())
+        });
     let mut painted = false;
-    for annotation in ordered {
-        if crate::features::filter::focus::inside_hole(annotation, global, 2.0 / local.scale()) {
+    for (idx, annotation) in ordered.clone().enumerate() {
+        if crate::features::filter::focus::enabled(annotation) {
+            if Some(idx) != last_focus || inside_any_focus {
+                continue;
+            }
+            let intersects_focus = ordered
+                .clone()
+                .filter(|item| crate::features::filter::focus::enabled(item))
+                .any(|item| {
+                    let b = super::annotation_style::damage(
+                        item,
+                        local.window_units(),
+                        local.drawing_bounds(),
+                        local.ruler_projection(),
+                    );
+                    b.left() < global.right()
+                        && b.right() > global.left()
+                        && b.top() < global.bottom()
+                        && b.bottom() > global.top()
+                });
+            if intersects_focus {
+                painted = true;
+                let group = ordered.clone();
+                local.clipped_scene(Some(global), |local| {
+                    crate::features::filter::focus::draw_group(local, group);
+                });
+            }
             continue;
         }
         let bounds = super::annotation_style::damage(
@@ -233,27 +280,14 @@ pub(super) fn draw_visible<'a>(
             && bounds.bottom() > global.top()
         {
             painted = true;
-            if crate::features::filter::focus::enabled(annotation) {
-                local.clipped_scene(Some(global), |local| {
-                    annotations::draw_annotation(
-                        local,
-                        annotation,
-                        false,
-                        editors,
-                        filters,
-                        active_text_id,
-                    );
-                });
-            } else {
-                annotations::draw_annotation(
-                    local,
-                    annotation,
-                    false,
-                    editors,
-                    filters,
-                    active_text_id,
-                );
-            }
+            annotations::draw_annotation(
+                local,
+                annotation,
+                false,
+                editors,
+                filters,
+                active_text_id,
+            );
         }
     }
     painted

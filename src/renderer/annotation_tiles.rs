@@ -224,11 +224,18 @@ pub(super) fn draw(
             crate::types::AnnotationShape::Highlighter { .. }
         )
     });
-    if multiply && !ordered_scene {
+    let merged_focus = req
+        .pending
+        .is_some_and(crate::features::filter::focus::enabled)
+        && bodies
+            .iter()
+            .copied()
+            .any(crate::features::filter::focus::enabled);
+    if (multiply || merged_focus) && !ordered_scene {
         bodies.extend(req.pending);
     }
     ordered(req, view, &bodies, multiply);
-    if !ordered_scene && !multiply {
+    if !ordered_scene && !multiply && !merged_focus {
         pending(req);
     }
 }

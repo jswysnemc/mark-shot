@@ -409,6 +409,16 @@ impl EditorState {
         if !self.cache_annotation_pixels(ann) {
             return;
         }
+        if crate::features::filter::focus::enabled(ann)
+            && self
+                .annotations
+                .iter()
+                .any(crate::features::filter::focus::enabled)
+        {
+            // 1. 已有聚焦标注时不在持久层叠加第二次压暗，标记完整标注层按多孔洞并集重建
+            self.annotations_dirty = true;
+            return;
+        }
         for (i, placement) in self.placements.iter().enumerate() {
             let offset = placement.offset();
             let pad = ann.visual_pad();

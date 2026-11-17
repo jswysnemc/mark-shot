@@ -19,8 +19,30 @@ pub(super) fn render_precise(editor: &mut EditorState) -> Option<(Vec<u8>, (f64,
         pixels.width() as f32,
         pixels.height() as f32,
     )?;
-    for annotation in &editor.annotations {
-        let annotation = annotation.scaled(crop.scale);
+    let scaled_list: Vec<_> = editor
+        .annotations
+        .iter()
+        .map(|ann| ann.scaled(crop.scale))
+        .collect();
+    let last_focus = scaled_list
+        .iter()
+        .rposition(crate::features::filter::focus::enabled);
+    for (idx, annotation) in scaled_list.iter().enumerate() {
+        if crate::features::filter::focus::enabled(annotation) {
+            if Some(idx) == last_focus {
+                crate::features::filter::focus::draw_group(
+                    &mut crate::renderer::Painter::new(&mut pixels)
+                        .with_frozen_image(
+                            crate::renderer::FrozenImage::image(&file.original, file.viewport)
+                                .mapped(crop.scale, (0.0, 0.0)),
+                        )
+                        .with_drawing_bounds(Some(bounds))
+                        .with_origin(origin),
+                    scaled_list.iter(),
+                );
+            }
+            continue;
+        }
         crate::renderer::draw_annotation(
             &mut crate::renderer::Painter::new(&mut pixels)
                 .with_frozen_image(
@@ -30,7 +52,7 @@ pub(super) fn render_precise(editor: &mut EditorState) -> Option<(Vec<u8>, (f64,
                 .with_drawing_bounds(Some(bounds))
                 .with_text(&mut editor.text.font_system, &mut editor.text.swash_cache)
                 .with_origin(origin),
-            &annotation,
+            annotation,
             false,
             &mut editors,
             &blurs,

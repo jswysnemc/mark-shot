@@ -88,13 +88,46 @@ pub(in crate::app) fn render_final_precise(
     let mut scaled_editors = HashMap::new();
     // 1. 【截图】【原图滤镜】导出重新读取冻结原图，预览缓存和先前标注都不会成为滤镜来源
     let in_place = HashMap::new();
-    for ann in &editor_state.annotations {
-        let scaled;
-        let (ann, editors) = if scale == 1.0 {
-            (ann, &mut editor_state.text.editors)
+    let scaled_all: Vec<crate::types::Annotation> = if scale == 1.0 {
+        Vec::new()
+    } else {
+        editor_state
+            .annotations
+            .iter()
+            .map(|ann| ann.scaled(scale))
+            .collect()
+    };
+    let export_list: &[crate::types::Annotation] = if scale == 1.0 {
+        &editor_state.annotations
+    } else {
+        &scaled_all
+    };
+    let last_focus = export_list
+        .iter()
+        .rposition(crate::features::filter::focus::enabled);
+    for (idx, ann) in export_list.iter().enumerate() {
+        if crate::features::filter::focus::enabled(ann) {
+            if Some(idx) == last_focus {
+                crate::features::filter::focus::draw_group(
+                    &mut renderer::Painter::new(&mut out)
+                        .with_frozen_image(
+                            renderer::FrozenImage::desktop(
+                                &editor_state.captures,
+                                &editor_state.placements,
+                            )
+                            .mapped(scale, (0.0, 0.0)),
+                        )
+                        .with_drawing_bounds(renderer::scale_rect(&sel, scale))
+                        .with_origin(offset),
+                    export_list.iter(),
+                );
+            }
+            continue;
+        }
+        let editors = if scale == 1.0 {
+            &mut editor_state.text.editors
         } else {
-            scaled = ann.scaled(scale);
-            (&scaled, &mut scaled_editors)
+            &mut scaled_editors
         };
         renderer::draw_annotation(
             &mut renderer::Painter::new(&mut out)
