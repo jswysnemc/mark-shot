@@ -443,6 +443,11 @@ impl WindowContent for ResultWindow {
             )
             .chain(self.translation.retire_deadline)
             .chain(self.stacking.deadline)
+            .chain(
+                (self.view == View::Image)
+                    .then(|| self.preview.deadline())
+                    .flatten(),
+            )
             .chain(self.table.as_ref().and_then(|table| table.bars.deadline()))
             .min()
     }

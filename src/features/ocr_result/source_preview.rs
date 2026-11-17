@@ -1,6 +1,9 @@
 //! 【文字识别】【原图交互】按实际 Qt 整数几何保存指针中心缩放、左键平移及复位状态
 
 use crate::backend::window::WindowCursor;
+use std::time::{Duration, Instant};
+
+const ZOOM_HUD_DURATION: Duration = Duration::from_millis(900);
 
 #[cfg(test)]
 mod tests;
@@ -12,6 +15,7 @@ pub(super) struct SourcePreview {
     anchor: (f64, f64),
     pan_anchor: (f64, f64),
     pub raster: Option<tiny_skia::Pixmap>,
+    zoom_deadline: Option<Instant>,
 }
 
 impl Default for SourcePreview {
@@ -24,6 +28,7 @@ impl Default for SourcePreview {
             anchor: (0.0, 0.0),
             pan_anchor: (0.0, 0.0),
             raster: None,
+            zoom_deadline: None,
         }
     }
 }
@@ -122,6 +127,7 @@ impl SourcePreview {
             );
             self.clamp_pan(viewport, image);
         }
+        self.zoom_deadline = Some(Instant::now() + ZOOM_HUD_DURATION);
         true
     }
 
@@ -161,9 +167,32 @@ impl SourcePreview {
 
     /// 【文字识别】【双击复位】恢复适配大小、居中位置并清除拖动，无参数、无返回值
     pub fn reset(&mut self) {
+        if self.zoom > 1.01 {
+            self.zoom_deadline = Some(Instant::now() + ZOOM_HUD_DURATION);
+        }
         self.zoom = 1.0;
         self.pan = (0.0, 0.0);
         self.dragging = false;
+    }
+
+    /// 【文字识别】【缩放提示期限】无参数，返回原图缩放倍率浮标到期时刻
+    pub fn deadline(&self) -> Option<Instant> {
+        self.zoom_deadline
+    }
+
+    /// 【文字识别】【缩放提示可见】无参数，返回当前是否需要显示缩放倍率浮标
+    pub fn zoom_visible(&self) -> bool {
+        self.zoom_deadline.is_some()
+    }
+
+    /// 【文字识别】【缩放提示过期】按当前时刻 now 清理已到期的倍率浮标，返回状态是否变化
+    pub fn expire(&mut self, now: Instant) -> bool {
+        if self.zoom_deadline.is_some_and(|deadline| deadline <= now) {
+            self.zoom_deadline = None;
+            true
+        } else {
+            false
+        }
     }
 
     /// 【文字识别】【原图光标】按当前缩放和抓取返回普通、张手或握手光标，无参数

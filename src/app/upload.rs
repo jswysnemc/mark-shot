@@ -23,6 +23,11 @@ impl State {
         self.requested || self.task.is_some() || self.close_at.is_some()
     }
 
+    /// 【图片上传】【传输状态】返回后台网络上传任务是否正在运行且尚未取消，无参数
+    pub fn uploading(&self) -> bool {
+        self.task.is_some() && !self.canceled
+    }
+
     /// 【图片上传】【完成期限】返回成功后关闭期限，无参数；后台上传自身没有周期计时要求
     pub fn deadline(&self) -> Option<Instant> {
         self.close_at
@@ -85,6 +90,7 @@ pub(super) fn start(state: &mut EditorState, overlay: &mut dyn ScreenOverlay, di
             state.upload.canceled = false;
             state.upload.task = Some(task);
             overlay.set_cursor(CursorIcon::Progress);
+            crate::editor::dirty::mark_all_dirty(dirty, state.placements.len());
             log::info!("【图片上传】【任务启动】开始上传当前选区");
         }
         Err(error) => {
@@ -101,6 +107,7 @@ pub(super) fn cancel(state: &mut EditorState, dirty: &mut u32) {
     if let Some(task) = &mut state.upload.task {
         state.upload.canceled = true;
         task.cancel();
+        crate::editor::dirty::mark_all_dirty(dirty, state.placements.len());
         feedback(state, "Upload canceled", dirty);
     }
 }

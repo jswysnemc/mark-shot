@@ -11,8 +11,10 @@ impl Pin {
         }
         match action {
             PinAction::RotateLeft | PinAction::RotateRight => {
+                let clockwise = action == PinAction::RotateRight;
                 self.clear_text();
-                self.image.rotate(action == PinAction::RotateRight)?;
+                self.image.rotate(clockwise)?;
+                self.feedback.rotated(clockwise);
                 if self.text_selection {
                     self.start_ocr()?;
                 }
@@ -29,21 +31,35 @@ impl Pin {
                         }
                 };
                 self.image.scale(zoom);
+                self.feedback.zoom(self.image.zoom);
             }
-            PinAction::AlwaysOnTop => self.image.always_on_top = !self.image.always_on_top,
+            PinAction::AlwaysOnTop => {
+                self.image.always_on_top = !self.image.always_on_top;
+                self.feedback.topmost(self.image.always_on_top);
+            }
             PinAction::Edit => actions::open(&self.image.png()?, false)?,
             PinAction::ScanCode => crate::features::code_scan::transport::spawn_from_pin(
                 &self.image.png()?,
                 self.image.always_on_top,
             )?,
-            PinAction::Copy => crate::backend::initialize_clipboard()
-                .copy_image_to_clipboard(&self.image.png()?)?,
+            PinAction::Copy => {
+                crate::backend::initialize_clipboard()
+                    .copy_image_to_clipboard(&self.image.png()?)?;
+                self.feedback.copied_image();
+            }
             PinAction::CopySelectedText => {
-                crate::utils::copy_to_clipboard(&self.text.line_text(true))?
+                crate::utils::copy_to_clipboard(&self.text.line_text(true))?;
+                self.feedback.copied_text();
             }
             PinAction::CopyImageText => {
                 if self.text.is_active() {
-                    crate::utils::copy_to_clipboard(&self.text.line_text(false))?;
+                    let content = self.text.line_text(false);
+                    if content.is_empty() {
+                        self.feedback.no_text();
+                    } else {
+                        crate::utils::copy_to_clipboard(&content)?;
+                        self.feedback.copied_text();
+                    }
                 } else {
                     self.copy_after_ocr = true;
                     if !self.start_ocr()? {
@@ -55,6 +71,8 @@ impl Pin {
                 self.text_selection = !self.text_selection;
                 if self.text_selection && !self.text.is_active() {
                     self.text_selection = self.start_ocr()?;
+                } else {
+                    self.feedback.text_selection(self.text_selection);
                 }
                 self.text.deselect();
                 self.selecting = false;
@@ -64,6 +82,7 @@ impl Pin {
             PinAction::ToggleTranslation => {
                 self.translation.active = !self.translation.active;
                 self.sync_translation_text();
+                self.feedback.translation_view(self.translation.active);
             }
             PinAction::TargetLanguage => self.open_menu(true),
             PinAction::SaveAs => actions::save(self.image.png()?, self.image.density)?,

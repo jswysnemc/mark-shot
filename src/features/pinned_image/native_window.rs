@@ -96,6 +96,7 @@ impl WindowContent for Pin {
         let point = (input.position.0 - previous.0, input.position.1 - previous.1);
         let shift = wheel::offset(point, before, self.image.size());
         self.position_offset = Some((previous.0 + shift.0, previous.1 + shift.1));
+        self.feedback.zoom(self.image.zoom);
         WindowAction::Redraw
     }
     /// 【原生贴图】【置顶状态】无参数，返回当前原生置顶请求

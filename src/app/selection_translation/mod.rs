@@ -9,7 +9,7 @@ pub(super) mod tasks;
 use crate::{
     editor::EditorState,
     features::selection_translation::session::Session,
-    ui::selection_translation::{language_popup::Popup, result_bar::Bar},
+    ui::selection_translation::{language_popup::Popup, result_bar::Bar, status_pill::StatusPill},
 };
 use std::time::{Duration, Instant};
 
@@ -19,6 +19,7 @@ pub(crate) struct State {
     pub draft: Option<Session>,
     pub popup: Option<Popup>,
     pub bar: Option<Bar>,
+    pub status_pill: Option<StatusPill>,
     pub requested: Option<String>,
     pub pending: Option<String>,
     pub task: Option<crate::translation::task::Task>,

@@ -86,12 +86,25 @@ impl Pin {
                     self.sync_translation_text();
                     if std::mem::take(&mut self.copy_after_ocr) {
                         let text = self.text.line_text(false);
-                        let result = if text.is_empty() {
-                            Err("No text found in this image".into())
+                        if text.is_empty() {
+                            self.feedback.no_text();
                         } else {
-                            crate::utils::copy_to_clipboard(&text)
-                        };
-                        self.report(result);
+                            let result = crate::utils::copy_to_clipboard(&text);
+                            if result.is_ok() {
+                                self.feedback.copied_text();
+                            }
+                            self.report(result);
+                        }
+                    } else if self.text_selection
+                        && !self.translation.after_ocr
+                        && !self.window_after_ocr
+                    {
+                        if self.text.lines.is_empty() {
+                            self.text_selection = false;
+                            self.feedback.no_text();
+                        } else {
+                            self.feedback.text_selection(true);
+                        }
                     }
                     if self.translation.after_ocr {
                         let result = self.start_translation();

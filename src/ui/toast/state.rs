@@ -207,8 +207,14 @@ impl Toast {
     fn layout(&mut self, place: &ToastPlace) {
         self.monitor_idx = place.monitor_idx;
         let cfg = &crate::config::get().toasts;
-        let (height, margin) = (cfg.height, cfg.margin);
-        let w = self.text_width + cfg.padding * 2.0;
+        let (height, margin) = (cfg.height.max(28.0), cfg.margin);
+        let indicator_pad = if super::draw::kind_for(self.kind, self.text.as_ref()).has_indicator()
+        {
+            16.0
+        } else {
+            0.0
+        };
+        let w = (self.text_width + cfg.padding * 2.0 + indicator_pad).max(56.0);
         let (cx, cy) = match (self.spec.anchor, place.focus) {
             (ToastAnchor::SelectionCenter, Some(focus)) => (
                 focus.left() + focus.width() / 2.0,
@@ -255,6 +261,7 @@ impl Toasts {
     }
 
     fn push(&mut self, kind: ToastKind, text: Cow<'static, str>, font_system: &mut FontSystem) {
+        crate::fonts::ui_fallback::ensure_text(font_system, &text);
         let text_width =
             crate::renderer::measure_line_width(&text, crate::theme::font::label(), font_system);
         if let Some(toast) = self.items.iter_mut().find(|t| t.kind == kind) {

@@ -33,7 +33,20 @@ pub fn run_settings_action(
         SettingsAction::RulerModes => super::super::ruler::toggle(editor_state, dirty_mask),
         SettingsAction::NumberStyles => super::super::number::toggle(editor_state, dirty_mask),
         SettingsAction::ResetNumber => {
-            crate::editor::number_edits::reset_sequence(editor_state, dirty_mask)
+            crate::editor::number_edits::reset_sequence(editor_state, dirty_mask);
+            let message = if crate::ui::language::Language::current()
+                == crate::ui::language::Language::Chinese
+            {
+                "序号已重置为 1"
+            } else {
+                "Sequence reset to 1"
+            };
+            editor_state.toasts.show_text(
+                crate::ui::toast::ToastKind::RulerMode,
+                message.to_owned(),
+                &mut editor_state.text.font_system,
+            );
+            crate::editor::dirty::mark_dirty(dirty_mask, editor_state.input.pointer.monitor_idx);
         }
         SettingsAction::ArrowStyles => super::super::line::toggle(
             editor_state,

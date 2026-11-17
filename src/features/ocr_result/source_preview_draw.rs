@@ -58,3 +58,46 @@ pub(super) fn draw(
         None,
     );
 }
+
+/// 【文字识别】【原图缩放胶囊】在 body 右下角绘制滚轮或复位触发的紧凑百分比胶囊，无返回值
+pub(super) fn draw_zoom_hud(
+    preview: &SourcePreview,
+    fonts: &mut cosmic_text::FontSystem,
+    cache: &mut cosmic_text::SwashCache,
+    canvas: &mut Pixmap,
+    body: Rect,
+    scale: f32,
+) {
+    if !preview.zoom_visible() || body.width() < 56.0 || body.height() < 34.0 {
+        return;
+    }
+    // 1. 测量当前缩放百分比胶囊宽高并锚定在原图视区右下角
+    let label = format!("{}%", (preview.zoom * 100.0).round() as i32);
+    let (pill_w, pill_h) = crate::ui::micro_badge::measure(
+        fonts,
+        &label,
+        "",
+        crate::ui::micro_badge::BadgeKind::Zoom,
+        (body.width() - 16.0).max(44.0),
+    );
+    let Some(rect) = Rect::from_xywh(
+        (body.right() - pill_w - 10.0).max(body.left() + 6.0),
+        (body.bottom() - pill_h - 10.0).max(body.top() + 4.0),
+        pill_w,
+        pill_h,
+    ) else {
+        return;
+    };
+    // 2. 绘制半透明紧凑倍率胶囊
+    let mut painter = crate::renderer::Painter::new(canvas)
+        .with_scale(scale)
+        .with_text(fonts, cache);
+    crate::ui::micro_badge::draw(
+        &mut painter,
+        rect,
+        crate::ui::micro_badge::BadgeKind::Zoom,
+        &label,
+        "",
+        1.0,
+    );
+}

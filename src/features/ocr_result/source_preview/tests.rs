@@ -131,3 +131,35 @@ fn zoom_raster_is_viewport_bounded_and_transparent_pixels_do_not_gain_checkerboa
     assert_eq!(preview.raster.as_ref().unwrap().data().len(), 300 * 190 * 4);
     assert_eq!(image.data(), vec![0; 100 * 60 * 4]);
 }
+
+/// 【原图测试】【缩放浮标生命周期】验证滚轮缩放与双击复位均激活倍率浮标且到期自动隐藏，无参数、无返回值
+#[test]
+fn wheel_zoom_and_double_click_reset_show_transient_percentage_badge() {
+    use std::time::{Duration, Instant};
+    use tiny_skia::{Pixmap, Rect};
+
+    let mut preview = SourcePreview::default();
+    assert!(!preview.zoom_visible());
+    assert!(preview.wheel((300, 190), (100, 60), (80.0, 60.0), 120.0));
+    assert!(preview.zoom_visible());
+
+    let mut fonts = crate::fonts::ocr_ui::new();
+    let mut cache = cosmic_text::SwashCache::new();
+    let mut canvas = Pixmap::new(320, 220).unwrap();
+    let body = Rect::from_xywh(8.0, 20.0, 300.0, 190.0).unwrap();
+    super::super::source_preview_draw::draw_zoom_hud(
+        &preview,
+        &mut fonts,
+        &mut cache,
+        &mut canvas,
+        body,
+        1.0,
+    );
+    assert!(canvas.pixels().iter().any(|px| px.alpha() > 200));
+
+    assert!(preview.expire(Instant::now() + Duration::from_secs(2)));
+    assert!(!preview.zoom_visible());
+
+    preview.reset();
+    assert!(preview.zoom_visible());
+}

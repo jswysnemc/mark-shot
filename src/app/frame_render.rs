@@ -457,6 +457,7 @@ pub(super) fn render_monitor(
     crate::ui::canvas_navigation::draw::draw(editor_state, i, dirty_rect);
     crate::ui::canvas_navigation::zoom::draw(editor_state, i, dirty_rect);
     super::selection_translation::panels::draw(editor_state, i, dirty_rect);
+    crate::ui::upload_status::draw(editor_state, i, dirty_rect);
     super::selection_size::panels::draw_popup(editor_state, i, dirty_rect);
     crate::features::color_sample::inspector_draw::draw(editor_state, i, dirty_rect);
     crate::ui::image_window::draw(editor_state, i);

@@ -170,6 +170,7 @@ fn failed(state: &mut EditorState, error: Box<dyn std::error::Error>, dirty: &mu
         },
         dirty,
     );
+    super::panels::update(state, dirty);
     super::super::panels::toolbar::update_toolbar(state, dirty);
 }
 
@@ -219,6 +220,8 @@ pub(in crate::app) fn poll(
             {
                 if let Err(error) = translate(state, overlay) {
                     failed(state, error, dirty);
+                } else {
+                    super::panels::update(state, dirty);
                 }
             }
             Ok(_) => failed(state, "No text to translate".into(), dirty),
@@ -295,5 +298,6 @@ pub(in crate::app) fn cancel(state: &mut EditorState, dirty: &mut u32) {
         task.cancel();
         state.selection_translation.retired.push(task);
     }
+    super::panels::update(state, dirty);
     super::super::panels::toolbar::update_toolbar(state, dirty);
 }

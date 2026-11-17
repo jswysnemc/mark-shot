@@ -111,13 +111,23 @@ pub(super) fn draw(state: &mut ResultWindow, canvas: &mut Pixmap, scale: f32) {
                 );
             }
         }
-        View::Image => super::source_preview_draw::draw(
-            &mut state.preview,
-            &state.image,
-            canvas,
-            state.layout.body,
-            scale,
-        ),
+        View::Image => {
+            super::source_preview_draw::draw(
+                &mut state.preview,
+                &state.image,
+                canvas,
+                state.layout.body,
+                scale,
+            );
+            super::source_preview_draw::draw_zoom_hud(
+                &state.preview,
+                &mut state.fonts,
+                &mut state.cache,
+                canvas,
+                state.layout.body,
+                scale,
+            );
+        }
     }
     if state.view == View::Text {
         super::translation::draw::draw(state, canvas, scale);

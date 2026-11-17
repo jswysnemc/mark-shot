@@ -211,11 +211,12 @@ impl ResultWindow {
                 let submenu = super::more_menu::wake(self, now);
                 let translation = super::translation::controller::wake(self, now);
                 let stacking = super::stacking::expire(self, now);
+                let preview_zoom = self.preview.expire(now);
                 let table = self
                     .table
                     .as_mut()
                     .is_some_and(|table| table.bar_wake(self.layout.table_body, now));
-                if feedback || submenu || translation || stacking || table {
+                if feedback || submenu || translation || stacking || preview_zoom || table {
                     WindowAction::Redraw
                 } else {
                     WindowAction::None

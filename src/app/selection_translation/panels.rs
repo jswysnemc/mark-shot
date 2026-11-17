@@ -9,7 +9,12 @@ use crate::{
     types::popup::PopupFrame,
     ui::{
         panel::UiPanel,
-        selection_translation::{draw, language_popup::Popup, result_bar::Bar},
+        selection_translation::{
+            draw,
+            language_popup::Popup,
+            result_bar::Bar,
+            status_pill::{self, StatusPill},
+        },
         toolbar::{Integration, ToolbarButton, ToolbarItem},
     },
 };
@@ -228,12 +233,78 @@ pub(in crate::app) fn update(state: &mut EditorState, dirty: &mut u32) {
             bar.hovered,
         )
     });
-    if old_look == new_look {
-        return;
+    if old_look != new_look {
+        for (monitor, rect) in old.into_iter().chain(new) {
+            state.damage_local(monitor, rect);
+            crate::editor::dirty::mark_dirty(dirty, monitor);
+        }
     }
-    for (monitor, rect) in old.into_iter().chain(new) {
-        state.damage_local(monitor, rect);
-        crate::editor::dirty::mark_dirty(dirty, monitor);
+
+    // 1. 同步更新识别中或翻译中的选区跟随微胶囊并上报脏区
+    let old_pill = state.selection_translation.status_pill.clone();
+    let in_progress = !state.ui_hidden
+        && !state.tool_active
+        && (state.selection_translation.recognizing || state.selection_translation.task.is_some());
+    state.selection_translation.status_pill = if in_progress {
+        let monitor = state.input.pointer.monitor_idx;
+        let placement = &state.placements[monitor];
+        let zone = state
+            .selection
+            .zone
+            .and_then(|z| state.canvas_local_rect(z, monitor))
+            .and_then(|r| r.intersect(&placement.rect()?));
+        zone.map(|region| {
+            let recognizing = state.selection_translation.recognizing;
+            let pending = state.selection_translation.pending.clone();
+            let fonts = state
+                .selection_translation
+                .ui_fonts
+                .get_or_insert_with(crate::fonts::ocr_ui::new);
+            let mut pill = StatusPill::new(recognizing, pending.as_deref(), fonts);
+            let obstacles = [&state.toolbar, &state.action_toolbar]
+                .iter()
+                .filter(|p| p.monitor_idx == monitor)
+                .filter_map(|p| p.rect())
+                .chain(
+                    state
+                        .settings_panel
+                        .rect()
+                        .filter(|_| state.settings_panel.monitor_idx == monitor),
+                )
+                .chain(
+                    state
+                        .selection_translation
+                        .bar
+                        .as_ref()
+                        .filter(|b| b.monitor == monitor)
+                        .map(|b| b.rect),
+                )
+                .collect::<Vec<_>>();
+            pill.rect = placement::result(
+                region,
+                (pill.rect.width(), pill.rect.height()),
+                placement.rect().unwrap(),
+                &obstacles,
+            );
+            pill.monitor = monitor;
+            pill
+        })
+    } else {
+        None
+    };
+    if old_pill != state.selection_translation.status_pill {
+        let new_bounds = state
+            .selection_translation
+            .status_pill
+            .as_ref()
+            .map(|pill| (pill.monitor, pill.rect));
+        for (monitor, rect) in [old_pill.map(|pill| (pill.monitor, pill.rect)), new_bounds]
+            .into_iter()
+            .flatten()
+        {
+            state.damage_local(monitor, rect);
+            crate::editor::dirty::mark_dirty(dirty, monitor);
+        }
     }
 }
 
@@ -323,6 +394,14 @@ pub(in crate::app) fn draw(state: &mut EditorState, monitor: usize, dirty: Optio
         .filter(|bar| bar.monitor == monitor)
     {
         painter.clipped_scene(dirty, |p| draw::bar(p, bar));
+    }
+    if let Some(pill) = state
+        .selection_translation
+        .status_pill
+        .as_ref()
+        .filter(|pill| pill.monitor == monitor)
+    {
+        painter.clipped_scene(dirty, |p| status_pill::draw(p, pill));
     }
     if let Some(popup) = state
         .selection_translation
