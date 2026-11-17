@@ -34,9 +34,9 @@ pub(crate) fn reconcile(path: &Path) {
     }
 }
 
-/// 【开机启动】【系统注册】按 path、enabled 使用绝对程序及配置路径更新用户启动项，返回系统错误
+/// 【开机启动】【系统注册】按 path、enabled 使用持久化程序及配置路径更新用户启动项，返回系统错误
 fn update(path: &Path, enabled: bool) -> io::Result<()> {
-    let executable = std::env::current_exe()?;
+    let executable = crate::utils::self_executable::persistent_path()?;
     let config = std::path::absolute(path)?;
     #[cfg(target_os = "linux")]
     return linux::update(&executable, &config, enabled);

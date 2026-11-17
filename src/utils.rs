@@ -5,6 +5,7 @@ pub(crate) mod platform;
 pub(crate) mod png_preview;
 pub(crate) mod process_group;
 pub(crate) mod screenshot_path;
+pub(crate) mod self_executable;
 #[cfg(test)]
 pub(crate) mod test_files;
 pub(crate) mod transparent_pixmap;
@@ -428,7 +429,7 @@ pub fn spawn_self_activated(args: &[&str], token: Option<&str>) -> crate::AppRes
     spawn_self_with(args, &[], std::process::Stdio::null(), token, &[]).map(|_| ())
 }
 
-/// 【辅助进程】【就绪交接】将 args、stdin 交给独立进程，在 timeout 内等待首行；返回就绪结果或错误
+/// 【辅助进程】【就绪交接】将 args、stdin 交给独立进程，在 timeout 内等待首行；AppImage 形态放宽挂载余量，返回就绪结果或错误
 pub fn spawn_self_ready(
     args: &[&str],
     stdin: &[u8],
@@ -436,6 +437,11 @@ pub fn spawn_self_ready(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use std::io::BufRead;
 
+    let timeout = if self_executable::uses_appimage() {
+        timeout.max(std::time::Duration::from_secs(15))
+    } else {
+        timeout
+    };
     let stdout = spawn_self_with(args, stdin, std::process::Stdio::piped(), None, &[])?
         .ok_or("child has no stdout")?;
 
@@ -464,9 +470,9 @@ fn spawn_self_with(
     environment: &[(&str, &str)],
 ) -> Result<Option<std::process::ChildStdout>, Box<dyn std::error::Error>> {
     use std::io::Write;
-    use std::process::{Command, Stdio};
+    use std::process::Stdio;
 
-    let mut command = Command::new(std::env::current_exe()?);
+    let mut command = self_executable::command()?;
     command.args(args);
     // 1. 【贴图编辑】【单次身份】隐藏来源不能随编辑器后续启动的复制、设置或其他窗口继续传播
     command.env_remove("MARK_SHOT_PIN_OWNER_PID");

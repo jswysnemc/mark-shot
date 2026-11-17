@@ -345,8 +345,9 @@ pub fn lock_file_pid(paths: &Paths) -> Option<i32> {
     fs::read_to_string(&paths.lock).ok()?.trim().parse().ok()
 }
 
+/// 【文字识别】【守护启动】无参数，使用可跨越临时挂载生命周期的程序路径启动后台服务，返回系统错误
 pub fn spawn_daemon() -> io::Result<()> {
-    let mut command = Command::new(std::env::current_exe()?);
+    let mut command = crate::utils::self_executable::command()?;
     command.args([DAEMON_ARG, "serve"]);
     crate::config::pass_to(&mut command);
     spawn_detached(command, crate::logging::open_log_file())
