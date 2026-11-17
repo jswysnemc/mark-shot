@@ -20,6 +20,7 @@ pub(super) struct OptionItem {
     pub value: String,
     pub label: String,
     pub detail: String,
+    pub keywords: String,
 }
 
 impl OptionItem {
@@ -33,7 +34,14 @@ impl OptionItem {
             value: value.into(),
             label: label.into(),
             detail: detail.into(),
+            keywords: String::new(),
         }
+    }
+
+    /// 【设置下拉】【检索词补充】按 keywords 附加不参与行内展示的双语检索词，返回更新后的选项
+    pub fn with_keywords(mut self, keywords: impl Into<String>) -> Self {
+        self.keywords = keywords.into();
+        self
     }
 }
 
@@ -90,9 +98,12 @@ impl Dropdown {
             .iter()
             .enumerate()
             .filter(|(_, option)| {
-                format!("{} {} {}", option.value, option.label, option.detail)
-                    .to_lowercase()
-                    .contains(&query)
+                format!(
+                    "{} {} {} {}",
+                    option.value, option.label, option.detail, option.keywords
+                )
+                .to_lowercase()
+                .contains(&query)
             })
             .map(|(index, _)| index)
             .collect();

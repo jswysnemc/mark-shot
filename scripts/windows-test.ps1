@@ -58,7 +58,7 @@ try {
         'backend::windows::clipboard::image_tests::',
         'config::tests::',
         'features::capture_history::tests::storage::',
-        'ui::file_picker::save::tests::',
+        'features::save_as::tests::',
         'features::ocr_result::control_input::tests::',
         'features::ocr_result::input_method::tests::'
     )

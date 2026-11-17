@@ -15,24 +15,32 @@ pub(super) fn setting(state: &mut Preferences, index: usize) {
     let Some(row) = layout.rows.iter().find(|row| row.index == index) else {
         return;
     };
+    let chinese = state.chinese();
     let options = choices
         .iter()
         .map(|value| {
-            OptionItem::new(
-                *value,
-                if value.is_empty() && ENTRIES[index].section == "startup" {
-                    let mut defaults = state.values.clone();
-                    defaults["startup"][ENTRIES[index].key] = serde_json::Value::Null;
+            let (label, keywords) = if value.is_empty() && ENTRIES[index].section == "startup" {
+                let mut defaults = state.values.clone();
+                defaults["startup"][ENTRIES[index].key] = serde_json::Value::Null;
+                (
                     format!(
                         "{} ({})",
-                        ENTRIES[index].display_label(&defaults, state.chinese()),
-                        if state.chinese() { "默认" } else { "default" }
-                    )
-                } else {
-                    ENTRIES[index].option_label(value, state.chinese()).into()
-                },
-                "",
-            )
+                        ENTRIES[index].display_label(&defaults, chinese),
+                        if chinese { "默认" } else { "default" }
+                    ),
+                    format!(
+                        "{} {}",
+                        ENTRIES[index].display_label(&defaults, !chinese),
+                        if chinese { "default" } else { "默认" }
+                    ),
+                )
+            } else {
+                (
+                    ENTRIES[index].option_label(value, chinese).into(),
+                    ENTRIES[index].option_label(value, !chinese).into(),
+                )
+            };
+            OptionItem::new(*value, label, "").with_keywords(keywords)
         })
         .collect();
     let configured = ENTRIES[index].configured_display(&state.values);

@@ -10,6 +10,7 @@ pub struct Mode {
 
 #[derive(Clone, Debug)]
 pub struct Info {
+    pub id: isize,
     pub name: Option<String>,
     pub description: Option<String>,
     pub location: (i32, i32),
@@ -31,6 +32,7 @@ impl Output {
         let size = (bounds.width as i32, bounds.height as i32);
         Self {
             info: Info {
+                id: native.handle,
                 name: Some(native.name.clone()),
                 description: Some(native.name.clone()),
                 location: (bounds.left, bounds.top),

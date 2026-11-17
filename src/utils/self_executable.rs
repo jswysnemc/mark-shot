@@ -1,11 +1,8 @@
 //! 【辅助进程】【程序路径】识别 AppImage 临时挂载并切换为宿主包路径，防止父进程退出卸载代码页导致 SIGBUS
 
-use std::{
-    ffi::{OsStr, OsString},
-    io,
-    path::{Path, PathBuf},
-    process::Command,
-};
+#[cfg(any(target_os = "linux", test))]
+use std::{ffi::OsStr, path::Path};
+use std::{ffi::OsString, io, path::PathBuf, process::Command};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Invocation {

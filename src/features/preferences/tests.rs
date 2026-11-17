@@ -467,30 +467,34 @@ fn all_settings_input_fields_expose_ime_targets_and_accept_committed_chinese_tex
     assert!(state.apply());
     assert_eq!(state.value(directory), "/tmp/截图目录");
 
-    // 3. 【设置回归】【下拉搜索】超过八项的可搜索下拉菜单接收中文输入法并实时过滤选项
-    state.page = Page::Capture;
-    let tool = entry("startup.normal_tool");
-    state.activate(Control::Row(tool));
-    let dropdown_id = state
-        .text_input_target()
-        .expect("searchable dropdown IME target");
-    let dropdown_snap = state
-        .text_input_snapshot(focus, dropdown_id, None, ChangeCause::Other)
-        .expect("searchable dropdown IME snapshot");
-    assert!(dropdown_snap.cursor_rect.is_some());
-    state.event(WindowEvent::TextInput(Edit {
-        preedit: Preedit::default(),
-        commit: "文字".into(),
-        replacement: None,
-    }));
-    assert_eq!(
-        state
-            .dropdown
-            .as_ref()
-            .and_then(|menu| menu.search.as_ref())
-            .map(|field| field.text())
-            .as_deref(),
-        Some("文字")
-    );
-    assert!(!state.dropdown.as_ref().unwrap().filtered.is_empty());
+    // 3. 【设置回归】【下拉搜索】超过八项的可搜索下拉菜单在英文与中文界面下均接收中文输入法并实时过滤选项
+    for language in ["english", "chinese"] {
+        state.dropdown = None;
+        state.values["ui"]["language"] = language.into();
+        state.page = Page::Capture;
+        let tool = entry("startup.normal_tool");
+        state.activate(Control::Row(tool));
+        let dropdown_id = state
+            .text_input_target()
+            .expect("searchable dropdown IME target");
+        let dropdown_snap = state
+            .text_input_snapshot(focus, dropdown_id, None, ChangeCause::Other)
+            .expect("searchable dropdown IME snapshot");
+        assert!(dropdown_snap.cursor_rect.is_some());
+        state.event(WindowEvent::TextInput(Edit {
+            preedit: Preedit::default(),
+            commit: "文字".into(),
+            replacement: None,
+        }));
+        let menu = state.dropdown.as_ref().unwrap();
+        assert_eq!(
+            menu.search.as_ref().map(|field| field.text()).as_deref(),
+            Some("文字")
+        );
+        assert!(
+            menu.filtered
+                .iter()
+                .any(|&idx| menu.options[idx].value == "text")
+        );
+    }
 }
