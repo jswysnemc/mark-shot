@@ -16,8 +16,13 @@ Mark Shot 使用运行在 ONNX Runtime 上的 PP-OCRv5 模型在本地识别文�
 | 推理库 | ONNX Runtime 1.28.0，下载后校验 SHA-256 |
 | 语言模型 | 拉丁文、西里尔文、阿拉伯文、希腊文、中文与日文、韩文、泰文 |
 
-下载可以取消，也可以断点续传。安装完成后可以离线使用。启用 `bundled-ocr`
-特性的构建内嵌了推理库，见[安装说明](installation.md)。
+下载支持取消与断点续传；从**设置 → 文字识别 → 管理语言包与运行库**打开时，窗口保持常驻，可连续安装或移除多个语言包。
+安装完成后可离线使用。启用 `bundled-ocr` 特性的构建已内嵌推理库，见[安装说明](installation.md)。
+
+直连 GitHub 速度较慢时，可在文字识别设置页面、`[ocr].download_mirror` 或环境变量
+`MARK_SHOT_OCR_MIRROR` 中配置 HTTP/HTTPS 镜像前缀（如 `https://ghfast.top/` 或
+`https://gh-proxy.com/`）。镜像请求失败时程序自动回退直连 GitHub，且所有下载文件均强制校验固定
+SHA-256 摘要。
 
 ### 开始识别
 
@@ -49,6 +54,7 @@ result_panel = false
 
 ```toml
 [ocr]
+download_mirror = ""      # 可选 HTTP/HTTPS GitHub 下载镜像前缀
 threads = 4
 mode = "on-demand"        # on-demand | at-launch | daemon
 device = "auto"           # auto | cpu | gpu，仅常驻进程使用

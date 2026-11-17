@@ -116,7 +116,7 @@ python3 scripts/packaging/install_linux.py \
 
 `package_deb.py`、`package_rpm.py`、`package_pacman.py`、`package_appimage.py`、
 `package_flatpak.py` 和 `package_portable.py` 分别把该目录制作为对应格式的安装包。
-`native-release.yml` 处理 `v*` 标签，正式版本使用 `v0.2.1`，并兼容旧 `native-v*` 标签的预览重试。
+`native-release.yml` 处理 `v*` 标签，正式版本使用 `v0.2.2`，并兼容旧 `native-v*` 标签的预览重试。
 该流程调用既有 `release-*.yml` 工作流，
 等待全部验证和打包任务成功后再公开发布；`windows-build.yml` 生成 Windows 归档和 Setup 安装包。
 安装包使用 Inno Setup 编译，并验证静默安装、文件摘要、程序启动和卸载清理。

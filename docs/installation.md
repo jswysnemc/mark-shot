@@ -3,7 +3,7 @@
 **English** | [简体中文](zh-CN/installation.md)
 
 The current release is
-[0.2.1](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.1).
+[0.2.2](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.2).
 The 0.1.x packages contain the earlier Qt implementation, preserved on `qt-old`.
 AUR and PPA metadata publication uses separate, explicit release workflows.
 
@@ -17,8 +17,8 @@ library and license notices; Rust is only needed for source builds.
 For the Linux x86_64 portable archive, keep the extracted directory intact:
 
 ```sh
-tar -xzf mark-shot-native-0.2.1-linux-x86_64.tar.gz
-./mark-shot-native-0.2.1-linux-x86_64/mark-shot
+tar -xzf mark-shot-native-0.2.2-linux-x86_64.tar.gz
+./mark-shot-native-0.2.2-linux-x86_64/mark-shot
 ```
 
 Use the `linux-aarch64` archive on ARM64. On Windows, extract the complete ZIP and run
@@ -30,13 +30,13 @@ Expand **Files and SHA-256** on the release page and compare the complete digest
 Checksum files and internal JSON metadata are not separate release assets.
 
 ```sh
-sha256sum mark-shot-native-0.2.1-linux-x86_64.tar.gz
+sha256sum mark-shot-native-0.2.2-linux-x86_64.tar.gz
 ```
 
 On Windows, use PowerShell:
 
 ```powershell
-Get-FileHash .\mark-shot-native-0.2.1-windows-x86_64-msvc.zip -Algorithm SHA256
+Get-FileHash .\mark-shot-native-0.2.2-windows-x86_64-msvc.zip -Algorithm SHA256
 ```
 
 Release filenames use `.` instead of `~` to comply with GitHub asset naming. Package contents and internal versions remain unchanged by filename normalization.

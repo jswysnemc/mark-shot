@@ -16,12 +16,12 @@ override; opening and confirming an unchanged default does not save it as an exp
 
 | Page | Content |
 | --- | --- |
-| Appearance | Theme, language, tray icon |
-| Capture | Finish action, double-click and middle-click actions, frozen displays, initial tool, window and region detection |
+| Appearance | Theme, language, launch at login, tray icon |
+| Capture | Finish action, start bar and shortcut hints, double-click and middle-click actions, frozen displays, initial tool, window and region detection |
 | Recording | Format, quality, encoder, frame rate, audio, save folder |
 | Toolbar | Toolbar position and size, buttons of the main and action toolbars |
 | Shortcuts | Every editor key binding and the global capture shortcut |
-| OCR | Recognition engine, run mode, installed models |
+| OCR | Recognition engine, download mirror, run mode, installed models and runtime |
 | Translation | Target language, translation service and its credentials |
 | Storage | Save folder, file name pattern, capture history |
 | Pins & frames | Pinned image border, export frame with live preview |
@@ -80,6 +80,8 @@ overlay = "auto"     # auto | window | layer
 [capture]
 freeze_scope = "all-screens"     # all-screens | cursor-screen
 hide_own_windows = true          # hide pins and other Mark Shot windows while capturing
+show_start_bar = true            # false skips the top Select/Fullscreen/Video/GIF mode bar
+show_hints = true                # false hides the bottom-left startup shortcut panel
 kde_kwin_screenshot = true       # false uses the desktop portal on KDE
 double_click_action = "copy"     # none | copy | save | save-as | pin | cancel
 middle_click_action = "none"
@@ -199,6 +201,7 @@ in the state folder take precedence.
 | `MARK_SHOT_CAPTURE` | `kde`, `image-copy`, `screencopy` or `portal`. Forces the Wayland capture method |
 | `MARK_SHOT_LOG` | Log level: `error`, `warn`, `info`, `debug` or `trace` |
 | `MARK_SHOT_CONFIG_DIR` | Folder containing a Qt-style `config.json` to use |
+| `MARK_SHOT_OCR_MIRROR` | HTTP/HTTPS GitHub mirror prefix for OCR runtime and model downloads; overrides `[ocr].download_mirror` |
 | `MARK_SHOT_MEDIA_LIBRARY` | Absolute path of the recording library, for development builds |
 | `MARK_SHOT_UPLOAD_*` | Upload settings, see above |
 

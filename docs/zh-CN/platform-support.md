@@ -33,7 +33,8 @@ Mark Shot 根据当前桌面实际提供的协议选择后端，不依据发行�
 | 托盘图标 | 支持 | 支持 | 需要扩展 | 支持 | 支持 |
 | 屏幕录制 | 支持 | 支持 | 通过门户 | 支持 | 支持 |
 
-文字输入法在 Wayland 上通过 text-input-v3 支持，在 X11 上通过 XIM 支持。
+文字输入法在 Wayland 上通过 text-input-v3 支持（覆盖文字标注、Layer 覆盖层及设置和弹窗中的单行输入框），在 X11 上通过 XIM 支持。
+“另存为”在 Linux 上调用 `org.freedesktop.portal.FileChooser` 门户，在 Windows 上调用原生 `IFileSaveDialog`。
 
 “界面区域识别”在所有平台上都可从冻结画面查找矩形区域。Windows 同时启用区域识别与窗口识别时，
 还会使用 UI Automation 提供的控件边界与祖先路径。
@@ -58,7 +59,9 @@ Mark Shot 根据当前桌面实际提供的协议选择后端，不依据发行�
 
 ### GNOME
 
-- 首次截图时门户会弹出对话框，由用户选择显示器。截图成功后授权会被记住。
+- 首次截图时门户会弹出对话框，由用户选择显示器。截图成功后授权会被记住；失效的恢复令牌会自动重试，
+  热插拔显示器在门户授权后读取。缺少 `zwp_linux_dmabuf` 或 `xdg-output` 的沙箱会话会自动回退到共享内存缓冲与
+  `wl_output` 逻辑几何。
 - GNOME 不提供 layer-shell 和数据控制协议。Mark Shot 使用普通窗口，并通过 Xwayland 复制内容，
   因此剪贴板功能要求 Xwayland 可用。
 - GNOME 没有公开接口用于获取活动窗口和窗口几何信息，`-w` 与窗口吸附会报告不支持。

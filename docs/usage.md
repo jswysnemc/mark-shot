@@ -15,7 +15,9 @@ Run `mark-shot`. The screen freezes and a selection overlay appears.
 3. **Annotate.** Pick a tool from the toolbar. See [Annotation tools](annotation-tools.md).
 4. **Finish.** Use one of the actions below.
 
-`Esc` or a right click during selection cancels the capture.
+`Esc` or a right click during selection cancels the capture. The top mode selector (`Select`,
+`Fullscreen`, `Video`, `GIF`) and the bottom-left shortcut hint panel can each be hidden with
+`[capture].show_start_bar` and `[capture].show_hints` in **Settings → Capture**.
 
 On Windows, with both `[region_detection].enabled` and `[window_detection].enabled` turned on,
 system control boundaries take precedence over image candidates. The deepest detected control is
@@ -31,7 +33,7 @@ chosen with the wheel. Pressing the mouse locks the highlighted region for that 
 | Accept | `Enter` | Runs the default finish action |
 | Copy | `Ctrl+C`, or double-click inside the selection | Copies the image to the clipboard |
 | Save | `Ctrl+S` | Saves to the screenshots folder |
-| Save as | `Ctrl+Alt+S` | Opens a file dialog |
+| Save as | `Ctrl+Alt+S` | Opens the native system file save dialog |
 | Pin | `Ctrl+P` | Pins the image above other windows |
 | Cancel | `Esc` | Discards the capture |
 
@@ -79,9 +81,10 @@ running instance instead of opening a second overlay.
 ### Scrolling screenshots
 
 Run `mark-shot --scroll`, or press `Ctrl+Shift+S` after selecting a region. Scroll the content
-inside the selection at a steady pace; Mark Shot captures frames continuously and stitches them
-into one long image. Fixed headers and footers are kept once. If consecutive frames do not
-overlap enough, a hint asks you to scroll back slowly.
+inside the highlighted selection at a steady pace; Mark Shot captures frames continuously, stitches
+them into one long image, and shows both a detail view and the full stitched overview with live
+`+px` stitch increments in a borderless preview panel. Fixed headers and footers are kept once. If
+consecutive frames do not overlap enough, a hint asks you to scroll back slowly.
 
 ## Pinned images
 
@@ -100,7 +103,7 @@ Opening the editor from a pin hides the source pin until editing finishes or is 
 | --- | --- |
 | Left drag | Move |
 | Drag an edge or corner | Resize, keeping the aspect ratio |
-| Scroll wheel | Zoom around the pointer |
+| Scroll wheel | Zoom around the pointer and show the current zoom percentage |
 | Double-click | Close |
 | Right click | Menu: rotate, zoom, reset size, always on top, edit, copy, recognize text, translate, scan codes, save as, close |
 | `Ctrl+V` | Pin the clipboard content as another window |
@@ -136,7 +139,8 @@ local and needs no model download.
 
 - **Upload** sends the annotated PNG to an image host and copies the returned URL. There is no
   default host; configure one first, see [Configuration](configuration.md#upload).
-- **Open with** lists installed desktop applications and passes the image to the chosen one.
+- **Open with** lists installed desktop applications registered for images (including viewers marked
+  `NoDisplay=true`, such as `imv`) and passes the image to the chosen one.
 
 Both buttons are in the action toolbar.
 
@@ -214,7 +218,7 @@ Tool names: `selection`, `pick`, `pen`, `highlighter`, `laser`, `marker`, `ruler
 | `--background` | Run the tray and global shortcut service until quit |
 | `--config FILE` | Use another configuration file |
 | `--print-default-config` | Print the complete default configuration |
-| `--debug`, `--no-debug` | Enable or disable diagnostic logging |
+| `--debug`, `--no-debug` | Enable or disable diagnostic logging (`--debug` prints the active log file path to stderr and propagates to helpers) |
 | `--debug-log FILE` | Write diagnostics to a chosen file |
 | `-s`, `--speed` | Print startup timings to standard error |
 | `-n`, `--nonotify` | Suppress desktop notifications |

@@ -10,12 +10,12 @@
 
 | 页面 | 内容 |
 | --- | --- |
-| 外观与语言 | 主题、语言、托盘图标 |
-| 截图与标注 | 完成动作、双击与中键动作、冻结的显示器范围、初始工具、窗口与区域识别 |
+| 外观与语言 | 主题、语言、开机启动、托盘图标 |
+| 截图与标注 | 完成动作、起始模式栏与快捷键说明开关、双击与中键动作、冻结显示器范围、初始工具、窗口与区域识别 |
 | 屏幕录制 | 格式、质量、编码器、帧率、音频、保存目录 |
-| 工具栏 | 工具栏位置和尺寸，主工具栏与动作工具栏的按钮 |
-| 快捷键 | 编辑器的全部按键，以及全局截图快捷键 |
-| 文字识别 | 识别引擎、运行方式、已安装的模型 |
+| 工具栏 | 工具栏位置和尺寸，主工具栏与动作工具栏按钮 |
+| 快捷键 | 编辑器全部按键与全局截图快捷键 |
+| 文字识别 | 识别引擎、下载镜像、运行方式、语言包与推理库管理 |
 | 翻译服务 | 目标语言、翻译服务及其凭据 |
 | 存储与历史 | 保存目录、文件名格式、截图历史 |
 | 贴图与外框 | 贴图边框、带实时预览的导出外框 |
@@ -75,7 +75,9 @@ overlay = "auto"     # auto | window | layer
 ```toml
 [capture]
 freeze_scope = "all-screens"     # all-screens | cursor-screen
-hide_own_windows = true          # 截图时隐藏贴图等 Mark Shot 自身的窗口
+hide_own_windows = true          # 截图时隐藏贴图等 Mark Shot 自身窗口
+show_start_bar = true            # 设为 false 时隐藏顶部选择/全屏/视频/GIF模式栏，直接拖选区域
+show_hints = true                # 设为 false 时隐藏左下角快捷键提示面板
 kde_kwin_screenshot = true       # 设为 false 时，KDE 上改用桌面门户
 double_click_action = "copy"     # none | copy | save | save-as | pin | cancel
 middle_click_action = "none"
@@ -193,6 +195,7 @@ max_file_size_mb = 1
 | `MARK_SHOT_CAPTURE` | `kde`、`image-copy`、`screencopy` 或 `portal`，强制指定 Wayland 截图方式 |
 | `MARK_SHOT_LOG` | 日志级别：`error`、`warn`、`info`、`debug` 或 `trace` |
 | `MARK_SHOT_CONFIG_DIR` | 指定一个目录，使用其中 Qt 格式的 `config.json` |
+| `MARK_SHOT_OCR_MIRROR` | 文字识别推理库与模型下载的 HTTP/HTTPS GitHub 镜像前缀，优先于 `[ocr].download_mirror` |
 | `MARK_SHOT_MEDIA_LIBRARY` | 录制媒体库的绝对路径，用于开发构建 |
 | `MARK_SHOT_UPLOAD_*` | 上传设置，见上文 |
 

@@ -1,3 +1,10 @@
+mark-shot (0.2.2-1) unstable; urgency=medium
+
+  * Add OCR download mirror settings, startup UI toggles, and native portal save dialogs.
+  * Fix Wayland IME support, floating recording panel drag jitter, portal hotplug capture, and AppImage helper launches.
+
+ -- Mark Shot maintainers <snemc@qq.com>  Wed, 18 Nov 2026 06:30:00 +0900
+
 mark-shot (0.2.1-1) unstable; urgency=medium
 
   * Add login startup preferences and native Nix packaging.

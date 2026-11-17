@@ -2395,7 +2395,7 @@ checksum = "fc04a4c58212d57930a24bf47d3fa87485264a3a054e9c10e042eb373573ad3c"
 
 [[package]]
 name = "mark-shot"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "ashpd",
  "async-trait",

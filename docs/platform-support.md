@@ -35,7 +35,9 @@ On Linux the session type decides the protocol. A Wayland session uses Wayland e
 | Tray icon | Yes | Yes | Needs an extension | Yes | Yes |
 | Screen recording | Yes | Yes | Through the portal | Yes | Yes |
 
-Text input methods are supported through text-input-v3 on Wayland and XIM on X11.
+Text input methods are supported through text-input-v3 on Wayland (across text annotations,
+Layer-shell overlays and single-line settings or dialog fields) and XIM on X11. **Save as** uses
+`org.freedesktop.portal.FileChooser` on Linux and `IFileSaveDialog` on Windows.
 
 "Interface region detection" finds rectangles in the frozen image on every platform. Windows
 additionally uses UI Automation control boundaries and ancestor paths when both region and window
@@ -64,7 +66,9 @@ desktop-specific source.
 ### GNOME
 
 - The first capture opens the portal dialog to choose a monitor. The permission is remembered
-  after a successful capture.
+  after a successful capture; stale restore tokens are retried automatically and hot-plugged
+  monitors are queried after portal authorization. Sandbox sessions without `zwp_linux_dmabuf` or
+  `xdg-output` fall back cleanly to shared-memory buffers and logical `wl_output` geometry.
 - GNOME does not offer layer-shell or data-control. Mark Shot uses a normal window and copies
   through Xwayland, so Xwayland must be available for clipboard support.
 - There is no public interface for the active window or for window geometry, so `-w` and window

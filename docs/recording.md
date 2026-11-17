@@ -34,7 +34,9 @@ and the current parameters. These parameters apply to this recording without cha
 
 Enable **Recording → Keep recording controls visible** to show a compact panel with recording
 time, pause/resume, stop and hide buttons. The option is off by default and applies to the next
-recording. The preparation window closes when recording starts.
+recording. The preparation window closes when recording starts. On Wayland layer-shell sessions,
+dragging the panel moves a frame-throttled preview layer and commits the final position on release
+to avoid surface-margin oscillation.
 
 Hiding the panel, pressing `Esc` in it or closing it keeps recording active. A four-second hint
 explains how to open the capture interface again or use the tray to pause, resume and stop.

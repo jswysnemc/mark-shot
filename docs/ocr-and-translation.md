@@ -18,8 +18,16 @@ button, the size and the progress for each.
 | Inference library | ONNX Runtime 1.28.0, verified by SHA-256 |
 | Language model | Latin, Cyrillic, Arabic, Greek, Chinese and Japanese, Korean, or Thai |
 
-Downloads can be cancelled and resumed. Once installed, OCR works offline. A build with the
-`bundled-ocr` feature embeds the inference library, see [Installation](installation.md).
+Downloads can be cancelled and resumed, and remain open when managed from
+**Settings → OCR → Manage models & runtime** so multiple language packs can be installed or removed
+in one session. Once installed, OCR works offline. A build with the `bundled-ocr` feature embeds
+the inference library, see [Installation](installation.md).
+
+If direct GitHub downloads are slow or blocked, configure an HTTP/HTTPS mirror prefix (such as
+`https://ghfast.top/` or `https://gh-proxy.com/`) on the OCR settings page, in
+`[ocr].download_mirror`, or through `MARK_SHOT_OCR_MIRROR`. Mirror failures fall back to direct
+GitHub automatically, and every downloaded archive is still verified against its pinned SHA-256
+digest.
 
 ### Starting recognition
 
@@ -53,6 +61,7 @@ result_panel = false
 
 ```toml
 [ocr]
+download_mirror = ""      # optional HTTP/HTTPS GitHub mirror prefix
 threads = 4
 mode = "on-demand"        # on-demand | at-launch | daemon
 device = "auto"           # auto | cpu | gpu; used by the daemon
