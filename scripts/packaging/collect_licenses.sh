@@ -21,9 +21,14 @@ tar -xzf "$archive" --strip-components=1 -C "$root/target/packaging-tools/cargo-
 "$root/target/packaging-tools/cargo-about/cargo-about" generate --locked --workspace \
   --target "$arch-unknown-linux-gnu" --fail --config "$root/release/about.toml" \
   --output-file "$destination/DEPENDENCIES.txt" "$root/release/license-notices.hbs"
-python3 "$root/scripts/ci-download.py" \
-  https://raw.githubusercontent.com/microsoft/onnxruntime/da9b5e364c465de65c49d91e696cd6485270757f/LICENSE \
-  "$destination/LICENSE-ONNXRUNTIME.txt" 2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c
-python3 "$root/scripts/ci-download.py" \
-  https://raw.githubusercontent.com/microsoft/onnxruntime/da9b5e364c465de65c49d91e696cd6485270757f/ThirdPartyNotices.txt \
-  "$destination/NOTICES-ONNXRUNTIME.txt" 0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2
+# 1. 从仓库内固定摘要归档提取 ONNX Runtime 许可证，避免上游仓库不可访问阻断发行打包
+onnx_archive="$root/release/onnxruntime-notices.tar.xz"
+printf '2714b9fc3e7df7b4b97499565db07bef4e4e19c968c7c948b36a8a3c8ea785c0  %s\n' "$onnx_archive" | sha256sum --check >/dev/null
+tar -xJf "$onnx_archive" -C "$destination" LICENSE-ONNXRUNTIME.txt NOTICES-ONNXRUNTIME.txt
+(
+  cd "$destination"
+  sha256sum --check >/dev/null <<'EOF'
+2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c  LICENSE-ONNXRUNTIME.txt
+0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2  NOTICES-ONNXRUNTIME.txt
+EOF
+)
