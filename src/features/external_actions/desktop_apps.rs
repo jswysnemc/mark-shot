@@ -14,7 +14,7 @@ pub struct DesktopApp {
     pub icon: String,
 }
 
-/// 【打开方式】【条目解析】按 text 和 path 返回可见图片应用；忽略动作分组、隐藏条目和缺少命令的条目
+/// 【打开方式】【条目解析】按 text 和 path 返回声明了图片 MIME 的应用；忽略动作分组、Hidden 条目和缺少命令的条目
 pub fn parse(text: &str, path: &Path) -> Option<DesktopApp> {
     let mut fields = BTreeMap::new();
     let mut entry = false;
@@ -32,7 +32,6 @@ pub fn parse(text: &str, path: &Path) -> Option<DesktopApp> {
     let boolean = |key| matches!(value(key).to_ascii_lowercase().as_str(), "true" | "1");
     if value("Type") != "Application"
         || boolean("Hidden")
-        || boolean("NoDisplay")
         || !value("MimeType")
             .split(';')
             .any(|mime| mime.trim().to_ascii_lowercase().starts_with("image/"))

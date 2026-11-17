@@ -53,16 +53,24 @@ fn result(path: &Path) -> serde_json::Value {
     }
 }
 
-/// 【外部动作测试】【桌面过滤】隐藏、无图片 MIME、非应用和动作分组不进入原版打开方式列表
+/// 【外部动作测试】【桌面过滤】NoDisplay 图片查看器正常保留，Hidden、无图片 MIME、非应用和动作分组不进入打开方式列表
 #[test]
 fn desktop_entries_filter_visibility_mime_and_action_sections() {
     let text = "[Desktop Entry]\nType=Application\nName=Viewer\nExec=viewer %f\nIcon=view\nMimeType=image/jpeg;image/png;\n[Desktop Action Edit]\nName=Wrong\nExec=wrong\n";
     let parsed = desktop_apps::parse(text, Path::new("/test.desktop")).unwrap();
     assert_eq!(parsed.name, "Viewer");
     assert_eq!(parsed.exec, "viewer %f");
+    for value in ["true", "1"] {
+        let imv = format!(
+            "[Desktop Entry]\nType=Application\nName=imv\nExec=imv %F\nNoDisplay={value}\nMimeType=image/png;image/jpeg;\n"
+        );
+        let parsed = desktop_apps::parse(&imv, Path::new("/usr/share/applications/imv.desktop"))
+            .expect("NoDisplay image viewers should remain available in Open with");
+        assert_eq!(parsed.name, "imv");
+        assert_eq!(parsed.exec, "imv %F");
+    }
     for (key, value) in [
         ("Hidden", "TRUE"),
-        ("NoDisplay", "1"),
         ("Type", "Link"),
         ("MimeType", "text/plain"),
         ("Name", ""),
