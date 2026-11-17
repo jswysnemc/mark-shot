@@ -81,6 +81,7 @@ impl Output {
 pub use super::windows_output::Output;
 
 // Pipewire and pixels
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StreamInfo {
     pub node_id: u32,
     pub size: Option<(i32, i32)>,

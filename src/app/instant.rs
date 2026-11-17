@@ -51,6 +51,17 @@ pub async fn full(conn: crate::backend::session::Session, launch: Launch) -> Res
     )?;
     let shots = capture.capture_frame(&outputs).await?;
     drop(visibility);
+    overlay.sync_outputs()?;
+    let latest = overlay.discovered_outputs();
+    let mut outputs = outputs;
+    for output in &mut outputs {
+        if let Some(updated) = latest.iter().find(|item| {
+            item.info.id == output.info.id
+                || (output.info.name.is_some() && item.info.name == output.info.name)
+        }) {
+            output.info = updated.info.clone();
+        }
+    }
     drop(overlay);
     prof.mark("capture");
 

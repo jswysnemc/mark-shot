@@ -483,6 +483,14 @@ impl ScreenOverlay for WaylandOverlay {
         &self.runtime.state.outputs
     }
 
+    /// 【截图覆盖层】【输出同步】执行一次事件队列往返以吸收门户授权期间到达的显示器变更，返回协议结果
+    fn sync_outputs(&mut self) -> crate::AppResult {
+        self.runtime
+            .event_queue
+            .roundtrip(&mut self.runtime.state)?;
+        Ok(())
+    }
+
     fn hidpi(&self) -> bool {
         self.runtime.state.viewporter.is_some()
     }

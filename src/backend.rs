@@ -17,7 +17,7 @@ pub mod windows;
 pub mod x11;
 pub use platform::{
     initialize_capture, initialize_capture_with_cursor, initialize_clipboard, initialize_notifier,
-    initialize_overlay, initialize_window_capture, prepare_portal_capture,
+    initialize_overlay, initialize_window_capture,
 };
 pub mod window_detection;
 
@@ -236,6 +236,10 @@ pub trait ScreenOverlay {
         timeout: Option<Duration>,
     ) -> Result<OverlayEvent, Box<dyn std::error::Error>>;
     fn discovered_outputs(&self) -> &[Output];
+    /// 【覆盖层】【输出同步】在交互式门户授权结束后刷新合成器输出几何，默认平台保持无操作，返回协议错误
+    fn sync_outputs(&mut self) -> crate::AppResult {
+        Ok(())
+    }
     fn hidpi(&self) -> bool;
     /// true once compositor has shown the last frame
     /// or after FRAME_FALLBACK without an answer, to avoid monitor freezing

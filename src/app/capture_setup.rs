@@ -11,12 +11,6 @@ pub(super) async fn start_capture(
     let icons_handle = std::thread::spawn(init::load_icons_cache);
     let system_fonts = std::thread::spawn(crate::fonts::system);
 
-    // 1. 【截图】【提前授权】先让 Portal 走完选择来源，再初始化覆盖层读取显示器列表：
-    //    用户先开机、再插外接屏时，合成器的布局通知往往和授权窗口的关闭同时到达，
-    //    先授权能保证下面读到的位置和数量已经是当前布局，而不是上一版桌面；
-    //    只有 Portal 是唯一可用后端时才提前授权，原生协议可用时返回 None，避免多弹权限窗口
-    let mut prepared = crate::backend::prepare_portal_capture(&conn, launch.include_cursor).await;
-
     let mut overlay = initialize_overlay(conn.clone())?;
     let preferred = overlay.set_composited_background(true);
     prof.mark("overlay init");
@@ -30,11 +24,10 @@ pub(super) async fn start_capture(
     // 1. 【截图】【延迟准备】仅预先连接捕获后端和准备内存，读取桌面像素前不映射覆盖层
     let mut early = None;
     if delayed {
-        // 2. 【截图】【授权延续】延迟截图本来就要等，把已经完成的授权直接交给提前创建的捕获器，
-        //    否则这里会重新申请一次权限，用掉的时间落到倒计时之外
-        let capture = early.insert(prepared.take().unwrap_or_else(|| {
-            crate::backend::initialize_capture_with_cursor(&conn, launch.include_cursor)
-        }));
+        let capture = early.insert(crate::backend::initialize_capture_with_cursor(
+            &conn,
+            launch.include_cursor,
+        ));
         overlay.prefault();
         prof.mark("pool prefaulted");
         delay::wait_launch(launch, &**capture, prof).await?;
@@ -57,13 +50,13 @@ pub(super) async fn start_capture(
     } else {
         None
     };
-    let targets =
+    let mut targets =
         crate::backend::output_selection::indices(&names, &launch.display_names, !one, active)?;
-    let outputs: Vec<_> = targets.iter().map(|&i| all[i].clone()).collect();
+    let mut outputs: Vec<_> = targets.iter().map(|&i| all[i].clone()).collect();
     if one {
         prof.mark("active output probed");
     }
-    let capture = early.or(prepared).unwrap_or_else(|| {
+    let capture = early.unwrap_or_else(|| {
         crate::backend::initialize_capture_with_cursor(&conn, launch.include_cursor)
     });
     let window_work = async {
@@ -83,6 +76,18 @@ pub(super) async fn start_capture(
     drop(visibility);
     let screenshots = screenshots?;
     prof.mark("capture");
+    // 3. 【截图】【布局对齐】门户授权窗口期间若热插拔布局刚完成稳定，同步最新输出位置与尺寸后再建表面
+    overlay.sync_outputs()?;
+    let latest = overlay.discovered_outputs();
+    for (target, output) in targets.iter_mut().zip(&mut outputs) {
+        if let Some((index, updated)) = latest.iter().enumerate().find(|(_, item)| {
+            item.info.id == output.info.id
+                || (output.info.name.is_some() && item.info.name == output.info.name)
+        }) {
+            *target = index;
+            output.info = updated.info.clone();
+        }
+    }
 
     let kept: Vec<usize> = screenshots.frames.iter().map(|f| f.output).collect();
     if kept.is_empty() {

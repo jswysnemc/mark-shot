@@ -17,14 +17,6 @@ pub fn initialize_capture_with_cursor(
     Box::new(windows::capture::Method { include_cursor })
 }
 
-/// 【Windows平台】【提前授权】Windows 没有 Portal 捕获链路，显示器列表本身就是实时的，返回 None 走普通捕获
-pub async fn prepare_portal_capture(
-    _session: &Session,
-    _include_cursor: bool,
-) -> Option<Box<dyn CaptureMethod>> {
-    None
-}
-
 /// 【Windows平台】【窗口捕获】按session和光标策略创建原生窗口捕获器，allow_clipboard不参与系统截图权限，返回共享接口
 pub fn initialize_window_capture(
     session: &Session,
