@@ -31,7 +31,7 @@ pub(super) struct Row {
 }
 
 pub(in crate::features::preferences) struct Layout {
-    pub(super) viewport: Rect,
+    pub(in crate::features::preferences) viewport: Rect,
     pub(super) rows: Vec<Row>,
     pub(super) panels: Vec<(Rect, &'static str)>,
     pub(in crate::features::preferences) controls: Vec<(Hit, Rect)>,

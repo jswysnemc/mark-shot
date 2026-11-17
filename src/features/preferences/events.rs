@@ -15,20 +15,11 @@ impl WindowContent for Preferences {
         true
     }
 
-    /// 【翻译测试】【输入目标】无参数，返回聚焦原文编辑器的稳定身份
+    /// 【设置窗口】【输入目标】无参数，返回当前聚焦可编辑输入框的稳定身份
     fn text_input_target(&self) -> Option<u64> {
-        (self.translation_page() && self.translation.preview.source.focused)
-            .then(|| {
-                self.translation
-                    .preview
-                    .source
-                    .editor
-                    .as_ref()
-                    .map(|editor| editor.input_identity())
-            })
-            .flatten()
+        super::text_input::target(self)
     }
-    /// 【翻译测试】【输入快照】按协议参数返回原文光标和周围文字，使用实际编辑区域
+    /// 【设置窗口】【输入快照】按协议参数返回活动输入框的光标位置和周围文字
     fn text_input_snapshot(
         &mut self,
         focus: crate::types::text_input::Focus,
@@ -36,34 +27,11 @@ impl WindowContent for Preferences {
         previous: Option<&crate::types::text_input::Snapshot>,
         cause: crate::types::text_input::ChangeCause,
     ) -> Option<crate::types::text_input::Snapshot> {
-        let area = super::translation::layout::Layout::new(self)
-            .preview
-            .source_input();
-        self.translation
-            .preview
-            .source
-            .editor
-            .as_mut()?
-            .input_snapshot(
-                &mut self.fonts,
-                crate::ui::text_editor::InputArea {
-                    rect: area,
-                    offset: 0.0,
-                },
-                focus,
-                target_id,
-                previous,
-                cause,
-            )
+        super::text_input::snapshot(self, focus, target_id, previous, cause)
     }
-    /// 【翻译测试】【候选取消】无参数，清除原文编辑器候选，返回是否需要重绘
+    /// 【设置窗口】【候选取消】无参数，清除活动输入框预编辑候选，返回是否需要重绘
     fn cancel_text_input(&mut self) -> bool {
-        self.translation
-            .preview
-            .source
-            .editor
-            .as_mut()
-            .is_some_and(|editor| editor.cancel_preedit())
+        super::text_input::cancel(self)
     }
 
     /// 【设置窗口】【系统关闭】无参数，关闭前提交输入，失败保留窗口和草稿，返回是否允许关闭
@@ -275,6 +243,11 @@ impl WindowContent for Preferences {
                     && let Some(index) = self.focus
                 {
                     self.activate(Control::Row(index));
+                }
+            }
+            WindowEvent::TextInput(edit) => {
+                if !super::text_input::apply(self, edit) {
+                    return WindowAction::None;
                 }
             }
             WindowEvent::Focused(false) => {

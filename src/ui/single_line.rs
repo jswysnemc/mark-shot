@@ -4,7 +4,8 @@ use crate::ui::fonts::UiFonts;
 use crate::{
     backend::window::KeyInput,
     keys::Key,
-    ui::text_editor::{EditEvent, TextEditor},
+    types::text_input::{ChangeCause, Edit, Focus, Snapshot},
+    ui::text_editor::{EditEvent, InputArea, InputMethodUpdate, TextEditor},
 };
 use cosmic_text::SwashCache;
 use tiny_skia::{Pixmap, Rect};
@@ -72,6 +73,53 @@ impl SingleLine {
     /// 【界面控件】【全文选择】选中字段全部文字，fonts 用于排版；不修改内容
     pub fn select_all(&mut self, fonts: &mut UiFonts) {
         self.editor.select_all(fonts);
+    }
+
+    /// 【界面控件】【输入身份】返回单行编辑器的稳定协议身份，无参数
+    pub fn input_identity(&self) -> u64 {
+        self.editor.input_identity()
+    }
+
+    /// 【界面控件】【候选取消】清理当前未确认预编辑候选，无参数，返回是否存在候选变化
+    pub fn cancel_preedit(&mut self) -> bool {
+        self.editor.cancel_preedit()
+    }
+
+    /// 【界面控件】【输入快照】按 fonts、rect 及协议参数生成单行光标与周围文本快照，无变化返回空值
+    pub fn input_snapshot(
+        &mut self,
+        fonts: &mut UiFonts,
+        rect: Rect,
+        focus: Focus,
+        target_id: u64,
+        previous: Option<&Snapshot>,
+        cause: ChangeCause,
+    ) -> Option<Snapshot> {
+        self.editor.input_snapshot(
+            fonts,
+            InputArea {
+                rect,
+                offset: self.offset,
+            },
+            focus,
+            target_id,
+            previous,
+            cause,
+        )
+    }
+
+    /// 【界面控件】【输入法提交】按单行容量约束与字体准备应用 edit 批次，返回候选与正文变更状态
+    pub fn input_method(&mut self, fonts: &mut UiFonts, mut edit: Edit) -> InputMethodUpdate {
+        let selected = self.editor.selected_text().map_or(0, |text| text.len());
+        let replaced = edit.replacement.map_or(0, |value| value.length);
+        let removed = selected.saturating_add(replaced);
+        let remaining = self
+            .limit
+            .saturating_sub(self.text().len().saturating_sub(removed));
+        edit.commit = normalized(&edit.commit, remaining);
+        fonts.ensure_text(&edit.commit);
+        fonts.ensure_text(&edit.preedit.text);
+        self.editor.input_method(fonts, edit)
     }
 
     /// 【界面控件】【有界插入】规范 text 并插入选区，fonts 用于排版；返回文字是否改变
@@ -167,5 +215,49 @@ mod tests {
     fn normalization_bounds_utf8_and_replaces_lines() {
         assert_eq!(normalized("汉字", 4), "汉");
         assert_eq!(normalized("a\nb\tc\0d", 99), "a b cd");
+    }
+
+    /// 【单行测试】【中文输入法】验证预编辑候选与确认提交遵循字节上限且替换已有全文选区
+    #[test]
+    fn single_line_accepts_ime_preedit_and_commit_within_limit() {
+        use crate::types::text_input::Preedit;
+
+        let mut fonts = UiFonts::with_system_family("Sans Serif");
+        let mut field = SingleLine::new("default", &mut fonts, 12);
+        field.select_all(&mut fonts);
+        let preedit = field.input_method(
+            &mut fonts,
+            Edit {
+                preedit: Preedit {
+                    text: "zhong".into(),
+                    cursor: Some((5, 5)),
+                },
+                commit: String::new(),
+                replacement: None,
+            },
+        );
+        assert!(preedit.accepted && preedit.changed && preedit.text_changed);
+        let next_preedit = field.input_method(
+            &mut fonts,
+            Edit {
+                preedit: Preedit {
+                    text: "zhongwen".into(),
+                    cursor: Some((8, 8)),
+                },
+                commit: String::new(),
+                replacement: None,
+            },
+        );
+        assert!(next_preedit.accepted && next_preedit.changed && !next_preedit.text_changed);
+        let committed = field.input_method(
+            &mut fonts,
+            Edit {
+                preedit: Preedit::default(),
+                commit: "中文输入法".into(),
+                replacement: None,
+            },
+        );
+        assert!(committed.accepted && committed.text_changed);
+        assert_eq!(field.text(), "中文输入");
     }
 }

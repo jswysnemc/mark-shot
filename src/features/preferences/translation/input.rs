@@ -643,6 +643,15 @@ pub(in crate::features::preferences) fn event(
                 state.translation.scroll = next.min(layout.maximum);
             }
         }
+        WindowEvent::TextInput(edit) if !state.search_focus => {
+            let Some((field, editor)) = &mut state.translation.editing else {
+                return None;
+            };
+            if field.secret() && !state.translation.reveal {
+                return Some(WindowAction::None);
+            }
+            editor.input_method(&mut state.fonts, edit.clone());
+        }
         _ => return None,
     }
     Some(WindowAction::Redraw)

@@ -18,6 +18,7 @@ mod shell;
 mod shortcuts;
 #[cfg(test)]
 mod tests;
+mod text_input;
 mod toolbar;
 mod toolbar_preview;
 mod translation;

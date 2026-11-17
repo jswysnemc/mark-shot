@@ -122,6 +122,25 @@ impl TextInput {
         }
     }
 
+    /// 【输入法】【输出重映射】按 remap 更新存活焦点的输出索引，被裁剪掉的输出清理本地状态
+    pub fn retain_outputs(&mut self, remap: impl Fn(usize) -> Option<usize>) {
+        for device in &mut self.devices {
+            if let Some(mut focus) = device.focus {
+                if let Some(next_idx) = remap(focus.monitor_idx) {
+                    focus.monitor_idx = next_idx;
+                    device.focus = Some(focus);
+                    if let Some(current) = &mut device.state.current {
+                        current.monitor_idx = next_idx;
+                    }
+                } else {
+                    device.focus = None;
+                    device.surface = None;
+                    device.state.reset();
+                }
+            }
+        }
+    }
+
     /// 【输入法】【交付复核】用当前对象提交计数重新计算 update 的同步许可，无返回值；前一排队事件可能已经触发新的客户端提交
     pub fn validate(&self, update: &mut Update) {
         update.sync_allowed = self.devices.iter().any(|device| {

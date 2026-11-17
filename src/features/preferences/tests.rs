@@ -419,3 +419,78 @@ fn wheel_over_number_changes_value_and_commits_the_edit() {
     assert_eq!(state.scroll, before);
     assert!(state.editing.is_none());
 }
+
+/// 【设置回归】【中文输入法】验证顶部搜索框、行内编辑框与可搜索下拉框均导出输入法身份、光标矩形并接收提交文本
+#[test]
+fn all_settings_input_fields_expose_ime_targets_and_accept_committed_chinese_text() {
+    use super::window::Control;
+    use crate::types::text_input::{ChangeCause, Edit, Focus, Preedit};
+
+    let focus = Focus {
+        id: 7,
+        monitor_idx: 0,
+    };
+    let mut state = Preferences::new(false).unwrap();
+    assert!(state.text_input_target().is_none());
+
+    // 1. 【设置回归】【顶部搜索】空搜索框获得焦点后立即提供有效光标矩形并接受中文提交
+    state.activate(Control::Search);
+    let search_id = state.text_input_target().expect("search bar IME target");
+    let search_snap = state
+        .text_input_snapshot(focus, search_id, None, ChangeCause::Other)
+        .expect("search bar IME snapshot");
+    assert!(search_snap.cursor_rect.is_some());
+    state.event(WindowEvent::TextInput(Edit {
+        preedit: Preedit::default(),
+        commit: "保存目录".into(),
+        replacement: None,
+    }));
+    assert_eq!(state.search.text(), "保存目录");
+    state.search.set("", &mut state.fonts, false);
+    state.search_focus = false;
+
+    // 2. 【设置回归】【行内编辑】设置项单行文本框导出输入法快照并可保存中文路径
+    state.page = Page::Storage;
+    let directory = entry("save.directory");
+    state.activate(Control::Row(directory));
+    let row_id = state.text_input_target().expect("row editor IME target");
+    assert_ne!(row_id, search_id);
+    let row_snap = state
+        .text_input_snapshot(focus, row_id, None, ChangeCause::Other)
+        .expect("row editor IME snapshot");
+    assert!(row_snap.cursor_rect.is_some());
+    state.event(WindowEvent::TextInput(Edit {
+        preedit: Preedit::default(),
+        commit: "/tmp/截图目录".into(),
+        replacement: None,
+    }));
+    assert!(state.apply());
+    assert_eq!(state.value(directory), "/tmp/截图目录");
+
+    // 3. 【设置回归】【下拉搜索】超过八项的可搜索下拉菜单接收中文输入法并实时过滤选项
+    state.page = Page::Capture;
+    let tool = entry("startup.normal_tool");
+    state.activate(Control::Row(tool));
+    let dropdown_id = state
+        .text_input_target()
+        .expect("searchable dropdown IME target");
+    let dropdown_snap = state
+        .text_input_snapshot(focus, dropdown_id, None, ChangeCause::Other)
+        .expect("searchable dropdown IME snapshot");
+    assert!(dropdown_snap.cursor_rect.is_some());
+    state.event(WindowEvent::TextInput(Edit {
+        preedit: Preedit::default(),
+        commit: "文字".into(),
+        replacement: None,
+    }));
+    assert_eq!(
+        state
+            .dropdown
+            .as_ref()
+            .and_then(|menu| menu.search.as_ref())
+            .map(|field| field.text())
+            .as_deref(),
+        Some("文字")
+    );
+    assert!(!state.dropdown.as_ref().unwrap().filtered.is_empty());
+}

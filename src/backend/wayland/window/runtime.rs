@@ -257,6 +257,13 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
     let dialog_manager = globals
         .bind::<xdg_wm_dialog_v1::XdgWmDialogV1, _, _>(&qh, 1..=1, ())
         .ok();
+    // 1. 【原生窗口】【输入法先决】在首次提交主表面前绑定座席与输入法管理器，确保合成器激活窗口时立即下发 enter
+    let seats = SeatState::new(&globals, &qh);
+    let mut text_input = TextInput::default();
+    text_input.manager = globals.bind::<wayland_protocols::wp::text_input::zv3::client::zwp_text_input_manager_v3::ZwpTextInputManagerV3, _, _>(&qh, 1..=1, ()).ok();
+    for seat in seats.seats() {
+        text_input.bind(&seat, &qh);
+    }
     let layer_geometry = super::layer_geometry::Geometry::new(spec.size);
     let role = if content.always_on_top()
         && let Some(layers) = &layers
@@ -282,12 +289,10 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         &qh,
     );
     main.role.commit();
-    let mut text_input = TextInput::default();
-    text_input.manager = globals.bind::<wayland_protocols::wp::text_input::zv3::client::zwp_text_input_manager_v3::ZwpTextInputManagerV3, _, _>(&qh, 1..=1, ()).ok();
     let mut state = NativeWindow {
         registry: RegistryState::new(&globals),
         outputs: OutputState::new(&globals, &qh),
-        seats: SeatState::new(&globals, &qh),
+        seats,
         cursor_shapes: CursorShapeManager::bind(&globals, &qh).ok(),
         cursor: None,
         pointer: None,

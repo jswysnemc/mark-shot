@@ -373,8 +373,10 @@ impl SeatHandler for NativeWindow {
         }
     }
 
-    /// 【原生窗口】【新增座席】设备等待能力通知再按需绑定
-    fn new_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
+    /// 【原生窗口】【新增座席】立即绑定输入法对象，其余指针与键盘设备等待能力通知按需绑定
+    fn new_seat(&mut self, _: &Connection, qh: &QueueHandle<Self>, seat: wl_seat::WlSeat) {
+        self.text_input.bind(&seat, qh);
+    }
 
     /// 【原生窗口】【移除设备】释放 seat 已移除的 capability 对象；不影响其他座席
     fn remove_capability(

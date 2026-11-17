@@ -149,6 +149,38 @@ impl WindowContent for Picker {
         true
     }
 
+    /// 【颜色控件】【输入目标】返回正在编辑的十六进制色值框身份，未编辑时返回空值
+    fn text_input_target(&self) -> Option<u64> {
+        self.editing.then(|| self.hex.input_identity())
+    }
+
+    /// 【颜色控件】【输入快照】按协议参数返回十六进制色值框光标矩形与周边文本
+    fn text_input_snapshot(
+        &mut self,
+        focus: crate::types::text_input::Focus,
+        target_id: u64,
+        previous: Option<&crate::types::text_input::Snapshot>,
+        cause: crate::types::text_input::ChangeCause,
+    ) -> Option<crate::types::text_input::Snapshot> {
+        if !self.editing {
+            return None;
+        }
+        let bounds = self.picker.hex_field_rect()?;
+        let area = Rect::from_xywh(
+            bounds.left() + 8.0,
+            bounds.top() + 3.0,
+            bounds.width() - 16.0,
+            bounds.height() - 6.0,
+        )?;
+        self.hex
+            .input_snapshot(&mut self.fonts, area, focus, target_id, previous, cause)
+    }
+
+    /// 【颜色控件】【候选取消】清除十六进制输入框未确认预编辑候选，返回是否存在变更
+    fn cancel_text_input(&mut self) -> bool {
+        self.hex.cancel_preedit()
+    }
+
     /// 【颜色控件】【绘制窗口】按canvas和scale绘制现有取色器及统一输入、按钮，无返回值
     fn draw(&mut self, canvas: &mut Pixmap, scale: f32) {
         let palette = Palette::current();
@@ -226,6 +258,10 @@ impl WindowContent for Picker {
                 }
                 _ => return WindowAction::None,
             },
+            WindowEvent::TextInput(edit) if self.editing => {
+                self.hex.input_method(&mut self.fonts, edit);
+                self.error = false;
+            }
             WindowEvent::PointerMove { position } => {
                 if let Some(element) = self.dragging {
                     self.adjust(element, position);

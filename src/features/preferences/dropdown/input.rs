@@ -183,6 +183,15 @@ fn handle(
                 }
             }
         },
+        WindowEvent::TextInput(edit) => {
+            if let Some(search) = &mut menu.search {
+                let update = search.input_method(fonts, edit.clone());
+                if update.text_changed {
+                    menu.filter();
+                    menu.reveal(Layout::new(menu, size).capacity);
+                }
+            }
+        }
         _ => {}
     }
     Outcome::Keep

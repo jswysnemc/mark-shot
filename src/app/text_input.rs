@@ -146,20 +146,34 @@ fn cursor_rect(state: &EditorState, monitor_idx: usize) -> Option<(i32, i32, i32
     let editor = state.text.editors.get(&session.presented().id)?;
     let cursor = editor.cursor();
     editor.with_buffer(|buffer| {
-        buffer.layout_runs().find_map(|run| {
-            let x = run.cursor_position(&cursor)?;
-            let view = state.canvas_transform();
-            let point = view.to_screen((
-                f64::from(start.0 + padding.0 + x),
-                f64::from(start.1 + padding.1 + run.line_top),
-            ));
-            Some((
-                (point.0 - f64::from(placement.position.0)).floor() as i32,
-                (point.1 - f64::from(placement.position.1)).floor() as i32,
-                1,
-                (f64::from(run.line_height) * view.scale).ceil().max(1.0) as i32,
-            ))
-        })
+        let view = state.canvas_transform();
+        buffer
+            .layout_runs()
+            .find_map(|run| {
+                let x = run.cursor_position(&cursor)?;
+                let point = view.to_screen((
+                    f64::from(start.0 + padding.0 + x),
+                    f64::from(start.1 + padding.1 + run.line_top),
+                ));
+                Some((
+                    (point.0 - f64::from(placement.position.0)).floor() as i32,
+                    (point.1 - f64::from(placement.position.1)).floor() as i32,
+                    1,
+                    (f64::from(run.line_height) * view.scale).ceil().max(1.0) as i32,
+                ))
+            })
+            .or_else(|| {
+                let point =
+                    view.to_screen((f64::from(start.0 + padding.0), f64::from(start.1 + padding.1)));
+                Some((
+                    (point.0 - f64::from(placement.position.0)).floor() as i32,
+                    (point.1 - f64::from(placement.position.1)).floor() as i32,
+                    1,
+                    (f64::from(buffer.metrics().line_height) * view.scale)
+                        .ceil()
+                        .max(1.0) as i32,
+                ))
+            })
     })
 }
 

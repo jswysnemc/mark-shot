@@ -4,6 +4,7 @@
 
 use smithay_client_toolkit::output::OutputState;
 use smithay_client_toolkit::registry::ProvidesRegistryState;
+use smithay_client_toolkit::seat::SeatState;
 use smithay_client_toolkit::{delegate_dispatch2, delegate_registry, registry_handlers};
 use wayland_client::{Connection, Dispatch, QueueHandle};
 use wayland_protocols::wp::{
@@ -21,7 +22,7 @@ impl ProvidesRegistryState for OverlayState {
     fn registry(&mut self) -> &mut smithay_client_toolkit::registry::RegistryState {
         &mut self.registry_state
     }
-    registry_handlers![OutputState];
+    registry_handlers![OutputState, SeatState];
 }
 
 delegate_registry!(OverlayState);

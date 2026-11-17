@@ -173,16 +173,26 @@ impl TextEditor {
         let editor = self.display_editor(fonts);
         let cursor = editor.cursor();
         let cursor_rect = editor.with_buffer(|buffer| {
-            buffer.layout_runs().find_map(|run| {
-                run.cursor_position(&cursor).map(|x| {
-                    (
-                        (rect.x() + x - offset).floor() as i32,
-                        (rect.y() + run.line_top).floor() as i32,
-                        1,
-                        run.line_height.ceil().max(1.0) as i32,
-                    )
+            buffer
+                .layout_runs()
+                .find_map(|run| {
+                    run.cursor_position(&cursor).map(|x| {
+                        (
+                            (rect.x() + x - offset).floor() as i32,
+                            (rect.y() + run.line_top).floor() as i32,
+                            1,
+                            run.line_height.ceil().max(1.0) as i32,
+                        )
+                    })
                 })
-            })
+                .or_else(|| {
+                    Some((
+                        (rect.x() - offset).floor() as i32,
+                        rect.y().floor() as i32,
+                        1,
+                        buffer.metrics().line_height.ceil().max(1.0) as i32,
+                    ))
+                })
         });
         let surrounding = &self.input.context.as_ref().unwrap().surrounding;
         let content = if self.input.single_line {
