@@ -99,7 +99,7 @@ impl PointerHandler for NativeWindow {
                     self.dispatch_to(id, WindowEvent::PointerMove { position }, None);
                 }
                 PointerEventKind::Motion { .. } => {
-                    if id == SurfaceId::Main && self.layer_motion(position) {
+                    if id == SurfaceId::Main && self.layer_motion(position, qh) {
                         continue;
                     }
                     self.dispatch_to(id, WindowEvent::PointerMove { position }, None);
@@ -133,7 +133,7 @@ impl PointerHandler for NativeWindow {
                 }
                 PointerEventKind::Release { button, .. } => {
                     if id == SurfaceId::Main && button == super::LEFT_BUTTON {
-                        self.layer_gesture = None;
+                        self.end_layer_gesture();
                     }
                     let seat = self.pointer_seat.clone();
                     let serial = seat.as_ref().and_then(|seat| {

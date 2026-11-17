@@ -63,6 +63,8 @@ pub(super) struct NativeWindow {
     pub layers: Option<LayerShell>,
     pub layer_geometry: super::layer_geometry::Geometry,
     pub layer_gesture: Option<super::layer_geometry::Gesture>,
+    pub layer_preview: Option<super::layer_preview::LayerPreview>,
+    pub layer_rebind_needed: bool,
     pub pointer_position: (f64, f64),
     pub viewporter: Option<wp_viewporter::WpViewporter>,
     pub fractional_manager: Option<wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1>,
@@ -98,7 +100,7 @@ impl NativeWindow {
         if matches!(event, WindowEvent::Focused(false)) {
             self.pointer_grabs.cancel();
             self.keyboard_grabs.cancel();
-            self.layer_gesture = None;
+            self.end_layer_gesture();
         }
         if id == SurfaceId::Main
             && (self.dialog.is_some() || !self.popup.is_empty())
@@ -120,6 +122,7 @@ impl NativeWindow {
                     event => dialog.content.event(event),
                 }
             }
+            SurfaceId::LayerPreview => return,
         };
         self.apply(id, action, serial);
         self.reconcile_text_input();
@@ -130,7 +133,14 @@ impl NativeWindow {
         match action {
             WindowAction::None => {}
             WindowAction::Redraw => {
-                if let Some(surface) = self.surface_mut(id) {
+                if id == SurfaceId::Main {
+                    if let Some(preview) = &mut self.layer_preview {
+                        preview.dirty = true;
+                    }
+                    if !self.main.hidden_for_drag {
+                        self.main.dirty = true;
+                    }
+                } else if let Some(surface) = self.surface_mut(id) {
                     surface.dirty = true;
                 }
             }
@@ -144,6 +154,7 @@ impl NativeWindow {
                         .is_some_and(|dialog| dialog.content.dialog_accepted());
                     self.finish_dialog(id, accepted);
                 }
+                SurfaceId::LayerPreview => {}
             },
             WindowAction::Move | WindowAction::Resize | WindowAction::ResizeEdge(_) => {
                 if id == SurfaceId::Main && self.begin_layer_gesture(action) {
@@ -200,6 +211,7 @@ impl NativeWindow {
                 .as_ref()
                 .filter(|dialog| dialog.id == id)
                 .map(|dialog| &dialog.surface),
+            SurfaceId::LayerPreview => None,
         }
     }
 }
@@ -295,6 +307,8 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         layers,
         layer_geometry,
         layer_gesture: None,
+        layer_preview: None,
+        layer_rebind_needed: false,
         pointer_position: (0.0, 0.0),
         viewporter,
         fractional_manager,
@@ -332,9 +346,17 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         state.sync_content_size();
         state.sync_dialog(&qh);
         state.sync_popup(&qh, None);
+        state.render_layer_preview(&qh)?;
         state
             .main
             .render(state.content.as_mut(), &mut state.pool, &qh)?;
+        if state.layer_gesture.is_none()
+            && !state.main.hidden_for_drag
+            && !state.main.dirty
+            && state.main.configured
+        {
+            state.layer_preview = None;
+        }
         if state.main.configured {
             super::super::activation::activate(&globals, &qh, state.main.role.wl_surface());
         }
@@ -368,8 +390,9 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
             }
         }
     }
-    // 1. 【原生窗口】【关闭交接】先关闭所属子窗口，再析构父表面，最后发送销毁请求
+    // 1. 【原生窗口】【关闭交接】先关闭所属子窗口和拖动预览，再析构父表面，最后发送销毁请求
     state.close_popups();
+    state.layer_preview.take();
     state.dialog.take();
     drop(state);
     connection.flush()?;

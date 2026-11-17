@@ -46,6 +46,7 @@ impl NativeWindow {
                 .as_mut()
                 .filter(|dialog| dialog.id == id)
                 .map(|dialog| &mut dialog.surface),
+            SurfaceId::LayerPreview => None,
         }
     }
 
@@ -58,6 +59,7 @@ impl NativeWindow {
                 .as_ref()
                 .filter(|dialog| dialog.id == id)
                 .map(|dialog| dialog.content.as_ref()),
+            SurfaceId::LayerPreview => None,
         }
     }
 
@@ -70,6 +72,7 @@ impl NativeWindow {
                 .as_mut()
                 .filter(|dialog| dialog.id == id)
                 .is_some_and(|dialog| dialog.content.cancel_text_input()),
+            SurfaceId::LayerPreview => false,
         };
         if changed && let Some(surface) = self.surface_mut(id) {
             surface.dirty = true;

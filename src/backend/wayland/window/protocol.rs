@@ -82,12 +82,22 @@ impl Dispatch<wp_fractional_scale_v1::WpFractionalScaleV1, SurfaceId> for Native
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        if let wp_fractional_scale_v1::Event::PreferredScale { scale } = event
-            && let Some(surface) = state.surface_mut(*id)
-            && surface.fractional.as_ref() == Some(proxy)
-        {
-            surface.scale = (scale as f32 / 120.0).max(0.25);
-            surface.dirty = true;
+        if let wp_fractional_scale_v1::Event::PreferredScale { scale } = event {
+            if *id == SurfaceId::LayerPreview {
+                if let Some(preview) = state.layer_preview.as_mut()
+                    && preview.fractional.as_ref() == Some(proxy)
+                {
+                    preview.scale = (scale as f32 / 120.0).max(0.25);
+                    preview.dirty = true;
+                }
+                return;
+            }
+            if let Some(surface) = state.surface_mut(*id)
+                && surface.fractional.as_ref() == Some(proxy)
+            {
+                surface.scale = (scale as f32 / 120.0).max(0.25);
+                surface.dirty = true;
+            }
         }
     }
 }

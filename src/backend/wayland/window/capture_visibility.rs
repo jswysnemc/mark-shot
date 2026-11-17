@@ -26,11 +26,18 @@ impl NativeWindow {
         self.pointer_grabs.cancel();
         self.keyboard_grabs.cancel();
         self.layer_gesture = None;
+        self.layer_preview = None;
+        self.layer_rebind_needed = false;
+        self.main.hidden_for_drag = false;
         if !hidden {
             self.main.role.place(self.layer_geometry);
             if let Some(layer) = self.main.role.as_layer() {
                 use smithay_client_toolkit::shell::wlr_layer::{KeyboardInteractivity, Layer};
-                layer.set_layer(Layer::Top);
+                layer.set_layer(if self.content.above_pinned_windows() {
+                    Layer::Overlay
+                } else {
+                    Layer::Top
+                });
                 layer.set_exclusive_zone(-1);
                 layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
             }

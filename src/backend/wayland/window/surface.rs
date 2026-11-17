@@ -22,6 +22,7 @@ use wayland_protocols::wp::{
 pub(super) enum SurfaceId {
     Main,
     Dialog(u64),
+    LayerPreview,
 }
 
 pub(super) struct Surface {
@@ -32,6 +33,7 @@ pub(super) struct Surface {
     pub size: (u32, u32),
     pub scale: f32,
     pub dirty: bool,
+    pub hidden_for_drag: bool,
     pub configured: bool,
     pub frame_pending: bool,
     buffers: Vec<Buffer>,
@@ -76,6 +78,7 @@ impl Surface {
             fractional,
             scale: 1.0,
             dirty: true,
+            hidden_for_drag: false,
             configured: false,
             frame_pending: false,
             buffers: Vec::new(),
@@ -140,9 +143,13 @@ impl Surface {
             .canvas
             .as_mut()
             .ok_or("cannot allocate a window canvas")?;
-        content.draw(canvas, self.scale);
-        if content.rounded_corners() {
-            crate::ui::window_frame::clip_rounded_surface(canvas, self.scale);
+        if self.hidden_for_drag {
+            canvas.fill(tiny_skia::Color::TRANSPARENT);
+        } else {
+            content.draw(canvas, self.scale);
+            if content.rounded_corners() {
+                crate::ui::window_frame::clip_rounded_surface(canvas, self.scale);
+            }
         }
         let available = self
             .buffers

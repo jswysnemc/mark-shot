@@ -31,7 +31,7 @@ impl WindowHandler for NativeWindow {
                 }
             }
             Some(super::surface::SurfaceId::Dialog(id)) => self.finish_dialog(id, false),
-            None => {}
+            Some(super::surface::SurfaceId::LayerPreview) | None => {}
         }
     }
 
@@ -84,7 +84,7 @@ impl LayerShellHandler for NativeWindow {
         }
     }
 
-    /// 【原生窗口】【浮层配置】应用 layer 的 configure 大小并更新视区，通知同一业务对象，不重置编辑历史，无返回值
+    /// 【原生窗口】【浮层配置】应用 layer 的 configure 大小并更新视区，预览浮层独立就绪且不重置业务对象，无返回值
     fn configure(
         &mut self,
         _: &Connection,
@@ -93,6 +93,15 @@ impl LayerShellHandler for NativeWindow {
         configure: LayerSurfaceConfigure,
         _: u32,
     ) {
+        if let Some(preview) = self
+            .layer_preview
+            .as_mut()
+            .filter(|preview| preview.matches(layer.wl_surface()))
+        {
+            preview.configured = true;
+            preview.dirty = true;
+            return;
+        }
         if !self.main.matches(layer.wl_surface()) {
             return;
         }
@@ -152,6 +161,14 @@ impl CompositorHandler for NativeWindow {
         _: u32,
     ) {
         if self.popup_frame_done(surface) {
+            return;
+        }
+        if let Some(preview) = self
+            .layer_preview
+            .as_mut()
+            .filter(|preview| preview.matches(surface))
+        {
+            preview.frame_pending = false;
             return;
         }
         if let Some(id) = self.surface_id(surface)

@@ -122,4 +122,18 @@ mod tests {
             (380, 340)
         );
     }
+
+    /// 【浮层几何测试】【单调拖动】固定抓取表面时连续指针轨迹一对一映射到全局位置，不产生回弹振荡
+    #[test]
+    fn stationary_grab_surface_tracks_continuous_pointer_motion_monotonically() {
+        let initial = Geometry::new((460, 52)).centered((0, 0), (1920, 1080));
+        let start = initial.position;
+        let gesture = Gesture::new(initial, (80.0, 20.0), false);
+        let mut current = initial;
+        for step in 1..=20 {
+            let local = (80.0 + f64::from(step * 14), 20.0 + f64::from(step * 6));
+            current = gesture.update(current, local, (200, 40));
+            assert_eq!(current.position, (start.0 + step * 14, start.1 + step * 6));
+        }
+    }
 }

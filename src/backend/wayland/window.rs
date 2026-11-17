@@ -8,6 +8,7 @@ mod dialog_protocol;
 mod input;
 mod input_grab;
 mod layer_geometry;
+mod layer_preview;
 mod popup;
 mod popup_input;
 mod popup_resources;
