@@ -94,6 +94,28 @@ pub fn draw(p: &mut Painter, panel: &SettingsPanel, current_color: Color) {
         style.align = crate::renderer::text::HAlign::Right;
         p.text(layout.values[index], &text, style);
     }
+    let palette = crate::theme::toolbar::Palette::current();
+    // 1. 在同一行内为字号滑块组、透明度滑块组与右侧样式按钮之间补充柔和纵向分隔细线
+    for (left_rect, right_rect) in [
+        (Some(layout.values[0]), Some(layout.glyphs[1])),
+        (
+            Some(layout.values[1]),
+            layout.controls[Control::Color.index()],
+        ),
+    ] {
+        if let (Some(l), Some(r)) = (left_rect, right_rect)
+            && (l.top() - r.top()).abs() < 12.0
+            && r.left() > l.right()
+        {
+            let sep_x = ((l.right() + r.left()) * 0.5).floor();
+            let sep_h = 16.0;
+            let sep_y = (l.top() + l.bottom() - sep_h) * 0.5;
+            if let Some(sep) = Rect::from_xywh(sep_x, sep_y, 1.0, sep_h) {
+                p.fill_rounded(sep, 0.5, palette.separator.with_alpha(52));
+            }
+        }
+    }
+
     for (control, svg) in [
         (Control::Color, icons::COLOR),
         (Control::Background, icons::BACKGROUND),
@@ -105,7 +127,7 @@ pub fn draw(p: &mut Painter, panel: &SettingsPanel, current_color: Color) {
         };
         let hovered = panel.hovered == Some(control.index());
         let selected = panel.selected == Some(control.index());
-        let mut ink = crate::theme::toolbar::Palette::current().text;
+        let mut ink = palette.text;
         if matches!(control, Control::Color | Control::Background) {
             let color = if control == Control::Color {
                 current_color
@@ -114,33 +136,39 @@ pub fn draw(p: &mut Painter, panel: &SettingsPanel, current_color: Color) {
             };
             let color = color.to_color_u8();
             let inset = Rect::from_xywh(
-                cell.left() + 1.0,
-                cell.top() + 1.0,
-                cell.width() - 2.0,
-                cell.height() - 2.0,
+                cell.left() + 1.5,
+                cell.top() + 1.5,
+                cell.width() - 3.0,
+                cell.height() - 3.0,
             )
             .unwrap();
+            // 2. 半透明文字背景色自动叠加微棋盘衬底，避免透明态与面板底色混淆
+            if color.alpha() < 255 {
+                crate::ui::settings_panel::draw_controls::draw_alpha_checker(p, inset, 7.5);
+            }
             p.fill_rounded(
                 inset,
-                8.0,
+                7.5,
                 Rgba(color.red(), color.green(), color.blue(), color.alpha()),
             );
             border(
                 p,
                 inset,
-                8.0,
-                2.0,
-                if hovered {
-                    crate::theme::toolbar::Palette::current().hover_border
+                7.5,
+                if hovered || selected { 1.5 } else { 1.0 },
+                if hovered || selected {
+                    palette.hover_border
                 } else {
-                    Rgba(255, 255, 255, 100)
+                    palette.control_border
                 },
             );
             let luma = (u32::from(color.red()) * 299
                 + u32::from(color.green()) * 587
                 + u32::from(color.blue()) * 114)
                 / 1000;
-            ink = if luma > 150 && color.alpha() > 120 {
+            ink = if color.alpha() <= 80 {
+                Rgba(30, 41, 59, 255)
+            } else if luma > 150 && color.alpha() > 120 {
                 Rgba(11, 17, 32, 255)
             } else {
                 Rgba(248, 250, 252, 255)

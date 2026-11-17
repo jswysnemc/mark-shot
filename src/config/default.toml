@@ -292,22 +292,22 @@ save = 20.0
 
 # The panel with the current tool's settings.
 [settings_panel]
-item_gap = 8.0
+item_gap = 6.0
 # ratio of the panel height
-item_height = 0.7
-separator_slot = 16.0
+item_height = 0.72
+separator_slot = 11.0
 # rough width of one character, used to size labels
 char_width = 7.0
 label_padding = 8.0
-swatch_size = 28.0
+swatch_size = 30.0
 # radius of the color dot, ratio of the swatch
 swatch_dot = 0.35
-icon_button_size = 28.0
+icon_button_size = 30.0
 icon_size = 16.0
 copy_icon_size = 15.0
-stepper_width = 84.0
+stepper_width = 82.0
 stepper_bold = true
-stepper_arrow_zone = 30.0
+stepper_arrow_zone = 24.0
 stepper_arrow_width = 7.0
 stepper_arrow_height = 3.5
 stepper_arrow_gap = 5.0

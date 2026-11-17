@@ -227,6 +227,7 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
                 range: StepperRange::NumberWidth,
                 unit: "px",
             },
+            SettingsWidget::Separator,
             SettingsWidget::Action {
                 action: SettingsAction::ResetNumber,
                 svg: crate::ui::icons::RESET_NUMBER,
@@ -245,6 +246,7 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
                 range: StepperRange::Magnification,
                 unit: "x",
             },
+            SettingsWidget::Separator,
             SettingsWidget::Toggle {
                 visual: ToggleVisual::Icon {
                     svg: crate::ui::icons::RECTANGLE,
@@ -327,11 +329,13 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
         Tool::Text => TEXT_WIDGETS,
         Tool::Rectangle => &[
             SettingsWidget::ColorSwatch(ColorTarget::Main),
+            SettingsWidget::Separator,
             SettingsWidget::Stepper {
                 label: "",
                 range: StepperRange::Stroke,
                 unit: "px",
             },
+            SettingsWidget::Separator,
             SettingsWidget::Toggle {
                 visual: ToggleVisual::Checkbox { label: "Fill" },
                 field: ToggleField::Fill,
@@ -340,7 +344,6 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
             CORNER_RADIUS,
         ],
         Tool::Circle => &[
-            FIXED_RATIO,
             SettingsWidget::ColorSwatch(ColorTarget::Main),
             SettingsWidget::Separator,
             SettingsWidget::Stepper {
@@ -353,9 +356,14 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
                 visual: ToggleVisual::Checkbox { label: "Fill" },
                 field: ToggleField::Fill,
             },
+            FIXED_RATIO,
         ],
         Tool::Redact => &[
             SettingsWidget::ColorSwatch(ColorTarget::Main),
+            SettingsWidget::Action {
+                action: SettingsAction::FilterModes,
+                svg: crate::ui::icons::REDACT,
+            },
             SettingsWidget::Separator,
             SettingsWidget::Stepper {
                 label: "",
@@ -363,10 +371,6 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
                 unit: "",
             },
             SettingsWidget::Separator,
-            SettingsWidget::Action {
-                action: SettingsAction::FilterModes,
-                svg: crate::ui::icons::REDACT,
-            },
             CORNER_RADIUS,
         ],
         Tool::Eyedropper => EYEDROPPER_WIDGETS,
@@ -558,7 +562,15 @@ impl PanelItem for SettingsWidget {
             SettingsWidget::Toggle { visual, .. } => match visual {
                 ToggleVisual::Icon { .. } => cfg.icon_button_size,
                 ToggleVisual::Checkbox { label } => {
-                    cfg.checkbox_size + cfg.checkbox_gap + label.len() as f32 * cfg.char_width
+                    let chars = if crate::ui::language::Language::current()
+                        == crate::ui::language::Language::Chinese
+                        && *label == "Fill"
+                    {
+                        4.0
+                    } else {
+                        label.len() as f32
+                    };
+                    (24.0 + chars * cfg.char_width).max(48.0)
                 }
             },
             SettingsWidget::Label(text) => {

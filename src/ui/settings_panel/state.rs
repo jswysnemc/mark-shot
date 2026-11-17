@@ -142,11 +142,17 @@ impl SettingsPanel {
             return self.cells.get(index).copied();
         }
         let widget = self.widgets.get(index)?;
-        let x = size::padding()
-            + self.widgets[..index]
-                .iter()
-                .map(|item| item.size() + item.trailing_padding())
-                .sum::<f32>();
+        let padding = size::padding().max(7.0);
+        let mut x = padding;
+        for (i, item) in self.widgets[..index].iter().enumerate() {
+            let next_is_sep = matches!(self.widgets.get(i + 1), Some(SettingsWidget::Separator));
+            let gap = if next_is_sep {
+                0.0
+            } else {
+                item.trailing_padding()
+            };
+            x += item.size() + gap;
+        }
         let height = self.item_height();
         Rect::from_xywh(x, (self.size.1 - height) / 2.0, widget.size(), height)
     }
@@ -242,16 +248,10 @@ impl SettingsPanel {
         self.fields.sync_value(idx, text);
     }
 
+    /// 【属性面板】【文本起点】返回 widget_idx 步进输入框的文本起始横坐标，兼容多行换行布局
     pub fn widget_text_x(&self, widget_idx: usize) -> Option<f32> {
-        let rect = self.rect()?;
-        let mut current_x = rect.left() + size::padding();
-        for (idx, widget) in self.widgets.iter().enumerate() {
-            if idx == widget_idx {
-                return Some(current_x + size::padding());
-            }
-            current_x += widget.size() + widget.trailing_padding();
-        }
-        None
+        let item = self.widget_rect(widget_idx)?;
+        Some(item.left() + size::padding())
     }
 
     pub fn is_toggled(&self, idx: usize) -> bool {

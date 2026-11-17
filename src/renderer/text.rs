@@ -120,6 +120,13 @@ pub fn measure_text_prefix_width(
 }
 
 impl Painter<'_> {
+    /// 【界面字体】【按需补字】按 text 为当前绘制器关联的字体系统补充非 ASCII 缺字，无返回值
+    pub(crate) fn ensure_ui_text(&mut self, text: &str) {
+        if let Some(fonts) = self.fonts.as_mut() {
+            crate::fonts::ui_fallback::ensure_text(fonts.system, text);
+        }
+    }
+
     /// 【文字绘制】【缓冲输出】按 buffer、pos 和 color 绘制实际布局行，所有字形复用同一缓存路径，无返回值
     pub fn text_buffer(&mut self, buffer: &Buffer, pos: (f32, f32), color: Color) {
         for run in buffer.layout_runs() {
