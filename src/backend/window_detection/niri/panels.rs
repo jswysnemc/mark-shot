@@ -1,4 +1,4 @@
-//! 【niri 窗口识别】【面板独占区】原版 DMS、Waybar 及显式边缘覆盖
+//! 【niri 窗口识别】【面板独占区】旧版平铺坐标重建使用 DMS、Waybar、显式覆盖与自定义面板推算
 
 use super::{layout, model::Layer};
 use serde_json::Value;
@@ -203,7 +203,11 @@ pub(super) fn insets(
         }
         (edge(&Value::String(name.into()), 0), settings.size)
     } else {
-        if !present(layers, output, &["waybar"]) || !enabled(&settings.waybar["exclusive"], true) {
+        if !present(layers, output, &["waybar"]) {
+            return super::panel_inference::insets(layers, output, layout, height, tallest)
+                .unwrap_or(inset);
+        }
+        if !enabled(&settings.waybar["exclusive"], true) {
             return inset;
         }
         let index = edge(&settings.waybar["position"], 0);

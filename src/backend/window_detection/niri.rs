@@ -3,6 +3,9 @@
 mod geometry;
 mod layout;
 mod model;
+mod panel_inference;
+#[cfg(test)]
+mod panel_inference_tests;
 mod panels;
 #[cfg(test)]
 mod tests;

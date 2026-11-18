@@ -71,6 +71,7 @@ fn unknown_waybar_height_uses_tallest_column_and_overrides_are_explicit() {
     let layers = vec![model::Layer {
         namespace: "waybar".into(),
         output: Some("DP-1".into()),
+        layer: Some("Top".into()),
     }];
     let layout = layout::Layout {
         gaps: 8.0,

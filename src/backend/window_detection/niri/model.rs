@@ -61,4 +61,6 @@ pub(super) struct Layout {
 pub(super) struct Layer {
     pub namespace: String,
     pub output: Option<String>,
+    #[serde(default)]
+    pub layer: Option<String>,
 }
