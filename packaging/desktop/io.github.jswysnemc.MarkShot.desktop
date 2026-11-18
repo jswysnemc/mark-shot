@@ -3,10 +3,14 @@ Type=Application
 Name=Mark Shot
 Comment=Native screenshot, annotation and recording tool
 Comment[zh_CN]=原生截图、标注与录屏工具
-Exec=mark-shot %f
+Exec=@exec@ %f
 Icon=io.github.jswysnemc.MarkShot
 Terminal=false
 Categories=Graphics;
 MimeType=image/png;image/jpeg;image/webp;
 StartupNotify=true
 Keywords=screenshot;capture;annotation;recording;
+# 【桌面集成】【KDE授权】KWin 的 ScreenShot2 只授权声明了该接口的 desktop 文件
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2
+# 【桌面集成】【KDE窗口检测】窗口级截图与窗口识别所需的 Wayland 协议
+X-KDE-Wayland-Interfaces=org_kde_plasma_window_management,zkde_screencast_unstable_v1

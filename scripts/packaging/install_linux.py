@@ -37,10 +37,6 @@ def install(root, binary, media, destination, prefix, arch, commit, licenses=Non
     command.symlink_to("../lib/mark-shot/mark-shot")
     for source, relative in (
         (
-            root / "packaging/desktop/io.github.jswysnemc.MarkShot.desktop",
-            "share/applications/io.github.jswysnemc.MarkShot.desktop",
-        ),
-        (
             root / "packaging/desktop/io.github.jswysnemc.MarkShot.metainfo.xml",
             "share/metainfo/io.github.jswysnemc.MarkShot.metainfo.xml",
         ),
@@ -53,6 +49,15 @@ def install(root, binary, media, destination, prefix, arch, commit, licenses=Non
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
         target.chmod(0o644)
+    # 【原生打包】【桌面入口】按实际安装前缀写入绝对 Exec，KWin 用 canonicalFilePath 比对进程路径
+    desktop = installed / "share/applications/io.github.jswysnemc.MarkShot.desktop"
+    desktop.parent.mkdir(parents=True, exist_ok=True)
+    desktop.write_text(
+        (root / "packaging/desktop/io.github.jswysnemc.MarkShot.desktop")
+        .read_text()
+        .replace("@exec@", str(private / "mark-shot"))
+    )
+    desktop.chmod(0o644)
     notices = installed / "share/licenses/mark-shot"
     notices.mkdir(parents=True, exist_ok=True)
     for source in (
