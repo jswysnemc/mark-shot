@@ -4,6 +4,15 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$root"
 export CARGO_TARGET_DIR="$root/target"
+# 【原生构建】【链接配置】剥离发行版继承的 LTO 参数，避免 cc crate 产出 GCC slim-LTO 目标文件
+# 发行版打包配置（如 Arch/Manjaro 的 makepkg.conf）默认在 CFLAGS 中追加 -flto=auto。
+# libspa-sys 等 crate 通过 cc crate 编译 C 源码，会继承该参数并产出只含 .gnu.lto_* 段的
+# slim-LTO 目标文件；rustc 1.90 起 x86_64-unknown-linux-gnu 默认使用 rust-lld，
+# 它不加载 GCC LTO 插件，导致这些静态库的符号在链接期全部丢失。
+# 追加在末尾可覆盖先前的 -flto，与 scripts/media/build-libraries.sh 的处理保持一致。
+export CFLAGS="${CFLAGS:-} -fno-lto"
+export CXXFLAGS="${CXXFLAGS:-} -fno-lto"
+export LDFLAGS="${LDFLAGS:-} -fno-lto"
 offline=()
 configuration=()
 if [[ "${1:-}" == --offline ]]; then
