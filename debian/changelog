@@ -1,3 +1,11 @@
+mark-shot (0.2.3-1) unstable; urgency=medium
+
+  * Add sharp and rounded arrow tails, multiply blend mode for highlighters, and dynamic dashed text editing outlines.
+  * Improve Windows IME context recovery, DIB clipboard compatibility for Lark/Feishu, and Wayland modal window resizing.
+  * Hide capture hints on first drag and optimize shortcut input layout.
+
+ -- Mark Shot maintainers <snemc@qq.com>  Thu, 19 Nov 2026 08:00:00 +0900
+
 mark-shot (0.2.2-1) unstable; urgency=medium
 
   * Add OCR download mirror settings, startup UI toggles, and native portal save dialogs.

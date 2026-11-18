@@ -18,9 +18,9 @@ The keys below are the defaults; all of them can be changed, see [Shortcuts](sho
 | Selection | `S` | Move and resize the captured region |
 | Pick | `V` | Select, move, resize, rotate and delete annotations |
 | Pen | `P` | Freehand stroke |
-| Highlighter | `H` | Translucent freehand stroke |
+| Highlighter | `H` | Translucent stroke with multiply blend mode; supports freehand and straight lines |
 | Line | `D` | Straight or curved line; solid, dashed or dotted |
-| Arrow | `A` | Arrow with six head styles and three shaft styles |
+| Arrow | `A` | Arrow with notched, triangle or open heads; sharp or rounded tail; single or double ended |
 | Rectangle | `R` | Outline or filled rectangle with optional rounded corners |
 | Ellipse | `C` | Outline or filled ellipse |
 | Marker | `K` | One of 24 preset shapes |
@@ -37,20 +37,23 @@ The keys below are the defaults; all of them can be changed, see [Shortcuts](sho
 
 ## Tool details
 
+**Highlighter.** Uses multiply blend mode to preserve underlying text and details with authentic translucent marker optics. Supports freehand drawing as well as straight-line mode, remembering stroke width and mode independently.
+
 **Line and arrow.** Hold `Shift` to snap the direction to 45 degree steps. With the pick tool,
 double-click the path to insert a control point and drag it to bend the line; `Delete` removes the
-selected control point. Arrow heads offer a direct notched head, a filled triangle and an open
-line head, single or double ended; the direct head is the default. Arrows use a rounded shaft and
-carry a light drop shadow.
+selected control point. Arrow heads offer a direct notched head (default), a filled triangle and an open
+line head. Tails offer sharp or rounded endings, while double-ended arrows are an independent toggle
+combinable with any head and tail style. Direct sharp arrows use continuous polygonal contouring without junction gaps.
 
 **Rectangle and ellipse.** Hold `Shift` while dragging for a square or a circle. The `1:1` switch
 in the property bar makes that permanent, and `R` sets the corner radius of rectangles in image
 pixels. New rectangles start with a small radius and a light drop shadow.
 
-**Text.** Click to place the caret and type. `Enter` starts a new line; `Esc`, `Ctrl+Enter` or a
-click outside commits the text. The font panel offers search, a point size from 8 to 300, bold and
-italic. Input methods are supported on Wayland and X11. To change an existing text, select it with
-the pick tool and use the edit button in the property bar.
+**Text.** Click to place the caret and type. A dynamic cyan dashed border indicates active input boundaries
+during editing, disappearing automatically on commit and remaining excluded from exported images.
+`Enter` starts a new line; `Esc`, `Ctrl+Enter` or a click outside commits the text. The font panel offers
+search, a point size from 8 to 300, bold and italic. Native input methods are supported across Wayland, X11,
+and Windows. To change an existing text, select it with the pick tool and use the edit button in the property bar.
 
 **Number.** Click for a round badge, or drag to add a pointer tail. Seven styles are available:
 digits, upper and lower case letters, upper and lower case Roman numerals, Heavenly Stems and

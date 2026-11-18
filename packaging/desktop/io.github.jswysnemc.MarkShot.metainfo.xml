@@ -16,6 +16,7 @@
   <developer id="io.github.jswysnemc"><name>jswysnemc</name></developer>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.2.3" type="stable" date="2026-11-19"/>
     <release version="0.2.2" type="stable" date="2026-11-18"/>
     <release version="0.2.1" type="stable" date="2026-11-17"/>
     <release version="0.2.0" type="stable" date="2026-11-13"/>

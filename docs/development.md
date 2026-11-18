@@ -141,7 +141,7 @@ python3 scripts/packaging/install_linux.py \
 
 The per-format scripts `package_deb.py`, `package_rpm.py`, `package_pacman.py`,
 `package_appimage.py`, `package_flatpak.py` and `package_portable.py` turn that tree into a
-package. `native-release.yml` handles `v*` tags, including the official `v0.2.2` release, and
+package. `native-release.yml` handles `v*` tags, including the official `v0.2.3` release, and
 accepts legacy `native-v*` tags for preview retries. It calls the existing `release-*.yml`
 workflows and waits for all verification and package jobs before publishing. `windows-build.yml`
 produces the Windows archive and Setup installer. The installer is compiled with Inno Setup,
