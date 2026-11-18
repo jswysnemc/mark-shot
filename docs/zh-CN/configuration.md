@@ -195,7 +195,9 @@ max_file_size_mb = 1
 | `MARK_SHOT_CAPTURE` | `kde`、`image-copy`、`screencopy` 或 `portal`，强制指定 Wayland 截图方式 |
 | `MARK_SHOT_LOG` | 日志级别：`error`、`warn`、`info`、`debug` 或 `trace` |
 | `MARK_SHOT_CONFIG_DIR` | 指定一个目录，使用其中 Qt 格式的 `config.json` |
-| `MARK_SHOT_OCR_MIRROR` | 文字识别推理库与模型下载的 HTTP/HTTPS GitHub 镜像前缀，优先于 `[ocr].download_mirror` |
+| `MARK_SHOT_OCR_MIRROR` | 文字识别模型下载的 HTTP/HTTPS GitHub 镜像前缀，优先于 `[ocr].download_mirror`；推理库使用官方 PyPI 资源 |
+| `MARK_SHOT_NIRI_PANEL_EDGE` | 旧版 niri 平铺窗口的面板边缘覆盖：`top`、`bottom`、`left`、`right` 或 `none` |
+| `MARK_SHOT_NIRI_PANEL_SIZE` | 面板独占区的逻辑像素高度或宽度，与边缘覆盖配合使用 |
 | `MARK_SHOT_MEDIA_LIBRARY` | 录制媒体库的绝对路径，用于开发构建 |
 | `MARK_SHOT_UPLOAD_*` | 上传设置，见上文 |
 

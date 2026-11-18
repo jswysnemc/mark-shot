@@ -102,6 +102,20 @@ uv run --no-project --python /usr/bin/python3 python scripts/wayland_test_runtim
 
 They need niri, Xvfb, niri-use, xdotool, wtype, grim and Pillow. These are test dependencies only.
 
+### FOLL_PIN capture regression
+
+On the affected KDE Wayland system, run the following separately for cancellation, copying and
+pinning. Complete each capture normally; the script does not inject desktop input or kill windows:
+
+```sh
+python3 scripts/check_foll_pin.py --iterations 3 --output target/foll-pin-kde-cancel.json -- mark-shot --capture
+```
+
+The JSON records acquired/released counters before and after each capture, a bounded wait for
+release, the kernel and desktop environment. Add `--wait-for-pin-close` when testing pinning and
+close those windows before confirming the measurement. These counters cover the whole system, so other applications can affect the result.
+A stable result under private niri does not establish that the affected KWin/AMD combination is fixed.
+
 ## Conventions
 
 - Keep a source file under 750 lines and give it one responsibility. Split by responsibility

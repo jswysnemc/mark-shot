@@ -29,6 +29,11 @@ If direct GitHub downloads are slow or blocked, configure an HTTP/HTTPS mirror p
 GitHub automatically, and every downloaded archive is still verified against its pinned SHA-256
 digest.
 
+The inference library downloads from the official ONNX Runtime package on PyPI. Mark Shot verifies
+the archive and native libraries, extracts only the libraries and license notices, and requires no
+Python installation. Previously installed libraries from the official GitHub archive remain valid
+when their original checksums match.
+
 ### Starting recognition
 
 | From | How |
@@ -36,6 +41,10 @@ digest.
 | Command line | `mark-shot --ocr`, then select a region |
 | Editor | Press `O`, or use the OCR button on the action toolbar |
 | Pinned image | Right-click menu: **Copy Image Text** or **Text Selection Copy** |
+
+Enable **Settings → Pins & frames → Select text automatically in new pins** to recognize new
+pinned images and drag to select text after recognition completes. The option is off by default
+and requires installed OCR resources. Its configuration key is `[pinned].auto_text_selection`.
 
 ### Result window
 

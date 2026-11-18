@@ -201,7 +201,9 @@ in the state folder take precedence.
 | `MARK_SHOT_CAPTURE` | `kde`, `image-copy`, `screencopy` or `portal`. Forces the Wayland capture method |
 | `MARK_SHOT_LOG` | Log level: `error`, `warn`, `info`, `debug` or `trace` |
 | `MARK_SHOT_CONFIG_DIR` | Folder containing a Qt-style `config.json` to use |
-| `MARK_SHOT_OCR_MIRROR` | HTTP/HTTPS GitHub mirror prefix for OCR runtime and model downloads; overrides `[ocr].download_mirror` |
+| `MARK_SHOT_OCR_MIRROR` | HTTP/HTTPS GitHub mirror prefix for OCR model downloads; overrides `[ocr].download_mirror`. The inference library uses official PyPI resources |
+| `MARK_SHOT_NIRI_PANEL_EDGE` | Override old niri tiled-window panel reconstruction: `top`, `bottom`, `left`, `right`, or `none` |
+| `MARK_SHOT_NIRI_PANEL_SIZE` | Panel exclusive area in logical pixels, used with the edge override |
 | `MARK_SHOT_MEDIA_LIBRARY` | Absolute path of the recording library, for development builds |
 | `MARK_SHOT_UPLOAD_*` | Upload settings, see above |
 

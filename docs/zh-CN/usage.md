@@ -21,6 +21,12 @@
 向下滚动返回内部组件；框选阶段按 `Tab` 可切换整窗与组件。指针停留后，程序继续查询响应较慢的
 控件接口，并保留用户通过滚轮选定的区域。鼠标按下时锁定高亮范围，供本次点击采用。
 
+旧版 niri 没有上报平铺窗口的精确坐标时，程序会针对命名空间包含 `bar`、`dock` 或 `panel`
+词段的水平自定义面板，有界推算独占区。明确的 `top`、`bottom` 方向优先；未声明方向的 bar、panel
+按顶部处理，dock 按底部处理。推算与实际面板不符时，可指定边缘和逻辑像素尺寸：
+`env MARK_SHOT_NIRI_PANEL_EDGE=top MARK_SHOT_NIRI_PANEL_SIZE=52 mark-shot`。
+设置 `MARK_SHOT_NIRI_PANEL_EDGE=none` 可关闭推算；新版 niri 上报的精确坐标始终优先。
+
 ### 完成截图
 
 | 动作 | 按键 | 结果 |

@@ -26,6 +26,14 @@ to an inner control. `Tab` switches between the whole window and controls during
 control providers are queried further after the pointer stops; this preserves a region explicitly
 chosen with the wheel. Pressing the mouse locks the highlighted region for that click.
 
+On older niri versions that omit exact tiled-window positions, horizontal custom panels with a
+`bar`, `dock` or `panel` namespace use a bounded estimate of their exclusive area. Explicit `top`
+and `bottom` names take priority; unnamed bars and panels assume the top, docks the bottom.
+If the estimate does not match your panel, override its edge and size in logical pixels:
+`env MARK_SHOT_NIRI_PANEL_EDGE=top MARK_SHOT_NIRI_PANEL_SIZE=52 mark-shot`.
+Use `MARK_SHOT_NIRI_PANEL_EDGE=none` to disable estimates. Exact positions reported by newer
+niri versions always take priority.
+
 ### Finishing
 
 | Action | Key | Result |

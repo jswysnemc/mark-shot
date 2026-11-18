@@ -94,6 +94,19 @@ uv run --no-project --python /usr/bin/python3 python scripts/wayland_test_runtim
 
 这些工具需要 niri、Xvfb、niri-use、xdotool、wtype、grim 和 Pillow，它们仅是测试依赖。
 
+### FOLL_PIN 截图回归
+
+在出现问题的 KDE Wayland 环境中，分别验证取消、复制和贴图。每次正常完成截图；脚本不会模拟
+桌面输入或终止窗口：
+
+```sh
+python3 scripts/check_foll_pin.py --iterations 3 --output target/foll-pin-kde-cancel.json -- mark-shot --capture
+```
+
+JSON 记录每次截图前后的获取与释放计数、内核版本和桌面环境，并有界等待释放。验证贴图时增加
+`--wait-for-pin-close`，关闭本次贴图窗口后再确认采样。计数覆盖整个系统，其他应用可能影响结果；私有 niri 中的稳定
+结果不能证明报告中的 KWin 与 AMD 驱动组合已经修复。
+
 ## 约定
 
 - 单个源文件不超过 750 行，并且只承担一项职责。文件接近该行数之前按职责拆分。
