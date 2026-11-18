@@ -3,7 +3,10 @@
 use super::{runtime::NativeWindow, surface::SurfaceId};
 use crate::{
     AppResult,
-    backend::wayland::utils::buffers,
+    backend::wayland::utils::{
+        buffers,
+        shm_pool::{Buffer, SlotPool},
+    },
     types::{
         popup::{PopupFrame, validate},
         popup_tree::{Placement, PopupNode},
@@ -13,7 +16,6 @@ use smithay_client_toolkit::{
     compositor::FrameCallbackData,
     shell::wlr_layer::LayerSurface,
     shell::xdg::{XdgPositioner, popup::Popup},
-    shm::slot::{Buffer, SlotPool},
 };
 use wayland_client::{
     QueueHandle,

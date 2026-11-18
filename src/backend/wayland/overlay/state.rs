@@ -44,7 +44,7 @@ pub struct OverlayState {
     pub cursor_shape_manager:
         smithay_client_toolkit::seat::pointer::cursor_shape::CursorShapeManager,
     pub seat: smithay_client_toolkit::seat::SeatState,
-    pub pool: smithay_client_toolkit::shm::slot::SlotPool,
+    pub pool: crate::backend::wayland::utils::shm_pool::SlotPool,
     // ── wayland protocol ─────────────────────────────────────────────────────────
     pub outputs: Vec<Output>,
     pub frac: Option<wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1>,
@@ -102,7 +102,7 @@ impl OverlayRunTime {
                 &globals, &qh,
             )?;
 
-        let pool = smithay_client_toolkit::shm::slot::SlotPool::new(256 * 1024, &shm)?;
+        let pool = crate::backend::wayland::utils::shm_pool::SlotPool::new(256 * 1024, &shm)?;
 
         // ── other wayland globals ─────────────────────────────────────────────────────────────────────────
         let frac = globals
@@ -162,7 +162,7 @@ impl OverlayState {
         output_state: smithay_client_toolkit::output::OutputState,
         cursor_shape_manager: smithay_client_toolkit::seat::pointer::cursor_shape::CursorShapeManager,
         seat: smithay_client_toolkit::seat::SeatState,
-        pool: smithay_client_toolkit::shm::slot::SlotPool,
+        pool: crate::backend::wayland::utils::shm_pool::SlotPool,
         frac: Option<wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1>,
         viewporter: Option<wp_viewporter::WpViewporter>,
     ) -> Self {

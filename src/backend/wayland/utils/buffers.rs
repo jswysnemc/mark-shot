@@ -1,7 +1,7 @@
 //! 【Wayland缓冲】【有界复用】贴图和原生菜单共用空闲缓冲选择，最多保留三个当前尺寸缓冲
 
+use super::shm_pool::{Buffer, SlotPool};
 use crate::AppResult;
-use smithay_client_toolkit::shm::slot::{Buffer, SlotPool};
 use wayland_client::protocol::wl_shm;
 
 /// 【Wayland缓冲】【缓冲选择】为 size 从 buffers、pool 返回空闲缓冲索引；拒绝过大尺寸，三个缓冲仍占用时返回空值

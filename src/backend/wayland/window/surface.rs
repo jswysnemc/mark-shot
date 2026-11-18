@@ -2,11 +2,13 @@
 
 use super::runtime::NativeWindow;
 use super::{WindowContent, WindowSpec, role::Role};
-use crate::AppResult;
+use crate::{
+    AppResult,
+    backend::wayland::utils::shm_pool::{Buffer, SlotPool},
+};
 use smithay_client_toolkit::{
     compositor::{CompositorState, FrameCallbackData},
     shell::xdg::XdgShell,
-    shm::slot::{Buffer, SlotPool},
 };
 use tiny_skia::Pixmap;
 use wayland_client::{

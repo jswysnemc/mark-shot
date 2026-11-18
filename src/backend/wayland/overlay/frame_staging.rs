@@ -32,12 +32,9 @@ pub(super) fn released(state: &mut OverlayState, reclaim: bool) {
             && let Some(spare) = &mut surface.spare_buffer
             && !spare.active()
         {
+            // 1. 回收空闲备用槽位的完整共享页并保留缓冲对象，无密封 mmap 映射会自动跟随新分配页
             spare.reclaim(&mut state.pool);
             surface.buffer_history.reclaimed(spare.reclaimed());
-            if spare.reclaimed() {
-                // 1. 【截图覆盖层】【对象失效】回收共享页后销毁旧缓冲，让下次附着重新导入，避免KWin复用失效的映射
-                surface.spare_buffer = None;
-            }
         }
         if surface.waiting_release && surface.frame_sent.is_none() && has_writable_buffer(surface) {
             surface.waiting_release = false;

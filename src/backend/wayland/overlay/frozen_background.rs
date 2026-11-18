@@ -5,11 +5,12 @@ use crate::{
     AppResult,
     backend::wayland::utils::{
         shm::{ShmBuffer, create_shm_buffer},
+        shm_pool::SlotPool,
         surface::Background,
     },
     image_source::ImageSource,
 };
-use smithay_client_toolkit::{compositor::Region, shm::slot::SlotPool};
+use smithay_client_toolkit::compositor::Region;
 use tiny_skia::IntRect;
 
 impl WaylandOverlay {

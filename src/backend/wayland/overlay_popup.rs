@@ -4,7 +4,7 @@ use crate::{
     AppResult,
     backend::wayland::{
         overlay::state::OverlayState,
-        utils::{buffers, surface::Role},
+        utils::{buffers, shm_pool::Buffer, surface::Role},
     },
     types::{
         OverlayEvent,
@@ -17,7 +17,6 @@ use smithay_client_toolkit::{
         XdgPositioner, XdgSurface,
         popup::{Popup, PopupConfigure, PopupHandler},
     },
-    shm::slot::Buffer,
 };
 use wayland_client::{Connection, QueueHandle};
 use wayland_protocols::{

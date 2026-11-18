@@ -1,14 +1,13 @@
 //! 【原生窗口】【浮层拖动预览】保持被抓取主表面静止，通过无输入预览浮层按帧跟随指针以消除坐标振荡
 
 use super::{layer_geometry::Geometry, runtime::NativeWindow, surface::SurfaceId};
-use crate::AppResult;
+use crate::{AppResult, backend::wayland::utils::shm_pool::Buffer};
 use smithay_client_toolkit::{
     compositor::{FrameCallbackData, Region},
     shell::{
         WaylandSurface,
         wlr_layer::{Anchor, KeyboardInteractivity, Layer, LayerSurface},
     },
-    shm::slot::Buffer,
 };
 use tiny_skia::Pixmap;
 use wayland_client::{

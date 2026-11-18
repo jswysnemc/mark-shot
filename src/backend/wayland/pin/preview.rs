@@ -1,14 +1,16 @@
 //! 【贴图】【拖动预览】保留原表面的隐式指针抓取，独立无输入 layer 显示可跨输出的图像
 
 use super::{render::buffer, runtime::Pin};
-use crate::{AppResult, features::pinned_image::placement::Placement};
+use crate::{
+    AppResult, backend::wayland::utils::shm_pool::Buffer,
+    features::pinned_image::placement::Placement,
+};
 use smithay_client_toolkit::{
     compositor::{FrameCallbackData, Region},
     shell::{
         WaylandSurface,
         wlr_layer::{Anchor, KeyboardInteractivity, Layer, LayerSurface},
     },
-    shm::slot::Buffer,
 };
 use wayland_client::{QueueHandle, protocol::wl_output};
 use wayland_protocols::wp::{

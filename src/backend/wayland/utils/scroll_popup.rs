@@ -1,6 +1,9 @@
 //! 【滚动截图】【标准弹出角色】以透明父窗口持有控制表面，使用合成器边界约束且不申请菜单抓取
 
-use super::shm::{ShmBuffer, create_shm_buffer};
+use super::{
+    shm::{ShmBuffer, create_shm_buffer},
+    shm_pool::SlotPool,
+};
 use crate::{AppResult, backend::wayland::overlay::state::OverlayState};
 use smithay_client_toolkit::{
     compositor::CompositorState,
@@ -12,7 +15,6 @@ use smithay_client_toolkit::{
             window::{Window, WindowDecorations},
         },
     },
-    shm::slot::SlotPool,
 };
 use wayland_client::{Proxy, QueueHandle, protocol::wl_surface::WlSurface};
 use wayland_protocols::wp::viewporter::client::wp_viewport::WpViewport;

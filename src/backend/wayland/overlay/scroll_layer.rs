@@ -2,12 +2,14 @@
 
 use super::state::OverlayState;
 use crate::{
-    backend::wayland::utils::shm::{ShmBuffer, create_shm_buffer},
+    backend::wayland::utils::{
+        shm::{ShmBuffer, create_shm_buffer},
+        shm_pool::SlotPool,
+    },
     types::scroll_panel::{ScrollPanelFrame, edge_bounds, edge_pixels},
 };
 use smithay_client_toolkit::{
     compositor::{CompositorState, Region},
-    shm::slot::SlotPool,
     subcompositor::SubcompositorState,
 };
 use tiny_skia::{Color, IntRect, Rect};

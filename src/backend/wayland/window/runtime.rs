@@ -10,7 +10,7 @@ use smithay_client_toolkit::{
     registry::RegistryState,
     seat::{SeatState, pointer::cursor_shape::CursorShapeManager},
     shell::{wlr_layer::LayerShell, xdg::XdgShell},
-    shm::{Shm, slot::SlotPool},
+    shm::Shm,
 };
 use wayland_client::{
     Connection,
@@ -34,8 +34,10 @@ use super::{
     surface::{Surface, SurfaceId},
 };
 use crate::{
-    AppResult, backend::wayland::text_input::TextInput,
-    features::text::input_method::focus::Target, keys::Mods,
+    AppResult,
+    backend::wayland::{text_input::TextInput, utils::shm_pool::SlotPool},
+    features::text::input_method::focus::Target,
+    keys::Mods,
 };
 use std::time::Instant;
 wayland_client::delegate_noop!(NativeWindow: ignore crate::backend::wayland::activation::XdgActivationV1);

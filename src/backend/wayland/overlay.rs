@@ -27,13 +27,13 @@ pub mod state;
 mod visibility;
 
 use crate::backend::ScreenOverlay;
+use crate::backend::wayland::utils::shm_pool::SlotPool;
 use crate::backend::wayland::utils::surface::InputRegion;
 use crate::types::{CursorIcon, DamageRect, Output, OverlayEvent};
 use log::info;
 use smithay_client_toolkit::compositor::{FrameCallbackData, Region};
 use smithay_client_toolkit::shell::WaylandSurface;
 use smithay_client_toolkit::shell::wlr_layer::{KeyboardInteractivity, Layer};
-use smithay_client_toolkit::shm::slot::SlotPool;
 use state::Probe;
 
 const CONFIGURE_TIMEOUT: Duration = Duration::from_secs(5);

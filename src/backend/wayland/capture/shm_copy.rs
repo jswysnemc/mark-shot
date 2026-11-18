@@ -2,18 +2,17 @@
 
 use std::time::{Duration, Instant};
 
+use crate::backend::task_wake::{Source as CancelSource, Wake};
+use crate::backend::wayland::utils::shm_pool::raw::RawPool;
+use crate::types::{CaptureResult, MonitorFrame, Output, StreamInfo};
+use crate::utils::to_rgba;
 use rustix::event::{PollFd, PollFlags, poll};
 use rustix::time::Timespec;
 use smithay_client_toolkit::delegate_dispatch2;
-use smithay_client_toolkit::shm::raw::RawPool;
 use smithay_client_toolkit::shm::{Shm, ShmHandler};
 use wayland_client::globals::{GlobalList, GlobalListContents, registry_queue_init};
 use wayland_client::protocol::{wl_buffer, wl_output, wl_registry, wl_shm};
 use wayland_client::{Connection, Dispatch, EventQueue, QueueHandle};
-
-use crate::backend::task_wake::{Source as CancelSource, Wake};
-use crate::types::{CaptureResult, MonitorFrame, Output, StreamInfo};
-use crate::utils::to_rgba;
 
 struct CancelOnDrop(Wake);
 

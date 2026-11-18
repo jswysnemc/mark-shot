@@ -7,14 +7,12 @@ use super::{
 };
 use crate::{
     AppResult,
+    backend::wayland::utils::shm_pool::Buffer,
     features::pinned_image::menu::{self, PinAction},
 };
-use smithay_client_toolkit::{
-    shell::xdg::{
-        XdgPositioner, XdgSurface,
-        popup::{Popup, PopupConfigure, PopupHandler},
-    },
-    shm::slot::Buffer,
+use smithay_client_toolkit::shell::xdg::{
+    XdgPositioner, XdgSurface,
+    popup::{Popup, PopupConfigure, PopupHandler},
 };
 use tiny_skia::Pixmap;
 use wayland_client::{Connection, QueueHandle};

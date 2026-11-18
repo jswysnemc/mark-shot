@@ -27,8 +27,10 @@ impl WaylandOverlay {
         runtime.event_queue.flush()?;
         runtime.event_queue.roundtrip(&mut runtime.state)?;
         // 2. 【截图覆盖层】【共享缓冲回收】表面关闭后重建空池，避免旧整屏页留到下次窗口创建
-        runtime.state.pool =
-            smithay_client_toolkit::shm::slot::SlotPool::new(256 * 1024, &runtime.state.shm)?;
+        runtime.state.pool = crate::backend::wayland::utils::shm_pool::SlotPool::new(
+            256 * 1024,
+            &runtime.state.shm,
+        )?;
         self.faulted = 0;
         // 2. 【截图覆盖层】【旧事件清理】旧表面的焦点和帧事件不能影响随后打开的文件对话框
         runtime.state.events.clear();

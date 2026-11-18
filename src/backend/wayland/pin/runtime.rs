@@ -4,6 +4,7 @@ use super::popup::PinPopup;
 use super::{gesture::Gesture, preview::Preview};
 use crate::{
     AppResult,
+    backend::wayland::utils::shm_pool::{Buffer, SlotPool},
     features::pinned_image::{
         model::PinnedImage,
         placement::{Geometry, Placement},
@@ -31,10 +32,7 @@ use smithay_client_toolkit::{
             window::{Window, WindowDecorations},
         },
     },
-    shm::{
-        Shm,
-        slot::{Buffer, SlotPool},
-    },
+    shm::Shm,
 };
 use std::sync::{Arc, atomic::AtomicBool};
 use wayland_client::{

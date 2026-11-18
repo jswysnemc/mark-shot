@@ -5,8 +5,8 @@
 // from the high-level Wayland protocol handlers ('state/compositor_shm_layer.rs')
 // reminder: each output has its own surface
 
+use super::shm_pool::{Buffer, SlotPool};
 use crate::utils::copy_swizzled;
-use smithay_client_toolkit::shm::slot::{Buffer, SlotPool};
 use wayland_client::protocol::{wl_buffer, wl_shm};
 
 #[cfg(test)]

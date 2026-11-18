@@ -1,12 +1,13 @@
 //! 【贴图】【原图绘制】只在内容变化时重绘，复制与保存不包含显示边框和文字选择层
 
 use super::runtime::{Pin, Shell};
-use crate::{AppResult, features::pinned_image::placement::Placement, renderer::Painter};
-use smithay_client_toolkit::{
-    compositor::FrameCallbackData,
-    shell::xdg::XdgSurface,
-    shm::slot::{Buffer, SlotPool},
+use crate::{
+    AppResult,
+    backend::wayland::utils::shm_pool::{Buffer, SlotPool},
+    features::pinned_image::placement::Placement,
+    renderer::Painter,
 };
+use smithay_client_toolkit::{compositor::FrameCallbackData, shell::xdg::XdgSurface};
 use tiny_skia::{FilterQuality, Pixmap, PixmapPaint, Transform};
 use wayland_client::QueueHandle;
 
