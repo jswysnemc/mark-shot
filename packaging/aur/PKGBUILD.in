@@ -10,6 +10,8 @@ depends=('glibc' 'fontconfig' 'libxkbcommon' 'libxkbcommon-x11' 'libxcb' 'openss
 makedepends=('git' 'rust' 'clang' 'pkgconf' 'python' 'nasm' 'curl' 'xz')
 optdepends=('noto-fonts: fallback fonts' 'noto-fonts-cjk: CJK fonts' 'xdg-desktop-portal: portal capture')
 conflicts=('mark-shot-bin')
+# 【原生发布】【媒体摘要】禁止调试包处理添加 .gnu_debuglink，保持已校验媒体库内容不变
+options=('!debug')
 _commit=@commit@
 source=("mark-shot::git+https://github.com/jswysnemc/mark-shot.git#commit=$_commit")
 sha256sums=('SKIP')
