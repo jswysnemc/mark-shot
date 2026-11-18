@@ -96,6 +96,7 @@ fn upload_busy_blocks_actual_editor_events_and_cancel_preserves_canvas() {
 
 /// 【上传输入测试】【原版结果】按实际 Qt 样本验证成功、失败、复制失败与超时的提示、关闭期限和冻结选区
 #[test]
+/// 【上传输入回归】【完成契约】无参数，按当前界面语言核对提示，并验证复制、关闭和原图状态，无返回值
 fn upload_completion_matches_original_qt_window_contract() {
     let fixture: serde_json::Value =
         serde_json::from_str(include_str!("../../../../tests/fixtures/qt-upload.json")).unwrap();
@@ -135,7 +136,7 @@ fn upload_completion_matches_original_qt_window_contract() {
         );
         assert_eq!(
             state.toasts.items.last().unwrap().text,
-            case["toast"].as_str().unwrap()
+            crate::ui::language::Language::current().text(case["toast"].as_str().unwrap())
         );
         assert_eq!(state.selection.zone, selection);
         assert!(state.finish.is_none() && state.annotations.is_empty() && !state.cancel);
