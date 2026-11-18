@@ -24,6 +24,7 @@ fn distribution(archive: &'static str) -> Distribution {
             sha256: HASH,
         },
         platform: "test",
+        base_url: "http://localhost",
     }
 }
 
@@ -143,4 +144,60 @@ fn extracts_regular_tar_files_without_following_symlinks() {
     )
     .unwrap();
     assert_eq!(fs::read_dir(dest.path()).unwrap().count(), 2);
+}
+
+/// 【识别运行库】【官方格式】无参数，验证 wheel 只提取原生库与版权文件，忽略 Python 模块，无返回值
+#[test]
+fn wheel_extraction_keeps_native_files_without_installing_python_modules() {
+    let root = tempfile::tempdir().unwrap();
+    let dest = tempfile::tempdir().unwrap();
+    let path = root.path().join("runtime.whl");
+    archive(
+        &path,
+        &[
+            ("onnxruntime/capi/runtime.dll", CONTENT),
+            ("onnxruntime/capi/shared.dll", CONTENT),
+            ("onnxruntime/LICENSE", CONTENT),
+            ("onnxruntime/__init__.py", b"raise RuntimeError()"),
+        ],
+    );
+    let dist = distribution("runtime.whl");
+    install::extract(&path, dest.path(), dist, &AtomicBool::new(false)).unwrap();
+    install::verify_installed(dest.path(), dist).unwrap();
+    assert_eq!(fs::read_dir(dest.path()).unwrap().count(), 3);
+    fs::write(dest.path().join("runtime.dll"), b"xyz").unwrap();
+    assert!(install::verify_installed(dest.path(), dist).is_err());
+}
+
+/// 【识别运行库】【真实资源】按 MARK_SHOT_RUNTIME_ARCHIVE 指定的本地官方 wheel 校验和解包，返回测试结果，不联网
+#[test]
+#[ignore = "requires a downloaded official runtime wheel"]
+fn verified_official_wheel_extracts_current_platform_runtime() {
+    let path = std::path::PathBuf::from(
+        std::env::var_os("MARK_SHOT_RUNTIME_ARCHIVE").expect("runtime archive path"),
+    );
+    let dist = super::manifest::current().unwrap();
+    crate::ocr::model_integrity::verify_asset(&path, &dist.archive).unwrap();
+    let dest = tempfile::tempdir().unwrap();
+    install::extract(&path, dest.path(), dist, &AtomicBool::new(false)).unwrap();
+    install::verify_installed(dest.path(), dist).unwrap();
+    assert_eq!(fs::read_dir(dest.path()).unwrap().count(), 4);
+}
+
+/// 【识别运行库】【完整安装】无参数，通过生产下载入口访问固定官方资源、安装并初始化原生推理会话，无返回值
+#[test]
+#[ignore = "requires official network access"]
+fn official_runtime_download_installs_and_initializes_session_options() {
+    let dist = super::manifest::current().unwrap();
+    let root = tempfile::tempdir().unwrap();
+    install::download(root.path(), dist, &AtomicBool::new(false), |_| {}).unwrap();
+    let installed = root.path().join("installed");
+    install::verify_installed(&installed, dist).unwrap();
+    #[cfg(feature = "ocr-dynamic")]
+    {
+        ort::init_from(installed.join(dist.library.file))
+            .unwrap()
+            .commit();
+        assert!(ort::session::Session::builder().is_ok());
+    }
 }

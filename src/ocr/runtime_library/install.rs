@@ -17,6 +17,18 @@ pub fn verify(dir: &Path, dist: Distribution) -> Result<(), String> {
     Ok(())
 }
 
+/// 【识别运行库】【安装兼容】按 dir 与 dist 校验已安装资源，兼容先前官方 GitHub 归档的摘要，返回完整性错误
+pub(super) fn verify_installed(dir: &Path, dist: Distribution) -> Result<(), String> {
+    verify(dir, dist).or_else(|error| {
+        let Some(legacy) =
+            super::manifest::legacy().filter(|legacy| legacy.platform == dist.platform)
+        else {
+            return Err(error);
+        };
+        verify(dir, legacy)
+    })
+}
+
 /// 【识别运行库】【文件复制】从 reader 复制允许的 name 到 dir；size 限制单文件大小，cancel 中断安装，返回错误
 fn copy(
     reader: &mut impl Read,
@@ -62,7 +74,7 @@ pub fn extract(
     cancel: &AtomicBool,
 ) -> Result<(), String> {
     let file = File::open(archive).map_err(|error| error.to_string())?;
-    if dist.archive.file.ends_with(".zip") {
+    if dist.archive.file.ends_with(".zip") || dist.archive.file.ends_with(".whl") {
         let mut archive = zip::ZipArchive::new(file).map_err(|error| error.to_string())?;
         for index in 0..archive.len() {
             let mut entry = archive.by_index(index).map_err(|error| error.to_string())?;
@@ -124,11 +136,11 @@ pub fn download(
         "另一窗口正在安装运行库 / Runtime is being installed in another window".to_string()
     })?;
     let installed = root.join("installed");
-    if verify(&installed, dist).is_ok() {
+    if verify_installed(&installed, dist).is_ok() {
         return Ok(());
     }
     let stopped = AtomicBool::new(false);
-    let original = format!("{}/{}", super::manifest::BASE_URL, dist.archive.file);
+    let original = format!("{}/{}", dist.base_url, dist.archive.file);
     let urls = crate::ocr::mirror::candidates(&original);
     crate::ocr::download::fetch_candidates(
         &crate::ocr::download::agent(),

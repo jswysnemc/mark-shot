@@ -47,7 +47,7 @@ pub fn installed() -> bool {
     let (Ok(root), Some(dist)) = (directory(), manifest::current()) else {
         return false;
     };
-    install::verify(&root.join("installed"), dist).is_ok()
+    install::verify_installed(&root.join("installed"), dist).is_ok()
 }
 
 /// 【识别运行库】【加载入口】无参数，串行校验和初始化当前进程的运行库；未安装时返回引导信息，绝不自动下载
@@ -65,7 +65,7 @@ pub fn load() -> Result<(), String> {
         let dist =
             manifest::current().ok_or("当前平台没有运行库发行包 / Unsupported runtime platform")?;
         let root = directory()?.join("installed");
-        install::verify(&root, dist).map_err(|error| {
+        install::verify_installed(&root, dist).map_err(|error| {
             format!("请在 OCR 面板下载或修复推理库 / Install or repair the OCR runtime: {error}")
         })?;
         ort::init_from(root.join(dist.library.file))

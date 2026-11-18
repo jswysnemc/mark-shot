@@ -2,6 +2,8 @@
 
 use crate::ocr::models::Asset;
 
+mod wheel;
+
 pub const VERSION: &str = "1.28.0";
 pub const BASE_URL: &str = "https://github.com/microsoft/onnxruntime/releases/download/v1.28.0";
 
@@ -11,10 +13,16 @@ pub struct Distribution {
     pub library: Asset,
     pub shared: Asset,
     pub platform: &'static str,
+    pub base_url: &'static str,
 }
 
-/// 【识别运行库】【平台选择】无参数，返回当前平台的官方 CPU 运行库；没有验证过的架构返回空值
+/// 【识别运行库】【平台选择】无参数，返回当前平台固定摘要的官方 PyPI 原生库资源，没有验证过的架构返回空值
 pub fn current() -> Option<Distribution> {
+    wheel::current()
+}
+
+/// 【识别运行库】【旧版清单】无参数，返回先前 GitHub 归档的校验清单，保留已安装且验证通过的运行库
+pub(super) fn legacy() -> Option<Distribution> {
     for (
         platform,
         archive,
@@ -65,6 +73,7 @@ pub fn current() -> Option<Distribution> {
         if matches {
             return Some(Distribution {
                 platform,
+                base_url: BASE_URL,
                 archive: Asset {
                     file: archive,
                     size: bytes,
