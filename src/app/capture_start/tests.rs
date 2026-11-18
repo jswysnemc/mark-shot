@@ -117,7 +117,7 @@ fn fullscreen_selects_current_output_and_dismisses_intro() {
     assert!(!state.capture_start.visible);
 }
 
-/// 【截图起始测试】【实际拖选】形成选区后起始控件消失，录屏工具保留区域供小工具栏调整，不提前交接
+/// 【截图起始测试】【实际拖选】无参数，首次拖动隐藏起始控件，录屏工具保留区域与格式供继续编辑，无返回值
 #[test]
 fn gif_selection_stays_editable_and_keeps_requested_format() {
     let mut state = editor();
@@ -126,7 +126,7 @@ fn gif_selection_stays_editable_and_keeps_requested_format() {
     crate::app::input::handle_pointer_button(&mut state, MouseButton::Left, true, &mut 0);
     crate::app::input::handle_pointer_move(&mut state, 0, 400.0, 300.0, &mut 0);
     sync(&mut state, &mut 0);
-    assert!(state.capture_start.visible);
+    assert!(!state.capture_start.visible);
     crate::app::input::handle_pointer_button(&mut state, MouseButton::Left, false, &mut 0);
     sync(&mut state, &mut 0);
     assert!(!state.capture_start.visible);
@@ -188,9 +188,9 @@ fn recording_shortcuts_match_the_top_buttons() {
     assert_eq!(state.selected_tool, crate::tools::Tool::Recording);
 }
 
-/// 【截图起始测试】【无效拖选】不足八像素的拖动不构成有效选区，起始入口继续可用
+/// 【截图起始测试】【无效拖选】无参数，微小拖动也隐藏起始界面，拒绝选区后不重新显示，无返回值
 #[test]
-fn rejected_tiny_selection_preserves_start_controls() {
+fn rejected_tiny_selection_does_not_restore_start_controls() {
     let mut state = editor();
     crate::app::input::handle_pointer_move(&mut state, 0, 80.0, 120.0, &mut 0);
     crate::app::input::handle_pointer_button(&mut state, MouseButton::Left, true, &mut 0);
@@ -198,7 +198,27 @@ fn rejected_tiny_selection_preserves_start_controls() {
     sync(&mut state, &mut 0);
     crate::app::input::handle_pointer_button(&mut state, MouseButton::Left, false, &mut 0);
     sync(&mut state, &mut 0);
-    assert!(state.capture_start.visible && state.selection.zone.is_none());
+    assert!(!state.capture_start.visible && state.selection.zone.is_none());
+}
+
+/// 【截图起始测试】【首次移动】无参数，按下或同坐标移动保留界面，首次单轴移动立即隐藏两块界面，无返回值
+#[test]
+fn first_drag_hides_hints_and_mode_bar_before_release() {
+    let mut state = editor();
+    crate::app::input::handle_pointer_move(&mut state, 0, 80.0, 120.0, &mut 0);
+    crate::app::input::handle_pointer_button(&mut state, MouseButton::Left, true, &mut 0);
+    assert!(state.capture_start.visible && state.capture_start.shows_bar());
+    crate::app::input::handle_pointer_move(&mut state, 0, 80.0, 120.0, &mut 0);
+    assert!(state.capture_start.visible);
+    let mut dirty = 0;
+    crate::app::input::handle_pointer_move(&mut state, 0, 81.0, 120.0, &mut dirty);
+    assert!(state.input.mouse_down && state.tool_active);
+    assert!(!state.capture_start.visible && !state.capture_start.shows_bar());
+    assert!(crate::ui::capture_start::hints::bounds(&state, 0).is_none());
+    assert_ne!(dirty, 0);
+    crate::app::input::handle_pointer_button(&mut state, MouseButton::Left, false, &mut 0);
+    assert!(state.selection.zone.is_none());
+    assert!(!state.capture_start.visible);
 }
 
 /// 【截图起始测试】【空闲窗口】已有录制控制窗口时不启动第二个窗口，避免选区交接后发生独占锁冲突

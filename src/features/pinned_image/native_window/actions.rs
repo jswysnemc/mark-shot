@@ -1,10 +1,20 @@
 //! 【原生贴图】【业务动作】菜单关闭后交付变换、识别及输出
 
 use super::*;
+use crate::config::pinned_preferences::Preference;
 
 impl Pin {
     /// 【原生贴图】【菜单动作】按action变换原图或交付输出，返回重绘或关闭，保存和编辑使用共用业务入口
     pub(super) fn action(&mut self, action: PinAction) -> crate::AppResult<WindowAction> {
+        self.action_with(action, crate::config::pinned_preferences::save)
+    }
+
+    /// 【原生贴图】【动作提交】按 action 执行业务，persist 保存菜单偏好，返回窗口动作或业务错误
+    pub(super) fn action_with(
+        &mut self,
+        action: PinAction,
+        persist: impl FnOnce(Preference, bool) -> std::io::Result<()>,
+    ) -> crate::AppResult<WindowAction> {
         use crate::features::pinned_image::actions;
         if !self.enabled(action) {
             return Ok(WindowAction::None);
@@ -34,7 +44,10 @@ impl Pin {
                 self.feedback.zoom(self.image.zoom);
             }
             PinAction::AlwaysOnTop => {
-                self.image.always_on_top = !self.image.always_on_top;
+                let enabled = !self.image.always_on_top;
+                // 1. 【原生贴图】【偏好提交】保存成功后才修改当前开关，写入失败沿用原状态并交给统一反馈
+                persist(Preference::AlwaysOnTop, enabled)?;
+                self.image.always_on_top = enabled;
                 self.feedback.topmost(self.image.always_on_top);
             }
             PinAction::Edit => actions::open(&self.image.png()?, false)?,
@@ -68,7 +81,9 @@ impl Pin {
                 }
             }
             PinAction::TextSelection => {
-                self.text_selection = !self.text_selection;
+                let enabled = !self.text_selection;
+                persist(Preference::AutoTextSelection, enabled)?;
+                self.text_selection = enabled;
                 if self.text_selection && !self.text.is_active() {
                     self.text_selection = self.start_ocr()?;
                 } else {

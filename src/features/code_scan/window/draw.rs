@@ -53,13 +53,28 @@ pub(super) fn draw(state: &mut ResultWindow, canvas: &mut tiny_skia::Pixmap, sca
                 Control::CopyAll => !state.editor.is_empty(),
                 Control::Close => true,
             };
+            let hovered = state.hovered == Some(*control);
             if *control == Control::Close {
+                if hovered {
+                    controls::button(
+                        &mut painter,
+                        *area,
+                        "",
+                        state.pressed == Some(*control),
+                        true,
+                        true,
+                    );
+                }
                 painter.icon(
                     crate::ui::icons::CLOSE,
                     16.0,
                     area.left() + 6.0,
                     area.top() + 6.0,
-                    palette.text,
+                    if hovered {
+                        crate::theme::toolbar::Palette::current().hover_text
+                    } else {
+                        palette.text
+                    },
                 );
                 continue;
             }
@@ -68,7 +83,7 @@ pub(super) fn draw(state: &mut ResultWindow, canvas: &mut tiny_skia::Pixmap, sca
                 *area,
                 label,
                 *control == Control::CopyAll,
-                false,
+                hovered,
                 enabled,
             );
         }

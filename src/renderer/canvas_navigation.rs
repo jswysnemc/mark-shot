@@ -140,6 +140,7 @@ pub(super) fn draw(
             req.selection_edges,
         );
     }
+    super::text_editing_frame::draw(req, origin, scale, 1.0 / view.scale as f32, dirty);
     if req.selected_annotation.is_some() || req.is_pending_selected {
         let mut painter = Painter::new(req.canvas)
             .with_scale(scale)

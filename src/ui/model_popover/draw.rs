@@ -3,7 +3,8 @@ use tiny_skia::Rect;
 use crate::ocr::models::{MODELS, ModelStatus};
 use crate::renderer::Painter;
 use crate::renderer::text::TextStyle;
-use crate::theme::{Rgba, color, font, radius, stroke};
+use crate::theme::{Rgba, color, font, radius};
+use crate::ui::controls;
 use crate::ui::icons;
 use crate::ui::model_popover::{
     ModelPopover, ModelPopoverElement, ModelRow, button_geom, cfg, note_font_size, row_geom,
@@ -12,6 +13,7 @@ use crate::ui::panel::UiPanel;
 
 const RECOMMENDED: &str = "Recommended for your system";
 
+/// 【识别资源】【面板绘制】按 p 与 popover 的有效尺寸更新缓存并绘制完整内容，无返回值
 pub fn draw_model_popover(p: &mut Painter, popover: &mut ModelPopover) {
     let Some(rect) = popover.rect() else {
         return;
@@ -29,6 +31,7 @@ pub fn draw_model_popover(p: &mut Painter, popover: &mut ModelPopover) {
     popover.pixmap = cache;
 }
 
+/// 【识别资源】【内容绘制】按 p 与 popover 绘制标题、折叠按钮和可见资源，无返回值
 fn draw_content(p: &mut Painter, popover: &ModelPopover) {
     let cfg = cfg();
     let (w, h) = popover.size;
@@ -45,15 +48,12 @@ fn draw_content(p: &mut Painter, popover: &ModelPopover) {
     } else {
         "OCR · Engine and resources"
     };
-    let parts: &[(&str, Rgba, f32)] = &[(title, emphasis(), font::label())];
-    let mut x = title_x;
-    for &(text, text_color, size) in parts {
-        if let Some(rect) = Rect::from_xywh(x, cfg.padding, (title_x + title_w - x).max(1.0), 20.0)
-        {
-            p.text(rect, text, TextStyle::new(size, text_color.color()));
-        }
-        // title_gap: between the title's dot and its highlighted part
-        x += p.measure(text, size) + cfg.title_gap;
+    if let Some(rect) = Rect::from_xywh(title_x, cfg.padding, title_w, 20.0) {
+        p.text(
+            rect,
+            title,
+            TextStyle::new(font::label(), color::foreground()),
+        );
     }
     if let Some(rect) = Rect::from_xywh(title_x, cfg.padding + 22.0, title_w, 18.0) {
         p.text(
@@ -96,6 +96,19 @@ fn draw_content(p: &mut Painter, popover: &ModelPopover) {
         } else {
             "Other language models"
         };
+        let action = match (chinese, expanded) {
+            (true, true) => "收起",
+            (true, false) => "展开",
+            (false, true) => "Less",
+            (false, false) => "More",
+        };
+        let hovered = popover.hovered
+            == Some(if resources {
+                ModelPopoverElement::Resources
+            } else {
+                ModelPopoverElement::Languages
+            });
+        let foreground = control(p, area, false, hovered);
         p.text(
             Rect::from_xywh(
                 area.left() + 10.0,
@@ -105,18 +118,12 @@ fn draw_content(p: &mut Painter, popover: &ModelPopover) {
             )
             .unwrap(),
             title,
-            TextStyle::new(font::small(), color::foreground()),
+            TextStyle::new(font::small(), foreground),
         );
-        let action = match (chinese, expanded) {
-            (true, true) => "收起",
-            (true, false) => "展开",
-            (false, true) => "Less",
-            (false, false) => "More",
-        };
         p.text(
             Rect::from_xywh(area.right() - 64.0, area.top(), 54.0, area.height()).unwrap(),
             action,
-            TextStyle::new(font::small(), emphasis()).center(),
+            TextStyle::new(font::small(), foreground).center(),
         );
     }
     if popover.resources_expanded {
@@ -130,6 +137,7 @@ fn draw_content(p: &mut Painter, popover: &ModelPopover) {
     }
 }
 
+/// 【识别资源】【模型卡片】按 p、panel、idx、row 和 hovered 绘制统一状态卡片及操作按钮，无返回值
 fn draw_row(
     p: &mut Painter,
     panel: &ModelPopover,
@@ -149,27 +157,12 @@ fn draw_row(
     let button_hovered = hovered == Some(ModelPopoverElement::Button(idx));
 
     let row_selected = row.active || row.recommended;
-    if row_hovered || row_selected {
-        p.item_border(
-            rect.left(),
-            rect.top(),
-            rect.width(),
-            rect.height(),
-            radius::item(),
-            stroke::border(),
-            row_hovered,
-            row_selected,
-        );
-    }
+    let foreground = control(p, rect, row_selected, row_hovered);
 
     let left = rect.left() + cfg.row_padding;
     let text_w = (button.left() - cfg.status_width - left).max(0.0);
 
-    let name_color = if row.active {
-        emphasis()
-    } else {
-        color::foreground()
-    };
+    let name_color = foreground;
     if let Some(name_rect) =
         Rect::from_xywh(left, rect.top() + cfg.name_top, text_w, cfg.name_height)
     {
@@ -192,9 +185,16 @@ fn draw_row(
                 Rect::from_xywh(left, rect.top() + cfg.note_top, text_w, cfg.note_height)
             {
                 let (note, note_color) = if row.recommended {
-                    (RECOMMENDED, emphasis())
+                    (RECOMMENDED, foreground)
                 } else {
-                    (model.note, color::muted())
+                    (
+                        model.note,
+                        if row_selected || row_hovered {
+                            foreground
+                        } else {
+                            color::muted()
+                        },
+                    )
                 };
                 p.text(
                     note_rect,
@@ -221,7 +221,15 @@ fn draw_row(
         p.text(
             status_rect,
             &status_text,
-            TextStyle::new(note_font_size(), color::muted().color()).center(),
+            TextStyle::new(
+                note_font_size(),
+                if row_selected || row_hovered {
+                    foreground
+                } else {
+                    color::muted()
+                },
+            )
+            .center(),
         );
     }
 
@@ -236,23 +244,14 @@ fn draw_row(
     };
 
     if !checked && button_hovered {
-        p.item_border(
-            button.left(),
-            button.top(),
-            cfg.button_size,
-            cfg.button_size,
-            radius::item(),
-            stroke::border(),
-            true,
-            false,
-        );
+        control(p, button, false, true);
     }
     let tint = if checked {
-        emphasis()
+        foreground
     } else if button_hovered {
-        color::hover()
+        crate::theme::toolbar::Palette::current().hover_text
     } else {
-        color::foreground()
+        foreground
     };
     p.icon(
         icon,
@@ -263,11 +262,19 @@ fn draw_row(
     );
 }
 
+/// 【识别资源】【下载大小】按 bytes 返回以 MiB 换算的紧凑标签，无其他参数
 fn size_label(bytes: u64) -> String {
     format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
 }
 
-/// 【识别模型】【强调文字】返回当前主题的不透明强调色，标题和选中状态不能使用半透明背景填色，无参数
-fn emphasis() -> Rgba {
-    crate::theme::context_menu::Palette::current().accent
+/// 【识别资源】【统一控件】按 rect、active 和 hovered 在 painter 绘制共享按钮背景，返回对应文字及图标前景色
+pub(super) fn control(painter: &mut Painter<'_>, rect: Rect, active: bool, hovered: bool) -> Rgba {
+    controls::button(painter, rect, "", active, hovered, true);
+    if active {
+        color::on_active()
+    } else if hovered {
+        crate::theme::toolbar::Palette::current().hover_text
+    } else {
+        color::foreground()
+    }
 }

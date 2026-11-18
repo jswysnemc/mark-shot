@@ -8,10 +8,15 @@ mod capture;
 mod events;
 #[path = "native/ime.rs"]
 mod ime;
+#[path = "native/ime_caret.rs"]
+mod ime_caret;
 #[path = "native/message_loop.rs"]
 mod message_loop;
 #[path = "native/monitors.rs"]
 mod monitors;
+#[cfg(test)]
+#[path = "native/text_input_tests.rs"]
+mod text_input_tests;
 #[path = "native/wake.rs"]
 mod wake;
 #[path = "native/window.rs"]

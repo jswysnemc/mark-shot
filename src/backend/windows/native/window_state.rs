@@ -29,6 +29,10 @@ pub(super) struct Context {
     pub owner: ThreadId,
     pub inside: Cell<bool>,
     pub text_target: Cell<u64>,
+    pub resetting_ime: Cell<bool>,
+    pub text_rect: Cell<Option<(i32, i32, i32, i32)>>,
+    pub composition: RefCell<Option<crate::types::text_input::CompositionGeometry>>,
+    pub ime_caret: super::ime_caret::Caret,
     pub ime_context: Cell<windows_sys::Win32::UI::Input::Ime::HIMC>,
 }
 
@@ -71,10 +75,17 @@ pub(super) unsafe extern "system" fn procedure(
         }),
         WM_SETTINGCHANGE | WM_THEMECHANGED => Some(Event::Theme { id }),
         WM_CLOSE => Some(Event::Close { id }),
-        WM_SETFOCUS | WM_KILLFOCUS => Some(Event::Focus {
-            id,
-            focused: message == WM_SETFOCUS,
-        }),
+        WM_SETFOCUS | WM_KILLFOCUS => {
+            if message == WM_KILLFOCUS {
+                context.ime_caret.clear();
+            } else if let Err(error) = context.ime_caret.sync(hwnd, context.text_rect.get()) {
+                log::error!("【Windows输入法】【焦点光标】{error}");
+            }
+            Some(Event::Focus {
+                id,
+                focused: message == WM_SETFOCUS,
+            })
+        }
         WM_SIZE => {
             let mut rect = unsafe { std::mem::zeroed() };
             unsafe {
@@ -172,7 +183,7 @@ pub(super) unsafe extern "system" fn procedure(
         }),
         WM_IME_STARTCOMPOSITION | WM_IME_ENDCOMPOSITION | WM_IME_COMPOSITION => {
             let target = context.text_target.get();
-            if target == 0 {
+            if target == 0 || context.resetting_ime.get() {
                 return 0;
             }
             let composition = if message == WM_IME_COMPOSITION {
@@ -191,6 +202,27 @@ pub(super) unsafe extern "system" fn procedure(
                     .map_or(0, |composition| composition.cursor),
                 commit: composition.map_or_else(String::new, |composition| composition.commit),
             })
+        }
+        WM_IME_SETCONTEXT => {
+            // 1. 【Windows输入法】【预编辑归属】应用绘制正文候选，系统保留候选列表而不再叠加默认组合窗口
+            let flags = if context.text_target.get() != 0 {
+                lparam & !(windows_sys::Win32::UI::Input::Ime::ISC_SHOWUICOMPOSITIONWINDOW as isize)
+            } else {
+                lparam
+            };
+            return unsafe { DefWindowProcW(hwnd, message, wparam, flags) };
+        }
+        WM_IME_REQUEST
+            if wparam == windows_sys::Win32::UI::Input::Ime::IMR_QUERYCHARPOSITION as usize =>
+        {
+            return unsafe {
+                super::ime::query_position(
+                    hwnd,
+                    context.text_rect.get(),
+                    context.composition.borrow().as_ref(),
+                    lparam,
+                )
+            };
         }
         WM_CHAR => Some(Event::Character {
             id,

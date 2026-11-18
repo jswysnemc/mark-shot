@@ -234,3 +234,72 @@ fn existing_annotation_selection_does_not_expand_blink_damage() {
         "the existing selected object expanded the caret area: {rect:?}"
     );
 }
+
+/// 【文字外框测试】【实际像素】按 state 返回生产帧中的青绿色虚线像素数，用于区分文字、背景和编辑外框
+fn editing_frame_pixels(state: &EditorState) -> usize {
+    state.canvas[0]
+        .pixels()
+        .iter()
+        .enumerate()
+        .filter(|(index, pixel)| {
+            let x = index % state.canvas[0].width() as usize;
+            let y = index / state.canvas[0].width() as usize;
+            (245..450).contains(&x)
+                && (195..315).contains(&y)
+                && pixel.green() > 160
+                && u16::from(pixel.green()) > u16::from(pixel.red()) + 40
+                && pixel.green() > pixel.blue()
+        })
+        .count()
+}
+
+/// 【文字外框测试】【输入与导出】无参数，空输入也显示虚线框，光标隐藏时外框保持，提交后消失且不写入持久图层，无返回值
+#[test]
+fn editing_frame_is_visible_for_empty_text_and_stays_out_of_committed_layers() {
+    let now = Instant::now();
+    let mut state = prepared(now);
+    frame(&mut state, 1);
+    let shown = editing_frame_pixels(&state);
+    assert!(shown > 20, "text input has no dashed editing frame");
+    crate::app::text_caret::tick(&mut state, now + Duration::from_millis(500), &mut 0);
+    frame(&mut state, 1);
+    assert_eq!(editing_frame_pixels(&state), shown);
+    crate::editor::text_session::commit(&mut state, &mut 0);
+    frame(&mut state, 1);
+    assert_eq!(editing_frame_pixels(&state), 0);
+    crate::editor::text_session::begin_new(&mut state, (250.0, 260.0), 1.0, &mut 0);
+    frame(&mut state, 1);
+    assert!(editing_frame_pixels(&state) > 10);
+}
+
+/// 【文字外框测试】【缩放叠层】无参数，放大和缩小时编辑外框使用变换后的坐标，光标局部重绘与完整帧一致，无返回值
+#[test]
+fn navigated_editing_frame_survives_partial_caret_redraws() {
+    for zoom in [0.75, 1.5, 2.0] {
+        let now = Instant::now();
+        let mut state = prepared(now);
+        assert!(state.ensure_navigation());
+        state
+            .navigation
+            .view
+            .as_mut()
+            .unwrap()
+            .zoom_at(zoom, (250.0, 200.0), true);
+        assert!(!state.canvas_transform().is_identity());
+        frame(&mut state, 1);
+        let shown = editing_frame_pixels(&state);
+        assert!(shown > 10, "zoom {zoom} has no editing frame");
+        let mut dirty = 0;
+        crate::app::text_caret::tick(&mut state, now + Duration::from_millis(500), &mut dirty);
+        let partial = frame(&mut state, dirty);
+        let complete = frame(&mut state, 1);
+        assert!(
+            partial == complete,
+            "zoom {zoom} changed pixels outside caret damage"
+        );
+        assert_eq!(editing_frame_pixels(&state), shown);
+        crate::editor::text_session::commit(&mut state, &mut 0);
+        frame(&mut state, 1);
+        assert_eq!(editing_frame_pixels(&state), 0);
+    }
+}

@@ -347,6 +347,9 @@ section!(Pen {
 });
 
 section!(Highlighter {
+    width: f32 = 6.0,
+    style: crate::features::highlighter::HighlighterStyle =
+        crate::features::highlighter::HighlighterStyle::StraightLine,
     smoothing: f32 = 0.7,
     min_distance: f32 = 1.0,
     opacity: f32 = 0.4,

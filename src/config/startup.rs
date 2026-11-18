@@ -58,8 +58,7 @@ pub(super) fn migrate_loupe(config: &mut super::Config, path: &std::path::Path) 
     {
         super::settings_store::write(path, &[("startup.selection_loupe".into(), enabled.into())])?;
         config.startup.selection_loupe = Some(enabled);
-        if let Some(state) =
-            dirs::state_dir().map(|directory| directory.join("mark-shot/tools.toml"))
+        if let Some(state) = crate::editor::saved::path()
             && state.exists()
         {
             super::persistence::update(&state, |text| {

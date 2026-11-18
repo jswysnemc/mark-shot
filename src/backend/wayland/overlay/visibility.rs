@@ -10,7 +10,6 @@ impl WaylandOverlay {
         if self.suspended {
             return Ok(());
         }
-        self.text_interactivity_monitor = None;
         let runtime = &mut self.runtime;
         runtime.state.popup = None;
         // 1. 【截图覆盖层】【资源移除】先释放子表面和视区，再由角色所有者销毁角色及主表面

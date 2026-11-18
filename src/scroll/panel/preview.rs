@@ -1,17 +1,10 @@
-//! 【滚动截图】【双预览导航】始终保留主细节预览与副全景概览，采用无边框极简圆角呈现
+//! 【滚动截图】【双预览导航】主细节和全景概览使用直角，竖向缩略图靠底并随长图增长向上扩展
 
-use crate::{
-    renderer::{Painter, paths::rounded_rect_path},
-    theme::toolbar::Palette,
-};
+use crate::{renderer::Painter, theme::toolbar::Palette};
 use shot_stitch::Axis;
-use tiny_skia::{
-    BlendMode, FillRule, Paint, PathBuilder, Pixmap, PremultipliedColorU8, Rect, Transform,
-};
+use tiny_skia::{PathBuilder, Pixmap, PremultipliedColorU8, Rect};
 
 const SPLIT_GAP: f32 = 8.0;
-const DETAIL_RADIUS: f32 = 6.0;
-const OVERVIEW_RADIUS: f32 = 5.0;
 
 #[derive(Default)]
 pub struct PreviewState {
@@ -117,7 +110,7 @@ pub fn layout(area: Rect, dimensions: (i32, i32), axis: Axis) -> Option<PreviewL
     })
 }
 
-/// 【滚动截图】【概览矩形】按 layout 和 dimensions 等比适配完整长图，返回副预览内的实际图像范围
+/// 【滚动截图】【概览矩形】按 layout 和 dimensions 等比适配完整长图，返回竖向靠底、横向居中的图像范围
 pub fn overview_rect(layout: &PreviewLayout, dimensions: (i32, i32)) -> Option<Rect> {
     let area = layout.overview?;
     let (w, h) = (dimensions.0 as f32, dimensions.1 as f32);
@@ -127,7 +120,7 @@ pub fn overview_rect(layout: &PreviewLayout, dimensions: (i32, i32)) -> Option<R
     let factor = (area.width() / w).min(area.height() / h);
     Rect::from_xywh(
         area.left() + (area.width() - w * factor) / 2.0,
-        area.top() + (area.height() - h * factor) / 2.0,
+        area.top() + (area.height() - h * factor) * if layout.horizontal { 0.5 } else { 1.0 },
         (w * factor).max(1.0),
         (h * factor).max(1.0),
     )
@@ -147,9 +140,9 @@ pub fn scrub_at(position: (f64, f64), rect: Rect, layout: &PreviewLayout, offset
 pub(super) fn draw_tracks(p: &mut Painter, detail: Rect, overview: Option<Rect>) {
     let palette = Palette::current();
     let well = palette.control_fill.with_alpha(180);
-    p.fill_rounded(detail, DETAIL_RADIUS, well);
+    p.fill_rounded(detail, 0.0, well);
     if let Some(track) = overview {
-        p.fill_rounded(track, OVERVIEW_RADIUS, well);
+        p.fill_rounded(track, 0.0, well);
     }
 }
 
@@ -188,7 +181,7 @@ pub fn draw(
         )
         .unwrap_or(layout.detail)
     };
-    draw_image(p, image, detail_target, layout.scale, origin, DETAIL_RADIUS);
+    draw_image(p, image, detail_target, layout.scale, origin);
 
     // 2. 在副预览槽内绘制完整长图缩略及轻量捕获区间与当前视口指示
     if let Some(rect) = overview_rect(layout, (image.width(), image.height())) {
@@ -198,7 +191,6 @@ pub fn draw(
             rect,
             rect.width() / image.width() as f32,
             (0.0, 0.0),
-            4.0,
         );
         let length = (layout.max_scrub + layout.viewport).max(1.0);
         if let Some(range) = capture_range {
@@ -233,46 +225,13 @@ pub fn draw(
     }
 }
 
-/// 【滚动截图】【圆角遮罩】将局部光栅 pixels 外侧四角裁切为 radius 物理像素圆角，无返回值
-fn clip_pixmap_corners(pixels: &mut Pixmap, radius: f32) {
-    let w = pixels.width() as f32;
-    let h = pixels.height() as f32;
-    let r = radius.min(w * 0.5).min(h * 0.5);
-    if r < 1.0 || w < 4.0 || h < 4.0 {
-        return;
-    }
-    let Some(bounds) = Rect::from_xywh(0.0, 0.0, w, h) else {
-        return;
-    };
-    let Some(inner) = rounded_rect_path(&bounds, r, true, true, true, true) else {
-        return;
-    };
-    let mut pb = PathBuilder::new();
-    pb.push_rect(bounds);
-    pb.push_path(&inner);
-    if let Some(mask) = pb.finish() {
-        pixels.fill_path(
-            &mask,
-            &Paint {
-                blend_mode: BlendMode::DestinationOut,
-                anti_alias: true,
-                ..Default::default()
-            },
-            FillRule::EvenOdd,
-            Transform::identity(),
-            None,
-        );
-    }
-}
-
-/// 【滚动截图】【局部光栅】按 rect、factor、origin 与 radius 从 image 采样可见区域并绘制圆角图像到 p，无返回值
+/// 【滚动截图】【局部光栅】按 rect、factor 和 origin 从 image 采样可见区域并绘制直角图像到 p，无返回值
 fn draw_image(
     p: &mut Painter,
     image: shot_stitch::StitchedView<'_>,
     rect: Rect,
     factor: f32,
     origin: (f32, f32),
-    radius: f32,
 ) {
     let scale = p.scale();
     let width = (rect.width() * scale).round().max(1.0) as u32;
@@ -300,7 +259,6 @@ fn draw_image(
             .unwrap();
         }
     }
-    clip_pixmap_corners(&mut pixels, radius * scale);
     let (x, y) = p.to_px(rect.left(), rect.top());
     p.draw_pixmap(x.round() as i32, y.round() as i32, &pixels);
 }

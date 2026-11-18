@@ -103,6 +103,17 @@ pub fn init(process: Process) {
     }
 }
 
+/// 【诊断日志】【默认路径】无参数，返回系统状态目录中的日志路径，Windows 使用本地数据目录，不创建文件
+pub(crate) fn default_log_file_path() -> Option<PathBuf> {
+    Some(
+        dirs::state_dir()
+            .or_else(dirs::data_local_dir)?
+            .join("mark-shot")
+            .join("mark-shot.log"),
+    )
+}
+
+/// 【诊断日志】【实际路径】无参数，返回显式配置或系统默认日志路径，不创建文件
 pub fn log_file_path() -> Option<PathBuf> {
     if let Some(path) = crate::config::get()
         .log
@@ -112,7 +123,7 @@ pub fn log_file_path() -> Option<PathBuf> {
     {
         return Some(PathBuf::from(path));
     }
-    Some(dirs::state_dir()?.join("mark-shot").join("mark-shot.log"))
+    default_log_file_path()
 }
 
 /// Opens the log for appending, keeping one older file around.

@@ -30,6 +30,8 @@ mod collection_stack;
 mod filter_handles;
 pub mod fixed_path;
 mod glyph_run;
+#[cfg(test)]
+mod highlighter_tests;
 pub(crate) mod line_edit;
 mod line_handles;
 mod magnifier_handles;
@@ -53,6 +55,7 @@ mod selection_border_damage;
 mod selection_handles;
 pub mod stroke_path;
 pub mod text;
+mod text_editing_frame;
 mod text_preedit;
 
 pub use annotations::{

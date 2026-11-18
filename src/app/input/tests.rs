@@ -21,6 +21,7 @@ mod filter;
 mod filter_output;
 mod filter_properties;
 mod filter_support;
+mod highlighter;
 mod history;
 mod interaction_parity;
 mod line;
@@ -126,6 +127,12 @@ fn key(state: &mut EditorState, value: &str, dirty: &mut u32) {
 /// 【输入测试】【控件中心】返回 state 属性面板 index 对应控件的本地中心，供真实输入分派测试使用
 fn widget_center(state: &EditorState, index: usize) -> (f64, f64) {
     let panel = &state.settings_panel;
+    if let Some(rect) = panel.widget_rect(index) {
+        return (
+            (rect.left() + rect.width() * 0.5) as f64,
+            (rect.top() + rect.height() * 0.5) as f64,
+        );
+    }
     let offset: f32 = panel.widgets[..index]
         .iter()
         .map(|widget| widget.size() + widget.trailing_padding())

@@ -117,6 +117,7 @@ pub(in crate::app) fn snapshot(
         return None;
     }
     Some(Snapshot {
+        composition: None,
         target_id,
         focus_id: focus.id,
         monitor_idx: monitor,

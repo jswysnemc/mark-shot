@@ -111,6 +111,8 @@ pub(super) fn draw(
             });
     }
 
+    super::text_editing_frame::draw(req, req.offset, s, 1.0, dirty_rect.copied());
+
     if let Some(pending) = req.pending
         && req.is_pending_selected
     {

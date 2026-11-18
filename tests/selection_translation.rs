@@ -79,9 +79,31 @@ fn fonts() -> cosmic_text::FontSystem {
     fonts
 }
 
-/// 【框选翻译测试】【生产尺寸】保留原版按钮尺寸，新浮窗按钮插入复制与退出之间，整体宽度增加一个按钮间距
+/// 【框选翻译测试】【生产尺寸】无参数，在独立英文进程核对固定参考尺寸和新增浮窗按钮间距，无返回值
 #[test]
 fn language_list_and_every_bar_button_match_qt_geometry() {
+    // 1. 【框选翻译测试】【语言隔离】参考数据来自英文控件，子进程固定语言且不改动用户配置或并行测试环境
+    const REFERENCE_PROCESS: &str = "MARK_SHOT_QT_TRANSLATION_REFERENCE";
+    if std::env::var_os(REFERENCE_PROCESS).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "language_list_and_every_bar_button_match_qt_geometry",
+                "--nocapture",
+            ])
+            .env(REFERENCE_PROCESS, "1")
+            .env("MARK_SHOT_LANG", "en")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "English reference process failed:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+        return;
+    }
+    // 2. 【框选翻译测试】【尺寸核对】使用参考字体逐项比较语言菜单、结果条和按钮位置
     let reference: Value = serde_json::from_str(include_str!(
         "fixtures/qt-selection-translation/reference.json"
     ))

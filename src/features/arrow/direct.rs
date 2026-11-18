@@ -33,9 +33,12 @@ pub(super) fn path(
     let center = line.section(start, line.length - notch);
     let center = super::path::polyline_path(&center)?;
     let mut builder = PathBuilder::new();
-    builder.push_path(&crate::features::line::draw::stroke_outline_rendered(
-        &center, line_style, width, scale,
-    )?);
+    let shaft = if style.tail == super::ArrowTail::Pointed && !style.bidirectional() {
+        super::tail::shaft(line, line.length - notch, line_style, width, scale)?
+    } else {
+        crate::features::line::draw::stroke_outline_rendered(&center, line_style, width, scale)?
+    };
+    builder.push_path(&shaft);
     let end = *line.points.last()?;
     // 2. 【箭头】【头部合成】终点始终绘制头部，双向样式增加起点头部
     dart(

@@ -100,10 +100,12 @@ pub(super) fn path(line: &Polyline, metrics: HeadMetrics, style: ArrowStyle) -> 
             offset(start_base, start_normal, metrics.half_width),
         );
     } else {
-        // 1. 【箭头】【圆头箭身】单向箭头从圆头尾帽开始，箭身保持固定笔宽而不是收成尖楔
+        // 1. 【箭头】【尾部起点】尖尾沿原版采样轮廓直接展开，圆尾从完整半宽开始
         let tail_normal = normal_at(&shaft, 0);
         let tail_right = offset(shaft[0], tail_normal, half);
-        builder.move_to(tail_right.0, tail_right.1);
+        let pointed = style.tail == super::ArrowTail::Pointed;
+        let first = if pointed { start } else { tail_right };
+        builder.move_to(first.0, first.1);
         for index in 1..shaft.len() {
             add(
                 &mut builder,
@@ -125,17 +127,20 @@ pub(super) fn path(line: &Polyline, metrics: HeadMetrics, style: ArrowStyle) -> 
                 offset(shaft[index], normal_at(&shaft, index), -half),
             );
         }
-        let tail_left = offset(shaft[0], tail_normal, -half);
-        add(&mut builder, tail_left);
-        tail_cap(
-            &mut builder,
-            start,
-            line.tangent(0.0),
-            tail_normal,
-            tail_left,
-            tail_right,
-            half,
-        );
+        // 2. 【箭头】【连续闭合】尖尾、主体和头部共用一条轮廓，避免拼接反向路径造成透明孔洞
+        if !pointed {
+            let tail_left = offset(shaft[0], tail_normal, -half);
+            add(&mut builder, tail_left);
+            tail_cap(
+                &mut builder,
+                start,
+                line.tangent(0.0),
+                tail_normal,
+                tail_left,
+                tail_right,
+                half,
+            );
+        }
     }
     builder.close();
     builder.finish()

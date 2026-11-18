@@ -1,16 +1,13 @@
 //! 【识别安装】【资源控件】复用面板绘制、命中和状态，选择引擎不创建下载任务
 
 use super::{ModelPopover, ModelPopoverElement, cfg};
-use crate::{
-    ocr::{
-        engine_choice::{self, Engine},
-        models::{ModelStatus, OcrModels},
-    },
-    renderer::{Painter, text::TextStyle},
-    theme::{color, font, radius, stroke},
-    ui::icons,
+use crate::ocr::{
+    engine_choice::{self, Engine},
+    models::{ModelStatus, OcrModels},
 };
 use tiny_skia::Rect;
+
+pub use super::setup_draw::draw;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct State {
@@ -54,7 +51,7 @@ pub fn rows() -> usize {
 }
 
 /// 【识别安装】【行矩形】按 origin 与 index 返回统一设置行矩形，供绘制和命中共用
-fn rect(panel: &ModelPopover, origin: (f32, f32), index: usize) -> Rect {
+pub(super) fn rect(panel: &ModelPopover, origin: (f32, f32), index: usize) -> Rect {
     let config = cfg();
     Rect::from_xywh(
         origin.0 + config.padding,
@@ -75,7 +72,7 @@ pub fn hit(
     origin: (f32, f32),
     point: (f64, f64),
 ) -> Option<ModelPopoverElement> {
-    (0..rows())
+    (0..super::layout::setup_rows(panel))
         .find(|index| super::state::point_in_rect(point, rect(panel, origin, *index)))
         .map(|index| match (cfg!(target_os = "windows"), index) {
             (true, 0) => ModelPopoverElement::SystemEngine,
@@ -143,127 +140,4 @@ pub fn activate(
     sync(panel, models);
     panel.dirty = true;
     true
-}
-
-/// 【识别安装】【控件绘制】按 panel 绘制引擎选项与独立下载行，p 为共享主题画笔，无返回值
-pub fn draw(p: &mut Painter, panel: &ModelPopover) {
-    let chinese =
-        crate::ui::language::Language::current() == crate::ui::language::Language::Chinese;
-    let count = if panel.setup.show_models() { rows() } else { 2 };
-    for index in 0..count {
-        let (element, title, note, selected) = match (cfg!(target_os = "windows"), index) {
-            (true, 0) => (
-                ModelPopoverElement::SystemEngine,
-                if chinese {
-                    "Windows 系统 OCR"
-                } else {
-                    "Windows OCR"
-                },
-                if chinese {
-                    "使用系统语言包，适合简单单语言文本"
-                } else {
-                    "Installed language packs; simple single-language text"
-                },
-                panel.setup.engine == Engine::System,
-            ),
-            (true, 1) => (
-                ModelPopoverElement::PaddleEngine,
-                if chinese {
-                    "本地模型 OCR（推荐）"
-                } else {
-                    "Local model OCR (recommended)"
-                },
-                if chinese {
-                    "手动下载推理库和语言模型"
-                } else {
-                    "Download runtime and language model manually"
-                },
-                panel.setup.engine == Engine::Paddle,
-            ),
-            _ => (
-                ModelPopoverElement::Runtime,
-                if chinese {
-                    "推理库 · ONNX Runtime"
-                } else {
-                    "Runtime · ONNX Runtime"
-                },
-                if chinese {
-                    "下载一次，安装后可离线识别"
-                } else {
-                    "Install once for offline recognition"
-                },
-                panel.setup.runtime == ModelStatus::Installed,
-            ),
-        };
-        let area = rect(panel, (0.0, 0.0), index);
-        let hovered = panel.hovered == Some(element);
-        p.item_border(
-            area.left(),
-            area.top(),
-            area.width(),
-            area.height(),
-            radius::item(),
-            stroke::border(),
-            hovered,
-            selected,
-        );
-        let left = area.left() + cfg().row_padding;
-        let width =
-            (area.width() - cfg().row_padding * 2.0 - cfg().button_size - cfg().status_width)
-                .max(1.0);
-        p.text(
-            Rect::from_xywh(left, area.top() + cfg().name_top, width, cfg().name_height).unwrap(),
-            title,
-            TextStyle::new(font::label(), color::foreground()),
-        );
-        p.text(
-            Rect::from_xywh(
-                left,
-                area.top() + cfg().note_top,
-                area.width() - cfg().row_padding * 2.0,
-                cfg().note_height,
-            )
-            .unwrap(),
-            note,
-            TextStyle::new(font::small(), color::muted()),
-        );
-        let icon = if element != ModelPopoverElement::Runtime {
-            if selected { icons::CHECK } else { icons::OCR }
-        } else {
-            match panel.setup.runtime {
-                ModelStatus::Installed => icons::CHECK,
-                ModelStatus::Queued | ModelStatus::Downloading(_) => icons::CLOSE,
-                ModelStatus::Failed => icons::RETRY,
-                _ => icons::DOWNLOAD,
-            }
-        };
-        p.icon(
-            icon,
-            cfg().icon_size,
-            area.right() - cfg().row_padding - cfg().icon_size,
-            area.top() + (area.height() - cfg().icon_size) / 2.0,
-            color::foreground(),
-        );
-        if element == ModelPopoverElement::Runtime {
-            let status = match panel.setup.runtime {
-                ModelStatus::Downloading(percent) => format!("{percent}%"),
-                ModelStatus::Queued => "…".into(),
-                ModelStatus::Installed => if chinese { "已安装" } else { "Installed" }.into(),
-                _ => crate::ocr::runtime_library::manifest::current()
-                    .map(|dist| format!("{:.1} MB", dist.archive.size as f64 / 1_000_000.0))
-                    .unwrap_or_else(|| "Unavailable".into()),
-            };
-            p.text(
-                Rect::from_xywh(
-                    area.right() - cfg().button_size - cfg().status_width - cfg().row_padding,
-                    area.top(),
-                    cfg().status_width,
-                    cfg().row_height,
-                )
-                .unwrap(),
-                &status,
-                TextStyle::new(font::small(), color::muted()).center(),
-            );
-        }
-    }
 }

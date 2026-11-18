@@ -235,6 +235,7 @@ fn xim_preedit_commit_and_fallback_follow_the_current_text_target() {
         unreachable!()
     };
     let snapshot = Snapshot {
+        composition: None,
         target_id: 100,
         focus_id: focus.id,
         monitor_idx: 0,

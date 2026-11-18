@@ -198,20 +198,10 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
                 } else if editing {
                     let shortcut = matches!(entry.kind, Kind::Shortcut);
                     let edit = layout::text_edit(row.control);
-                    widgets::field(
-                        painter,
-                        if shortcut { row.control } else { edit.field },
-                        "",
-                        true,
-                        false,
-                    );
+                    widgets::field(painter, edit.field, "", true, false);
                     widgets::button(
                         painter,
-                        if shortcut {
-                            layout::reset_rect(row.control)
-                        } else {
-                            edit.reset
-                        },
+                        edit.reset,
                         if chinese { "恢复" } else { "Reset" },
                         false,
                         hover == Some(Control::Reset(row.index)),
@@ -220,7 +210,7 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
                     if shortcut {
                         widgets::button(
                             painter,
-                            layout::apply_rect(row.control),
+                            edit.save,
                             if entry.section == "desktop" {
                                 if chinese { "禁用" } else { "Disable" }
                             } else if chinese {
@@ -232,18 +222,19 @@ pub(super) fn draw(state: &mut Preferences, canvas: &mut Pixmap, scale: f32) {
                             hover == Some(Control::Clear(row.index)),
                             true,
                         );
-                        painter.text(
-                            rect(
-                                row.control.left(),
-                                row.control.top(),
-                                (row.control.width() - 96.0).max(1.0),
-                                row.control.height(),
-                            ),
+                        let prompt = controls::fit_label(
+                            painter,
                             if chinese {
                                 "按下快捷键…"
                             } else {
                                 "Press a shortcut…"
                             },
+                            12.0,
+                            edit.input.width(),
+                        );
+                        painter.text(
+                            edit.field,
+                            &prompt,
                             TextStyle::new(12.0, palette.accent).center(),
                         );
                     } else {

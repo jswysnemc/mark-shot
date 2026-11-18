@@ -1,4 +1,4 @@
-//! 【截图起始】【生命周期】选区形成后丢弃起始控件，不因清空选区重新出现
+//! 【截图起始】【生命周期】首次拖动时丢弃起始控件，不因取消或清空选区重新出现
 
 pub(crate) mod input;
 mod placement;
@@ -60,13 +60,16 @@ fn damage(state: &mut EditorState, dirty: &mut u32) {
     }
 }
 
-/// 【截图起始】【阶段交接】按 state 的正式选区永久关闭起始界面，dirty 返回旧控件损坏
+/// 【截图起始】【阶段交接】按 state 的首次拖动或正式选区永久关闭起始界面，dirty 返回旧控件损坏，无返回值
 pub(crate) fn sync(state: &mut EditorState, dirty: &mut u32) {
-    if state.capture_start.visible
-        && state.selection.zone.is_some()
-        && !state.input.mouse_down
-        && !state.tool_active
-    {
+    let dragging = state.selection.creating
+        && state.input.mouse_down
+        && state
+            .input
+            .drag_start
+            .is_some_and(|origin| origin != state.canvas_point());
+    let selected = state.selection.zone.is_some() && !state.input.mouse_down && !state.tool_active;
+    if state.capture_start.visible && (dragging || selected) {
         state.capture_start.visible = false;
         state.capture_start.hovered = None;
         state.capture_start.hint_hovered = None;

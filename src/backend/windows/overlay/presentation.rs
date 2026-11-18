@@ -338,9 +338,10 @@ impl ScreenOverlay for Overlay {
     ) -> crate::AppResult {
         for (index, (_, window)) in self.surfaces.iter_mut().enumerate() {
             let target = snapshot.filter(|snapshot| snapshot.monitor_idx == index);
-            window.set_text_input(
+            window.set_text_input_with_geometry(
                 target.map_or(0, |snapshot| snapshot.target_id),
                 target.and_then(|snapshot| snapshot.cursor_rect),
+                target.and_then(|snapshot| snapshot.composition.as_ref()),
             )?;
         }
         self.text = snapshot.cloned();

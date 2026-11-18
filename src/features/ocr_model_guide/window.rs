@@ -7,14 +7,21 @@ use crate::{
         engine_choice::{self, Source},
         models::{MODELS, ModelEvent, ModelStatus, OcrModels},
     },
-    renderer::{Painter, text::TextStyle},
+    renderer::Painter,
     ui::model_popover::{self, ModelPopover, ModelPopoverElement, ModelRow},
 };
 use std::{
     sync::{Arc, OnceLock},
     time::{Duration, Instant},
 };
-use tiny_skia::{Pixmap, Rect};
+use tiny_skia::Pixmap;
+
+#[path = "frame.rs"]
+mod frame;
+
+#[cfg(test)]
+#[path = "tests.rs"]
+mod tests;
 
 struct Guide {
     models: OcrModels,
@@ -24,6 +31,8 @@ struct Guide {
     icons: crate::renderer::Icons,
     completion: Arc<OnceLock<Source>>,
     pressed: Option<ModelPopoverElement>,
+    close_hovered: bool,
+    close_pressed: bool,
     size: (u32, u32),
     deadline: Option<Instant>,
     auto_close: bool,
@@ -32,9 +41,14 @@ struct Guide {
 impl Guide {
     /// 【识别模型】【显示比例】返回当前窗口可容纳模型组件的比例，无参数，标题栏保持紧凑逻辑高度
     fn fit(&self) -> f32 {
-        (self.size.0 as f32 / self.panel.size.0)
-            .min((self.size.1 as f32 - 28.0).max(1.0) / self.panel.size.1)
-            .min(1.0)
+        frame::layout(self.size, self.panel.size).fit
+    }
+
+    /// 【识别窗口】【内容定位】无参数，按当前窗口与内容尺寸同步缩放后的绘制和命中原点，无返回值
+    fn place_panel(&mut self) {
+        let layout = frame::layout(self.size, self.panel.size);
+        self.panel.render_pos = (layout.origin.0 / layout.fit, layout.origin.1 / layout.fit);
+        self.panel.position = self.panel.render_pos;
     }
 
     /// 【识别模型】【指针换算】按 position 返回组件未缩放坐标，保证合成器限制窗口尺寸后命中仍与显示一致
@@ -47,9 +61,7 @@ impl Guide {
         let mut panel = ModelPopover::new();
         panel.open = true;
         panel.opacity = 1.0;
-        panel.render_pos = (0.0, 28.0);
-        panel.position = panel.render_pos;
-        let size = (360, 540);
+        let size = frame::preferred(panel.size);
         let mut result = Self {
             models,
             panel,
@@ -58,11 +70,15 @@ impl Guide {
             icons: crate::app::load_icons_cache(),
             completion,
             pressed: None,
+            close_hovered: false,
+            close_pressed: false,
             size,
             deadline: None,
             auto_close,
         };
         result.sync();
+        result.size = frame::preferred(result.panel.size);
+        result.place_panel();
         result
     }
 
@@ -80,6 +96,7 @@ impl Guide {
                 recommended: self.models.installed_count() == 0
                     && index == self.models.recommended(),
             }));
+        self.place_panel();
         self.deadline = self
             .models
             .needs_poll()
@@ -133,6 +150,10 @@ impl Drop for Guide {
 }
 
 impl WindowContent for Guide {
+    /// 【识别窗口】【内容尺寸】无参数，返回展开或收起后完整内容需要的窗口大小
+    fn preferred_size(&self) -> Option<(u32, u32)> {
+        Some(frame::preferred(self.panel.size))
+    }
     /// 【识别模型】【圆角外观】无参数，返回启用圆角外侧透明裁切
     fn rounded_corners(&self) -> bool {
         true
@@ -149,27 +170,24 @@ impl WindowContent for Guide {
 
     /// 【识别模型】【面板绘制】按 scale 在 canvas 绘制模型组件和紧凑标题栏，缩小窗口时整体适配
     fn draw(&mut self, canvas: &mut Pixmap, scale: f32) {
-        canvas.fill(crate::theme::color::panel().into());
+        self.size = (
+            (canvas.width() as f32 / scale).round() as u32,
+            (canvas.height() as f32 / scale).round() as u32,
+        );
+        canvas.fill(crate::theme::window::Palette::current().window.color());
         let fit = self.fit();
+        self.place_panel();
         {
             let mut painter = Painter::new(canvas)
                 .with_scale(scale)
                 .with_icons(&self.icons)
                 .with_text(&mut self.fonts, &mut self.cache);
-            painter.text(
-                Rect::from_xywh(10.0, 0.0, (self.size.0 as f32 - 40.0).max(1.0), 28.0).unwrap(),
-                "Mark Shot / OCR",
-                TextStyle::new(12.0, crate::theme::color::foreground()),
+            frame::draw(
+                &mut painter,
+                self.size,
+                self.close_hovered,
+                self.close_pressed,
             );
-            painter.icon(
-                crate::ui::icons::CLOSE,
-                12.0,
-                self.size.0 as f32 - 21.0,
-                8.0,
-                crate::theme::color::foreground(),
-            );
-            self.panel.render_pos = (0.0, 28.0 / fit);
-            self.panel.position = self.panel.render_pos;
             model_popover::draw_model_popover(
                 &mut painter.with_scale(scale * fit),
                 &mut self.panel,
@@ -198,6 +216,7 @@ impl WindowContent for Guide {
             }
             WindowEvent::Resize { size } => {
                 self.size = size;
+                self.place_panel();
                 WindowAction::Redraw
             }
             WindowEvent::Key(input) => match input.key {
@@ -207,17 +226,7 @@ impl WindowContent for Guide {
                     .hovered
                     .map_or(WindowAction::None, |item| self.activate(item)),
                 Some(Key::Up | Key::Down) => {
-                    let mut items = Vec::new();
-                    if cfg!(target_os = "windows") {
-                        items.extend([
-                            ModelPopoverElement::SystemEngine,
-                            ModelPopoverElement::PaddleEngine,
-                        ]);
-                    }
-                    if self.panel.setup.show_models() {
-                        items.push(ModelPopoverElement::Runtime);
-                        items.extend((0..MODELS.len()).map(ModelPopoverElement::Row));
-                    }
+                    let items = model_popover::navigation_items(&self.panel);
                     let old = items
                         .iter()
                         .position(|item| Some(*item) == self.panel.hovered);
@@ -234,7 +243,24 @@ impl WindowContent for Guide {
                 _ => WindowAction::None,
             },
             WindowEvent::PointerMove { position } => {
-                self.panel.hovered = self.panel.element_at(self.panel_point(position));
+                let close = frame::layout(self.size, self.panel.size).close;
+                let hovered =
+                    crate::ui::toolbar::contains(close, (position.0 as f32, position.1 as f32));
+                let item = self.panel.element_at(self.panel_point(position));
+                let changed = self.close_hovered != hovered || self.panel.hovered != item;
+                self.close_hovered = hovered;
+                self.panel.hovered = item;
+                if changed {
+                    WindowAction::Redraw
+                } else {
+                    WindowAction::None
+                }
+            }
+            WindowEvent::PointerLeave | WindowEvent::Focused(false) => {
+                self.close_hovered = false;
+                self.close_pressed = false;
+                self.panel.hovered = None;
+                self.pressed = None;
                 WindowAction::Redraw
             }
             WindowEvent::PointerButton {
@@ -242,10 +268,22 @@ impl WindowContent for Guide {
                 button: window::LEFT_BUTTON,
                 pressed,
             } => {
-                if position.1 < 28.0 {
+                let close = frame::layout(self.size, self.panel.size).close;
+                let over_close =
+                    crate::ui::toolbar::contains(close, (position.0 as f32, position.1 as f32));
+                if self.close_pressed && !pressed {
+                    self.close_pressed = false;
+                    return if over_close {
+                        WindowAction::Close
+                    } else {
+                        WindowAction::Redraw
+                    };
+                }
+                if position.1 < f64::from(frame::HEADER) {
                     if pressed {
-                        return if position.0 >= f64::from(self.size.0) - 30.0 {
-                            WindowAction::Close
+                        return if over_close {
+                            self.close_pressed = true;
+                            WindowAction::Redraw
                         } else {
                             WindowAction::Move
                         };
@@ -293,7 +331,7 @@ pub(crate) fn dialog() -> window::WindowDialog {
             title: "Mark Shot / OCR".into(),
             app_id: "mark-shot-ocr-resources".into(),
             size: content.size,
-            minimum: (320, 260),
+            minimum: (280, 160),
         },
         content: Box::new(content),
     }

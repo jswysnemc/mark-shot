@@ -100,6 +100,10 @@ impl Window {
             owner: std::thread::current().id(),
             inside: Cell::new(false),
             text_target: Cell::new(0),
+            resetting_ime: Cell::new(false),
+            text_rect: Cell::new(None),
+            composition: RefCell::new(None),
+            ime_caret: Default::default(),
             ime_context: Cell::new(std::ptr::null_mut()),
         });
         let title: Vec<_> = options.title.encode_utf16().chain([0]).collect();
@@ -351,14 +355,29 @@ impl Window {
         target: u64,
         rect: Option<(i32, i32, i32, i32)>,
     ) -> io::Result<()> {
+        self.set_text_input_with_geometry(target, rect, None)
+    }
+
+    /// 【Windows输入法】【原子同步】按 target、rect 和 geometry 先保存本轮输入状态，再通知系统，返回系统结果；可重入查询只读取本轮几何
+    pub fn set_text_input_with_geometry(
+        &mut self,
+        target: u64,
+        rect: Option<(i32, i32, i32, i32)>,
+        geometry: Option<&crate::types::text_input::CompositionGeometry>,
+    ) -> io::Result<()> {
         let previous = self.context.text_target.replace(target);
-        super::ime::sync(
-            self.hwnd,
-            self.context.ime_context.get(),
-            previous,
-            target,
-            rect,
-        )
+        self.context
+            .composition
+            .replace(geometry.filter(|_| target != 0).cloned());
+        self.context.text_rect.set(rect.filter(|_| target != 0));
+        self.context
+            .ime_caret
+            .sync(self.hwnd, self.context.text_rect.get())?;
+        // 1. 【Windows输入法】【取消隔离】旧候选取消可能同步回调结束消息，该消息不能使用已发布的新字段身份
+        self.context.resetting_ime.set(previous != target);
+        let result = super::ime::sync(self.hwnd, previous, target, rect);
+        self.context.resetting_ime.set(false);
+        result
     }
 
     /// 【Windows窗口】【暂时隐藏】无参数，隐藏当前表面，保留原生位图和窗口身份，无返回值
@@ -480,6 +499,7 @@ impl Drop for Window {
     fn drop(&mut self) {
         debug_assert_eq!(self.context.owner, std::thread::current().id());
         self.release_escape();
+        self.context.ime_caret.clear();
         unsafe {
             windows_sys::Win32::UI::Input::Ime::ImmAssociateContext(
                 self.hwnd,

@@ -79,7 +79,7 @@ fn update_one(state: &mut EditorState, kind: LineChoice, dirty_mask: &mut u32) {
             margin,
         );
         let active = Some(match kind {
-            LineChoice::Heads => line_edits::current_head(state) as usize,
+            LineChoice::Heads => line_edits::current_head(state).head_index(),
             LineChoice::Pattern => line_edits::current_style(state) as usize,
         });
         let popup = popup_mut(state, kind);

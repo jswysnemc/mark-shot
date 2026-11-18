@@ -202,6 +202,10 @@ pub enum ToggleField {
     MarkerFill,
     MagnifierRectangle,
     FixedRatio,
+    ArrowBidirectional,
+    ArrowPointedTail,
+    ArrowRoundedTail,
+    HighlighterLine,
 }
 
 impl ToggleField {
@@ -297,6 +301,24 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
                 action: SettingsAction::LineStyles,
                 svg: crate::ui::icons::LINE,
             },
+            SettingsWidget::Toggle {
+                visual: ToggleVisual::Checkbox {
+                    label: "Double arrow",
+                },
+                field: ToggleField::ArrowBidirectional,
+            },
+            SettingsWidget::Toggle {
+                visual: ToggleVisual::Checkbox {
+                    label: "Pointed tail",
+                },
+                field: ToggleField::ArrowPointedTail,
+            },
+            SettingsWidget::Toggle {
+                visual: ToggleVisual::Checkbox {
+                    label: "Rounded tail",
+                },
+                field: ToggleField::ArrowRoundedTail,
+            },
             SettingsWidget::Separator,
             SettingsWidget::Stepper {
                 label: "",
@@ -317,7 +339,22 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
                 unit: "px",
             },
         ],
-        Tool::Pen | Tool::Highlighter | Tool::Laser | Tool::NumeratedArrow => &[
+        Tool::Highlighter => &[
+            SettingsWidget::ColorSwatch(ColorTarget::Main),
+            SettingsWidget::Toggle {
+                visual: ToggleVisual::Checkbox {
+                    label: "Straight line",
+                },
+                field: ToggleField::HighlighterLine,
+            },
+            SettingsWidget::Separator,
+            SettingsWidget::Stepper {
+                label: "",
+                range: StepperRange::Stroke,
+                unit: "px",
+            },
+        ],
+        Tool::Pen | Tool::Laser | Tool::NumeratedArrow => &[
             SettingsWidget::ColorSwatch(ColorTarget::Main),
             SettingsWidget::Separator,
             SettingsWidget::Stepper {
@@ -568,7 +605,15 @@ impl PanelItem for SettingsWidget {
                     {
                         4.0
                     } else {
-                        label.len() as f32
+                        let label = super::draw_controls::localized_toggle_label(label);
+                        let scale = if crate::ui::language::Language::current()
+                            == crate::ui::language::Language::Chinese
+                        {
+                            2.0
+                        } else {
+                            1.0
+                        };
+                        label.chars().count() as f32 * scale
                     };
                     (24.0 + chars * cfg.char_width).max(48.0)
                 }

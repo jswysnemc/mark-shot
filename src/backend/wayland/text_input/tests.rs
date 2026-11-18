@@ -6,6 +6,7 @@ use crate::types::text_input::{ChangeCause, ContentType, Snapshot, Surrounding};
 /// 【输入法测试】【快照构造】返回 target_id 的最小协议状态，不连接合成器
 fn snapshot(target_id: u64) -> Snapshot {
     Snapshot {
+        composition: None,
         target_id,
         focus_id: 20,
         monitor_idx: 0,

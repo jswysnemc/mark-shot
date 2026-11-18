@@ -13,6 +13,10 @@ use crate::theme::Rgba;
 use crate::types::{StrokeGroup, ToolSettings};
 use crate::ui::color_popover::color_to_hex_string;
 
+mod storage;
+#[cfg(test)]
+mod storage_tests;
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 struct File {
@@ -42,6 +46,9 @@ struct File {
     magnifier_zoom: Option<f32>,
     number_style: Option<String>,
     arrow_style: Option<String>,
+    arrow_bidirectional: Option<bool>,
+    arrow_tail: Option<String>,
+    highlighter_style: Option<String>,
     direct_head_migrated: Option<bool>,
     arrow_line_style: Option<String>,
     line_style: Option<String>,
@@ -102,14 +109,16 @@ pub struct Saved {
     pub magnifier_zoom: Option<f32>,
     pub number_style: Option<crate::features::number::NumberStyle>,
     pub arrow_style: Option<crate::features::arrow::ArrowStyle>,
+    pub highlighter_style: Option<crate::features::highlighter::HighlighterStyle>,
     pub arrow_line_style: Option<crate::features::line::LineStyle>,
     pub line_style: Option<crate::features::line::LineStyle>,
     pub magnifier: Option<bool>,
     pub recent_colors: Vec<Rgba>,
 }
 
-fn path() -> Option<PathBuf> {
-    Some(dirs::state_dir()?.join("mark-shot").join("tools.toml"))
+/// 【工具偏好】【状态路径】无参数，返回当前平台的持久化文件路径，目录不可用时返回空值
+pub(crate) fn path() -> Option<PathBuf> {
+    storage::path()
 }
 
 fn parse_color(s: &str) -> Option<Rgba> {
@@ -129,7 +138,12 @@ fn load() -> Saved {
     let Some(path) = path() else {
         return Saved::default();
     };
-    let Ok(text) = std::fs::read_to_string(&path) else {
+    load_at(&path)
+}
+
+/// 【工具偏好】【指定读取】从 path 读取并校验工具偏好，返回恢复值，缺失或非法内容使用默认偏好
+fn load_at(path: &std::path::Path) -> Saved {
+    let Ok(text) = std::fs::read_to_string(path) else {
         return Saved::default();
     };
     let file: File = match toml::from_str(&text) {
@@ -181,6 +195,10 @@ fn load() -> Saved {
         magnifier_zoom: file.magnifier_zoom.filter(|value| value.is_finite()),
         number_style: file.number_style.as_deref().and_then(parse_number_style),
         arrow_style,
+        highlighter_style: file
+            .highlighter_style
+            .as_deref()
+            .and_then(crate::features::highlighter::HighlighterStyle::parse),
         arrow_line_style: file.arrow_line_style.as_deref().and_then(parse_line_style),
         line_style: file.line_style.as_deref().and_then(parse_line_style),
         magnifier: file.magnifier,
@@ -250,13 +268,17 @@ fn parse_number_style(value: &str) -> Option<crate::features::number::NumberStyl
 
 /// 【箭头】【旧偏好迁移】旧版本保存的 KDE 头部一次性迁移到直箭头，写入标记后保留用户后续选择
 fn saved_arrow_style(file: &File) -> Option<crate::features::arrow::ArrowStyle> {
-    let style = file.arrow_style.as_deref().and_then(parse_arrow_style);
-    if file.direct_head_migrated != Some(true)
-        && style == Some(crate::features::arrow::ArrowStyle::Kde)
-    {
-        return Some(crate::features::arrow::ArrowStyle::Direct);
+    let mut style = file.arrow_style.as_deref().and_then(parse_arrow_style)?;
+    if file.direct_head_migrated != Some(true) && style == crate::features::arrow::ArrowStyle::Kde {
+        style = crate::features::arrow::ArrowStyle::Direct;
     }
-    style
+    style.bidirectional = file.arrow_bidirectional.unwrap_or(style.bidirectional);
+    style.tail = file
+        .arrow_tail
+        .as_deref()
+        .and_then(crate::features::arrow::ArrowTail::parse)
+        .unwrap_or(style.tail);
+    Some(style)
 }
 
 /// 【箭头】【头部偏好】将 value 转为头部样式；未知值单独忽略并记录原因，返回样式或空值
@@ -300,7 +322,18 @@ pub fn save(
         return;
     };
 
-    let file = File {
+    let file = snapshot(settings, history);
+    if let Err(error) = storage::write(&path, &file) {
+        info!(
+            "【工具偏好】【状态保存】无法写入 {}：{error}",
+            path.display()
+        );
+    }
+}
+
+/// 【工具偏好】【状态快照】按 settings 和 history 返回待保存的完整偏好，不包含会话骨架或窗口状态
+fn snapshot(settings: &ToolSettings, history: &[Color]) -> File {
+    File {
         color: Some(hex(settings.color)),
         stroke_width: None,
         stroke_widths: StrokeGroup::ALL
@@ -329,31 +362,14 @@ pub fn save(
         magnifier_zoom: Some(settings.magnifier_zoom),
         number_style: Some(settings.number_style.key().to_string()),
         arrow_style: Some(settings.arrow_style.key().to_string()),
+        arrow_bidirectional: Some(settings.arrow_style.bidirectional),
+        arrow_tail: Some(settings.arrow_style.tail.key().to_string()),
+        highlighter_style: Some(settings.highlighter_style.key().to_string()),
         direct_head_migrated: Some(true),
         arrow_line_style: Some(settings.arrow_line_style.key().to_string()),
         line_style: Some(settings.line_style.key().to_string()),
         magnifier: None,
         recent_colors: history.iter().map(|&c| hex(c)).collect(),
-    };
-    let text = match toml::to_string(&file) {
-        Ok(text) => text,
-        Err(e) => {
-            info!("tools state: can't serialize: {e}");
-            return;
-        }
-    };
-
-    // using temp file
-    // small edge case bug fix: adding pid to name, so executing capture two times, wouldn't
-    // write into the same file
-    let tmp = path.with_extension(format!("toml.{}.tmp", std::process::id()));
-    let written = path
-        .parent()
-        .map_or(Ok(()), std::fs::create_dir_all)
-        .and_then(|()| std::fs::write(&tmp, text))
-        .and_then(|()| std::fs::rename(&tmp, &path));
-    if let Err(e) = written {
-        info!("tools state: can't write {}: {e}", path.display());
     }
 }
 

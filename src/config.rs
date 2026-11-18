@@ -45,6 +45,7 @@ pub use loading::*;
 mod document;
 mod legacy;
 mod paths;
+pub(crate) mod pinned_preferences;
 pub mod preferences;
 pub mod recovery;
 pub(crate) mod runtime_overrides;

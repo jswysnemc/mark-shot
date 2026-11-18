@@ -39,7 +39,11 @@ pub(super) fn read(hwnd: HWND, flags: isize) -> io::Result<Composition> {
         });
     }
     let result = (|| {
-        let preedit = if flags & GCS_COMPSTR as isize != 0 {
+        // 1. 【Windows输入法】【增量候选】光标、属性和分句消息只表示变化字段，读取当前完整候选避免误清空正文
+        let preedit = if flags
+            & (GCS_COMPSTR | GCS_CURSORPOS | GCS_COMPATTR | GCS_COMPCLAUSE) as isize
+            != 0
+        {
             string(context, GCS_COMPSTR)?
         } else {
             Vec::new()
@@ -71,10 +75,9 @@ pub(super) fn read(hwnd: HWND, flags: isize) -> io::Result<Composition> {
     result
 }
 
-/// 【Windows输入法】【目标同步】按hwnd、saved、previous与target切换候选资格，rect为物理光标范围，返回系统结果，不跨线程使用输入上下文
+/// 【Windows输入法】【目标同步】按 hwnd、previous 和 target 切换默认输入上下文，rect 为物理光标范围，返回系统结果，不跨线程使用上下文
 pub(super) fn sync(
     hwnd: HWND,
-    saved: HIMC,
     previous: u64,
     target: u64,
     rect: Option<(i32, i32, i32, i32)>,
@@ -89,15 +92,17 @@ pub(super) fn sync(
                 }
             }
         }
-        unsafe {
-            ImmAssociateContext(
-                hwnd,
-                if target == 0 {
-                    std::ptr::null_mut()
-                } else {
-                    saved
-                },
-            );
+        if target == 0 {
+            unsafe {
+                ImmAssociateContext(hwnd, std::ptr::null_mut());
+            }
+        } else {
+            // 2. 【Windows输入法】【默认恢复】与 Qt 保持一致，恢复线程默认上下文，不依赖创建时取得的句柄
+            if unsafe { ImmAssociateContextEx(hwnd, std::ptr::null_mut(), IACE_DEFAULT) } == 0 {
+                return Err(io::Error::other(
+                    "cannot associate the default Windows input context",
+                ));
+            }
         }
     }
     let Some((x, y, width, height)) = rect.filter(|_| target != 0) else {
@@ -122,8 +127,73 @@ pub(super) fn sync(
     };
     unsafe {
         ImmSetCompositionWindow(context, &composition);
+        // 3. 【Windows输入法】【中文兼容】部分中文输入法采用候选点定位，随后仍保留完整光标排除区域
+        let language =
+            windows_sys::Win32::UI::Input::KeyboardAndMouse::GetKeyboardLayout(0) as usize & 0x3ff;
+        if language == 0x04 {
+            let mut point = candidate;
+            point.dwStyle = CFS_CANDIDATEPOS;
+            ImmSetCandidateWindow(context, &point);
+        }
         ImmSetCandidateWindow(context, &candidate);
         ImmReleaseContext(hwnd, context);
     }
     Ok(())
+}
+
+/// 【Windows输入法】【光标查询】按 hwnd、rect、geometry 和系统请求指针返回处理结果；组合字符使用真实几何，不猜测字宽
+pub(super) unsafe fn query_position(
+    hwnd: HWND,
+    rect: Option<(i32, i32, i32, i32)>,
+    geometry: Option<&crate::types::text_input::CompositionGeometry>,
+    request: isize,
+) -> isize {
+    use windows_sys::Win32::{
+        Foundation::POINT, Graphics::Gdi::ClientToScreen, UI::WindowsAndMessaging::GetClientRect,
+    };
+    if request == 0 {
+        return 0;
+    }
+    // 1. 【Windows输入法】【系统请求】消息指针由 IMM 在窗口线程借用，先核对结构尺寸及可定位字符
+    let query = unsafe { &mut *(request as *mut IMECHARPOSITION) };
+    if query.dwSize < std::mem::size_of::<IMECHARPOSITION>() as u32 {
+        return 0;
+    }
+    let position = match geometry {
+        Some(geometry) => geometry.at(query.dwCharPos),
+        None if query.dwCharPos == 0 => rect,
+        None => None,
+    };
+    let Some((x, y, _, height)) = position else {
+        return 0;
+    };
+    let mut caret = POINT { x, y };
+    let mut document = unsafe { std::mem::zeroed() };
+    unsafe {
+        GetClientRect(hwnd, &mut document);
+    }
+    let mut top = POINT {
+        x: document.left,
+        y: document.top,
+    };
+    let mut bottom = POINT {
+        x: document.right,
+        y: document.bottom,
+    };
+    // 2. 【Windows输入法】【屏幕坐标】光标与客户区范围统一转换为物理屏幕坐标，候选位置不受窗口边框偏移影响
+    if unsafe { ClientToScreen(hwnd, &mut caret) } == 0
+        || unsafe { ClientToScreen(hwnd, &mut top) } == 0
+        || unsafe { ClientToScreen(hwnd, &mut bottom) } == 0
+    {
+        return 0;
+    }
+    query.pt = caret;
+    query.cLineHeight = height.max(1) as u32;
+    query.rcDocument = windows_sys::Win32::Foundation::RECT {
+        left: top.x,
+        top: top.y,
+        right: bottom.x,
+        bottom: bottom.y,
+    };
+    1
 }

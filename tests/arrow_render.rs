@@ -287,13 +287,16 @@ fn head_metrics_do_not_panic_on_non_finite_parameters() {
     }
 }
 
-/// 【箭头测试】【头部编号】四种头部的配置名称和原版编号保持一致，未知值不覆盖默认偏好
+/// 【箭头测试】【头部编号】三种头部保持独立索引，旧配置编号仍映射原属性，未知值不覆盖默认偏好，无返回值
 #[test]
 fn head_styles_keep_reference_configuration_ids() {
     for (index, style) in ArrowStyle::ALL.into_iter().enumerate() {
-        assert_eq!(style as usize, index);
+        assert_eq!(style.head_index(), index);
         assert_eq!(ArrowStyle::parse(style.key()), Some(style));
-        assert_eq!(ArrowStyle::parse(&index.to_string()), Some(style));
+        assert_eq!(
+            ArrowStyle::parse(&[0, 1, 4][index].to_string()),
+            Some(style)
+        );
     }
     assert_eq!(ArrowStyle::parse("unknown"), None);
 }

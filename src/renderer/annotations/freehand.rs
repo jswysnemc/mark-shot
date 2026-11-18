@@ -113,6 +113,7 @@ pub(super) fn stroke_highlighter(
         .fill_rect(rect, &paint, Transform::identity(), Some(&mask));
 }
 
+/// 【荧光笔】【即时预览】按 p、points、flat_ends、color 与 stroke_width 绘制 dirty 范围，返回值为空；临时笔迹在目标背景上乘法合成
 pub fn draw_highlighter_live(
     p: &mut Painter,
     points: &[(f32, f32)],
@@ -154,7 +155,17 @@ pub fn draw_highlighter_live(
         stroke_width,
     );
 
-    p.draw_pixmap(x as i32, y as i32, &tmp);
+    p.canvas.draw_pixmap(
+        x as i32,
+        y as i32,
+        tmp.as_ref(),
+        &tiny_skia::PixmapPaint {
+            blend_mode: tiny_skia::BlendMode::Multiply,
+            ..Default::default()
+        },
+        Transform::identity(),
+        None,
+    );
 }
 
 pub fn stroke_pen_segment(

@@ -121,6 +121,7 @@ pub struct ToolSettings {
     pub magnifier_zoom: f32,
     pub number_style: crate::features::number::NumberStyle,
     pub arrow_style: crate::features::arrow::ArrowStyle,
+    pub highlighter_style: crate::features::highlighter::HighlighterStyle,
     pub arrow_line_style: crate::features::line::LineStyle,
     pub line_style: crate::features::line::LineStyle,
     pub color: Color,
@@ -149,6 +150,7 @@ impl Default for ToolSettings {
                 StrokeGroup::Number => tools.number.width,
                 StrokeGroup::Arrow => tools.arrow.width,
                 StrokeGroup::Line => tools.line.width,
+                StrokeGroup::Highlighter => tools.highlighter.width,
                 _ => tools.stroke.width,
             };
             let width = saved.stroke(group).unwrap_or(configured);
@@ -208,6 +210,7 @@ impl Default for ToolSettings {
             ),
             number_style: saved.number_style.unwrap_or(tools.number.style),
             arrow_style: saved.arrow_style.unwrap_or(tools.arrow.style),
+            highlighter_style: saved.highlighter_style.unwrap_or(tools.highlighter.style),
             arrow_line_style: saved.arrow_line_style.unwrap_or(tools.arrow.line_style),
             line_style: saved.line_style.unwrap_or(tools.line.style),
             color: default_color().color(),

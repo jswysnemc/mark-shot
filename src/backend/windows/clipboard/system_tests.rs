@@ -16,6 +16,20 @@ fn png_and_dibv5_survive_owner_destruction_and_dib_only_fallback() {
     assert_eq!(read_image_png().unwrap(), png);
     let dib = {
         let _opened = Opened::read().unwrap();
+        let compatible = memory::read(8, 128 * 1024 * 1024).unwrap();
+        assert_eq!(u32::from_le_bytes(compatible[..4].try_into().unwrap()), 40);
+        assert_eq!(
+            u16::from_le_bytes(compatible[14..16].try_into().unwrap()),
+            24
+        );
+        assert_eq!(
+            u32::from_le_bytes(compatible[16..20].try_into().unwrap()),
+            0
+        );
+        assert_eq!(
+            i32::from_le_bytes(compatible[8..12].try_into().unwrap()),
+            16
+        );
         memory::read(17, 128 * 1024 * 1024).unwrap()
     };
     let decoded = ::image::load_from_memory(&image::png(&dib).unwrap())

@@ -117,7 +117,7 @@ pub(super) fn draw(
         SettingsAction::ArrowStyles | SettingsAction::LineStyles => {
             if let Some(preview) = preview {
                 let (kind, index) = if action == SettingsAction::ArrowStyles {
-                    (LineChoice::Heads, panel.arrow_style as usize)
+                    (LineChoice::Heads, panel.arrow_style.head_index())
                 } else {
                     (LineChoice::Pattern, panel.line_style as usize)
                 };

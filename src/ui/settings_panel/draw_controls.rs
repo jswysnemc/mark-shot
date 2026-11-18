@@ -161,7 +161,7 @@ pub(super) fn localized_toggle_label(label: &'static str) -> &'static str {
     if Language::current() == Language::Chinese {
         match label {
             "Fill" => "填充",
-            _ => label,
+            _ => Language::Chinese.text(label),
         }
     } else {
         label

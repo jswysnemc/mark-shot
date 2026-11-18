@@ -6,6 +6,38 @@ use crate::backend::window::{WindowContent, WindowEvent};
 mod autostart;
 mod effective;
 
+/// 【设置回归】【快捷键编辑行】无参数，最小和常规窗口下输入框与右侧恢复、清除按钮独立布局且命中一致，无返回值
+#[test]
+fn shortcut_editing_reserves_separate_buttons_to_the_right() {
+    use super::window::Control;
+    for width in [640, 900, 1200] {
+        let mut state = Preferences::new(false).unwrap();
+        state.size.0 = width;
+        state.page = Page::Keys;
+        let index = entry("keys.copy");
+        state.activate(Control::Row(index));
+        let layout = super::layout::Layout::new(&state);
+        let row = layout.rows.iter().find(|row| row.index == index).unwrap();
+        let edit = super::layout::text_edit(row.control);
+        assert!(edit.field.width() >= 112.0);
+        assert!(edit.field.right() < edit.reset.left());
+        assert!(edit.reset.right() < edit.save.left());
+        assert_eq!(edit.save.right(), row.control.right());
+        for (expected, area) in [
+            (Control::Reset(index), edit.reset),
+            (Control::Clear(index), edit.save),
+        ] {
+            assert_eq!(
+                layout.hit(
+                    &state,
+                    (f64::from(area.left() + 8.0), f64::from(area.top() + 8.0))
+                ),
+                Some(expected)
+            );
+        }
+    }
+}
+
 /// 【设置回归】【整行编辑】无参数，常规和最小窗口下编辑路径不会挤压输入框，绘制和按钮命中共用坐标
 #[test]
 fn path_editing_uses_full_row_at_all_supported_widths() {
@@ -459,13 +491,20 @@ fn all_settings_input_fields_expose_ime_targets_and_accept_committed_chinese_tex
         .text_input_snapshot(focus, row_id, None, ChangeCause::Other)
         .expect("row editor IME snapshot");
     assert!(row_snap.cursor_rect.is_some());
+    let chinese_path = state
+        .path
+        .parent()
+        .unwrap()
+        .join("截图目录")
+        .to_string_lossy()
+        .into_owned();
     state.event(WindowEvent::TextInput(Edit {
         preedit: Preedit::default(),
-        commit: "/tmp/截图目录".into(),
+        commit: chinese_path.clone(),
         replacement: None,
     }));
     assert!(state.apply());
-    assert_eq!(state.value(directory), "/tmp/截图目录");
+    assert_eq!(state.value(directory), chinese_path);
 
     // 3. 【设置回归】【下拉搜索】超过八项的可搜索下拉菜单在英文与中文界面下均接收中文输入法并实时过滤选项
     for language in ["english", "chinese"] {

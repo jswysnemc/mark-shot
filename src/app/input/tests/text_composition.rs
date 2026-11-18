@@ -471,3 +471,61 @@ fn composing_text_is_visible_without_entering_the_document_or_persistent_layer()
             .contains_key(&text_composition::PREEDIT_ID)
     );
 }
+
+/// 【输入法测试】【字符几何】无参数，实际组合布局区分首字与当前光标，UTF-16 代理对内部不生成位置，闪烁不重复同步，无返回值
+#[test]
+fn composition_snapshot_exposes_real_utf16_character_positions() {
+    let mut state = prepared("", 0, 0);
+    state
+        .input
+        .text_input
+        .enter(crate::types::text_input::Focus {
+            id: 401,
+            monitor_idx: 0,
+        });
+    crate::app::text_input::sync_with(&mut state, |_| Ok(()), &mut 0).unwrap();
+    let preedit = "中𠮷文";
+    text_composition::apply(
+        &mut state,
+        Edit {
+            preedit: Preedit::from_protocol(
+                preedit.into(),
+                preedit.len() as i32,
+                preedit.len() as i32,
+            )
+            .unwrap(),
+            ..Default::default()
+        },
+        &mut 0,
+    );
+    let mut snapshot = None;
+    crate::app::text_input::sync_with(
+        &mut state,
+        |value| {
+            snapshot = value.cloned();
+            Ok(())
+        },
+        &mut 0,
+    )
+    .unwrap();
+    let snapshot = snapshot.unwrap();
+    let geometry = snapshot.composition.unwrap();
+    assert_eq!(
+        geometry
+            .positions
+            .iter()
+            .map(|value| value.0)
+            .collect::<Vec<_>>(),
+        [0, 1, 3, 4]
+    );
+    assert_ne!(geometry.at(0), snapshot.cursor_rect);
+    assert_eq!(geometry.at(4), snapshot.cursor_rect);
+    assert_eq!(geometry.at(2), None);
+    assert_eq!(content(&state), "");
+    crate::app::text_input::sync_with(
+        &mut state,
+        |_| panic!("unchanged caret frame synchronized text geometry"),
+        &mut 0,
+    )
+    .unwrap();
+}

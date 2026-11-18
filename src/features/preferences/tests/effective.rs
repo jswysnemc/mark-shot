@@ -16,7 +16,10 @@ fn opening_and_leaving_inherited_directory_does_not_persist_the_effective_path()
         let index = entry(path);
         state.page = ENTRIES[index].page;
         let shown = state.value(index);
-        assert!(std::path::Path::new(&shown).is_absolute());
+        assert!(
+            std::path::Path::new(&shown).is_absolute(),
+            "{path}: {shown}"
+        );
         state.activate(Control::Row(index));
         assert_eq!(state.editing.as_ref().unwrap().1.text(), shown);
         assert!(state.apply());

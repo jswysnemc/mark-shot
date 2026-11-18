@@ -100,8 +100,24 @@ pub struct Snapshot {
     pub monitor_idx: usize,
     pub surrounding: Option<Surrounding>,
     pub cursor_rect: Option<(i32, i32, i32, i32)>,
+    pub composition: Option<CompositionGeometry>,
     pub cause: ChangeCause,
     pub content: ContentType,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompositionGeometry {
+    pub positions: Vec<(u32, (i32, i32, i32, i32))>,
+}
+
+impl CompositionGeometry {
+    /// 【输入法】【字符定位】按 offset 返回组合串 UTF-16 字符边界的光标矩形，代理对内部或不可见字符返回空值
+    pub fn at(&self, offset: u32) -> Option<(i32, i32, i32, i32)> {
+        self.positions
+            .binary_search_by_key(&offset, |entry| entry.0)
+            .ok()
+            .map(|index| self.positions[index].1)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

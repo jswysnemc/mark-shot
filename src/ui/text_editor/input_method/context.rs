@@ -170,6 +170,13 @@ impl TextEditor {
                 surrounding: self.surrounding(),
             });
         }
+        let preedit = self.preedit().cloned().map(|mut preedit| {
+            if self.input.single_line {
+                preedit.text = super::flat_text(&preedit.text);
+            }
+            preedit
+        });
+        let composition_start = self.display_cursor(self.editor.cursor());
         let editor = self.display_editor(fonts);
         let cursor = editor.cursor();
         let cursor_rect = editor.with_buffer(|buffer| {
@@ -194,6 +201,21 @@ impl TextEditor {
                     ))
                 })
         });
+        let composition = preedit.zip(composition_start).map(|(preedit, start)| {
+            crate::features::text::input_method::geometry::layout(
+                editor,
+                start,
+                &preedit.text,
+                |x, y, height| {
+                    (
+                        (rect.x() + x - offset).floor() as i32,
+                        (rect.y() + y).floor() as i32,
+                        1,
+                        height.ceil().max(1.0) as i32,
+                    )
+                },
+            )
+        });
         let surrounding = &self.input.context.as_ref().unwrap().surrounding;
         let content = if self.input.single_line {
             ContentType::Text
@@ -206,11 +228,13 @@ impl TextEditor {
                 && old.monitor_idx == focus.monitor_idx
                 && old.surrounding == *surrounding
                 && old.cursor_rect == cursor_rect
+                && old.composition == composition
                 && old.content == content
         }) {
             return None;
         }
         Some(Snapshot {
+            composition,
             target_id,
             focus_id: focus.id,
             monitor_idx: focus.monitor_idx,

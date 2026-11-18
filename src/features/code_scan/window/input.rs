@@ -76,11 +76,15 @@ impl WindowContent for ResultWindow {
         let layout = Layout::new(self.size);
         match event {
             WindowEvent::Wake => self.poll(),
-            WindowEvent::Resize { size } => self.size = size,
+            WindowEvent::Resize { size } => {
+                self.size = size;
+                self.hovered = None;
+            }
             WindowEvent::Focused(false) | WindowEvent::PointerLeave => {
                 self.dragging = false;
                 self.scroll_drag = None;
                 self.pressed = None;
+                self.hovered = None;
             }
             WindowEvent::Key(input) => {
                 if input.key == Some(Key::Escape) {
@@ -115,6 +119,7 @@ impl WindowContent for ResultWindow {
                 button: LEFT_BUTTON,
                 pressed,
             } => {
+                self.hovered = layout.hit(position);
                 if !pressed {
                     self.dragging = false;
                     self.scroll_drag = None;
@@ -162,6 +167,8 @@ impl WindowContent for ResultWindow {
                 }
             }
             WindowEvent::PointerMove { position } => {
+                let previous = self.hovered;
+                self.hovered = layout.hit(position);
                 if let Some(drag) = self.scroll_drag {
                     if let Some(bar) = self.editor.scrollbar(&mut self.fonts, layout.viewport) {
                         self.editor
@@ -177,7 +184,7 @@ impl WindowContent for ResultWindow {
                         true,
                         1,
                     );
-                } else {
+                } else if self.hovered == previous {
                     return WindowAction::None;
                 }
             }

@@ -371,6 +371,7 @@ pub(super) fn snapshot(state: &mut EditorState, focus: Focus, target_id: u64) ->
             }
     });
     let next = (!same).then(|| Snapshot {
+        composition: None,
         target_id,
         focus_id: focus.id,
         monitor_idx: monitor,

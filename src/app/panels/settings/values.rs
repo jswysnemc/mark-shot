@@ -125,6 +125,44 @@ pub fn apply_toggle_field(
     new_value: bool,
     dirty_mask: &mut u32,
 ) {
+    if matches!(
+        field,
+        ToggleField::ArrowBidirectional
+            | ToggleField::ArrowPointedTail
+            | ToggleField::ArrowRoundedTail
+    ) {
+        let mut style = crate::editor::line_edits::current_head(editor_state);
+        match field {
+            ToggleField::ArrowBidirectional => style.bidirectional = new_value,
+            ToggleField::ArrowPointedTail => {
+                style.tail = if new_value {
+                    crate::features::arrow::ArrowTail::Pointed
+                } else {
+                    crate::features::arrow::ArrowTail::Rounded
+                }
+            }
+            ToggleField::ArrowRoundedTail => {
+                style.tail = if new_value {
+                    crate::features::arrow::ArrowTail::Rounded
+                } else {
+                    crate::features::arrow::ArrowTail::Pointed
+                };
+            }
+            _ => unreachable!(),
+        }
+        crate::editor::line_edits::set_arrow_attributes(editor_state, style, dirty_mask);
+        update_settings_panel(editor_state, dirty_mask);
+        return;
+    }
+    if field == ToggleField::HighlighterLine {
+        editor_state.tool_settings.highlighter_style = if new_value {
+            crate::features::highlighter::HighlighterStyle::StraightLine
+        } else {
+            crate::features::highlighter::HighlighterStyle::Freehand
+        };
+        update_settings_panel(editor_state, dirty_mask);
+        return;
+    }
     if field == ToggleField::FixedRatio {
         crate::editor::shape_edits::set_ratio(editor_state, new_value, dirty_mask);
         update_settings_panel(editor_state, dirty_mask);
@@ -161,7 +199,12 @@ pub fn apply_toggle_field(
             ToggleField::Outline => ts.outline = new_value,
             ToggleField::Fill => ts.fill = new_value,
             ToggleField::MarkerFill => ts.marker_filled = new_value,
-            ToggleField::MagnifierRectangle | ToggleField::FixedRatio => {}
+            ToggleField::MagnifierRectangle
+            | ToggleField::FixedRatio
+            | ToggleField::ArrowBidirectional
+            | ToggleField::ArrowPointedTail
+            | ToggleField::ArrowRoundedTail
+            | ToggleField::HighlighterLine => {}
         },
         move |ann| match (&mut ann.shape, field) {
             (AnnotationShape::Text { bold, .. }, ToggleField::Bold) => *bold = new_value,

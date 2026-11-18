@@ -15,7 +15,7 @@ pub(super) fn fixture() -> (Vec<u8>, Vec<u8>) {
 #[test]
 fn dibv5_preserves_every_alpha_and_unassociated_channel() {
     let (rgba, png) = fixture();
-    let dib = image::dib(&png).unwrap();
+    let dib = image::payload(&png).unwrap().dibv5;
     assert_eq!(i32::from_le_bytes(dib[8..12].try_into().unwrap()), -16);
     assert_eq!(&dib[124..128], &[31, 197, 0x5a, 0]);
     let decoded = ::image::load_from_memory(&image::png(&dib).unwrap())
@@ -29,7 +29,7 @@ fn dibv5_preserves_every_alpha_and_unassociated_channel() {
 #[test]
 fn bottom_up_dibv5_restores_original_row_order() {
     let (rgba, png) = fixture();
-    let mut dib = image::dib(&png).unwrap();
+    let mut dib = image::payload(&png).unwrap().dibv5;
     dib[8..12].copy_from_slice(&16_i32.to_le_bytes());
     let rows = dib[124..].to_vec();
     for (index, row) in rows.as_chunks::<64>().0.iter().rev().enumerate() {
@@ -45,7 +45,7 @@ fn bottom_up_dibv5_restores_original_row_order() {
 #[test]
 fn invalid_headers_and_truncated_pixels_are_rejected() {
     let (_, png) = fixture();
-    let dib = image::dib(&png).unwrap();
+    let dib = image::payload(&png).unwrap().dibv5;
     for length in [0, 3, 39, 123, 124, 128] {
         assert!(image::png(&dib[..length]).is_err(), "length={length}");
     }
@@ -86,4 +86,38 @@ fn legacy_rgb_dib_handles_padding_and_bottom_up_rows() {
         .collect::<Vec<_>>();
     assert_eq!(actual.dimensions(), (3, 2));
     assert_eq!(actual.as_raw(), &expected);
+}
+
+/// 【Windows剪贴板测试】【兼容输出】无参数，验证实际编码的传统布局、行序、白底透明合成与行尾填充，无返回值
+#[test]
+fn compatible_payload_is_bottom_up_rgb24_with_white_alpha_composition() {
+    let pixels = [
+        20, 40, 60, 255, 180, 80, 20, 128, 1, 2, 3, 0, 90, 120, 150, 255, 11, 22, 33, 255, 44, 55,
+        66, 255,
+    ];
+    let png = crate::utils::encode_rgba(&pixels, 3, 2);
+    let payload = image::payload(&png).unwrap();
+    let dib = payload.compatible;
+    assert_eq!(u32::from_le_bytes(dib[..4].try_into().unwrap()), 40);
+    assert_eq!(i32::from_le_bytes(dib[8..12].try_into().unwrap()), 2);
+    assert_eq!(u16::from_le_bytes(dib[14..16].try_into().unwrap()), 24);
+    assert_eq!(u32::from_le_bytes(dib[16..20].try_into().unwrap()), 0);
+    assert_eq!(dib.len(), 64);
+    assert_eq!(&dib[40..43], &[150, 120, 90]);
+    assert_eq!(&dib[49..52], &[0; 3]);
+    assert_eq!(&dib[61..64], &[0; 3]);
+    let decoded = ::image::load_from_memory(&image::png(&dib).unwrap())
+        .unwrap()
+        .into_rgba8();
+    assert_eq!(
+        decoded.as_raw(),
+        &[
+            20, 40, 60, 255, 217, 167, 137, 255, 255, 255, 255, 255, 90, 120, 150, 255, 11, 22, 33,
+            255, 44, 55, 66, 255
+        ]
+    );
+    let transparent = ::image::load_from_memory(&image::png(&payload.dibv5).unwrap())
+        .unwrap()
+        .into_rgba8();
+    assert_eq!(transparent.as_raw(), &pixels);
 }

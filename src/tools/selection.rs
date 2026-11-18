@@ -128,7 +128,8 @@ impl ToolBehavior for SelectionTool {
         }
     }
 
-    fn on_move(&self, state: &mut EditorState, global: (f64, f64), _dirty_mask: &mut u32) {
+    /// 【选区工具】【拖动更新】按 state 和 global 更新选区，dirty_mask 返回首次拖动隐藏起始界面的损坏范围，无返回值
+    fn on_move(&self, state: &mut EditorState, global: (f64, f64), dirty_mask: &mut u32) {
         if state.fullscreen_scope {
             return;
         }
@@ -164,6 +165,8 @@ impl ToolBehavior for SelectionTool {
         }
 
         if selection_changed {
+            // 1. 【截图起始】【首次拖动】当前移动事件立即清除提示和模式条，不等待松开或后台轮询
+            crate::app::capture_start::sync(state, dirty_mask);
             if let Some(sel) = old_sel {
                 state.damage_rects.push(DamageZone::Global(sel));
             }

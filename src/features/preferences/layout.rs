@@ -158,6 +158,8 @@ impl Layout {
                 132.0
             } else if stacked {
                 width - 32.0
+            } else if editing && matches!(entry.kind, Kind::Shortcut) {
+                (width * 0.40).max(224.0).min(width - 32.0)
             } else {
                 (width * 0.40).clamp(132.0, 300.0)
             };
@@ -244,16 +246,12 @@ impl Layout {
                 .as_ref()
                 .is_some_and(|(index, _)| *index == row.index)
             {
-                let reset = if matches!(ENTRIES[row.index].kind, Kind::Text) {
-                    text_edit(row.control).reset
-                } else {
-                    reset_rect(row.control)
-                };
+                let reset = text_edit(row.control).reset;
                 if contains(reset, point) {
                     return Some(Control::Reset(row.index));
                 }
                 if matches!(ENTRIES[row.index].kind, Kind::Shortcut)
-                    && contains(apply_rect(row.control), point)
+                    && contains(text_edit(row.control).save, point)
                 {
                     return Some(Control::Clear(row.index));
                 }
@@ -355,26 +353,6 @@ pub(super) fn text_edit(control: Rect) -> TextEdit {
             button_height,
         ),
     }
-}
-
-/// 【设置窗口】【保存按钮】按 control 返回输入框末端的提交按钮范围
-pub(super) fn apply_rect(control: Rect) -> Rect {
-    rect(
-        control.right() - 48.0,
-        control.top(),
-        48.0,
-        control.height(),
-    )
-}
-
-/// 【设置窗口】【恢复按钮】按 control 返回编辑框内恢复继承的操作范围
-pub(super) fn reset_rect(control: Rect) -> Rect {
-    rect(
-        control.right() - 96.0,
-        control.top(),
-        48.0,
-        control.height(),
-    )
 }
 
 /// 【设置窗口】【边缘调整】按 size、position 返回六像素边缘或角落方向，内容区域返回空值

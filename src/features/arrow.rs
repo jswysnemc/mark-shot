@@ -6,5 +6,9 @@ mod fletched;
 pub mod metrics;
 pub mod path;
 mod style;
+mod style_serde;
+mod tail;
+#[cfg(test)]
+mod tail_tests;
 
-pub use style::ArrowStyle;
+pub use style::{ArrowHead, ArrowStyle, ArrowTail};

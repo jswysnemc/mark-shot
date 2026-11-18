@@ -76,6 +76,12 @@ fn change_annotation(
 
 /// 【箭头】【头部修改】把 style 用于 state 当前箭头或后续默认值；dirty_mask 返回损坏区域，已有标注形成一次撤销
 pub fn set_head(state: &mut EditorState, style: ArrowStyle, dirty_mask: &mut u32) {
+    let style = current_head(state).with_head(style);
+    set_arrow_attributes(state, style, dirty_mask);
+}
+
+/// 【箭头】【组合修改】把 style 用于 state 当前箭头或后续默认值，dirty_mask 返回范围，已有标注保存一次撤销
+pub fn set_arrow_attributes(state: &mut EditorState, style: ArrowStyle, dirty_mask: &mut u32) {
     if !arrow_available(state) || current_head(state) == style {
         return;
     }

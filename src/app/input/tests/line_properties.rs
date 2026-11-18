@@ -8,6 +8,7 @@ use crate::editor::line_edits;
 use crate::features::{arrow::ArrowStyle, line::LineStyle};
 use crate::tools::Tool;
 use crate::types::{AnnotationShape, CursorIcon, StrokeGroup};
+use crate::ui::settings_panel::ToggleField;
 use crate::ui::settings_panel::{SettingsAction, SettingsWidget, StepperRange};
 use crate::ui::{
     line_properties::LineChoice,
@@ -88,12 +89,12 @@ fn changing_existing_heads_and_patterns_does_not_override_future_defaults() {
     let mut state = line_editor(Tool::Arrow, &mut dirty);
     draw(&mut state, (140.0, 180.0), (420.0, 220.0), &mut dirty);
     pick(&mut state, 0, &mut dirty);
-    choose(&mut state, LineChoice::Heads, 3, &mut dirty);
+    choose(&mut state, LineChoice::Heads, 1, &mut dirty);
     choose(&mut state, LineChoice::Pattern, 2, &mut dirty);
     assert!(matches!(
         state.annotations[0].shape,
         AnnotationShape::Arrow {
-            style: ArrowStyle::BidirectionalKde,
+            style: ArrowStyle::Kde,
             line_style: LineStyle::Dotted,
             ..
         }
@@ -104,18 +105,57 @@ fn changing_existing_heads_and_patterns_does_not_override_future_defaults() {
     assert_eq!(state.undo_stack.len(), 3);
     key(&mut state, "Ctrl+Z", &mut dirty);
     assert_eq!(line_edits::current_style(&state), LineStyle::Solid);
-    assert_eq!(
-        line_edits::current_head(&state),
-        ArrowStyle::BidirectionalKde
-    );
+    assert_eq!(line_edits::current_head(&state), ArrowStyle::Kde);
     key(&mut state, "Ctrl+Z", &mut dirty);
     assert_eq!(line_edits::current_head(&state), ArrowStyle::Fletched);
     key(&mut state, "Ctrl+Shift+Z", &mut dirty);
     key(&mut state, "Ctrl+Shift+Z", &mut dirty);
     assert_eq!(line_edits::current_style(&state), LineStyle::Dotted);
-    choose(&mut state, LineChoice::Heads, 3, &mut dirty);
+    choose(&mut state, LineChoice::Heads, 1, &mut dirty);
     choose(&mut state, LineChoice::Pattern, 2, &mut dirty);
     assert_eq!(state.undo_stack.len(), 3);
+}
+
+/// 【线条测试】【独立属性】无参数，真实属性按钮修改双向与尾部，切换头部保留二者，已有标注修改可分别撤销，无返回值
+#[test]
+fn direction_and_tail_toggles_survive_head_changes_and_have_separate_undo() {
+    let mut dirty = 0;
+    let mut state = line_editor(Tool::Arrow, &mut dirty);
+    for field in [
+        ToggleField::ArrowBidirectional,
+        ToggleField::ArrowPointedTail,
+    ] {
+        let index = state.settings_panel.widgets.iter().position(|widget| matches!(widget, SettingsWidget::Toggle { field: value, .. } if *value == field)).unwrap();
+        let point = widget_center(&state, index);
+        click(&mut state, point, &mut dirty);
+    }
+    choose(&mut state, LineChoice::Heads, 1, &mut dirty);
+    let expected = crate::features::arrow::ArrowStyle {
+        tail: crate::features::arrow::ArrowTail::Pointed,
+        ..ArrowStyle::BidirectionalKde
+    };
+    assert_eq!(state.tool_settings.arrow_style, expected);
+    assert!(state.undo_stack.is_empty());
+    draw(&mut state, (140.0, 180.0), (420.0, 220.0), &mut dirty);
+    pick(&mut state, 0, &mut dirty);
+    for field in [
+        ToggleField::ArrowBidirectional,
+        ToggleField::ArrowRoundedTail,
+    ] {
+        let index = state.settings_panel.widgets.iter().position(|widget| matches!(widget, SettingsWidget::Toggle { field: value, .. } if *value == field)).unwrap();
+        let point = widget_center(&state, index);
+        click(&mut state, point, &mut dirty);
+    }
+    assert_eq!(line_edits::current_head(&state), ArrowStyle::Kde);
+    assert_eq!(state.undo_stack.len(), 3);
+    assert_eq!(state.tool_settings.arrow_style, expected);
+    key(&mut state, "Ctrl+Z", &mut dirty);
+    assert_eq!(
+        line_edits::current_head(&state).tail,
+        crate::features::arrow::ArrowTail::Pointed
+    );
+    key(&mut state, "Ctrl+Z", &mut dirty);
+    assert_eq!(line_edits::current_head(&state), expected);
 }
 
 /// 【线条测试】【按钮切换】按钮打开和关闭只处理一次，两类弹层互斥，弹层内单击选择不会传到画布

@@ -521,10 +521,12 @@ smoothing = 0.7
 min_distance = 1.0
 
 [tools.highlighter]
+width = 6.0
+style = "straight_line"
 # 0 draws the raw pointer path, closer to 1 is smoother (and lags more)
 smoothing = 0.7
 min_distance = 1.0
-# multiplied by the color's own alpha
+# 【荧光笔】【透明兼容】旧透明度字段保留读取兼容，效果由颜色透明度与荧光混合决定
 opacity = 0.4
 
 [tools.laser]
@@ -551,8 +553,12 @@ style = "arabic"
 
 [tools.arrow]
 width = 3.0
-style = "direct"
 line_style = "solid"
+
+[tools.arrow.style]
+head = "direct"
+tail = "rounded"
+bidirectional = false
 
 [tools.line]
 width = 3.0

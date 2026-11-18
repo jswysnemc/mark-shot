@@ -17,6 +17,9 @@ mod popup;
 mod text;
 mod translation;
 
+#[cfg(test)]
+mod preference_tests;
+
 use popup::Menu;
 use tiny_skia::{Pixmap, PixmapPaint, Transform};
 
@@ -284,48 +287,62 @@ pub(crate) fn run_at_seed(
     position: Option<(i32, i32)>,
     seed: Option<crate::features::image_translation::seed::Seed>,
 ) -> crate::AppResult {
-    let mut image = PinnedImage::decode(bytes, density)?;
-    image.always_on_top = crate::config::get().pinned.always_on_top;
+    let image = PinnedImage::decode(bytes, density)?;
     let spec = WindowSpec {
         title: "Pinned Mark Shot".into(),
         app_id: "mark-shot-pin".into(),
         size: image.size(),
         minimum: (24, 24),
     };
-    let mut pin = Pin {
-        image,
-        position_offset: None,
-        initial: position,
-        menu: None,
-        next_menu: 0,
-        fonts: crate::fonts::bundled(),
-        cache: cosmic_text::SwashCache::new(),
-        icons: crate::app::load_icons_cache(),
-        wake: None,
-        text: crate::ocr::OcrView::default(),
-        text_selection: false,
-        selecting: false,
-        ocr: None,
-        copy_after_ocr: false,
-        window_after_ocr: false,
-        translation: crate::features::pinned_image::translation::Translation::new(
-            crate::config::translation::current()
-                .map(|config| config.target_language)
-                .unwrap_or_else(|_| "Simplified Chinese".into()),
-        ),
-        translation_task: None,
-        translation_retired: Vec::new(),
-        top_supported: false,
-        menu_anchor: (0.0, 0.0),
-        feedback: Default::default(),
-        model_dialog: None,
-        model_waiting: false,
-    };
-    if let Some(seed) = seed {
-        pin.apply_seed(seed)?;
-    }
-    if crate::config::get().pinned.auto_text_selection {
-        pin.text_selection = true;
-    }
+    let preferences = crate::config::preferences::current();
+    let pin = Pin::new(image, position, seed, &preferences.pinned)?;
     window::run(spec, pin)
+}
+
+impl Pin {
+    /// 【原生贴图】【状态创建】按 image、position、seed 和 preferences 恢复窗口内容及菜单默认值，返回状态或种子错误
+    fn new(
+        mut image: PinnedImage,
+        position: Option<(i32, i32)>,
+        seed: Option<crate::features::image_translation::seed::Seed>,
+        preferences: &crate::config::Pinned,
+    ) -> crate::AppResult<Self> {
+        image.always_on_top = preferences.always_on_top;
+        let mut pin = Self {
+            image,
+            position_offset: None,
+            initial: position,
+            menu: None,
+            next_menu: 0,
+            fonts: crate::fonts::bundled(),
+            cache: cosmic_text::SwashCache::new(),
+            icons: crate::app::load_icons_cache(),
+            wake: None,
+            text: crate::ocr::OcrView::default(),
+            text_selection: false,
+            selecting: false,
+            ocr: None,
+            copy_after_ocr: false,
+            window_after_ocr: false,
+            translation: crate::features::pinned_image::translation::Translation::new(
+                crate::config::translation::current()
+                    .map(|config| config.target_language)
+                    .unwrap_or_else(|_| "Simplified Chinese".into()),
+            ),
+            translation_task: None,
+            translation_retired: Vec::new(),
+            top_supported: false,
+            menu_anchor: (0.0, 0.0),
+            feedback: Default::default(),
+            model_dialog: None,
+            model_waiting: false,
+        };
+        if let Some(seed) = seed {
+            pin.apply_seed(seed)?;
+        }
+        if preferences.auto_text_selection {
+            pin.text_selection = true;
+        }
+        Ok(pin)
+    }
 }

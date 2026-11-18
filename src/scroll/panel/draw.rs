@@ -1,4 +1,4 @@
-//! 【滚动截图】【极简面板绘制】去除全部面板与预览描边，保留语义状态头、拼接增量、主副双预览与轻量图标栏
+//! 【滚动截图】【面板绘制】外沿细边框区分底层，保留语义状态头、主副双预览与轻量图标栏
 
 use super::{
     PanelButton, PanelLayout,
@@ -58,7 +58,7 @@ fn status_dot_color(session: &ScrollSession, palette: &Palette) -> Rgba {
     }
 }
 
-/// 【滚动截图】【完整面板】将 session 和 state 按无边框极简 layout 绘制到 p，hovered 与 pressed 表达按钮事务，无返回值
+/// 【滚动截图】【完整面板】将 session 和 state 按 layout 绘制到 p，hovered 与 pressed 表达按钮事务，无返回值
 pub fn draw(
     p: &mut Painter,
     session: &mut ScrollSession,
@@ -68,8 +68,28 @@ pub fn draw(
     state: &mut PreviewState,
 ) {
     let palette = Palette::current();
-    // 1. 绘制无描边极简不透明圆角底板，保障无层协议下平色定位锚点稳定
+    // 1. 【滚动截图】【窗口轮廓】不透明圆角底板配合单物理像素细边，区分纯白底层与预览窗口
     p.fill_rounded(layout.rect, CARD_RADIUS, palette.list_fill);
+    let border_width = 1.0 / p.scale().max(0.1);
+    if let Some(bounds) = layout.rect.inset(border_width * 0.5, border_width * 0.5)
+        && let Some(path) = crate::renderer::paths::rounded_rect_path(
+            &bounds,
+            CARD_RADIUS - border_width * 0.5,
+            true,
+            true,
+            true,
+            true,
+        )
+    {
+        p.stroke_path(
+            &path,
+            crate::theme::window::Palette::current().border,
+            &tiny_skia::Stroke {
+                width: border_width,
+                ..Default::default()
+            },
+        );
+    }
 
     // 2. 绘制顶部语义圆点、自适应截断状态文本与右对齐总长度及 +N 拼接增量读数
     let dot_cy = layout.status.top() + layout.status.height() * 0.5;

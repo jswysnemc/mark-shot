@@ -14,6 +14,7 @@ pub mod desktop;
 pub mod export_image;
 pub mod external_actions;
 pub mod filter;
+pub mod highlighter;
 pub mod image_translation;
 pub mod laser_trace;
 pub mod line;

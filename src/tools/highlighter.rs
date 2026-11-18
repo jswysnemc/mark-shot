@@ -1,7 +1,7 @@
 use crate::editor::{DamageZone, EditorState};
 use crate::renderer::shadow_color_for;
 use crate::tools::ToolBehavior;
-use crate::tools::pen::{straighten, tail_damage};
+use crate::tools::pen::tail_damage;
 use crate::types::annotations::{Annotation, AnnotationShape};
 use crate::types::{MouseButton, StrokeGroup};
 use tiny_skia::Rect;
@@ -63,8 +63,10 @@ impl ToolBehavior for HighlighterTool {
 
     /// 【画布导航】【工具移动】按state稳定画布指针更新草稿，_global提供已转换位置，dirty_mask返回重绘范围，无返回值
     fn on_move(&self, state: &mut EditorState, _global: (f64, f64), dirty_mask: &mut u32) {
-        if state.input.shift {
-            straighten(state);
+        if state.tool_settings.highlighter_style
+            == crate::features::highlighter::HighlighterStyle::StraightLine
+        {
+            straight_line(state, dirty_mask);
             return;
         }
 
@@ -108,5 +110,34 @@ impl ToolBehavior for HighlighterTool {
             state.damage_rects.push(DamageZone::Global(damage));
             *dirty_mask |= crate::utils::get_overlapping_monitors(&damage, &state.placements);
         }
+    }
+}
+
+/// 【荧光笔】【直线草稿】按 state 从初始点更新唯一终点，Shift 约束角度，dirty_mask 返回完整新旧笔迹范围
+fn straight_line(state: &mut EditorState, dirty_mask: &mut u32) {
+    let point = state.canvas_point();
+    let point = (point.0 as f32, point.1 as f32);
+    let Some(annotation) = state.pending.as_mut() else {
+        return;
+    };
+    let old = annotation.damage_bbox(false);
+    let AnnotationShape::Highlighter { points, flat_ends } = &mut annotation.shape else {
+        return;
+    };
+    let Some(&start) = points.first() else {
+        return;
+    };
+    let end = if state.input.shift {
+        crate::interaction::snap_line(start, point)
+    } else {
+        point
+    };
+    points.truncate(1);
+    points.push(end);
+    *flat_ends = [false; 2];
+    annotation.update_bbox();
+    for damage in [old, annotation.damage_bbox(false)] {
+        state.damage_rects.push(DamageZone::Global(damage));
+        *dirty_mask |= crate::utils::get_overlapping_monitors(&damage, &state.placements);
     }
 }

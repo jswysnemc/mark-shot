@@ -70,12 +70,27 @@ pub(crate) fn outline_rendered(
         );
         polyline_path(&points)?
     };
-    builder.push_path(&crate::features::line::draw::stroke_outline_rendered(
-        &center,
-        line_style,
-        width,
-        skeleton.style_scale,
-    )?);
+    let shaft = if style.tail == super::ArrowTail::Pointed && !style.bidirectional() {
+        super::tail::shaft(
+            &line,
+            if style.open() {
+                line.length
+            } else {
+                line.length - metrics.length
+            },
+            line_style,
+            width,
+            skeleton.style_scale,
+        )?
+    } else {
+        crate::features::line::draw::stroke_outline_rendered(
+            &center,
+            line_style,
+            width,
+            skeleton.style_scale,
+        )?
+    };
+    builder.push_path(&shaft);
     let mut heads = PathBuilder::new();
     for vertices in head_triangles(&line, metrics, style) {
         // 1. 【箭头】【填充绕向】实心头部与描边外轮廓同向，非零填充不会抵消接缝

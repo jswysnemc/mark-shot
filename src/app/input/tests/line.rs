@@ -5,37 +5,46 @@ use super::{key, pointer};
 use crate::app::input::{handle_modifiers, handle_pointer_button, refresh_panels, select_tool};
 use crate::editor::{DamageZone, line_edits};
 use crate::features::{
-    arrow::ArrowStyle,
+    arrow::{ArrowStyle, ArrowTail},
     line::{LineStyle, drag, geometry},
 };
 use crate::tools::Tool;
 use crate::types::{AnnotationShape, MouseButton, SelectionHandle, StrokeGroup};
 
-/// 【线条测试】【创建组合】六种头部和三种线型通过真实手势提交，直线与旧编号箭头笔宽分组不变
+/// 【线条测试】【创建组合】三种头部、两种尾部、独立双向与三种线型通过真实手势提交，无返回值
 #[test]
 fn every_arrow_head_and_pattern_is_committed_by_the_shared_line_tool() {
     let mut dirty = 0;
     let mut state = line_editor(Tool::Arrow, &mut dirty);
     assert_eq!(state.selected_tool, Tool::Arrow);
     for head in ArrowStyle::ALL {
-        for pattern in LineStyle::ALL {
-            state.tool_settings.arrow_style = head;
-            state.tool_settings.arrow_line_style = pattern;
-            draw(&mut state, (140.0, 180.0), (420.0, 220.0), &mut dirty);
-            let annotation = state.annotations.last().unwrap();
-            let AnnotationShape::Arrow {
-                line,
-                style,
-                line_style,
-            } = &annotation.shape
-            else {
-                panic!("arrow expected")
-            };
-            assert_eq!((*style, *line_style), (head, pattern));
-            assert_eq!(line.start, (140.0, 180.0));
-            assert_eq!(line.end, (420.0, 220.0));
-            assert!(line.controls.is_empty());
-            assert_eq!(annotation.stroke_width, 3.0);
+        for bidirectional in [false, true] {
+            for tail in [ArrowTail::Pointed, ArrowTail::Rounded] {
+                let head = ArrowStyle {
+                    bidirectional,
+                    tail,
+                    ..head
+                };
+                for pattern in LineStyle::ALL {
+                    state.tool_settings.arrow_style = head;
+                    state.tool_settings.arrow_line_style = pattern;
+                    draw(&mut state, (140.0, 180.0), (420.0, 220.0), &mut dirty);
+                    let annotation = state.annotations.last().unwrap();
+                    let AnnotationShape::Arrow {
+                        line,
+                        style,
+                        line_style,
+                    } = &annotation.shape
+                    else {
+                        panic!("arrow expected")
+                    };
+                    assert_eq!((*style, *line_style), (head, pattern));
+                    assert_eq!(line.start, (140.0, 180.0));
+                    assert_eq!(line.end, (420.0, 220.0));
+                    assert!(line.controls.is_empty());
+                    assert_eq!(annotation.stroke_width, 3.0);
+                }
+            }
         }
     }
     key(&mut state, "D", &mut dirty);
@@ -47,8 +56,8 @@ fn every_arrow_head_and_pattern_is_committed_by_the_shared_line_tool() {
             matches!(state.annotations.last().unwrap().shape, AnnotationShape::Line { style, .. } if style == pattern)
         );
     }
-    assert_eq!(state.annotations.len(), 21);
-    assert_eq!(state.undo_stack.len(), 21);
+    assert_eq!(state.annotations.len(), 39);
+    assert_eq!(state.undo_stack.len(), 39);
     assert_eq!(state.tool_settings.stroke(StrokeGroup::Numbered), 11.0);
     assert_eq!(StrokeGroup::Arrow as usize, 2);
     assert_eq!(StrokeGroup::Line as usize, 3);

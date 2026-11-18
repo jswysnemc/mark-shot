@@ -8,6 +8,14 @@ fn entry(path: &str) -> &'static Entry {
     ENTRIES.iter().find(|entry| entry.path() == path).unwrap()
 }
 
+/// 【设置实际值回归】【路径规范】按 path 返回系统规范化的绝对路径文字，避免 Windows 混用分隔符影响显示比较
+fn absolute(path: impl AsRef<std::path::Path>) -> String {
+    std::path::absolute(path)
+        .unwrap()
+        .to_string_lossy()
+        .into_owned()
+}
+
 /// 【设置实际值回归】【工具默认】无参数，验证默认截图显示选区、文件编辑显示选择标注，并保持原存储值为空
 #[test]
 fn unset_tools_show_the_actual_entry_point_defaults() {
@@ -56,7 +64,7 @@ fn inherited_paths_and_colors_are_concrete_without_changing_storage() {
     let history = crate::config::history::History::default().path().unwrap();
     assert_eq!(
         entry("history.directory").display(&values),
-        history.to_string_lossy()
+        absolute(history)
     );
     let recording = dirs::video_dir()
         .or_else(dirs::home_dir)
@@ -64,21 +72,23 @@ fn inherited_paths_and_colors_are_concrete_without_changing_storage() {
         .join("Mark Shot");
     assert_eq!(
         entry("recording.directory").display(&values),
-        recording.to_string_lossy()
+        absolute(recording)
     );
     let pictures = dirs::picture_dir()
         .or_else(|| dirs::home_dir().map(|home| home.join("Pictures")))
         .unwrap();
     assert_eq!(
         entry("save.directory").display(&values),
-        pictures.join("screenshots").to_string_lossy()
+        absolute(pictures.join("screenshots"))
     );
     assert_eq!(
         entry("log.path").display(&values),
-        dirs::state_dir()
-            .unwrap()
-            .join("mark-shot/mark-shot.log")
-            .to_string_lossy()
+        absolute(
+            dirs::state_dir()
+                .or_else(dirs::data_local_dir)
+                .unwrap()
+                .join("mark-shot/mark-shot.log")
+        )
     );
     assert!(
         crate::theme::Rgba::parse_hex(&entry("startup.default_color").display(&values)).is_some()

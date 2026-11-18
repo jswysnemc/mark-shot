@@ -1,4 +1,4 @@
-//! 【Windows剪贴板】【系统拥有】图片同时提供PNG与DIBV5，文本使用Unicode，进程退出后系统继续持有数据
+//! 【Windows剪贴板】【系统拥有】图片提供 PNG、透明 DIBV5 和传统 DIB，进程退出后系统继续持有数据
 
 mod content;
 pub use content::{read_files, read_html};
@@ -29,16 +29,25 @@ fn png_format() -> std::io::Result<u32> {
 }
 
 impl crate::backend::ClipboardProvider for Provider {
-    /// 【Windows剪贴板】【原图复制】按png_data提供PNG及透明DIBV5，返回所有权交接结果，不启动常驻进程
+    /// 【Windows剪贴板】【原图复制】按 png_data 提供 PNG、透明 DIBV5 和兼容 DIB，返回所有权交接结果
     fn copy_image_to_clipboard(&self, png_data: &[u8]) -> crate::AppResult {
-        let dib = image::dib(png_data)?;
+        let payload = image::payload(png_data)?;
         let png = Buffer::new(png_data)?;
-        let dib = Buffer::new(&dib)?;
+        let dibv5 = Buffer::new(&payload.dibv5)?;
+        let compatible = Buffer::new(&payload.compatible)?;
+        let format = png_format()?;
         let clipboard = Opened::write()?;
         clipboard.clear()?;
-        png.give(png_format()?)?;
-        dib.give(17)?;
-        Ok(())
+        let result = (|| {
+            png.give(format)?;
+            dibv5.give(17)?;
+            compatible.give(8)?;
+            Ok(())
+        })();
+        if result.is_err() {
+            clipboard.clear()?;
+        }
+        result
     }
 }
 

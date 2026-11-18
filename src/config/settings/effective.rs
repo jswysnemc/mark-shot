@@ -86,8 +86,7 @@ pub(super) fn resolve(entry: &Entry, values: &Value, configured: String) -> Stri
             directory(Some(configured.clone().into())).unwrap_or(configured)
         }
         ("log", "path") if configured.is_empty() => {
-            directory(dirs::state_dir().map(|root| root.join("mark-shot/mark-shot.log")))
-                .unwrap_or(configured)
+            directory(crate::logging::default_log_file_path()).unwrap_or(configured)
         }
         _ => configured,
     }

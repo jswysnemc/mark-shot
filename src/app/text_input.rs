@@ -14,6 +14,7 @@ use crate::{
     ui::panel::UiPanel,
 };
 use cosmic_text::{Edit as _, Selection};
+mod composition_geometry;
 pub(crate) mod fields;
 
 /// 【输入法】【正文资格】按 state 返回可输入正文的会话身份；字段、菜单和识别界面拥有输入时返回空值
@@ -220,10 +221,12 @@ pub(crate) fn sync_with(
     }
     let context = context(state);
     let rect = cursor_rect(state, focus.monitor_idx);
+    let composition = composition_geometry::snapshot(state, focus.monitor_idx);
     let unchanged = target.snapshot.as_ref().is_some_and(|old| {
         old.target_id == target_id
             && old.focus_id == focus.id
             && old.cursor_rect == rect
+            && old.composition == composition
             && match (context, old.surrounding.as_ref()) {
                 (None, None) => true,
                 (Some(context), Some(old)) => context.matches(old),
@@ -239,6 +242,7 @@ pub(crate) fn sync_with(
         monitor_idx: focus.monitor_idx,
         surrounding: context.map(Window::owned),
         cursor_rect: rect,
+        composition,
         cause: target.cause,
         content: crate::types::text_input::ContentType::Multiline,
     };

@@ -9,6 +9,10 @@ use crate::{
 use std::time::Instant;
 use tiny_skia::Pixmap;
 
+#[cfg(test)]
+#[path = "text_input_tests.rs"]
+mod text_input_tests;
+
 pub(super) struct Surface {
     pub(super) window: native::Window,
     pub(super) content: Box<dyn WindowContent>,
@@ -97,15 +101,29 @@ impl Surface {
             self.text.as_ref(),
             crate::types::text_input::ChangeCause::Other,
         ) {
-            let rect = snapshot.cursor_rect.map(|(x, y, w, h)| {
+            let physical = |(x, y, w, h): (i32, i32, i32, i32)| {
                 (
                     (x as f32 * self.scale).round() as i32,
                     (y as f32 * self.scale).round() as i32,
                     (w as f32 * self.scale).ceil().max(1.0) as i32,
                     (h as f32 * self.scale).ceil().max(1.0) as i32,
                 )
+            };
+            let rect = snapshot.cursor_rect.map(physical);
+            let composition = snapshot.composition.as_ref().map(|geometry| {
+                crate::types::text_input::CompositionGeometry {
+                    positions: geometry
+                        .positions
+                        .iter()
+                        .map(|(offset, rect)| (*offset, physical(*rect)))
+                        .collect(),
+                }
             });
-            self.window.set_text_input(self.focus_id, rect)?;
+            self.window.set_text_input_with_geometry(
+                snapshot.target_id,
+                rect,
+                composition.as_ref(),
+            )?;
             self.text = Some(snapshot);
         }
         Ok(())
@@ -211,7 +229,10 @@ impl Surface {
             return Ok(close);
         }
         if let native::Event::Composition { target, .. } = &event
-            && (self.text.is_none() || *target != self.focus_id)
+            && self
+                .text
+                .as_ref()
+                .is_none_or(|snapshot| *target != snapshot.target_id)
         {
             return Ok(false);
         }

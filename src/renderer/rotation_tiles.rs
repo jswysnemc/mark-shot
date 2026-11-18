@@ -1,8 +1,8 @@
 //! 【标注旋转】【固定分块】斜角正文按原始物理像素网格栅格化，局部缓冲只合成相交部分
 
 use super::Painter;
-use crate::types::Annotation;
-use tiny_skia::{Pixmap, PixmapPaint, Transform};
+use crate::types::{Annotation, AnnotationShape};
+use tiny_skia::{BlendMode, Pixmap, PixmapPaint, Transform};
 
 const SIDE: i64 = 128;
 
@@ -23,13 +23,28 @@ pub(super) fn draw(
         painter.drawing_bounds(),
         painter.ruler_projection(),
     );
-    draw_region(painter, bounds, body);
+    let blend_mode = if matches!(annotation.shape, AnnotationShape::Highlighter { .. }) {
+        BlendMode::Multiply
+    } else {
+        BlendMode::SourceOver
+    };
+    draw_region_with_blend(painter, bounds, blend_mode, body);
 }
 
 /// 【标注绘制】【固定区域】按painter、bounds和body绘制固定物理网格，任意局部裁切保持相同栅格结果，无返回值
 pub(crate) fn draw_region(
     painter: &mut Painter<'_>,
     bounds: tiny_skia::Rect,
+    body: impl FnMut(&mut Painter<'_>),
+) {
+    draw_region_with_blend(painter, bounds, BlendMode::SourceOver, body);
+}
+
+/// 【标注绘制】【背景合成】按 painter、bounds 与 blend_mode 执行 body，返回值为空；荧光笔图块在真实背景上保持乘法混合
+fn draw_region_with_blend(
+    painter: &mut Painter<'_>,
+    bounds: tiny_skia::Rect,
+    blend_mode: BlendMode,
     mut body: impl FnMut(&mut Painter<'_>),
 ) {
     let scale = f64::from(painter.scale());
@@ -68,7 +83,10 @@ pub(crate) fn draw_region(
                 (x - origin.0) as i32,
                 (y - origin.1) as i32,
                 tile.as_ref(),
-                &PixmapPaint::default(),
+                &PixmapPaint {
+                    blend_mode,
+                    ..PixmapPaint::default()
+                },
                 Transform::identity(),
                 None,
             );

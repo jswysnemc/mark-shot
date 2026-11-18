@@ -111,7 +111,12 @@ impl Pin {
                     self.resize(true, qh);
                 }
                 PinAction::AlwaysOnTop => {
-                    self.image.always_on_top = !self.image.always_on_top;
+                    let enabled = !self.image.always_on_top;
+                    crate::config::pinned_preferences::save(
+                        crate::config::pinned_preferences::Preference::AlwaysOnTop,
+                        enabled,
+                    )?;
+                    self.image.always_on_top = enabled;
                     self.recreate(qh);
                     self.resize(false, qh);
                 }
@@ -136,7 +141,12 @@ impl Pin {
                     }
                 }
                 PinAction::TextSelection => {
-                    self.text_selection = !self.text_selection;
+                    let enabled = !self.text_selection;
+                    crate::config::pinned_preferences::save(
+                        crate::config::pinned_preferences::Preference::AutoTextSelection,
+                        enabled,
+                    )?;
+                    self.text_selection = enabled;
                     if self.text_selection {
                         self.text_selection = if self.text.is_active() {
                             true

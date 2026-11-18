@@ -267,6 +267,15 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
             SettingsWidget::Toggle { field, .. } => {
                 let value = match selected_ann {
                     Some(ann) => match (&ann.shape, field) {
+                        (AnnotationShape::Arrow { style, .. }, ToggleField::ArrowBidirectional) => {
+                            style.bidirectional
+                        }
+                        (AnnotationShape::Arrow { style, .. }, ToggleField::ArrowPointedTail) => {
+                            style.tail == crate::features::arrow::ArrowTail::Pointed
+                        }
+                        (AnnotationShape::Arrow { style, .. }, ToggleField::ArrowRoundedTail) => {
+                            style.tail == crate::features::arrow::ArrowTail::Rounded
+                        }
                         (
                             AnnotationShape::Rectangle { fixed_ratio, .. }
                             | AnnotationShape::Circle { fixed_ratio, .. },
@@ -294,6 +303,21 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
                         _ => false,
                     },
                     None => match field {
+                        ToggleField::ArrowBidirectional => {
+                            editor_state.tool_settings.arrow_style.bidirectional
+                        }
+                        ToggleField::ArrowPointedTail => {
+                            editor_state.tool_settings.arrow_style.tail
+                                == crate::features::arrow::ArrowTail::Pointed
+                        }
+                        ToggleField::ArrowRoundedTail => {
+                            editor_state.tool_settings.arrow_style.tail
+                                == crate::features::arrow::ArrowTail::Rounded
+                        }
+                        ToggleField::HighlighterLine => {
+                            editor_state.tool_settings.highlighter_style
+                                == crate::features::highlighter::HighlighterStyle::StraightLine
+                        }
                         ToggleField::FixedRatio => editor_state.tool_settings.fixed_ratio,
                         ToggleField::Bold => editor_state.tool_settings.bold,
                         ToggleField::Italic => editor_state.tool_settings.italic,

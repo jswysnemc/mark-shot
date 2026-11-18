@@ -49,7 +49,6 @@ pub struct WaylandOverlay {
     scrolling: Option<usize>,
     scroll_window: Option<scroll_window::ScrollWindow>,
     scroll_panel_rect: Option<tiny_skia::Rect>,
-    text_interactivity_monitor: Option<usize>,
     task_source: Option<crate::backend::task_wake::Source>,
     theme_source: Option<crate::theme::config_watch::Watch>,
     controller: Option<std::sync::Arc<crate::features::single_instance::Controller>>,
@@ -76,7 +75,6 @@ impl WaylandOverlay {
             scrolling: None,
             scroll_window: None,
             scroll_panel_rect: None,
-            text_interactivity_monitor: None,
             task_source: None,
             theme_source: super::theme_notifications::source(),
             controller: crate::features::single_instance::context::current(),
@@ -257,31 +255,12 @@ impl ScreenOverlay for WaylandOverlay {
         }
         Ok(self.task_source.as_ref().unwrap().wake())
     }
-    /// 【输入法】【原生同步】同步 snapshot 后刷新连接，Layer 模式编辑期间放开按需键盘交互以兼容输入法切换，返回协议结果
+    /// 【输入法】【原生同步】同步 snapshot 后刷新连接；保持已映射截图层的键盘策略，返回协议结果
     fn set_text_input(
         &mut self,
         snapshot: Option<&crate::types::text_input::Snapshot>,
     ) -> crate::AppResult {
-        let active = snapshot.map(|value| value.monitor_idx);
-        if self.layer && self.scrolling.is_none() && self.text_interactivity_monitor != active {
-            if let Some(previous) = self.text_interactivity_monitor.take()
-                && let Some(sd) = self.runtime.state.surfaces.get(&previous)
-                && sd.mapped
-                && let crate::backend::wayland::utils::surface::Role::Layer(layer) = &sd.role
-            {
-                layer.set_keyboard_interactivity(KeyboardInteractivity::Exclusive);
-                sd.surface.commit();
-            }
-            if let Some(current) = active
-                && let Some(sd) = self.runtime.state.surfaces.get(&current)
-                && sd.mapped
-                && let crate::backend::wayland::utils::surface::Role::Layer(layer) = &sd.role
-            {
-                layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
-                sd.surface.commit();
-                self.text_interactivity_monitor = Some(current);
-            }
-        }
+        // 1. 【输入法】【焦点稳定】映射后改为 OnDemand 会使 niri 释放层焦点，leave 与重新启用将形成循环
         self.runtime.state.text_input.sync(snapshot);
         self.runtime.event_queue.flush()?;
         Ok(())
@@ -579,7 +558,6 @@ impl ScreenOverlay for WaylandOverlay {
             .collect();
         let rt = &mut self.runtime;
         let remap = |idx: usize| keep.iter().position(|&k| k == idx);
-        self.text_interactivity_monitor = self.text_interactivity_monitor.and_then(remap);
         rt.state.text_input.retain_outputs(remap);
 
         for (idx, sd) in std::mem::take(&mut rt.state.surfaces) {
