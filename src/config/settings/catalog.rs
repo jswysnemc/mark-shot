@@ -78,6 +78,10 @@ impl Entry {
             return help;
         }
         let labels = match (self.section, self.key) {
+            ("pinned", "auto_text_selection") => (
+                "新贴图自动识别文字，识别完成后可直接拖动选字；需要已安装的识别资源",
+                "Recognize new pins automatically, then drag to select text; requires installed OCR resources",
+            ),
             ("recording", "directory") => (
                 "留空保存到视频目录中的 Mark Shot 文件夹；也可指定完整路径",
                 "Empty uses Videos/Mark Shot; otherwise enter a full path",

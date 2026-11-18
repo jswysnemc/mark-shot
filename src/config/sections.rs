@@ -18,6 +18,7 @@ section!(Save {
 section!(Pinned {
     file_paths_to_image: bool = true,
     always_on_top: bool = true,
+    auto_text_selection: bool = false,
     border_enabled: bool = true,
     border_color: Rgba = rgb(94, 234, 212),
     border_width: f32 = 2.0,

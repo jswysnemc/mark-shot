@@ -1,5 +1,6 @@
 use super::*;
 mod filter;
+mod pinned;
 
 fn read(text: &str) -> Config {
     parse(text, "test")

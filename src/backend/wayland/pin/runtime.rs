@@ -378,6 +378,19 @@ pub(super) fn run_at_seed(
     if let Some(seed) = seed {
         pin.apply_translation_seed(seed);
     }
+    // 1. 【贴图】【自动划词】按显式偏好启动一次原图识别，已有文字种子不重复识别
+    if crate::config::get().pinned.auto_text_selection {
+        pin.text_selection = true;
+        if !pin.text.is_active() {
+            match pin.start_ocr() {
+                Ok(started) => pin.text_selection = started,
+                Err(error) => {
+                    pin.text_selection = false;
+                    pin.report(Err(error));
+                }
+            }
+        }
+    }
     let visibility_wake = pin.translation_wake.clone();
     let mut visibility =
         crate::backend::capture_visibility::Watch::new(move || visibility_wake.ping())?;

@@ -7,6 +7,11 @@ use serde_json::{Map, Value};
 pub(super) fn section(root: &Value) -> Option<Value> {
     let source = values::first(root, &["pinned", "pinnedWindow"])?;
     let mut result = Map::new();
+    if let Some(value) = values::first(source, &["auto_text_selection", "autoTextSelection"])
+        .and_then(values::boolean)
+    {
+        result.insert("auto_text_selection".into(), value.into());
+    }
     if let Some(value) =
         values::first(source, &["always_on_top", "alwaysOnTop"]).and_then(values::boolean)
     {

@@ -132,6 +132,14 @@ pub(super) const ENTRIES: &[Entry] = &[
     field!(
         Pinned,
         "pinned",
+        "auto_text_selection",
+        "贴图后自动启用划词选择",
+        "Select text automatically in new pins",
+        Kind::Toggle
+    ),
+    field!(
+        Pinned,
+        "pinned",
         "border_enabled",
         "显示贴图边框",
         "Pin border",

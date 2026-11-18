@@ -107,6 +107,8 @@ shadow_opacity = 0.32
 # 复制文件时，允许把路径转为文字贴图；图片文件首次仍直接显示图片
 file_paths_to_image = true
 always_on_top = true
+# 贴图后自动识别文字并启用划词选择；需要已安装的识别资源
+auto_text_selection = false
 border_enabled = true
 border_color = "#5EEAD4"
 border_width = 2.0

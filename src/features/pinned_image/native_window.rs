@@ -61,6 +61,16 @@ impl WindowContent for Pin {
     /// 【原生贴图】【后台通知】按wake记录窗口唤醒句柄，不启动空闲轮询
     fn connected(&mut self, wake: window::WindowWake) {
         self.wake = Some(wake);
+        // 1. 【原生贴图】【自动划词】等待窗口唤醒句柄就绪后启动一次识别，已有文字种子直接使用
+        if self.text_selection && !self.text.is_active() {
+            match self.start_ocr() {
+                Ok(started) => self.text_selection = started,
+                Err(error) => {
+                    self.text_selection = false;
+                    self.report(Err(error));
+                }
+            }
+        }
     }
     /// 【原生贴图】【置顶能力】按supported记录平台是否提供真实置顶
     fn stacking_supported(&mut self, supported: bool) {
@@ -313,6 +323,9 @@ pub(crate) fn run_at_seed(
     };
     if let Some(seed) = seed {
         pin.apply_seed(seed)?;
+    }
+    if crate::config::get().pinned.auto_text_selection {
+        pin.text_selection = true;
     }
     window::run(spec, pin)
 }
