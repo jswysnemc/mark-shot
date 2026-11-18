@@ -10,3 +10,4 @@ Categories=Graphics;
 MimeType=image/png;image/jpeg;image/webp;
 StartupNotify=true
 Keywords=screenshot;capture;annotation;recording;
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2

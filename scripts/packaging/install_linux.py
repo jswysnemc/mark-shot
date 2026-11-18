@@ -8,6 +8,19 @@ from artifact_metadata import architecture, source_sha, verify_elf
 from media_checksums import verify_media
 
 
+def desktop_entry(source, prefix):
+    """【原生打包】【桌面入口】按 source 模板和 prefix 返回写入绝对入口路径后的桌面描述文本"""
+    text = Path(source).read_text()
+    # 1. Flatpak 清单导出阶段要求保持裸命令名以匹配 command 字段
+    if Path(prefix) == Path("/app"):
+        return text
+    # 2. 系统软件包写入绝对符号链接路径，使 KWin ScreenShot2 通过 canonicalFilePath 匹配真实程序
+    executable = (Path(prefix) / "bin/mark-shot").as_posix()
+    if "\nExec=mark-shot %f\n" not in text:
+        raise ValueError("desktop template is missing expected Exec=mark-shot %f line")
+    return text.replace("\nExec=mark-shot %f\n", f"\nExec={executable} %f\n", 1)
+
+
 def install(root, binary, media, destination, prefix, arch, commit, licenses=None):
     """【原生打包】【完整安装】按源码、程序、媒体库、目标、前缀、架构、提交和版权目录返回安装根目录"""
     root, binary, media, destination = map(Path, (root, binary, media, destination))
@@ -35,11 +48,15 @@ def install(root, binary, media, destination, prefix, arch, commit, licenses=Non
     if command.exists() or command.is_symlink():
         command.unlink()
     command.symlink_to("../lib/mark-shot/mark-shot")
+    desktop_target = installed / "share/applications/io.github.jswysnemc.MarkShot.desktop"
+    desktop_target.parent.mkdir(parents=True, exist_ok=True)
+    desktop_target.write_text(
+        desktop_entry(
+            root / "packaging/desktop/io.github.jswysnemc.MarkShot.desktop", prefix
+        )
+    )
+    desktop_target.chmod(0o644)
     for source, relative in (
-        (
-            root / "packaging/desktop/io.github.jswysnemc.MarkShot.desktop",
-            "share/applications/io.github.jswysnemc.MarkShot.desktop",
-        ),
         (
             root / "packaging/desktop/io.github.jswysnemc.MarkShot.metainfo.xml",
             "share/metainfo/io.github.jswysnemc.MarkShot.metainfo.xml",

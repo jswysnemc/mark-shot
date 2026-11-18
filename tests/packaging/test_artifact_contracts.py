@@ -187,6 +187,44 @@ class ArtifactContracts(unittest.TestCase):
             self.assertEqual(
                 (installed / "lib/mark-shot/SOURCE-COMMIT").read_text().strip(), COMMIT
             )
+            desktop_text = (
+                installed / "share/applications/io.github.jswysnemc.MarkShot.desktop"
+            ).read_text()
+            self.assertIn("\nExec=/usr/bin/mark-shot %f\n", desktop_text)
+            self.assertIn(
+                "\nX-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2\n",
+                desktop_text + ("\n" if not desktop_text.endswith("\n") else ""),
+            )
+            self.assertEqual(
+                (installed / "bin/mark-shot").resolve(),
+                (installed / "lib/mark-shot/mark-shot").resolve(),
+            )
+            flatpak = install(
+                ROOT,
+                binary,
+                media,
+                directory / "flatpak",
+                "/app",
+                "x86_64",
+                COMMIT,
+                licenses,
+            )
+            flatpak_desktop = (
+                flatpak / "share/applications/io.github.jswysnemc.MarkShot.desktop"
+            ).read_text()
+            self.assertIn("\nExec=mark-shot %f\n", flatpak_desktop)
+            self.assertIn(
+                "X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2",
+                flatpak_desktop,
+            )
+            if shutil.which("desktop-file-validate"):
+                for candidate in (
+                    ROOT / "packaging/desktop/io.github.jswysnemc.MarkShot.desktop",
+                    installed / "share/applications/io.github.jswysnemc.MarkShot.desktop",
+                ):
+                    subprocess.run(
+                        ["desktop-file-validate", str(candidate)], check=True
+                    )
             self.assertTrue((installed / "share/doc/mark-shot/Cargo.lock").is_file())
             for path in (
                 "share/doc/mark-shot/README.md",

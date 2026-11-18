@@ -4,6 +4,7 @@ import argparse
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import tempfile
 
@@ -63,6 +64,13 @@ def package(repository, stage, package_version, commit, destination):
     )
     tool.chmod(0o755)
     destination.mkdir(parents=True, exist_ok=True)
+    # 1. 【原生打包】【桌面模板】linuxdeploy 拒绝含路径分隔符的 Exec 条目，封装前恢复源码裸命令桌面入口
+    desktop_file = stage / "usr/share/applications/io.github.jswysnemc.MarkShot.desktop"
+    shutil.copy2(
+        repository / "packaging/desktop/io.github.jswysnemc.MarkShot.desktop",
+        desktop_file,
+    )
+    desktop_file.chmod(0o644)
     asset = destination / f"mark-shot-native-{package_version}-linux-x86_64.AppImage"
     environment = {
         **os.environ,
@@ -94,10 +102,10 @@ def package(repository, stage, package_version, commit, destination):
         env=environment,
         check=True,
     )
-    # 1. 【原生打包】【路径修正】部署工具会修改 ELF 的 RPATH，封装前刷新媒体库摘要
+    # 2. 【原生打包】【路径修正】部署工具会修改 ELF 的 RPATH，封装前刷新媒体库摘要
     verify_media(private / "media", refresh=True)
     glibc_requirement(stage)
-    # 2. 【原生打包】【独立封装】直接调用同一固定工具内的输出插件，不再次部署或修改 ELF
+    # 3. 【原生打包】【独立封装】直接调用同一固定工具内的输出插件，不再次部署或修改 ELF
     with tempfile.TemporaryDirectory(
         prefix="linuxdeploy-output-", dir=tools
     ) as temporary:
