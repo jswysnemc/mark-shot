@@ -43,7 +43,10 @@ pub(crate) fn watch(wake: crate::backend::window::WindowWake) -> SystemWatch {
 async fn listen(wake: crate::backend::window::WindowWake) {
     use ashpd::desktop::settings::{ColorScheme, Settings};
     use futures::StreamExt;
-    let Ok(settings) = Settings::new().await else {
+    let Ok(connection) = zbus::Connection::session().await else {
+        return;
+    };
+    let Ok(settings) = Settings::with_connection(connection).await else {
         return;
     };
     let Ok(mut changes) = settings.receive_color_scheme_changed().await else {

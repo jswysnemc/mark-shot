@@ -45,7 +45,13 @@ fn detect() -> Mode {
             .ok()?;
         runtime.block_on(async {
             tokio::time::timeout(std::time::Duration::from_millis(300), async {
-                let settings = ashpd::desktop::settings::Settings::new().await.ok()?;
+                // 1. 【Linux主题】【独立连接】使用独立会话连接，避免把 ashpd 的全局
+                // SESSION 单例绑定到这个即将销毁的临时运行时；否则后续 portal 捕获
+                // 复用一个已停止读驱动的新建连接而永久卡死。
+                let connection = zbus::Connection::session().await.ok()?;
+                let settings = ashpd::desktop::settings::Settings::with_connection(connection)
+                    .await
+                    .ok()?;
                 let scheme = settings.color_scheme().await.ok()?;
                 Some(
                     if scheme == ashpd::desktop::settings::ColorScheme::PreferDark {
