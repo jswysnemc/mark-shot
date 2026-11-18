@@ -61,7 +61,9 @@ impl Capture {
         };
         let closed = Arc::new(AtomicBool::new(false));
         let (session, stream, monitor) = runtime.block_on(async {
-            let portal = Screencast::new().await.map_err(|e| e.to_string())?;
+            // 1. 【门户录制】【独立连接】每次录制持有自己的总线连接，结束后不会遗留绑定旧运行时的全局连接
+            let connection = zbus::Connection::session().await.map_err(|e| e.to_string())?;
+            let portal = Screencast::with_connection(connection).await.map_err(|e| e.to_string())?;
             let session = Arc::new(portal.create_session(Default::default()).await.map_err(|e| e.to_string())?);
             let watched = session.clone();
             let ended = closed.clone();

@@ -96,10 +96,13 @@ pub fn choose_save_path(initial_path: &Path) -> crate::AppResult<Option<PathBuf>
         .build()?;
 
     let outcome = runtime.block_on(async move {
+        // 1. 【文件门户】【独立连接】临时运行时独立持有总线连接，关闭对话框后不污染其他门户请求
+        let connection = zbus::Connection::session().await?;
         let png_filter = FileFilter::new(filter_label)
             .glob("*.png")
             .mimetype("image/png");
         let mut request = SelectedFiles::save_file()
+            .connection(Some(connection))
             .title(title)
             .accept_label(accept)
             .modal(true)

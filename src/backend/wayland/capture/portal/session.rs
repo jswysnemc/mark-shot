@@ -208,7 +208,9 @@ impl PortalCapture {
         if outputs.is_empty() {
             return Err("continuous portal capture needs an output".into());
         }
-        let proxy = Screencast::new().await?;
+        // 1. 【Portal捕获】【独立总线】授权会话使用当前运行时创建的连接，避免其他临时门户操作影响截图
+        let bus = zbus::Connection::session().await?;
+        let proxy = Screencast::with_connection(bus).await?;
         let saved = token::read_token();
         let authorizer = LiveAuthorizer {
             proxy: &proxy,
