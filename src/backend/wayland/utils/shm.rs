@@ -7,7 +7,7 @@
 
 use super::shm_pool::{Buffer, SlotPool};
 use crate::utils::copy_swizzled;
-use wayland_client::protocol::{wl_buffer, wl_shm};
+use wayland_client::protocol::wl_shm;
 
 #[cfg(test)]
 #[path = "shm_tests.rs"]
@@ -187,10 +187,6 @@ impl ShmBuffer {
             canvas.fill(0);
         }
     }
-    pub fn wl_buffer(&self) -> &wl_buffer::WlBuffer {
-        self.buffer.wl_buffer()
-    }
-
     pub fn write_pixels(&mut self, pool: &mut SlotPool, pixels: &[u8]) {
         if let Some(canvas) = pool.canvas(&self.buffer) {
             let len = pixels.len().min(canvas.len());

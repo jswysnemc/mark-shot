@@ -90,6 +90,9 @@ ocr-gpu = ["bundled-ocr", "dep:lzma-rust2", "oar-ocr/webgpu"]
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 xim = { version = "0.6", features = ["x11rb-server"] }
+wayland-server = "0.31"
+wayland-protocols = { version = "0.32", features = ["server"] }
+wayland-protocols-wlr = { version = "0.3", features = ["server"] }
 
 [lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

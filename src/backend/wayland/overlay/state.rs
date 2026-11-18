@@ -1,10 +1,13 @@
 pub mod compositor_shm;
 pub mod cursor;
+
 pub mod global;
 pub mod keyboard;
 pub mod layer;
 pub mod output;
 pub mod pointer;
+#[cfg(test)]
+mod shm_lifecycle_tests;
 pub(super) use crate::backend::pointer_coalescing;
 pub(super) mod primary_selection;
 mod scroll_window;

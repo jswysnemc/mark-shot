@@ -5,6 +5,12 @@ pub mod raw;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod lifecycle_tests;
+
+#[cfg(test)]
+pub(crate) mod test_server;
+
 use raw::RawPool;
 use smithay_client_toolkit::{globals::ProvidesBoundGlobal, shm::CreatePoolError};
 use std::{
@@ -397,11 +403,6 @@ impl Buffer {
         self.activate()?;
         surface.attach(Some(&self.buffer), 0, 0);
         Ok(())
-    }
-
-    /// 【共享内存池】【协议句柄】无参数，返回内部 wl_buffer 引用
-    pub fn wl_buffer(&self) -> &wl_buffer::WlBuffer {
-        &self.buffer
     }
 
     /// 【共享内存池】【缓冲高度】无参数，返回缓冲像素高度

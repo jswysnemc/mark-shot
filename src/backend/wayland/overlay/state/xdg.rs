@@ -28,12 +28,12 @@ impl WindowHandler for OverlayState {
             matches!(&surface.role, crate::backend::wayland::utils::surface::Role::ScrollParent(parent) if parent.wl_surface() == window.wl_surface())
         }) {
             self.configure_surface(window.wl_surface(), size);
-            if let Some(surface) = self.surfaces.values_mut().find(|surface| &surface.surface == window.wl_surface())
-                && let Some(buffer) = &mut surface.shm_buffer {
-                    buffer.clear(&mut self.pool);
-                    window.set_window_geometry(0, 0, surface.width, surface.height);
-                    surface.surface.attach(Some(buffer.wl_buffer()), 0, 0);
-                    surface.surface.commit();
+            if let Some(surface) = self.surfaces.values().find(|surface| {
+                &surface.surface == window.wl_surface() && surface.shm_buffer.is_some()
+            }) {
+                // 1. 【滚动截图】【父窗口配置】缓冲已由 configure_surface 按尺寸初始化并附着，此处只提交窗口几何状态
+                window.set_window_geometry(0, 0, surface.width, surface.height);
+                surface.surface.commit();
             }
             return;
         }

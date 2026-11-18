@@ -20,7 +20,7 @@ impl LayerShellHandler for OverlayState {
         }
     }
 
-    /// besides usual configuration, we create a small 1x1 transparent buffer for the probe surface to find the focused monitor
+    /// 【截图覆盖层】【层配置】按 layer 和 configure 更新表面；探测层提交活动透明像素，连接、队列与序列号不参与缓冲分配，无返回值
     fn configure(
         &mut self,
         _: &Connection,
@@ -41,7 +41,11 @@ impl LayerShellHandler for OverlayState {
             return;
         };
         buffer.write_pixels(&mut self.pool, &[0; 4]);
-        layer.wl_surface().attach(Some(buffer.wl_buffer()), 0, 0);
+        // 1. 【截图覆盖层】【探测占用】探测像素也必须登记活动状态，释放前禁止复用或销毁其槽位
+        if let Err(error) = buffer.buffer.attach_to(layer.wl_surface()) {
+            self.configure_error = Some(error.to_string());
+            return;
+        }
         layer.wl_surface().damage_buffer(0, 0, 1, 1);
         layer.commit();
         probe.buffer = Some(buffer);
