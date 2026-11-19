@@ -220,7 +220,8 @@ class ArtifactContracts(unittest.TestCase):
             if shutil.which("desktop-file-validate"):
                 for candidate in (
                     ROOT / "packaging/desktop/io.github.jswysnemc.MarkShot.desktop",
-                    installed / "share/applications/io.github.jswysnemc.MarkShot.desktop",
+                    installed
+                    / "share/applications/io.github.jswysnemc.MarkShot.desktop",
                 ):
                     subprocess.run(
                         ["desktop-file-validate", str(candidate)], check=True

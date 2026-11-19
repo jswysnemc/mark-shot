@@ -8,6 +8,14 @@ use crate::backend::wayland::utils::{
 };
 use smithay_client_toolkit::shell::{WaylandSurface, wlr_layer::Layer};
 
+/// 【截图覆盖层测试】【回调同步】按 runtime 先处理服务端事件，再等待回调生成的附着和销毁请求完成，无返回值
+fn sync(runtime: &mut OverlayRunTime) {
+    // 1. 【截图覆盖层测试】【事件交付】首轮往返只保证调用前请求完成，配置和释放回调仍可生成新请求
+    runtime.event_queue.roundtrip(&mut runtime.state).unwrap();
+    // 2. 【截图覆盖层测试】【请求确认】第二轮确认回调中新建的请求，随后快照不再依赖私有服务线程调度
+    runtime.event_queue.roundtrip(&mut runtime.state).unwrap();
+}
+
 /// 【截图覆盖层测试】【探测占用】无参数，验证探测像素提交后保持活动，所有者丢弃时等待真实释放，无返回值
 #[test]
 fn monitor_probe_registers_its_buffer_until_release() {
@@ -32,9 +40,9 @@ fn monitor_probe_registers_its_buffer_until_release() {
         buffer: None,
         output: None,
     });
-    runtime.event_queue.roundtrip(&mut runtime.state).unwrap();
+    sync(&mut runtime);
     server.configure_layer();
-    runtime.event_queue.roundtrip(&mut runtime.state).unwrap();
+    sync(&mut runtime);
     // 1. 【截图覆盖层测试】【活动登记】配置回调实际提交缓冲，客户端必须同步登记服务端占用
     let buffer = runtime
         .state
@@ -47,10 +55,10 @@ fn monitor_probe_registers_its_buffer_until_release() {
     assert!(buffer.active(), "probe attachment bypassed activation");
     assert_eq!(server.snapshot().attached_buffers, [0]);
     runtime.state.probe.as_mut().unwrap().buffer = None;
-    runtime.event_queue.roundtrip(&mut runtime.state).unwrap();
+    sync(&mut runtime);
     assert!(server.snapshot().destroyed_buffers.is_empty());
     server.release(0);
-    runtime.event_queue.roundtrip(&mut runtime.state).unwrap();
+    sync(&mut runtime);
     assert_eq!(server.snapshot().destroyed_buffers, [0]);
 }
 
@@ -92,7 +100,7 @@ fn create_scroll_parent(runtime: &mut OverlayRunTime) {
             frame_sent: None,
         },
     );
-    runtime.event_queue.roundtrip(&mut runtime.state).unwrap();
+    sync(runtime);
 }
 
 /// 【截图覆盖层测试】【重复配置】无参数，验证初次配置只附着一次，重复尺寸不重新附着仍活动的透明父缓冲，无返回值
@@ -102,7 +110,7 @@ fn scroll_parent_configure_does_not_reattach_an_active_buffer() {
     let mut runtime = OverlayRunTime::new(&connection).unwrap();
     create_scroll_parent(&mut runtime);
     server.configure_window(1, 1);
-    runtime.event_queue.roundtrip(&mut runtime.state).unwrap();
+    sync(&mut runtime);
     assert_eq!(
         server.snapshot().attached_buffers,
         [0],
@@ -116,14 +124,14 @@ fn scroll_parent_configure_does_not_reattach_an_active_buffer() {
             .active()
     );
     server.configure_window(1, 1);
-    runtime.event_queue.roundtrip(&mut runtime.state).unwrap();
+    sync(&mut runtime);
     assert_eq!(server.snapshot().attached_buffers, [0]);
     assert!(runtime.state.configure_error.is_none());
     // 1. 【截图覆盖层测试】【几何复用】服务端已释放当前缓冲时，同尺寸配置同样只提交几何状态，不需要重新附着像素
     server.release(0);
-    runtime.event_queue.roundtrip(&mut runtime.state).unwrap();
+    sync(&mut runtime);
     server.configure_window(1, 1);
-    runtime.event_queue.roundtrip(&mut runtime.state).unwrap();
+    sync(&mut runtime);
     assert_eq!(server.snapshot().attached_buffers, [0]);
 }
 
@@ -134,9 +142,9 @@ fn scroll_parent_resize_preserves_the_unreleased_old_slot() {
     let mut runtime = OverlayRunTime::new(&connection).unwrap();
     create_scroll_parent(&mut runtime);
     server.configure_window(1, 1);
-    runtime.event_queue.roundtrip(&mut runtime.state).unwrap();
+    sync(&mut runtime);
     server.configure_window(128, 128);
-    runtime.event_queue.roundtrip(&mut runtime.state).unwrap();
+    sync(&mut runtime);
     let snapshot = server.snapshot();
     assert_eq!(snapshot.attached_buffers, [0, 1]);
     assert_ne!(snapshot.buffer_offsets[0], snapshot.buffer_offsets[1]);
@@ -149,6 +157,6 @@ fn scroll_parent_resize_preserves_the_unreleased_old_slot() {
             .active()
     );
     server.release(0);
-    runtime.event_queue.roundtrip(&mut runtime.state).unwrap();
+    sync(&mut runtime);
     assert_eq!(server.snapshot().destroyed_buffers, [0]);
 }

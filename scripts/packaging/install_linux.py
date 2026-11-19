@@ -48,7 +48,9 @@ def install(root, binary, media, destination, prefix, arch, commit, licenses=Non
     if command.exists() or command.is_symlink():
         command.unlink()
     command.symlink_to("../lib/mark-shot/mark-shot")
-    desktop_target = installed / "share/applications/io.github.jswysnemc.MarkShot.desktop"
+    desktop_target = (
+        installed / "share/applications/io.github.jswysnemc.MarkShot.desktop"
+    )
     desktop_target.parent.mkdir(parents=True, exist_ok=True)
     desktop_target.write_text(
         desktop_entry(
