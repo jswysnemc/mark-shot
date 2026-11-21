@@ -1,5 +1,6 @@
 //! 【贴图】【表格绘制】测量单元格宽度、分配列宽并绘制带边框、表头与背景的富文本表格
 
+use super::super::html::TableStyle;
 use super::{
     Align, Attrs, Buffer, FontSystem, Palette, block_height, build_span_buffer, draw_decorations,
     draw_span_backgrounds, fill_rect, is_light, max_line_width,
@@ -12,9 +13,10 @@ const V_PAD: f32 = 6.0;
 const MIN_COL: f32 = 48.0;
 const BORDER: f32 = 1.0;
 
-/// 【贴图】【表格数据】记录预处理后的行与已解析片段属性
+/// 【贴图】【表格数据】记录预处理后的行、源样式与已解析片段属性
 pub(super) struct Table {
     pub(super) rows: Vec<Row>,
+    pub(super) style: TableStyle,
 }
 
 /// 【贴图】【表格行数据】记录表头标记、行背景与单元格
@@ -32,10 +34,11 @@ pub(super) struct Cell {
     pub(super) spans: Vec<(String, Attrs<'static>)>,
 }
 
-/// 【贴图】【已排表格】记录最终宽度、高度与逐行布局
+/// 【贴图】【已排表格】记录最终宽度、高度、源样式与逐行布局
 pub(super) struct LaidTable {
     pub(super) width: f32,
     pub(super) height: f32,
+    style: TableStyle,
     rows: Vec<LaidRow>,
 }
 
@@ -56,8 +59,17 @@ struct LaidCell {
     header: bool,
 }
 
-/// 【贴图】【表格宽度】按表格自然列宽返回含左右内边距的期望总宽
+/// 【贴图】【表格宽度】按源宽度、源列宽或自然列宽返回期望总宽，百分比填充取页面正文上限
 pub(super) fn intrinsic_width(fonts: &mut FontSystem, table: &Table) -> f32 {
+    if table.style.fill {
+        return super::MAX_CONTENT;
+    }
+    if let Some(width) = table.style.width {
+        return width;
+    }
+    if !table.style.columns.is_empty() {
+        return table.style.columns.iter().sum();
+    }
     natural_widths(fonts, table).iter().sum()
 }
 
@@ -123,6 +135,34 @@ fn padded(width: f32) -> f32 {
     (width + H_PAD * 2.0).max(MIN_COL)
 }
 
+/// 【贴图】【比例列宽】按 source 比例缩放到 target，逐列不低于最小列宽且总和恰为 target
+fn scaled_columns(source: &[f32], target: f32) -> Vec<f32> {
+    let count = source.len();
+    if count == 0 {
+        return Vec::new();
+    }
+    let floor = MIN_COL * count as f32;
+    if target <= floor {
+        return vec![(target / count as f32).max(1.0); count];
+    }
+    let mut widths: Vec<f32> = source.iter().map(|width| width.max(MIN_COL)).collect();
+    let sum: f32 = widths.iter().sum();
+    if sum > 0.0 {
+        for width in &mut widths {
+            *width = (*width * target / sum).max(MIN_COL);
+        }
+    }
+    let total: f32 = widths.iter().sum();
+    let slack: f32 = widths.iter().map(|width| width - MIN_COL).sum();
+    let excess = total - target;
+    if excess > 0.0 && slack > 0.0 {
+        for width in &mut widths {
+            *width -= excess * (*width - MIN_COL) / slack;
+        }
+    }
+    widths
+}
+
 /// 【贴图】【自然列宽】按未换行单元格宽度返回每列含内边距的最宽列宽
 fn natural_widths(fonts: &mut FontSystem, table: &Table) -> Vec<f32> {
     let columns = table
@@ -141,9 +181,31 @@ fn natural_widths(fonts: &mut FontSystem, table: &Table) -> Vec<f32> {
     widths.into_iter().map(padded).collect()
 }
 
-/// 【贴图】【表格排版】按可用宽度分配列宽、换行单元格并累计行高，返回已排表格
+/// 【贴图】【表格排版】按源宽度/列宽或自然列宽分配列宽、换行单元格并累计行高，返回已排表格
 pub(super) fn layout(fonts: &mut FontSystem, table: &Table, available: f32) -> LaidTable {
-    let columns = column_widths(&natural_widths(fonts, table), available);
+    let natural = natural_widths(fonts, table);
+    let count = natural.len();
+    let target = if table.style.fill {
+        available
+    } else if let Some(width) = table.style.width {
+        width.min(available)
+    } else if !table.style.columns.is_empty() {
+        table.style.columns.iter().sum::<f32>().min(available)
+    } else {
+        available
+    };
+    let use_columns = table.style.columns.len() == count && !table.style.columns.is_empty();
+    let columns = if table.style.fill {
+        if use_columns {
+            scaled_columns(&table.style.columns, target)
+        } else {
+            scaled_columns(&natural, target)
+        }
+    } else if use_columns {
+        scaled_columns(&table.style.columns, target)
+    } else {
+        column_widths(&natural, target)
+    };
     let mut rows = Vec::with_capacity(table.rows.len());
     let mut height = 0.0_f32;
     for row in &table.rows {
@@ -179,6 +241,7 @@ pub(super) fn layout(fonts: &mut FontSystem, table: &Table, available: f32) -> L
     LaidTable {
         width: columns.iter().sum(),
         height,
+        style: table.style.clone(),
         rows,
     }
 }
@@ -191,7 +254,11 @@ pub(super) fn draw(
     palette: &Palette,
     backgrounds: &[Option<Rgba>],
 ) {
-    let border = crate::theme::color::border().color();
+    let border = table
+        .style
+        .border
+        .unwrap_or_else(crate::theme::color::border)
+        .color();
     let left = origin.0.round();
     let top = origin.1.round();
     let right = (origin.0 + table.width).round();

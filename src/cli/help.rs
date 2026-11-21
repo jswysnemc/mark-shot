@@ -39,7 +39,7 @@ Screen recording:
 
 Pinning:
   --pin-image FILE              Open an image as a separate pinned window
-  --pin-clipboard               Pin a clipboard image, rich text, or plain text
+  --pin-clipboard               Pin a clipboard image, formatted HTML/RTF (local images render, network images become placeholders), or plain text
 
 QR codes and barcodes:
   --scan, --scan-code            Select a screen region and show decoded results

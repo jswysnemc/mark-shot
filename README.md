@@ -35,7 +35,7 @@ software, so it does not depend on Qt, GTK or a web view.
 | Capture | Region, window, monitor and full-desktop capture, delayed capture, scrolling screenshots, headless capture with a JSON report |
 | Annotation | Pen, highlighter, line, arrow, rectangle, ellipse, shape markers, numbering, text, mosaic and blur, magnifier, ruler, laser pointer |
 | Editing | Move, resize and rotate annotations, multi-selection, undo and redo, canvas zoom and pan, export frame with padding and shadow |
-| Pinning | Pin a capture, an image file or the clipboard as an always-on-top window, preserving clipboard rich text, with OCR text selection and translation |
+| Pinning | Pin a capture, an image file or the clipboard as an always-on-top window, preserving clipboard HTML/RTF formatting: readable local images are rendered, network/unreadable images become labelled placeholders, image paragraphs become aligned rows, and `align`/centre layouts are kept (embedded RTF images and Office vector objects are not included), with OCR text selection and translation |
 | OCR | Local PP-OCRv5 recognition, editable result window, table export to TSV, CSV, Markdown and HTML |
 | Translation | Bilibili Index-Translate, OpenAI, Anthropic, Gemini, Tencent, Baidu, Youdao, or a custom command |
 | Recording | MP4, MKV and GIF with pause and resume, system audio or microphone, hardware encoding where available |
@@ -83,7 +83,7 @@ mark-shot -m -f -t s         # save the monitor under the pointer
 mark-shot --scroll           # scrolling screenshot
 mark-shot --ocr              # recognize text in a region
 mark-shot --record           # open the recording controller
-mark-shot --pin-clipboard    # pin the clipboard image, rich text or text
+mark-shot --pin-clipboard    # pin the clipboard image, rich text or text; local images render, network images become placeholders
 mark-shot picture.png        # annotate an existing image
 mark-shot --settings         # open preferences
 ```

@@ -1,6 +1,6 @@
 //! 【贴图】【剪贴板来源】读取原生图片、文件列表、HTML 与文本，所有缓冲都有上限
 
-use super::{IMAGE_LIMIT, TEXT_LIMIT};
+use super::{IMAGE_LIMIT, MARKUP_LIMIT, TEXT_LIMIT};
 use std::path::PathBuf;
 
 #[derive(Default)]
@@ -8,6 +8,7 @@ pub(super) struct Clipboard {
     pub image: Option<Vec<u8>>,
     pub files: Vec<PathBuf>,
     pub html: Option<String>,
+    pub rtf: Option<String>,
     pub text: Option<String>,
     pub sequence: u32,
 }
@@ -146,6 +147,45 @@ fn finish(text: String) -> Option<String> {
     (!text.is_empty()).then(|| text.to_string())
 }
 
+/// 【贴图】【RTF类型排序】按 mimes 过滤 RTF 基础类型，优先 text/rtf 后 application/rtf，返回原始字符串列表
+#[cfg(any(target_os = "linux", test))]
+fn rtf_mime_candidates(mimes: &[String]) -> Vec<String> {
+    use std::collections::HashSet;
+    let mut seen = HashSet::new();
+    let mut candidates: Vec<(u8, String)> = Vec::new();
+    for mime in mimes {
+        let base = mime.split(';').next().unwrap_or(mime).trim();
+        let rank = if base.eq_ignore_ascii_case("text/rtf") {
+            0
+        } else if base.eq_ignore_ascii_case("application/rtf") {
+            1
+        } else {
+            continue;
+        };
+        if !seen.insert(mime.trim().to_ascii_lowercase()) {
+            continue;
+        }
+        candidates.push((rank, mime.clone()));
+    }
+    candidates.sort_by_key(|(rank, _)| *rank);
+    candidates.into_iter().map(|(_, mime)| mime).collect()
+}
+
+/// 【贴图】【RTF来源解码】按字节移除 BOM 后优先 UTF-8，否则按 Windows-1252 解码，空内容返回空值
+#[cfg(any(target_os = "linux", test))]
+fn decode_rtf_source(bytes: &[u8]) -> Option<String> {
+    let bytes = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
+    let text = std::str::from_utf8(bytes)
+        .map(str::to_owned)
+        .unwrap_or_else(|_| {
+            let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(bytes);
+            decoded.into_owned()
+        });
+    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
+    let text = text.trim_end_matches('\0');
+    (!text.trim().is_empty()).then(|| text.to_string())
+}
+
 /// 【贴图】【Linux类型读取】按 x11、mime、limit 读取有界数据，缺少类型或权限时返回错误
 #[cfg(target_os = "linux")]
 fn data_with(
@@ -195,7 +235,7 @@ pub(super) fn read() -> crate::AppResult<Clipboard> {
         });
     }
     let image = data_with(x11, MimeType::Specific("image/png"), IMAGE_LIMIT).ok();
-    let (html, text) = if image.is_none() {
+    let (html, rtf, text) = if image.is_none() {
         let mimes = if x11 {
             crate::backend::x11::clipboard::targets(false).unwrap_or_default()
         } else {
@@ -206,20 +246,35 @@ pub(super) fn read() -> crate::AppResult<Clipboard> {
             candidates.push("text/html".into());
         }
         let html = candidates.iter().find_map(|mime| {
-            data_with(x11, MimeType::Specific(mime), TEXT_LIMIT)
+            data_with(x11, MimeType::Specific(mime), MARKUP_LIMIT)
                 .ok()
                 .and_then(|bytes| decode_html(&bytes, mime))
         });
+        let rtf = if html.is_none() {
+            let mut rtf_candidates = rtf_mime_candidates(&mimes);
+            if x11 && rtf_candidates.is_empty() {
+                rtf_candidates.push("text/rtf".into());
+                rtf_candidates.push("application/rtf".into());
+            }
+            rtf_candidates.iter().find_map(|mime| {
+                data_with(x11, MimeType::Specific(mime), MARKUP_LIMIT)
+                    .ok()
+                    .and_then(|bytes| decode_rtf_source(&bytes))
+            })
+        } else {
+            None
+        };
         let text = data_with(x11, MimeType::Text, TEXT_LIMIT)
             .ok()
             .and_then(|bytes| String::from_utf8(bytes).ok());
-        (html, text)
+        (html, rtf, text)
     } else {
-        (None, None)
+        (None, None, None)
     };
     Ok(Clipboard {
         image,
         html,
+        rtf,
         text,
         ..Default::default()
     })
@@ -266,12 +321,20 @@ pub(super) fn read() -> crate::AppResult<Clipboard> {
         .ok()
         .filter(|bytes| bytes.len() as u64 <= IMAGE_LIMIT);
     let html = crate::backend::clipboard::read_html().ok();
+    let rtf = if html.is_none() {
+        crate::backend::clipboard::read_rtf()
+            .ok()
+            .filter(|text| text.len() as u64 <= MARKUP_LIMIT)
+    } else {
+        None
+    };
     let text = crate::backend::clipboard::read_text()
         .ok()
         .filter(|text| text.len() as u64 <= TEXT_LIMIT);
     Ok(Clipboard {
         image,
         html,
+        rtf,
         text,
         sequence,
         ..Default::default()
@@ -280,7 +343,9 @@ pub(super) fn read() -> crate::AppResult<Clipboard> {
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_html, html_charset, html_mime_candidates};
+    use super::{
+        decode_html, decode_rtf_source, html_charset, html_mime_candidates, rtf_mime_candidates,
+    };
 
     /// 【贴图测试】【UTF16LE编码】按 text 返回小端 UTF-16 字节，测试用
     fn utf16le(text: &str) -> Vec<u8> {
@@ -408,5 +473,37 @@ mod tests {
             decode_html(b"plain", "text/html;charset=windows-1252").as_deref(),
             Some("plain")
         );
+    }
+
+    /// 【贴图测试】【RTF类型排序】无参数，优先 text/rtf 再 application/rtf，忽略其他类型并去重
+    #[test]
+    fn rtf_mime_candidates_prefer_text_rtf() {
+        let mimes = [
+            "application/rtf",
+            "text/plain",
+            "text/rtf;charset=utf-8",
+            "text/html",
+            "text/rtf",
+            "application/rtf",
+        ]
+        .map(str::to_string);
+        assert_eq!(
+            rtf_mime_candidates(&mimes),
+            ["text/rtf;charset=utf-8", "text/rtf", "application/rtf"]
+        );
+    }
+
+    /// 【贴图测试】【RTF来源解码】无参数，UTF-8、BOM 与 Windows-1252 字节均可还原，空内容返回空值
+    #[test]
+    fn decode_rtf_source_accepts_utf8_bom_and_ansi() {
+        assert_eq!(
+            decode_rtf_source(b"{\\rtf1\\ansi hello}").as_deref(),
+            Some("{\\rtf1\\ansi hello}")
+        );
+        let mut bom = vec![0xEF, 0xBB, 0xBF];
+        bom.extend("{\\rtf1 中文}".as_bytes());
+        assert_eq!(decode_rtf_source(&bom).as_deref(), Some("{\\rtf1 中文}"));
+        assert_eq!(decode_rtf_source(b"caf\xe9").as_deref(), Some("café"));
+        assert_eq!(decode_rtf_source(b"  \r\n"), None);
     }
 }

@@ -14,8 +14,10 @@ impl RichText {
     /// 【贴图】【可见内容】无参数，返回是否存在非分隔线块或表格单元中的非空白文本
     pub fn has_content(&self) -> bool {
         self.blocks.iter().any(|block| match &block.kind {
+            BlockKind::Image(_) => true,
+            BlockKind::ImageRow(images) => !images.is_empty(),
             BlockKind::Rule => false,
-            BlockKind::Table { rows } => rows.iter().any(|row| {
+            BlockKind::Table { rows, .. } => rows.iter().any(|row| {
                 row.cells.iter().any(|cell| {
                     cell.spans
                         .iter()
@@ -39,16 +41,46 @@ pub(in crate::cli::pin_clipboard) struct Block {
     pub spans: Vec<Span>,
 }
 
-/// 【贴图】【块类型】描述段落、标题、列表、引用、代码、分隔线及表格语义
+/// 【贴图】【块类型】描述段落、标题、列表、引用、代码、分隔线、图片及表格语义
 #[derive(Clone, Debug, PartialEq)]
 pub(in crate::cli::pin_clipboard) enum BlockKind {
     Paragraph,
     Heading(u8),
-    ListItem { depth: usize, marker: String },
-    Quote { depth: usize },
+    Image(ImageBlock),
+    ImageRow(Vec<ImageBlock>),
+    ListItem {
+        depth: usize,
+        marker: String,
+    },
+    Quote {
+        depth: usize,
+    },
     Code,
     Rule,
-    Table { rows: Vec<TableRow> },
+    Table {
+        rows: Vec<TableRow>,
+        style: TableStyle,
+    },
+}
+
+/// 【贴图】【图片块】记录图像字节（占位图为空）、标签、固有尺寸与可选的显示尺寸
+#[derive(Clone, Debug, PartialEq)]
+pub(in crate::cli::pin_clipboard) struct ImageBlock {
+    pub data: Option<Vec<u8>>,
+    pub label: String,
+    pub width: u32,
+    pub height: u32,
+    pub display_width: Option<f32>,
+    pub display_height: Option<f32>,
+}
+
+/// 【贴图】【表格样式】记录源表格的期望宽度、百分比填充标记、各列宽度与边框颜色
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(in crate::cli::pin_clipboard) struct TableStyle {
+    pub width: Option<f32>,
+    pub fill: bool,
+    pub columns: Vec<f32>,
+    pub border: Option<Rgba>,
 }
 
 /// 【贴图】【表格行】记录是否表头、行背景与单元格列表
@@ -66,6 +98,7 @@ pub(in crate::cli::pin_clipboard) struct TableCell {
     pub align: Align,
     pub background: Option<Rgba>,
     pub header: bool,
+    pub width: Option<f32>,
 }
 
 /// 【贴图】【对齐】描述段落的水平对齐方式

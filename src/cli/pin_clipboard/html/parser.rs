@@ -1,17 +1,22 @@
 //! 【贴图】【HTML解析器】迭代扫描标签、维护样式与结构栈并构建富文本块
 
 use super::super::html_style;
-use super::model::{Align, Block, BlockKind, RichText, Span, SpanStyle};
+use super::model::{Align, Block, BlockKind, ImageBlock, RichText, Span, SpanStyle};
 use super::tags::{
-    append_span, block_align, finalize_spans, heading_level, is_block, is_block_background_tag,
-    is_heading, is_outer_container_tag, tag_background, tag_color,
+    append_span, finalize_spans, heading_level, is_block, is_block_background_tag, is_heading,
+    is_outer_container_tag, tag_background, tag_color,
 };
 use super::token::{Tag, decode_entities, is_raw, parse_start_tag, skip_raw, tag_name};
 use crate::theme::Rgba;
 
+mod align;
+mod image;
 mod table;
 
 use table::TableBuilder;
+
+const IMAGE_COUNT_LIMIT: usize = 16;
+const IMAGE_BYTES_LIMIT: usize = 64 * 1024 * 1024;
 
 /// 【贴图】【解析入口】按 html 保留常见格式并返回富文本；脚本、样式与传输头不会成为正文
 pub(in crate::cli::pin_clipboard) fn parse(html: &str) -> RichText {
@@ -74,6 +79,7 @@ struct Frame {
     saved: SpanStyle,
     saved_background: Option<Rgba>,
     kind: FrameKind,
+    align_pushed: bool,
 }
 
 /// 【贴图】【帧类型】区分普通内联、块、列表、列表项、引用、代码、表格、单元格与居中容器
@@ -111,6 +117,11 @@ struct Parser {
     table: Option<TableBuilder>,
     table_depth: usize,
     strip_pre_newline: bool,
+    image_bytes: usize,
+    image_count: usize,
+    images: Vec<ImageBlock>,
+    image_align: Option<Align>,
+    align_scope: Vec<Align>,
 }
 
 impl Parser {
@@ -136,6 +147,11 @@ impl Parser {
             table: None,
             table_depth: 0,
             strip_pre_newline: false,
+            image_bytes: 0,
+            image_count: 0,
+            images: Vec::new(),
+            image_align: None,
+            align_scope: Vec::new(),
         }
     }
 
@@ -190,6 +206,12 @@ impl Parser {
         }
         let decoded = decode_entities(text);
         let text = decoded.as_str();
+        if !self.images.is_empty() {
+            if text.chars().all(|ch| ch.is_whitespace()) {
+                return;
+            }
+            self.flush_images();
+        }
         if self.pre > 0 {
             let mut text = text;
             if self.strip_pre_newline {
@@ -235,6 +257,7 @@ impl Parser {
             self.push_span("\n", &style);
             return;
         }
+        self.flush_images();
         self.ensure_draft();
         let style = self.span_style();
         if let Some(draft) = self.draft.as_mut() {
@@ -279,7 +302,7 @@ impl Parser {
         }
         let (kind, align) = match self.pending.take() {
             Some(pending) => (pending.kind, pending.align),
-            None => (BlockKind::Paragraph, Align::Left),
+            None => (BlockKind::Paragraph, self.current_align()),
         };
         let align = if self.center > 0 {
             Align::Center
@@ -332,8 +355,9 @@ impl Parser {
         }
     }
 
-    /// 【贴图】【写出块】无参数，裁剪尾部空白后将有内容的草稿写入块列表
+    /// 【贴图】【写出块】无参数，先写出待定图片再裁剪尾部空白并把有内容的草稿写入块列表
     fn flush(&mut self) {
+        self.flush_images();
         let Some(mut draft) = self.draft.take() else {
             return;
         };
@@ -351,6 +375,28 @@ impl Parser {
         });
     }
 
+    /// 【贴图】【写出图片】无参数，把待定图片写成单个图片块或图片行并应用首个图片的对齐
+    fn flush_images(&mut self) {
+        if self.images.is_empty() {
+            return;
+        }
+        let align = self.image_align.take().unwrap_or(Align::Left);
+        let mut images = std::mem::take(&mut self.images);
+        let kind = if images.len() == 1 {
+            BlockKind::Image(images.remove(0))
+        } else {
+            BlockKind::ImageRow(images)
+        };
+        self.blocks.push(Block {
+            kind,
+            align,
+            background: None,
+            spans: Vec::new(),
+        });
+        self.at_start = true;
+        self.space = false;
+    }
+
     /// 【贴图】【开始标签】按 tag 更新结构状态与样式栈，块级标签先写出上一块
     fn start_tag(&mut self, tag: &Tag) {
         let name = tag.name.as_str();
@@ -358,6 +404,7 @@ impl Parser {
             self.table_depth += 1;
             if !tag.self_closing {
                 self.push_frame(name, FrameKind::Table);
+                self.enter_align_scope(tag);
             }
             return;
         }
@@ -386,11 +433,7 @@ impl Parser {
                 return;
             }
             "img" => {
-                if let Some(alt) = tag.attr("alt").filter(|alt| !alt.trim().is_empty()) {
-                    let alt = alt.to_string();
-                    let style = self.span_style();
-                    self.push_span(&alt, &style);
-                }
+                self.handle_img(tag);
                 return;
             }
             _ => {}
@@ -468,7 +511,7 @@ impl Parser {
             let item = self.next_list_item();
             self.pending = Some(Pending {
                 kind: BlockKind::Paragraph,
-                align: block_align(tag),
+                align: self.effective_align(tag),
             });
             self.list_items.push(item);
             self.push_frame(name, FrameKind::ListItem);
@@ -485,9 +528,10 @@ impl Parser {
             self.flush();
             self.pending = Some(Pending {
                 kind: BlockKind::Heading(level),
-                align: block_align(tag),
+                align: self.effective_align(tag),
             });
             self.push_frame(name, FrameKind::Block);
+            self.enter_align_scope(tag);
             self.apply_tag_style(tag);
             return;
         }
@@ -495,9 +539,10 @@ impl Parser {
             self.flush();
             self.pending = Some(Pending {
                 kind: BlockKind::Paragraph,
-                align: block_align(tag),
+                align: self.effective_align(tag),
             });
             self.push_frame(name, FrameKind::Block);
+            self.enter_align_scope(tag);
             self.apply_tag_style(tag);
             return;
         }
@@ -547,6 +592,9 @@ impl Parser {
             }
             self.style = frame.saved;
             self.block_background = frame.saved_background;
+            if frame.align_pushed {
+                self.align_scope.pop();
+            }
         }
         if self.table_depth == 0
             && (is_block(name)
@@ -557,6 +605,16 @@ impl Parser {
         }
     }
 
+    /// 【贴图】【草稿文本】无参数，返回当前草稿是否已含非空白文本
+    fn draft_has_text(&self) -> bool {
+        self.draft.as_ref().is_some_and(|draft| {
+            draft
+                .spans
+                .iter()
+                .any(|span| span.text.chars().any(|ch| !ch.is_whitespace()))
+        })
+    }
+
     /// 【贴图】【帧入栈】按 name 与 kind 保存当前样式与容器背景，供结束标签恢复
     fn push_frame(&mut self, name: &str, kind: FrameKind) {
         self.frames.push(Frame {
@@ -564,6 +622,7 @@ impl Parser {
             saved: self.style.clone(),
             saved_background: self.block_background,
             kind,
+            align_pushed: false,
         });
     }
 

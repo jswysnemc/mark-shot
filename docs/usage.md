@@ -105,7 +105,7 @@ Opening the editor from a pin hides the source pin until editing finishes or is 
 | --- | --- |
 | The editor | `Ctrl+P` or the pin button |
 | An image file | `mark-shot --pin-image FILE` |
-| The clipboard | `mark-shot --pin-clipboard` pins an image, formatted HTML or plain text |
+| The clipboard | `mark-shot --pin-clipboard` pins an image, formatted HTML/RTF or plain text; local images render and network or unreadable images become placeholders |
 
 | Gesture | Result |
 | --- | --- |
@@ -118,9 +118,16 @@ Opening the editor from a pin hides the source pin until editing finishes or is 
 
 When the clipboard holds HTML, its common formatting is preserved in the pinned image: bold,
 italic, underline, strikethrough, colours, font sizes, headings, lists, quotes, code, links and
-tables. Text wraps at 720 pixels, code blocks keep long lines up to 1600 pixels, and tables use
-aligned columns with borders. Container colours from applications such as code editors are kept.
-Scripts and styles are never executed.
+tables. The same formatting is preserved from RTF, including colours, fonts, paragraphs, bullets
+and simple tables; embedded objects and images in RTF are ignored. Readable local `file:` images
+referenced by clipboard HTML are rendered and scaled to their declared or intrinsic size. Network
+and unreadable images are shown as labelled placeholders instead of being downloaded, sized from
+their declared dimensions or alt text, and images that share a paragraph are laid out as a single
+row. `align` attributes, `text-align` styles and `<center>` are honoured, so centred and right
+aligned layouts stay aligned. Embedded RTF images and Office vector objects are not included. Text
+wraps at 720 pixels, code blocks keep long lines up to 1600 pixels, and tables use aligned columns
+with borders. Container colours from applications such as code editors are kept. Scripts and styles
+are never executed.
 
 Copying and saving always use the original pixels, regardless of the displayed size. After text
 recognition, dragging over recognized text selects it and `Ctrl+C` copies the selection. The
@@ -218,7 +225,7 @@ Tool names: `selection`, `pick`, `pen`, `highlighter`, `laser`, `marker`, `ruler
 | Option | Meaning |
 | --- | --- |
 | `--pin-image FILE` | Pin an image file |
-| `--pin-clipboard` | Pin a clipboard image, formatted HTML or plain text |
+| `--pin-clipboard` | Pin a clipboard image, formatted HTML/RTF (local images render, network images become placeholders) or plain text |
 | `--scan`, `--scan IMAGE`, `--scan-json IMAGE` | Scan QR codes and barcodes |
 | `--history` | Open the capture history |
 | `--settings` | Open preferences |

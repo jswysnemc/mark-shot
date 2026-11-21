@@ -37,21 +37,33 @@ pub fn read_files() -> crate::AppResult<Vec<PathBuf>> {
     Ok(files)
 }
 
-/// 【Windows剪贴板】【HTML读取】无参数，先读 HTML Format 再退回 text/html，返回最多六十四 KiB 的 UTF-8 HTML 正文
+/// 【Windows剪贴板】【标记上限】富文本 HTML/RTF 的字节上限，避免逐字符样式导致正文提前截断
+const MARKUP_LIMIT: usize = 16 * 1024 * 1024;
+
+/// 【Windows剪贴板】【HTML读取】无参数，先读 HTML Format 再退回 text/html，返回最多十六 MiB 的 UTF-8 HTML 正文
 pub fn read_html() -> crate::AppResult<String> {
     let _clipboard = Opened::read()?;
-    let bytes = payload("HTML Format").or_else(|_| payload("text/html"))?;
+    let bytes =
+        payload("HTML Format", MARKUP_LIMIT).or_else(|_| payload("text/html", MARKUP_LIMIT))?;
     Ok(decode_payload(&bytes))
 }
 
-/// 【Windows剪贴板】【格式数据】按 name 登记格式并读取有界字节，登记或读取失败返回错误
-fn payload(name: &str) -> crate::AppResult<Vec<u8>> {
+/// 【Windows剪贴板】【RTF读取】无参数，先读 Rich Text Format 再退回 text/rtf，返回最多十六 MiB 的 RTF 正文
+pub fn read_rtf() -> crate::AppResult<String> {
+    let _clipboard = Opened::read()?;
+    let bytes =
+        payload("Rich Text Format", MARKUP_LIMIT).or_else(|_| payload("text/rtf", MARKUP_LIMIT))?;
+    Ok(decode_payload(&bytes))
+}
+
+/// 【Windows剪贴板】【格式数据】按 name 与 limit 登记格式并读取有界字节，登记或读取失败返回错误
+fn payload(name: &str, limit: usize) -> crate::AppResult<Vec<u8>> {
     let name: Vec<_> = name.encode_utf16().chain([0]).collect();
     let format = unsafe { RegisterClipboardFormatW(name.as_ptr()) };
     if format == 0 {
         return Err(std::io::Error::last_os_error().into());
     }
-    Ok(memory::read(format, 64 * 1024)?)
+    Ok(memory::read(format, limit)?)
 }
 
 /// 【Windows剪贴板】【负载解码】按 BOM、零字节分布或 UTF-8 解码 HTML 负载，容忍 UTF-16 与末尾终止符

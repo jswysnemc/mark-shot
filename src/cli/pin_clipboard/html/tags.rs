@@ -130,19 +130,23 @@ pub(super) fn is_heading(name: &str) -> bool {
     heading_level(name).is_some()
 }
 
-/// 【贴图】【块对齐】按 style 属性读取 text-align，返回块级对齐方式
-pub(super) fn block_align(tag: &Tag) -> Align {
-    let Some(css) = tag.attr("style") else {
-        return Align::Left;
-    };
-    for (property, value) in html_style::declarations(css) {
-        if property.eq_ignore_ascii_case("text-align") {
-            return match value.trim().to_ascii_lowercase().as_str() {
-                "center" => Align::Center,
-                "right" => Align::Right,
-                _ => Align::Left,
-            };
+/// 【贴图】【块对齐】按 style 的 text-align 与 align 属性解析块级对齐，均缺失时返回空值
+pub(super) fn tag_align(tag: &Tag) -> Option<Align> {
+    if let Some(css) = tag.attr("style") {
+        for (property, value) in html_style::declarations(css) {
+            if property.eq_ignore_ascii_case("text-align") {
+                return Some(parse_align(value));
+            }
         }
     }
-    Align::Left
+    tag.attr("align").map(parse_align)
+}
+
+/// 【贴图】【对齐解析】按 value 解析 left/center/right/justify，未知值回退左对齐
+fn parse_align(value: &str) -> Align {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "center" => Align::Center,
+        "right" => Align::Right,
+        _ => Align::Left,
+    }
 }

@@ -6,5 +6,7 @@ mod tags;
 mod token;
 
 #[allow(unused_imports)]
-pub(super) use model::{Align, Block, BlockKind, RichText, Span, SpanStyle, TableCell, TableRow};
+pub(super) use model::{
+    Align, Block, BlockKind, ImageBlock, RichText, Span, SpanStyle, TableCell, TableRow, TableStyle,
+};
 pub(super) use parser::parse;

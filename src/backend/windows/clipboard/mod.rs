@@ -1,7 +1,7 @@
 //! 【Windows剪贴板】【系统拥有】图片提供 PNG、透明 DIBV5 和传统 DIB，进程退出后系统继续持有数据
 
 mod content;
-pub use content::{read_files, read_html};
+pub use content::{read_files, read_html, read_rtf};
 mod image;
 #[cfg(test)]
 mod image_tests;

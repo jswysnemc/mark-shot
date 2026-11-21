@@ -10,6 +10,7 @@ use cosmic_text::{
 };
 use tiny_skia::{Color, Pixmap, Rect};
 
+mod picture;
 mod table;
 
 const PADDING: f32 = 16.0;
@@ -42,6 +43,11 @@ pub(super) fn image(rich: &RichText) -> crate::AppResult<Vec<u8>> {
     let mut buffers: Vec<Option<Buffer>> = Vec::with_capacity(prepared.len());
     for block in &prepared {
         if matches!(block.kind, BlockKind::Rule) {
+            buffers.push(None);
+            continue;
+        }
+        if picture::is_picture(&block.kind) {
+            prose_intrinsic = prose_intrinsic.max(picture::measure(&block.kind).min(MAX_CONTENT));
             buffers.push(None);
             continue;
         }
@@ -86,13 +92,29 @@ pub(super) fn image(rich: &RichText) -> crate::AppResult<Vec<u8>> {
     for (index, (block, buffer)) in prepared.into_iter().zip(buffers).enumerate() {
         let PreparedBlock {
             kind,
+            align,
             indent,
             background,
             table,
             ..
         } = block;
         let gap = block_gap(&kind);
-        if matches!(kind, BlockKind::Rule) {
+        if picture::is_picture(&kind) {
+            let layout = picture::layout(&kind, align, prose_width, cursor);
+            let height = layout.height();
+            laid.push(LaidBlock {
+                kind,
+                buffer: None,
+                x: PADDING,
+                y: cursor,
+                height,
+                extra: 0.0,
+                background,
+                table: None,
+                picture: Some(layout),
+            });
+            cursor += height;
+        } else if matches!(kind, BlockKind::Rule) {
             laid.push(LaidBlock {
                 kind,
                 buffer: None,
@@ -102,6 +124,7 @@ pub(super) fn image(rich: &RichText) -> crate::AppResult<Vec<u8>> {
                 extra: 0.0,
                 background: None,
                 table: None,
+                picture: None,
             });
             cursor += 1.0;
         } else if let Some(data) = table {
@@ -116,6 +139,7 @@ pub(super) fn image(rich: &RichText) -> crate::AppResult<Vec<u8>> {
                 extra: 0.0,
                 background,
                 table: Some(laid_table),
+                picture: None,
             });
             cursor += height;
         } else {
@@ -135,6 +159,7 @@ pub(super) fn image(rich: &RichText) -> crate::AppResult<Vec<u8>> {
                 extra,
                 background,
                 table: None,
+                picture: None,
             });
             cursor = text_y + height + extra;
         }
@@ -164,6 +189,12 @@ pub(super) fn image(rich: &RichText) -> crate::AppResult<Vec<u8>> {
         let mut painter = Painter::new(&mut image).with_text(&mut fonts, &mut cache);
         for block in &laid {
             draw_block_background(&mut painter, block, &layout);
+            if picture::is_picture(&block.kind) {
+                if let Some(picture) = &block.picture {
+                    picture::draw(&mut painter, &block.kind, picture, &palette);
+                }
+                continue;
+            }
             if let Some(data) = &block.table {
                 table::draw(
                     &mut painter,
@@ -234,6 +265,7 @@ struct LaidBlock {
     extra: f32,
     background: Option<Rgba>,
     table: Option<table::LaidTable>,
+    picture: Option<picture::Layout>,
 }
 
 /// 【贴图】【块预处理】按 rich 转换每个片段为宇宙文本属性，并登记片段底色索引
@@ -248,9 +280,18 @@ fn prepare(
         .map(|block| {
             let mut table = None;
             let kind = match &block.kind {
-                BlockKind::Table { rows } => {
-                    table = Some(prepare_table(rows, palette, line_height, backgrounds));
-                    BlockKind::Table { rows: Vec::new() }
+                BlockKind::Table { rows, style } => {
+                    table = Some(prepare_table(
+                        rows,
+                        style,
+                        palette,
+                        line_height,
+                        backgrounds,
+                    ));
+                    BlockKind::Table {
+                        rows: Vec::new(),
+                        style: Default::default(),
+                    }
                 }
                 _ => block.kind.clone(),
             };
@@ -288,6 +329,7 @@ fn prepare(
 /// 【贴图】【表格预处理】按行与单元格把片段转换为表格模块所需的属性结构
 fn prepare_table(
     rows: &[TableRow],
+    style: &super::html::TableStyle,
     palette: &Palette,
     line_height: f32,
     backgrounds: &mut Vec<Option<Rgba>>,
@@ -323,7 +365,10 @@ fn prepare_table(
                 .collect(),
         })
         .collect();
-    table::Table { rows }
+    table::Table {
+        rows,
+        style: style.clone(),
+    }
 }
 
 /// 【贴图】【片段上下文】记录所属块的字号、标题、引用、代码与行高基准及调色信息
@@ -468,6 +513,8 @@ fn block_gap(kind: &BlockKind) -> f32 {
         BlockKind::Heading(_) => 12.0,
         BlockKind::Code => 10.0,
         BlockKind::Table { .. }
+        | BlockKind::Image(_)
+        | BlockKind::ImageRow(_)
         | BlockKind::Quote { .. }
         | BlockKind::Rule
         | BlockKind::Paragraph => 8.0,

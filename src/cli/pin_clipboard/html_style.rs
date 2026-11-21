@@ -202,6 +202,44 @@ pub(super) fn font_size(value: &str, base: f32) -> Option<f32> {
     Some(pixels.clamp(6.0, 96.0))
 }
 
+/// 【贴图】【长度解析】按 value 解析 px/pt/in/cm/mm 为像素长度，拒绝负数与非有限值并限制上限
+pub(super) fn length_px(value: &str) -> Option<f32> {
+    let lower = value.trim().to_ascii_lowercase();
+    let split = lower
+        .char_indices()
+        .find(|(_, ch)| !(ch.is_ascii_digit() || *ch == '.' || *ch == '-' || *ch == '+'))
+        .map_or(lower.len(), |(index, _)| index);
+    if split == 0 {
+        return None;
+    }
+    let number: f32 = lower[..split].parse().ok()?;
+    if !number.is_finite() || number < 0.0 {
+        return None;
+    }
+    let pixels = match &lower[split..] {
+        "px" => number,
+        "pt" => number * (4.0 / 3.0),
+        "in" => number * 96.0,
+        "cm" => number * (96.0 / 2.54),
+        "mm" => number * (96.0 / 25.4),
+        _ => return None,
+    };
+    if !pixels.is_finite() {
+        return None;
+    }
+    Some(pixels.clamp(0.0, 100_000.0))
+}
+
+/// 【贴图】【百分比解析】按 value 解析 0..=100000 的百分比数值，非百分比语法返回空值
+pub(super) fn percent(value: &str) -> Option<f32> {
+    let trimmed = value.trim();
+    let number: f32 = trimmed.strip_suffix('%')?.trim().parse().ok()?;
+    if !number.is_finite() || number < 0.0 {
+        return None;
+    }
+    Some(number.clamp(0.0, 100_000.0))
+}
+
 /// 【贴图】【字重解析】按 value 解析 bold/bolder/数值/常规关键字，返回是否加粗
 pub(super) fn bold(value: &str) -> Option<bool> {
     match value.trim().to_ascii_lowercase().as_str() {

@@ -1,26 +1,124 @@
 //! 【贴图】【HTML表格解析】在解析器中构建表格行、单元格与背景
 
-use super::super::model::{Align, Block, BlockKind, Span, TableCell, TableRow};
-use super::super::tags::{block_align, finalize_spans, tag_background};
+use super::super::super::html_style;
+use super::super::model::{Align, Block, BlockKind, Span, TableCell, TableRow, TableStyle};
+use super::super::tags::{finalize_spans, tag_background};
 use super::super::token::Tag;
 use super::{FrameKind, Parser};
 use crate::theme::Rgba;
 
-/// 【贴图】【表格构建】记录正在构建的表格容器背景、已完成行与当前行/单元格
+/// 【贴图】【表格构建】记录正在构建的表格容器背景、源宽度、填充标记、边框、列宽与行/单元格
 #[derive(Default)]
 pub(super) struct TableBuilder {
     pub(super) background: Option<Rgba>,
+    pub(super) width: Option<f32>,
+    pub(super) fill: bool,
+    pub(super) border: Option<Rgba>,
+    pub(super) columns: Vec<f32>,
     pub(super) rows: Vec<TableRow>,
     pub(super) row: Option<TableRow>,
     pub(super) cell: Option<CellDraft>,
 }
 
-/// 【贴图】【单元格草稿】记录尚未写出的单元格片段、对齐、背景与表头标记
+/// 【贴图】【单元格草稿】记录尚未写出的单元格片段、对齐、背景、表头标记与源宽度
 pub(super) struct CellDraft {
     pub(super) header: bool,
     pub(super) align: Align,
     pub(super) background: Option<Rgba>,
+    pub(super) width: Option<f32>,
     pub(super) spans: Vec<Span>,
+}
+
+/// 【贴图】【宽度规格】区分像素宽度、百分比宽度与缺失的源宽度声明
+enum WidthSpec {
+    Px(f32),
+    Percent(f32),
+    None,
+}
+
+/// 【贴图】【宽度声明】按 style 的 width 优先、HTML width 属性兜底解析宽度规格
+fn width_spec(tag: &Tag) -> WidthSpec {
+    if let Some(style) = tag.attr("style") {
+        for (property, value) in html_style::declarations(style) {
+            if !property.eq_ignore_ascii_case("width") {
+                continue;
+            }
+            if let Some(percent) = html_style::percent(value) {
+                return WidthSpec::Percent(percent);
+            }
+            if let Some(px) = html_style::length_px(value) {
+                return WidthSpec::Px(px);
+            }
+        }
+    }
+    if let Some(value) = tag.attr("width") {
+        if let Some(percent) = html_style::percent(value) {
+            return WidthSpec::Percent(percent);
+        }
+        if let Ok(px) = value.trim().parse::<f32>()
+            && px.is_finite()
+            && px >= 0.0
+        {
+            return WidthSpec::Px(px.clamp(0.0, 100_000.0));
+        }
+        if let Some(px) = html_style::length_px(value) {
+            return WidthSpec::Px(px);
+        }
+    }
+    WidthSpec::None
+}
+
+/// 【贴图】【表格宽度】按 tag 返回像素宽度与是否用百分比填充可用宽度
+fn table_width(tag: &Tag) -> (Option<f32>, bool) {
+    match width_spec(tag) {
+        WidthSpec::Px(px) => (Some(px), false),
+        WidthSpec::Percent(_) => (None, true),
+        WidthSpec::None => (None, false),
+    }
+}
+
+/// 【贴图】【单元宽度】按 tag 与 table_width 解析单元宽度，百分比仅在已知表宽时换算
+fn cell_width(tag: &Tag, table_width: Option<f32>) -> Option<f32> {
+    match width_spec(tag) {
+        WidthSpec::Px(px) => Some(px),
+        WidthSpec::Percent(percent) => table_width.map(|width| width * percent / 100.0),
+        WidthSpec::None => None,
+    }
+}
+
+/// 【贴图】【表格边框】按 style 边框颜色优先、非零 border 属性兜底，返回黑色或解析到的颜色
+fn table_border(tag: &Tag) -> Option<Rgba> {
+    if let Some(style) = tag.attr("style")
+        && let Some(color) = style_border_color(style)
+    {
+        return Some(color);
+    }
+    let enabled = tag.attr("border").is_some_and(|value| {
+        let value = value.trim();
+        !value.is_empty() && value != "0"
+    });
+    enabled.then_some(Rgba(0, 0, 0, 255))
+}
+
+/// 【贴图】【边框颜色】按 style 查找首个带颜色的 border 声明，windowtext 映射为黑色
+fn style_border_color(style: &str) -> Option<Rgba> {
+    for (property, value) in html_style::declarations(style) {
+        if !property.to_ascii_lowercase().starts_with("border") {
+            continue;
+        }
+        for token in value.split(|ch: char| ch.is_ascii_whitespace() || ch == ',') {
+            if token.is_empty() {
+                continue;
+            }
+            if token.eq_ignore_ascii_case("windowtext") {
+                return Some(Rgba(0, 0, 0, 255));
+            }
+            if let Some(color) = html_style::color(token) {
+                return Some(color);
+            }
+        }
+    }
+    None
 }
 
 impl Parser {
@@ -37,12 +135,18 @@ impl Parser {
     pub(super) fn start_table(&mut self, tag: &Tag) {
         self.flush();
         let background = tag_background(tag).or(self.block_background);
+        let (width, fill) = table_width(tag);
+        let border = table_border(tag);
         self.table = Some(TableBuilder {
             background,
+            width,
+            fill,
+            border,
             ..TableBuilder::default()
         });
         self.table_depth = 1;
         self.push_frame("table", FrameKind::Table);
+        self.enter_align_scope(tag);
         self.apply_tag_style(tag);
     }
 
@@ -59,6 +163,7 @@ impl Parser {
             });
         }
         self.push_frame("tr", FrameKind::Row);
+        self.enter_align_scope(tag);
         self.apply_tag_style(tag);
     }
 
@@ -76,9 +181,12 @@ impl Parser {
             }
         }
         let header = tag.name == "th";
-        let align = block_align(tag);
+        let align = self.effective_align(tag);
         let background = tag_background(tag);
+        let table_width = self.table.as_ref().and_then(|table| table.width);
+        let width = cell_width(tag, table_width);
         self.push_frame(&tag.name, FrameKind::Cell);
+        self.enter_align_scope(tag);
         self.at_start = true;
         self.space = false;
         if header {
@@ -91,6 +199,7 @@ impl Parser {
                 header,
                 align,
                 background,
+                width,
                 spans: Vec::new(),
             });
         }
@@ -127,6 +236,7 @@ impl Parser {
             align: cell.align,
             background: cell.background,
             header,
+            width: cell.width,
         });
         if header {
             row.header = true;
@@ -141,6 +251,21 @@ impl Parser {
         };
         if row.cells.is_empty() {
             return;
+        }
+        let derived = self
+            .table
+            .as_ref()
+            .filter(|table| table.columns.is_empty())
+            .and_then(|_| {
+                row.cells
+                    .iter()
+                    .map(|cell| cell.width)
+                    .collect::<Option<Vec<f32>>>()
+            });
+        if let Some(columns) = derived
+            && let Some(table) = self.table.as_mut()
+        {
+            table.columns = columns;
         }
         if let Some(table) = self.table.as_mut() {
             table.rows.push(row);
@@ -164,7 +289,15 @@ impl Parser {
             return;
         }
         self.blocks.push(Block {
-            kind: BlockKind::Table { rows: table.rows },
+            kind: BlockKind::Table {
+                rows: table.rows,
+                style: TableStyle {
+                    width: table.width,
+                    fill: table.fill,
+                    columns: table.columns,
+                    border: table.border,
+                },
+            },
             align: Align::Left,
             background: table.background,
             spans: Vec::new(),
