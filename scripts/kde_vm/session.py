@@ -6,6 +6,17 @@ import shlex
 import subprocess
 import time
 
+DESKTOP_APP_ID = "io.github.jswysnemc.MarkShot"
+WINDOW_TITLES = {
+    "mark-shot-editor": "Mark Shot — Edit",
+    "mark-shot-settings": "Mark Shot — Settings",
+}
+
+
+def is_mark_shot(window):
+    """【虚拟机测试】【应用识别】按 window 返回是否属于 Mark Shot，兼容浮层身份和安装桌面条目标识"""
+    return window["app"].startswith("mark-shot") or window["app"] == DESKTOP_APP_ID
+
 
 class Session:
     """【KDE虚拟机】【测试会话】持有虚拟机身份、证据目录和独立配置目录"""
@@ -146,12 +157,16 @@ finally:subprocess.run(command+['/Scripting','org.kde.kwin.Scripting.unloadScrip
 
     def windows(self, app=None):
         """【KDE虚拟机】【窗口清单】按 app 返回 KWin 真实窗口及状态，空值返回全部，不修改窗口"""
+        # 1. 【虚拟机测试】【窗口读取】取得当前真实应用标识与窗口标题
         windows = self.kwin("return workspace.windowList().map(w=>({id:w.internalId.toString(),app:w.resourceClass.toString(),caption:w.caption,x:w.frameGeometry.x,y:w.frameGeometry.y,width:w.frameGeometry.width,height:w.frameGeometry.height,minimized:w.minimized}));")
-        return [window for window in windows if app is None or window["app"] == app]
+        # 2. 【虚拟机测试】【职责匹配】KDE 共享安装标识时通过既有标题区分编辑器和设置窗口
+        title = WINDOW_TITLES.get(app)
+        return [window for window in windows if app is None or window["app"] == app
+                or (title is not None and window["app"] == DESKTOP_APP_ID and window["caption"] == title)]
 
     def restore(self, identifier):
         """【KDE虚拟机】【窗口恢复】按 identifier 恢复本次标注窗口并给予焦点，其他程序不能通过此入口操作"""
-        assert any(window["id"] == identifier and window["app"].startswith("mark-shot") for window in self.windows())
+        assert any(window["id"] == identifier and is_mark_shot(window) for window in self.windows())
         self.kwin("const w=workspace.windowList().find(w=>w.internalId.toString()===" + json.dumps(identifier) + ");w.minimized=false;workspace.activeWindow=w;return true;")
 
     def stop(self, pid):

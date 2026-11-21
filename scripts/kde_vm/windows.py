@@ -40,6 +40,7 @@ path.write_text(json.dumps([{'name':f'Controlled {i:02d}','command':'true','clos
     pid = session.launch(binary, ["--pin-image", session.remote + "/source.png"], overrides=overrides)
     try:
         pin = session.wait(lambda: next((w for w in session.windows() if w["id"] not in before and w["width"] == 600), None), "没有打开贴图")
+        pin_identity = (pin["app"], pin["caption"])
         session.screenshot("pin")
         open_editor(session, pin)
         session.screenshot("opened-from-pin")
@@ -56,18 +57,24 @@ path.write_text(json.dumps([{'name':f'Controlled {i:02d}','command':'true','clos
         shown = editor(session)
         session.click(shown["x"] + shown["width"] - 25, shown["y"] + 21)
         session.wait(lambda: not editor(session), "关闭按钮未关闭编辑器")
-        pin = session.wait(lambda: next((w for w in session.windows() if w["width"] == 600 and w["app"].startswith("mark-shot")), None), "编辑器关闭后贴图未恢复")
+        pin = session.wait(lambda: next((w for w in session.windows() if (w["width"], w["height"]) == image.size
+                                       and (w["app"], w["caption"]) == pin_identity), None),
+                           "编辑器关闭后贴图未恢复")
         session.screenshot("pin-restored")
         open_editor(session, pin)
         session.key("ctrl+e")
         shown = editor(session)
-        session.move(shown["x"] + 800, shown["y"] + 100)
+        session.move(shown["x"] + 700, shown["y"] + 100)
         time.sleep(0.2)
         before_menu = session.screenshot("extensions-before")
+        session.move(shown["x"] + 800, shown["y"] + 100)
         session.scroll(steps=4)
+        session.move(shown["x"] + 700, shown["y"] + 100)
         time.sleep(0.2)
         down_menu = session.screenshot("extensions-down")
+        session.move(shown["x"] + 800, shown["y"] + 100)
         session.scroll(down=False, steps=4)
+        session.move(shown["x"] + 700, shown["y"] + 100)
         time.sleep(0.2)
         up_menu = session.screenshot("extensions-up")
         with Image.open(before_menu) as a, Image.open(down_menu) as b, Image.open(up_menu) as c:
@@ -90,7 +97,7 @@ path.write_text(json.dumps([{'name':f'Controlled {i:02d}','command':'true','clos
         session.screenshot("settings-selection")
         capture_ids = {w["id"] for w in session.windows() if w.get("pid") == pid or w["app"] == binary.rsplit("/", 1)[-1]}
         assert capture_ids, "没有截图表面"
-        session.click(976, 483)
+        session.click(976, 499)
         session.wait(lambda: session.windows("mark-shot-settings"), "侧栏设置按钮未打开设置窗口")
         session.wait(lambda: not any(w["id"] in capture_ids for w in session.windows()), "打开设置后截图表面仍存活")
         session.screenshot("settings-opened")
