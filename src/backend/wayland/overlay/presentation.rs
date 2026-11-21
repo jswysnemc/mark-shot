@@ -5,7 +5,7 @@ use crate::backend::wayland::utils::{
     scroll_popup::ScrollPopup,
     surface::{InputRegion, Role, SurfaceData},
 };
-use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
+use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity};
 use std::time::Instant;
 
 impl WaylandOverlay {
@@ -22,6 +22,7 @@ impl WaylandOverlay {
         }
         let hidpi = rt.state.viewporter.is_some();
         let scrolling = self.scrolling;
+        let shell_layer = self.shell_policy.layer(scrolling.is_some());
         let panel = self
             .scroll_window
             .as_ref()
@@ -97,17 +98,12 @@ impl WaylandOverlay {
                 .filter(|_| self.layer || self.scrolling.is_some())
             {
                 Some(shell) => {
-                    // ── creating a wayland overlay on top, with screenshot itself and etc ────────────────────
-                    let namespace = match std::env::var("XDG_CURRENT_DESKTOP").as_deref() {
-                        // namespace utility on kde ignores both opening & closing animations
-                        Ok("KDE") => "utility",
-                        _ => "mark-shot",
-                    };
+                    // 1. 【截图输入法】【浮层保留】只调整层级，不将 KDE 截图转换为普通窗口
                     let layer = shell.create_layer_surface(
                         &qh,
                         surface.clone(),
-                        Layer::Overlay,
-                        Some(namespace),
+                        shell_layer,
+                        Some(self.shell_policy.namespace),
                         Some(&wl_output),
                     );
                     layer.set_anchor(Anchor::all());
