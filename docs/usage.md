@@ -105,7 +105,7 @@ Opening the editor from a pin hides the source pin until editing finishes or is 
 | --- | --- |
 | The editor | `Ctrl+P` or the pin button |
 | An image file | `mark-shot --pin-image FILE` |
-| The clipboard | `mark-shot --pin-clipboard` pins an image or plain text |
+| The clipboard | `mark-shot --pin-clipboard` pins an image, formatted HTML or plain text |
 
 | Gesture | Result |
 | --- | --- |
@@ -115,6 +115,12 @@ Opening the editor from a pin hides the source pin until editing finishes or is 
 | Double-click | Close |
 | Right click | Menu: rotate, zoom, reset size, always on top, edit, copy, recognize text, translate, scan codes, save as, close |
 | `Ctrl+V` | Pin the clipboard content as another window |
+
+When the clipboard holds HTML, its common formatting is preserved in the pinned image: bold,
+italic, underline, strikethrough, colours, font sizes, headings, lists, quotes, code, links and
+tables. Text wraps at 720 pixels, code blocks keep long lines up to 1600 pixels, and tables use
+aligned columns with borders. Container colours from applications such as code editors are kept.
+Scripts and styles are never executed.
 
 Copying and saving always use the original pixels, regardless of the displayed size. After text
 recognition, dragging over recognized text selects it and `Ctrl+C` copies the selection. The
@@ -212,7 +218,7 @@ Tool names: `selection`, `pick`, `pen`, `highlighter`, `laser`, `marker`, `ruler
 | Option | Meaning |
 | --- | --- |
 | `--pin-image FILE` | Pin an image file |
-| `--pin-clipboard` | Pin a clipboard image or plain text |
+| `--pin-clipboard` | Pin a clipboard image, formatted HTML or plain text |
 | `--scan`, `--scan IMAGE`, `--scan-json IMAGE` | Scan QR codes and barcodes |
 | `--history` | Open the capture history |
 | `--settings` | Open preferences |

@@ -1,8 +1,11 @@
 //! 【贴图】【剪贴板入口】将图片、颜色、文本及文件内容交接到独立置顶窗口
 
 mod content;
+mod html;
+mod html_style;
 mod render;
 mod repeat;
+mod rich_text;
 mod source;
 #[cfg(test)]
 mod tests;

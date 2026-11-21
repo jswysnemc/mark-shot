@@ -3,7 +3,7 @@
 mod read;
 mod serve;
 mod transfer;
-pub use read::read;
+pub use read::{read, targets};
 pub use serve::serve;
 
 pub const LIMIT: usize = 128 * 1024 * 1024;

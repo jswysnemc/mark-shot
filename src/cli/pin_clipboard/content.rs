@@ -1,6 +1,6 @@
 //! 【贴图】【内容分类】颜色、HTML 和复制文件转换，不执行网页脚本或外部链接
 
-use super::{IMAGE_LIMIT, render, source::Clipboard};
+use super::{IMAGE_LIMIT, html, render, rich_text, source::Clipboard};
 
 /// 【贴图】【色值解析】按 text 识别 HEX 与三分量 RGB，返回 RGBA；越界及非有限值返回空值
 pub(super) fn color(text: &str) -> Option<[u8; 4]> {
@@ -142,6 +142,10 @@ pub(super) fn image(
         return Ok(image.clone());
     }
     if let Some(html) = &clipboard.html {
+        let rich = html::parse(html);
+        if rich.has_content() {
+            return rich_text::image(&rich);
+        }
         let text = html_text(html);
         if !text.is_empty() {
             return render::text_image(&text);
