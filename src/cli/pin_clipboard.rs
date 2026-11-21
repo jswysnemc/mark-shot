@@ -1,14 +1,20 @@
 //! 【贴图】【剪贴板入口】将图片、颜色、文本及文件内容交接到独立置顶窗口
 
 mod content;
+mod html;
+mod html_style;
 mod render;
 mod repeat;
+mod rich_text;
+mod rtf;
 mod source;
+mod spans;
 #[cfg(test)]
 mod tests;
 
 const IMAGE_LIMIT: u64 = 64 * 1024 * 1024;
 const TEXT_LIMIT: u64 = 64 * 1024;
+const MARKUP_LIMIT: u64 = 16 * 1024 * 1024;
 
 /// 【贴图】【内容交接】无参数，按剪贴板类型生成图片，成功启动后记录文件重复贴图状态，返回结果
 pub(super) fn run() -> crate::AppResult {

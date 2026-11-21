@@ -2403,6 +2403,7 @@ dependencies = [
  "cosmic-text",
  "crc32fast",
  "dirs",
+ "encoding_rs",
  "flate2",
  "futures",
  "getrandom 0.3.4",

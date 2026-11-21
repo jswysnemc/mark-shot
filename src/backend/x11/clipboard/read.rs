@@ -99,3 +99,87 @@ pub fn read(mime: &str, primary: bool, limit: usize) -> crate::AppResult<Vec<u8>
         crate::backend::x11::wait::wait(&display, &wake, Some(timeout))?;
     }
 }
+
+/// 【X11剪贴板】【目标枚举】按 primary 查询选择区声明的 TARGETS，返回至多二百五十六个格式名称
+pub fn targets(primary: bool) -> crate::AppResult<Vec<String>> {
+    const MAX_TARGETS: u32 = 256;
+    let display = Display::connect()?;
+    let surface = Surface::new(display.clone(), (0, 0), (1, 1), true)?;
+    display
+        .connection
+        .change_window_attributes(
+            surface.window,
+            &ChangeWindowAttributesAux::new().event_mask(EventMask::PROPERTY_CHANGE),
+        )?
+        .check()?;
+    let selection = if primary {
+        AtomEnum::PRIMARY.into()
+    } else {
+        display.atom("CLIPBOARD")?
+    };
+    let target = display.atom("TARGETS")?;
+    let property = display.atom("MARK_SHOT_TARGETS")?;
+    display.connection.convert_selection(
+        surface.window,
+        selection,
+        target,
+        property,
+        x11rb::CURRENT_TIME,
+    )?;
+    display.connection.flush()?;
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let wake = crate::backend::task_wake::Source::new()?;
+    loop {
+        while let Some(event) = display.connection.poll_for_event()? {
+            let ready = match event {
+                Event::SelectionNotify(event) if event.selection == selection => {
+                    if event.property == x11rb::NONE {
+                        return Err("clipboard does not expose its target list".into());
+                    }
+                    true
+                }
+                _ => false,
+            };
+            if !ready {
+                continue;
+            }
+            let reply = display
+                .connection
+                .get_property(
+                    true,
+                    surface.window,
+                    property,
+                    AtomEnum::ATOM,
+                    0,
+                    MAX_TARGETS,
+                )?
+                .reply()?;
+            if reply.value.len() > MAX_TARGETS as usize * 4 {
+                return Err("clipboard target list exceeds the limit".into());
+            }
+            let mut targets = Vec::new();
+            for atom in reply
+                .value32()
+                .into_iter()
+                .flatten()
+                .take(MAX_TARGETS as usize)
+            {
+                if atom == x11rb::NONE {
+                    continue;
+                }
+                if let Ok(cookie) = display.connection.get_atom_name(atom)
+                    && let Ok(reply) = cookie.reply()
+                    && !reply.name.is_empty()
+                {
+                    targets.push(String::from_utf8_lossy(&reply.name).into_owned());
+                }
+            }
+            return Ok(targets);
+        }
+        let timeout = deadline.saturating_duration_since(Instant::now());
+        if timeout.is_zero() {
+            return Err("X11 clipboard target query timed out".into());
+        }
+        crate::backend::x11::wait::wait(&display, &wake, Some(timeout))?;
+    }
+}
