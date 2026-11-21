@@ -93,11 +93,13 @@ pub(super) struct Attributes {
 impl Attributes {
     /// 【Windows内部进程】【白名单创建】按 handles 创建启动属性列表，返回列表；句柄数组须保留到CreateProcessW完成
     pub fn new(handles: &[HANDLE]) -> io::Result<Self> {
+        // 1. 【Windows内部进程】【容量查询】查询单条属性所需存储，失败时返回系统错误
         let mut size = 0;
         unsafe { InitializeProcThreadAttributeList(std::ptr::null_mut(), 1, 0, &mut size) };
         if size == 0 {
             return Err(io::Error::last_os_error());
         }
+        // 2. 【Windows内部进程】【属性初始化】按指针对齐分配存储，并记录是否需要释放系统属性
         let mut result = Self {
             storage: vec![0; size.div_ceil(std::mem::size_of::<usize>())],
             initialized: false,
@@ -106,6 +108,7 @@ impl Attributes {
             return Err(io::Error::last_os_error());
         }
         result.initialized = true;
+        // 3. 【Windows内部进程】【白名单安装】只允许指定标准流句柄继承到本次子进程
         if unsafe {
             UpdateProcThreadAttribute(
                 result.as_mut_ptr(),

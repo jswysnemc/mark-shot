@@ -44,18 +44,21 @@ fn quote(output: &mut Vec<u16>, value: &OsStr) -> io::Result<()> {
     let value = wide(value)?;
     output.push(u16::from(b'"'));
     let mut slashes = 0;
+    // 1. 【Windows内部进程】【反斜杠累计】保留连续反斜杠数量，在后续字符到达时统一编码
     for &unit in &value[..value.len() - 1] {
         if unit == u16::from(b'\\') {
             slashes += 1;
             continue;
         }
         output.extend(std::iter::repeat_n(u16::from(b'\\'), slashes));
+        // 2. 【Windows内部进程】【引号转义】引号前反斜杠加倍，并增加一个反斜杠保留字面引号
         if unit == u16::from(b'"') {
             output.extend(std::iter::repeat_n(u16::from(b'\\'), slashes + 1));
         }
         output.push(unit);
         slashes = 0;
     }
+    // 3. 【Windows内部进程】【尾部引用】尾部反斜杠加倍，避免吞掉参数结束引号
     output.extend(std::iter::repeat_n(u16::from(b'\\'), slashes * 2));
     output.push(u16::from(b'"'));
     Ok(())
