@@ -4,7 +4,7 @@
 // and overall is context aware, and does some safety checks
 use tiny_skia::Rect;
 
-use crate::editor::dirty::{apply_damage_rects, mark_all_dirty, mark_dirty};
+use crate::editor::dirty::{apply_damage_rects, mark_dirty};
 use crate::editor::{DamageZone, EditorState};
 use crate::keys::{Action, Dir};
 use crate::tools::Tool;
@@ -231,19 +231,19 @@ fn tool_copy(editor_state: &mut EditorState, dirty_mask: &mut u32) -> bool {
     }
 }
 
+/// 【截图快捷键】【全选分流】按 editor_state 选择 OCR 全文或切换全图范围，dirty_mask 返回重绘显示器，无返回值
 fn select_all(editor_state: &mut EditorState, dirty_mask: &mut u32) {
+    // 1. 【截图快捷键】【识别输入】识别工具继续选择文字，不修改截图范围
     if editor_state.selected_tool == Tool::Ocr {
         if editor_state.ocr.view.is_active() {
             crate::tools::ocr::select_all_text(editor_state);
         }
         return;
     }
-    let placement = &editor_state.placements[editor_state.input.pointer.monitor_idx];
-    let (x, y) = placement.offset();
-    editor_state.selection.zone =
-        Rect::from_xywh(x, y, placement.size.0 as f32, placement.size.1 as f32);
-    mark_all_dirty(dirty_mask, editor_state.placements.len());
-    refresh_panels(editor_state, dirty_mask);
+    // 2. 【截图快捷键】【范围切换】鼠标释放后复用中键入口，记录原选区并支持再次切回
+    if !editor_state.input.mouse_down {
+        super::input::pointer_policy::toggle_scope(editor_state, dirty_mask);
+    }
 }
 
 fn nudge_selection(

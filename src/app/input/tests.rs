@@ -40,6 +40,7 @@ mod pointer_buttons;
 mod preferences;
 mod recording;
 mod ruler;
+mod select_all_scope;
 mod selection_handles;
 mod selection_history;
 mod selection_size;
