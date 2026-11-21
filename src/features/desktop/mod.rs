@@ -214,6 +214,7 @@ async fn serve(path: &Path, root: &Path) -> crate::AppResult {
                         if hotkey {
                             previous.shortcuts_enabled != next.shortcuts_enabled
                                 || previous.screenshot_shortcut != next.screenshot_shortcut
+                                || previous.active_window_shortcut != next.active_window_shortcut
                                 || recording != paused
                         } else {
                             previous.tray_enabled != next.tray_enabled
@@ -255,10 +256,12 @@ async fn serve(path: &Path, root: &Path) -> crate::AppResult {
                         hotkey,
                     };
                     let shortcut = next.screenshot_shortcut.clone();
+                    let active_window_shortcut = next.active_window_shortcut.clone();
                     let menu = menu_state.subscribe();
                     let task = tokio::spawn(async move {
                         if hotkey {
-                            hotkeys::run(shortcut, reporter, cancelled).await;
+                            hotkeys::run(shortcut, active_window_shortcut, reporter, cancelled)
+                                .await;
                         } else {
                             tray::run(reporter, cancelled, menu).await;
                         }
@@ -298,7 +301,10 @@ async fn serve(path: &Path, root: &Path) -> crate::AppResult {
                 }
             }
             Event::Action(action, token) => {
-                if matches!(action, Action::Capture | Action::Fullscreen) {
+                let immediate_capture = matches!(action, Action::Capture | Action::Fullscreen);
+                #[cfg(target_os = "linux")]
+                let immediate_capture = immediate_capture || action == Action::CaptureWindow;
+                if immediate_capture {
                     delayed.cancel();
                 }
                 let Some(args) = action.arguments() else {

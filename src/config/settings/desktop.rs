@@ -31,4 +31,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         labels: ("全局截图快捷键", "Global screenshot shortcut"),
         kind: Kind::Shortcut,
     },
+    Entry {
+        page: Page::Keys,
+        section: "desktop",
+        key: "active_window_shortcut",
+        labels: (
+            "活动窗口截图快捷键（KDE）",
+            "Active window screenshot shortcut (KDE)",
+        ),
+        kind: Kind::Shortcut,
+    },
 ];

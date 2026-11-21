@@ -1,4 +1,5 @@
 mod activation;
+pub(crate) mod app_identity;
 pub mod capture;
 pub mod clipboard;
 pub mod keysym;

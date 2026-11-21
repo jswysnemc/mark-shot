@@ -207,7 +207,9 @@ pub(super) fn create_shell(
     } else {
         let window = xdg.create_window(surface, WindowDecorations::ClientOnly, qh);
         window.set_title("Pinned Mark Shot");
-        window.set_app_id("mark-shot-pin");
+        window.set_app_id(crate::backend::wayland::app_identity::current(
+            "mark-shot-pin",
+        ));
         window.set_min_size(Some((size.0.min(24), size.1.min(24))));
         Shell::Window(window)
     }

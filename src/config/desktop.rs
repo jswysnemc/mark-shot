@@ -9,6 +9,7 @@ pub struct Desktop {
     pub tray_enabled: bool,
     pub shortcuts_enabled: bool,
     pub screenshot_shortcut: String,
+    pub active_window_shortcut: String,
 }
 
 impl Default for Desktop {
@@ -19,6 +20,7 @@ impl Default for Desktop {
             tray_enabled: cfg!(target_os = "windows"),
             shortcuts_enabled: cfg!(target_os = "windows"),
             screenshot_shortcut: "PrintScreen".into(),
+            active_window_shortcut: "Alt+PrintScreen".into(),
         }
     }
 }

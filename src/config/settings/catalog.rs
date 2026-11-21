@@ -118,6 +118,10 @@ impl Entry {
                 "按下组合键重新绑定；系统占用或授权失败会显示原因",
                 "Press a key combination to rebind; conflicts and permission errors are reported",
             ),
+            ("desktop", "active_window_shortcut") => (
+                "仅用于 KDE Wayland，截图当前活动窗口；留空禁用，实际按键由系统确认",
+                "Captures the active window on KDE Wayland; leave empty to disable. The desktop confirms the binding",
+            ),
             ("ui", "language") => (
                 "界面语言；环境变量覆盖时以环境为准",
                 "Interface language; environment override takes priority",

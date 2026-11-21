@@ -16,7 +16,9 @@ pub(super) fn create(
         .xdg_shell
         .create_window(surface, WindowDecorations::ClientOnly, queue);
     window.set_title("Mark Shot — Edit");
-    window.set_app_id("mark-shot-editor");
+    window.set_app_id(crate::backend::wayland::app_identity::current(
+        "mark-shot-editor",
+    ));
     window.set_min_size(Some(state.image_minimum));
     window.set_window_geometry(0, 0, size.0, size.1);
     Role::Window(window)

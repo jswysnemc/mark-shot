@@ -210,7 +210,9 @@ impl WaylandOverlay {
                             &qh,
                         );
                         window.set_title("mark-shot");
-                        window.set_app_id("mark-shot");
+                        window.set_app_id(crate::backend::wayland::app_identity::current(
+                            "mark-shot",
+                        ));
                         window.set_fullscreen(Some(&wl_output));
                         Role::Window(window)
                     }

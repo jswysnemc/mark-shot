@@ -47,7 +47,12 @@ fn occupied_print_screen_still_registers_and_releases() {
             hotkey: true,
         };
         let (cancel, cancelled) = tokio::sync::watch::channel(false);
-        let task = tokio::spawn(super::super::run("PrintScreen".into(), reporter, cancelled));
+        let task = tokio::spawn(super::super::run(
+            "PrintScreen".into(),
+            String::new(),
+            reporter,
+            cancelled,
+        ));
         let result = tokio::time::timeout(std::time::Duration::from_secs(3), receiver.recv()).await;
         let mut activated = false;
         let mut repeated = false;

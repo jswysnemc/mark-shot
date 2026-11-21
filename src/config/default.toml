@@ -21,6 +21,8 @@ autostart = false
 # shortcuts_enabled = false
 # 【桌面集成】【全局截图】X11与Windows直接注册；Wayland由系统门户确认实际绑定
 screenshot_shortcut = "PrintScreen"
+# 【全局快捷键】【活动窗口】KDE 由系统门户确认实际按键，留空禁用此项
+active_window_shortcut = "Alt+PrintScreen"
 
 [recording]
 # 【屏幕录制】【文件配置】mp4 | mkv | gif；GIF 在停止后从工作视频转换

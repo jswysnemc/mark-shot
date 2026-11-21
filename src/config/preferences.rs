@@ -85,11 +85,13 @@ pub fn write_fields(path: &Path, section: &str, fields: &[(&str, Value)]) -> io:
 
 /// 【设置窗口】【输入校验】校验 section、key 对应的 value，拒绝会导致保存路径错误的日期格式及非法快捷键
 pub(super) fn validate(section: &str, key: &str, value: &Value) -> io::Result<()> {
-    if section == "desktop" && key == "screenshot_shortcut" {
+    if section == "desktop" && matches!(key, "screenshot_shortcut" | "active_window_shortcut") {
         let text = value
             .as_str()
             .ok_or_else(|| io::Error::other("全局快捷键必须是一个按键组合"))?;
-        crate::keys::parse(text).map_err(io::Error::other)?;
+        if key != "active_window_shortcut" || !text.trim().is_empty() {
+            crate::keys::parse(text).map_err(io::Error::other)?;
+        }
     }
     if let Some(entry) = super::settings::ENTRIES
         .iter()
@@ -136,6 +138,32 @@ pub(super) fn validate(section: &str, key: &str, value: &Value) -> io::Result<()
 
 #[cfg(test)]
 mod tests {
+    /// 【设置回归】【活动窗口快捷键】无参数和返回值，验证无效输入保留原配置，合法组合及留空禁用可保存并解析
+    #[test]
+    fn active_window_shortcut_rejects_invalid_values_and_accepts_disabled_binding() {
+        // 1. 【设置回归】【配置准备】创建独立配置文件并保留原始内容
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        let original = "[desktop]\nactive_window_shortcut = 'Alt+PrintScreen'\n";
+        std::fs::write(&path, original).unwrap();
+        // 2. 【设置回归】【非法输入】错误按键及数组不能覆盖可用配置
+        for invalid in [
+            "Ctrl+UnknownKey".into(),
+            serde_json::json!(["Alt+PrintScreen"]),
+        ] {
+            assert!(super::write(&path, "desktop", "active_window_shortcut", invalid).is_err());
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+        }
+        // 3. 【设置回归】【有效输入】合法组合及留空禁用均能保存并进入启动配置
+        for binding in ["Ctrl+Shift+F9", "", " "] {
+            super::write(&path, "desktop", "active_window_shortcut", binding.into()).unwrap();
+            assert_eq!(
+                super::load(&path).unwrap().desktop.active_window_shortcut,
+                binding
+            );
+        }
+    }
+
     /// 【设置回归】【无效输入】无参数，无效文件名不能覆盖之前可用的保存配置
     #[test]
     fn invalid_filename_pattern_does_not_replace_configuration() {

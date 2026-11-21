@@ -64,6 +64,11 @@ pub(super) fn notify_hidden(host: &host::Shared, fonts: fonts::Shared) {
     if !host.borrow().active() {
         return;
     }
+    // 1. 【录制控制面板】【采集隔离】Linux 无法将提示排除于屏幕流，录制期间不创建会进入视频的提示窗口
+    if cfg!(target_os = "linux") {
+        log::info!("【录制控制面板】【入口保留】面板已隐藏，录制继续，可通过截图界面或托盘控制");
+        return;
+    }
     if let Err(error) = hidden_notice::run(fonts) {
         log::error!("【录制控制面板】【隐藏提示】{error}");
         crate::backend::notify::send_blocking(

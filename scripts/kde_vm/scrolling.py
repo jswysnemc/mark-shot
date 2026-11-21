@@ -47,11 +47,10 @@ def controls(path):
         return None
     x = (min(p[0] for p in pixels) + max(p[0] for p in pixels)) / 2
     y = (min(p[1] for p in pixels) + max(p[1] for p in pixels)) / 2
-    ink = sum(1 for row in range(round(y) - 2, round(y) + 3)
-              for column in range(round(x - 94) + 5, round(x - 94) + 8)
-              if min(image.getpixel((column, row))) < 130
-              and max(image.getpixel((column, row))) - min(image.getpixel((column, row))) > 15)
-    return {"pause": (x - 94, y), "copy": (x + 47, y), "paused": ink > 3}
+    # 1. 【虚拟机测试】【暂停颜色】暂停按钮使用青色底板，避免按旧图标笔画猜测导致没有恢复采集
+    red, green, blue = image.getpixel((round(x - 94 - 12), round(y)))
+    paused = green > red + 5 and blue > red + 5
+    return {"pause": (x - 94, y), "copy": (x + 47, y), "paused": paused}
 
 
 def run(session, binary, overrides, page_binary="/tmp/mark-shot-kde-scroll-page", wayland_display="/run/user/1000/wayland-1", hidden_controls=False):
@@ -98,8 +97,16 @@ root=Path(values);(root/'runtime').mkdir(mode=0o700,exist_ok=True)
         assert buttons, "滚动结束后没有可操作的控制窗口"
         if not buttons["paused"]:
             session.click(*buttons["pause"])
+            buttons = session.wait(lambda: (value if value and value["paused"] else None)
+                                   if (value := controls(session.screenshot("scroll-paused"))) else None,
+                                   "暂停后控制窗口没有完成布局")
         session.click(*buttons["copy"])
-        session.wait(lambda: not session.alive(pid), "长图复制后程序没有退出")
+        if hidden_controls:
+            # 2. 【虚拟机测试】【剪贴板交接】GNOME 关闭截图窗口后仍需数据连接提供剪贴板，按实际窗口关闭判断完成
+            session.wait(lambda: not any(window.get("pid") == pid for window in session.windows()),
+                         "长图复制后控制窗口没有关闭")
+        else:
+            session.wait(lambda: not session.alive(pid), "长图复制后程序没有退出")
         actual_path = session.clipboard()
         expected = texture(320, 512)
         expected.save(session.root / "expected.png")
