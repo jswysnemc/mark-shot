@@ -8,7 +8,7 @@ pub(super) struct Clipboard {
     pub image: Option<Vec<u8>>,
     pub files: Vec<PathBuf>,
     pub html: Option<String>,
-    pub rtf: Option<String>,
+    pub rtf: Option<Vec<u8>>,
     pub text: Option<String>,
     pub sequence: u32,
 }
@@ -171,19 +171,19 @@ fn rtf_mime_candidates(mimes: &[String]) -> Vec<String> {
     candidates.into_iter().map(|(_, mime)| mime).collect()
 }
 
-/// 【贴图】【RTF来源解码】按字节移除 BOM 后优先 UTF-8，否则按 Windows-1252 解码，空内容返回空值
+/// 【贴图】【RTF来源保留】按 bytes 移除 UTF-8 BOM 和末尾终止符，返回原始字节；代码页由 RTF 解析器决定，空内容返回空值
 #[cfg(any(target_os = "linux", test))]
-fn decode_rtf_source(bytes: &[u8]) -> Option<String> {
+fn decode_rtf_source(bytes: &[u8]) -> Option<Vec<u8>> {
     let bytes = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
-    let text = std::str::from_utf8(bytes)
-        .map(str::to_owned)
-        .unwrap_or_else(|_| {
-            let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(bytes);
-            decoded.into_owned()
-        });
-    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
-    let text = text.trim_end_matches('\0');
-    (!text.trim().is_empty()).then(|| text.to_string())
+    let end = bytes
+        .iter()
+        .rposition(|byte| *byte != 0)
+        .map_or(0, |end| end + 1);
+    let bytes = &bytes[..end];
+    bytes
+        .iter()
+        .any(|byte| !byte.is_ascii_whitespace())
+        .then(|| bytes.to_vec())
 }
 
 /// 【贴图】【Linux类型读取】按 x11、mime、limit 读取有界数据，缺少类型或权限时返回错误
@@ -498,12 +498,18 @@ mod tests {
     fn decode_rtf_source_accepts_utf8_bom_and_ansi() {
         assert_eq!(
             decode_rtf_source(b"{\\rtf1\\ansi hello}").as_deref(),
-            Some("{\\rtf1\\ansi hello}")
+            Some(b"{\\rtf1\\ansi hello}".as_slice())
         );
         let mut bom = vec![0xEF, 0xBB, 0xBF];
         bom.extend("{\\rtf1 中文}".as_bytes());
-        assert_eq!(decode_rtf_source(&bom).as_deref(), Some("{\\rtf1 中文}"));
-        assert_eq!(decode_rtf_source(b"caf\xe9").as_deref(), Some("café"));
+        assert_eq!(
+            decode_rtf_source(&bom).as_deref(),
+            Some("{\\rtf1 中文}".as_bytes())
+        );
+        assert_eq!(
+            decode_rtf_source(b"caf\xe9").as_deref(),
+            Some(b"caf\xe9".as_slice())
+        );
         assert_eq!(decode_rtf_source(b"  \r\n"), None);
     }
 }

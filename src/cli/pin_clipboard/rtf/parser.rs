@@ -1,9 +1,13 @@
 //! 【RTF解析】【主解析】扫描 RTF 记号，维护分组格式栈并构建段落、字段、表格与代码块
 
 use super::super::html::{Align, Block, BlockKind, RichText, Span, SpanStyle};
+use super::super::spans;
+use super::code::merge_code_blocks;
+use super::colors::{ColorTable, Component};
 use super::encoding;
+use super::fonts::FontTable;
 use super::lexer::{Lexer, Token};
-use super::table::{self, ColorTable, Component, FontTable, TableBuilder};
+use super::table::TableBuilder;
 use crate::theme::Rgba;
 
 /// 【RTF解析】【字符状态】记录当前片段的样式、可见性、Unicode 回退计数、代码页与字体索引
@@ -36,6 +40,8 @@ struct Paragraph {
     depth: usize,
     bullet: bool,
     background: Option<Rgba>,
+    spacing: i32,
+    multiple: bool,
 }
 
 impl Default for Paragraph {
@@ -46,6 +52,8 @@ impl Default for Paragraph {
             depth: 0,
             bullet: false,
             background: None,
+            spacing: 0,
+            multiple: false,
         }
     }
 }
@@ -63,6 +71,7 @@ enum Mode {
 /// 【RTF解析】【分组帧】保存进入分组时的字符状态、目标模式与字段信息
 struct Frame {
     fmt: Format,
+    para: Paragraph,
     mode: Mode,
     skip: bool,
     field: bool,
@@ -84,6 +93,7 @@ pub(super) struct Parser {
     pending_bytes: Vec<u8>,
     blocks: Vec<Block>,
     draft: Vec<Span>,
+    draft_para: Option<Paragraph>,
     background: Option<Rgba>,
     first_paragraph_done: bool,
     table: Option<TableBuilder>,
@@ -105,6 +115,7 @@ impl Parser {
             pending_bytes: Vec::new(),
             blocks: Vec::new(),
             draft: Vec::new(),
+            draft_para: None,
             background: None,
             first_paragraph_done: false,
             table: None,
@@ -112,8 +123,8 @@ impl Parser {
     }
 
     /// 【RTF解析】【解析入口】按 text 扫描全部记号并返回富文本；任意输入都不会 panic
-    pub(super) fn parse(mut self, text: &str) -> RichText {
-        let mut lexer = Lexer::new(text.as_bytes());
+    pub(super) fn parse(mut self, text: &[u8]) -> RichText {
+        let mut lexer = Lexer::new(text);
         while let Some(token) = lexer.next() {
             match token {
                 Token::Start => self.open_group(),
@@ -158,6 +169,7 @@ impl Parser {
             .map_or((Mode::Normal, false), |frame| (frame.mode, frame.skip));
         self.frames.push(Frame {
             fmt: self.fmt.clone(),
+            para: self.para,
             mode,
             skip,
             field: false,
@@ -188,6 +200,7 @@ impl Parser {
             self.colors.finish();
         }
         self.fmt = frame.fmt;
+        self.para = frame.para;
     }
 
     /// 【RTF解析】【有效模式】无参数，返回当前分组的目标模式，忽略分组直接视为跳过
@@ -341,6 +354,8 @@ impl Parser {
             "ql" | "qj" => self.para.align = Align::Left,
             "qc" => self.para.align = Align::Center,
             "qr" => self.para.align = Align::Right,
+            "sl" => self.para.spacing = param.unwrap_or(0),
+            "slmult" => self.para.multiple = param == Some(1),
             "li" => {
                 if let Some(value) = param {
                     self.para.depth = (value.max(0) as usize / 720).min(8);
@@ -432,6 +447,13 @@ impl Parser {
             self.fallback -= 1;
             return;
         }
+        if matches!(byte, b'\\' | b'{' | b'}') {
+            self.pending_high = None;
+            if self.mode() != Mode::Skip {
+                self.pending_bytes.push(byte);
+            }
+            return;
+        }
         self.flush_hex();
         self.pending_high = None;
         if self.mode() == Mode::Skip {
@@ -443,9 +465,6 @@ impl Parser {
                     frame.skip = true;
                 }
             }
-            b'\\' => self.emit_text("\\"),
-            b'{' => self.emit_text("{"),
-            b'}' => self.emit_text("}"),
             b'~' => self.emit_text("\u{00a0}"),
             b'_' => self.emit_text("-"),
             b' ' => self.emit_text(" "),
@@ -469,23 +488,17 @@ impl Parser {
         }
     }
 
-    /// 【RTF解析】【纯文本】按 bytes 处理回退字符后追加文本，UTF-8 无效时使用替换字符
+    /// 【RTF解析】【纯文本】按 bytes 消耗 Unicode 回退字节后与十六进制字节共同解码，无返回值，保留跨记号的多字节字符
     fn text(&mut self, bytes: &[u8]) {
-        let text = String::from_utf8_lossy(bytes);
-        let text = if self.fallback > 0 {
-            let count = text.chars().count();
-            let skip = self.fallback.min(count);
-            self.fallback -= skip;
-            if skip == count {
-                return;
-            }
-            text.chars().skip(skip).collect::<String>()
-        } else {
-            text.into_owned()
-        };
+        let skip = self.fallback.min(bytes.len());
+        self.fallback -= skip;
+        if skip == bytes.len() {
+            return;
+        }
         self.pending_high = None;
-        self.flush_hex();
-        self.emit_text(&text);
+        if self.mode() != Mode::Skip {
+            self.pending_bytes.extend_from_slice(&bytes[skip..]);
+        }
     }
 
     /// 【RTF解析】【Unicode 转义】按 param 插入字符，处理负值、代理对与回退字符计数
@@ -544,19 +557,34 @@ impl Parser {
         if !self.fmt.visible || text.is_empty() {
             return;
         }
+        let mut style = self.fmt.style.clone();
+        if self.para.spacing != 0 {
+            let height = if self.para.multiple {
+                self.para.spacing.unsigned_abs() as f32 / 240.0
+            } else {
+                self.para.spacing.unsigned_abs() as f32 / 15.0 / style.size.unwrap_or(16.0)
+            };
+            let height = if !self.para.multiple && self.para.spacing > 0 {
+                height.max(crate::theme::font::line_height())
+            } else {
+                height
+            };
+            style.line_height = Some(height.clamp(0.1, 20.0));
+        }
         if let Some(table) = self.table.as_mut()
             && table.accepts_text()
         {
             table.append_span(
                 Span {
                     text: text.into(),
-                    style: self.fmt.style.clone(),
+                    style,
                 },
                 self.para.align,
             );
             return;
         }
-        table::append_span(&mut self.draft, text, &self.fmt.style);
+        self.draft_para = Some(self.para);
+        spans::append_span(&mut self.draft, text, &style);
     }
 
     /// 【RTF解析】【字体文本】按 text 累加当前字体名，遇到分号时登记字体
@@ -645,11 +673,12 @@ impl Parser {
     /// 【RTF解析】【写出段落】无参数，裁剪空白、补写列表标记并生成普通或列表块
     fn flush_paragraph(&mut self) {
         let mut spans = std::mem::take(&mut self.draft);
-        table::trim_spans(&mut spans);
+        let para = self.draft_para.take().unwrap_or(self.para);
+        spans::trim_spans(&mut spans);
         if spans.is_empty() {
             return;
         }
-        let kind = if self.para.bullet {
+        let kind = if para.bullet {
             spans.insert(
                 0,
                 Span {
@@ -658,7 +687,7 @@ impl Parser {
                 },
             );
             BlockKind::ListItem {
-                depth: self.para.depth,
+                depth: para.depth,
                 marker: "• ".into(),
             }
         } else {
@@ -666,8 +695,8 @@ impl Parser {
         };
         let block = Block {
             kind,
-            align: self.para.align,
-            background: self.para.background,
+            align: para.align,
+            background: para.background,
             spans,
         };
         self.push_block(block);
@@ -688,62 +717,4 @@ impl Parser {
 /// 【RTF解析】【布尔参数】按 param 解析开关，缺省或非零为真，零为假
 fn flag(param: Option<i32>) -> bool {
     param.is_none_or(|value| value != 0)
-}
-
-/// 【RTF解析】【代码段落】按 block 判断是否为全部非空白片段都使用等宽字体的普通段落
-fn is_code_paragraph(block: &Block) -> bool {
-    if !matches!(block.kind, BlockKind::Paragraph) {
-        return false;
-    }
-    let mut has_text = false;
-    for span in &block.spans {
-        if span
-            .text
-            .chars()
-            .any(|character| !character.is_whitespace())
-        {
-            has_text = true;
-            if !span.style.code {
-                return false;
-            }
-        }
-    }
-    has_text
-}
-
-/// 【RTF解析】【合并代码】按 blocks 将连续等宽段落合并为代码块，段落之间以换行连接
-fn merge_code_blocks(blocks: Vec<Block>) -> Vec<Block> {
-    let mut result = Vec::with_capacity(blocks.len());
-    let mut run: Option<Block> = None;
-    for block in blocks {
-        if !is_code_paragraph(&block) {
-            if let Some(current) = run.take() {
-                result.push(current);
-            }
-            result.push(block);
-            continue;
-        }
-        match run.as_mut() {
-            Some(current) => {
-                if let Some(style) = current.spans.last().map(|span| span.style.clone()) {
-                    table::append_span(&mut current.spans, "\n", &style);
-                }
-                for span in &block.spans {
-                    table::append_span(&mut current.spans, &span.text, &span.style);
-                }
-            }
-            None => {
-                run = Some(Block {
-                    kind: BlockKind::Code,
-                    align: block.align,
-                    background: block.background,
-                    spans: block.spans,
-                });
-            }
-        }
-    }
-    if let Some(current) = run {
-        result.push(current);
-    }
-    result
 }

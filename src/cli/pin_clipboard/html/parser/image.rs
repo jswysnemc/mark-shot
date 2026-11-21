@@ -72,7 +72,7 @@ pub(super) fn load(tag: &Tag) -> Option<ImageBlock> {
     Some(placeholder(tag, label))
 }
 
-/// 【贴图】【本地读取】按 src 读取无主机 file URL 的普通图片文件，失败返回空值
+/// 【贴图】【本地读取】按 src 读取本地图片，tag 提供显示尺寸、label 提供替代文本；返回图片块，读取失败返回空值
 fn load_local(tag: &Tag, src: &str, label: &str) -> Option<ImageBlock> {
     let path = local_path(src)?;
     let metadata = std::fs::metadata(&path).ok()?;

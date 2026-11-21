@@ -3,6 +3,62 @@
 use super::super::html::{Align, Block, BlockKind, RichText, Span};
 use super::super::rich_text;
 use super::parse;
+
+/// 【RTF测试】【原始代码页】无参数，验证 GBK、Shift_JIS 和混合原始转义字节按声明代码页还原，无返回值
+#[test]
+fn raw_codepage_bytes_keep_multibyte_characters() {
+    assert_eq!(
+        all_text(&parse(b"{\\rtf1\\ansi\\ansicpg932 \x95\\\\}")),
+        "表"
+    );
+    for (input, expected) in [
+        (b"{\\rtf1\\ansi\\ansicpg936 \xd6\xd0}".as_slice(), "中"),
+        (
+            b"{\\rtf1\\ansi\\ansicpg932 \x93\xfa\x96\\'7b}".as_slice(),
+            "日本",
+        ),
+        (b"{\\rtf1\\ansi\\ansicpg936 \\'d6\xd0}".as_slice(), "中"),
+    ] {
+        assert_eq!(all_text(&parse(input)), expected);
+    }
+}
+
+/// 【RTF测试】【段落分组】无参数，验证嵌套段落对齐恢复且末段格式在根组结束后仍保留，无返回值
+#[test]
+fn paragraph_alignment_restores_after_nested_groups() {
+    let rich = parse(r"{\rtf1\qc center\par{\qr right\par}after}");
+    assert_eq!(
+        rich.blocks
+            .iter()
+            .map(|block| block.align)
+            .collect::<Vec<_>>(),
+        [Align::Center, Align::Right, Align::Center]
+    );
+    assert_eq!(parse(r"{\rtf1\qr final}").blocks[0].align, Align::Right);
+}
+
+/// 【RTF测试】【行距保留】无参数，验证倍数和固定行距按字号转换，分组结束及 pard 恢复行距，无返回值
+#[test]
+fn line_spacing_preserves_multiples_fixed_height_and_scope() {
+    let minimum = parse(r"{\rtf1\fs48\sl240\slmult0 A}");
+    assert!(
+        minimum.blocks[0].spans[0].style.line_height.unwrap() >= crate::theme::font::line_height()
+    );
+    let rich = parse(r"{\rtf1\fs24\sl480\slmult1 A\par{\sl240 B\par}C\par\pard D}");
+    assert_eq!(
+        rich.blocks
+            .iter()
+            .map(|block| block.spans[0].style.line_height)
+            .collect::<Vec<_>>(),
+        [Some(2.0), Some(1.0), Some(2.0), None]
+    );
+    assert_eq!(
+        parse(r"{\rtf1\fs24\sl-480\slmult0 A}").blocks[0].spans[0]
+            .style
+            .line_height,
+        Some(2.0)
+    );
+}
 use crate::theme::Rgba;
 
 /// 【RTF测试】【文本拼接】按 block 返回所有片段拼接后的文本

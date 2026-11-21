@@ -1,50 +1,11 @@
 //! 【贴图】【HTML标签工具】提供块级判断、颜色提取与片段裁剪等无状态辅助函数
 
 use super::super::html_style;
-use super::model::{Align, Span, SpanStyle};
+use super::model::Align;
 use super::token::Tag;
 use crate::theme::Rgba;
 
-/// 【贴图】【片段追加】按 spans 与 text 追加片段，相同样式与上一片段合并
-pub(super) fn append_span(spans: &mut Vec<Span>, text: &str, style: &SpanStyle) {
-    if text.is_empty() {
-        return;
-    }
-    if let Some(last) = spans.last_mut()
-        && last.style == *style
-    {
-        last.text.push_str(text);
-        return;
-    }
-    spans.push(Span {
-        text: text.into(),
-        style: style.clone(),
-    });
-}
-
-/// 【贴图】【结尾裁剪】按 code 裁剪片段尾部空白，代码块只移除一个尾随换行
-pub(super) fn finalize_spans(spans: &mut Vec<Span>, code: bool) {
-    if code {
-        if let Some(last) = spans.last_mut() {
-            if last.text.ends_with("\r\n") {
-                last.text.truncate(last.text.len() - 2);
-            } else if last.text.ends_with('\n') {
-                last.text.pop();
-            }
-        }
-    } else {
-        for span in spans.iter_mut().rev() {
-            let trimmed = span
-                .text
-                .trim_end_matches(|ch: char| ch.is_ascii_whitespace());
-            span.text.truncate(trimmed.len());
-            if !span.text.is_empty() {
-                break;
-            }
-        }
-    }
-    spans.retain(|span| !span.text.is_empty());
-}
+pub(super) use super::super::spans::{append_span, finalize_spans};
 
 /// 【贴图】【块标签】按 name 判断是否作为普通段落容器，返回是否为块级标签
 pub(super) fn is_block(name: &str) -> bool {

@@ -49,11 +49,11 @@ pub fn read_html() -> crate::AppResult<String> {
 }
 
 /// 【Windows剪贴板】【RTF读取】无参数，先读 Rich Text Format 再退回 text/rtf，返回最多十六 MiB 的 RTF 正文
-pub fn read_rtf() -> crate::AppResult<String> {
+pub fn read_rtf() -> crate::AppResult<Vec<u8>> {
     let _clipboard = Opened::read()?;
     let bytes =
         payload("Rich Text Format", MARKUP_LIMIT).or_else(|_| payload("text/rtf", MARKUP_LIMIT))?;
-    Ok(decode_payload(&bytes))
+    Ok(bytes)
 }
 
 /// 【Windows剪贴板】【格式数据】按 name 与 limit 登记格式并读取有界字节，登记或读取失败返回错误

@@ -8,6 +8,7 @@ mod repeat;
 mod rich_text;
 mod rtf;
 mod source;
+mod spans;
 #[cfg(test)]
 mod tests;
 

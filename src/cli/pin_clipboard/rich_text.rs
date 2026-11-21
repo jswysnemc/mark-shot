@@ -326,7 +326,7 @@ fn prepare(
         .collect()
 }
 
-/// 【贴图】【表格预处理】按行与单元格把片段转换为表格模块所需的属性结构
+/// 【贴图】【表格预处理】按 rows、style、palette 和 line_height 生成表格属性；backgrounds 接收片段背景，返回绘制表格
 fn prepare_table(
     rows: &[TableRow],
     style: &super::html::TableStyle,
