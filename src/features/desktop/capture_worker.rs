@@ -1,10 +1,10 @@
 //! 【Windows快捷截图】【进程预热】后台准备一次性待命进程，激活时使用最新配置，截图退出后准备下一次
 
 use super::{actions::Action, standby};
+use crate::utils::windows_process::{self, Child, Stream, Streams};
 use std::{
     io::{Read, Write},
-    os::windows::process::CommandExt,
-    process::{Child, Command, Stdio},
+    process::Command,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -41,12 +41,15 @@ fn prepare() -> crate::AppResult<Standby> {
     let mut command = Command::new(std::env::current_exe()?);
     command.arg(standby::ARG);
     crate::config::pass_to(&mut command);
-    command
-        .creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(crate::logging::open_log_file().map_or_else(Stdio::null, Stdio::from));
-    let mut child = Standby(command.spawn()?);
+    let mut child = Standby(windows_process::spawn(
+        &command,
+        windows_sys::Win32::System::Threading::CREATE_NO_WINDOW,
+        Streams {
+            stdin: Stream::Piped,
+            stdout: Stream::Piped,
+            stderr: crate::logging::open_log_file(),
+        },
+    )?);
     log::info!("【Windows快捷截图】【待命创建】进程编号={}", child.0.id());
     let mut output = child
         .0
@@ -105,15 +108,16 @@ fn cold(action: Action) -> crate::AppResult {
     let mut command = Command::new(std::env::current_exe()?);
     command.args(action.arguments().ok_or("invalid capture action")?);
     crate::config::pass_to(&mut command);
-    command
-        .creation_flags(
-            windows_sys::Win32::System::Threading::CREATE_NEW_PROCESS_GROUP
-                | windows_sys::Win32::System::Threading::CREATE_NO_WINDOW,
-        )
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(crate::logging::open_log_file().map_or_else(Stdio::null, Stdio::from));
-    let mut child = Standby(command.spawn()?);
+    let mut child = Standby(windows_process::spawn(
+        &command,
+        windows_sys::Win32::System::Threading::CREATE_NEW_PROCESS_GROUP
+            | windows_sys::Win32::System::Threading::CREATE_NO_WINDOW,
+        Streams {
+            stdin: Stream::Null,
+            stdout: Stream::Null,
+            stderr: crate::logging::open_log_file(),
+        },
+    )?);
     unsafe {
         windows_sys::Win32::UI::WindowsAndMessaging::AllowSetForegroundWindow(child.0.id());
     }

@@ -2,7 +2,7 @@
 
 use std::{
     io::{Seek, SeekFrom},
-    process::{Command, Stdio},
+    process::Command,
     sync::atomic::{AtomicBool, Ordering},
     time::{Duration, Instant},
 };
@@ -45,18 +45,13 @@ fn request(image: OcrImage, source: Source, cancel: &AtomicBool) -> AppResult<Oc
         command.arg("--system-ocr");
     }
     crate::config::pass_to(&mut command);
-    command
-        .stdin(Stdio::from(input))
-        .stdout(Stdio::from(output.try_clone()?));
-    command.stderr(crate::logging::open_log_file().map_or_else(Stdio::null, Stdio::from));
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW);
-    }
     #[cfg(target_os = "linux")]
     {
-        use std::{io, os::unix::process::CommandExt};
+        use std::{io, os::unix::process::CommandExt, process::Stdio};
+        command
+            .stdin(Stdio::from(input))
+            .stdout(Stdio::from(output.try_clone()?))
+            .stderr(crate::logging::open_log_file().map_or_else(Stdio::null, Stdio::from));
         let parent = std::process::id() as nix::libc::pid_t;
         // 1. 【识别任务】【进程绑定】fork 后只调用系统接口；窗口退出时内核终止识别，避免留下孤立任务
         unsafe {
@@ -71,7 +66,21 @@ fn request(image: OcrImage, source: Source, cancel: &AtomicBool) -> AppResult<Oc
             });
         }
     }
+    #[cfg(target_os = "linux")]
     let mut child = command.spawn()?;
+    #[cfg(target_os = "windows")]
+    let mut child = {
+        use crate::utils::windows_process::{self, Stream, Streams};
+        windows_process::spawn(
+            &command,
+            windows_sys::Win32::System::Threading::CREATE_NO_WINDOW,
+            Streams {
+                stdin: Stream::File(input),
+                stdout: Stream::File(output.try_clone()?),
+                stderr: crate::logging::open_log_file(),
+            },
+        )?
+    };
     let result = (|| {
         let deadline = Instant::now() + Duration::from_secs(90);
         loop {
