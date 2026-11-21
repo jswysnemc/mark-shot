@@ -44,6 +44,7 @@ const PROBE_TIMEOUT: Duration = Duration::from_millis(300);
 pub struct WaylandOverlay {
     _clipboard_scope: Option<crate::backend::wayland::clipboard::context::Scope>,
     runtime: state::OverlayRunTime,
+    shell_policy: shell_policy::Policy,
     layer: bool,
     faulted: usize,
     composited_background: bool,
@@ -63,7 +64,6 @@ impl WaylandOverlay {
         layer: bool,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let rt = state::OverlayRunTime::new(&connection)?;
-        let layer = shell_policy::layer_allowed(layer);
         let has_layer_shell = rt.state.layer_shell.is_some();
         if layer && !has_layer_shell {
             info!("compositor has no wlr-layer-shell, the overlay opens as a window");
@@ -78,6 +78,7 @@ impl WaylandOverlay {
                 )
             }),
             runtime: rt,
+            shell_policy: shell_policy::Policy::current(),
             layer: layer && has_layer_shell,
             faulted: 0,
             composited_background: false,
@@ -280,6 +281,11 @@ impl ScreenOverlay for WaylandOverlay {
         snapshot: Option<&crate::types::text_input::Snapshot>,
     ) -> crate::AppResult {
         // 1. 【输入法】【焦点稳定】映射后改为 OnDemand 会使 niri 释放层焦点，leave 与重新启用将形成循环
+        self.shell_policy.sync(
+            snapshot.is_some(),
+            self.scrolling.is_some(),
+            &self.runtime.state.surfaces,
+        );
         self.runtime.state.text_input.sync(snapshot);
         self.runtime.event_queue.flush()?;
         Ok(())
