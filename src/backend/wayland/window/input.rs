@@ -82,6 +82,11 @@ impl PointerHandler for NativeWindow {
         events: &[PointerEvent],
     ) {
         for event in events {
+            if let PointerEventKind::Press { serial, .. }
+            | PointerEventKind::Release { serial, .. } = event.kind
+            {
+                self.clipboard_input(self.pointer_seat.clone(), serial);
+            }
             if self.popup_pointer(event) {
                 continue;
             }
@@ -193,6 +198,7 @@ impl KeyboardHandler for NativeWindow {
     ) {
         let id = self.keyboard_surface;
         let seat = self.keyboard_seat.clone();
+        self.clipboard_input(seat.clone(), serial);
         if id == Some(SurfaceId::Main)
             && self.popup.is_empty()
             && self.dialog.is_none()
@@ -243,10 +249,13 @@ impl KeyboardHandler for NativeWindow {
         _: &QueueHandle<Self>,
         _: &wl_keyboard::WlKeyboard,
         surface: &wl_surface::WlSurface,
-        _: u32,
+        serial: u32,
         _: &[u32],
         _: &[Keysym],
     ) {
+        if let (Some(core), Some(seat)) = (&self.clipboard, &self.keyboard_seat) {
+            core.borrow_mut().enter(seat.clone(), serial);
+        }
         if self.popup_enter(surface) {
             return;
         }
@@ -266,6 +275,9 @@ impl KeyboardHandler for NativeWindow {
         surface: &wl_surface::WlSurface,
         _: u32,
     ) {
+        if let (Some(core), Some(seat)) = (&self.clipboard, &self.keyboard_seat) {
+            core.borrow_mut().focus(seat.clone(), false);
+        }
         self.modifiers = Mods::default();
         self.keyboard_grabs.cancel();
         if self.popup_leave(surface) {
@@ -288,10 +300,11 @@ impl KeyboardHandler for NativeWindow {
         _: &Connection,
         qh: &QueueHandle<Self>,
         _: &wl_keyboard::WlKeyboard,
-        _: u32,
+        input_serial: u32,
         event: KeyEvent,
     ) {
         let seat = self.keyboard_seat.clone();
+        self.clipboard_input(seat.clone(), input_serial);
         let serial = seat.as_ref().and_then(|seat| {
             self.keyboard_grabs.release(
                 event.raw_code,
@@ -345,6 +358,9 @@ impl SeatHandler for NativeWindow {
         seat: wl_seat::WlSeat,
         capability: Capability,
     ) {
+        if let Some(core) = &self.clipboard {
+            core.borrow_mut().seat(&seat, qh);
+        }
         match capability {
             Capability::Pointer if self.pointer.is_none() => {
                 if let Ok(pointer) = self.seats.get_pointer(qh, &seat) {
@@ -375,6 +391,9 @@ impl SeatHandler for NativeWindow {
 
     /// 【原生窗口】【新增座席】立即绑定输入法对象，其余指针与键盘设备等待能力通知按需绑定
     fn new_seat(&mut self, _: &Connection, qh: &QueueHandle<Self>, seat: wl_seat::WlSeat) {
+        if let Some(core) = &self.clipboard {
+            core.borrow_mut().seat(&seat, qh);
+        }
         self.text_input.bind(&seat, qh);
     }
 

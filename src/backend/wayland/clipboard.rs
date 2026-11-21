@@ -1,8 +1,14 @@
+pub(crate) mod background;
+pub(crate) mod context;
+pub(crate) mod core;
+pub(crate) mod core_dispatch;
 pub mod daemon;
 pub mod ext_data_control;
 mod image_formats;
 mod image_service;
 mod image_source;
+mod payload;
+mod transfer;
 
 use std::time::Duration;
 

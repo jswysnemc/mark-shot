@@ -176,5 +176,6 @@ pub(super) fn build_ocr_state() -> OcrState {
         result_scale: 1.0,
         open_result_on_completion: false,
         copy_on_completion: false,
+        quick_copy: false,
     }
 }

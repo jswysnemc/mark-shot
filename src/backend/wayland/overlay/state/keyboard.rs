@@ -30,6 +30,9 @@ impl KeyboardHandler for OverlayState {
         >(keyboard)
         {
             self.popup_grabs.push_back((serial, data.seat().clone()));
+            if let Some(core) = &self.clipboard {
+                core.borrow_mut().input(data.seat().clone(), serial, true);
+            }
             self.events.push_back(OverlayEvent::PopupSerial(serial));
         }
         self.process_key(&event);
@@ -69,12 +72,19 @@ impl KeyboardHandler for OverlayState {
         &mut self,
         _: &Connection,
         _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
+        keyboard: &wl_keyboard::WlKeyboard,
         surface: &wl_surface::WlSurface,
-        _: u32,
+        serial: u32,
         _: &[u32],
         _: &[Keysym],
     ) {
+        if let Some(core) = &self.clipboard
+            && let Some(data) = wayland_client::Proxy::data::<
+                smithay_client_toolkit::seat::keyboard::KeyboardData<Self, ()>,
+            >(keyboard)
+        {
+            core.borrow_mut().enter(data.seat().clone(), serial);
+        }
         if let Some(popup) = self.popup.as_mut()
             && popup.popup.wl_surface() == surface
         {
@@ -112,10 +122,17 @@ impl KeyboardHandler for OverlayState {
         &mut self,
         _: &Connection,
         _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
+        keyboard: &wl_keyboard::WlKeyboard,
         surface: &wl_surface::WlSurface,
         _: u32,
     ) {
+        if let Some(core) = &self.clipboard
+            && let Some(data) = wayland_client::Proxy::data::<
+                smithay_client_toolkit::seat::keyboard::KeyboardData<Self, ()>,
+            >(keyboard)
+        {
+            core.borrow_mut().focus(data.seat().clone(), false);
+        }
         if let Some(monitor_idx) = self
             .surfaces
             .iter()

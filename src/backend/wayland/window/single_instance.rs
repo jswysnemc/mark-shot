@@ -21,6 +21,10 @@ struct ControlSource {
 }
 
 impl Binding {
+    /// 【原生窗口】【控制解除】按 handle 移除保留控制器的事件源，无返回值，使剪贴板服务不占用单实例锁
+    pub fn remove(self, handle: &LoopHandle<'static, NativeWindow>) {
+        handle.remove(self.token);
+    }
     /// 【原生窗口】【控制登记】按 handle 和 controller 登记本次事件来源，返回自动随事件循环回收的绑定，不创建线程
     pub fn install(
         handle: &LoopHandle<'static, NativeWindow>,

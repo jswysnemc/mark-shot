@@ -44,6 +44,11 @@ pub(super) struct Surface {
 }
 
 impl Surface {
+    /// 【原生窗口剪贴板】【像素释放】无参数，释放已解除映射窗口的 CPU 像素及共享缓冲，无返回值
+    pub(super) fn release_pixels(&mut self) {
+        self.canvas = None;
+        self.buffers.clear();
+    }
     /// 【原生窗口】【表面构造】用 spec、id 和已绑定协议建立独立窗口，qh 提供事件路由，返回未提交表面
     pub fn new(
         spec: WindowSpec,

@@ -62,7 +62,6 @@ pub async fn full(conn: crate::backend::session::Session, launch: Launch) -> Res
             output.info = updated.info.clone();
         }
     }
-    drop(overlay);
     prof.mark("capture");
 
     let outputs: Vec<_> = shots
@@ -78,7 +77,12 @@ pub async fn full(conn: crate::backend::session::Session, launch: Launch) -> Res
     let png = encode_png(&pixmap);
     prof.mark("png encoded");
 
+    if launch.outputs().copy {
+        overlay.prepare_clipboard_copy()?;
+    }
+
     deliver(png, scale, launch.outputs(), launch.output.as_deref(), "").await;
+    overlay.finish_clipboard()?;
     prof.mark("delivered");
     prof.dump();
     Ok(())
@@ -107,6 +111,11 @@ pub async fn window(conn: crate::backend::session::Session, launch: Launch) -> R
     let png = encode_png_with_alpha(capture.pixmap.into_pixmap());
     prof.mark("png encoded");
 
+    let mut overlay = initialize_overlay(conn)?;
+    if launch.outputs().copy {
+        overlay.prepare_clipboard_copy()?;
+    }
+
     deliver(
         png,
         capture.scale,
@@ -115,6 +124,7 @@ pub async fn window(conn: crate::backend::session::Session, launch: Launch) -> R
         "",
     )
     .await;
+    overlay.finish_clipboard()?;
     prof.mark("delivered");
     prof.dump();
     Ok(())

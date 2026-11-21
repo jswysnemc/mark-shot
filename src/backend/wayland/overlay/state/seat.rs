@@ -39,6 +39,9 @@ impl SeatHandler for OverlayState {
             _ => {}
         }
         self.primary_selection.seat(&seat, qh);
+        if let Some(core) = &self.clipboard {
+            core.borrow_mut().seat(&seat, qh);
+        }
         // 1. 【Wayland输入】【绑定交付】能力通知本身不产生画布事件，不能等待下一次重绘才提交设备请求
         self.pending_flush = true;
     }

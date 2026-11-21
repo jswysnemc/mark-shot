@@ -170,6 +170,22 @@ mod items {
         if items == legacy {
             return Ok(ITEMS.to_vec());
         }
+        // 2. 【工具栏配置】【旧侧栏升级】只升级缺少快速文字复制的旧默认侧栏，不改变用户定制列表
+        let legacy_actions = ACTION_ITEMS
+            .iter()
+            .copied()
+            .filter(|item| {
+                !matches!(
+                    item,
+                    ToolbarItem::Button(crate::ui::toolbar::ToolbarButton::Integration(
+                        crate::ui::toolbar::Integration::OcrCopy
+                    ))
+                )
+            })
+            .collect::<Vec<_>>();
+        if items == legacy_actions {
+            return Ok(ACTION_ITEMS.to_vec());
+        }
         Ok(items)
     }
 }

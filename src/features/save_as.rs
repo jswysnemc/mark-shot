@@ -1,6 +1,8 @@
 //! 【截图另存为】【入口】通过桌面文件选择器门户与安全落盘器保存冻结的最终图像
 
 pub(crate) mod portal;
+#[cfg(target_os = "linux")]
+mod runtime;
 pub mod snapshot;
 pub(crate) mod writer;
 

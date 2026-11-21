@@ -53,12 +53,23 @@ software, so it does not depend on Qt, GTK or a web view.
 
 Details and known limits are in [Platform support](docs/platform-support.md).
 
+On GNOME Wayland, install the optional pin extension from this checkout with
+`bash scripts/install-gnome-pin-extension.sh`, log out and back in, then run
+`gnome-extensions enable mark-shot-pin@jswysnemc`. It raises only `mark-shot-pin` windows
+once when they appear. You can turn off Always on Top in GNOME's window menu afterward;
+exclusive fullscreen windows may still cover pins. Other Wayland compositors need
+wlr-layer-shell for client-controlled pinning.
+
 ## Install
+
+### 1. Download a package (recommended)
 
 Download [0.2.3](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.3)
 and choose a package for your distribution and architecture. The release page contains a collapsed
 file list with SHA-256 values; checksum files are not separate assets. See
 [Installation](docs/installation.md) for download verification and the available formats.
+
+### 2. Build from source
 
 To build from source, Rust 1.95 or newer is required; `rustup` picks the pinned toolchain from
 `rust-toolchain.toml` automatically.

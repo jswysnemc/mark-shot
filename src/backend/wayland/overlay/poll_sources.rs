@@ -32,9 +32,11 @@ pub(super) fn wait(
     let control = controller.map(|controller| controller.poll_guard());
     let control_deadline = control.as_ref().and_then(|guard| guard.deadline());
     let primary_timeout = runtime.state.primary_selection.timeout();
+    let clipboard = runtime.state.clipboard.as_ref().map(|core| core.borrow());
     let timeout = [
         timeout,
         primary_timeout,
+        clipboard.as_ref().and_then(|core| core.timeout()),
         control_deadline.map(|at| at.saturating_duration_since(Instant::now())),
     ]
     .into_iter()
@@ -60,6 +62,9 @@ pub(super) fn wait(
     if primary_timeout.is_some() {
         runtime.state.primary_selection.poll_fds(&mut descriptors);
     }
+    if let Some(core) = &clipboard {
+        core.poll_fds(&mut descriptors);
+    }
     let control_start = descriptors.len();
     if let Some(control) = &control {
         control.poll_fds(&mut descriptors);
@@ -77,6 +82,7 @@ pub(super) fn wait(
         .any(|fd| !fd.revents().is_empty());
     // 1. 【Wayland覆盖层】【借用释放】处理来源前释放全部描述符借用，控制服务可以回收已结束连接
     drop(descriptors);
+    drop(clipboard);
     drop(control);
     if wayland_events.intersects(PollFlags::ERR | PollFlags::HUP) {
         return Err("Wayland connection closed".into());
@@ -107,6 +113,9 @@ pub(super) fn wait(
             .state
             .primary_selection
             .progress(&mut runtime.state.events);
+        if let Some(core) = &runtime.state.clipboard {
+            core.borrow_mut().progress();
+        }
         return Ok(Wake::Progress);
     }
     if task_events.contains(PollFlags::IN) {

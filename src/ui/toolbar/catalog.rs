@@ -129,6 +129,12 @@ pub const ENTRIES: &[Entry] = &[
     entry!("pin", Button::Finish(Finish::Pin), "贴图", "Pin"),
     entry!("ocr", Button::Tool(Tool::Ocr), "文字识别", "OCR"),
     entry!(
+        "ocr_copy",
+        Button::Integration(Integration::OcrCopy),
+        "识别文字并复制",
+        "Recognize and copy text"
+    ),
+    entry!(
         "scan_code",
         Button::Integration(Integration::ScanCode),
         "识别二维码与条形码",

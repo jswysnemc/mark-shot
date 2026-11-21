@@ -72,10 +72,21 @@ impl PointerHandler for Pin {
         &mut self,
         _: &Connection,
         qh: &QueueHandle<Self>,
-        _: &wl_pointer::WlPointer,
+        pointer: &wl_pointer::WlPointer,
         events: &[PointerEvent],
     ) {
         for event in events {
+            if let PointerEventKind::Press { serial, .. } | PointerEventKind::Release { serial, .. } =
+                event.kind
+                && let Some(core) = &self.clipboard
+                && let Some(data) = wayland_client::Proxy::data::<
+                    smithay_client_toolkit::seat::pointer::PointerData<()>,
+                >(pointer)
+            {
+                let mut core = core.borrow_mut();
+                core.input(data.seat().clone(), serial, false);
+                core.advance(None);
+            }
             let position = event.position;
             if &event.surface == self.shell.surface() {
                 self.last_position = position;
@@ -153,10 +164,19 @@ impl KeyboardHandler for Pin {
         &mut self,
         _: &Connection,
         qh: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
-        _: u32,
+        keyboard: &wl_keyboard::WlKeyboard,
+        serial: u32,
         event: KeyEvent,
     ) {
+        if let Some(core) = &self.clipboard
+            && let Some(data) = wayland_client::Proxy::data::<
+                smithay_client_toolkit::seat::keyboard::KeyboardData<Self, ()>,
+            >(keyboard)
+        {
+            let mut core = core.borrow_mut();
+            core.input(data.seat().clone(), serial, true);
+            core.advance(Some(serial));
+        }
         self.key(event, qh);
     }
     /// 【贴图】【重复按键】贴图动作不重复执行，菜单导航等待下一次按下
@@ -187,22 +207,36 @@ impl KeyboardHandler for Pin {
         &mut self,
         _: &Connection,
         _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
+        keyboard: &wl_keyboard::WlKeyboard,
         _: &wl_surface::WlSurface,
         _: u32,
         _: &[u32],
         _: &[Keysym],
     ) {
+        if let Some(core) = &self.clipboard
+            && let Some(data) = wayland_client::Proxy::data::<
+                smithay_client_toolkit::seat::keyboard::KeyboardData<Self, ()>,
+            >(keyboard)
+        {
+            core.borrow_mut().focus(data.seat().clone(), true);
+        }
     }
     /// 【贴图】【键盘离开】清除修饰键及未完成拖动，保持已经选择的文字
     fn leave(
         &mut self,
         _: &Connection,
         _: &QueueHandle<Self>,
-        _: &wl_keyboard::WlKeyboard,
+        keyboard: &wl_keyboard::WlKeyboard,
         _: &wl_surface::WlSurface,
         _: u32,
     ) {
+        if let Some(core) = &self.clipboard
+            && let Some(data) = wayland_client::Proxy::data::<
+                smithay_client_toolkit::seat::keyboard::KeyboardData<Self, ()>,
+            >(keyboard)
+        {
+            core.borrow_mut().focus(data.seat().clone(), false);
+        }
         self.mods = Mods::default();
         self.selecting = false;
     }
@@ -240,6 +274,9 @@ impl SeatHandler for Pin {
         seat: wl_seat::WlSeat,
         capability: Capability,
     ) {
+        if let Some(core) = &self.clipboard {
+            core.borrow_mut().seat(&seat, qh);
+        }
         match capability {
             Capability::Pointer if self.pointer.is_none() => {
                 if let Ok(pointer) = self.seats.get_pointer(qh, &seat) {

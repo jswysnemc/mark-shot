@@ -10,6 +10,7 @@ pub(crate) mod names;
 pub mod number;
 pub mod numerated_arrow;
 pub mod ocr;
+pub(crate) mod ocr_copy;
 pub mod pen;
 pub mod pick;
 pub mod ruler;

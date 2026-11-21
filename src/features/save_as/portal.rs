@@ -90,12 +90,8 @@ pub fn choose_save_path(initial_path: &Path) -> crate::AppResult<Option<PathBuf>
     let folder = resolve_initial_folder(initial_path);
     let current_name = resolve_initial_name(initial_path);
 
-    // 1. 构建单线程异步运行时驱动 D-Bus 桌面文件门户请求，避免依赖全局运行时上下文
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
-
-    let outcome = runtime.block_on(async move {
+    // 1. 【截图另存为】【运行时隔离】在独立线程驱动门户请求，允许调用方已有 Tokio 运行时
+    let outcome = super::runtime::block_on(async move {
         // 1. 【文件门户】【独立连接】临时运行时独立持有总线连接，关闭对话框后不污染其他门户请求
         let connection = zbus::Connection::session().await?;
         let png_filter = FileFilter::new(filter_label)
@@ -113,7 +109,7 @@ pub fn choose_save_path(initial_path: &Path) -> crate::AppResult<Option<PathBuf>
             request = request.current_folder(dir)?;
         }
         request.send().await?.response()
-    });
+    })?;
 
     // 2. 区分用户主动取消与门户异常，成功时转换首个授权 URI 为本地路径
     match outcome {

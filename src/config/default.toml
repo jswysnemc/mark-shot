@@ -170,6 +170,7 @@ field_text_height = 0.75
 [keys]
 accept = "Return"
 copy = "Ctrl+C"
+ocr_copy = "Ctrl+Shift+C"
 save = "Ctrl+S"
 save_as = "Ctrl+Alt+S"
 open_with = []
@@ -242,7 +243,7 @@ main = [
     "magnifier", "ruler", "laser", "eyedropper", "recording", "separator", "clear", "undo", "redo",
 ]
 actions = [
-    "scope", "separator", "open_with", "extensions", "scroll", "pin", "ocr", "scan_code", "translate",
+"scope", "separator", "open_with", "extensions", "scroll", "pin", "ocr", "ocr_copy", "scan_code", "translate",
     "separator", "copy", "save_as", "upload", "separator", "settings", "separator", "cancel",
 ]
 main_vertical = false

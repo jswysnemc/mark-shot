@@ -33,6 +33,8 @@ use smithay_client_toolkit::output::OutputState;
 use smithay_client_toolkit::shm::Shm;
 
 pub struct OverlayState {
+    pub(crate) clipboard:
+        Option<std::rc::Rc<std::cell::RefCell<crate::backend::wayland::clipboard::core::Core>>>,
     pub(crate) defer_capture_frame: bool,
     pub(super) primary_selection: primary_selection::PrimarySelection,
     pub text_input: crate::backend::wayland::text_input::TextInput,
@@ -141,11 +143,17 @@ impl OverlayRunTime {
         state.layer_shell =
             smithay_client_toolkit::shell::wlr_layer::LayerShell::bind(&globals, &qh).ok();
         state.text_input.manager = globals.bind::<wayland_protocols::wp::text_input::zv3::client::zwp_text_input_manager_v3::ZwpTextInputManagerV3, _, _>(&qh, 1..=1, ()).ok();
+        state.clipboard = crate::backend::wayland::clipboard::core::Core::bind(&globals, &qh);
 
         // two roundtrips: first gets globals
         // second waits for events update
         event_queue.roundtrip(&mut state)?;
         event_queue.roundtrip(&mut state)?;
+        if let Some(core) = &state.clipboard {
+            for seat in state.seat.seats() {
+                core.borrow_mut().seat(&seat, &qh);
+            }
+        }
 
         Ok(Self {
             globals,
@@ -170,6 +178,7 @@ impl OverlayState {
         viewporter: Option<wp_viewporter::WpViewporter>,
     ) -> Self {
         Self {
+            clipboard: None,
             primary_selection: Default::default(),
             defer_capture_frame: false,
             text_input: Default::default(),

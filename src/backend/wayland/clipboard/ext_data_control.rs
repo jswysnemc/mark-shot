@@ -4,6 +4,9 @@ pub struct ClipboardMethod;
 
 impl ClipboardProvider for ClipboardMethod {
     fn copy_image_to_clipboard(&self, png_data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(result) = super::context::image(png_data) {
+            return result;
+        }
         crate::utils::spawn_self_ready(&[super::DAEMON_ARG], png_data, super::READY_TIMEOUT)
     }
 }
