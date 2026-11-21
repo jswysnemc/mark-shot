@@ -36,7 +36,7 @@ impl Role {
             qh,
         );
         window.set_title(spec.title.clone());
-        window.set_app_id(spec.app_id.clone());
+        window.set_app_id(crate::backend::wayland::app_identity::current(&spec.app_id));
         window.set_min_size(Some(spec.minimum));
         Self::Window(window)
     }

@@ -10,14 +10,16 @@ mod windows;
 mod x11;
 use super::Reporter;
 
-/// 【全局快捷键】【取消边界】按shortcut注册并等待事件，reporter交付结果，cancelled控制释放，无返回值
+/// 【全局快捷键】【取消边界】按 shortcut 与 active_window_shortcut 注册，reporter 交付结果，cancelled 控制释放，无返回值
 pub(super) async fn run(
     shortcut: String,
+    active_window_shortcut: String,
     reporter: Reporter,
     cancelled: tokio::sync::watch::Receiver<bool>,
 ) {
     #[cfg(target_os = "windows")]
     {
+        let _ = active_window_shortcut;
         if let Err(error) = windows::run(shortcut, reporter.clone(), cancelled).await {
             reporter.status(super::status::Registration::Failed(error));
         }
@@ -30,7 +32,13 @@ pub(super) async fn run(
             crate::backend::session::Session::X11(display) => {
                 x11::run(display, &shortcut, &reporter).await
             }
-            crate::backend::session::Session::Wayland(_) => portal::run(&shortcut, &reporter).await,
+            crate::backend::session::Session::Wayland(_) => {
+                let kde = crate::backend::wayland::app_identity::current("")
+                    == crate::backend::wayland::app_identity::APP_ID;
+                let window = (kde && !active_window_shortcut.trim().is_empty())
+                    .then_some(active_window_shortcut.as_str());
+                portal::run(&shortcut, window, &reporter).await
+            }
         }
     };
     #[cfg(target_os = "linux")]

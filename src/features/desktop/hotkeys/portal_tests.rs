@@ -72,3 +72,25 @@ fn changed_binding_recovers_without_restarting_the_portal_session() {
         Event::Status(7, true, Registration::Failed(_))
     ));
 }
+
+/// 【全局快捷键测试】【独立窗口动作】无参数，窗口绑定不得复用普通截图动作，空绑定报告失败，恢复后通过，无返回值
+#[test]
+fn active_window_binding_is_required_and_routes_to_window_capture() {
+    let (reporter, mut receiver) = reporter();
+    assert!(!report_window_binding(
+        &shortcuts("active-window", ""),
+        &reporter
+    ));
+    assert!(matches!(
+        receiver.try_recv().unwrap(),
+        Event::Status(7, true, Registration::Failed(_))
+    ));
+    assert!(report_window_binding(
+        &shortcuts("active-window", "Alt+Print"),
+        &reporter
+    ));
+    assert_eq!(action("active-window"), Some(Action::CaptureWindow));
+    assert_eq!(action("screenshot"), Some(Action::Capture));
+    assert_eq!(action("other"), None);
+    assert_eq!(trigger("Alt+PrintScreen").unwrap(), "ALT+Print");
+}

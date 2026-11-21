@@ -3,6 +3,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Action {
     Capture,
+    CaptureWindow,
     Fullscreen,
     Pin,
     Delay(u64),
@@ -21,6 +22,7 @@ impl Action {
     pub fn arguments(self) -> Option<&'static [&'static str]> {
         match self {
             Self::Capture => Some(&["--capture"]),
+            Self::CaptureWindow => Some(&["--window"]),
             Self::Fullscreen => Some(&["--fullscreen"]),
             Self::Pin => Some(&["--pin-clipboard"]),
             Self::Settings => Some(&["--settings"]),
@@ -57,6 +59,9 @@ mod tests {
             matches!(command(Action::Fullscreen), Command::Editor(launch) if launch.fullscreen && launch.mode == crate::types::Mode::Editor)
         );
         assert!(matches!(command(Action::Pin), Command::PinClipboard));
+        assert!(
+            matches!(command(Action::CaptureWindow), Command::Editor(launch) if launch.mode == crate::types::Mode::Window)
+        );
         assert!(matches!(command(Action::Settings), Command::Settings));
         assert!(matches!(command(Action::History), Command::History));
     }

@@ -88,7 +88,9 @@ impl ScrollPopup {
         let parent =
             shell.create_window(compositor.create_surface(qh), WindowDecorations::None, qh);
         parent.set_title("mark-shot");
-        parent.set_app_id("mark-shot-scroll");
+        parent.set_app_id(crate::backend::wayland::app_identity::current(
+            "mark-shot-scroll",
+        ));
         parent.set_min_size(Some((1, 1)));
         parent.set_max_size(Some((1, 1)));
         parent.set_window_geometry(0, 0, 1, 1);

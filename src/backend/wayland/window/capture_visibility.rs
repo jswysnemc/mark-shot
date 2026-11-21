@@ -12,7 +12,9 @@ impl Surface {
             self.role.wl_surface().attach(None, 0, 0);
         } else if let Some(window) = self.role.as_window() {
             window.set_title(self.spec.title.clone());
-            window.set_app_id(self.spec.app_id.clone());
+            window.set_app_id(crate::backend::wayland::app_identity::current(
+                &self.spec.app_id,
+            ));
             window.set_min_size(Some(self.spec.minimum));
         }
         self.role.commit();
