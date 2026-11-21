@@ -9,6 +9,8 @@ pub(crate) mod self_executable;
 #[cfg(test)]
 pub(crate) mod test_files;
 pub(crate) mod transparent_pixmap;
+#[cfg(target_os = "windows")]
+pub(crate) mod windows_process;
 
 use crate::types::{CursorIcon, Placement, SelectionHandle, SignedRect};
 use std::path::PathBuf;
@@ -412,7 +414,7 @@ pub fn copy_swizzled(dst: &mut [u8], src: &[u8]) {
 
 /// 【辅助进程】【独立调用】将 args 和 stdin 交给独立应用进程；返回启动及输入结果，终端中断不影响辅助窗口
 pub fn spawn_self(args: &[&str], stdin: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-    spawn_self_with(args, stdin, std::process::Stdio::null(), None, &[]).map(|_| ())
+    spawn_self_with(args, stdin, false, None, &[]).map(|_| ())
 }
 
 /// 【辅助进程】【环境交接】按 args、stdin 和 environment 启动独立进程，返回启动结果；环境只作用于该子进程
@@ -421,12 +423,12 @@ pub fn spawn_self_with_env(
     stdin: &[u8],
     environment: &[(&str, &str)],
 ) -> crate::AppResult {
-    spawn_self_with(args, stdin, std::process::Stdio::null(), None, environment).map(|_| ())
+    spawn_self_with(args, stdin, false, None, environment).map(|_| ())
 }
 
 /// 【辅助进程】【桌面激活】按args启动窗口并交付一次性的token，不修改常驻进程环境，返回启动结果
 pub fn spawn_self_activated(args: &[&str], token: Option<&str>) -> crate::AppResult {
-    spawn_self_with(args, &[], std::process::Stdio::null(), token, &[]).map(|_| ())
+    spawn_self_with(args, &[], false, token, &[]).map(|_| ())
 }
 
 /// 【辅助进程】【就绪交接】将 args、stdin 交给独立进程，在 timeout 内等待首行；AppImage 形态放宽挂载余量，返回就绪结果或错误
@@ -442,7 +444,7 @@ pub fn spawn_self_ready(
     } else {
         timeout
     };
-    let launched = spawn_self_with(args, stdin, std::process::Stdio::piped(), None, &[])?;
+    let launched = spawn_self_with(args, stdin, true, None, &[])?;
     let stdout = launched.stdout.ok_or("child has no stdout")?;
     let input_error = launched.input_error;
 
@@ -466,21 +468,23 @@ pub fn spawn_self_ready(
 }
 
 struct SelfProcessOutput {
+    #[cfg(target_os = "linux")]
     stdout: Option<std::process::ChildStdout>,
+    #[cfg(target_os = "windows")]
+    stdout: Option<std::fs::File>,
     input_error: Option<std::io::Error>,
 }
 
-/// 【辅助进程】【管道调用】按 args 启动进程并写入 stdin，stdout 指定输出方式，activation_token 和 environment 设置环境
+/// 【辅助进程】【管道调用】按 args 启动进程并写入 stdin，capture_stdout 指定是否接收输出，activation_token 和 environment 设置环境
 /// 返回输出管道及输入错误；就绪调用方须先读取真实启动结果，再处理输入错误
 fn spawn_self_with(
     args: &[&str],
     stdin: &[u8],
-    stdout: std::process::Stdio,
+    capture_stdout: bool,
     activation_token: Option<&str>,
     environment: &[(&str, &str)],
 ) -> Result<SelfProcessOutput, Box<dyn std::error::Error>> {
     use std::io::Write;
-    use std::process::Stdio;
 
     let mut command = self_executable::command()?;
     command.args(args);
@@ -491,12 +495,22 @@ fn spawn_self_with(
         command.env("XDG_ACTIVATION_TOKEN", token);
     }
     crate::config::pass_to(&mut command);
-    command
-        .stdin(Stdio::piped())
-        .stdout(stdout)
-        // 1. 【辅助进程】【日志隔离】错误输出使用日志文件，避免长驻进程保持调用方输出管道
-        .stderr(crate::logging::open_log_file().map_or_else(Stdio::null, Stdio::from));
-    let mut pipes = helper_process::spawn(command)?;
+    #[cfg(target_os = "linux")]
+    let mut pipes = {
+        use std::process::Stdio;
+        command
+            .stdin(Stdio::piped())
+            .stdout(if capture_stdout {
+                Stdio::piped()
+            } else {
+                Stdio::null()
+            })
+            // 1. 【辅助进程】【日志隔离】错误输出使用日志文件，避免长驻进程保持调用方输出管道
+            .stderr(crate::logging::open_log_file().map_or_else(Stdio::null, Stdio::from));
+        helper_process::spawn(command)?
+    };
+    #[cfg(target_os = "windows")]
+    let mut pipes = helper_process::spawn_self(&command, capture_stdout)?;
 
     let input_error = pipes
         .stdin
