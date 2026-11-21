@@ -442,8 +442,9 @@ pub fn spawn_self_ready(
     } else {
         timeout
     };
-    let stdout = spawn_self_with(args, stdin, std::process::Stdio::piped(), None, &[])?
-        .ok_or("child has no stdout")?;
+    let launched = spawn_self_with(args, stdin, std::process::Stdio::piped(), None, &[])?;
+    let stdout = launched.stdout.ok_or("child has no stdout")?;
+    let input_error = launched.input_error;
 
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
@@ -453,22 +454,31 @@ pub fn spawn_self_ready(
     });
 
     match rx.recv_timeout(timeout) {
-        Ok(Ok(line)) if line == "\n" => Ok(()),
-        Ok(Ok(line)) if line.is_empty() => Err("helper process exited unexpectedly".into()),
+        Ok(Ok(line)) if line == "\n" && input_error.is_none() => Ok(()),
+        Ok(Ok(line)) if line.is_empty() || line == "\n" => Err(input_error.map_or_else(
+            || "helper process exited unexpectedly".into(),
+            |error| Box::new(error) as Box<dyn std::error::Error>,
+        )),
         Ok(Ok(line)) => Err(line.trim_end().into()),
         Ok(Err(e)) => Err(e.into()),
         Err(_) => Err("helper process didn't respond in time".into()),
     }
 }
 
-/// 【辅助进程】【管道调用】启动 args 对应进程并写入 stdin；stdout 指定输出方式，返回可选输出管道
+struct SelfProcessOutput {
+    stdout: Option<std::process::ChildStdout>,
+    input_error: Option<std::io::Error>,
+}
+
+/// 【辅助进程】【管道调用】按 args 启动进程并写入 stdin，stdout 指定输出方式，activation_token 和 environment 设置环境
+/// 返回输出管道及输入错误；就绪调用方须先读取真实启动结果，再处理输入错误
 fn spawn_self_with(
     args: &[&str],
     stdin: &[u8],
     stdout: std::process::Stdio,
     activation_token: Option<&str>,
     environment: &[(&str, &str)],
-) -> Result<Option<std::process::ChildStdout>, Box<dyn std::error::Error>> {
+) -> Result<SelfProcessOutput, Box<dyn std::error::Error>> {
     use std::io::Write;
     use std::process::Stdio;
 
@@ -488,17 +498,35 @@ fn spawn_self_with(
         .stderr(crate::logging::open_log_file().map_or_else(Stdio::null, Stdio::from));
     let mut pipes = helper_process::spawn(command)?;
 
-    pipes
+    let input_error = pipes
         .stdin
         .take()
         .ok_or("child has no stdin")?
-        .write_all(stdin)?;
-    Ok(pipes.stdout.take())
+        .write_all(stdin)
+        .err();
+    // 2. 【辅助进程】【真实错误】就绪通道优先报告子进程原因，输入管道错误不能遮盖启动失败说明
+    if pipes.stdout.is_none() {
+        if let Some(error) = input_error {
+            return Err(error.into());
+        }
+        return Ok(SelfProcessOutput {
+            stdout: None,
+            input_error: None,
+        });
+    }
+    Ok(SelfProcessOutput {
+        stdout: pipes.stdout.take(),
+        input_error,
+    })
 }
 
 #[cfg(target_os = "linux")]
 pub fn copy_to_clipboard(text: &str) -> Result<(), Box<dyn std::error::Error>> {
     use crate::backend::clipboard::{DAEMON_ARG, READY_TIMEOUT, TEXT_ARG};
+
+    if let Some(result) = crate::backend::wayland::clipboard::context::text(text) {
+        return result;
+    }
 
     spawn_self_ready(&[DAEMON_ARG, TEXT_ARG], text.as_bytes(), READY_TIMEOUT)
 }

@@ -62,6 +62,7 @@ pub enum Action {
     Upload,
     Translate,
     ScanCode,
+    OcrCopy,
     Cancel,
     Undo,
     Redo,
@@ -90,6 +91,7 @@ pub enum Action {
 pub const ACTIONS: &[(&str, Action, &[&str])] = &[
     ("accept", Action::Accept, &["Return"]),
     ("copy", Action::Finish(Finish::Copy), &["Ctrl+C"]),
+    ("ocr_copy", Action::OcrCopy, &["Ctrl+Shift+C"]),
     ("save", Action::Finish(Finish::Save), &["Ctrl+S"]),
     ("save_as", Action::SaveAs, &["Ctrl+Alt+S"]),
     ("open_with", Action::OpenWith, &[]),

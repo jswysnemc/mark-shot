@@ -34,6 +34,7 @@ mod native_field_reference;
 mod native_field_support;
 mod native_text_input;
 mod number;
+mod ocr_copy;
 mod pen_cache;
 mod pointer_buttons;
 mod preferences;
@@ -108,6 +109,7 @@ pub(in crate::app) fn editor() -> EditorState {
             result_scale: 1.0,
             open_result_on_completion: false,
             copy_on_completion: false,
+            quick_copy: false,
         },
     );
     editor.magnifier.hidden = true;

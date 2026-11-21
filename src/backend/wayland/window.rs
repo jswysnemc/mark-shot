@@ -1,6 +1,7 @@
 //! 【原生窗口】【接口】普通 xdg-toplevel 窗口与内容之间的事件契约
 
 mod capture_visibility;
+mod clipboard;
 mod content_size;
 mod deadline;
 mod dialog;
@@ -28,5 +29,5 @@ pub use crate::backend::window::{
     KeyInput, LEFT_BUTTON, RIGHT_BUTTON, ScrollInput, ScrollSource, WindowAction, WindowContent,
     WindowCursor, WindowDialog, WindowEvent, WindowPopupAction, WindowSpec,
 };
-pub use runtime::run;
+pub use runtime::{run, run_on};
 pub use wake::WindowWake;

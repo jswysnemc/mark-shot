@@ -246,6 +246,7 @@ fn disable(toolbar: &mut Toolbar, undo: bool, redo: bool, clear: bool, busy: boo
                             | crate::ui::toolbar::Integration::Upload
                             | crate::ui::toolbar::Integration::Translate
                             | crate::ui::toolbar::Integration::ScanCode
+                            | crate::ui::toolbar::Integration::OcrCopy
                             | crate::ui::toolbar::Integration::Settings
                     )
                 }

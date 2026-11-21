@@ -8,6 +8,14 @@ use crate::logging::Process;
 
 /// 【命令行】【执行】按values解析系统字符串参数并调度任务，返回执行结果；帮助和辅助进程不创建截图运行时
 pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
+    let result = execute(values);
+    #[cfg(target_os = "linux")]
+    crate::backend::wayland::clipboard::background::serve_pending()?;
+    result
+}
+
+/// 【命令行】【任务执行】按 values 调度命令并释放任务运行时，返回任务结果；剪贴板持有由外层统一交接
+fn execute(values: impl IntoIterator<Item = OsString>) -> AppResult {
     let options = arguments::parse(values, Instant::now())?;
     match options.command {
         Command::Help => {
@@ -185,7 +193,7 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
 
     // 3. 【截图运行时】【任务调度】阻塞任务结束后释放空闲线程，交互会话不保留十秒工作线程
     let runtime = super::capture_runtime::build()?;
-    runtime.block_on(async {
+    let result = runtime.block_on(async {
         match command {
             Command::Capture(mut capture) => {
                 capture.include_cursor |= crate::config::get().startup.include_cursor;
@@ -207,5 +215,7 @@ pub fn run(values: impl IntoIterator<Item = OsString>) -> AppResult {
             }
             _ => Ok(()),
         }
-    })
+    });
+    drop(runtime);
+    result
 }

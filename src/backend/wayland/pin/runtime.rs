@@ -63,6 +63,9 @@ impl Shell {
 }
 
 pub(super) struct Pin {
+    pub clipboard:
+        Option<std::rc::Rc<std::cell::RefCell<crate::backend::wayland::clipboard::core::Core>>>,
+    pub _clipboard_scope: Option<crate::backend::wayland::clipboard::context::Scope>,
     pub connection: Connection,
     pub registry: RegistryState,
     pub outputs: OutputState,
@@ -282,6 +285,18 @@ pub(super) fn run_at_seed(
     let compositor = CompositorState::bind(&globals, &qh)?;
     let xdg = XdgShell::bind(&globals, &qh)?;
     let layers = LayerShell::bind(&globals, &qh).ok();
+    if layers.is_none() && crate::config::get().pinned.always_on_top {
+        log::info!(
+            "【Wayland贴图】【置顶能力】wlr-layer-shell unavailable; GNOME/mutter requires the Mark Shot Pin Shell extension or the window menu's Always on Top action"
+        );
+        crate::backend::notify::send_blocking(crate::backend::notify::Notice::Failed(
+            if crate::ui::language::Language::current() == crate::ui::language::Language::Chinese {
+                "当前合成器不支持客户端置顶。GNOME 可安装 Mark Shot Pin 扩展，或在窗口菜单中选择“总在最前”".into()
+            } else {
+                "This compositor cannot keep pin windows above others. On GNOME, install Mark Shot Pin or choose Always on Top in the window menu.".into()
+            },
+        ));
+    }
     image.always_on_top = layers.is_some() && crate::config::get().pinned.always_on_top;
     let shell = create_shell(
         &compositor,
@@ -310,6 +325,8 @@ pub(super) fn run_at_seed(
     let shm = Shm::bind(&globals, &qh)?;
     let pool = SlotPool::new(4096, &shm)?;
     let mut pin = Pin {
+        clipboard: crate::backend::wayland::clipboard::core::Core::bind(&globals, &qh),
+        _clipboard_scope: None,
         connection: connection.clone(),
         registry: RegistryState::new(&globals),
         outputs,
@@ -374,6 +391,9 @@ pub(super) fn run_at_seed(
         translation_wake,
         last_position: (0.0, 0.0),
     };
+    pin._clipboard_scope = pin.clipboard.as_ref().map(|core| {
+        crate::backend::wayland::clipboard::core::Core::scope(core, qh.clone(), connection.clone())
+    });
     pin.resize(false, &qh);
     if let Some(seed) = seed {
         pin.apply_translation_seed(seed);
@@ -418,12 +438,19 @@ pub(super) fn run_at_seed(
             continue;
         }
         pin.dirty |= pin.feedback.expire();
+        if let Some(core) = &pin.clipboard {
+            core.borrow_mut().progress();
+        }
         pin.poll_translation();
         pin.render_preview(&qh)?;
         if pin.dirty && pin.configured && !pin.frame_pending {
             pin.render(&qh)?;
         }
         let timeout = [
+            pin.clipboard
+                .as_ref()
+                .and_then(|core| core.borrow().timeout())
+                .map(|_| std::time::Duration::from_millis(5)),
             (!pin.translation_retired.is_empty()).then_some(std::time::Duration::from_millis(10)),
             pin.feedback
                 .deadline()
@@ -434,5 +461,8 @@ pub(super) fn run_at_seed(
         .min();
         event_loop.dispatch(timeout, &mut pin)?;
     }
+    super::clipboard::retain(pin, connection, event_loop)?;
     Ok(())
 }
+
+crate::backend::wayland::clipboard::core_dispatch::clipboard_dispatch!(Pin);

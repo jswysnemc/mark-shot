@@ -43,6 +43,8 @@ use std::time::Instant;
 wayland_client::delegate_noop!(NativeWindow: ignore crate::backend::wayland::activation::XdgActivationV1);
 
 pub(super) struct NativeWindow {
+    pub clipboard:
+        Option<std::rc::Rc<std::cell::RefCell<crate::backend::wayland::clipboard::core::Core>>>,
     pub registry: RegistryState,
     pub outputs: OutputState,
     pub seats: SeatState,
@@ -219,8 +221,16 @@ impl NativeWindow {
 }
 
 /// 【原生窗口】【启动】创建 spec 指定的父窗口并运行 content，子窗口保持同连接；返回连接或提交错误，空闲阻塞
-pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppResult {
-    let connection = Connection::connect_to_env()?;
+pub fn run(spec: WindowSpec, content: impl WindowContent + 'static) -> AppResult {
+    run_on(Connection::connect_to_env()?, spec, content)
+}
+
+/// 【原生窗口】【连接复用】按 connection、spec 和 content 启动窗口，返回生命周期结果；保留调用方已选定的沙箱连接
+pub fn run_on(
+    connection: Connection,
+    spec: WindowSpec,
+    mut content: impl WindowContent + 'static,
+) -> AppResult {
     let (globals, queue) = registry_queue_init(&connection)?;
     let qh = queue.handle();
     let mut event_loop: EventLoop<NativeWindow> = EventLoop::try_new()?;
@@ -292,6 +302,7 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
     );
     main.role.commit();
     let mut state = NativeWindow {
+        clipboard: crate::backend::wayland::clipboard::core::Core::bind(&globals, &qh),
         registry: RegistryState::new(&globals),
         outputs: OutputState::new(&globals, &qh),
         seats,
@@ -330,11 +341,22 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         exit: false,
         loop_handle: event_loop.handle(),
     };
+    if let Some(core) = &state.clipboard {
+        for seat in state.seats.seats() {
+            core.borrow_mut().seat(&seat, &qh);
+        }
+    }
+    let _clipboard_scope = state.clipboard.as_ref().map(|core| {
+        crate::backend::wayland::clipboard::core::Core::scope(core, qh.clone(), connection.clone())
+    });
     let visibility_wake = state.wake.clone();
     let mut visibility =
         crate::backend::capture_visibility::Watch::new(move || visibility_wake.notify())?;
     let mut hidden = false;
     while !state.exit {
+        if let Some(core) = &state.clipboard {
+            core.borrow_mut().progress();
+        }
         let requested = visibility.requested()?;
         if hidden != requested {
             state.capture_visibility(requested);
@@ -378,6 +400,11 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
         let deadline = [
             state.next_deadline(),
             control.as_ref().and_then(|control| control.deadline()),
+            state.clipboard.as_ref().and_then(|core| {
+                core.borrow()
+                    .timeout()
+                    .map(|_| Instant::now() + std::time::Duration::from_millis(5))
+            }),
         ]
         .into_iter()
         .flatten()
@@ -401,6 +428,16 @@ pub fn run(spec: WindowSpec, mut content: impl WindowContent + 'static) -> AppRe
     state.close_popups();
     state.layer_preview.take();
     state.dialog.take();
+    if let Some(control) = control {
+        control.remove(&event_loop.handle());
+    }
+    if state
+        .clipboard
+        .as_ref()
+        .is_some_and(|core| core.borrow().active())
+    {
+        return super::clipboard::retain(state, connection, event_loop);
+    }
     drop(state);
     connection.flush()?;
     Ok(())

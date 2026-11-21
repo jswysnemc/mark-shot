@@ -13,6 +13,7 @@ use wayland_client::backend::WaylandError;
 
 mod buffer_budget;
 pub(crate) mod buffer_history;
+mod clipboard;
 mod frame_mode;
 pub(crate) mod frame_pixels;
 pub(super) mod frame_staging;
@@ -23,6 +24,7 @@ mod presentation;
 mod scroll;
 pub(crate) mod scroll_layer;
 mod scroll_window;
+mod shell_policy;
 pub mod state;
 mod visibility;
 
@@ -40,6 +42,7 @@ const CONFIGURE_TIMEOUT: Duration = Duration::from_secs(5);
 const PROBE_TIMEOUT: Duration = Duration::from_millis(300);
 
 pub struct WaylandOverlay {
+    _clipboard_scope: Option<crate::backend::wayland::clipboard::context::Scope>,
     runtime: state::OverlayRunTime,
     layer: bool,
     faulted: usize,
@@ -60,12 +63,20 @@ impl WaylandOverlay {
         layer: bool,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let rt = state::OverlayRunTime::new(&connection)?;
+        let layer = shell_policy::layer_allowed(layer);
         let has_layer_shell = rt.state.layer_shell.is_some();
         if layer && !has_layer_shell {
             info!("compositor has no wlr-layer-shell, the overlay opens as a window");
         }
 
         Ok(Self {
+            _clipboard_scope: rt.state.clipboard.as_ref().map(|core| {
+                crate::backend::wayland::clipboard::core::Core::scope(
+                    core,
+                    rt.event_queue.handle(),
+                    connection,
+                )
+            }),
             runtime: rt,
             layer: layer && has_layer_shell,
             faulted: 0,
@@ -83,6 +94,14 @@ impl WaylandOverlay {
 }
 
 impl ScreenOverlay for WaylandOverlay {
+    /// 【Wayland剪贴板】【快捷复制准备】无参数，为无界面捕获映射短期授权表面，返回协议结果
+    fn prepare_clipboard_copy(&mut self) -> crate::AppResult {
+        self.prepare_clipboard_window()
+    }
+    /// 【Wayland剪贴板】【窗口交接】无参数，先关闭截图表面再保留数据连接，返回关闭结果；接管或传输结束后释放连接
+    fn finish_clipboard(self: Box<Self>) -> crate::AppResult {
+        self.retain_clipboard()
+    }
     /// 【截图场景】【能力启用】按 captures 准备共享背景，返回当前合成器是否支持完整原生场景
     fn enable_capture_scene(
         &mut self,
@@ -403,6 +422,12 @@ impl ScreenOverlay for WaylandOverlay {
             rt.event_queue.dispatch_pending(&mut rt.state)?;
             frame_staging::released(&mut rt.state, !self.composited_background);
             rt.state.primary_selection.progress(&mut rt.state.events);
+            if let Some(core) = &rt.state.clipboard {
+                core.borrow_mut().progress();
+                if rt.state.surfaces.is_empty() && !core.borrow().active() {
+                    return Ok(OverlayEvent::Tick);
+                }
+            }
 
             if rt.state.pending_flush {
                 rt.state.pending_flush = false;
@@ -418,6 +443,24 @@ impl ScreenOverlay for WaylandOverlay {
                     }
                 ) {
                     rt.state.primary_selection.advance();
+                    if let Some(core) = &rt.state.clipboard {
+                        core.borrow_mut().advance(None);
+                    }
+                }
+                if matches!(
+                    &ev,
+                    OverlayEvent::Popup {
+                        event: crate::types::popup::PopupEvent::Button { .. },
+                        ..
+                    }
+                ) && let Some(core) = &rt.state.clipboard
+                {
+                    core.borrow_mut().advance(None);
+                }
+                if let OverlayEvent::PopupSerial(serial) = &ev
+                    && let Some(core) = &rt.state.clipboard
+                {
+                    core.borrow_mut().advance(Some(*serial));
                 }
                 if let OverlayEvent::TextInput(update) = &mut ev {
                     rt.state.text_input.validate(update);

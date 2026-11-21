@@ -38,6 +38,7 @@ pub fn icon(button: ToolbarButton) -> &'static str {
             Integration::Extensions => EXTENSIONS,
             Integration::Translate => TRANSLATE,
             Integration::ScanCode => SCAN_CODE,
+            Integration::OcrCopy => icons::OCR,
             Integration::Upload => UPLOAD,
             Integration::Settings => SETTINGS,
         },

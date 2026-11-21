@@ -8,7 +8,9 @@ pub use super::wayland::window::WindowWake;
 #[cfg(target_os = "linux")]
 pub fn run(spec: WindowSpec, content: impl WindowContent + 'static) -> crate::AppResult {
     match super::session::Session::connect_to_env()? {
-        super::session::Session::Wayland(_) => super::wayland::window::run(spec, content),
+        super::session::Session::Wayland(connection) => {
+            super::wayland::window::run_on(connection, spec, content)
+        }
         super::session::Session::X11(display) => super::x11::window::run(display, spec, content),
     }
 }

@@ -16,7 +16,7 @@ pub fn cli(args: impl Iterator<Item = String>) {
     let text = args.iter().any(|a| a == TEXT_ARG);
     let primary = args.iter().any(|a| a == PRIMARY_ARG);
 
-    match crate::backend::x11::clipboard::use_x11() {
+    match crate::backend::x11::clipboard::use_x11_for_copy() {
         Ok(true) => {
             if let Err(error) = crate::backend::x11::clipboard::serve(text, primary) {
                 println!("{}", error.to_string().replace('\n', " "));

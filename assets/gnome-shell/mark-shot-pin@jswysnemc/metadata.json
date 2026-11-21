@@ -1,0 +1,7 @@
+{
+  "uuid": "mark-shot-pin@jswysnemc",
+  "name": "Mark Shot Pin",
+  "description": "Keep Mark Shot pinned windows above other windows.",
+  "shell-version": ["45", "46", "47", "48", "49", "50", "51", "52"],
+  "version": 1
+}

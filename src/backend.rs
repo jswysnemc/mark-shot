@@ -64,6 +64,14 @@ pub(crate) mod native_backdrop;
 pub(crate) mod software_scene;
 
 pub trait ScreenOverlay {
+    /// 【剪贴板】【窗口结束】无参数，销毁窗口并按后端需要交接剪贴板服务，返回交接结果；原生辅助进程无需保留本连接
+    fn finish_clipboard(self: Box<Self>) -> crate::AppResult {
+        Ok(())
+    }
+    /// 【剪贴板】【快捷复制准备】无参数，为没有数据控制协议的无界面交付取得窗口焦点，返回准备结果
+    fn prepare_clipboard_copy(&mut self) -> crate::AppResult {
+        Ok(())
+    }
     /// 【截图场景】【能力启用】按 captures 准备共享原图，返回是否支持独立背景和稀疏前景；只在截图呈现前调用
     fn enable_capture_scene(&mut self, _captures: &mut [Capture]) -> crate::AppResult<bool> {
         Ok(false)

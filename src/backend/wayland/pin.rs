@@ -1,6 +1,7 @@
 //! 【贴图】【进程入口】以原生 Wayland 窗口显示截图，不创建截图或 OCR 运行时
 
 mod actions;
+mod clipboard;
 mod geometry;
 mod gesture;
 mod input;

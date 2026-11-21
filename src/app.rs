@@ -317,6 +317,7 @@ async fn make_screenshot(
                 continue;
             }
             editor_state.ocr.models.shutdown();
+            overlay.finish_clipboard()?;
             return Ok(());
         }
         editor_state.ocr.models.shutdown();
@@ -346,15 +347,17 @@ async fn make_screenshot(
             return Ok(());
         }
         if editor_state.upload.copied {
-            drop(overlay);
+            overlay.finish_clipboard()?;
             crate::backend::notify::send(crate::backend::notify::Notice::ImageUrlCopied).await;
             return Ok(());
         }
-        if editor_state.mode == Mode::Ocr {
-            return ocr::finish(&mut editor_state).await;
+        let result = if editor_state.mode == Mode::Ocr {
+            ocr::finish(&mut editor_state).await
         } else {
-            return finish::finish_capture(&mut editor_state).await;
-        }
+            finish::finish_capture(&mut editor_state).await
+        };
+        overlay.finish_clipboard()?;
+        return result;
     }
 }
 

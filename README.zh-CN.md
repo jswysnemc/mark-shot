@@ -51,11 +51,21 @@ Mark Shot 冻结屏幕画面，由用户框选区域并添加标注，然后复�
 
 各桌面的能力和已知限制见[平台支持](docs/zh-CN/platform-support.md)。
 
+GNOME Wayland 可在本仓库目录执行 `bash scripts/install-gnome-pin-extension.sh`，
+注销并重新登录后执行 `gnome-extensions enable mark-shot-pin@jswysnemc`。
+该可选扩展只在 `mark-shot-pin` 窗口出现时置顶一次；之后可在 GNOME 窗口菜单中取消
+“总在最前”，独占全屏窗口仍可能遮挡贴图。其他 Wayland 合成器需要提供
+wlr-layer-shell，程序才能控制贴图置顶。
+
 ## 安装
+
+### 1. 下载预编译安装包（推荐）
 
 下载 [0.2.3](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.3)，
 按发行版和架构选择安装包。发布页面的折叠列表展示文件及 SHA-256，摘要文件不再作为独立资产上传。
 校验方法和可用格式见[安装说明](docs/zh-CN/installation.md)。
+
+### 2. 从源码构建
 
 从源码构建时，需要 Rust 1.95 或更新版本；
 `rustup` 会按 `rust-toolchain.toml` 自动选用固定的工具链。

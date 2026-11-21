@@ -86,3 +86,31 @@ fn legacy_default_main_gains_recording_without_changing_custom_layouts() {
         serde_json::from_value(json!({"main":["selection","rectangle"]})).unwrap();
     assert_eq!(custom.main, list(&["selection", "rectangle"]));
 }
+
+/// 【工具栏回归】【快速复制升级】无参数，旧默认侧栏在 OCR 后补充快速复制，自定义侧栏保持选择，无返回值
+#[test]
+fn legacy_default_actions_gain_ocr_copy_without_changing_custom_layouts() {
+    let legacy = ACTION_ITEMS
+        .iter()
+        .copied()
+        .filter(|item| catalog::id(*item) != "ocr_copy")
+        .collect::<Vec<_>>();
+    let old = serde_json::to_value(ToolbarLayout {
+        actions: legacy,
+        ..Default::default()
+    })
+    .unwrap();
+    let upgraded: ToolbarLayout = serde_json::from_value(old).unwrap();
+    assert_eq!(upgraded.actions, ACTION_ITEMS);
+    let ids = upgraded
+        .actions
+        .iter()
+        .map(|item| catalog::id(*item))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        ids[ids.iter().position(|id| *id == "ocr").unwrap() + 1],
+        "ocr_copy"
+    );
+    let custom: ToolbarLayout = serde_json::from_value(json!({"actions":["ocr","copy"]})).unwrap();
+    assert_eq!(custom.actions, list(&["ocr", "copy"]));
+}

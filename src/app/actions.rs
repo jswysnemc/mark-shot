@@ -73,6 +73,8 @@ pub fn run(editor_state: &mut EditorState, action: Action, dirty_mask: &mut u32)
             super::capture_start::input::shortcut(editor_state, action, dirty_mask);
         }
         Action::ScanCode => super::code_scan::open(editor_state, dirty_mask),
+        Action::OcrCopy if !busy => crate::tools::ocr_copy::request(editor_state, dirty_mask),
+        Action::OcrCopy => {}
         Action::Translate => super::selection_translation::toggle(editor_state, dirty_mask),
         Action::Upload => super::upload::request(editor_state, dirty_mask),
         Action::OpenWith => super::external_actions::toggle(

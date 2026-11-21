@@ -119,6 +119,7 @@ impl ToolBehavior for OcrTool {
     // on deactivate we cancel scan in progress, or cache scanned text if it was done.
     // and in both cases clear the visuals
     fn on_deactivate(&self, state: &mut EditorState, _dirty_mask: &mut u32) {
+        state.ocr.quick_copy = false;
         let scanning = state.ocr.runtime.is_busy();
         cancel_scan(state);
         if scanning {
@@ -373,6 +374,7 @@ pub fn finish_ocr(
     result: Result<ocr::OcrText, String>,
     dirty_mask: &mut u32,
 ) {
+    let quick_copy = std::mem::take(&mut state.ocr.quick_copy);
     state.ocr.scan_started = None;
     // Whatever happens next, the progress badge has to come off the canvas.
     damage_all(state);
@@ -406,6 +408,11 @@ pub fn finish_ocr(
     let text = ocr::preprocess::normalize(text, state.ocr.result_scale);
     state.ocr.view.set_lines(text.lines);
     info!("ocr: {} line(s)", state.ocr.view.lines.len());
+
+    if quick_copy {
+        super::ocr_copy::complete(state, dirty_mask);
+        return;
+    }
 
     if state.ocr.copy_on_completion {
         copy_all(state, dirty_mask);

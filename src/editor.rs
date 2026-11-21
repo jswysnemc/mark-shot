@@ -142,6 +142,8 @@ pub struct OcrState {
     /// 【文字识别】【结果流程】主 OCR 命令识别完成后转交独立结果窗口
     pub open_result_on_completion: bool,
     pub copy_on_completion: bool,
+    /// 【文字识别】【快速复制】本次识别结束后直接复制全文，成功后关闭截图
+    pub quick_copy: bool,
 }
 
 pub struct EditorState {

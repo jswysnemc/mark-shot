@@ -10,9 +10,30 @@ pub const LIMIT: usize = 128 * 1024 * 1024;
 
 /// 【Linux剪贴板】【协议选择】无参数，根据真实会话及数据控制能力选择X11，返回探测错误
 pub fn use_x11() -> crate::AppResult<bool> {
+    match wayland_controlled()? {
+        None => Ok(true),
+        Some(true) => Ok(false),
+        Some(false) if std::env::var_os("DISPLAY").is_some() => Ok(true),
+        Some(false) => Err(
+            "this Wayland compositor has no data-control clipboard or X11 clipboard reader".into(),
+        ),
+    }
+}
+
+/// 【Linux剪贴板】【复制协议】无参数，按真实会话选择复制服务，返回协议结果；Wayland 缺少数据控制时禁止无焦点 X11 写入
+pub fn use_x11_for_copy() -> crate::AppResult<bool> {
+    match wayland_controlled()? {
+        None => Ok(true),
+        Some(true) => Ok(false),
+        Some(false) => Err("this Wayland compositor has no data-control clipboard; copy from a focused Mark Shot window using the core Wayland clipboard protocol".into()),
+    }
+}
+
+/// 【Linux剪贴板】【能力探测】无参数，返回 Wayland 数据控制能力；X11 会话返回空值，连接失败返回错误
+fn wayland_controlled() -> crate::AppResult<Option<bool>> {
     use crate::backend::session::Session;
     let Session::Wayland(connection) = Session::connect_to_env()? else {
-        return Ok(true);
+        return Ok(None);
     };
     let (globals, _) = wayland_client::globals::registry_queue_init::<Probe>(&connection)?;
     let controlled = globals.contents().with_list(|globals| {
@@ -23,13 +44,7 @@ pub fn use_x11() -> crate::AppResult<bool> {
             )
         })
     });
-    if controlled {
-        return Ok(false);
-    }
-    if std::env::var_os("DISPLAY").is_some() {
-        return Ok(true);
-    }
-    Err("this Wayland compositor has no data-control clipboard; enable Xwayland clipboard integration".into())
+    Ok(Some(controlled))
 }
 
 struct Probe;

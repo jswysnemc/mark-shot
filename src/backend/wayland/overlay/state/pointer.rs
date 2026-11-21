@@ -23,6 +23,27 @@ impl PointerHandler for OverlayState {
         events: &[PointerEvent],
     ) {
         for event in events {
+            if self
+                .popup
+                .as_ref()
+                .is_some_and(|popup| popup.popup.wl_surface() == &event.surface)
+                && let PointerEventKind::Press {
+                    serial,
+                    button: 0x110..=0x112,
+                    ..
+                }
+                | PointerEventKind::Release {
+                    serial,
+                    button: 0x110..=0x112,
+                    ..
+                } = event.kind
+                && let Some(core) = &self.clipboard
+                && let Some(data) = wayland_client::Proxy::data::<
+                    smithay_client_toolkit::seat::pointer::PointerData<()>,
+                >(pointer)
+            {
+                core.borrow_mut().input(data.seat().clone(), serial, false);
+            }
             if self.popup_pointer(event) {
                 continue;
             }
@@ -113,6 +134,9 @@ impl PointerHandler for OverlayState {
                             _ => unreachable!(),
                         };
                         self.primary_selection.button(data.seat().clone(), serial);
+                        if let Some(core) = &self.clipboard {
+                            core.borrow_mut().input(data.seat().clone(), serial, false);
+                        }
                     }
                     // 1. 【Wayland覆盖层】【按钮时间】平台时间与菜单序列号分别保存，输入处理延迟不能改变双击间隔
                     self.events.push_back(OverlayEvent::PointerButton {
