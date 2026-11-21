@@ -16,6 +16,7 @@ async-trait = "0.1"
 tokio = { version = "1.50.0", features = ["rt", "rt-multi-thread", "macros", "sync", "time", "net", "process", "io-util"] }
 futures = "0.3"
 dirs = "7.0"
+encoding_rs = "0.8"
 memmap2 = "0.9"
 cosmic-text = "0.19.0"
 unicode-segmentation = "1.13"
