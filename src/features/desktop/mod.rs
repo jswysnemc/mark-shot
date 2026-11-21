@@ -301,10 +301,10 @@ async fn serve(path: &Path, root: &Path) -> crate::AppResult {
                 }
             }
             Event::Action(action, token) => {
-                if matches!(
-                    action,
-                    Action::Capture | Action::CaptureWindow | Action::Fullscreen
-                ) {
+                let immediate_capture = matches!(action, Action::Capture | Action::Fullscreen);
+                #[cfg(target_os = "linux")]
+                let immediate_capture = immediate_capture || action == Action::CaptureWindow;
+                if immediate_capture {
                     delayed.cancel();
                 }
                 let Some(args) = action.arguments() else {
