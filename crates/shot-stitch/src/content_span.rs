@@ -3,7 +3,7 @@
 use crate::long_image::LongImage;
 use shot_image::Image;
 
-/// 【长图拼接】【横向复核】按 long、previous、frame、position、span、excluded 返回原始像素支持的运动正文范围，无清晰范围时保留原范围供重采样校验
+/// 【长图拼接】【横向复核】按 long、previous、frame、position、span、excluded 返回清晰运动正文范围，无法安全缩窄时返回包含全部运动列的范围供重采样校验
 pub(crate) fn refine(
     long: &LongImage,
     previous: Option<&Image>,
@@ -25,8 +25,31 @@ pub(crate) fn refine(
             (long.row(y), frame.row(y - position), y - position)
         })
         .collect();
-    let left = span.0.max(0);
-    let right = (span.0 + span.1).min(frame.width());
+    let mut left = span.0.max(0);
+    let mut right = (span.0 + span.1).min(frame.width());
+    let columns: Vec<_> = (0..frame.width())
+        .map(|x| {
+            let motion = previous.map_or(0, |last| {
+                rows.iter()
+                    .filter(|(_, new, y)| {
+                        if *y >= last.height() {
+                            return false;
+                        }
+                        let old = last.row(*y)[x as usize];
+                        [0, 8, 16].into_iter().any(|shift| {
+                            ((old >> shift) & 255).abs_diff((new[x as usize] >> shift) & 255) > 1
+                        })
+                    })
+                    .count()
+            });
+            // 2. 【长图拼接】【签名碰撞复核】统计不变的像素仍可能变化，整列运动不能被采样带掩盖
+            if motion * 4 > rows.len() {
+                left = left.min(x);
+                right = right.max(x + 1);
+            }
+            motion
+        })
+        .collect();
     let mut run = left;
     let mut moving = false;
     let mut best = left..left;
@@ -41,20 +64,9 @@ pub(crate) fn refine(
                     .all(|shift| ((a >> shift) & 255).abs_diff((b >> shift) & 255) <= 1)
             })
             .count();
-        // 2. 【长图拼接】【侧栏排除】允许少量局部遮挡；固定侧栏在错开的文档行上不能成为正文边界
+        // 3. 【长图拼接】【侧栏排除】允许少量局部遮挡；固定侧栏在错开的文档行上不能成为正文边界
         if clean * 4 >= rows.len() * 3 {
-            // 3. 【长图拼接】【运动证据】同一视口坐标始终静止的装饰不能单独证实另一份正文的位移
-            moving |= previous.is_some_and(|last| {
-                rows.iter().any(|(_, new, y)| {
-                    if *y >= last.height() {
-                        return false;
-                    }
-                    let old = last.row(*y)[x as usize];
-                    [0, 8, 16].into_iter().any(|shift| {
-                        ((old >> shift) & 255).abs_diff((new[x as usize] >> shift) & 255) > 1
-                    })
-                })
-            });
+            moving |= columns[x as usize] > 0;
             if moving && x + 1 - run > best.end - best.start {
                 best = run..x + 1;
             }
@@ -63,9 +75,14 @@ pub(crate) fn refine(
             moving = false;
         }
     }
-    if best.end - best.start >= 8 {
+    // 4. 【长图拼接】【正文完整性】只有静止侧栏或空白可以排除，另一段运动正文不能因不匹配而被隐藏
+    let hides_content = columns
+        .iter()
+        .enumerate()
+        .any(|(column, &motion)| motion * 4 > rows.len() && !best.contains(&(column as i32)));
+    if best.end - best.start >= 8 && !hides_content {
         (best.start, best.end - best.start)
     } else {
-        span
+        (left, right - left)
     }
 }

@@ -38,7 +38,7 @@ pub(crate) fn refine(
             best_rows = matching;
         }
     }
-    // 1. 【长图拼接】【恢复交接】签名看似通过但像素证据不足时，交给历史和边缘恢复，不能直接丢弃本帧
+    // 2. 【长图拼接】【恢复交接】签名看似通过但像素证据不足时，交给历史和边缘恢复，不能直接丢弃本帧
     if best_rows < stitcher.config.min_overlap {
         best.1 = crate::types::NO_MATCH;
     }

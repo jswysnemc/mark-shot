@@ -8,7 +8,7 @@ use crate::{
 const PROBES: usize = 12;
 const CANDIDATES: usize = 24;
 
-/// 【长图拼接】【采样行筛选】按 frame、top、bottom 和 weights 返回分散的有纹理正文行，不选择固定顶底栏
+/// 【长图拼接】【采样行筛选】按 frame、top、bottom、weights 和 count 返回至多 count 的两倍个正文行，同时包含纹理边缘及分段中部
 fn probes(
     frame: &Signature,
     top: usize,
@@ -17,7 +17,7 @@ fn probes(
     count: usize,
 ) -> Vec<usize> {
     let end = frame.len().saturating_sub(bottom);
-    let mut rows = Vec::with_capacity(count);
+    let mut rows = Vec::with_capacity(count * 2);
     // 1. 【长图拼接】【正文分段】分散采样避免候选只命中一段重复空白
     for section in 0..count {
         let start = top + end.saturating_sub(top) * section / count;
@@ -34,6 +34,11 @@ fn probes(
             .max_by(|left, right| left.1.total_cmp(&right.1));
         if let Some((row, _)) = row {
             rows.push(row);
+            // 2. 【长图拼接】【重复边缘补充】最强边缘可能都来自重复分隔线，追加分段中部保留区分正文的证据
+            let middle = start + (limit - start) / 2;
+            if middle != row {
+                rows.push(middle);
+            }
         }
     }
     rows
@@ -42,6 +47,7 @@ fn probes(
 /// 【长图拼接】【行差异】按 first、second 和 weights 返回活动带平均误差，保留既有单带异常剔除规则
 fn difference(first: &[f32; BAND_COUNT], second: &[f32; BAND_COUNT], weights: &Weights) -> f32 {
     let (mut sum, mut count, mut worst) = (0.0_f32, 0, 0.0_f32);
+    // 1. 【长图拼接】【活动带差异】只累计正文带，固定侧栏不参与误差
     for band in 0..BAND_COUNT {
         if weights[band] <= 0.0 {
             continue;
@@ -51,6 +57,7 @@ fn difference(first: &[f32; BAND_COUNT], second: &[f32; BAND_COUNT], weights: &W
         worst = worst.max(value);
         count += 1;
     }
+    // 2. 【长图拼接】【局部异常】足够多正文带时剔除一个最大异常，沿用完整评分的规则
     if count >= 4 {
         sum -= worst;
         count -= 1;

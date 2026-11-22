@@ -34,6 +34,7 @@ fn document_at(origin: i32, width: i32, height: i32, left: Option<i32>) -> Image
 /// 【长截图回归】【正文分布】无参数和返回值，窄正文位于选区边缘或采样带之间时也不能遗漏滚动
 #[test]
 fn narrow_content_at_capture_edges_and_band_boundaries() {
+    // 1. 【长截图回归】【位置矩阵】改变正文在选区中的横向位置和实际滚动步长
     for width in [64, 128, 320, 1280, 3840] {
         for left in [0, width / 4, width / 2 - 20, width - 40] {
             let mut stitcher = Stitcher::new(Config::default()).unwrap();
@@ -52,11 +53,101 @@ fn narrow_content_at_capture_edges_and_band_boundaries() {
                 );
                 assert_eq!(stitcher.dimensions(), (width, origin + 400));
             }
+            // 2. 【长截图回归】【完整核验】每个位置都必须保留整幅原始文档
             assert_eq!(
                 stitcher.full_image().unwrap().unwrap(),
                 document_at(0, width, 840, Some(left))
             );
         }
+    }
+}
+
+/// 【长截图回归】【统计碰撞帧】按 origin、switched、width、strip 返回窄纹理和横向交替色块，色块反转不改变亮度统计
+fn colliding_frame(origin: i32, switched: bool, width: i32, strip: i32) -> Image {
+    let pixels = (0..400)
+        .flat_map(|y| {
+            (0..width).map(move |x| {
+                let value = if x < strip {
+                    ((origin + y) * 37 + x * 13).rem_euclid(251) as u32
+                } else if (x % 2 == 0) ^ switched {
+                    20
+                } else {
+                    230
+                };
+                0xff00_0000 | value << 16 | value << 8 | value
+            })
+        })
+        .collect();
+    Image::from_pixels(width, 400, pixels).unwrap()
+}
+
+/// 【长截图回归】【窄纹理误拼】无参数和返回值，少量吻合条纹不能掩盖其余正文像素反转，拒绝后仍能继续补采
+#[test]
+fn matching_strip_cannot_hide_changes_with_identical_luminance_statistics() {
+    // 1. 【长截图回归】【反例矩阵】正文均值和方差相同，原始像素证据必须发现页面变化
+    for width in [160, 320, 1280] {
+        for strip in [8, 12] {
+            let mut stitcher = Stitcher::new(Config::default()).unwrap();
+            let first = colliding_frame(0, false, width, strip);
+            stitcher.push(first.clone()).unwrap();
+            let result = stitcher
+                .push(colliding_frame(120, true, width, strip))
+                .unwrap();
+            assert_eq!(
+                result.status,
+                Status::NoMatch,
+                "width={width}, strip={strip}, result={result:?}"
+            );
+            assert_eq!(stitcher.full_image().unwrap().unwrap(), first);
+            // 2. 【长截图回归】【锚点恢复】拒绝帧不能影响随后具有真实重叠的原页面
+            let result = stitcher
+                .push(colliding_frame(83, false, width, strip))
+                .unwrap();
+            assert_eq!(
+                (result.status, result.added),
+                (Status::Appended, 83),
+                "{result:?}"
+            );
+        }
+    }
+}
+
+/// 【长截图回归】【重复分隔行】按 origin 返回三十二像素周期的相同分隔线与独立正文，用于检验历史候选歧义
+fn separated_frame(origin: i32) -> Image {
+    let pixels = (origin..origin + 400)
+        .flat_map(|y| {
+            let mut hash = (y as u32 + 1).wrapping_mul(2_654_435_761);
+            hash ^= hash >> 16;
+            hash = hash.wrapping_mul(2_246_822_519);
+            hash ^= hash >> 13;
+            let value = match y % 32 {
+                0 => 0,
+                1 => 250,
+                _ => 50 + hash % 150,
+            };
+            std::iter::repeat_n(0xff00_0000 | value << 16 | value << 8 | value, 32)
+        })
+        .collect();
+    Image::from_pixels(32, 400, pixels).unwrap()
+}
+
+/// 【长截图回归】【重复边缘恢复】无参数和返回值，多于二十四个相同分隔线不能挤掉具有不同正文的真实历史位置
+#[test]
+fn recurring_separator_edges_do_not_exhaust_history_candidates() {
+    // 1. 【长截图回归】【历史准备】在不同累计高度内保留大量相同高对比分隔线
+    for maximum in [800, 1600, 3200, 6400] {
+        let mut stitcher = Stitcher::new(Config::default()).unwrap();
+        for origin in (0..=maximum).step_by(100) {
+            let result = stitcher.push(separated_frame(origin)).unwrap();
+            assert_ne!(result.status, Status::NoMatch, "origin={origin}");
+        }
+        // 2. 【长截图回归】【正文定位】按真实正文恢复早期位置，不能仅凭分隔线的重复分数截断候选
+        let result = stitcher.push(separated_frame(128)).unwrap();
+        assert_eq!(
+            (result.status, result.position),
+            (Status::NoProgress, 128),
+            "maximum={maximum}, result={result:?}"
+        );
     }
 }
 

@@ -36,6 +36,7 @@ fn frame(offset: i32, sidebar: i32, right: bool, header: i32) -> Image {
 /// 【长截图回归】【固定导航】无参数和返回值，左右侧栏、宽侧栏和浏览器顶栏保持完整正文并支持往返补采
 #[test]
 fn fixed_navigation_preserves_content_and_revisits() {
+    // 1. 【长截图回归】【固定区域矩阵】逐帧核验各侧栏及顶栏组合的真实位移
     for (sidebar, right, header) in [
         (224, false, 0),
         (224, true, 0),
@@ -58,6 +59,7 @@ fn fixed_navigation_preserves_content_and_revisits() {
             );
             assert_eq!(result.position, offset);
         }
+        // 2. 【长截图回归】【往返与补采】检查历史正文像素，再返回任意已知位置并继续增长
         let before = stitcher.full_image().unwrap().unwrap();
         assert_eq!(stitcher.dimensions(), (800, 1320));
         let content_x = if right { 100 } else { 700 };
@@ -105,6 +107,7 @@ fn highlighted_frame(offset: i32, section: i32) -> Image {
 /// 【长截图回归】【大步长导航】无参数和返回值，目录高亮变化不能影响不等步长拼接或正文像素
 #[test]
 fn changing_navigation_highlights_keep_large_scroll_steps() {
+    // 1. 【长截图回归】【动态目录输入】保留旧版不等步长和目录高亮变化
     let mut stitcher = Stitcher::new(Config::default()).unwrap();
     stitcher.push(highlighted_frame(0, 0)).unwrap();
     let mut offset = 0;
@@ -119,6 +122,7 @@ fn changing_navigation_highlights_keep_large_scroll_steps() {
             "{result:?}"
         );
     }
+    // 2. 【长截图回归】【正文校验】所有累计行必须对应原文档坐标
     let image = stitcher.full_image().unwrap().unwrap();
     assert_eq!(image.height(), 800 + offset);
     for y in 0..image.height() {
@@ -129,6 +133,7 @@ fn changing_navigation_highlights_keep_large_scroll_steps() {
 /// 【长截图回归】【页面切换】无参数和返回值，只保留相同侧栏的另一份正文不能作为重叠，也不能替换锚点
 #[test]
 fn unrelated_content_cannot_match_only_the_fixed_navigation() {
+    // 1. 【长截图回归】【页面切换拒绝】保持侧栏不变，仅切换到无重叠正文
     let mut stitcher = Stitcher::new(Config::default()).unwrap();
     for origin in [0, 180, 360] {
         stitcher.push(frame(origin, 224, false, 60)).unwrap();
@@ -137,6 +142,7 @@ fn unrelated_content_cannot_match_only_the_fixed_navigation() {
     let result = stitcher.push(frame(20000, 224, false, 60)).unwrap();
     assert_eq!(result.status, Status::NoMatch, "{result:?}");
     assert_eq!(stitcher.full_image().unwrap().unwrap(), before);
+    // 2. 【长截图回归】【合法帧恢复】原锚点仍支持返回原页面继续增长
     let result = stitcher.push(frame(540, 224, false, 60)).unwrap();
     assert_eq!((result.status, result.added), (Status::Appended, 180));
 }

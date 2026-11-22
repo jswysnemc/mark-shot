@@ -29,6 +29,7 @@ pub(super) fn capture(frame: &MonitorFrame, rect: (u32, u32, u32, u32)) -> u64 {
 pub(super) fn image(image: &Image) -> u64 {
     let mut hasher = start(image.width() as u32, image.height() as u32);
     let mut buffer = [0_u8; 1024];
+    // 1. 【滚动截图】【字节统一】按原捕获的 RGBA 顺序转换固定小块，复用栈缓冲避免整帧副本
     for vertical in 0..image.height() {
         for chunk in image.row(vertical).chunks(256) {
             for (&pixel, bytes) in chunk.iter().zip(buffer.as_chunks_mut::<4>().0) {

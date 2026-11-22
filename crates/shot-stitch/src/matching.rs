@@ -78,6 +78,7 @@ impl Stitcher {
 
     /// 【长图拼接】【边缘恢复】按 frame、cols 和 prediction 筛选可达的边缘位置，返回通过连续原始像素核验的候选
     pub(crate) fn find_edge(&self, frame: &Image, cols: &Signature, prediction: i32) -> (i32, f32) {
+        // 1. 【长图拼接】【可达边缘】恢复仅允许揭露新内容且具有最小几何重叠的位置
         let (full, height) = (self.long.height(), cols.len() as i32);
         if full <= 0 || height <= 0 {
             return (0, NO_MATCH);
@@ -93,6 +94,7 @@ impl Stitcher {
             (minimum.max(full - height + 1), maximum),
         ];
         let mut best = (prediction.clamp(minimum, maximum), NO_MATCH);
+        // 2. 【长图拼接】【完整复核】分别筛选首尾候选，以原始像素证据确认真实位置
         for (start, end) in ranges {
             if start > end {
                 continue;
