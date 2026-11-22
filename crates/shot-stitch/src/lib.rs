@@ -14,6 +14,7 @@ mod long_image;
 mod long_rows;
 mod matching;
 mod motion_mask;
+mod overlap_evidence;
 mod owned_image;
 mod pixel_block;
 pub mod profile;
