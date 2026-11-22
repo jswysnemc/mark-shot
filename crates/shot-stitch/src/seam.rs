@@ -71,6 +71,8 @@ pub(crate) fn find(
     if best.end - best.start < required
         || evidence.textured_rows < 8
         || evidence.clean_rows < stitcher.config.min_overlap
+        || (evidence.continuous_rows < stitcher.config.min_overlap
+            && !crate::texture_consistency::matches(long, frame, position, span, start..end))
     {
         // 2. 【滚动截图】【分数缩放】整段只有均衡重采样误差时沿用原边界，避免覆盖已经清晰的旧正文
         let resampled_rows = stitcher.last_frame.as_ref().map_or(0, |previous| {

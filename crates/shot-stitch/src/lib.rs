@@ -21,6 +21,7 @@ pub mod profile;
 mod recovery_search;
 mod seam;
 mod session;
+mod texture_consistency;
 mod types;
 
 pub use image_view::StitchedView;

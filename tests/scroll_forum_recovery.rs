@@ -2,7 +2,7 @@
 
 use mark_shot::scroll::ScrollSession;
 use shot_image::Image;
-use shot_stitch::{Config, Status, Stitcher};
+use shot_stitch::{Axis, Config, Edge, Status, Stitcher};
 use tiny_skia::Rect;
 
 const HEIGHT: i32 = 640;
@@ -58,15 +58,47 @@ fn check_body(source: &image::RgbImage, view: shot_stitch::StitchedView<'_>) {
 fn two_browser_frames_with_local_updates_have_enough_overlap() {
     let before = page(0);
     let changed = page(1);
-    let mut stitcher = Stitcher::new(Config::default()).unwrap();
-    // 1. 【论坛长截图】【清晰段分散】正文和头像只占一行的一部分，干净重叠被局部变化切成短段
-    stitcher.push(viewport(&before, 0)).unwrap();
-    let result = stitcher.push(viewport(&changed, 200)).unwrap();
-    assert_eq!(
-        (result.status, result.position, result.added),
-        (Status::Appended, 200, 200),
-        "{result:?}"
-    );
+    for axis in [Axis::Vertical, Axis::Horizontal] {
+        for (first, next, edge) in [(0, 200, Edge::End), (200, 0, Edge::Start)] {
+            let mut stitcher = Stitcher::new(Config::default()).unwrap();
+            stitcher.set_axis(axis).unwrap();
+            let orient = |frame: Image| {
+                if axis == Axis::Horizontal {
+                    frame.transpose().unwrap()
+                } else {
+                    frame
+                }
+            };
+            // 1. 【论坛长截图】【清晰段分散】正文和头像只占一行的一部分，干净重叠被局部变化切成短段
+            stitcher.push(orient(viewport(&before, first))).unwrap();
+            let result = stitcher.push(orient(viewport(&changed, next))).unwrap();
+            assert_eq!(
+                (result.status, result.position, result.added, result.edge),
+                (Status::Appended, next, 200, edge),
+                "{axis:?}: {result:?}"
+            );
+            // 2. 【论坛长截图】【双向正文】横向转回页面坐标后，前插和追加都必须保留全部稳定标题像素
+            let mut image = stitcher.full_image().unwrap().unwrap();
+            if axis == Axis::Horizontal {
+                image = image.transpose().unwrap();
+            }
+            assert_eq!((image.width(), image.height()), (1000, HEIGHT + 200));
+            for y in 0..image.height() {
+                for x in 0..690 {
+                    let pixel = before.get_pixel(x as u32, y as u32).0;
+                    let expected = 0xff00_0000
+                        | u32::from(pixel[0]) << 16
+                        | u32::from(pixel[1]) << 8
+                        | u32::from(pixel[2]);
+                    assert_eq!(
+                        image.row(y)[x as usize],
+                        expected,
+                        "{axis:?}, {edge:?}: {x}, {y}"
+                    );
+                }
+            }
+        }
+    }
 }
 
 /// 【论坛长截图】【真实长列表】无参数和返回值，超过一万或一万五千像素后每帧更新回复和时间，续接位置及正文保持准确

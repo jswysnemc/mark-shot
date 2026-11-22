@@ -114,3 +114,57 @@ fn matching_avatars_and_blank_gaps_cannot_hide_unrelated_titles() {
     // 2. 【论坛长截图】【原图保持】误匹配不能修改原图或增长长度
     assert_eq!(stitcher.full_image().unwrap().unwrap(), first);
 }
+
+/// 【论坛长截图】【统计碰撞页面】按 origin、switched、period 返回视口，标题反转保留均值与方差，头像保持独立文档纹理
+fn colliding_titles(origin: i32, switched: bool, period: i32) -> Image {
+    let pixels = (origin..origin + 448)
+        .flat_map(|y| {
+            (0..320).map(move |x| {
+                let line = y.rem_euclid(period);
+                let value = if line == period - 1 {
+                    238
+                } else if (16..212).contains(&x) && line < 18 {
+                    if (x % 2 == 0) ^ switched { 20 } else { 230 }
+                } else if (240..270).contains(&x) && (2..28).contains(&line) {
+                    20 + (y * 37 + x * 17).rem_euclid(160) as u32
+                } else {
+                    255
+                };
+                0xff00_0000 | value << 16 | value << 8 | value
+            })
+        })
+        .collect();
+    Image::from_pixels(320, 448, pixels).unwrap()
+}
+
+/// 【论坛长截图】【分散纹理误拼】无参数和返回值，头像延伸到标题下方也不能掩盖整份正文替换，双轴都必须拒绝
+#[test]
+fn matching_avatar_texture_cannot_hide_titles_with_identical_statistics() {
+    for axis in [shot_stitch::Axis::Vertical, shot_stitch::Axis::Horizontal] {
+        for period in [52, 64, 80, 100] {
+            let mut stitcher = Stitcher::new(Config::default()).unwrap();
+            stitcher.set_axis(axis).unwrap();
+            let orient = |frame: Image| {
+                if axis == shot_stitch::Axis::Horizontal {
+                    frame.transpose().unwrap()
+                } else {
+                    frame
+                }
+            };
+            let first = orient(colliding_titles(0, false, period));
+            stitcher.push(first.clone()).unwrap();
+            // 1. 【论坛长截图】【主要正文替换】重复头像提供清晰纹理，所有标题变成另一份内容，不能选择空白段强行续接
+            let revision = stitcher.revision();
+            let result = stitcher
+                .push(orient(colliding_titles(83, true, period)))
+                .unwrap();
+            assert_eq!(
+                result.status,
+                Status::NoMatch,
+                "{axis:?}, {period}: {result:?}"
+            );
+            assert_eq!(stitcher.revision(), revision);
+            assert_eq!(stitcher.full_image().unwrap().unwrap(), first);
+        }
+    }
+}
