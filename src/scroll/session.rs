@@ -23,6 +23,7 @@ pub struct ScrollSession {
     pub region: Rect,
     pub monitor_idx: usize,
     last_signature: Vec<u8>,
+    last_fingerprint: Option<u64>,
     last_capture: std::time::Instant,
     last_progress: std::time::Instant,
     preview: Option<Pixmap>,
@@ -46,6 +47,7 @@ impl ScrollSession {
             region,
             monitor_idx,
             last_signature: Vec::new(),
+            last_fingerprint: None,
             last_capture: std::time::Instant::now(),
             last_progress: std::time::Instant::now(),
             preview: None,
@@ -113,32 +115,41 @@ impl ScrollSession {
     ) -> Result<bool, String> {
         self.last_capture = Instant::now();
         let signature = frame::capture_signature(&capture, rect, SIGNATURE_COLS, SIGNATURE_ROWS)?;
-        if frame::is_duplicate(&self.last_signature, &signature) {
+        let fingerprint = frame::capture_fingerprint(&capture, rect)?;
+        if self.duplicate(&signature, fingerprint) {
             self.status = "Waiting for scroll".into();
             return Ok(false);
         }
         let image = frame::crop(&capture, rect)?;
         // 1. 【滚动截图】【峰值边界】拼接增长阶段不再持有完整输出帧
         drop(capture);
-        Ok(self.push_signed(image, signature))
+        Ok(self.push_signed(image, signature, fingerprint))
     }
 
     /// 【滚动截图】【图像接收】将image交给拼接器，返回是否增长；已有图像调用者共用相同签名规则
     pub fn push(&mut self, image: Image) -> bool {
         self.last_capture = std::time::Instant::now();
 
-        // skip identical frames to avoid refreshing anchors repeatedly
+        // 1. 【滚动截图】【重复复核】采样点相同仍检查全部像素，避免宽背景窄正文移动被跳过
         let signature = frame::signature(&image, SIGNATURE_COLS, SIGNATURE_ROWS);
-        if frame::is_duplicate(&self.last_signature, &signature) {
+        let fingerprint = super::frame_fingerprint::image(&image);
+        if self.duplicate(&signature, fingerprint) {
             self.status = "Waiting for scroll".into();
             return false;
         }
-        self.push_signed(image, signature)
+        self.push_signed(image, signature, fingerprint)
     }
 
-    /// 【滚动截图】【有效帧拼接】按signature记忆image并更新会话，返回是否增长，拼接失败时暂停
-    fn push_signed(&mut self, image: Image, signature: Vec<u8>) -> bool {
+    /// 【滚动截图】【重复判断】按 signature、fingerprint 返回是否与上次捕获相同，不修改拼接锚点
+    fn duplicate(&self, signature: &[u8], fingerprint: u64) -> bool {
+        self.last_fingerprint == Some(fingerprint)
+            && frame::is_duplicate(&self.last_signature, signature)
+    }
+
+    /// 【滚动截图】【有效帧拼接】按 signature、fingerprint 记忆 image 并更新会话，返回是否增长，拼接失败时暂停
+    fn push_signed(&mut self, image: Image, signature: Vec<u8>, fingerprint: u64) -> bool {
         self.last_signature = signature;
+        self.last_fingerprint = Some(fingerprint);
 
         let outcome = match self.stitcher.push(image) {
             Ok(outcome) => outcome,

@@ -71,6 +71,15 @@ pub(crate) fn capture_signature(
     Ok(signature)
 }
 
+/// 【滚动截图】【捕获指纹】按 frame 和 rect 返回完整像素指纹，尺寸或缓冲边界非法时返回错误
+pub(crate) fn capture_fingerprint(
+    frame: &MonitorFrame,
+    rect: (u32, u32, u32, u32),
+) -> Result<u64, String> {
+    validate(frame, rect)?;
+    Ok(super::frame_fingerprint::capture(frame, rect))
+}
+
 /// Downsamples image luminance across a cols x rows grid to detect duplicate frames.
 pub fn signature(image: &Image, cols: usize, rows: usize) -> Vec<u8> {
     let mut out = Vec::with_capacity(cols * rows);

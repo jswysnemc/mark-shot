@@ -26,8 +26,11 @@ impl Stitcher {
     }
 
     fn recover(&self, frame: &Image, cols: &Signature, predicted: i32) -> Option<Placement> {
-        let (position, confidence) = self.find_edge(cols, predicted);
-        if confidence <= self.config.accept_diff {
+        let (position, confidence) = self.find_edge(frame, cols, predicted);
+        if confidence <= self.config.accept_diff
+            && crate::seam::find(self, frame, position, Edge::None)
+                .is_some_and(|seam| seam.matching_rows >= self.config.min_overlap)
+        {
             return Some(Placement {
                 position,
                 offset: position - self.anchor,
@@ -110,8 +113,8 @@ impl Stitcher {
         }
         let height = frame.height();
         let full = self.long.height();
-        // static frames skip anchor updates and do not report errors
-        if cols == self.last_cols {
+        // 1. 【长图拼接】【静止复核】统计签名可能相同，只有原始像素一致才跳过锚点更新
+        if cols == self.last_cols && self.last_frame.as_ref().is_some_and(|last| *last == frame) {
             self.pending_edge = Edge::None;
             return Ok(StitchResult {
                 status: Status::NoProgress,
@@ -145,11 +148,16 @@ impl Stitcher {
                 placement = recovered;
             } else {
                 if full >= height {
-                    let known = self.find_known(&cols, predicted);
+                    let known = self.find_known(&frame, &cols, predicted);
                     if known.1 <= self.config.accept_diff {
                         let applied = known.0 - self.anchor;
                         if let Some(last) = &self.last_frame {
-                            self.fixed.observe(last, &frame, applied);
+                            self.fixed.observe_span(
+                                last,
+                                &frame,
+                                applied,
+                                self.motion.moving_span(frame.width()),
+                            );
                         }
                         return Ok(self.adopt(frame, cols, known.0, applied));
                     }
@@ -164,7 +172,14 @@ impl Stitcher {
         let observation = self
             .last_frame
             .as_ref()
-            .map(|last| self.fixed.observe(last, &frame, placement.offset))
+            .map(|last| {
+                self.fixed.observe_span(
+                    last,
+                    &frame,
+                    placement.offset,
+                    self.motion.moving_span(frame.width()),
+                )
+            })
             .unwrap_or_default();
         let mut top_trim = 0;
         let mut bottom_trim = 0;
@@ -226,7 +241,7 @@ impl Stitcher {
             && !trusted_switch
             && (edge_diff > self.config.accept_diff || overlap < self.config.min_overlap)
         {
-            let known = self.find_known(&cols, predicted);
+            let known = self.find_known(&frame, &cols, predicted);
             if known.1 <= self.config.accept_diff {
                 placement.position = known.0;
                 placement.offset = known.0 - self.anchor;

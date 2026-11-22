@@ -58,7 +58,8 @@ impl MotionMask {
             .motion
             .map(|value| if value >= 0.10 { 1.0 } else { 0.0 });
         let moving = weights.iter().filter(|&&w| w > 0.0).count();
-        self.partial = (3..BAND_COUNT).contains(&moving);
+        // 1. 【长图拼接】【窄正文保留】单带或双带运动也构成正文，不能退回包含整幅空白的平均评分
+        self.partial = (1..BAND_COUNT).contains(&moving);
         self.weights = if self.partial { weights } else { ALL_BANDS };
     }
 

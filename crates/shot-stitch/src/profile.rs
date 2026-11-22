@@ -7,20 +7,20 @@ pub type Weights = [f32; BAND_COUNT];
 pub const ALL_BANDS: Weights = [1.0; BAND_COUNT];
 pub const ROW_MAX_DIFF: f32 = 2.0;
 
+/// 【长图拼接】【采样带边界】按 width、band 返回连续覆盖选区的像素闭区间，小选区允许相邻带共用一个像素
 pub fn band_columns(width: i32, band: usize) -> (i32, i32) {
     if width <= 0 {
         return (0, 0);
     }
-    let span = (0.96_f32 - 0.04_f32) / BAND_COUNT as f32;
-    let start = 0.04 + span * band as f32;
-    let first = (width as f32 * start).round() as i32;
-    let last = (width as f32 * (start + span * 0.95)).round() as i32;
+    let first = (i64::from(width) * band as i64 / BAND_COUNT as i64) as i32;
+    let last = (i64::from(width) * (band + 1) as i64 / BAND_COUNT as i64) as i32 - 1;
     (
         first.clamp(0, width - 1),
         last.clamp(first.clamp(0, width - 1), width - 1),
     )
 }
 
+/// 【长图拼接】【横向特征】按 frame 返回每行各带的亮度与对比度特征，完整读取带内像素，失败返回分配或尺寸错误
 pub fn compute(frame: &Image) -> Result<Signature, ImageError> {
     let rows = frame.height() as usize;
     if (frame.width() as usize + BAND_COUNT)
@@ -36,23 +36,25 @@ pub fn compute(frame: &Image) -> Result<Signature, ImageError> {
     result.resize(rows, [0.0; BAND_COUNT]);
     for band in 0..BAND_COUNT {
         let (start, end) = band_columns(frame.width(), band);
-        let count = (end - start + 1).clamp(1, 9);
-        let step = if count > 1 {
-            (end - start) as f32 / (count - 1) as f32
-        } else {
-            0.0
-        };
+        let count = f64::from(end - start + 1);
+        // 1. 【长图拼接】【完整像素】固定稀疏采样会遗漏细文字，横向统计覆盖带内每个像素
         for (y, row) in result.iter_mut().enumerate() {
-            let mut sum = 0.0;
-            for i in 0..count {
-                let x =
-                    ((start as f32 + i as f32 * step).round() as i32).clamp(0, frame.width() - 1);
-                let pixel = frame.row(y as i32)[x as usize];
-                sum += 0.299 * ((pixel >> 16) & 255) as f32
-                    + 0.587 * ((pixel >> 8) & 255) as f32
-                    + 0.114 * (pixel & 255) as f32;
+            let mut sum = 0_u64;
+            let mut squares = 0_u64;
+            for &pixel in &frame.row(y as i32)[start as usize..=end as usize] {
+                let luminance = u64::from(
+                    (299 * ((pixel >> 16) & 255)
+                        + 587 * ((pixel >> 8) & 255)
+                        + 114 * (pixel & 255))
+                        / 1000,
+                );
+                sum += luminance;
+                squares += luminance * luminance;
             }
-            row[band] = sum / count as f32;
+            // 2. 【长图拼接】【正文对比度】方差补充均值，避免宽空白将窄正文的行变化稀释为零
+            let mean = sum as f64 / count;
+            let variance = (squares as f64 / count - mean * mean).max(0.0);
+            row[band] = (mean - variance.sqrt()) as f32;
         }
     }
     Ok(result)

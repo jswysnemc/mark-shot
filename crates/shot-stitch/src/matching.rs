@@ -1,6 +1,7 @@
 use crate::profile::Signature;
 use crate::session::Stitcher;
-use crate::types::{Edge, NO_MATCH, overhang};
+use crate::types::{Edge, NO_MATCH};
+use shot_image::Image;
 
 struct Candidates {
     best: (i32, f32),
@@ -24,41 +25,49 @@ impl Candidates {
 }
 
 impl Stitcher {
-    pub(crate) fn find_known(&self, cols: &Signature, prediction: i32) -> (i32, f32) {
+    /// 【长图拼接】【历史复核】按 frame、cols 和 prediction 搜索正文位置，返回通过完整评分与像素校验的结果
+    pub(crate) fn find_known(
+        &self,
+        frame: &Image,
+        cols: &Signature,
+        prediction: i32,
+    ) -> (i32, f32) {
         let maximum = self.long.height() - cols.len() as i32;
         if maximum < 0 || cols.is_empty() {
             return (0, NO_MATCH);
         }
         let inside = prediction.clamp(0, maximum);
-        let diff = self.known_diff(cols, inside, (0, 0)).0;
-        if diff <= self.config.accept_diff {
-            return (inside, diff);
-        }
         let mut candidates = Candidates {
             best: (inside, NO_MATCH),
             good: (inside, NO_MATCH),
             distance: i32::MAX,
         };
-        for pos in [prediction, self.anchor, 0, maximum]
-            .into_iter()
-            .chain((0..=maximum).step_by(8))
-            .chain(std::iter::once(maximum))
-        {
+        // 1. 【长图拼接】【直接位置】优先核验预测和原锚点，评分通过仍必须具备连续原始像素证据
+        let valid = |pos| {
+            crate::seam::find(self, frame, pos, Edge::None)
+                .is_some_and(|seam| seam.matching_rows >= self.config.min_overlap)
+        };
+        for pos in [prediction, self.anchor, 0, maximum] {
             let pos = pos.clamp(0, maximum);
-            candidates.visit(
-                pos,
-                self.known_diff(cols, pos, (0, 0)).0,
-                inside,
-                self.config.accept_diff,
-            );
+            let diff = self.known_diff(cols, pos, (0, 0)).0;
+            if diff <= self.config.accept_diff && valid(pos) {
+                return (pos, diff);
+            }
         }
-        for pos in (candidates.best.0 - 8).max(0)..=(candidates.best.0 + 8).min(maximum) {
-            candidates.visit(
-                pos,
-                self.known_diff(cols, pos, (0, 0)).0,
-                inside,
-                self.config.accept_diff,
-            );
+        // 2. 【长图拼接】【分层搜索】用分散行筛选任意位置，仅对有限候选执行完整重叠校验
+        for pos in crate::recovery_search::candidates(
+            &self.long.cols,
+            cols,
+            inside,
+            &self.motion.weights,
+            (self.fixed.top(), self.fixed.bottom()),
+            self.config.accept_diff,
+            None,
+        ) {
+            let diff = self.known_diff(cols, pos, (0, 0)).0;
+            if diff <= self.config.accept_diff && valid(pos) {
+                candidates.visit(pos, diff, inside, self.config.accept_diff);
+            }
         }
         if candidates.good.1 <= self.config.accept_diff {
             candidates.good
@@ -67,56 +76,45 @@ impl Stitcher {
         }
     }
 
-    fn visit_edge(&self, cols: &Signature, pos: i32, best: &mut (i32, f32)) {
-        let height = cols.len() as i32;
-        let (amount, edge) = overhang(pos, height, self.long.height());
-        if amount <= 0 || !self.reachable(pos, height) {
-            return;
-        }
-        let excluded = if edge == Edge::Start {
-            (self.fixed.top(), 0)
-        } else {
-            (0, self.fixed.bottom())
-        };
-        let (diff, length) = self.known_diff(cols, pos, excluded);
-        if length >= self.config.min_overlap && diff < best.1 {
-            *best = (pos, diff);
-        }
-    }
-
-    pub(crate) fn find_edge(&self, cols: &Signature, prediction: i32) -> (i32, f32) {
+    /// 【长图拼接】【边缘恢复】按 frame、cols 和 prediction 筛选可达的边缘位置，返回通过连续原始像素核验的候选
+    pub(crate) fn find_edge(&self, frame: &Image, cols: &Signature, prediction: i32) -> (i32, f32) {
+        // 1. 【长图拼接】【可达边缘】恢复仅允许揭露新内容且具有最小几何重叠的位置
         let (full, height) = (self.long.height(), cols.len() as i32);
         if full <= 0 || height <= 0 {
             return (0, NO_MATCH);
         }
-        let minimum = self.config.min_overlap - height;
-        let maximum = full - self.config.min_overlap;
+        let distance = height - self.config.min_overlap;
+        let minimum = (-distance).max(self.anchor - distance);
+        let maximum = (full - self.config.min_overlap).min(self.anchor + distance);
         if minimum > maximum {
             return (0, NO_MATCH);
         }
-        let mut best = (prediction.clamp(minimum, maximum), NO_MATCH);
-        for pos in [prediction, self.anchor, self.anchor + self.last_offset] {
-            self.visit_edge(cols, pos.clamp(minimum, maximum), &mut best);
-        }
         let ranges = [
-            (minimum.max(full - height + 1), maximum),
             (minimum, maximum.min(-1)),
-            (
-                (prediction - 160).clamp(minimum, maximum),
-                (prediction + 160).clamp(minimum, maximum),
-            ),
+            (minimum.max(full - height + 1), maximum),
         ];
+        let mut best = (prediction.clamp(minimum, maximum), NO_MATCH);
+        // 2. 【长图拼接】【完整复核】分别筛选首尾候选，以原始像素证据确认真实位置
         for (start, end) in ranges {
             if start > end {
                 continue;
             }
-            for pos in (start..=end).step_by(8).chain(std::iter::once(end)) {
-                self.visit_edge(cols, pos, &mut best);
-            }
-        }
-        if best.1 < NO_MATCH {
-            for pos in minimum.max(best.0 - 8)..=maximum.min(best.0 + 8) {
-                self.visit_edge(cols, pos, &mut best);
+            for pos in crate::recovery_search::candidates(
+                &self.long.cols,
+                cols,
+                prediction,
+                &self.motion.weights,
+                (self.fixed.top(), self.fixed.bottom()),
+                self.config.accept_diff,
+                Some((start, end)),
+            ) {
+                if crate::seam::find(self, frame, pos, Edge::None)
+                    .is_some_and(|seam| seam.matching_rows >= self.config.min_overlap)
+                    && (best.1 == NO_MATCH
+                        || (pos - prediction).abs() < (best.0 - prediction).abs())
+                {
+                    best = (pos, 0.0);
+                }
             }
         }
         best

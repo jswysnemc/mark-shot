@@ -76,6 +76,10 @@ fn capture_signature_matches_cropped_image_without_pixel_copy() {
     let capture = monitor_frame(310, 220, 310 * 4 + 16);
     for rect in [(0, 0, 310, 220), (21, 19, 211, 177), (3, 7, 1, 1)] {
         let image = frame::crop(&capture, rect).unwrap();
+        assert_eq!(
+            frame::capture_fingerprint(&capture, rect).unwrap(),
+            super::frame_fingerprint::image(&image)
+        );
         for (columns, rows) in [(18, 24), (0, 0), (33, 31)] {
             assert_eq!(
                 frame::capture_signature(&capture, rect, columns, rows).unwrap(),
