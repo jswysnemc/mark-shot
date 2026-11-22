@@ -9,7 +9,7 @@ import time
 
 from PIL import Image, ImageDraw
 
-from pin_performance import CONFIG, Input
+from pin_performance import CONFIG, Input, awake
 from session import Session
 
 
@@ -40,6 +40,14 @@ def geometry(session):
     return left, top, width, height
 
 
+def visible_colors(session, name):
+    """【贴图测试】【画面断言】按 session、name 保存屏幕并检查原图红绿蓝区域，各颜色至少二十像素，背景空白立即失败"""
+    frame = Image.open(session.screenshot(name)).convert('RGB')
+    pixels = list(frame.get_flattened_data())
+    counts = [pixels.count(color) for color in [(240, 40, 60), (20, 180, 60), (40, 100, 240)]]
+    assert min(counts) >= 20, f'{name}: 图像颜色未显示，计数={counts}'
+
+
 def run(session, binary):
     """【贴图测试】【完整回归】以 session、binary 测试原图交付和图像子表面重建，返回结果，结束时回收本次窗口"""
     source = Image.new('RGBA', (640, 400), (0, 0, 0, 0))
@@ -53,6 +61,7 @@ def run(session, binary):
     path = session.root / 'source.png'
     source.save(path)
     session.setup(CONFIG)
+    awake(session)
     remote = session.remote + '/source.png'
     subprocess.run(['scp', '-q', str(path), session.host + ':' + remote], check=True, timeout=20)
     pid = session.launch(binary, ['--pin-image', remote], overrides={'WAYLAND_DEBUG': '1'})
@@ -60,31 +69,31 @@ def run(session, binary):
     try:
         time.sleep(.8)
         assert session.alive(pid), session.log('capture')
-        session.screenshot('initial')
+        visible_colors(session, 'initial')
         left, top = (session.size[0] - 640) // 2, (session.size[1] - 400) // 2
         point = (left + 150, top + 130)
         session.click(*point)
         copy_image(session, source, 'initial-copy')
         control.drag(point, (60, 30))
         time.sleep(.3)
-        session.screenshot('moved')
+        visible_colors(session, 'moved')
         copy_image(session, source, 'moved-copy')
         point = (point[0] + 60, point[1] + 30)
         control.move(*point)
         control.zoom(8)
         time.sleep(.3)
-        session.screenshot('zoomed')
+        visible_colors(session, 'zoomed')
         copy_image(session, source, 'zoomed-copy')
         left, top, width, height = geometry(session)
         control.drag((left + width - 3, top + height - 3), (80, 50))
         time.sleep(.3)
-        session.screenshot('resized')
+        visible_colors(session, 'resized')
         copy_image(session, source, 'resized-copy')
         left, top, width, height = geometry(session)
         point = (left + width // 2, top + height // 2)
         # 2. 【贴图测试】【图像身份】依次旋转后验证实际像素，方位及共享源不能沿用旧图
         menu_action(session, point, 1)
-        session.screenshot('rotated')
+        visible_colors(session, 'rotated')
         copy_image(session, source.transpose(Image.Transpose.ROTATE_270), 'rotated-copy')
         left, top, width, height = geometry(session)
         point = (left + width // 2, top + height // 2)
@@ -94,7 +103,7 @@ def run(session, binary):
         left, top, width, height = geometry(session)
         point = (left + width // 2, top + height // 2)
         menu_action(session, point, 5)
-        session.screenshot('normal-window')
+        visible_colors(session, 'normal-window')
         windows = session.wait(lambda: [window for window in session.windows()
                                       if window['caption'] == 'Pinned Mark Shot'], '普通贴图窗口没有创建')
         window = windows[0]
@@ -102,7 +111,7 @@ def run(session, binary):
         session.click(*point)
         copy_image(session, source, 'normal-copy')
         menu_action(session, point, 5)
-        session.screenshot('top-restored')
+        visible_colors(session, 'top-restored')
         assert session.alive(pid), session.log('capture')
         return {'copy_pixels_preserved': True, 'rotation_preserved': True,
                 'resize_and_zoom_preserved': True, 'shell_recreation_preserved': True}
@@ -110,6 +119,34 @@ def run(session, binary):
         control.close()
         session.cleanup()
         session.log('capture')
+
+
+def oversized(session, binary):
+    """【贴图测试】【超长画面】按 session、binary 验证横纵三万像素原图仍能显示，不要求合成器上传超大纹理，返回结果"""
+    session.setup(CONFIG + 'border_enabled=false\n')
+    awake(session)
+    for size in [(32768, 128), (128, 32768)]:
+        source = Image.new('RGB', size)
+        draw = ImageDraw.Draw(source)
+        for index, color in enumerate([(240, 40, 60), (20, 180, 60), (40, 100, 240), (200, 180, 30)]):
+            if size[0] > size[1]:
+                rect = (index * size[0] // 4, 0, (index + 1) * size[0] // 4 - 1, size[1] - 1)
+            else:
+                rect = (0, index * size[1] // 4, size[0] - 1, (index + 1) * size[1] // 4 - 1)
+            draw.rectangle(rect, fill=color)
+        name = f'oversized-{size[0]}-{size[1]}'
+        path = session.root / (name + '.png')
+        source.save(path)
+        remote = session.remote + '/source.png'
+        subprocess.run(['scp', '-q', str(path), session.host + ':' + remote], check=True, timeout=20)
+        pid = session.launch(binary, ['--pin-image', remote])
+        try:
+            time.sleep(.8)
+            assert session.alive(pid), session.log('capture')
+            visible_colors(session, name + '-visible')
+        finally:
+            session.cleanup()
+    return {'oversized_images_visible': True}
 
 
 def main():
@@ -122,6 +159,7 @@ def main():
     options = parser.parse_args()
     session = Session(options.domain, options.host, options.root)
     result = run(session, options.binary)
+    result.update(oversized(session, options.binary))
     (session.root / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
     print(json.dumps(result, ensure_ascii=False))
 

@@ -15,7 +15,8 @@ use wayland_protocols::wp::viewporter::client::wp_viewport::WpViewport;
 
 pub(super) struct ImageSource {
     slot: Slot,
-    identity: (usize, u32, u32),
+    generation: u64,
+    pixels: (u32, u32),
 }
 
 pub(super) struct ImageSurface {
@@ -23,12 +24,12 @@ pub(super) struct ImageSurface {
     role: WlSubsurface,
     viewport: WpViewport,
     buffer: Option<Buffer>,
-    identity: Option<(usize, u32, u32)>,
+    generation: Option<u64>,
     visible: bool,
 }
 
 impl ImageSurface {
-    /// 【贴图】【子表面创建】按 parent 创建同步且无输入的背景，qh 绑定当前贴图队列，返回角色或协议错误
+    /// 【贴图】【子表面创建】从 pin 取得协议能力，按 parent 创建同步且无输入的背景，qh 绑定当前队列，返回角色或协议错误
     pub(super) fn new(pin: &Pin, parent: &WlSurface, qh: &QueueHandle<Pin>) -> AppResult<Self> {
         let (role, surface) = pin
             .subcompositor
@@ -48,7 +49,7 @@ impl ImageSurface {
             role,
             viewport,
             buffer: None,
-            identity: None,
+            generation: None,
             visible: false,
         })
     }
@@ -60,8 +61,8 @@ impl ImageSurface {
         placement: Placement,
         pool: &mut crate::backend::wayland::utils::shm_pool::SlotPool,
     ) -> AppResult {
-        let (_, width, height) = source.identity;
-        if self.identity != Some(source.identity) {
+        let (width, height) = source.pixels;
+        if self.generation != Some(source.generation) {
             self.buffer = Some(pool.create_buffer_in(
                 &source.slot,
                 width as i32,
@@ -69,7 +70,7 @@ impl ImageSurface {
                 width as i32 * 4,
                 wl_shm::Format::Argb8888,
             )?);
-            self.identity = Some(source.identity);
+            self.generation = Some(source.generation);
             self.visible = false;
         }
         let (x, y, w, h) = source_rect((width, height), placement);
@@ -96,7 +97,7 @@ impl ImageSurface {
             self.surface.commit();
             self.visible = false;
             // 1. 【贴图】【重新附着】旧缓冲可能尚未释放，下一次显示创建同槽位的新别名
-            self.identity = None;
+            self.generation = None;
         }
     }
 }
@@ -134,10 +135,19 @@ fn source_rect(pixels: (u32, u32), placement: Placement) -> (f64, f64, f64, f64)
     (x, y, w, h)
 }
 
+/// 【贴图】【纹理预算】按 pixels 返回是否适合整图上传，超长或超过六十四 MiB 的原图保留可见区域软件绘制
+fn within_texture_budget(pixels: (u32, u32)) -> bool {
+    pixels.0 <= 8192
+        && pixels.1 <= 8192
+        && u64::from(pixels.0) * u64::from(pixels.1) <= 16 * 1024 * 1024
+}
+
 impl Pin {
     /// 【贴图】【背景能力】无参数，返回是否可以用同步图像子表面，缺少协议时继续软件绘制
     pub(super) fn composited_image(&self) -> bool {
-        self.subcompositor.is_some() && self.viewporter.is_some()
+        self.subcompositor.is_some()
+            && self.viewporter.is_some()
+            && within_texture_budget((self.image.image.width(), self.image.image.height()))
     }
 
     /// 【贴图】【原图上传】无参数，按原图身份更新共享图像存储，返回分配或映射错误；已有图像不复制
@@ -145,30 +155,26 @@ impl Pin {
         if !self.composited_image() {
             return Ok(());
         }
-        let image = &self.image.image;
-        let identity = (
-            image.data().as_ptr() as usize,
-            image.width(),
-            image.height(),
-        );
-        if self
-            .image_source
-            .as_ref()
-            .is_some_and(|source| source.identity == identity)
-        {
+        if self.image_source.is_some() {
             return Ok(());
         }
+        let image = &self.image.image;
         // 1. 【贴图】【独立原件】共享像素只供合成器显示，复制和保存继续读取不变的 RGBA 原图
         let slot = self.pool.new_slot(image.data().len())?;
         crate::utils::copy_swizzled(
             &mut self.pool.raw_data_mut(&slot)[..image.data().len()],
             image.data(),
         );
-        self.image_source = Some(ImageSource { slot, identity });
+        self.image_generation += 1;
+        self.image_source = Some(ImageSource {
+            slot,
+            generation: self.image_generation,
+            pixels: (image.width(), image.height()),
+        });
         Ok(())
     }
 
-    /// 【贴图】【主图同步】按 qh 映射当前主图或交给预览，返回协议结果，前景缓冲保持独立
+    /// 【贴图】【主图同步】按 qh 映射主图，hidden 为真时隐藏并交给拖动预览，返回协议结果，前景缓冲保持独立
     pub(super) fn update_main_image(&mut self, qh: &QueueHandle<Self>, hidden: bool) -> AppResult {
         if !self.composited_image() {
             return Ok(());
@@ -195,6 +201,15 @@ impl Pin {
 mod tests {
     use super::*;
     use crate::features::pinned_image::placement::{Geometry, place};
+
+    /// 【贴图测试】【超长兼容】无参数，普通图片可交给合成器，超过纹理尺寸或内存预算的图片保留旧显示路径
+    #[test]
+    fn oversized_originals_keep_the_visible_software_path() {
+        assert!(within_texture_budget((2560, 1600)));
+        assert!(!within_texture_budget((32768, 128)));
+        assert!(!within_texture_budget((128, 32768)));
+        assert!(!within_texture_budget((8192, 8192)));
+    }
 
     /// 【贴图测试】【原始裁切】无参数，移动及超大缩放的源矩形不越界，并保持可见区域对应原图比例
     #[test]

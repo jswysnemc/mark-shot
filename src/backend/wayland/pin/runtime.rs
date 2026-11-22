@@ -65,6 +65,7 @@ impl Shell {
 pub(super) struct Pin {
     pub subcompositor: Option<smithay_client_toolkit::subcompositor::SubcompositorState>,
     pub image_source: Option<super::image_surface::ImageSource>,
+    pub image_generation: u64,
     pub image_surface: Option<super::image_surface::ImageSurface>,
     pub clipboard:
         Option<std::rc::Rc<std::cell::RefCell<crate::backend::wayland::clipboard::core::Core>>>,
@@ -338,6 +339,7 @@ pub(super) fn run_at_seed(
         )
         .ok(),
         image_source: None,
+        image_generation: 0,
         image_surface: None,
         clipboard: crate::backend::wayland::clipboard::core::Core::bind(&globals, &qh),
         _clipboard_scope: None,

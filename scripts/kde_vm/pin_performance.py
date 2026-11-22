@@ -113,13 +113,8 @@ def frame_metrics(log):
     return result
 
 
-def run(session, binary, source):
-    """【贴图测试】【对照执行】按 session、binary、source 测量相同移动和缩放，返回资源及帧指标；结束后回收本次进程"""
-    session.setup(CONFIG)
-    scripts = Path(__file__).resolve().parent.parent
-    subprocess.run(['scp', '-q', str(scripts / 'wayland_memory_metrics.py'),
-                    str(scripts / 'wayland_memory_file_pages.py'), session.host + ':' + session.remote + '/'],
-                   check=True, timeout=20)
+def awake(session):
+    """【贴图测试】【桌面唤醒】按 session 开启测试显示器并解锁其桌面，无返回值，避免把锁屏画面作为应用证据"""
     session.guest("""
 environment=os.environ.copy()
 for line in subprocess.check_output(['systemctl','--user','show-environment'],text=True).splitlines():
@@ -127,6 +122,17 @@ for line in subprocess.check_output(['systemctl','--user','show-environment'],te
 subprocess.run(['kscreen-doctor','--dpms','on'],env=environment,check=True,capture_output=True)
 subprocess.run(['sudo','-n','loginctl','unlock-session',environment['XDG_SESSION_ID']],check=True,capture_output=True)
 """)
+    time.sleep(.25)
+
+
+def run(session, binary, source):
+    """【贴图测试】【对照执行】按 session、binary、source 测量相同移动和缩放，返回资源及帧指标；结束后回收本次进程"""
+    session.setup(CONFIG)
+    scripts = Path(__file__).resolve().parent.parent
+    subprocess.run(['scp', '-q', str(scripts / 'wayland_memory_metrics.py'),
+                    str(scripts / 'wayland_memory_file_pages.py'), session.host + ':' + session.remote + '/'],
+                   check=True, timeout=20)
+    awake(session)
     pid = session.launch(binary, ['--pin-image', source], overrides={'WAYLAND_DEBUG': '1'})
     control = Input(session)
     try:
