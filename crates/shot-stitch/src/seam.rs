@@ -76,13 +76,25 @@ pub(crate) fn find(
     {
         // 2. 【滚动截图】【分数缩放】整段只有均衡重采样误差时沿用原边界，避免覆盖已经清晰的旧正文
         let resampled_rows = stitcher.last_frame.as_ref().map_or(0, |previous| {
-            edge_occlusion::resampled_overlap(
+            let rows = edge_occlusion::resampled_overlap(
                 previous,
                 frame,
                 position - stitcher.anchor,
                 span,
                 excluded,
-            )
+            );
+            if rows > 0 {
+                rows
+            } else {
+                // 3. 【长图拼接】【抗锯齿切换】浏览器停止合成滚动后可能切换文字渲染，需独立核验字形，沿用原图接缝
+                crate::antialiasing::overlap(
+                    previous,
+                    frame,
+                    position - stitcher.anchor,
+                    span,
+                    excluded,
+                )
+            }
         });
         if resampled_rows >= stitcher.config.min_overlap {
             let trim = match edge {

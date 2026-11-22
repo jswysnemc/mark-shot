@@ -4,6 +4,7 @@
 
 mod adjacent;
 mod algorithm;
+mod antialiasing;
 mod comparison;
 mod content_span;
 mod edge_occlusion;
