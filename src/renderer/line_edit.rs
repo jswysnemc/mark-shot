@@ -208,7 +208,7 @@ pub(crate) fn caret_rect(cursor_x: f32, rect: Rect, scroll: bool) -> (i32, i32, 
 /// 【字段绘制】【字形装饰】将 shape 绘入 p 的 origin，ink 为默认前景；字形与下划线使用同一个缩放锚点，无返回值
 pub(crate) fn text(p: &mut Painter, shape: &Shape, origin: (f32, f32), ink: Color) {
     for run in shape.runs() {
-        p.text_layout_run(&run, origin, ink);
+        p.ui_text_layout_run(&run, origin, ink);
     }
     let scale = p.scale();
     let origin = (origin.0 - p.origin.0, origin.1 - p.origin.1);

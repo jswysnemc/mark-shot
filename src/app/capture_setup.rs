@@ -126,7 +126,7 @@ pub(super) async fn start_capture(
         placements,
         icons_cache,
         TextState {
-            font_system: crate::fonts::bundled(),
+            font_system: crate::fonts::ui_system::new(),
             system_fonts: Some(system_fonts),
             swash_cache: SwashCache::new(),
             editors: HashMap::new(),

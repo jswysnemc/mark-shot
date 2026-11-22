@@ -34,6 +34,6 @@ pub(crate) fn title(p: &mut Painter<'_>, panel: &SettingsPanel) {
             line_w: line.w,
             ..run
         };
-        p.text_layout_run(&run, position, palette.strong_text.color());
+        p.ui_text_layout_run(&run, position, palette.strong_text.color());
     }
 }

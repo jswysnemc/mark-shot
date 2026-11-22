@@ -22,7 +22,7 @@ recognize, translate or upload the result. It is written in Rust and draws its o
 software, so it does not depend on Qt, GTK or a web view.
 
 > **Status.** `main` contains the native Rust rewrite. The current release is
-> [0.2.3](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.3).
+> [0.2.4](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.4).
 > The 0.1.x packages contain the earlier Qt implementation, preserved on
 > [`qt-old`](https://github.com/jswysnemc/mark-shot/tree/qt-old).
 > Linux on Wayland and X11 is the primary target. The Windows build runs, but
@@ -64,7 +64,7 @@ wlr-layer-shell for client-controlled pinning.
 
 ### 1. Download a package (recommended)
 
-Download [0.2.3](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.3)
+Download [0.2.4](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.4)
 and choose a package for your distribution and architecture. The release page contains a collapsed
 file list with SHA-256 values; checksum files are not separate assets. See
 [Installation](docs/installation.md) for download verification and the available formats.
@@ -117,6 +117,7 @@ pins and `Esc` cancels.
 | [Screen recording](docs/recording.md) | Formats, audio, control commands, platform paths |
 | [Desktop integration](docs/desktop-integration.md) | Compositor key bindings, global shortcut, tray, background service |
 | [Platform support](docs/platform-support.md) | Per-desktop capabilities and limits |
+| [Interface fonts](doc/ui-fonts.md) | Fontconfig matching and font rendering on Linux |
 | [Development](docs/development.md) | Repository layout, architecture, tests, packaging |
 
 Chinese versions are in [docs/zh-CN](docs/zh-CN/README.md).

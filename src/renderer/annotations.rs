@@ -15,6 +15,8 @@ mod shadow_stroke;
 use shadow_stroke::stroke_with_shadow;
 mod numbered;
 use numbered::draw_numerated_arrow;
+#[cfg(all(test, target_os = "linux"))]
+mod numbered_tests;
 #[cfg(test)]
 mod selection_chrome_tests;
 

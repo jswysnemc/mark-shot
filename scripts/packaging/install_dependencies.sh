@@ -12,7 +12,7 @@ case "$ID" in
     "${privilege[@]}" apt-get update
     packages=(build-essential clang libclang-dev pkg-config ca-certificates curl git python3
       libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libpipewire-0.3-dev
-      libssl-dev libfontconfig-dev fontconfig fonts-noto-core fonts-noto-cjk nasm
+      libssl-dev libfontconfig-dev libfreetype-dev fontconfig fonts-noto-core fonts-noto-cjk nasm
       libva-dev libdrm-dev libgbm-dev libpulse-dev xz-utils zstd)
     if [[ "$packaging" == packaging ]]; then
       packages+=(dpkg-dev desktop-file-utils file patchelf appstream fakeroot debhelper
@@ -22,7 +22,7 @@ case "$ID" in
     ;;
   fedora)
     packages=(gcc gcc-c++ make clang clang-devel pkgconf-pkg-config ca-certificates curl git python3
-      wayland-devel libxkbcommon-devel libxkbcommon-x11-devel libxcb-devel pipewire-devel openssl-devel fontconfig-devel
+      wayland-devel libxkbcommon-devel libxkbcommon-x11-devel libxcb-devel pipewire-devel openssl-devel fontconfig-devel freetype-devel
       google-noto-sans-fonts google-noto-sans-cjk-fonts nasm libva-devel libdrm-devel mesa-libgbm-devel
       pulseaudio-libs-devel xz zstd)
     if [[ "$packaging" == packaging ]]; then
@@ -32,7 +32,7 @@ case "$ID" in
     ;;
   arch)
     packages=(base-devel clang pkgconf ca-certificates curl git python wayland libxkbcommon
-      libxkbcommon-x11 libxcb pipewire openssl fontconfig noto-fonts noto-fonts-cjk nasm
+      libxkbcommon-x11 libxcb pipewire openssl fontconfig freetype2 noto-fonts noto-fonts-cjk nasm
       libva libdrm mesa libpulse xz zstd)
     if [[ "$packaging" == packaging ]]; then
       packages+=(desktop-file-utils file patchelf appstream)

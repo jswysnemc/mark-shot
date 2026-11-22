@@ -91,7 +91,7 @@ fn setup(
         placements,
         init::load_icons_cache(),
         TextState {
-            font_system: crate::fonts::bundled(),
+            font_system: crate::fonts::ui_system::new(),
             system_fonts: Some(std::thread::spawn(crate::fonts::system)),
             swash_cache: cosmic_text::SwashCache::new(),
             editors: std::collections::HashMap::new(),

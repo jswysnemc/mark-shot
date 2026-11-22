@@ -167,7 +167,8 @@ fn translation_ui_regression_menu_keeps_complete_glyphs() {
             .with_scale(scale)
             .with_text(&mut window.fonts, &mut window.cache);
         painter.clipped_scene(Some(area), |painter| {
-            painter.fill_rounded(area, 0.0, colors.base);
+            // 1. 【翻译回归】【完整恢复】清除裁切缓冲包含的完整物理像素，LCD 左侧滤镜边缘不能重复叠加在分数边界上
+            painter.fill_rounded(area.outset(1.0, 1.0).unwrap(), 0.0, colors.base);
             painter.text_buffer(&menu.labels[0][0], (19.0, 10.5), colors.text.color());
         });
         assert!(

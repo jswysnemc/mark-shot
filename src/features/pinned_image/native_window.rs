@@ -314,7 +314,7 @@ impl Pin {
             initial: position,
             menu: None,
             next_menu: 0,
-            fonts: crate::fonts::bundled(),
+            fonts: crate::fonts::ui_system::new(),
             cache: cosmic_text::SwashCache::new(),
             icons: crate::app::load_icons_cache(),
             wake: None,

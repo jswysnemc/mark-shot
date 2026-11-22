@@ -7,11 +7,16 @@ mod fontconfig;
 #[path = "fonts/windows.rs"]
 mod fontconfig;
 pub(crate) mod ocr_ui;
+#[cfg(target_os = "linux")]
+mod render_settings;
 pub(crate) mod ruler;
 pub(crate) mod selection_ui;
 pub mod text_faces;
 pub mod text_spans;
 pub mod ui_fallback;
+#[cfg(target_os = "linux")]
+pub(crate) mod ui_raster;
+pub(crate) mod ui_system;
 use cosmic_text::fontdb::{Database, Source};
 use std::sync::Arc;
 

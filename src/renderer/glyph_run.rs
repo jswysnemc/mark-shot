@@ -7,6 +7,23 @@ use tiny_skia::{Color, Pixmap, PixmapPaint, PremultipliedColorU8, Transform};
 impl Painter<'_> {
     /// 【文字绘制】【字形输出】按 run、pos 和 color 绘制一行字形，复用当前字体缓存与设备比例，无返回值
     pub(crate) fn text_layout_run(&mut self, run: &LayoutRun<'_>, pos: (f32, f32), color: Color) {
+        self.layout_run(run, pos, color, false);
+    }
+
+    /// 【界面字体】【布局绘制】按 run、pos 和 color 绘制界面，应用系统栅格配置，标注仍调用独立入口，无返回值
+    pub(crate) fn ui_text_layout_run(
+        &mut self,
+        run: &LayoutRun<'_>,
+        pos: (f32, f32),
+        color: Color,
+    ) {
+        self.layout_run(run, pos, color, true);
+    }
+
+    /// 【文字绘制】【栅格分流】按 run、pos、color 与 ui 绘制字形，ui 控制系统栅格配置，仅缓存实际使用字形，无返回值
+    fn layout_run(&mut self, run: &LayoutRun<'_>, pos: (f32, f32), color: Color, ui: bool) {
+        #[cfg(not(target_os = "linux"))]
+        let _ = ui;
         let scale = self.scale();
         let canvas_size = (self.canvas.width(), self.canvas.height());
         let Some(fonts) = self.fonts.as_mut() else {
@@ -18,6 +35,25 @@ impl Painter<'_> {
                 Color::from_rgba8(color.r(), color.g(), color.b(), color.a())
             });
             let physical = glyph.physical((0.0, 0.0), scale);
+            #[cfg(target_os = "linux")]
+            if ui
+                && crate::fonts::ui_raster::with_image(
+                    fonts.system,
+                    physical.cache_key,
+                    true,
+                    |image| {
+                        // 1. 【界面字体】【像素原点】先确定完整画布字形位置，再扣除整数裁切原点，局部重绘保持同一像素网格
+                        let x = (pos.0 * scale + physical.x as f32 + image.left as f32) as i32
+                            - (offset.0 * scale).round() as i32;
+                        let y = ((pos.1 + run.line_y) * scale + physical.y as f32
+                            - image.top as f32) as i32
+                            - (offset.1 * scale).round() as i32;
+                        crate::fonts::ui_raster::blend::paint(self.canvas, image, (x, y), color);
+                    },
+                )
+            {
+                continue;
+            }
             if let Some(image) = fonts.cache.get_image(fonts.system, physical.cache_key) {
                 let width = image.placement.width;
                 let height = image.placement.height;

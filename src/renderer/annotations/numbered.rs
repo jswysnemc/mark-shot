@@ -11,6 +11,7 @@ pub(super) fn contrasting_text_color(circle_color: Color) -> Color {
     }
 }
 
+/// 【编号标注】【正文绘制】按 start、end、number、color、stroke_width 和 shadow_color 将箭头及数字绘入 p，使用独立标注栅格，无返回值
 pub(super) fn draw_numerated_arrow(
     p: &mut Painter,
     start: (f32, f32),
@@ -20,6 +21,7 @@ pub(super) fn draw_numerated_arrow(
     stroke_width: f32,
     shadow_color: Color,
 ) {
+    // 1. 【编号标注】【背景绘制】按笔画宽度确定圆框与箭头尾部，应用正文和阴影变换
     let numbered = &crate::config::get().annotations.numbered;
     let (transform, shadow_transform) = transforms_for(p);
 
@@ -86,6 +88,7 @@ pub(super) fn draw_numerated_arrow(
             .fill_path(&circle, &fill_paint, FillRule::Winding, transform, None);
     }
 
+    // 2. 【编号标注】【数字排版】按数字长度选择字号，并在圆框中央定位文字
     let digits = number.to_string().len();
 
     let font_size = circle_radius * numbered.digit_sizes[digits.clamp(1, 4) - 1];
@@ -110,5 +113,8 @@ pub(super) fn draw_numerated_arrow(
 
     let text_color = contrasting_text_color(color);
 
-    p.text_buffer(&buffer, text_pos, text_color);
+    // 3. 【编号标注】【字形输出】沿用标注 Swash 路径，避免界面 Fontconfig 规则影响导出
+    for run in buffer.layout_runs() {
+        p.text_layout_run(&run, text_pos, text_color);
+    }
 }

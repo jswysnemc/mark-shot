@@ -182,7 +182,7 @@ impl TextEditor {
             cosmic_text::Color::rgba(0, 0, 0, 0)
         };
         colors[1] = cursor;
-        crate::renderer::editor_text::draw_editor(
+        crate::renderer::editor_text::draw_ui_editor(
             self.display_editor(fonts),
             fonts,
             cache,
