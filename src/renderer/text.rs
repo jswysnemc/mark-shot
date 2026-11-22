@@ -130,7 +130,7 @@ impl Painter<'_> {
     /// 【文字绘制】【缓冲输出】按 buffer、pos 和 color 绘制实际布局行，所有字形复用同一缓存路径，无返回值
     pub fn text_buffer(&mut self, buffer: &Buffer, pos: (f32, f32), color: Color) {
         for run in buffer.layout_runs() {
-            self.text_layout_run(&run, pos, color);
+            self.ui_text_layout_run(&run, pos, color);
         }
     }
 

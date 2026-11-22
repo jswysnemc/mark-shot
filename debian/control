@@ -18,6 +18,7 @@ Build-Depends:
  libpipewire-0.3-dev,
  libssl-dev,
  libfontconfig-dev,
+ libfreetype-dev,
  fontconfig,
  fonts-dejavu-core,
  fonts-noto-core,

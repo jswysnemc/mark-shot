@@ -207,7 +207,12 @@ pub(crate) fn with_pixels(
 }
 
 /// 【界面字体】【FreeType 绘制】按 library、face、key 与 settings 返回真实字形，应用字号、字重、微调、抗锯齿和 LCD 滤镜
-fn render<B>(library: &Library, face: &Face<B>, key: &GlyphKey, settings: Settings) -> Option<Glyph> {
+fn render<B>(
+    library: &Library,
+    face: &Face<B>,
+    key: &GlyphKey,
+    settings: Settings,
+) -> Option<Glyph> {
     let size = f32::from_bits(key.size);
     if !size.is_finite() || !(0.0..=1024.0).contains(&size) || size == 0.0 {
         return None;
