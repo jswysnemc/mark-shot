@@ -20,8 +20,7 @@
 Mark Shot 冻结屏幕画面，由用户框选区域并添加标注，然后复制、保存、贴图、识别文字、翻译或上传。
 程序使用 Rust 编写，界面由自身的软件渲染器绘制，不依赖 Qt、GTK 或 WebView。
 
-> **当前状态。** `main` 为原生 Rust 重写版本，当前正式版为
-> [0.2.4](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.4)。
+> **当前状态。** `main` 分支为原生 Rust 重写版本。
 > 0.1.x 安装包属于此前的 Qt 实现，源码保留在
 > [`qt-old`](https://github.com/jswysnemc/mark-shot/tree/qt-old) 分支。
 > Linux 的 Wayland 与 X11 是主要目标平台。Windows 版本可以运行，但尚未在真实 Windows 设备上完成全部验证。
@@ -59,13 +58,70 @@ wlr-layer-shell，程序才能控制贴图置顶。
 
 ## 安装
 
-### 1. 下载预编译安装包（推荐）
+### 1. 包管理器快速安装（推荐）
 
-下载 [0.2.4](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.4)，
-按发行版和架构选择安装包。发布页面的折叠列表展示文件及 SHA-256，摘要文件不再作为独立资产上传。
-校验方法和可用格式见[安装说明](docs/zh-CN/installation.md)。
+#### Arch Linux (AUR)
 
-### 2. 从源码构建
+Mark Shot 在 Arch Linux 用户软件仓库（AUR）提供预编译包 `mark-shot-bin` 与源码包 `mark-shot`（两者二选一，推荐免去本地编译等待的预编译包）：
+
+```sh
+# 方式 A（推荐）：安装预编译版本
+yay -S mark-shot-bin
+# 或使用 paru
+paru -S mark-shot-bin
+```
+
+若需在本地由源码编译，使用源码包：
+
+```sh
+# 方式 B（二选一）：从源码构建安装
+yay -S mark-shot
+```
+
+注意：AUR 仓库版本由维护者独立维护，可能滞后于 GitHub 官方发布。安装前可使用 `yay -Si mark-shot-bin` 核对当前仓库版本；若需立即使用最新正式版，也可在 Releases 页面直接下载对应架构的 `mark-shot-bin-*.pkg.tar.zst`，并通过 `sudo pacman -U` 安装。
+
+#### Debian / Ubuntu
+
+在 [Releases](https://github.com/jswysnemc/mark-shot/releases) 页面按系统版本与硬件架构下载对应的 `.deb` 安装包。例如在 Ubuntu 24.04 (x86_64) 下执行：
+
+```sh
+sudo apt install ./mark-shot_0.2.4-1_amd64.ubuntu24.04.deb
+```
+
+请按实际使用的系统版本与架构替换文件名。
+
+#### Fedora 43
+
+当前预编译 RPM 安装包针对 Fedora 43 构建。在 [Releases](https://github.com/jswysnemc/mark-shot/releases) 页面下载对应架构的 `.rpm` 文件后执行：
+
+```sh
+sudo dnf install ./mark-shot-0.2.4-1.fc43.x86_64.rpm
+```
+
+请按实际使用的硬件架构替换文件名。
+
+#### Nix / NixOS
+
+使用 Flake 直接运行或加入系统配置：
+
+```sh
+nix run github:jswysnemc/mark-shot
+```
+
+### 2. 通用包与独立文件
+
+- **AppImage**：下载 `mark-shot-native-*-linux-x86_64.AppImage`，添加可执行权限后直接运行：
+  ```sh
+  chmod +x mark-shot-native-*-linux-x86_64.AppImage
+  ./mark-shot-native-*-linux-x86_64.AppImage
+  ```
+- **Flatpak**：下载 `.flatpak` 单文件安装包，执行 `flatpak install mark-shot-native-*-linux-x86_64.flatpak`。
+- **便携归档（Tarball / Zip）**：在 [Releases](https://github.com/jswysnemc/mark-shot/releases) 页面下载 Linux 或 Windows 便携包，解压后直接执行。
+- **Windows 安装程序**：下载 `mark-shot-native-*-windows-x86_64-msvc-setup.exe` 运行安装向导。
+
+发布页面的折叠列表展示全部安装包文件及 SHA-256 校验摘要。完整校验方法与包格式详情见[安装说明](docs/zh-CN/installation.md)。
+
+### 3. 从源码构建
 
 从源码构建时，需要 Rust 1.95 或更新版本；
 `rustup` 会按 `rust-toolchain.toml` 自动选用固定的工具链。

@@ -21,10 +21,9 @@ Mark Shot freezes the screen, lets you select a region, annotate it, and then co
 recognize, translate or upload the result. It is written in Rust and draws its own interface in
 software, so it does not depend on Qt, GTK or a web view.
 
-> **Status.** `main` contains the native Rust rewrite. The current release is
-> [0.2.4](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.4).
-> The 0.1.x packages contain the earlier Qt implementation, preserved on
-> [`qt-old`](https://github.com/jswysnemc/mark-shot/tree/qt-old).
+> **Status.** `main` contains the native Rust rewrite.
+> The earlier 0.1.x Qt implementation is preserved on the
+> [`qt-old`](https://github.com/jswysnemc/mark-shot/tree/qt-old) branch.
 > Linux on Wayland and X11 is the primary target. The Windows build runs, but
 > has not been fully verified on real Windows machines yet.
 
@@ -62,14 +61,70 @@ wlr-layer-shell for client-controlled pinning.
 
 ## Install
 
-### 1. Download a package (recommended)
+### 1. Package managers (recommended)
 
-Download [0.2.4](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.4)
-and choose a package for your distribution and architecture. The release page contains a collapsed
-file list with SHA-256 values; checksum files are not separate assets. See
-[Installation](docs/installation.md) for download verification and the available formats.
+#### Arch Linux (AUR)
 
-### 2. Build from source
+Mark Shot is available in the Arch User Repository (AUR) as `mark-shot-bin` (prebuilt binary, recommended) and `mark-shot` (built from source) as mutually exclusive options:
+
+```sh
+# Option A (recommended): install prebuilt binary
+yay -S mark-shot-bin
+# or with paru
+paru -S mark-shot-bin
+```
+
+To build locally from source instead:
+
+```sh
+# Option B (alternative): build from source via AUR
+yay -S mark-shot
+```
+
+Note: Package versions in the AUR are maintained independently and may lag behind GitHub Releases. You can verify the available version with `yay -Si mark-shot-bin`. If you need the latest release immediately, download `mark-shot-bin-*.pkg.tar.zst` from GitHub Releases and install with `sudo pacman -U`.
+
+#### Debian / Ubuntu
+
+Download the `.deb` package matching your distribution version and architecture from [Releases](https://github.com/jswysnemc/mark-shot/releases). For example, on Ubuntu 24.04 (x86_64):
+
+```sh
+sudo apt install ./mark-shot_0.2.4-1_amd64.ubuntu24.04.deb
+```
+
+Replace the filename with the package matching your distribution version and architecture.
+
+#### Fedora 43
+
+RPM packages are currently built for Fedora 43. Download the package for your architecture from [Releases](https://github.com/jswysnemc/mark-shot/releases), then install:
+
+```sh
+sudo dnf install ./mark-shot-0.2.4-1.fc43.x86_64.rpm
+```
+
+Replace the filename with the package matching your architecture.
+
+#### Nix / NixOS
+
+Run directly via Flakes or integrate into your configuration:
+
+```sh
+nix run github:jswysnemc/mark-shot
+```
+
+### 2. Universal packages and portable archives
+
+- **AppImage**: Download `mark-shot-native-*-linux-x86_64.AppImage`, make it executable, and run:
+  ```sh
+  chmod +x mark-shot-native-*-linux-x86_64.AppImage
+  ./mark-shot-native-*-linux-x86_64.AppImage
+  ```
+- **Flatpak**: Download the `.flatpak` bundle and install with `flatpak install mark-shot-native-*-linux-x86_64.flatpak`.
+- **Portable archive**: Download the Linux `.tar.gz` or Windows `.zip` archive from [Releases](https://github.com/jswysnemc/mark-shot/releases), extract, and run.
+- **Windows installer**: Download `mark-shot-native-*-windows-x86_64-msvc-setup.exe` and follow the setup wizard.
+
+The release page contains a collapsed file list with SHA-256 values. See [Installation](docs/installation.md) for download verification and detailed format specifications.
+
+### 3. Build from source
 
 To build from source, Rust 1.95 or newer is required; `rustup` picks the pinned toolchain from
 `rust-toolchain.toml` automatically.

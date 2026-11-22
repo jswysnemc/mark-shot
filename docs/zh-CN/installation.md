@@ -3,9 +3,45 @@
 [English](../installation.md) | **简体中文**
 
 当前正式版为
-[0.2.3](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.3)。
+[0.2.4](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.4)。
 0.1.x 安装包属于此前的 Qt 实现，源码保留在 `qt-old` 分支。
-AUR 和 PPA 元数据使用独立发布流程，需要显式执行。
+
+## 包管理器安装
+
+### Arch Linux (AUR)
+
+Mark Shot 在 Arch Linux 用户软件仓库（AUR）提供两种安装方式，选择其中一种即可：
+
+- `mark-shot-bin`（推荐）：使用官方预编译资产，免去本地编译耗时与开发依赖。
+- `mark-shot`：获取源码并在本地编译。
+
+推荐使用 AUR 辅助工具安装预编译版本：
+
+```sh
+# 方式 A（推荐）：预编译版本
+yay -S mark-shot-bin
+# 或使用 paru
+paru -S mark-shot-bin
+```
+
+若需在本地由源码构建安装：
+
+```sh
+# 方式 B（二选一）：从源码构建
+yay -S mark-shot
+```
+
+AUR 仓库版本由维护者独立维护，可能滞后于 GitHub 官方发布。安装前可通过 `yay -Si mark-shot-bin` 核对当前仓库版本。若需要当前最新发布版本的安装包，可在发布页面直接下载对应架构的 `mark-shot-bin-*.pkg.tar.zst` 并使用 `sudo pacman -U` 安装。
+
+### Nix / NixOS
+
+通过 Flake 直接运行：
+
+```sh
+nix run github:jswysnemc/mark-shot
+```
+
+详细打包、验证与 NixOS 模块说明见 [Nix](nix.md)。
 
 ## 下载预编译安装包
 
@@ -16,8 +52,8 @@ Arch 安装包、AppImage、Flatpak、Linux 便携归档和 Windows x86_64 归�
 Linux x86_64 便携归档解压后应保留完整目录：
 
 ```sh
-tar -xzf mark-shot-native-0.2.3-linux-x86_64.tar.gz
-./mark-shot-native-0.2.3-linux-x86_64/mark-shot
+tar -xzf mark-shot-native-0.2.4-linux-x86_64.tar.gz
+./mark-shot-native-0.2.4-linux-x86_64/mark-shot
 ```
 
 ARM64 使用 `linux-aarch64` 归档。Windows 解压完整 ZIP 后运行 `mark-shot.exe`，
@@ -29,13 +65,13 @@ ARM64 使用 `linux-aarch64` 归档。Windows 解压完整 ZIP 后运行 `mark-s
 摘要文件和内部 JSON 元数据不再作为独立发布资产上传。
 
 ```sh
-sha256sum mark-shot-native-0.2.3-linux-x86_64.tar.gz
+sha256sum mark-shot-native-0.2.4-linux-x86_64.tar.gz
 ```
 
 Windows 使用 PowerShell：
 
 ```powershell
-Get-FileHash .\mark-shot-native-0.2.3-windows-x86_64-msvc.zip -Algorithm SHA256
+Get-FileHash .\mark-shot-native-0.2.4-windows-x86_64-msvc.zip -Algorithm SHA256
 ```
 
 发布文件名用 `.` 替换 `~`，以符合 GitHub 资产命名规则。
@@ -65,7 +101,7 @@ bash scripts/packaging/install_dependencies.sh
 ```sh
 sudo apt install build-essential clang libclang-dev pkg-config git python3 curl \
   libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libpipewire-0.3-dev \
-  libssl-dev libfontconfig-dev fontconfig fonts-noto-core fonts-noto-cjk nasm \
+  libssl-dev libfontconfig-dev libfreetype-dev fontconfig fonts-noto-core fonts-noto-cjk nasm \
   libva-dev libdrm-dev libgbm-dev libpulse-dev xz-utils zstd
 ```
 
@@ -74,7 +110,7 @@ sudo apt install build-essential clang libclang-dev pkg-config git python3 curl 
 ```sh
 sudo dnf install gcc gcc-c++ make clang clang-devel pkgconf-pkg-config git python3 curl \
   wayland-devel libxkbcommon-devel libxkbcommon-x11-devel libxcb-devel pipewire-devel \
-  openssl-devel fontconfig-devel google-noto-sans-fonts google-noto-sans-cjk-fonts nasm \
+  openssl-devel fontconfig-devel freetype-devel google-noto-sans-fonts google-noto-sans-cjk-fonts nasm \
   libva-devel libdrm-devel mesa-libgbm-devel pulseaudio-libs-devel xz zstd
 ```
 
@@ -82,7 +118,7 @@ sudo dnf install gcc gcc-c++ make clang clang-devel pkgconf-pkg-config git pytho
 
 ```sh
 sudo pacman -S --needed base-devel clang pkgconf git python curl wayland libxkbcommon \
-  libxkbcommon-x11 libxcb pipewire openssl fontconfig noto-fonts noto-fonts-cjk nasm \
+  libxkbcommon-x11 libxcb pipewire openssl fontconfig freetype2 noto-fonts noto-fonts-cjk nasm \
   libva libdrm mesa libpulse xz zstd
 ```
 
