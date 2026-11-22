@@ -18,7 +18,7 @@ def source_kind(path):
         return "clipboard"
     if "/mark-shot/frozen-source/" in path:
         return "frozen"
-    if path.startswith(("/memfd:smithay-client-toolkit", "/memfd:wayland-shm")):
+    if path.startswith(("/memfd:smithay-client-toolkit", "/memfd:wayland-shm", "/memfd:mark-shot-shm")):
         return "native"
     return None
 

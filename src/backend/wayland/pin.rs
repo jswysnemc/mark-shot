@@ -4,6 +4,7 @@ mod actions;
 mod clipboard;
 mod geometry;
 mod gesture;
+mod image_surface;
 mod input;
 mod language_menu;
 mod menu_draw;

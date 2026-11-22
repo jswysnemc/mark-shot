@@ -31,24 +31,26 @@ impl Pin {
         let sx = pixels.0 as f32 / placement.visible.width.max(1) as f32;
         let sy = pixels.1 as f32 / placement.visible.height.max(1) as f32;
         let mut canvas = Pixmap::new(pixels.0, pixels.1).ok_or("cannot allocate pinned image")?;
-        canvas.draw_pixmap(
-            0,
-            0,
-            self.image.image.as_ref(),
-            &PixmapPaint {
-                quality: FilterQuality::Bilinear,
-                ..Default::default()
-            },
-            Transform::from_scale(
-                placement.logical.width as f32 * sx / self.image.image.width() as f32,
-                placement.logical.height as f32 * sy / self.image.image.height() as f32,
-            )
-            .post_translate(
-                placement.offset.0 as f32 * sx,
-                placement.offset.1 as f32 * sy,
-            ),
-            None,
-        );
+        if !self.composited_image() {
+            canvas.draw_pixmap(
+                0,
+                0,
+                self.image.image.as_ref(),
+                &PixmapPaint {
+                    quality: FilterQuality::Bilinear,
+                    ..Default::default()
+                },
+                Transform::from_scale(
+                    placement.logical.width as f32 * sx / self.image.image.width() as f32,
+                    placement.logical.height as f32 * sy / self.image.image.height() as f32,
+                )
+                .post_translate(
+                    placement.offset.0 as f32 * sx,
+                    placement.offset.1 as f32 * sy,
+                ),
+                None,
+            );
+        }
         if self.translation.active {
             crate::features::image_translation::paint::viewport_xy(
                 &mut canvas,
@@ -117,6 +119,9 @@ impl Pin {
 
     /// 【贴图】【帧提交】按当前原图和逻辑大小提交一帧；qh 用于帧回调，缓冲忙碌时等待释放
     pub fn render(&mut self, qh: &QueueHandle<Self>) -> AppResult {
+        let hidden =
+            self.drag.is_some() && self.preview.as_ref().is_some_and(|preview| preview.ready);
+        self.update_main_image(qh, hidden)?;
         let pixels = (
             (self.placement.visible.width as f32 * self.render_scale).ceil() as u32,
             (self.placement.visible.height as f32 * self.render_scale).ceil() as u32,

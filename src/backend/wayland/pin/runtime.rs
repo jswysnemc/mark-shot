@@ -63,6 +63,10 @@ impl Shell {
 }
 
 pub(super) struct Pin {
+    pub subcompositor: Option<smithay_client_toolkit::subcompositor::SubcompositorState>,
+    pub image_source: Option<super::image_surface::ImageSource>,
+    pub image_generation: u64,
+    pub image_surface: Option<super::image_surface::ImageSurface>,
     pub clipboard:
         Option<std::rc::Rc<std::cell::RefCell<crate::backend::wayland::clipboard::core::Core>>>,
     pub _clipboard_scope: Option<crate::backend::wayland::clipboard::context::Scope>,
@@ -128,6 +132,7 @@ impl Pin {
     /// 【贴图】【角色重建】按置顶设置重建表面，原图和当前缩放保持不变；qh 用于绑定新协议对象
     pub fn recreate(&mut self, qh: &QueueHandle<Self>) {
         self.popup = None;
+        self.image_surface = None;
         if !self.image.always_on_top {
             self.placement = Placement {
                 logical: self.geometry(),
@@ -327,6 +332,15 @@ pub(super) fn run_at_seed(
     let shm = Shm::bind(&globals, &qh)?;
     let pool = SlotPool::new(4096, &shm)?;
     let mut pin = Pin {
+        subcompositor: smithay_client_toolkit::subcompositor::SubcompositorState::bind(
+            compositor.wl_compositor().clone(),
+            &globals,
+            &qh,
+        )
+        .ok(),
+        image_source: None,
+        image_generation: 0,
+        image_surface: None,
         clipboard: crate::backend::wayland::clipboard::core::Core::bind(&globals, &qh),
         _clipboard_scope: None,
         connection: connection.clone(),
