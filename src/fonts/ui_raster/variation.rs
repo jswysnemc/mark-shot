@@ -3,7 +3,7 @@
 use freetype::{Face, Library, ffi};
 
 /// 【界面字体】【字重同步】按 library、face 与 weight 设置可变字体字重，静态字体保持原样，无返回值
-pub(super) fn set_weight(library: &Library, face: &Face, weight: u16) {
+pub(super) fn set_weight<B>(library: &Library, face: &Face<B>, weight: u16) {
     let raw = face.raw() as *const _ as ffi::FT_Face;
     let mut axes = std::ptr::null_mut();
     // 1. 【界面字体】【变体读取】FreeType 分配轴描述，失败表示静态字体或不支持的变体

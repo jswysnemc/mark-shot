@@ -41,6 +41,7 @@ unsafe extern "C" {
     fn FcPatternAddInteger(pattern: *mut c_void, object: *const c_char, value: c_int) -> c_int;
     fn FcPatternAddDouble(pattern: *mut c_void, object: *const c_char, value: f64) -> c_int;
     fn FcConfigSubstitute(config: *mut c_void, pattern: *mut c_void, kind: c_int) -> c_int;
+    fn FcWeightFromOpenTypeDouble(weight: f64) -> f64;
     fn FcDefaultSubstitute(pattern: *mut c_void);
     fn FcFontMatch(config: *mut c_void, pattern: *mut c_void, result: *mut c_int) -> *mut c_void;
     fn FcPatternGetBool(
@@ -86,9 +87,16 @@ impl Config {
         (!config.is_null()).then_some(Self(config))
     }
 
-    /// 【界面字体】【实际匹配】按 file、index、family 与 pixels 返回当前字体的渲染设置，匹配失败返回默认配置
-    pub(super) fn settings(&self, file: &Path, index: u32, family: &str, pixels: f32) -> Settings {
-        let Some(pattern) = request(file, index, family, pixels) else {
+    /// 【界面字体】【实际匹配】按 file、index、family、pixels 与 weight 返回当前字体的渲染设置，匹配失败返回默认配置
+    pub(super) fn settings(
+        &self,
+        file: &Path,
+        index: u32,
+        family: &str,
+        pixels: f32,
+        weight: u16,
+    ) -> Settings {
+        let Some(pattern) = request(file, index, family, pixels, weight) else {
             return Settings::default();
         };
         let mut status = 0;
@@ -133,8 +141,8 @@ impl Config {
     }
 }
 
-/// 【界面字体】【匹配请求】按 file、index、family 与 pixels 创建独立模式，返回请求，非法路径或分配失败返回空值
-fn request(file: &Path, index: u32, family: &str, pixels: f32) -> Option<Pattern> {
+/// 【界面字体】【匹配请求】按 file、index、family、pixels 与 weight 创建独立模式，返回请求，非法路径或分配失败返回空值
+fn request(file: &Path, index: u32, family: &str, pixels: f32, weight: u16) -> Option<Pattern> {
     let file = CString::new(file.as_os_str().as_encoded_bytes()).ok()?;
     let family = CString::new(family).ok()?;
     let pattern = unsafe { FcPatternCreate() };
@@ -147,6 +155,11 @@ fn request(file: &Path, index: u32, family: &str, pixels: f32) -> Option<Pattern
         FcPatternAddString(pattern.0, c"family".as_ptr(), family.as_ptr().cast());
         FcPatternAddInteger(pattern.0, c"index".as_ptr(), index as i32);
         FcPatternAddDouble(pattern.0, c"pixelsize".as_ptr(), f64::from(pixels));
+        FcPatternAddDouble(
+            pattern.0,
+            c"weight".as_ptr(),
+            FcWeightFromOpenTypeDouble(f64::from(weight)),
+        );
     }
     Some(pattern)
 }

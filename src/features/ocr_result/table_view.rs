@@ -38,7 +38,7 @@ impl TableView {
     /// 【文字识别】【表格视区】用 table、fonts 创建稳定内容列宽和原版固定行高，返回独立视区；字体与颜色不改变其他窗口
     pub fn new(table: Table, fonts: &mut FontSystem) -> Self {
         let rows = RowGeometry::new(&table);
-        let mut header_fonts = crate::fonts::ui_system::new();
+        let mut header_fonts = crate::fonts::ui_system::with_family("DejaVu Sans");
         let columns = Columns::new(&table, fonts, &mut header_fonts);
         Self {
             table,

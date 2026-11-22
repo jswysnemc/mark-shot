@@ -32,7 +32,7 @@ pub(crate) fn draw_editor(
     );
 }
 
-/// 【界面文字】【编辑输出】按 editor、font_system、swash_cache、scale 和 colors 绘制界面正文；f 接收像素，应用 Fontconfig 灰度配置
+/// 【界面文字】【编辑输出】按 editor、font_system、swash_cache 和 scale 绘制界面；colors 依次为正文、光标、选择背景、选中文字，f 接收像素，无返回值
 pub(crate) fn draw_ui_editor(
     editor: &mut Editor<'static>,
     font_system: &mut cosmic_text::FontSystem,

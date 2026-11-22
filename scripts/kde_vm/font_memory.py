@@ -37,6 +37,9 @@ def scenario(session, binary, case, language):
         if case == 'pin-menu':
             session.click(session.size[0] // 2, session.size[1] // 2, 'right')
             time.sleep(.25)
+        elif case == 'editor':
+            session.move(1048, 142)
+            time.sleep(.8)
         session.screenshot('visible')
         records = []
         for _ in range(5):

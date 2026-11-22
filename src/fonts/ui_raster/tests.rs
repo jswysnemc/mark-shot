@@ -96,7 +96,7 @@ fn fontconfig_font_rules_change_real_glyph_rasterization() {
           <edit name="embeddedbitmap" mode="assign"><bool>false</bool></edit>
         </match>"#,
     );
-    let settings = config.settings(&face.file, face.index, &family, 18.0);
+    let settings = config.settings(&face.file, face.index, &family, 18.0, 400);
     assert_eq!(
         settings,
         Settings {
@@ -111,7 +111,13 @@ fn fontconfig_font_rules_change_real_glyph_rasterization() {
     );
     let mut raster = raster(config);
     let key = key(face, &raster.library);
-    let mono = raster.image(key.clone(), &family).unwrap();
+    let mono = raster
+        .image(
+            key.clone(),
+            &family,
+            Some(Arc::new(std::fs::read(&key.face.file).unwrap())),
+        )
+        .unwrap();
     assert_eq!(mono.content, Content::Mask);
     assert!(mono.data.iter().all(|value| *value == 0 || *value == 255));
     assert!(mono.data.contains(&255));
@@ -198,10 +204,26 @@ fn ui_glyphs_reuse_storage_and_leave_annotation_cache_unchanged() {
     let directory = tempfile::tempdir().unwrap();
     let mut raster = raster(config(directory.path(), &face.file, ""));
     let key = key(face, &raster.library);
-    let pointer = raster.image(key.clone(), &family).unwrap().data.as_ptr();
+    let pointer = raster
+        .image(
+            key.clone(),
+            &family,
+            Some(Arc::new(std::fs::read(&key.face.file).unwrap())),
+        )
+        .unwrap()
+        .data
+        .as_ptr();
     let bytes = raster.bytes;
     assert_eq!(
-        raster.image(key.clone(), &family).unwrap().data.as_ptr(),
+        raster
+            .image(
+                key.clone(),
+                &family,
+                Some(Arc::new(std::fs::read(&key.face.file).unwrap()))
+            )
+            .unwrap()
+            .data
+            .as_ptr(),
         pointer
     );
     assert_eq!(
@@ -247,4 +269,97 @@ fn ui_glyphs_reuse_storage_and_leave_annotation_cache_unchanged() {
             .data,
         original
     );
+}
+
+/// 【界面字体测试】【字重规则】无参数，同一文件与字号的常规、半粗体分别匹配 Fontconfig 规则，不共享错误设置
+#[test]
+fn fontconfig_weight_rules_are_applied_and_cached_per_weight() {
+    let (_, face, family) = font();
+    let directory = tempfile::tempdir().unwrap();
+    let mut raster = raster(config(
+        directory.path(),
+        &face.file,
+        r#"
+        <match target="pattern"><test name="weight" compare="more_eq"><const>demibold</const></test>
+          <edit name="antialias" mode="assign"><bool>false</bool></edit></match>
+        <match target="pattern"><test name="weight" compare="less"><const>demibold</const></test>
+          <edit name="antialias" mode="assign"><bool>true</bool></edit></match>"#,
+    ));
+    let key = key(face.clone(), &raster.library);
+    assert!(
+        raster
+            .config
+            .settings(&face.file, face.index, &family, 18.0, 400)
+            .antialias
+    );
+    assert!(
+        !raster
+            .config
+            .settings(&face.file, face.index, &family, 18.0, 600)
+            .antialias
+    );
+    raster
+        .image(
+            key.clone(),
+            &family,
+            Some(Arc::new(std::fs::read(&key.face.file).unwrap())),
+        )
+        .unwrap();
+    raster
+        .image(
+            GlyphKey {
+                weight: 600,
+                ..key.clone()
+            },
+            &family,
+            Some(Arc::new(std::fs::read(&key.face.file).unwrap())),
+        )
+        .unwrap();
+    assert_eq!(raster.settings.len(), 2);
+    assert!(raster.settings[&(face.clone(), 18.0_f32.to_bits(), 400)].antialias);
+    assert!(!raster.settings[&(face, 18.0_f32.to_bits(), 600)].antialias);
+}
+
+/// 【界面字体测试】【LCD 微调】无参数，轻微和完整微调在相同 RGB 设置下产生不同真实遮罩，输出模式均保持 LCD
+#[test]
+fn lcd_rendering_keeps_the_requested_hinting_target() {
+    let (_, source, _) = font();
+    let library = Library::init().unwrap();
+    let mut key = key(source.clone(), &library);
+    let face = library
+        .new_face(&source.file, source.index as isize)
+        .unwrap();
+    let mut different = false;
+    for size in [11.0_f32, 13.0, 17.0, 19.0] {
+        key.size = size.to_bits();
+        let slight = render(
+            &library,
+            &face,
+            &key,
+            Settings {
+                rgba: 1,
+                hintstyle: 1,
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+        let full = render(
+            &library,
+            &face,
+            &key,
+            Settings {
+                rgba: 1,
+                hintstyle: 3,
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            (slight.content, full.content),
+            (Content::Subpixel, Content::Subpixel)
+        );
+        different |=
+            slight.data != full.data || (slight.width, slight.height) != (full.width, full.height);
+    }
+    assert!(different, "LCD 输出忽略了轻微微调配置");
 }

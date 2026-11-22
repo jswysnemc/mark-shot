@@ -24,11 +24,12 @@ impl Painter<'_> {
                 physical.cache_key,
                 true,
                 |image| {
-                    let x = (pos.0 * scale + physical.x as f32 + image.left as f32
-                        - offset.0 * scale) as i32;
-                    let y = ((pos.1 + run.line_y) * scale + physical.y as f32
-                        - image.top as f32
-                        - offset.1 * scale) as i32;
+                    // 1. 【界面字体】【像素原点】先确定完整画布字形位置，再扣除整数裁切原点，局部重绘保持同一像素网格
+                    let x = (pos.0 * scale + physical.x as f32 + image.left as f32) as i32
+                        - (offset.0 * scale).round() as i32;
+                    let y = ((pos.1 + run.line_y) * scale + physical.y as f32 - image.top as f32)
+                        as i32
+                        - (offset.1 * scale).round() as i32;
                     crate::fonts::ui_raster::blend::paint(self.canvas, image, (x, y), color);
                 },
             ) {

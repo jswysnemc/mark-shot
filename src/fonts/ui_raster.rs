@@ -8,7 +8,7 @@ pub(crate) use bitmap::{Content, Glyph};
 use super::render_settings::{Config, Settings};
 use cosmic_text::{CacheKey, CacheKeyFlags, FontSystem, SubpixelBin, fontdb::Source};
 use freetype::{Face, Library, Matrix, RenderMode, Vector, face::LoadFlag};
-use std::{cell::RefCell, collections::HashMap, path::PathBuf};
+use std::{borrow::Borrow, cell::RefCell, collections::HashMap, path::PathBuf, sync::Arc};
 #[cfg(test)]
 mod tests;
 
@@ -29,9 +29,17 @@ struct GlyphKey {
     lcd: bool,
 }
 
+struct FaceBytes(Arc<dyn AsRef<[u8]> + Send + Sync>);
+impl Borrow<[u8]> for FaceBytes {
+    /// 【界面字体】【共享字节】无参数，借用排版已经映射的字体数据，无复制，返回字节切片
+    fn borrow(&self) -> &[u8] {
+        (*self.0).as_ref()
+    }
+}
+
 struct Raster {
-    faces: HashMap<FaceKey, Face>,
-    settings: HashMap<(FaceKey, u32), Settings>,
+    faces: HashMap<FaceKey, Face<FaceBytes>>,
+    settings: HashMap<(FaceKey, u32, u16), Settings>,
     glyphs: HashMap<GlyphKey, Glyph>,
     bytes: usize,
     library: Library,
@@ -55,8 +63,13 @@ impl Raster {
         })
     }
 
-    /// 【界面字体】【字形缓存】按 key、family 返回缓存字形或实际绘制结果，限制缓存容量，不复制整个字体文件
-    fn image(&mut self, key: GlyphKey, family: &str) -> Option<&Glyph> {
+    /// 【界面字体】【字形缓存】按 key、family 返回字形，data 为现有排版映射，已有字体可传空；缺字体且为空时失败，不复制整文件
+    fn image(
+        &mut self,
+        key: GlyphKey,
+        family: &str,
+        data: Option<Arc<dyn AsRef<[u8]> + Send + Sync>>,
+    ) -> Option<&Glyph> {
         if !self.glyphs.contains_key(&key) {
             if !self.faces.contains_key(&key.face) {
                 // 1. 【界面字体】【字体预算】只打开当前使用的字体，保留最多八个 FreeType 字体对象
@@ -66,11 +79,11 @@ impl Raster {
                 self.faces.insert(
                     key.face.clone(),
                     self.library
-                        .new_face(&key.face.file, key.face.index as isize)
+                        .new_memory_face2(FaceBytes(data?), key.face.index as isize)
                         .ok()?,
                 );
             }
-            let settings_key = (key.face.clone(), key.size);
+            let settings_key = (key.face.clone(), key.size, key.weight);
             if !self.settings.contains_key(&settings_key) {
                 if self.settings.len() >= 128 {
                     self.settings.clear();
@@ -82,6 +95,7 @@ impl Raster {
                         key.face.index,
                         family,
                         f32::from_bits(key.size),
+                        key.weight,
                     ),
                 );
             }
@@ -109,8 +123,8 @@ pub(crate) fn with_image(
     let Some(face) = fonts.db().face(cache_key.font_id) else {
         return false;
     };
-    let file = match &face.source {
-        Source::File(path) | Source::SharedFile(path, _) => path,
+    let (file, data) = match &face.source {
+        Source::SharedFile(path, data) => (path, Arc::clone(data)),
         _ => return false,
     };
     let key = GlyphKey {
@@ -135,7 +149,10 @@ pub(crate) fn with_image(
         if state.is_none() {
             *state = Raster::new();
         }
-        let Some(image) = state.as_mut().and_then(|raster| raster.image(key, family)) else {
+        let Some(image) = state
+            .as_mut()
+            .and_then(|raster| raster.image(key, family, Some(data)))
+        else {
             return false;
         };
         f(image);
@@ -190,11 +207,12 @@ pub(crate) fn with_pixels(
 }
 
 /// 【界面字体】【FreeType 绘制】按 library、face、key 与 settings 返回真实字形，应用字号、字重、微调、抗锯齿和 LCD 滤镜
-fn render(library: &Library, face: &Face, key: &GlyphKey, settings: Settings) -> Option<Glyph> {
+fn render<B>(library: &Library, face: &Face<B>, key: &GlyphKey, settings: Settings) -> Option<Glyph> {
     let size = f32::from_bits(key.size);
     if !size.is_finite() || !(0.0..=1024.0).contains(&size) || size == 0.0 {
         return None;
     }
+    // 1. 【界面字体】【度量同步】字号、字重和亚像素位置保持与排版缓存一致
     variation::set_weight(library, face, key.weight);
     face.set_char_size(0, (size * 64.0).round() as isize, 72, 72)
         .ok()?;
@@ -221,14 +239,15 @@ fn render(library: &Library, face: &Face, key: &GlyphKey, settings: Settings) ->
     } else {
         RenderMode::Normal
     };
+    // 2. 【界面字体】【微调分离】轻微微调独立于 LCD 输出模式，保留 Fontconfig 对轮廓的选择
     let mut flags = if !settings.antialias {
         LoadFlag::TARGET_MONO | LoadFlag::MONOCHROME
+    } else if settings.hintstyle == 1 {
+        LoadFlag::TARGET_LIGHT
     } else if lcd && vertical {
         LoadFlag::TARGET_LCD_V
     } else if lcd {
         LoadFlag::TARGET_LCD
-    } else if settings.hintstyle == 1 {
-        LoadFlag::TARGET_LIGHT
     } else {
         LoadFlag::TARGET_NORMAL
     };
@@ -247,6 +266,7 @@ fn render(library: &Library, face: &Face, key: &GlyphKey, settings: Settings) ->
     if lcd {
         set_lcd_filter(library, settings.lcd_filter)?;
     }
+    // 3. 【界面字体】【位图生成】只复制当前字形像素，不保留 FreeType 可变位图指针
     face.load_glyph(u32::from(key.glyph), flags | LoadFlag::COLOR)
         .ok()?;
     face.glyph().render_glyph(mode).ok()?;
