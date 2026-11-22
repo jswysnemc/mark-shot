@@ -56,6 +56,29 @@ fn unlocked_crash_leftover_does_not_keep_windows_hidden() {
     assert!(!watch.requested().unwrap());
 }
 
+/// 【截图窗口测试】【空闲唤醒】无参数，读取崩溃遗留租约不能再次唤醒监听，否则事件循环会持续扫描同一文件
+#[test]
+fn inspecting_stale_lease_does_not_wake_the_window() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("lease-process-1-stale");
+    std::fs::write(&path, "process:1").unwrap();
+    let (wake, events) = mpsc::channel();
+    let mut watch = Watch::in_directory(directory.path(), move || {
+        let _ = wake.send(());
+    })
+    .unwrap();
+    for _ in 0..10 {
+        assert!(!watch.requested().unwrap());
+        watch.applied().unwrap();
+    }
+    assert!(
+        events.recv_timeout(Duration::from_millis(100)).is_err(),
+        "读取租约触发了新的窗口唤醒"
+    );
+    std::fs::remove_file(path).unwrap();
+    events.recv_timeout(Duration::from_secs(2)).unwrap();
+}
+
 /// 【贴图编辑测试】【定向隔离】无参数，验证目标窗口隐藏并恢复，其他进程租约及窗口不会误隐藏或阻塞交接
 #[test]
 fn scoped_edit_lease_hides_only_the_origin_and_restores_it_on_drop() {

@@ -19,6 +19,7 @@ use wayland_protocols::wp::{
 };
 
 pub(super) struct Preview {
+    pub image: Option<super::image_surface::ImageSurface>,
     pub layer: LayerSurface,
     pub output: wl_output::WlOutput,
     pub placement: Placement,
@@ -88,6 +89,7 @@ impl Pin {
                 .info(output)
                 .map_or(1.0, |info| info.scale_factor.max(1) as f32);
             self.preview = Some(Preview {
+                image: None,
                 layer,
                 output: output.clone(),
                 placement,
@@ -137,6 +139,21 @@ impl Pin {
             let Some(index) = buffer(&mut self.pool, &mut preview.buffers, size)? else {
                 return Ok(());
             };
+            if self.composited_image() {
+                self.upload_image()?;
+                if preview.image.is_none() {
+                    preview.image = Some(super::image_surface::ImageSurface::new(
+                        self,
+                        preview.layer.wl_surface(),
+                        qh,
+                    )?);
+                }
+                preview.image.as_mut().unwrap().update(
+                    self.image_source.as_ref().unwrap(),
+                    preview.placement,
+                    &mut self.pool,
+                )?;
+            }
             let canvas = self.draw_image(size, scale, preview.placement)?;
             let buffer = &preview.buffers[index];
             crate::utils::copy_swizzled(

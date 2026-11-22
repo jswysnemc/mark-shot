@@ -30,7 +30,16 @@ impl Watch {
         let mut watcher =
             notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
                 if event.as_ref().is_ok_and(|event| {
-                    event.paths.iter().any(|path| {
+                    // 1. 【截图窗口】【监听过滤】租约检查产生的打开和关闭事件不能反过来唤醒窗口，避免遗留文件造成空闲循环
+                    matches!(
+                        event.kind,
+                        notify::EventKind::Create(_)
+                            | notify::EventKind::Remove(_)
+                            | notify::EventKind::Modify(notify::event::ModifyKind::Data(_))
+                            | notify::EventKind::Modify(notify::event::ModifyKind::Name(_))
+                            | notify::EventKind::Modify(notify::event::ModifyKind::Any)
+                            | notify::EventKind::Any
+                    ) && event.paths.iter().any(|path| {
                         path.file_name()
                             .is_some_and(|name| name.to_string_lossy().starts_with("lease-"))
                     })

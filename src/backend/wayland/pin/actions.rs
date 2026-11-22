@@ -91,6 +91,7 @@ impl Pin {
                 PinAction::RotateLeft | PinAction::RotateRight => {
                     self.clear_ocr();
                     self.image.rotate(action == PinAction::RotateRight)?;
+                    self.image_source = None;
                     self.resize(true, qh);
                     if self.text_selection {
                         self.start_ocr()?;
