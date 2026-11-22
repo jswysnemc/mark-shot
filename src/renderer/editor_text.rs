@@ -14,8 +14,53 @@ pub(crate) fn draw_editor(
         selection_color,
         selected_text_color,
     ]: [cosmic_text::Color; 4],
+    f: impl FnMut(i32, i32, u32, u32, cosmic_text::Color),
+) {
+    draw(
+        editor,
+        font_system,
+        swash_cache,
+        scale,
+        [
+            text_color,
+            cursor_color,
+            selection_color,
+            selected_text_color,
+        ],
+        false,
+        f,
+    );
+}
+
+/// 【界面文字】【编辑输出】按 editor、font_system、swash_cache、scale 和 colors 绘制界面正文；f 接收像素，应用 Fontconfig 灰度配置
+pub(crate) fn draw_ui_editor(
+    editor: &mut Editor<'static>,
+    font_system: &mut cosmic_text::FontSystem,
+    swash_cache: &mut SwashCache,
+    scale: f32,
+    colors: [cosmic_text::Color; 4],
+    f: impl FnMut(i32, i32, u32, u32, cosmic_text::Color),
+) {
+    draw(editor, font_system, swash_cache, scale, colors, true, f);
+}
+
+/// 【文字绘制】【编辑分流】按 editor、font_system、swash_cache、scale、colors 与 ui 绘制，f 接收物理像素；仅界面使用系统渲染配置
+fn draw(
+    editor: &mut Editor<'static>,
+    font_system: &mut cosmic_text::FontSystem,
+    swash_cache: &mut SwashCache,
+    scale: f32,
+    [
+        text_color,
+        cursor_color,
+        selection_color,
+        selected_text_color,
+    ]: [cosmic_text::Color; 4],
+    ui: bool,
     mut f: impl FnMut(i32, i32, u32, u32, cosmic_text::Color),
 ) {
+    #[cfg(not(target_os = "linux"))]
+    let _ = ui;
     editor.with_buffer_mut(|buffer| buffer.shape_until_scroll(font_system, false));
     let selection_bounds = editor.selection_bounds();
     let cursor = editor.cursor();
@@ -66,6 +111,19 @@ pub(crate) fn draw_editor(
                     && (end.line != line_i || glyph.start < end.index)
                 {
                     color = selected_text_color;
+                }
+                #[cfg(target_os = "linux")]
+                if ui
+                    && crate::fonts::ui_raster::with_pixels(
+                        font_system,
+                        physical.cache_key,
+                        color,
+                        |x, y, c| {
+                            f(physical.x + x, physical.y + y, 1, 1, c);
+                        },
+                    )
+                {
+                    continue;
                 }
                 swash_cache.with_pixels(font_system, physical.cache_key, color, |x, y, c| {
                     // 1. 【文字绘制】【字形透明度】Swash 的掩模像素不包含基础颜色 alpha，在字形回调中融合一次，不影响光标与选区

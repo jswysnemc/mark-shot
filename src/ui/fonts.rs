@@ -1,19 +1,17 @@
-//! 【界面字库】【按需加载】独立窗口共用一次性系统字库加载状态
+//! 【界面字库】【按需加载】独立窗口定向匹配系统家族，只补充实际显示内容的缺字
 
 use cosmic_text::FontSystem;
 use std::ops::{Deref, DerefMut};
 
 pub struct UiFonts {
     system: FontSystem,
-    loaded: bool,
 }
 
 impl UiFonts {
-    /// 【界面字库】【轻量创建】创建只含内置字体的字库；不扫描系统目录，不创建线程
+    /// 【界面字库】【轻量创建】无参数，返回定向匹配系统家族的字库，不枚举全部字体，不创建线程
     pub fn new() -> Self {
         Self {
-            system: crate::fonts::bundled(),
-            loaded: false,
+            system: crate::fonts::ui_system::new(),
         }
     }
 
@@ -26,17 +24,14 @@ impl UiFonts {
         value
     }
 
-    /// 【界面字库】【Unicode 补充】text 非 ASCII 时最多加载一次系统字库；同一窗口的全部字段共享结果
+    /// 【界面字库】【Unicode 补充】按 text 只加载实际缺失字形，当前窗口复用匹配字体，无返回值
     pub fn ensure_text(&mut self, text: &str) {
-        if !self.loaded && !text.is_ascii() {
-            crate::fonts::add_system(&mut self.system, crate::fonts::system());
-            self.loaded = true;
-        }
+        crate::fonts::ui_fallback::ensure_text(&mut self.system, text);
     }
 }
 
 impl Default for UiFonts {
-    /// 【界面字库】【默认创建】返回轻量字库状态，不执行系统字体发现
+    /// 【界面字库】【默认创建】无参数，返回定向加载系统家族的轻量字库
     fn default() -> Self {
         Self::new()
     }
@@ -51,7 +46,7 @@ impl Deref for UiFonts {
 }
 
 impl DerefMut for UiFonts {
-    /// 【界面字库】【排版访问】返回可变字体系统引用，加载标志仍由当前状态维护
+    /// 【界面字库】【排版访问】无参数，返回可变字体系统引用，缺字仍按当前内容定向补充
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.system
     }
@@ -60,16 +55,14 @@ impl DerefMut for UiFonts {
 #[cfg(test)]
 mod tests {
     use super::*;
-    /// 【界面字库测试】【重复请求】ASCII 不加载外部字体，Unicode 字库只补充一次且保留内置字形
+    /// 【界面字库测试】【重复请求】无参数，相同 Unicode 内容不重复加载字体，内置字形继续保留
     #[test]
     fn unicode_loading_is_shared_and_one_shot() {
         let mut fonts = UiFonts::new();
         fonts.ensure_text("plain");
-        assert!(!fonts.loaded);
         fonts.ensure_text("会议");
         let count = fonts.db().len();
-        fonts.ensure_text("日本語");
-        assert!(fonts.loaded);
+        fonts.ensure_text("会议");
         assert_eq!(fonts.db().len(), count);
         assert!(count >= 5);
     }

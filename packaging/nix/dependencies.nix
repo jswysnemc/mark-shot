@@ -14,6 +14,7 @@ rec {
   nativeCheckInputs = with pkgs; [ dbus ];
   buildInputs = with pkgs; [
     fontconfig
+    freetype
     openssl
     libxkbcommon
     libxcb

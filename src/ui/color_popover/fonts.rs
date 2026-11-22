@@ -34,33 +34,10 @@ impl PickerFonts {
         }
         text.chars().count()
     }
-    /// 【属性取色】【字体就绪】查询 Qt 使用的 Sans Serif 常规与半粗字体；返回独立字库，查询失败保留内置回退
+    /// 【属性取色】【字体就绪】无参数，返回系统首选 Sans Serif 常规与半粗字体，查询失败保留内置回退
     pub fn new() -> Self {
-        let mut system = crate::fonts::bundled();
-        let mut family = None;
-        // 1. 【属性取色】【定向查询】每种字重只读取匹配文件，不创建常驻进程或后台线程
-        for pattern in ["sans-serif", "sans-serif:weight=demibold"] {
-            if let Ok(output) = std::process::Command::new("fc-match")
-                .args(["-f", "%{file}", pattern])
-                .output()
-                && output.status.success()
-                && let Ok(file) = std::str::from_utf8(&output.stdout)
-            {
-                let path = std::path::Path::new(file.trim());
-                if path.is_file() && system.db_mut().load_font_file(path).is_ok() {
-                    family = system
-                        .db()
-                        .faces()
-                        .last()
-                        .and_then(|face| face.families.first().map(|item| item.0.clone()));
-                }
-            }
-        }
-        if let Some(family) = family {
-            system.db_mut().set_sans_serif_family(family);
-        }
         Self {
-            system,
+            system: crate::fonts::ui_system::new(),
             swash: SwashCache::new(),
         }
     }

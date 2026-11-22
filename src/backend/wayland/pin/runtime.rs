@@ -388,7 +388,7 @@ pub(super) fn run_at_seed(
         preview: None,
         clicks: Default::default(),
         popup: None,
-        font_system: crate::fonts::bundled(),
+        font_system: crate::fonts::ui_system::new(),
         swash: cosmic_text::SwashCache::new(),
         icons: crate::app::load_icons_cache(),
         text: Default::default(),

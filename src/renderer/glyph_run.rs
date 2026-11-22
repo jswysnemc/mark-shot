@@ -18,6 +18,22 @@ impl Painter<'_> {
                 Color::from_rgba8(color.r(), color.g(), color.b(), color.a())
             });
             let physical = glyph.physical((0.0, 0.0), scale);
+            #[cfg(target_os = "linux")]
+            if crate::fonts::ui_raster::with_image(
+                fonts.system,
+                physical.cache_key,
+                true,
+                |image| {
+                    let x = (pos.0 * scale + physical.x as f32 + image.left as f32
+                        - offset.0 * scale) as i32;
+                    let y = ((pos.1 + run.line_y) * scale + physical.y as f32
+                        - image.top as f32
+                        - offset.1 * scale) as i32;
+                    crate::fonts::ui_raster::blend::paint(self.canvas, image, (x, y), color);
+                },
+            ) {
+                continue;
+            }
             if let Some(image) = fonts.cache.get_image(fonts.system, physical.cache_key) {
                 let width = image.placement.width;
                 let height = image.placement.height;

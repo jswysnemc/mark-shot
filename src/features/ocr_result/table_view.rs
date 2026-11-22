@@ -38,11 +38,7 @@ impl TableView {
     /// 【文字识别】【表格视区】用 table、fonts 创建稳定内容列宽和原版固定行高，返回独立视区；字体与颜色不改变其他窗口
     pub fn new(table: Table, fonts: &mut FontSystem) -> Self {
         let rows = RowGeometry::new(&table);
-        let mut header_fonts = crate::fonts::bundled();
-        let family =
-            crate::fonts::text_faces::family(&mut header_fonts, "DejaVu Sans", false, false);
-        crate::fonts::text_faces::family(&mut header_fonts, &family, true, false);
-        header_fonts.db_mut().set_sans_serif_family(family);
+        let mut header_fonts = crate::fonts::ui_system::new();
         let columns = Columns::new(&table, fonts, &mut header_fonts);
         Self {
             table,

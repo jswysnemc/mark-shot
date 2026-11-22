@@ -65,7 +65,7 @@ impl Guide {
         let mut result = Self {
             models,
             panel,
-            fonts: crate::fonts::bundled(),
+            fonts: crate::fonts::ui_system::new(),
             cache: cosmic_text::SwashCache::new(),
             icons: crate::app::load_icons_cache(),
             completion,
