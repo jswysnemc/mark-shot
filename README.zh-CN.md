@@ -21,7 +21,7 @@ Mark Shot 冻结屏幕画面，由用户框选区域并添加标注，然后复�
 程序使用 Rust 编写，界面由自身的软件渲染器绘制，不依赖 Qt、GTK 或 WebView。
 
 > **当前状态。** `main` 为原生 Rust 重写版本，当前正式版为
-> [0.2.3](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.3)。
+> [0.2.4](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.4)。
 > 0.1.x 安装包属于此前的 Qt 实现，源码保留在
 > [`qt-old`](https://github.com/jswysnemc/mark-shot/tree/qt-old) 分支。
 > Linux 的 Wayland 与 X11 是主要目标平台。Windows 版本可以运行，但尚未在真实 Windows 设备上完成全部验证。
@@ -61,7 +61,7 @@ wlr-layer-shell，程序才能控制贴图置顶。
 
 ### 1. 下载预编译安装包（推荐）
 
-下载 [0.2.3](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.3)，
+下载 [0.2.4](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.4)，
 按发行版和架构选择安装包。发布页面的折叠列表展示文件及 SHA-256，摘要文件不再作为独立资产上传。
 校验方法和可用格式见[安装说明](docs/zh-CN/installation.md)。
 
@@ -112,6 +112,7 @@ mark-shot --settings         # 打开设置
 | [屏幕录制](docs/zh-CN/recording.md) | 格式、音频、控制命令、各平台实现 |
 | [桌面集成](docs/zh-CN/desktop-integration.md) | 合成器按键绑定、全局快捷键、托盘、后台服务 |
 | [平台支持](docs/zh-CN/platform-support.md) | 各桌面的能力与限制 |
+| [界面字体](doc/zh-CN/ui-fonts.md) | Linux 界面字体匹配与 Fontconfig 渲染配置 |
 | [开发说明](docs/zh-CN/development.md) | 仓库结构、架构、测试、打包 |
 
 英文版本位于 [docs](docs/README.md)。

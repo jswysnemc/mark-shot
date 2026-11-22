@@ -1,3 +1,12 @@
+mark-shot (0.2.4-1) unstable; urgency=medium
+
+  * Improve KDE Wayland pinned image movement, scaling and idle CPU usage.
+  * Honor Linux Fontconfig UI font matching and rendering while preserving annotation exports.
+  * Improve scrolling screenshot recovery and text rendering transition matching.
+  * Add rich text clipboard pins and active-window capture shortcuts.
+
+ -- Mark Shot maintainers <snemc@qq.com>  Mon, 23 Nov 2026 04:35:00 +0900
+
 mark-shot (0.2.3-1) unstable; urgency=medium
 
   * Add sharp and rounded arrow tails, multiply blend mode for highlighters, and dynamic dashed text editing outlines.
