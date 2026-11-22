@@ -14,12 +14,14 @@ mod long_image;
 mod long_rows;
 mod matching;
 mod motion_mask;
+mod overlap_evidence;
 mod owned_image;
 mod pixel_block;
 pub mod profile;
 mod recovery_search;
 mod seam;
 mod session;
+mod texture_consistency;
 mod types;
 
 pub use image_view::StitchedView;

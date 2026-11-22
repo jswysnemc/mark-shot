@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>Forum scroll regression</title>
+<style>
+  * { box-sizing: border-box; }
+  html { background: white; font-family: sans-serif; font-size: 16px; }
+  body { margin: 0; width: 1000px; }
+  .topic { height: 52px; border-bottom: 1px solid #eee; display: grid; grid-template-columns: 690px 150px 55px 65px 40px; align-items: center; }
+  .title { margin: 0 16px; font-size: .875rem; line-height: 1.25rem; color: #333; white-space: nowrap; }
+  .tags { display: flex; gap: 6px; margin: 0 16px; font-size: .6875rem; line-height: .875rem; color: #777; }
+  .tag { background: #eee; padding: 0 5px; }
+  .avatars { display: flex; gap: 4px; }
+  .avatar { width: 18px; height: 18px; border-radius: 50%; font-size: .625rem; display: grid; place-items: center; color: white; }
+  .count, .date { font-size: .6875rem; text-align: center; color: #666; }
+  .views { color: #ef7300; }
+</style>
+<main id="topics"></main>
+<script>
+  /** 【论坛回归】【页面生成】无参数，创建有唯一标题及头像组合的长列表，无返回值 */
+  function createTopics() {
+    const fragments = ['浏览器窗口测试', '桌面截图交流', '软件功能讨论', '输入法设置问题', '页面滚动与排版', '开发环境配置'];
+    // 1. 【论坛回归】【稳定正文】每行保留不同标题及头像，所有元素随正文滚动，无固定区域
+    for (let index = 0; index < 500; index++) {
+      const row = document.createElement('article');
+      row.className = 'topic';
+      const title = `${fragments[index % fragments.length]} ${index + 1}：${'记录原始页面像素，检查列表能否继续完整拼接'.slice(0, 12 + index % 13)}`;
+      const people = Array.from({length: 2 + index % 4}, (_, person) =>
+        `<span class="avatar" style="background:hsl(${(index * 37 + person * 71) % 360} 45% 58%)">${(index + person) % 10}</span>`).join('');
+      row.innerHTML = `<div><p class="title">${title}</p><div class="tags"><span class="tag">软件交流</span><span class="tag">${fragments[(index + 1) % fragments.length]}</span></div></div><div class="avatars">${people}</div><span class="count replies">${3 + index % 93}</span><span class="count views">${100 + (index * 97) % 8000}</span><span class="date">2 分钟</span>`;
+      document.querySelector('#topics').append(row);
+    }
+  }
+  /** 【论坛回归】【局部更新】按 phase 更新回复、时间和头像像素，无返回值，标题及布局保持原样 */
+  function updateCounters(phase) {
+    // 1. 【论坛回归】【动态字段】每行更新的位置分散在整个重叠区域，不能依赖一百行连续不变
+    document.querySelectorAll('.topic').forEach((row, index) => {
+      row.querySelector('.replies').textContent = phase === 0 ? String(3 + index % 93) : String(10 + (index * 13 + phase * 7) % 83);
+      row.querySelector('.date').textContent = phase === 0 ? '2 分钟' : `${3 + phase % 5} 分钟`;
+      // 2. 【论坛回归】【头像变化】模拟延迟加载或动画头像，变化只占每行十八像素高度
+      row.querySelectorAll('.avatar').forEach((avatar, person) => {
+        avatar.style.background = `hsl(${(index * 37 + person * 71 + phase * 89) % 360} 45% 58%)`;
+        avatar.textContent = String((index + person + phase * 3) % 10);
+      });
+    });
+  }
+  createTopics();
+</script>
+</html>
