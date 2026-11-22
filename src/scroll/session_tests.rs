@@ -36,6 +36,52 @@ fn region() -> Rect {
 
 const CROP: (u32, u32, u32, u32) = (0, 0, 40, 160);
 
+/// 【滚动截图测试】【宽背景正文】无参数和返回值，采集层不能将稀疏文字的移动帧误判为相同画面
+#[test]
+fn wide_capture_keeps_narrow_text_motion() {
+    // 1. 【滚动截图测试】【宽选区】固定宽背景与四十像素正文，经过真实会话重复帧检测
+    let mut session =
+        ScrollSession::new(Rect::from_xywh(0.0, 0.0, 1280.0, 400.0).unwrap(), 0).unwrap();
+    // 2. 【滚动截图测试】【连续消费】逐帧生成原图，位移和最终高度必须与输入一致
+    for step in 0..=12 {
+        let origin = step * 83;
+        let pixels = (origin..origin + 400)
+            .flat_map(|y| {
+                (0..1280).map(move |x| {
+                    let hash = (y as u32).wrapping_mul(2_654_435_761).rotate_left(7)
+                        ^ (x as u32).wrapping_mul(2_246_822_519);
+                    let value = if (540..580).contains(&x) && y % 28 < 16 {
+                        20 + hash % 140
+                    } else {
+                        250
+                    };
+                    0xff00_0000 | value << 16 | value << 8 | value
+                })
+            })
+            .collect();
+        let image = shot_image::Image::from_pixels(1280, 400, pixels).unwrap();
+        let accepted = if step % 2 == 0 {
+            let mut capture = page_frame(0, 1280, 400);
+            for y in 0..400 {
+                for (x, &pixel) in image.row(y).iter().enumerate() {
+                    let offset = y as usize * capture.pw_stride as usize + x * 4;
+                    capture.pixels[offset..offset + 4].copy_from_slice(&[
+                        (pixel >> 16) as u8,
+                        (pixel >> 8) as u8,
+                        pixel as u8,
+                        (pixel >> 24) as u8,
+                    ]);
+                }
+            }
+            session.push_capture(capture, (0, 0, 1280, 400)).unwrap()
+        } else {
+            session.push(image)
+        };
+        assert!(accepted, "frame={step}, status={}", session.status);
+        assert_eq!(session.total_height, origin + 400);
+    }
+}
+
 #[test]
 fn scrolling_frames_stitch_into_one_tall_image() {
     let mut session = ScrollSession::new(region(), 0).unwrap();

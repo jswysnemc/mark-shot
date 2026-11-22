@@ -1,6 +1,7 @@
 // Scrolling capture: frame cropping, preview thumbnails, panel and session state.
 
 pub mod frame;
+mod frame_fingerprint;
 pub mod panel;
 pub(crate) mod png;
 pub mod preview;

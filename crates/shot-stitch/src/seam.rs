@@ -23,10 +23,12 @@ pub(crate) fn refine(
     };
     let mut best_rows = rows(offset);
     if best_rows >= stitcher.config.min_overlap {
-        return (offset, confidence);
+        // 1. 【长图拼接】【像素优先】连续正文已证实位移，阴影改变整段特征评分不能覆盖原始像素证据
+        return (offset, 0.0);
     }
     let mut best = (offset, confidence);
-    for candidate in [stitcher.last_offset, stitcher.find_inner_offset(cols).0] {
+    let alternatives = stitcher.find_inner_offsets(cols);
+    for candidate in [stitcher.last_offset, alternatives[0].0, alternatives[1].0] {
         if candidate == best.0 || !stitcher.reachable(stitcher.anchor + candidate, frame.height()) {
             continue;
         }
@@ -35,6 +37,10 @@ pub(crate) fn refine(
             best = (candidate, 0.0);
             best_rows = matching;
         }
+    }
+    // 1. 【长图拼接】【恢复交接】签名看似通过但像素证据不足时，交给历史和边缘恢复，不能直接丢弃本帧
+    if best_rows < stitcher.config.min_overlap {
+        best.1 = crate::types::NO_MATCH;
     }
     best
 }
@@ -47,8 +53,15 @@ pub(crate) fn find(
     edge: Edge,
 ) -> Option<Replacement> {
     let long = &stitcher.long;
-    let span = stitcher.motion.moving_span(frame.width());
     let excluded = (stitcher.fixed.top(), stitcher.fixed.bottom());
+    let span = crate::content_span::refine(
+        long,
+        stitcher.last_frame.as_ref(),
+        frame,
+        position,
+        stitcher.motion.moving_span(frame.width()),
+        excluded,
+    );
     // 1. 【滚动截图】【边缘排除】两帧固定区域都不参与连接，坐标始终以已有长图正文为准
     let start = excluded.0.max(position + excluded.0).max(0);
     let end = (long.height() - excluded.1).min(position + frame.height() - excluded.1);

@@ -50,13 +50,16 @@ impl Stitcher {
         self.offset_in(cols, self.window())
     }
 
-    /// 【滚动截图】【正文位移】按 cols 排除视口两端后重试匹配，返回待原始像素校验的候选
-    pub(crate) fn find_inner_offset(&self, cols: &Signature) -> (i32, f32) {
-        let mut window = self.window();
-        let margin = cols.len() as i32 / 4;
-        window.top = window.top.max(margin);
-        window.bottom = window.bottom.max(margin);
-        self.offset_in(cols, window)
+    /// 【滚动截图】【正文位移】按 cols 排除视口两端后重试匹配，返回两种裁切幅度的候选，供原始像素复核
+    pub(crate) fn find_inner_offsets(&self, cols: &Signature) -> [(i32, f32); 2] {
+        // 1. 【长图拼接】【裁切分级】较大位移可能只剩短重叠，保留较小边距候选，不能统一丢弃四分之一视口
+        [4, 6].map(|divisor| {
+            let mut window = self.window();
+            let margin = cols.len() as i32 / divisor;
+            window.top = window.top.max(margin);
+            window.bottom = window.bottom.max(margin);
+            self.offset_in(cols, window)
+        })
     }
 
     /// 【滚动截图】【限定匹配】按 cols 和 window 搜索相邻帧位移，返回最佳位置及差异

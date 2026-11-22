@@ -50,14 +50,32 @@ impl FixedRegions {
     }
 
     pub fn observe(&mut self, previous: &Image, current: &Image, offset: i32) -> Observation {
+        let side = side_ignore(current.width());
+        self.observe_span(
+            previous,
+            current,
+            offset,
+            (side, current.width() - side * 2),
+        )
+    }
+
+    /// 【长图拼接】【固定区域观察】按 previous、current、offset 和运动正文 span 返回固定顶底栏，更新检测状态
+    pub(crate) fn observe_span(
+        &mut self,
+        previous: &Image,
+        current: &Image,
+        offset: i32,
+        span: (i32, i32),
+    ) -> Observation {
         if offset.unsigned_abs() < 12
             || previous.width() != current.width()
             || previous.height() != current.height()
         {
             return Observation::default();
         }
-        let header = scan(previous, current, false);
-        let footer = scan(previous, current, true);
+        // 1. 【长图拼接】【正文范围】不能裁掉窄正文后只比较空白，否则整幅视口会被误认成固定栏
+        let header = scan(previous, current, false, span);
+        let footer = scan(previous, current, true, span);
         self.header.update(header);
         self.footer.update(footer);
         Observation {
@@ -68,9 +86,8 @@ impl FixedRegions {
     }
 }
 
-fn scan(previous: &Image, current: &Image, bottom: bool) -> i32 {
-    let side = side_ignore(current.width());
-    let width = current.width() - side * 2;
+/// 【长图拼接】【固定边缘扫描】按 previous、current、bottom 和 span 返回从指定边缘连续不变的行数
+fn scan(previous: &Image, current: &Image, bottom: bool, span: (i32, i32)) -> i32 {
     let mut count = 0;
     while count < current.height() / 3 {
         let y = if bottom {
@@ -78,7 +95,7 @@ fn scan(previous: &Image, current: &Image, bottom: bool) -> i32 {
         } else {
             count
         };
-        if row_diff(previous.row(y), current.row(y), side, width) > ROW_MAX_DIFF {
+        if row_diff(previous.row(y), current.row(y), span.0, span.1) > ROW_MAX_DIFF {
             break;
         }
         count += 1;
