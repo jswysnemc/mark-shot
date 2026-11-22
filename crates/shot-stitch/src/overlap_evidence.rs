@@ -7,11 +7,11 @@ use std::ops::Range;
 pub(crate) struct Overlap {
     pub clean_rows: i32,
     pub textured_rows: i32,
-    pub continuous_rows: i32,
+    pub textured_run_rows: i32,
     pub seam: Range<i32>,
 }
 
-/// 【长图拼接】【重叠扫描】按 long、frame、position、span 和 range 返回清晰行总数、纹理行数、连续纹理段长度及最长干净接缝段，不复制像素
+/// 【长图拼接】【重叠扫描】按 long、frame、position、span 和 range 返回清晰行总数、纹理行数、含八行纹理的最长连续清晰段长度及最长干净接缝段，不复制像素
 pub(crate) fn scan(
     long: &LongImage,
     frame: &Image,
@@ -22,7 +22,7 @@ pub(crate) fn scan(
     let mut result = Overlap {
         clean_rows: 0,
         textured_rows: 0,
-        continuous_rows: 0,
+        textured_run_rows: 0,
         seam: range.start..range.start,
     };
     let mut run_start = range.start;
@@ -45,7 +45,7 @@ pub(crate) fn scan(
                 run_textured += 1;
             }
             if run_textured >= 8 {
-                result.continuous_rows = result.continuous_rows.max(vertical + 1 - run_start);
+                result.textured_run_rows = result.textured_run_rows.max(vertical + 1 - run_start);
             }
             if vertical + 1 - run_start > result.seam.end - result.seam.start {
                 result.seam = run_start..vertical + 1;
