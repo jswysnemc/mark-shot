@@ -75,13 +75,19 @@ impl PinnedImage {
         previous != self.size()
     }
 
-    /// 【贴图】【预览缩放】按 requested 设置原版滚轮与菜单倍率；限制到 0.1–6 倍和最小二十四像素，不限制屏幕
+    /// 【贴图】【预览缩放】按 requested 设置原版滚轮与菜单倍率；跨越原始尺寸时吸附到 100%，限制到 0.1–6 倍和最小二十四像素，不限制屏幕
     pub fn scale(&mut self, requested: f32) -> bool {
         if !requested.is_finite() || requested <= 0.0 {
             return false;
         }
         let previous = self.size();
-        let zoom = requested.clamp(0.1, 6.0);
+        let requested = requested.clamp(0.1, 6.0);
+        // 1. 【贴图】【百倍吸附】显示尺寸按整数像素量化，往返缩放会跳过原始宽度，跨越原始倍率时对齐到 100%
+        let zoom = if (self.zoom - 1.0) * (requested - 1.0) < 0.0 {
+            1.0
+        } else {
+            requested
+        };
         let width = (self.image.width() as f32 / self.density).round().max(1.0);
         let height = (self.image.height() as f32 / self.density).round().max(1.0);
         self.set_size((
@@ -127,5 +133,45 @@ impl PinnedImage {
     pub fn png(&self) -> AppResult<Vec<u8>> {
         // 1. 【贴图】【原图编码】使用截图相同的透明颜色舍入，避免复制、保存和再次编辑改变交接像素
         Ok(crate::utils::encode_png_with_alpha(self.image.clone()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 【贴图测试】【图像构造】按 width、height 创建纯色原图，返回与真实解码一致的显示状态
+    fn image(width: u32, height: u32) -> PinnedImage {
+        let rgba = vec![255; (width * height * 4) as usize];
+        PinnedImage::decode(&crate::utils::encode_rgba(&rgba, width, height), 1.0).unwrap()
+    }
+
+    /// 【贴图测试】【百倍吸附】验证跨越原始尺寸时对齐到 100%，不再停留在量化后的 101%
+    #[test]
+    fn zoom_crossing_the_original_size_snaps_to_one_hundred_percent() {
+        let mut image = image(174, 100);
+        let original = image.size();
+        image.scale(0.93);
+        assert_ne!(image.zoom, 1.0);
+        image.scale(image.zoom * 1.08);
+        assert_eq!(image.size(), original);
+        assert_eq!(image.zoom, 1.0);
+        // 1. 【贴图测试】【反向跨越】从原始尺寸以上缩小同样吸附，保证两个方向都能回到 100%
+        image.scale(1.08);
+        image.scale(image.zoom / 1.08 * 0.99);
+        assert_eq!(image.size(), original);
+        assert_eq!(image.zoom, 1.0);
+    }
+
+    /// 【贴图测试】【正常步进】验证未跨越原始尺寸时仍按倍率缩放，不被吸附干扰
+    #[test]
+    fn zoom_steps_away_from_the_original_size_are_not_snapped() {
+        let mut image = image(174, 100);
+        let original = image.size();
+        image.scale(0.93);
+        assert!(image.zoom < 1.0);
+        image.scale(image.zoom * 0.9);
+        assert!(image.zoom < 0.9);
+        assert!(image.size().0 < original.0);
     }
 }
