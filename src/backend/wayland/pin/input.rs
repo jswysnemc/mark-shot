@@ -150,6 +150,7 @@ impl PointerHandler for Pin {
                             drag.pointer = drag.global(position);
                         }
                         self.resize(false, qh);
+                        self.feedback.zoom(self.image.zoom);
                     }
                 }
                 _ => {}
