@@ -41,6 +41,16 @@ fn report_window_binding(shortcuts: &[Shortcut], reporter: &Reporter) -> bool {
     }
 }
 
+/// 【全局快捷键】【绑定完整检查】按 shortcuts 与 require_window 判断所需快捷键是否均已有非空触发描述
+fn has_all_bindings(shortcuts: &[Shortcut], require_window: bool) -> bool {
+    let has = |id: &str| {
+        shortcuts.iter().any(|shortcut| {
+            shortcut.id() == id && !shortcut.trigger_description().trim().is_empty()
+        })
+    };
+    has("screenshot") && (!require_window || has("active-window"))
+}
+
 /// 【全局快捷键】【动作路由】按 id 返回截图动作，忽略其他门户快捷键，不创建界面
 fn action(id: &str) -> Option<Action> {
     match id {
@@ -113,13 +123,25 @@ pub(super) async fn run(
             )
             .await?
             .response()?;
-        // 1. 【全局快捷键】【空绑定恢复】门户可能保留取消授权后的空绑定，仅首次响应请求系统配置
-        let bound = report_binding(response.shortcuts(), reporter);
-        let window_bound = window_shortcut.is_none() || report_window_binding(response.shortcuts(), reporter);
-        if (!bound || !window_bound) && portal.version() >= 2
-            && let Err(error) = portal.configure_shortcuts(&session, None, Default::default()).await
-        {
-            log::error!("【全局快捷键】【系统配置】无法打开快捷键配置: {error}");
+        // 1. 【全局快捷键】【绑定核对】部分桌面门户的 BindShortcuts 响应不完整，缺失时用 ListShortcuts 核对真实绑定
+        let bound_shortcuts = if has_all_bindings(response.shortcuts(), window_shortcut.is_some()) {
+            response.shortcuts().to_vec()
+        } else {
+            match portal.list_shortcuts(&session, Default::default()).await {
+                Ok(request) => match request.response() {
+                    Ok(listed) if !listed.shortcuts().is_empty() => listed.shortcuts().to_vec(),
+                    _ => response.shortcuts().to_vec(),
+                },
+                Err(error) => {
+                    log::info!("【全局快捷键】【绑定核对】无法读取已有绑定列表: {error}");
+                    response.shortcuts().to_vec()
+                }
+            }
+        };
+        // 2. 【全局快捷键】【非侵入汇报】仅汇报实际绑定状态，后台启动不主动弹出系统快捷键设置窗口打扰用户
+        report_binding(&bound_shortcuts, reporter);
+        if window_shortcut.is_some() {
+            report_window_binding(&bound_shortcuts, reporter);
         }
         loop {
             tokio::select! {

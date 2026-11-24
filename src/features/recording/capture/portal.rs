@@ -1,7 +1,7 @@
 //! 【门户录制】【授权绑定】自己持有授权会话与持续 PipeWire，不把来源选择交给外部录制器
 
 use super::{
-    Frame, Source,
+    Frame, Source, Step,
     pipewire::{Input, Stream},
 };
 use crate::{features::recording::Target, types::Output};
@@ -69,8 +69,12 @@ impl Capture {
             let ended = closed.clone();
             let monitor = tokio::spawn(async move {
                 use futures::StreamExt;
-                if let Ok(mut events) = watched.receive_closed().await { events.next().await; }
-                ended.store(true, Ordering::Release);
+                // 1. 【门户录制】【关闭监听】仅在确实收到桌面门户 Closed 信号时标记会话结束，避免订阅失败误报
+                if let Ok(mut events) = watched.receive_closed().await
+                    && events.next().await.is_some()
+                {
+                    ended.store(true, Ordering::Release);
+                }
             });
             let result = cancellable(commands, async {
                 portal.select_sources(&session, SelectSourcesOptions::default().set_sources(Some(SourceType::Monitor.into()))
@@ -126,31 +130,54 @@ async fn cancellable<T>(
     }
 }
 
+/// 【门户录制】【结束判定】按 has_frame 决定桌面关闭授权后的行为，已采集视频帧时优雅结束以完成封包保存
+fn closed_step(has_frame: bool) -> Result<Step, String> {
+    if has_frame {
+        log::info!("【门户录制】【授权结束】桌面端已关闭屏幕共享授权，结束当前录制并保存");
+        Ok(Step::Ended)
+    } else {
+        Err("录制授权已关闭 / Recording authorization closed".into())
+    }
+}
+
 impl Source for Capture {
     /// 【门户录制】【持续等待】无参数，持续流可在编码期限前等待新画面
     fn asynchronous(&self) -> bool {
         true
     }
-    /// 【门户录制】【连续取帧】按 timeout 等待持续流的新帧，不在每次读取后停流
-    fn next(&mut self, timeout: Duration) -> Result<bool, String> {
+    /// 【门户录制】【连续取帧】按 timeout 等待持续流的新帧，桌面关闭共享且已有帧时返回结束以触发正常保存
+    fn next(&mut self, timeout: Duration) -> Result<Step, String> {
         // 1. 【门户录制】【总线推进】持续驱动授权连接，撤销或关闭能及时进入会话状态
         self.runtime
             .block_on(async { tokio::task::yield_now().await });
         if self.closed.load(Ordering::Acquire) {
-            return Err("录制授权已关闭 / Recording authorization closed".into());
+            return closed_step(!self.pixels.is_empty());
         }
-        let size = self
+        let size = match self
             .stream
             .as_ref()
             .unwrap()
-            .video(&mut self.pixels, timeout)?;
+            .video(&mut self.pixels, timeout)
+        {
+            Ok(size) => size,
+            Err(error) => {
+                // 2. 【门户录制】【并发关闭】桌面停止共享时 PipeWire 流断开可能略早于 Closed 信号，复查授权状态后优雅收尾
+                self.runtime
+                    .block_on(async { tokio::task::yield_now().await });
+                if self.closed.load(Ordering::Acquire) {
+                    return closed_step(!self.pixels.is_empty());
+                }
+                return Err(error);
+            }
+        };
         if let Some(size) = size {
             if self.expected_size.is_some_and(|expected| expected != size) {
                 return Err("授权流像素尺寸与选区坐标不一致，请使用完整来源 / Portal pixel size does not match the selected region".into());
             }
             self.size = size;
+            return Ok(Step::Frame);
         }
-        Ok(size.is_some())
+        Ok(Step::Wait)
     }
     /// 【门户录制】【当前画面】无参数，借用最近完成的画面，静态流没有更新时保持原内容
     fn frame(&self) -> Option<Frame<'_>> {
@@ -164,8 +191,11 @@ impl Source for Capture {
             stride: self.size.0 as usize * 4,
         })
     }
-    /// 【门户录制】【暂停控制】按 paused 停用持续流，恢复时清理旧缓存
+    /// 【门户录制】【暂停控制】按 paused 停用持续流，桌面已关闭授权时直接成功以免阻断封装保存
     fn pause(&mut self, paused: bool) -> Result<(), String> {
+        if self.closed.load(Ordering::Acquire) {
+            return Ok(());
+        }
         self.stream.as_ref().unwrap().pause(paused)
     }
     /// 【门户录制】【路径诊断】无参数，返回当前实现的数据交付类型
@@ -204,5 +234,16 @@ mod tests {
             .unwrap();
         let result = runtime.block_on(super::cancellable::<()>(&receive, std::future::pending()));
         assert!(result.unwrap_err().contains("cancelled"));
+    }
+
+    /// 【门户录制回归】【优雅收尾】无参数，已有帧后桌面关闭授权返回正常结束，零帧时保留授权关闭错误
+    #[test]
+    fn closed_authorization_finishes_when_frames_exist_and_errors_when_empty() {
+        assert_eq!(super::closed_step(true), Ok(super::Step::Ended));
+        assert!(
+            super::closed_step(false)
+                .unwrap_err()
+                .contains("Recording authorization closed")
+        );
     }
 }

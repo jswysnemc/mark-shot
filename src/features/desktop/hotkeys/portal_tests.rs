@@ -94,3 +94,12 @@ fn active_window_binding_is_required_and_routes_to_window_capture() {
     assert_eq!(action("other"), None);
     assert_eq!(trigger("Alt+PrintScreen").unwrap(), "ALT+Print");
 }
+
+/// 【全局快捷键测试】【绑定完整判断】无参数，验证普通与活动窗口快捷键的绑定完整性判定逻辑
+#[test]
+fn has_all_bindings_requires_non_empty_triggers() {
+    let main_only = shortcuts("screenshot", "Ctrl+Alt+A");
+    assert!(has_all_bindings(&main_only, false));
+    assert!(!has_all_bindings(&main_only, true));
+    assert!(!has_all_bindings(&shortcuts("screenshot", "  "), false));
+}

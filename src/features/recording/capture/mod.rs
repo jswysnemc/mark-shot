@@ -21,9 +21,16 @@ pub(super) struct Frame<'a> {
     pub stride: usize,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Step {
+    Frame,
+    Wait,
+    Ended,
+}
+
 pub(super) trait Source {
-    /// 【录制采集】【下一帧】等待不超过 timeout，返回是否更新像素，不将静态画面等待视为采集失败
-    fn next(&mut self, timeout: Duration) -> Result<bool, String>;
+    /// 【录制采集】【下一帧】等待不超过 timeout，返回新帧、等待或来源正常结束，不将静态画面等待视为采集失败
+    fn next(&mut self, timeout: Duration) -> Result<Step, String>;
     /// 【录制采集】【当前画面】无参数，借用最近完成的画面，不读取正在写入的捕获缓冲
     fn frame(&self) -> Option<Frame<'_>>;
     /// 【录制采集】【暂停同步】按 paused 停用或恢复采集，恢复时不交付暂停前缓存

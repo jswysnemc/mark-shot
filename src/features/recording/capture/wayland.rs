@@ -4,7 +4,7 @@ mod dispatch;
 mod dmabuf;
 mod protocol;
 
-use super::{Frame, Source};
+use super::{Frame, Source, Step};
 use crate::types::Output;
 use memmap2::MmapMut;
 use std::{
@@ -319,7 +319,7 @@ impl Source for Capture {
         true
     }
     /// 【Wayland录制】【有界取帧】按 timeout 分派一次采集，只有完成后才交付借用像素
-    fn next(&mut self, timeout: Duration) -> Result<bool, String> {
+    fn next(&mut self, timeout: Duration) -> Result<Step, String> {
         if !self.active {
             self.state.ready = false;
             self.state.inverted = false;
@@ -352,14 +352,14 @@ impl Source for Capture {
             self.connection.flush().map_err(|e| e.to_string())?;
         }
         if !self.state.ready {
-            return Ok(false);
+            return Ok(Step::Wait);
         }
         if self.dma_buffer.is_some()
             && (self.state.inverted
                 || self.state.transform != wayland_client::protocol::wl_output::Transform::Normal)
         {
             self.prefer_cpu();
-            return Ok(false);
+            return Ok(Step::Wait);
         }
         self.protocol.complete();
         self.active = false;
@@ -370,7 +370,7 @@ impl Source for Capture {
         } else {
             self.pixel_size = self.pixels();
         }
-        Ok(true)
+        Ok(Step::Frame)
     }
     /// 【Wayland录制】【静态画面】无参数，返回已完成像素，可在等待 damage 时延续时长
     fn frame(&self) -> Option<Frame<'_>> {

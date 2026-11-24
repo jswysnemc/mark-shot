@@ -98,7 +98,11 @@ pub(super) fn run(
             continue;
         }
         if !pending {
-            pending = source.next(Duration::from_millis(10))?;
+            match source.next(Duration::from_millis(10))? {
+                capture::Step::Frame => pending = true,
+                capture::Step::Wait => {}
+                capture::Step::Ended => break,
+            }
         }
         let now = Instant::now();
         if now < next {
