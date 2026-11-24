@@ -75,15 +75,16 @@ impl PinnedImage {
         previous != self.size()
     }
 
-    /// 【贴图】【预览缩放】按 requested 设置原版滚轮与菜单倍率；跨越原始尺寸时吸附到 100%，限制到 0.1–6 倍和最小二十四像素，不限制屏幕
+    /// 【贴图】【预览缩放】按 requested 设置原版滚轮与菜单倍率；接近原始倍率并跨越时吸附到 100%，限制到 0.1–6 倍和最小二十四像素，不限制屏幕
     pub fn scale(&mut self, requested: f32) -> bool {
         if !requested.is_finite() || requested <= 0.0 {
             return false;
         }
         let previous = self.size();
         let requested = requested.clamp(0.1, 6.0);
-        // 1. 【贴图】【百倍吸附】显示尺寸按整数像素量化，往返缩放会跳过原始宽度，跨越原始倍率时对齐到 100%
-        let zoom = if (self.zoom - 1.0) * (requested - 1.0) < 0.0 {
+        // 1. 【贴图】【百倍吸附】整数像素量化会跳过原始宽度；仅本步落在 100% 附近时对齐，避免菜单和脚本的大幅跳变被拉回
+        let zoom = if (requested - 1.0).abs() <= 0.2 && (self.zoom - 1.0) * (requested - 1.0) < 0.0
+        {
             1.0
         } else {
             requested
@@ -161,6 +162,16 @@ mod tests {
         image.scale(image.zoom / 1.08 * 0.99);
         assert_eq!(image.size(), original);
         assert_eq!(image.zoom, 1.0);
+    }
+
+    /// 【贴图测试】【大幅跳变】验证远离原始倍率的一次性大幅缩放不会被吸附回 100%
+    #[test]
+    fn large_zoom_steps_do_not_snap_to_the_original_size() {
+        let mut image = image(240, 120);
+        image.set_zoom(1.0, (120, 60));
+        assert_eq!(image.size(), (120, 60));
+        image.scale(100.0);
+        assert_eq!(image.size(), (1440, 720));
     }
 
     /// 【贴图测试】【正常步进】验证未跨越原始尺寸时仍按倍率缩放，不被吸附干扰
