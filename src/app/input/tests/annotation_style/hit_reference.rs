@@ -134,6 +134,7 @@ fn annotation(scene: &Scene) -> crate::types::Annotation {
                         count: 3,
                     }
                 },
+                style: crate::features::ruler::RulerStyle::Standard,
                 pixel_scale: 1.0,
                 style_scale: 1.0,
             },

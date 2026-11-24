@@ -217,10 +217,32 @@ pub fn angle_arc(measurement: Measurement, unit: f32) -> Option<(f32, f32, f32)>
 }
 
 impl Measurement {
-    /// 【尺子】【刻度视觉范围】在几何边界上加入 unit 对应的刻度与数字留量；返回旋转后的外接矩形
+    /// 【尺子】【刻度视觉范围】在几何边界上加入 unit 对应的刻度、箭头与数字留量；返回旋转后的外接矩形
     pub fn visual_bounds(self, unit: f32) -> Option<Rect> {
         if let RulerGeometry::Length { rotation, .. } = self.geometry {
             let bounds = self.unrotated_bounds()?;
+            if self.style == super::RulerStyle::Simple {
+                let digits = self.length_metrics().map_or(3, |(width, height, _, _)| {
+                    width.max(height).to_string().len() + 2
+                });
+                let pad_x = (16.0 + digits as f32 * 5.0) * unit;
+                let pad_y = 32.0 * unit;
+                let local = Rect::from_ltrb(
+                    bounds.left() - pad_x,
+                    bounds.top() - pad_y,
+                    bounds.right() + pad_x,
+                    bounds.bottom() + pad_y,
+                )?;
+                let center = rect_center(bounds);
+                let points = [
+                    (local.left(), local.top()),
+                    (local.right(), local.top()),
+                    (local.right(), local.bottom()),
+                    (local.left(), local.bottom()),
+                ]
+                .map(|point| rotated(point, center, rotation));
+                return super::geometry::points_bounds(&points, 1.0 / self.pixel_scale);
+            }
             let digits = self.length_metrics().map_or(1, |(width, height, _, _)| {
                 width.max(height).to_string().len()
             });

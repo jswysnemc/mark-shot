@@ -117,6 +117,7 @@ pub struct ToolSettings {
     pub marker_shape: crate::types::MarkerShape,
     pub marker_filled: bool,
     pub ruler_mode: crate::features::ruler::RulerMode,
+    pub ruler_style: crate::features::ruler::RulerStyle,
     pub magnifier_shape: crate::features::magnifier::MagnifierShape,
     pub magnifier_zoom: f32,
     pub number_style: crate::features::number::NumberStyle,
@@ -204,6 +205,7 @@ impl Default for ToolSettings {
             marker_shape: saved.marker_shape.unwrap_or(tools.marker.shape),
             marker_filled: saved.marker_filled.unwrap_or(tools.marker.filled),
             ruler_mode: saved.ruler_mode.unwrap_or(tools.ruler.mode),
+            ruler_style: saved.ruler_style.unwrap_or(tools.ruler.style),
             magnifier_shape: saved.magnifier_shape.unwrap_or(tools.magnifier.shape),
             magnifier_zoom: crate::features::magnifier::clamped_zoom(
                 saved.magnifier_zoom.unwrap_or(tools.magnifier.zoom),

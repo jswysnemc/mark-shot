@@ -63,6 +63,7 @@ fn measurement(input: &Input, capture: f32) -> Measurement {
                 rotation: input.rotation,
             }
         },
+        style: crate::features::ruler::RulerStyle::Standard,
         pixel_scale: 1.0,
         style_scale: 640.0 / (640.0 / f64::from(capture)).round(),
     }

@@ -544,6 +544,7 @@ filled = true
 [tools.ruler]
 width = 3.0
 mode = "length"
+style = "standard"
 
 [tools.magnifier]
 width = 3.0

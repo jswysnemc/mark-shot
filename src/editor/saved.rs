@@ -42,6 +42,7 @@ struct File {
     marker_shape: Option<String>,
     marker_filled: Option<bool>,
     ruler_mode: Option<String>,
+    ruler_style: Option<String>,
     magnifier_shape: Option<String>,
     magnifier_zoom: Option<f32>,
     number_style: Option<String>,
@@ -105,6 +106,7 @@ pub struct Saved {
     pub marker_shape: Option<crate::types::MarkerShape>,
     pub marker_filled: Option<bool>,
     pub ruler_mode: Option<crate::features::ruler::RulerMode>,
+    pub ruler_style: Option<crate::features::ruler::RulerStyle>,
     pub magnifier_shape: Option<crate::features::magnifier::MagnifierShape>,
     pub magnifier_zoom: Option<f32>,
     pub number_style: Option<crate::features::number::NumberStyle>,
@@ -188,6 +190,7 @@ fn load_at(path: &std::path::Path) -> Saved {
         marker_shape: file.marker_shape.as_deref().and_then(parse_marker_shape),
         marker_filled: file.marker_filled,
         ruler_mode: file.ruler_mode.as_deref().and_then(parse_ruler_mode),
+        ruler_style: file.ruler_style.as_deref().and_then(parse_ruler_style),
         magnifier_shape: file
             .magnifier_shape
             .as_deref()
@@ -246,6 +249,15 @@ fn parse_ruler_mode(value: &str) -> Option<crate::features::ruler::RulerMode> {
         info!("【尺子】【模式设置】未知模式 {value:?}");
     }
     mode
+}
+
+/// 【尺子】【样式设置】将 value 转为稳定绘制样式；未知名称单独忽略，返回空值
+fn parse_ruler_style(value: &str) -> Option<crate::features::ruler::RulerStyle> {
+    let style = crate::features::ruler::RulerStyle::parse(value);
+    if style.is_none() {
+        info!("【尺子】【样式设置】未知样式 {value:?}");
+    }
+    style
 }
 
 /// 【放大镜】【形状设置】将 value 转为稳定框形；未知名称单独忽略，返回空值
@@ -358,6 +370,7 @@ fn snapshot(settings: &ToolSettings, history: &[Color]) -> File {
         marker_shape: Some(settings.marker_shape.key().to_string()),
         marker_filled: Some(settings.marker_filled),
         ruler_mode: Some(settings.ruler_mode.key().to_string()),
+        ruler_style: Some(settings.ruler_style.key().to_string()),
         magnifier_shape: Some(settings.magnifier_shape.key().to_string()),
         magnifier_zoom: Some(settings.magnifier_zoom),
         number_style: Some(settings.number_style.key().to_string()),

@@ -67,7 +67,11 @@ pub fn draw(painter: &mut Painter<'_>, measurement: Measurement, width: f32, col
                 let mut local = painter.sub(&mut temporary).with_origin(local_origin);
                 match measurement.geometry {
                     RulerGeometry::Length { .. } => {
-                        super::length_draw::draw(&mut local, measurement, width, color)
+                        if measurement.style == super::RulerStyle::Simple {
+                            super::simple_draw::draw(&mut local, measurement, width, color)
+                        } else {
+                            super::length_draw::draw(&mut local, measurement, width, color)
+                        }
                     }
                     RulerGeometry::Angle { .. } => {
                         super::angle_draw::draw(&mut local, measurement, width, color)

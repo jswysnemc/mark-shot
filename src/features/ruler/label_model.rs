@@ -25,10 +25,16 @@ pub struct InfoLabel {
     pub font_size: f32,
 }
 
-/// 【尺子】【完整单行】按measurement返回原版说明文字，三点角度即使退化也显示读数，未完成测量返回空值
+/// 【尺子】【完整单行】按measurement返回原版说明文字，简约长度尺已在箭头中间展示宽度不额外浮窗，未完成测量返回空值
 fn text(measurement: Measurement) -> Option<String> {
     match measurement.geometry {
-        RulerGeometry::Length { .. } => measurement.info_text(),
+        RulerGeometry::Length { .. } => {
+            if measurement.style == super::RulerStyle::Simple {
+                None
+            } else {
+                measurement.info_text()
+            }
+        }
         RulerGeometry::Angle { points, count: 3 } => Some(format!(
             "{:.1}\u{b0}",
             angle_degrees(points[0], points[1], points[2])

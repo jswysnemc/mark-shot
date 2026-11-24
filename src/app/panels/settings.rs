@@ -300,6 +300,9 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
                         ) => {
                             magnifier.shape == crate::features::magnifier::MagnifierShape::Rectangle
                         }
+                        (AnnotationShape::Ruler { measurement }, ToggleField::RulerSimple) => {
+                            measurement.style == crate::features::ruler::RulerStyle::Simple
+                        }
                         _ => false,
                     },
                     None => match field {
@@ -317,6 +320,10 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
                         ToggleField::HighlighterLine => {
                             editor_state.tool_settings.highlighter_style
                                 == crate::features::highlighter::HighlighterStyle::StraightLine
+                        }
+                        ToggleField::RulerSimple => {
+                            editor_state.tool_settings.ruler_style
+                                == crate::features::ruler::RulerStyle::Simple
                         }
                         ToggleField::FixedRatio => editor_state.tool_settings.fixed_ratio,
                         ToggleField::Bold => editor_state.tool_settings.bold,

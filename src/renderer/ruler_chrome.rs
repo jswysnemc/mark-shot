@@ -62,6 +62,16 @@ pub(crate) fn bounds(
     projection: crate::editor::canvas_navigation::transform::ViewTransform,
 ) -> Option<Rect> {
     let unit = measurement.unit(width);
+    if measurement.style == crate::features::ruler::RulerStyle::Simple
+        && measurement.mode() == crate::features::ruler::RulerMode::Length
+    {
+        return crate::features::ruler::simple_draw::bounds(measurement, width, window, projection)
+            .or_else(|| measurement.visual_bounds(unit))?
+            .outset(
+                window.canvas(0.8).max(unit) + window.canvas(2.0),
+                window.canvas(0.8).max(unit) + window.canvas(2.0),
+            );
+    }
     let layout = if projection.is_identity() {
         Layout::new(measurement, width, allowed, window)
     } else {

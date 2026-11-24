@@ -116,6 +116,7 @@ pub(super) fn decode(value: &Value) -> Annotation {
                         rotation: degrees as f32,
                     }
                 },
+                style: crate::features::ruler::RulerStyle::Standard,
                 pixel_scale: 1.0,
                 style_scale: 1.0,
             },

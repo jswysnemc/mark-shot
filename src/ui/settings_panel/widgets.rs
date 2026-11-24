@@ -206,6 +206,7 @@ pub enum ToggleField {
     ArrowPointedTail,
     ArrowRoundedTail,
     HighlighterLine,
+    RulerSimple,
 }
 
 impl ToggleField {
@@ -264,6 +265,12 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
             SettingsWidget::Action {
                 action: SettingsAction::RulerModes,
                 svg: crate::ui::icons::RULER,
+            },
+            SettingsWidget::Toggle {
+                visual: ToggleVisual::Checkbox {
+                    label: "Arrow style",
+                },
+                field: ToggleField::RulerSimple,
             },
             SettingsWidget::Separator,
             SettingsWidget::Stepper {

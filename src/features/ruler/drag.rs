@@ -183,6 +183,12 @@ pub fn body_hit(
                 return SelectionHandle::None;
             };
             let point = rotated(point, rect_center(bounds), -rotation);
+            if measurement.style == super::RulerStyle::Simple
+                && let Some((p0, p1)) = super::simple_draw::axis_endpoints(measurement)
+                && segment_distance(point, p0, p1) <= tolerance
+            {
+                return SelectionHandle::Move;
+            }
             if bounds
                 .outset(tolerance, tolerance)
                 .is_some_and(|expanded| contains(expanded, point))

@@ -11,9 +11,10 @@ pub mod labels;
 mod layout_rect;
 pub mod length_draw;
 pub mod model;
+pub mod simple_draw;
 pub mod state;
 pub mod tick_layout;
 pub mod ticks;
 pub mod window_chrome;
 
-pub use model::{Measurement, Point, RulerGeometry, RulerMode};
+pub use model::{Measurement, Point, RulerGeometry, RulerMode, RulerStyle};

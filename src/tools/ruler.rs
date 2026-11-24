@@ -192,6 +192,7 @@ fn begin(state: &mut EditorState, position: (f32, f32), space: DrawingSpace, dir
     }
     let Some(measurement) =
         Measurement::new(state.tool_settings.ruler_mode, position, space.pixel_scale)
+            .map(|measurement| measurement.with_style(state.tool_settings.ruler_style))
     else {
         return;
     };
