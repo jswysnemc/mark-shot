@@ -111,10 +111,14 @@ Opening the editor from a pin hides the source pin until editing finishes or is 
 | --- | --- |
 | Left drag | Move |
 | Drag an edge or corner | Resize, keeping the aspect ratio, and briefly show the current zoom percentage in the top-left corner |
-| Scroll wheel | Zoom around the pointer and show the current zoom percentage in the top-left corner |
+| Scroll wheel | Zoom around the pointer and show the current zoom percentage in the top-left corner; nearby steps crossing `100%` snap cleanly to the original size |
 | Double-click | Close |
 | Right click | Menu: rotate, zoom, reset size, always on top, edit, copy, recognize text, translate, scan codes, save as, close |
 | `Ctrl+V` | Pin the clipboard content as another window |
+
+Actions on a Wayland pinned image (copying image or text, rotating 90 degrees, toggling always on
+top, switching text selection mode, toggling between original and translated view, and empty OCR
+results) also show a brief status capsule on the pin without modifying the underlying pixels.
 
 When the clipboard holds HTML, its common formatting is preserved in the pinned image: bold,
 italic, underline, strikethrough, colours, font sizes, headings, lists, quotes, code, links and

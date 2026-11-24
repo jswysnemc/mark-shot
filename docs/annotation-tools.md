@@ -72,7 +72,11 @@ resizing one resizes the other so the zoom factor stays fixed. The lens is round
 and the zoom ranges from 1.25 to 6.
 
 **Ruler.** Shows width, height, diagonal and area, or an angle, in image pixels. Press `U` again
-to switch between length and angle for the next measurement.
+to switch between length and angle for the next measurement. For length measurements, the
+**Arrow style** toggle in the property bar (also `[tools.ruler].style` in the configuration)
+switches between the standard ruler with tick marks and floating detail card, and a compact
+double-headed arrow that displays the pixel span inline at the center (or raised outside on short
+spans) without a separate floating card.
 
 **Laser.** Strokes fade out about two seconds after the button is released. They are never part
 of the saved image and are not recorded in the undo history.
