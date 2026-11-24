@@ -348,7 +348,7 @@ impl Feedback {
     }
 
     /// 【贴图微反馈】【任务读取】返回当前底部任务胶囊标题，测试据此确认空识别或任务提示进入显示通道
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn task_title(&self) -> Option<&str> {
         self.task.as_ref().map(|entry| entry.title.as_str())
     }
