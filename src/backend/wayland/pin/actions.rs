@@ -110,6 +110,7 @@ impl Pin {
                     };
                     self.image.scale(zoom);
                     self.resize(true, qh);
+                    self.feedback.zoom(self.image.zoom);
                 }
                 PinAction::AlwaysOnTop => {
                     let enabled = !self.image.always_on_top;

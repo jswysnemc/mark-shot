@@ -281,7 +281,7 @@ impl Feedback {
         });
     }
 
-    /// 【贴图微反馈】【双层绘制】在贴图预览右上角绘制瞬时倍率或操作胶囊，在底部居中绘制识别或翻译状态胶囊
+    /// 【贴图微反馈】【双层绘制】在贴图预览左上角绘制缩放倍率、右上角绘制其他瞬时胶囊，在底部居中绘制识别或翻译状态胶囊
     pub fn draw(
         &self,
         canvas: &mut Pixmap,
@@ -304,16 +304,12 @@ impl Feedback {
         let hud_box = self.hud.as_ref().map(|entry| {
             let (w, h) = micro_badge::measure(fonts, &entry.title, "", entry.kind, max_w);
             let h = h.min((height - 6.0).max(16.0));
-            let x = if width < 96.0 {
-                ((width - w) * 0.5).max(3.0)
+            let x = if entry.kind == BadgeKind::Zoom {
+                hud_left(width, w)
             } else {
-                (width - w - 8.0).max(6.0)
+                hud_right(width, w)
             };
-            let y = if height < 44.0 {
-                ((height - h) * 0.5).max(2.0)
-            } else {
-                8.0
-            };
+            let y = hud_top(height, h);
             (entry, Rect::from_xywh(x, y, w, h))
         });
 
@@ -333,7 +329,7 @@ impl Feedback {
             Some((entry, detail, Rect::from_xywh(x, y, w, h)))
         });
 
-        // 2. 依次绘制底部任务胶囊与右上角瞬时微提示，不污染独立原图缓冲
+        // 2. 依次绘制底部任务胶囊与顶部瞬时微提示，不污染独立原图缓冲
         let mut painter = Painter::new(canvas)
             .with_scale(scale)
             .with_text(fonts, cache);
@@ -343,6 +339,35 @@ impl Feedback {
         if let Some((entry, Some(rect))) = hud_box {
             micro_badge::draw(&mut painter, rect, entry.kind, &entry.title, "", 1.0);
         }
+    }
+
+    /// 【贴图微反馈】【提示读取】返回当前瞬时胶囊标题，测试据此确认缩放百分比确实进入显示通道
+    #[cfg(test)]
+    pub(crate) fn hud_title(&self) -> Option<&str> {
+        self.hud.as_ref().map(|entry| entry.title.as_str())
+    }
+}
+
+/// 【贴图微反馈】【左上锚点】按可见宽度与胶囊宽度返回贴左上角的横坐标，窄窗口收拢避免溢出
+fn hud_left(width: f32, pill_width: f32) -> f32 {
+    8.0_f32.min((width - pill_width - 3.0).max(3.0))
+}
+
+/// 【贴图微反馈】【右上锚点】按可见宽度与胶囊宽度返回贴右上角的横坐标，窄窗口居中
+fn hud_right(width: f32, pill_width: f32) -> f32 {
+    if width < 96.0 {
+        ((width - pill_width) * 0.5).max(3.0)
+    } else {
+        (width - pill_width - 8.0).max(6.0)
+    }
+}
+
+/// 【贴图微反馈】【顶部锚点】按可见高度与胶囊高度返回顶部纵坐标，过矮窗口垂直居中
+fn hud_top(height: f32, pill_height: f32) -> f32 {
+    if height < 44.0 {
+        ((height - pill_height) * 0.5).max(2.0)
+    } else {
+        8.0
     }
 }
 
@@ -374,5 +399,15 @@ mod tests {
 
         feedback.clear();
         assert!(feedback.task.is_none());
+    }
+
+    /// 【贴图微反馈测试】【左上角定位】验证倍率胶囊贴左上角、窄窗口收拢，其他瞬时提示仍贴右上角
+    #[test]
+    fn zoom_pill_anchors_at_the_top_left_corner() {
+        assert_eq!(hud_left(320.0, 48.0), 8.0);
+        assert_eq!(hud_top(200.0, 26.0), 8.0);
+        assert_eq!(hud_left(40.0, 44.0), 3.0);
+        assert_eq!(hud_top(30.0, 26.0), 2.0);
+        assert_eq!(hud_right(320.0, 48.0), 264.0);
     }
 }

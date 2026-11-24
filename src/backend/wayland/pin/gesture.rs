@@ -210,6 +210,9 @@ impl Pin {
                     self.position = (geometry.left, geometry.top);
                     self.image.set_size((geometry.width, geometry.height));
                     self.resize(false, qh);
+                    if matches!(drag.kind, Kind::Resize(_)) {
+                        self.feedback.zoom(self.image.zoom);
+                    }
                 }
             }
         }
@@ -256,6 +259,7 @@ impl Pin {
         .geometry(pointer);
         self.image.set_size((geometry.width, geometry.height));
         self.resize(false, qh);
+        self.feedback.zoom(self.image.zoom);
         if !resizing {
             self.drag = None;
         }

@@ -19,6 +19,8 @@ mod translation;
 
 #[cfg(test)]
 mod preference_tests;
+#[cfg(test)]
+mod resize_tests;
 
 use popup::Menu;
 use tiny_skia::{Pixmap, PixmapPaint, Transform};
@@ -45,6 +47,7 @@ struct Pin {
     top_supported: bool,
     menu_anchor: (f32, f32),
     feedback: crate::features::pinned_image::feedback::Feedback,
+    resize_observed: bool,
     model_dialog: Option<window::WindowDialog>,
     model_waiting: bool,
 }
@@ -233,7 +236,14 @@ impl WindowContent for Pin {
                 _ => None,
             },
             WindowEvent::Resize { size } => {
+                let previous = self.image.size();
                 self.image.set_size(size);
+                let resized = self.resize_observed && self.image.size() != previous;
+                self.resize_observed = true;
+                if resized {
+                    self.feedback.zoom(self.image.zoom);
+                    return WindowAction::Redraw;
+                }
                 None
             }
             _ => None,
@@ -334,6 +344,7 @@ impl Pin {
             top_supported: false,
             menu_anchor: (0.0, 0.0),
             feedback: Default::default(),
+            resize_observed: false,
             model_dialog: None,
             model_waiting: false,
         };

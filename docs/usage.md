@@ -110,8 +110,8 @@ Opening the editor from a pin hides the source pin until editing finishes or is 
 | Gesture | Result |
 | --- | --- |
 | Left drag | Move |
-| Drag an edge or corner | Resize, keeping the aspect ratio |
-| Scroll wheel | Zoom around the pointer and show the current zoom percentage |
+| Drag an edge or corner | Resize, keeping the aspect ratio, and briefly show the current zoom percentage in the top-left corner |
+| Scroll wheel | Zoom around the pointer and show the current zoom percentage in the top-left corner |
 | Double-click | Close |
 | Right click | Menu: rotate, zoom, reset size, always on top, edit, copy, recognize text, translate, scan codes, save as, close |
 | `Ctrl+V` | Pin the clipboard content as another window |
