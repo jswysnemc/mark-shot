@@ -88,7 +88,7 @@ Note: Package versions in the AUR are maintained independently and may lag behin
 Download the `.deb` package matching your distribution version and architecture from [Releases](https://github.com/jswysnemc/mark-shot/releases). For example, on Ubuntu 24.04 (x86_64):
 
 ```sh
-sudo apt install ./mark-shot_0.2.4-1_amd64.ubuntu24.04.deb
+sudo apt install ./mark-shot_0.2.5-1_amd64.ubuntu24.04.deb
 ```
 
 Replace the filename with the package matching your distribution version and architecture.
@@ -98,7 +98,7 @@ Replace the filename with the package matching your distribution version and arc
 RPM packages are currently built for Fedora 43. Download the package for your architecture from [Releases](https://github.com/jswysnemc/mark-shot/releases), then install:
 
 ```sh
-sudo dnf install ./mark-shot-0.2.4-1.fc43.x86_64.rpm
+sudo dnf install ./mark-shot-0.2.5-1.fc43.x86_64.rpm
 ```
 
 Replace the filename with the package matching your architecture.

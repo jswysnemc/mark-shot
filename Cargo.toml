@@ -4,7 +4,7 @@ resolver = "3"
 
 [package]
 name = "mark-shot"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 rust-version = "1.95"
 description = "Native Rust screenshot and annotation tool for Linux X11, Wayland and Windows"
