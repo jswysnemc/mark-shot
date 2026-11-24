@@ -1,6 +1,6 @@
 //! 【PipeWire】【持续循环】一个连接按需激活并复制一帧，暂停后关闭活跃流和定时工作
 
-use super::{Command, Request, format, pixels};
+use super::{Command, Request, buffers, format, pixels};
 use pipewire::{self as pw, properties::properties, spa};
 use std::{
     cell::RefCell,
@@ -70,8 +70,8 @@ pub(super) fn run(
             let pending = pending.clone();
             let failure = failure.clone();
             let mainloop = mainloop.clone();
-            move |_, _, _, new| {
-                if let pw::stream::StreamState::Error(error) = new {
+            move |stream, _, _, new| match new {
+                pw::stream::StreamState::Error(error) => {
                     fail(
                         &pending,
                         &failure,
@@ -79,20 +79,57 @@ pub(super) fn run(
                     );
                     mainloop.quit();
                 }
+                pw::stream::StreamState::Paused => {
+                    // 1. 【PipeWire】【就绪激活】初始 INACTIVE 协商进入 Paused 后，若已有存活帧请求则立即激活流
+                    let requested = pending
+                        .borrow()
+                        .as_ref()
+                        .is_some_and(|request| !request.reply.is_closed());
+                    if requested && let Err(error) = stream.set_active(true) {
+                        fail(
+                            &pending,
+                            &failure,
+                            format!("cannot activate PipeWire stream: {error}"),
+                        );
+                        mainloop.quit();
+                    }
+                }
+                _ => {}
             }
         })
-        .param_changed(|_, data, id, parameter| {
-            let Some(parameter) = parameter else {
-                return;
-            };
-            if id != spa::param::ParamType::Format.as_raw() {
-                return;
-            }
-            if let Ok((media, subtype)) = spa::param::format_utils::parse_format(parameter)
-                && media == spa::param::format::MediaType::Video
-                && subtype == spa::param::format::MediaSubtype::Raw
-            {
-                let _ = data.format.parse(parameter);
+        .param_changed({
+            let pending = pending.clone();
+            let failure = failure.clone();
+            let mainloop = mainloop.clone();
+            move |stream, data, id, parameter| {
+                let Some(parameter) = parameter else {
+                    return;
+                };
+                if id != spa::param::ParamType::Format.as_raw() {
+                    return;
+                }
+                if let Ok((media, subtype)) = spa::param::format_utils::parse_format(parameter)
+                    && media == spa::param::format::MediaType::Video
+                    && subtype == spa::param::format::MediaSubtype::Raw
+                {
+                    // 2. 【PipeWire】【显式缓冲】格式确定后回复 SPA_PARAM_Buffers，避免 Mutter 等服务端停留在缓冲协商阶段
+                    let result = (|| -> Result<(), String> {
+                        data.format.parse(parameter).map_err(|error| {
+                            format!("cannot parse PipeWire video format: {error}")
+                        })?;
+                        let size = data.format.size();
+                        let bytes = buffers::shared(size.width, size.height)?;
+                        let pod = spa::pod::Pod::from_bytes(&bytes)
+                            .ok_or("invalid PipeWire buffer parameters")?;
+                        stream.update_params(&mut [pod]).map_err(|error| {
+                            format!("cannot update PipeWire buffer parameters: {error}")
+                        })
+                    })();
+                    if let Err(error) = result {
+                        fail(&pending, &failure, error);
+                        mainloop.quit();
+                    }
+                }
             }
         })
         .process({
