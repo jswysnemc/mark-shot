@@ -152,6 +152,30 @@ pub fn parse(values: impl IntoIterator<Item = OsString>, started: Instant) -> Ap
         None
     };
     let xdg_window = args.contains("--xdg-window");
+    // 1. 【命令行】【旧版兼容】兼容 Qt 时代自启动项残留的 --tray 参数，直接转入后台常驻服务
+    let legacy_tray = args.contains("--tray");
+    if legacy_tray {
+        let rest = args
+            .finish()
+            .into_iter()
+            .map(|value| {
+                value
+                    .into_string()
+                    .map_err(|_| "internal command expects UTF-8 arguments")
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        return Ok(Arguments {
+            command: Command::Internal {
+                kind: crate::features::desktop::ARG.into(),
+                args: rest,
+            },
+            config,
+            no_notify,
+            debug,
+            debug_log,
+            xdg_window,
+        });
+    }
     for kind in [
         crate::features::desktop::ARG,
         crate::backend::clipboard::DAEMON_ARG,
