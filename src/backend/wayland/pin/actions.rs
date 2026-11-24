@@ -89,9 +89,11 @@ impl Pin {
             self.connection.flush()?;
             match action {
                 PinAction::RotateLeft | PinAction::RotateRight => {
+                    let clockwise = action == PinAction::RotateRight;
                     self.clear_ocr();
-                    self.image.rotate(action == PinAction::RotateRight)?;
+                    self.image.rotate(clockwise)?;
                     self.image_source = None;
+                    self.feedback.rotated(clockwise);
                     self.resize(true, qh);
                     if self.text_selection {
                         self.start_ocr()?;
@@ -119,6 +121,7 @@ impl Pin {
                         enabled,
                     )?;
                     self.image.always_on_top = enabled;
+                    self.feedback.topmost(enabled);
                     self.recreate(qh);
                     self.resize(false, qh);
                 }
@@ -127,14 +130,27 @@ impl Pin {
                     &self.image.png()?,
                     self.image.always_on_top,
                 )?,
-                PinAction::Copy => crate::backend::initialize_clipboard()
-                    .copy_image_to_clipboard(&self.image.png()?)?,
+                PinAction::Copy => {
+                    crate::backend::initialize_clipboard()
+                        .copy_image_to_clipboard(&self.image.png()?)?;
+                    self.feedback.copied_image();
+                    self.dirty = true;
+                }
                 PinAction::CopySelectedText => {
-                    crate::utils::copy_to_clipboard(&self.text.line_text(true))?
+                    crate::utils::copy_to_clipboard(&self.text.line_text(true))?;
+                    self.feedback.copied_text();
+                    self.dirty = true;
                 }
                 PinAction::CopyImageText => {
                     if self.text.is_active() {
-                        crate::utils::copy_to_clipboard(&self.text.line_text(false))?;
+                        let content = self.text.line_text(false);
+                        if content.is_empty() {
+                            self.feedback.no_text();
+                        } else {
+                            crate::utils::copy_to_clipboard(&content)?;
+                            self.feedback.copied_text();
+                        }
+                        self.dirty = true;
                     } else {
                         self.copy_after_ocr = true;
                         if !self.start_ocr()? {
@@ -149,23 +165,24 @@ impl Pin {
                         enabled,
                     )?;
                     self.text_selection = enabled;
-                    if self.text_selection {
-                        self.text_selection = if self.text.is_active() {
-                            true
-                        } else {
-                            self.start_ocr()?
-                        };
+                    if self.text_selection && !self.text.is_active() {
+                        self.text_selection = self.start_ocr()?;
                     } else {
-                        self.text.deselect();
-                        self.selecting = false;
+                        self.feedback.text_selection(self.text_selection);
                     }
+                    self.text.deselect();
+                    self.selecting = false;
                     self.dirty = true;
                 }
                 PinAction::SaveAs => self.save_as()?,
                 PinAction::Close => self.exit = true,
                 PinAction::Translate => self.request_translation()?,
                 PinAction::ToggleTranslation => {
-                    self.set_translation_active(!self.translation.active)
+                    let next = !self.translation.active;
+                    self.set_translation_active(next);
+                    if self.translation.active == next {
+                        self.feedback.translation_view(self.translation.active);
+                    }
                 }
                 _ => {}
             }
