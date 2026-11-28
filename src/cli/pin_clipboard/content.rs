@@ -1,6 +1,57 @@
 //! 【贴图】【内容分类】颜色、HTML 和复制文件转换，不执行网页脚本或外部链接
 
 use super::{IMAGE_LIMIT, html, render, rich_text, rtf, source::Clipboard};
+use crate::features::pinned_image::density::Source;
+
+/// 【贴图】【内容结果】保存最终 PNG、源图片内嵌 DPR 以及像素来源
+pub(super) struct Content {
+    pub png: Vec<u8>,
+    pub density: Option<f32>,
+    pub source: Source,
+}
+
+impl Content {
+    /// 【贴图】【合成内容】按 png 和 density 返回由文本、HTML 或色卡按该比例渲染的内容
+    fn text(png: Vec<u8>, density: f32) -> Self {
+        Self {
+            png,
+            density: Some(density),
+            source: Source::Text,
+        }
+    }
+
+    /// 【贴图】【复制图片】按 png 和 density 返回剪贴板原始图片内容，允许按配置回退系统缩放
+    fn copied(png: Vec<u8>, density: Option<f32>) -> Self {
+        Self {
+            png,
+            density,
+            source: Source::ClipboardImage,
+        }
+    }
+
+    /// 【贴图】【文件图片】按 png 和 density 返回文件图片内容，缺少 DPR 时按配置回退系统缩放
+    fn file(png: Vec<u8>, density: Option<f32>) -> Self {
+        Self {
+            png,
+            density,
+            source: Source::FileImage,
+        }
+    }
+
+    /// 【贴图】【剪贴板图片】按 image 返回剪贴板原始图片内容，读取内嵌 DPR 但不解码像素
+    fn clipboard_image(image: &[u8]) -> Self {
+        let density = crate::features::pinned_image::density::embedded(image);
+        Self::copied(image.to_vec(), density)
+    }
+
+    /// 【贴图】【显示密度】无参数，返回交给贴图进程的密度；文本使用渲染比例，图片按配置解析
+    pub fn pin_scale(&self) -> f32 {
+        match self.source {
+            Source::Text => self.density.unwrap_or(1.0),
+            _ => crate::features::pinned_image::density::resolve(self.density, self.source),
+        }
+    }
+}
 
 /// 【贴图】【色值解析】按 text 识别 HEX 与三分量 RGB，返回 RGBA；越界及非有限值返回空值
 pub(super) fn color(text: &str) -> Option<[u8; 4]> {
@@ -90,12 +141,13 @@ pub(super) fn html_text(html: &str) -> String {
         .into()
 }
 
-/// 【贴图】【内容图像】按 clipboard、repeated 与 paths_enabled 生成 PNG，返回图像或明确的不可贴图错误
+/// 【贴图】【内容图像】按 clipboard、repeated、paths_enabled 与 text_scale 生成 PNG，返回图像或明确的不可贴图错误
 pub(super) fn image(
     clipboard: &Clipboard,
     repeated: bool,
     paths_enabled: bool,
-) -> crate::AppResult<Vec<u8>> {
+    text_scale: f32,
+) -> crate::AppResult<Content> {
     if !clipboard.files.is_empty() {
         // 1. 【贴图】【文件图像】首次贴图尝试单张图片文件，解码有尺寸限制，非图片继续显示路径
         if !repeated
@@ -121,9 +173,13 @@ pub(super) fn image(
                     && let Ok(image) =
                         crate::features::pinned_image::model::PinnedImage::decode(&bytes, 1.0)
                 {
-                    return image.png();
+                    let density = crate::features::pinned_image::density::embedded(&bytes);
+                    return Ok(Content::file(image.png()?, density));
                 }
             }
+        }
+        if let Some(image) = &clipboard.image {
+            return Ok(Content::clipboard_image(image));
         }
         if !paths_enabled {
             return Err("文件路径贴图已关闭 / File path pinning is disabled".into());
@@ -135,30 +191,36 @@ pub(super) fn image(
                 .map(|path| path.to_string_lossy())
                 .collect::<Vec<_>>()
                 .join("\n"),
-        );
+            text_scale,
+        )
+        .map(|png| Content::text(png, text_scale));
     }
     // 2. 【贴图】【剪贴板内容】图片优先于富文本和纯文本，颜色转换为带数值的色卡
     if let Some(image) = &clipboard.image {
-        return Ok(image.clone());
+        return Ok(Content::clipboard_image(image));
     }
     if let Some(html) = &clipboard.html {
         let rich = html::parse(html);
         if rich.has_content() {
-            return rich_text::image(&rich);
+            return rich_text::image(&rich, text_scale).map(|png| Content::text(png, text_scale));
         }
         let text = html_text(html);
         if !text.is_empty() {
-            return render::text_image(&text);
+            return render::text_image(&text, text_scale).map(|png| Content::text(png, text_scale));
         }
     }
     if let Some(rtf) = &clipboard.rtf {
         let rich = rtf::parse(rtf);
         if rich.has_content() {
-            return rich_text::image(&rich);
+            return rich_text::image(&rich, text_scale).map(|png| Content::text(png, text_scale));
         }
     }
     if let Some(text) = &clipboard.text {
-        return color(text).map_or_else(|| render::text_image(text), render::color_image);
+        let png = color(text).map_or_else(
+            || render::text_image(text, text_scale),
+            |color| render::color_image(color, text_scale),
+        )?;
+        return Ok(Content::text(png, text_scale));
     }
     Err("剪贴板中没有可贴图的内容 / No pinnable clipboard content".into())
 }

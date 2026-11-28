@@ -158,7 +158,14 @@ fn execute(values: impl IntoIterator<Item = OsString>) -> AppResult {
         log::error!("【桌面集成】【服务启动】{error}");
     }
     match options.command {
-        Command::PinFile(path) => return pin::run(&std::fs::read(path)?, 1.0),
+        Command::PinFile(path) => {
+            use crate::features::pinned_image::density::{self, Source};
+            let bytes = std::fs::read(path)?;
+            return pin::run(
+                &bytes,
+                density::resolve(density::embedded(&bytes), Source::FileImage),
+            );
+        }
         Command::PinClipboard => return super::pin_clipboard::run(),
         Command::ListDisplays => return super::headless::list_displays(),
         _ => {}

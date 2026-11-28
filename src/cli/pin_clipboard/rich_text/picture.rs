@@ -219,11 +219,12 @@ fn draw_pixmap(painter: &mut Painter, data: &[u8], placed: &Placed) {
     let Some(pixmap) = decode(data) else {
         return;
     };
+    let scale = painter.scale();
     let transform = Transform::from_scale(
-        placed.width / pixmap.width() as f32,
-        placed.height / pixmap.height() as f32,
+        placed.width * scale / pixmap.width() as f32,
+        placed.height * scale / pixmap.height() as f32,
     )
-    .post_translate(placed.x, placed.y);
+    .post_translate(placed.x * scale, placed.y * scale);
     painter.canvas().draw_pixmap(
         0,
         0,

@@ -42,6 +42,48 @@ impl From<OutputInfo> for Info {
 }
 
 impl Info {
+    /// 【Linux输出】【逻辑尺寸】优先返回 xdg-output 逻辑尺寸，缺失扩展时按当前物理模式、旋转方向与整数缩放换算
+    pub fn logical_size(&self) -> Option<(i32, i32)> {
+        if let Some(logical) = self.logical_size {
+            return Some(logical);
+        }
+        let mode = self.modes.iter().find(|mode| mode.current)?;
+        let (width, height) = if matches!(
+            self.transform,
+            Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270
+        ) {
+            (mode.dimensions.1, mode.dimensions.0)
+        } else {
+            mode.dimensions
+        };
+        if width <= 0 || height <= 0 {
+            return None;
+        }
+        let factor = self.scale_factor.max(1);
+        Some((
+            (width + factor - 1) / factor,
+            (height + factor - 1) / factor,
+        ))
+    }
+
+    /// 【Linux输出】【缩放比例】按较长边比较物理模式与逻辑尺寸计算一百二十分之一精度比例，缺失模式时采用整数缩放因子
+    pub fn scale(&self) -> f32 {
+        let physical = self
+            .modes
+            .iter()
+            .find(|mode| mode.current)
+            .map(|mode| mode.dimensions.0.max(mode.dimensions.1));
+        let logical = self.logical_size().map(|(width, height)| width.max(height));
+        let (Some(physical), Some(logical)) = (physical, logical) else {
+            return (self.scale_factor.max(1) as f32).clamp(0.25, 8.0);
+        };
+        if physical <= 0 || logical <= 0 {
+            return (self.scale_factor.max(1) as f32).clamp(0.25, 8.0);
+        }
+        let scale = (physical as f32 / logical as f32 * 120.0).round() / 120.0;
+        scale.clamp(0.25, 8.0)
+    }
+
     /// 【Linux输出】【X11投影】按 id、name、position、size 构造物理像素坐标描述，返回一倍比例输出
     pub fn x11(id: u32, name: String, position: (i32, i32), size: (i32, i32)) -> Self {
         Self {

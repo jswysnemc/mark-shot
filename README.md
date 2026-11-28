@@ -149,7 +149,7 @@ mark-shot -m -f -t s         # save the monitor under the pointer
 mark-shot --scroll           # scrolling screenshot
 mark-shot --ocr              # recognize text in a region
 mark-shot --record           # open the recording controller
-mark-shot --pin-clipboard    # pin the clipboard image, rich text or text; local images render, network images become placeholders
+mark-shot --pin-clipboard    # pin the clipboard image, rich text or text; Mark Shot copies keep their device pixel ratio, local images render, network images become placeholders
 mark-shot picture.png        # annotate an existing image
 mark-shot --settings         # open preferences
 ```

@@ -16,6 +16,7 @@ mod protocol;
 mod render;
 mod runtime;
 mod scale;
+mod scale_query;
 mod translation;
 
 use crate::AppResult;
@@ -23,6 +24,23 @@ pub use runtime::run;
 pub const PIN_ARG: &str = "--pin";
 pub const SCALE_ARG: &str = "--scale";
 pub const POSITION_ARG: &str = "--position";
+
+/// 【贴图】【系统比例】按首个 Wayland 输出的物理模式与逻辑尺寸返回显示比例；无 Wayland 时回退 X11 桌面 DPI
+pub fn system_scale() -> Option<f32> {
+    static SCALE: std::sync::OnceLock<Option<f32>> = std::sync::OnceLock::new();
+    *SCALE.get_or_init(|| {
+        scale_query::wayland().or_else(|| {
+            crate::backend::x11::connection::Display::connect()
+                .ok()
+                .map(|display| display.ui_scale)
+        })
+    })
+}
+
+/// 【贴图】【显示比例】按捕获比例和位置返回贴图密度；Wayland 捕获比例即源输出显示比例
+pub fn display_scale(scale: f32, _position: Option<(i32, i32)>) -> f32 {
+    scale
+}
 
 /// 【贴图】【内部参数】从 args 读取文件或有界标准输入；返回窗口运行结果，非法比例直接拒绝
 pub fn cli(mut args: impl Iterator<Item = String>) -> AppResult {
@@ -118,4 +136,14 @@ pub fn spawn_at(png: &[u8], scale: f32, position: Option<(i32, i32)>) -> AppResu
         ],
         png,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    /// 【贴图比例测试】【显示比例】无参数，验证 Wayland 直接沿用捕获比例，无返回值
+    #[test]
+    fn display_scale_keeps_the_capture_scale() {
+        assert_eq!(super::display_scale(1.25, Some((10, 20))), 1.25);
+        assert_eq!(super::display_scale(1.0, None), 1.0);
+    }
 }

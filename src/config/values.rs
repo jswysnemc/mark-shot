@@ -1,7 +1,100 @@
 use super::*;
+use serde::de::{self, Visitor};
+use std::fmt;
 
 // Value types
 // ==========================================
+
+/// 【贴图配置】【剪贴板图片比例】auto 优先内嵌 DPR、未知来源回退系统缩放；system 始终使用系统缩放；one 使用逻辑像素
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClipboardImageScale {
+    Auto,
+    System,
+    One,
+}
+
+impl ClipboardImageScale {
+    /// 【贴图配置】【文本名称】无参数，返回写入配置文件的稳定名称
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::System => "system",
+            Self::One => "1.0",
+        }
+    }
+
+    /// 【贴图配置】【文本解析】按 value 解析 auto、system 或 1.0，忽略大小写，返回空值表示无效
+    fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "auto" => Some(Self::Auto),
+            "system" => Some(Self::System),
+            "1" | "1.0" => Some(Self::One),
+            _ => None,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ClipboardImageScale {
+    /// 【贴图配置】【比例解析】从 d 读取字符串或数字 1.0，返回比例策略或格式错误
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct ScaleVisitor;
+
+        impl Visitor<'_> for ScaleVisitor {
+            type Value = ClipboardImageScale;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("auto, system, or 1.0")
+            }
+
+            fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+                ClipboardImageScale::parse(value).ok_or_else(|| {
+                    E::custom(format!(
+                        "invalid clipboard image scale {value:?}, expected auto, system, or 1.0"
+                    ))
+                })
+            }
+
+            fn visit_f64<E: de::Error>(self, value: f64) -> Result<Self::Value, E> {
+                if (value - 1.0).abs() < f64::EPSILON {
+                    Ok(ClipboardImageScale::One)
+                } else {
+                    Err(E::custom(
+                        "clipboard image scale must be auto, system, or 1.0",
+                    ))
+                }
+            }
+
+            fn visit_i64<E: de::Error>(self, value: i64) -> Result<Self::Value, E> {
+                if value == 1 {
+                    Ok(ClipboardImageScale::One)
+                } else {
+                    Err(E::custom(
+                        "clipboard image scale must be auto, system, or 1.0",
+                    ))
+                }
+            }
+
+            fn visit_u64<E: de::Error>(self, value: u64) -> Result<Self::Value, E> {
+                if value == 1 {
+                    Ok(ClipboardImageScale::One)
+                } else {
+                    Err(E::custom(
+                        "clipboard image scale must be auto, system, or 1.0",
+                    ))
+                }
+            }
+        }
+
+        d.deserialize_any(ScaleVisitor)
+    }
+}
+
+impl Serialize for ClipboardImageScale {
+    /// 【贴图配置】【比例输出】向 s 写入稳定名称，返回序列化结果，不输出内部枚举名
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(self.label())
+    }
+}
 
 /// color that defaults to a theme role unless explicitly set in config (`""` also keeps the default).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

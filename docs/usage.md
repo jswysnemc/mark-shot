@@ -145,9 +145,13 @@ wraps at 720 pixels, code blocks keep long lines up to 1600 pixels, and tables u
 with borders. Container colours from applications such as code editors are kept. Scripts and styles
 are never executed.
 
-Copying and saving always use the original pixels, regardless of the displayed size. After text
-recognition, dragging over recognized text selects it and `Ctrl+C` copies the selection. The
-border and the always-on-top default are in `[pinned]`.
+Copying and saving always use the original pixels, regardless of the displayed size. Images copied
+from Mark Shot keep the device pixel ratio written into the PNG, so a screenshot taken at 125%
+pins at its original size. For images from other applications, including copied image files,
+`[pinned].clipboard_image_scale` chooses between the display scale (`auto` or `system`) and
+logical pixels (`1.0`). Text and HTML pins are rendered at the same scale so they stay sharp.
+After text recognition, dragging over recognized text selects it and `Ctrl+C` copies the
+selection. The border and the always-on-top default are in `[pinned]`.
 
 ## Capture history
 

@@ -188,7 +188,7 @@ pub(super) async fn run(options: &CaptureOptions) -> AppResult {
                 capture_output::write(&path, &png)?;
                 crate::features::capture_history::remember_with_original(
                     &png,
-                    scale,
+                    crate::backend::pin::display_scale(scale, None),
                     &output,
                     Some(original.as_deref().unwrap_or(&png)),
                 );

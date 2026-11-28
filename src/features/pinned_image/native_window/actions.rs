@@ -56,8 +56,11 @@ impl Pin {
                 self.image.always_on_top,
             )?,
             PinAction::Copy => {
-                crate::backend::initialize_clipboard()
-                    .copy_image_to_clipboard(&self.image.png()?)?;
+                let png = crate::features::pinned_image::density::with_dpr(
+                    self.image.png()?,
+                    self.image.density,
+                );
+                crate::backend::initialize_clipboard().copy_image_to_clipboard(&png)?;
                 self.feedback.copied_image();
             }
             PinAction::CopySelectedText => {
