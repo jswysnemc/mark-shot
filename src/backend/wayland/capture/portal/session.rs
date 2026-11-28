@@ -273,23 +273,19 @@ impl CaptureSession for PortalCapture {
             tokio::time::sleep_until(deadline).await;
             self.first_frame_after = None;
         }
-        let mut frames = Vec::with_capacity(self.sources.len());
-        for source in &mut self.sources {
-            let frame = source.stream.next_frame().await?;
-            frames.push(MonitorFrame {
-                output: source.output,
-                pixels: frame.pixels,
-                pw_width: frame.width,
-                pw_height: frame.height,
-                pw_stride: frame.stride,
-                info: StreamInfo {
-                    node_id: source.info.node_id,
-                    size: source.info.size,
-                    position: source.info.position,
-                },
-            });
-        }
-        // 2. 【Portal捕获】【成功授权】只有真正收到原始像素后才保存恢复令牌
+        // 2. 【Portal捕获】【并发取帧】多输出同时激活采集，避免串行启停相互干扰并减少单屏静止导致的整体超时
+        let outcomes = futures::future::join_all(self.sources.iter_mut().map(|source| {
+            let output = source.output;
+            let info = StreamInfo {
+                node_id: source.info.node_id,
+                size: source.info.size,
+                position: source.info.position,
+            };
+            async move { (output, info, source.stream.next_frame().await) }
+        }))
+        .await;
+        let frames = collect_frames(outcomes)?;
+        // 3. 【Portal捕获】【成功授权】只有真正收到原始像素后才保存恢复令牌
         if let Some(token) = self.restore_token.take() {
             token::write_token(&token);
         }
@@ -321,6 +317,48 @@ impl Drop for PortalCapture {
             });
         }
     }
+}
+
+/// 【Portal捕获】【多屏汇总】按 outcomes 汇总各输出帧；多屏中个别静止或未响应输出超时时保留已成功输出，全失败时返回首个错误
+fn collect_frames(
+    outcomes: Vec<(
+        usize,
+        StreamInfo,
+        std::result::Result<crate::backend::wayland::capture::stream::PipewireFrame, String>,
+    )>,
+) -> Result<Vec<MonitorFrame>> {
+    let mut frames = Vec::with_capacity(outcomes.len());
+    let mut first_error = None;
+    for (output, info, outcome) in outcomes {
+        match outcome {
+            Ok(frame) => frames.push(MonitorFrame {
+                output,
+                pixels: frame.pixels,
+                pw_width: frame.width,
+                pw_height: frame.height,
+                pw_stride: frame.stride,
+                info,
+            }),
+            Err(error) => {
+                log::error!(
+                    "【Portal捕获】【输出取帧失败】输出索引={} node={} 尺寸={:?} 位置={:?} 错误={error}",
+                    output,
+                    info.node_id,
+                    info.size,
+                    info.position
+                );
+                if first_error.is_none() {
+                    first_error = Some(error);
+                }
+            }
+        }
+    }
+    if frames.is_empty() {
+        return Err(first_error
+            .unwrap_or_else(|| "portal capture produced no frames".into())
+            .into());
+    }
+    Ok(frames)
 }
 
 /// 【Portal捕获】【输出刷新】按 connection 与 selected 重新读取合成器当前输出描述，全部命中时返回最新列表

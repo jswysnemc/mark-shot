@@ -22,6 +22,7 @@ pub struct PipewireFrame {
 
 type FrameResult = Result<PipewireFrame, String>;
 const FRAME_TIMEOUT: Duration = Duration::from_secs(5);
+const REACTIVATE_AFTER: Duration = Duration::from_millis(1500);
 
 struct Request {
     id: u64,
@@ -29,6 +30,7 @@ struct Request {
 }
 enum Command {
     Frame(Request),
+    Reactivate(u64),
     Cancel(u64),
     Stop,
 }
@@ -91,7 +93,17 @@ impl PipewireStream {
         self.commands
             .send(Command::Frame(Request { id, reply }))
             .map_err(|_| "PipeWire request channel is unavailable")?;
-        match tokio::time::timeout(FRAME_TIMEOUT, response).await {
+        let mut response = response;
+        // 1. 【PipeWire】【首帧重试】流激活后在短窗口内未交付帧时触发重新激活，促使合成器补发首帧重绘
+        let received = match tokio::time::timeout(REACTIVATE_AFTER, &mut response).await {
+            Ok(result) => Ok(result),
+            Err(_) => {
+                let _ = self.commands.send(Command::Reactivate(id));
+                let remaining = FRAME_TIMEOUT.saturating_sub(REACTIVATE_AFTER);
+                tokio::time::timeout(remaining, response).await
+            }
+        };
+        match received {
             Ok(Ok(frame)) => frame,
             Ok(Err(_)) => Err(self
                 .failure

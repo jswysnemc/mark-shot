@@ -19,15 +19,49 @@ void ms_surface_destroy(void *handle) {
     av_free(surface);
 }
 
-/** 【显存帧】【格式约束】按 format 返回对应 VA 四字符格式，不接受未实现的多层颜色布局 */
+/** 【显存帧】【格式约束】按 format 返回对应 VA 四字符格式，支持 32 位 RGB 与 NV12 */
 static uint32_t va_format(uint32_t format) {
     switch (format) {
     case GBM_FORMAT_XRGB8888: return VA_FOURCC_BGRX;
     case GBM_FORMAT_ARGB8888: return VA_FOURCC_BGRA;
     case GBM_FORMAT_XBGR8888: return VA_FOURCC_RGBX;
     case GBM_FORMAT_ABGR8888: return VA_FOURCC_RGBA;
+    case GBM_FORMAT_NV12: return VA_FOURCC_NV12;
     default: return 0;
     }
+}
+
+/** 【显存帧】【兼容候选】按 format 返回旧版 VAAPI 驱动（如 i965）接受的同字节序回退 fourcc */
+static uint32_t va_fallback_format(uint32_t format) {
+    switch (format) {
+    case GBM_FORMAT_XRGB8888:
+    case GBM_FORMAT_ARGB8888: return VA_FOURCC_ARGB;
+    case GBM_FORMAT_XBGR8888:
+    case GBM_FORMAT_ABGR8888: return VA_FOURCC_ABGR;
+    default: return 0;
+    }
+}
+
+/** 【显存帧】【表面导入】按 display、rt_format、input 与 fallback 导入 DMA-BUF，失败时按兼容候选重试 */
+static VAStatus import_surface(VADisplay display, uint32_t rt_format,
+    VADRMPRIMESurfaceDescriptor *input, uint32_t fallback, VASurfaceID *source) {
+    VASurfaceAttrib attributes[2] = {0};
+    attributes[0].type = VASurfaceAttribMemoryType;
+    attributes[0].flags = VA_SURFACE_ATTRIB_SETTABLE;
+    attributes[0].value.type = VAGenericValueTypeInteger;
+    attributes[0].value.value.i = VA_SURFACE_ATTRIB_MEM_TYPE_DRM_PRIME_2;
+    attributes[1].type = VASurfaceAttribExternalBufferDescriptor;
+    attributes[1].flags = VA_SURFACE_ATTRIB_SETTABLE;
+    attributes[1].value.type = VAGenericValueTypePointer;
+    attributes[1].value.value.p = input;
+    // 1. 【显存帧】【首选导入】先使用与缓冲格式精确对应的 VA fourcc
+    VAStatus status = vaCreateSurfaces(display, rt_format, input->width, input->height, source, 1, attributes, 2);
+    // 2. 【显存帧】【旧驱动回退】部分驱动对 RGB32 仅接受 VA_FOURCC_ARGB/ABGR，按同通道顺序回退重试
+    if (status != VA_STATUS_SUCCESS && fallback && input->fourcc != fallback) {
+        input->fourcc = fallback;
+        status = vaCreateSurfaces(display, rt_format, input->width, input->height, source, 1, attributes, 2);
+    }
+    return status;
 }
 
 /** 【显存帧】【兼容分配】按设备、尺寸、格式和允许的 modifiers 建立单个 GBM 缓冲，descriptor 的 FD 由调用者关闭 */
@@ -73,8 +107,10 @@ failed:
 
 /** 【显存帧】【同步导入】将 descriptor 指定的已完成帧裁剪到编码器私有 NV12，返回前等待显存读取完成 */
 int ms_encoder_dmabuf(ms_encoder *encoder, const ms_dmabuf *descriptor, int x, int y, int64_t pts_us) {
-    if (!encoder->device || encoder->finalized || pts_us <= encoder->last_video ||
-        descriptor->planes < 1 || descriptor->planes > 4 || !va_format(descriptor->format) ||
+    if (!encoder || !descriptor || !encoder->video || !encoder->device || encoder->finalized ||
+        pts_us <= encoder->last_video || descriptor->planes < 1 || descriptor->planes > 4 ||
+        !va_format(descriptor->format) ||
+        (descriptor->format == GBM_FORMAT_NV12 && descriptor->planes != 2) ||
         descriptor->width > 16384 || descriptor->height > 16384 || x < 0 || y < 0 ||
         x + encoder->video->width > descriptor->width || y + encoder->video->height > descriptor->height)
         return ms_fail(encoder, "incompatible DMA-BUF frame", AVERROR(EINVAL));
@@ -82,6 +118,8 @@ int ms_encoder_dmabuf(ms_encoder *encoder, const ms_dmabuf *descriptor, int x, i
     if (device->type != AV_HWDEVICE_TYPE_VAAPI) return ms_fail(encoder, "DMA-BUF requires VAAPI", AVERROR(ENOSYS));
     VADisplay display = ((AVVAAPIDeviceContext *)device->hwctx)->display;
     VADRMPRIMESurfaceDescriptor input = {0};
+    int nv12 = descriptor->format == GBM_FORMAT_NV12;
+    uint32_t rt_format = nv12 ? VA_RT_FORMAT_YUV420 : VA_RT_FORMAT_RGB32;
     input.fourcc = va_format(descriptor->format); input.width = descriptor->width; input.height = descriptor->height;
     input.num_objects = descriptor->planes; input.num_layers = 1;
     input.layers[0].drm_format = descriptor->format; input.layers[0].num_planes = descriptor->planes;
@@ -93,21 +131,16 @@ int ms_encoder_dmabuf(ms_encoder *encoder, const ms_dmabuf *descriptor, int x, i
         input.layers[0].object_index[i] = i;
         input.layers[0].offset[i] = descriptor->offset[i]; input.layers[0].pitch[i] = descriptor->stride[i];
     }
-    VASurfaceAttrib attributes[2] = {0};
-    attributes[0].type = VASurfaceAttribMemoryType; attributes[0].flags = VA_SURFACE_ATTRIB_SETTABLE;
-    attributes[0].value.type = VAGenericValueTypeInteger; attributes[0].value.value.i = VA_SURFACE_ATTRIB_MEM_TYPE_DRM_PRIME_2;
-    attributes[1].type = VASurfaceAttribExternalBufferDescriptor; attributes[1].flags = VA_SURFACE_ATTRIB_SETTABLE;
-    attributes[1].value.type = VAGenericValueTypePointer; attributes[1].value.value.p = &input;
     VASurfaceID source = VA_INVALID_SURFACE, destination = VA_INVALID_SURFACE;
     VAConfigID config = VA_INVALID_ID;
     VAContextID context = VA_INVALID_ID;
     VABufferID parameters = VA_INVALID_ID;
-    VAStatus status = vaCreateSurfaces(display, VA_RT_FORMAT_RGB32, input.width, input.height, &source, 1, attributes, 2);
+    VAStatus status = import_surface(display, rt_format, &input, va_fallback_format(descriptor->format), &source);
     int result = AVERROR(EIO);
     if (status != VA_STATUS_SUCCESS) goto end;
     av_frame_unref(encoder->hardware);
     result = av_hwframe_get_buffer(encoder->video->hw_frames_ctx, encoder->hardware, 0);
-    if (result < 0) goto end;
+    if (result < 0) { ms_fail(encoder, "allocate hardware frame", result); goto end; }
     destination = (VASurfaceID)(uintptr_t)encoder->hardware->data[3];
     status = vaCreateConfig(display, VAProfileNone, VAEntrypointVideoProc, NULL, 0, &config);
     if (status != VA_STATUS_SUCCESS) goto end;
@@ -118,7 +151,7 @@ int ms_encoder_dmabuf(ms_encoder *encoder, const ms_dmabuf *descriptor, int x, i
     pipeline.surface = source; pipeline.surface_region = &crop;
     pipeline.surface_color_standard = VAProcColorStandardBT709;
     pipeline.output_color_standard = VAProcColorStandardBT709;
-    pipeline.input_color_properties.color_range = VA_SOURCE_RANGE_FULL;
+    pipeline.input_color_properties.color_range = nv12 ? VA_SOURCE_RANGE_REDUCED : VA_SOURCE_RANGE_FULL;
     pipeline.output_color_properties.color_range = VA_SOURCE_RANGE_REDUCED;
     status = vaCreateBuffer(display, context, VAProcPipelineParameterBufferType, sizeof(pipeline), 1, &pipeline, &parameters);
     if (status != VA_STATUS_SUCCESS) goto end;

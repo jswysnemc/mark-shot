@@ -43,6 +43,18 @@ pub(super) fn device(bytes: &[u8]) -> Option<PathBuf> {
     None
 }
 
+/// 【显存采集】【格式优先级】按 DRM 四字符 format 返回分配优先级，优先选择通用 BGR 布局与 NV12
+fn format_priority(format: u32) -> u8 {
+    match &format.to_le_bytes() {
+        b"XR24" => 0,
+        b"AR24" => 1,
+        b"NV12" => 2,
+        b"XB24" => 3,
+        b"AB24" => 4,
+        _ => 5,
+    }
+}
+
 /// 【显存采集】【缓冲提交】按 manager、state、media 和 qh 创建一个可采集的缓冲，返回带生命周期的协议与显存资源
 pub(super) fn allocate(
     manager: &dmabuf::ZwpLinuxDmabufV1,
@@ -55,7 +67,9 @@ pub(super) fn allocate(
         .as_deref()
         .ok_or("Compositor did not identify the DMA-BUF device")?;
     let size = state.size.ok_or("Missing DMA-BUF dimensions")?;
-    for (format, modifiers) in &state.dma_formats {
+    let mut candidates: Vec<_> = state.dma_formats.iter().collect();
+    candidates.sort_by_key(|(format, _)| format_priority(*format));
+    for (format, modifiers) in candidates {
         let Ok(surface) = Surface::new(media, device, size, *format, modifiers) else {
             continue;
         };
@@ -114,4 +128,32 @@ impl Dispatch<params::ZwpLinuxBufferParamsV1, ()> for State {
         }
     }
     wayland_client::event_created_child!(State, params::ZwpLinuxBufferParamsV1, [0 => (wl_buffer::WlBuffer, ())]);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_priority;
+
+    /// 【显存采集测试】【格式排序】无参数，验证 XR24/AR24/NV12 优先于 XB24/AB24 及未知格式
+    #[test]
+    fn dmabuf_format_priority_prefers_bgr_and_nv12() {
+        let mut formats = vec![
+            u32::from_le_bytes(*b"AB24"),
+            u32::from_le_bytes(*b"NV12"),
+            u32::from_le_bytes(*b"XB24"),
+            u32::from_le_bytes(*b"XR24"),
+            u32::from_le_bytes(*b"AR24"),
+        ];
+        formats.sort_by_key(|format| format_priority(*format));
+        assert_eq!(
+            formats,
+            vec![
+                u32::from_le_bytes(*b"XR24"),
+                u32::from_le_bytes(*b"AR24"),
+                u32::from_le_bytes(*b"NV12"),
+                u32::from_le_bytes(*b"XB24"),
+                u32::from_le_bytes(*b"AB24"),
+            ]
+        );
+    }
 }

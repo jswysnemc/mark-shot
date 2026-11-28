@@ -213,6 +213,24 @@ pub(super) fn run(
                     );
                 }
             }
+            Command::Reactivate(id) => {
+                let active_request = pending
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(|request| request.id == id && !request.reply.is_closed());
+                if !active_request {
+                    return;
+                }
+                log::info!("【PipeWire】【重新激活】流 node={node_id} 暂未交付帧，切换激活状态以触发合成器重绘");
+                // 4. 【PipeWire】【状态翻转】流已在 Streaming 时先停用，待进入 Paused 回调后自动重新激活
+                let target_active = stream.state() != pw::stream::StreamState::Streaming;
+                if let Err(error) = stream.set_active(target_active) {
+                    complete(
+                        &pending,
+                        Err(format!("cannot reactivate PipeWire stream: {error}")),
+                    );
+                }
+            }
             Command::Cancel(id) => {
                 if pending
                     .borrow()

@@ -103,3 +103,19 @@ fn has_all_bindings_requires_non_empty_triggers() {
     assert!(!has_all_bindings(&main_only, true));
     assert!(!has_all_bindings(&shortcuts("screenshot", "  "), false));
 }
+
+/// 【全局快捷键测试】【已登记跳过绑定】无参数，验证门户已登记目标标识（含用户清空触发键）时不再重复调用 BindShortcuts
+#[test]
+fn has_registered_shortcuts_accepts_existing_ids_even_when_unbound() {
+    let main_unbound = shortcuts("screenshot", "");
+    assert!(has_registered_shortcuts(&main_unbound, false));
+    assert!(!has_registered_shortcuts(&main_unbound, true));
+    assert!(!has_registered_shortcuts(&[], false));
+    assert!(!has_registered_shortcuts(
+        &shortcuts("other", "Ctrl+A"),
+        false
+    ));
+    let mut both = shortcuts("screenshot", "Ctrl+Alt+A");
+    both.extend(shortcuts("active-window", ""));
+    assert!(has_registered_shortcuts(&both, true));
+}
