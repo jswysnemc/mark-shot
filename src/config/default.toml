@@ -111,6 +111,8 @@ file_paths_to_image = true
 always_on_top = true
 # 贴图后自动识别文字并启用划词选择；需要已安装的识别资源
 auto_text_selection = false
+# 剪贴板图片显示比例：auto 优先使用图片内嵌 DPR，未知来源使用系统缩放；system 始终使用系统缩放；1.0 按逻辑像素
+clipboard_image_scale = "auto"
 border_enabled = true
 border_color = "#5EEAD4"
 border_width = 2.0

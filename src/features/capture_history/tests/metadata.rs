@@ -49,6 +49,7 @@ fn metadata_roundtrip_keeps_pixels_and_compressed_data() {
         .unwrap();
     let info = png_metadata::inspect(&mut Cursor::new(&recorded)).unwrap();
     assert_eq!(info.scale, 1.25);
+    assert_eq!(info.dpr, Some(1.25));
     assert_eq!(info.search, "会议 alpha notes");
     assert_eq!(
         image::load_from_memory(&original).unwrap().into_rgba8(),
@@ -74,7 +75,31 @@ fn metadata_roundtrip_keeps_pixels_and_compressed_data() {
         .unwrap();
     let second_info = png_metadata::inspect(&mut Cursor::new(second)).unwrap();
     assert_eq!(second_info.scale, 1.0);
+    assert_eq!(second_info.dpr, Some(1.0));
     assert!(second_info.search.is_empty());
+}
+
+/// 【截图历史测试】【剪贴板比例】无参数，验证未标记 PNG 没有 DPR，附加后保留像素并可被重新读取，无返回值
+#[test]
+fn with_scale_marks_an_unmarked_png_without_reencoding() {
+    let original = super::png(19, 11);
+    assert_eq!(
+        png_metadata::inspect(&mut Cursor::new(&original))
+            .unwrap()
+            .dpr,
+        None
+    );
+    let marked = png_metadata::with_scale(&original, 1.25).unwrap();
+    assert_eq!(
+        png_metadata::inspect(&mut Cursor::new(&marked))
+            .unwrap()
+            .dpr,
+        Some(1.25)
+    );
+    assert_eq!(
+        image::load_from_memory(&original).unwrap().into_rgba8(),
+        image::load_from_memory(&marked).unwrap().into_rgba8()
+    );
 }
 
 /// 【截图历史测试】【损坏边界】拒绝截断、坏校验和无图像数据，搜索按 UTF-8 边界限制长度

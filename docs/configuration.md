@@ -111,10 +111,18 @@ filename_format = "%Y-%m-%d_%H-%M"
 ```toml
 [pinned]
 always_on_top = true
+clipboard_image_scale = "auto"   # auto, system or 1.0
 border_enabled = true
 border_color = "#5EEAD4"
 border_width = 2.0
 ```
+
+`clipboard_image_scale` controls the size of images pinned from the clipboard. `auto` uses the
+device pixel ratio Mark Shot writes into the PNG when it copies a screenshot. Images without that
+marker, including copied image files, fall back to the display scale; synthesized text and HTML
+keep logical pixels. `system` uses the display scale for every image, while `1.0` treats image
+pixels as logical pixels. Text and HTML pins are rendered at the same display scale under `auto`
+and `system` so they stay sharp; with `1.0` they use logical pixels.
 
 ### Capture history
 

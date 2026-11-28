@@ -2,6 +2,40 @@
 
 use super::super::*;
 
+/// 【贴图配置回归】【剪贴板比例】无参数，验证默认 auto 与字符串、数字 1.0 的解析结果，无返回值
+#[test]
+fn clipboard_image_scale_parses_named_and_numeric_values() {
+    assert_eq!(
+        Config::default().pinned.clipboard_image_scale,
+        ClipboardImageScale::Auto
+    );
+    for (text, expected) in [
+        (
+            "[pinned]\nclipboard_image_scale = \"auto\"\n",
+            ClipboardImageScale::Auto,
+        ),
+        (
+            "[pinned]\nclipboard_image_scale = \"system\"\n",
+            ClipboardImageScale::System,
+        ),
+        (
+            "[pinned]\nclipboard_image_scale = \"1.0\"\n",
+            ClipboardImageScale::One,
+        ),
+        (
+            "[pinned]\nclipboard_image_scale = 1.0\n",
+            ClipboardImageScale::One,
+        ),
+    ] {
+        assert_eq!(
+            loading::parse(text, "config.toml")
+                .pinned
+                .clipboard_image_scale,
+            expected
+        );
+    }
+}
+
 /// 【贴图配置回归】【设置交接】无参数，验证 TOML、JSON 和设置保存都启用同一启动字段，无返回值
 #[test]
 fn automatic_text_selection_is_opt_in_and_survives_settings_roundtrip() {

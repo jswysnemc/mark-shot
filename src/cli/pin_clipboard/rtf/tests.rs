@@ -209,7 +209,7 @@ fn table_rows_and_cell_backgrounds_are_built() {
     assert_eq!(row.cells[0].background, Some(Rgba(4, 5, 6, 255)));
     assert_eq!(row.cells[1].background, Some(Rgba(7, 8, 9, 255)));
     assert!(row.cells.iter().all(|cell| cell.header));
-    let image = tiny_skia::Pixmap::decode_png(&rich_text::image(&rich).unwrap()).unwrap();
+    let image = tiny_skia::Pixmap::decode_png(&rich_text::image(&rich, 1.0).unwrap()).unwrap();
     assert!(image.width() > 0 && image.height() > 0);
 }
 
@@ -242,7 +242,7 @@ fn dark_paragraph_background_sets_canvas_and_renders() {
             .flat_map(|block| &block.spans)
             .all(|span| span.style.background.is_none())
     );
-    let png = rich_text::image(&rich).expect("expected a rendered png");
+    let png = rich_text::image(&rich, 1.0).expect("expected a rendered png");
     let image = tiny_skia::Pixmap::decode_png(&png).expect("expected a decodable png");
     let dark = image
         .pixels()

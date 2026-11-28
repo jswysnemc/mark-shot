@@ -48,7 +48,7 @@ pub(super) fn save(
 ) -> crate::AppResult<Option<PathBuf>> {
     let image = run.session.source().ok_or("the scroll image is empty")?;
     let png = crate::scroll::png::encode(image)?;
-    let scale = run.scale;
+    let scale = crate::backend::pin::display_scale(run.scale, None);
     let snapshot = Snapshot::new(png, scale, String::new())?;
     let path = crate::utils::screenshot_path::planned(dir)?;
     let paused = run.session.paused;

@@ -125,17 +125,19 @@ async fn deliver_positioned(
             return;
         }
     };
+    // 1. 【截图】【显示比例】Windows 使用目标显示器 DPI，Linux 使用捕获比例
+    let pin_scale = crate::backend::pin::display_scale(scale, position);
     crate::features::capture_history::remember_with_original(
         &exported,
-        scale,
+        pin_scale,
         search,
         Some(original.as_deref().unwrap_or(&png)),
     );
     if outputs.pin {
         let result = if let Some(image) = pin_translation {
-            crate::backend::pin::spawn_translated(&image.png, scale, position, &image.seed)
+            crate::backend::pin::spawn_translated(&image.png, pin_scale, position, &image.seed)
         } else {
-            crate::backend::pin::spawn_at(&png, scale, position)
+            crate::backend::pin::spawn_at(&png, pin_scale, position)
         };
         if let Err(e) = result {
             log::error!("pin failed: {e}");
@@ -158,7 +160,17 @@ async fn deliver_positioned(
         None
     };
     if outputs.copy {
-        match initialize_clipboard().copy_image_to_clipboard(&exported) {
+        // 1. 【截图】【剪贴板比例】把设备比例写入 PNG 文本块，贴图进程才能还原逻辑尺寸
+        let clipboard_png = match crate::features::capture_history::png_metadata::with_scale(
+            &exported, pin_scale,
+        ) {
+            Ok(png) => std::borrow::Cow::Owned(png),
+            Err(error) => {
+                log::error!("【截图】【剪贴板比例】{error}");
+                std::borrow::Cow::Borrowed(exported.as_ref())
+            }
+        };
+        match initialize_clipboard().copy_image_to_clipboard(&clipboard_png) {
             Ok(()) => {
                 let preview = saved.is_none().then_some(exported.as_ref());
                 notify::send(Notice::Copied(saved, preview)).await

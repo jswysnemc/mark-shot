@@ -18,6 +18,8 @@ pub struct PngInfo {
     pub width: u32,
     pub height: u32,
     pub scale: f32,
+    /// 仅在 PNG 实际包含 mark-shot DPR 文本块时存在；1.0 也是有效值
+    pub dpr: Option<f32>,
     pub search: String,
 }
 
@@ -188,6 +190,7 @@ pub fn inspect(reader: &mut (impl Read + Seek)) -> io::Result<PngInfo> {
                     width,
                     height,
                     scale: 1.0,
+                    dpr: None,
                     search: String::new(),
                 });
             } else {
@@ -195,11 +198,12 @@ pub fn inspect(reader: &mut (impl Read + Seek)) -> io::Result<PngInfo> {
                 if valid_crc && let Some((key, value)) = text(kind, &data) {
                     let current = info.as_mut().unwrap();
                     if key == DPR_KEY.as_bytes() {
-                        current.scale = std::str::from_utf8(value)
+                        let scale = std::str::from_utf8(value)
                             .ok()
                             .and_then(|value| value.parse::<f32>().ok())
-                            .filter(|scale| (1.0..=16.0).contains(scale))
-                            .unwrap_or(1.0);
+                            .filter(|scale| (1.0..=16.0).contains(scale));
+                        current.dpr = scale;
+                        current.scale = scale.unwrap_or(1.0);
                     } else if key == SEARCH_KEY.as_bytes() {
                         current.search = std::str::from_utf8(value)
                             .map(bounded_search)
@@ -244,6 +248,7 @@ impl<'a> Prepared<'a> {
         } else {
             1.0
         };
+        info.dpr = Some(info.scale);
         info.search = bounded_search(search);
         let mut metadata = Vec::new();
         chunk(
@@ -298,6 +303,16 @@ impl<'a> Prepared<'a> {
         }
         Ok(())
     }
+}
+
+/// 【截图历史】【比例附加】按 png 和 scale 返回插入 DPR 文本块的完整 PNG；像素数据保持不变
+pub fn with_scale(png: &[u8], scale: f32) -> io::Result<Vec<u8>> {
+    let prepared = Prepared::new(png, scale, "")?;
+    let capacity = usize::try_from(prepared.len())
+        .map_err(|_| invalid("PNG is too large to copy with metadata"))?;
+    let mut output = Vec::with_capacity(capacity);
+    prepared.write(&mut output)?;
+    Ok(output)
 }
 
 /// 【截图历史】【文本块编码】把 kind、data 及校验值追加到 output；只用于少量元数据

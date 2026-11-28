@@ -7,7 +7,7 @@ use super::{
 
 /// 【贴图测试】【渲染解码】按富文本渲染并解码 PNG，失败即 panic
 fn decoded(rich: &RichText) -> tiny_skia::Pixmap {
-    tiny_skia::Pixmap::decode_png(&rich_text::image(rich).unwrap()).unwrap()
+    tiny_skia::Pixmap::decode_png(&rich_text::image(rich, 1.0).unwrap()).unwrap()
 }
 
 /// 【贴图测试】【非背景像素】按图片返回与左上角画布颜色不同的像素数量
@@ -110,7 +110,7 @@ fn html_mixed_local_and_placeholder_form_a_row() {
     assert_eq!(images.len(), 2);
     assert!(images[0].data.is_some());
     assert!(images[1].data.is_none());
-    assert!(tiny_skia::Pixmap::decode_png(&rich_text::image(&rich).unwrap()).is_ok());
+    assert!(tiny_skia::Pixmap::decode_png(&rich_text::image(&rich, 1.0).unwrap()).is_ok());
 }
 
 /// 【贴图测试】【GitHub头部】无参数，居中 div 使 logo、标题、副标题与徽章行全部居中
@@ -138,7 +138,7 @@ fn html_github_header_centers_logo_heading_and_badges() {
     };
     assert_eq!(badges.len(), 3);
     assert_eq!(rich.blocks[3].align, Align::Center);
-    assert!(tiny_skia::Pixmap::decode_png(&rich_text::image(&rich).unwrap()).is_ok());
+    assert!(tiny_skia::Pixmap::decode_png(&rich_text::image(&rich, 1.0).unwrap()).is_ok());
 }
 
 /// 【贴图测试】【徽章单行】无参数，略超可用宽度的 6 个徽章占位等比缩小后保持一行

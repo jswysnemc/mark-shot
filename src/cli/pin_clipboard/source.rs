@@ -14,6 +14,11 @@ pub(super) struct Clipboard {
 }
 
 impl Clipboard {
+    /// 【贴图】【重复检测】无参数，返回剪贴板是否提供可区分新复制操作的序号；Wayland 返回 false
+    pub fn has_sequence(&self) -> bool {
+        self.sequence != 0
+    }
+
     /// 【贴图】【重复身份】无参数，返回文件列表及可用剪贴板版本的摘要，不持久化文件路径
     pub fn fingerprint(&self) -> u32 {
         let mut hash = crc32fast::Hasher::new();
@@ -227,14 +232,16 @@ pub(super) fn read() -> crate::AppResult<Clipboard> {
         .ok()
         .and_then(|bytes| String::from_utf8(bytes).ok())
         .map_or_else(Vec::new, |text| self::files(&text));
+    // 1. 【贴图】【文件图片回退】复制文件时也读取图片预览，文件不可解码时仍能贴出原图
+    let image = data_with(x11, MimeType::Specific("image/png"), IMAGE_LIMIT).ok();
     if !files.is_empty() {
         return Ok(Clipboard {
             files,
+            image,
             sequence: x11_sequence(x11).unwrap_or(0),
             ..Default::default()
         });
     }
-    let image = data_with(x11, MimeType::Specific("image/png"), IMAGE_LIMIT).ok();
     let (html, rtf, text) = if image.is_none() {
         let mimes = if x11 {
             crate::backend::x11::clipboard::targets(false).unwrap_or_default()
@@ -310,16 +317,18 @@ pub(super) fn read() -> crate::AppResult<Clipboard> {
     let files = crate::backend::clipboard::read_files().unwrap_or_default();
     let sequence =
         unsafe { windows_sys::Win32::System::DataExchange::GetClipboardSequenceNumber() };
+    // 1. 【贴图】【文件图片回退】复制文件时也读取图片预览，文件不可解码时仍能贴出原图
+    let image = crate::backend::clipboard::read_image_png()
+        .ok()
+        .filter(|bytes| bytes.len() as u64 <= IMAGE_LIMIT);
     if !files.is_empty() {
         return Ok(Clipboard {
             files,
+            image,
             sequence,
             ..Default::default()
         });
     }
-    let image = crate::backend::clipboard::read_image_png()
-        .ok()
-        .filter(|bytes| bytes.len() as u64 <= IMAGE_LIMIT);
     let html = crate::backend::clipboard::read_html().ok();
     let rtf = if html.is_none() {
         crate::backend::clipboard::read_rtf()

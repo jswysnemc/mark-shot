@@ -22,6 +22,11 @@ fn error(state: &mut EditorState, message: String) {
 /// 【截图另存为】【原图准备】合成 state 的最终 PNG 和可选文字索引；返回冻结快照，不修改完成状态
 fn snapshot(state: &mut EditorState) -> AppResult<Snapshot> {
     let (png, _, scale) = super::render_final(state).ok_or("cannot render screenshot")?;
+    let position = state
+        .selection
+        .zone
+        .map(|rect| (rect.left().round() as i32, rect.top().round() as i32));
+    let pin_scale = crate::backend::pin::display_scale(scale, position);
     let search = if crate::config::history::current().index_annotations {
         crate::features::capture_history::png_metadata::joined_search(
             state.annotations.iter().filter_map(|annotation| {
@@ -36,7 +41,7 @@ fn snapshot(state: &mut EditorState) -> AppResult<Snapshot> {
         String::new()
     };
     let exported = crate::features::export_image::current(&png)?.into_owned();
-    let mut snapshot = Snapshot::new(exported, scale, search)?;
+    let mut snapshot = Snapshot::new(exported, pin_scale, search)?;
     snapshot.original = super::history_source::png(state).map(std::sync::Arc::new);
     Ok(snapshot)
 }

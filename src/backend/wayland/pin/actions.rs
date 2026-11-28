@@ -127,8 +127,13 @@ impl Pin {
                     &self.image.png()?,
                     self.image.always_on_top,
                 )?,
-                PinAction::Copy => crate::backend::initialize_clipboard()
-                    .copy_image_to_clipboard(&self.image.png()?)?,
+                PinAction::Copy => {
+                    let png = crate::features::pinned_image::density::with_dpr(
+                        self.image.png()?,
+                        self.image.density,
+                    );
+                    crate::backend::initialize_clipboard().copy_image_to_clipboard(&png)?;
+                }
                 PinAction::CopySelectedText => {
                     crate::utils::copy_to_clipboard(&self.text.line_text(true))?
                 }

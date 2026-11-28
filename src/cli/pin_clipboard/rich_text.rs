@@ -24,8 +24,11 @@ const QUOTE_GAP: f32 = 10.0;
 const BODY_SIZE: f32 = 16.0;
 const CODE_SIZE: f32 = 14.0;
 
-/// 【贴图】【富文本图像】按 rich 排版并绘制段落、标题、列表、引用与代码，返回 PNG 或明确错误
-pub(super) fn image(rich: &RichText) -> crate::AppResult<Vec<u8>> {
+/// 【贴图】【富文本图像】按 rich 与 scale 排版并绘制段落、标题、列表、引用与代码，返回 PNG 或明确错误
+pub(super) fn image(rich: &RichText, scale: f32) -> crate::AppResult<Vec<u8>> {
+    if !scale.is_finite() || scale <= 0.0 {
+        return Err("invalid clipboard rich text scale".into());
+    }
     if !rich.has_content() {
         return Err("the clipboard rich text has no visible content".into());
     }
@@ -168,8 +171,8 @@ pub(super) fn image(rich: &RichText) -> crate::AppResult<Vec<u8>> {
         }
     }
 
-    let width = (content_width + PADDING * 2.0).ceil() as u32;
-    let height = (cursor + PADDING).ceil() as u32;
+    let width = ((content_width + PADDING * 2.0) * scale).ceil() as u32;
+    let height = ((cursor + PADDING) * scale).ceil() as u32;
     if width == 0 || height == 0 {
         return Err("the clipboard rich text has no drawable size".into());
     }
@@ -186,7 +189,9 @@ pub(super) fn image(rich: &RichText) -> crate::AppResult<Vec<u8>> {
             content_width,
             canvas: palette.canvas,
         };
-        let mut painter = Painter::new(&mut image).with_text(&mut fonts, &mut cache);
+        let mut painter = Painter::new(&mut image)
+            .with_scale(scale)
+            .with_text(&mut fonts, &mut cache);
         for block in &laid {
             draw_block_background(&mut painter, block, &layout);
             if picture::is_picture(&block.kind) {

@@ -107,10 +107,16 @@ filename_format = "%Y-%m-%d_%H-%M"
 ```toml
 [pinned]
 always_on_top = true
+clipboard_image_scale = "auto"   # auto、system 或 1.0
 border_enabled = true
 border_color = "#5EEAD4"
 border_width = 2.0
 ```
+
+`clipboard_image_scale` 控制剪贴板图片贴到屏幕时的显示尺寸。`auto` 优先使用 Mark Shot 复制截图时
+写入 PNG 的设备像素比；没有该标记的图片（包括复制的图片文件）回退到系统缩放，文本/HTML 合成内容保持
+逻辑像素。`system` 对所有图片使用系统缩放；`1.0` 把图片像素当作逻辑像素。文本和 HTML 贴图在
+`auto`/`system` 下按系统缩放渲染以保持清晰；设置为 `1.0` 时使用逻辑像素。
 
 ### 截图历史
 

@@ -8,6 +8,7 @@ use super::{
 };
 use crate::theme::Rgba;
 
+mod clipboard_scale;
 mod image_tests;
 
 /// 【贴图测试】【WPS表格】无参数，返回带 446.25pt 表宽与六个单元宽的 WPS 风格 HTML 解析结果
@@ -117,11 +118,11 @@ fn copied_image_is_pinned_then_its_path_can_be_pinned() {
         files: vec![path],
         ..Default::default()
     };
-    let png = content::image(&clipboard, false, false).unwrap();
+    let png = content::image(&clipboard, false, false, 1.0).unwrap().png;
     let first = tiny_skia::Pixmap::decode_png(&png).unwrap();
     assert_eq!((first.width(), first.height()), (19, 13));
-    assert!(content::image(&clipboard, true, false).is_err());
-    let repeated = content::image(&clipboard, true, true).unwrap();
+    assert!(content::image(&clipboard, true, false, 1.0).is_err());
+    let repeated = content::image(&clipboard, true, true, 1.0).unwrap().png;
     assert!(tiny_skia::Pixmap::decode_png(&repeated).unwrap().width() > 19);
 }
 
@@ -153,7 +154,7 @@ fn copied_fifo_is_rendered_as_a_path_without_opening_it() {
         files: vec![path],
         ..Default::default()
     };
-    let image = content::image(&clipboard, false, true).unwrap();
+    let image = content::image(&clipboard, false, true, 1.0).unwrap().png;
     assert!(tiny_skia::Pixmap::decode_png(&image).is_ok());
 }
 
@@ -256,7 +257,7 @@ fn rich_text_image_renders_png_and_rejects_empty_content() {
         "<h1>Title</h1><p>plain <b>bold</b> \
          <span style=\"color:#ff0000\">red</span></p><pre>code\n  x</pre>",
     );
-    let png = rich_text::image(&rich).unwrap();
+    let png = rich_text::image(&rich, 1.0).unwrap();
     let image = tiny_skia::Pixmap::decode_png(&png).unwrap();
     assert!(image.width() <= 752);
     assert!(image.height() > 32);
@@ -264,7 +265,7 @@ fn rich_text_image_renders_png_and_rejects_empty_content() {
         pixel.red() > 150 && pixel.green() < 120 && pixel.blue() < 120 && pixel.alpha() > 200
     });
     assert!(red, "expected red text pixels");
-    assert!(rich_text::image(&html::parse("   ")).is_err());
+    assert!(rich_text::image(&html::parse("   "), 1.0).is_err());
 }
 
 /// 【贴图测试】【容器背景】无参数，IDEA 外层容器背景成为画布、颜色成为默认前景且不泄漏为片段底色
@@ -289,7 +290,7 @@ fn html_container_background_becomes_canvas() {
             .flat_map(|block| &block.spans)
             .all(|span| span.style.background != Some(Rgba(30, 31, 34, 255)))
     );
-    let png = rich_text::image(&rich).unwrap();
+    let png = rich_text::image(&rich, 1.0).unwrap();
     let image = tiny_skia::Pixmap::decode_png(&png).unwrap();
     let dark = image
         .pixels()
@@ -431,7 +432,7 @@ fn html_table_renders_aligned_columns_and_borders() {
          <tr><td>a</td><td>1</td><td>short</td></tr>\
          <tr><td>a much longer label here</td><td>22</td><td>text</td></tr></table>",
     );
-    let png = rich_text::image(&rich).unwrap();
+    let png = rich_text::image(&rich, 1.0).unwrap();
     let image = tiny_skia::Pixmap::decode_png(&png).unwrap();
     assert!(image.width() <= 752);
     assert!(image.height() > 0);
@@ -475,7 +476,7 @@ fn html_table_keeps_source_width_columns_and_border() {
 #[test]
 fn html_table_with_source_width_renders_full_geometry() {
     let image =
-        tiny_skia::Pixmap::decode_png(&rich_text::image(&wps_table_rich()).unwrap()).unwrap();
+        tiny_skia::Pixmap::decode_png(&rich_text::image(&wps_table_rich(), 1.0).unwrap()).unwrap();
     assert!(
         (image.width() as f32 - 627.0).abs() <= 3.0,
         "width was {}",
@@ -492,7 +493,7 @@ fn html_table_percent_width_fills_the_content_page() {
         panic!("expected a table block");
     };
     assert!(style.fill);
-    let image = tiny_skia::Pixmap::decode_png(&rich_text::image(&rich).unwrap()).unwrap();
+    let image = tiny_skia::Pixmap::decode_png(&rich_text::image(&rich, 1.0).unwrap()).unwrap();
     assert_eq!(image.width(), 752);
     assert!(image.height() > 0);
 }
@@ -504,14 +505,14 @@ fn html_code_block_keeps_long_lines_up_to_cap() {
     let rich = html::parse(&format!(
         "<pre style=\"font-family:monospace\">{line}</pre>"
     ));
-    let image = tiny_skia::Pixmap::decode_png(&rich_text::image(&rich).unwrap()).unwrap();
+    let image = tiny_skia::Pixmap::decode_png(&rich_text::image(&rich, 1.0).unwrap()).unwrap();
     assert!(image.width() > 752, "long code should not wrap at 720");
     assert!(
         image.width() <= 1664,
         "code should stay within the 1600 cap"
     );
     let short = html::parse("<p>short prose</p>");
-    let short = tiny_skia::Pixmap::decode_png(&rich_text::image(&short).unwrap()).unwrap();
+    let short = tiny_skia::Pixmap::decode_png(&rich_text::image(&short, 1.0).unwrap()).unwrap();
     assert!(short.width() <= 752);
 }
 
@@ -519,7 +520,7 @@ fn html_code_block_keeps_long_lines_up_to_cap() {
 #[test]
 fn html_links_render_with_readable_blue_text() {
     let rich = html::parse("<p><a href=\"https://example.com\">link</a></p>");
-    let png = rich_text::image(&rich).unwrap();
+    let png = rich_text::image(&rich, 1.0).unwrap();
     let image = tiny_skia::Pixmap::decode_png(&png).unwrap();
     let readable = image
         .pixels()
@@ -543,14 +544,14 @@ fn rtf_clipboard_pins_rich_text_and_falls_back_to_plain_text() {
         text: Some("plain".into()),
         ..Default::default()
     };
-    let png = content::image(&clipboard, false, false).unwrap();
+    let png = content::image(&clipboard, false, false, 1.0).unwrap().png;
     assert!(tiny_skia::Pixmap::decode_png(&png).is_ok());
     let empty = Clipboard {
         rtf: Some("{\\rtf1 }".into()),
         text: Some("fallback".into()),
         ..Default::default()
     };
-    let png = content::image(&empty, false, false).unwrap();
+    let png = content::image(&empty, false, false, 1.0).unwrap().png;
     assert!(tiny_skia::Pixmap::decode_png(&png).is_ok());
 }
 
@@ -566,7 +567,7 @@ fn rtf_code_block_keeps_long_lines_unwrapped() {
         rich.blocks.first().map(|block| &block.kind),
         Some(BlockKind::Code)
     ));
-    let png = rich_text::image(&rich).unwrap();
+    let png = rich_text::image(&rich, 1.0).unwrap();
     let image = tiny_skia::Pixmap::decode_png(&png).unwrap();
     assert!(image.width() > 752, "expected an unwrapped code line");
     assert!(image.width() <= 1632);
@@ -586,7 +587,7 @@ fn html_image_reads_local_file_and_draws_it() {
     assert_eq!(image.display_width, Some(20.0));
     assert_eq!(image.display_height, Some(10.0));
     assert!(image.data.as_ref().is_some_and(|data| !data.is_empty()));
-    let rendered = tiny_skia::Pixmap::decode_png(&rich_text::image(&rich).unwrap()).unwrap();
+    let rendered = tiny_skia::Pixmap::decode_png(&rich_text::image(&rich, 1.0).unwrap()).unwrap();
     assert!(rendered.pixels().iter().any(|pixel| {
         pixel.red() > 200 && pixel.green() < 80 && pixel.blue() < 80 && pixel.alpha() > 200
     }));
@@ -646,7 +647,7 @@ fn html_image_only_document_has_content_and_renders() {
     let (_directory, url) = local_image(40, 20);
     let rich = html::parse(&format!("<img width=\"20\" height=\"10\" src=\"{url}\">"));
     assert!(rich.has_content());
-    assert!(tiny_skia::Pixmap::decode_png(&rich_text::image(&rich).unwrap()).is_ok());
+    assert!(tiny_skia::Pixmap::decode_png(&rich_text::image(&rich, 1.0).unwrap()).is_ok());
 }
 
 /// 【贴图测试】【大段富文本】无参数，超过旧 64 KiB 上限的 HTML 仍走富文本渲染而不是退化为纯文本
@@ -663,7 +664,7 @@ fn large_html_clipboard_keeps_rich_formatting() {
         text: Some("plain".into()),
         ..Default::default()
     };
-    let png = content::image(&clipboard, false, false).unwrap();
+    let png = content::image(&clipboard, false, false, 1.0).unwrap().png;
     let image = tiny_skia::Pixmap::decode_png(&png).unwrap();
     assert!(image.width() <= 752);
     assert!(image.height() > 32);

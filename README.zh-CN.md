@@ -146,7 +146,7 @@ mark-shot -m -f -t s         # 保存指针所在的显示器画面
 mark-shot --scroll           # 滚动长截图
 mark-shot --ocr              # 识别选区内的文字
 mark-shot --record           # 打开录制控制窗口
-mark-shot --pin-clipboard    # 把剪贴板中的图片、富文本或文字贴到屏幕上；本地图片正常渲染，网络图片显示为占位框
+mark-shot --pin-clipboard    # 把剪贴板中的图片、富文本或文字贴到屏幕上；Mark Shot 复制出的图片保留设备像素比，本地图片正常渲染，网络图片显示为占位框
 mark-shot picture.png        # 标注已有图片
 mark-shot --settings         # 打开设置
 ```

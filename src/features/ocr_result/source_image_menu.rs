@@ -38,7 +38,11 @@ pub(super) fn activate(state: &mut ResultWindow, index: usize) -> WindowAction {
     );
     let result = match index {
         0 => crate::features::pinned_image::actions::open(&state.png, false),
-        1 => crate::backend::pin::spawn(&state.png, 1.0),
+        1 => {
+            use crate::features::pinned_image::density::{self, Source};
+            let scale = density::resolve(density::embedded(&state.png), Source::FileImage);
+            crate::backend::pin::spawn(&state.png, scale)
+        }
         _ => return WindowAction::None,
     };
     if let Err(error) = result {

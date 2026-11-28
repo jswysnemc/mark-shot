@@ -7,6 +7,45 @@ pub const PIN_ARG: &str = "--pin";
 pub const SCALE_ARG: &str = "--scale";
 pub const POSITION_ARG: &str = "--position";
 
+/// 【贴图】【系统比例】按主显示器 DPI 返回显示比例；显示器查询失败时返回空值
+pub fn system_scale() -> Option<f32> {
+    static SCALE: std::sync::OnceLock<Option<f32>> = std::sync::OnceLock::new();
+    *SCALE.get_or_init(|| {
+        let monitors = crate::backend::windows::native::monitors().ok()?;
+        let monitor = monitors
+            .iter()
+            .find(|monitor| monitor.primary)
+            .or_else(|| monitors.first())?;
+        Some((monitor.dpi as f32 / 96.0).max(0.25))
+    })
+}
+
+/// 【贴图】【显示比例】按位置所在显示器的 DPI 返回贴图密度；位置缺失时使用主屏
+pub fn display_scale(scale: f32, position: Option<(i32, i32)>) -> f32 {
+    let Ok(monitors) = crate::backend::windows::native::monitors() else {
+        return scale;
+    };
+    let monitor = position
+        .and_then(|(x, y)| {
+            monitors
+                .iter()
+                .find(|monitor| contains(monitor.bounds, x, y))
+        })
+        .or_else(|| monitors.iter().find(|monitor| monitor.primary))
+        .or_else(|| monitors.first());
+    monitor.map_or(scale, |monitor| (monitor.dpi as f32 / 96.0).max(0.25))
+}
+
+/// 【贴图】【显示器包含】按 bounds 判断物理点是否落在显示器范围内，返回命中状态
+fn contains(bounds: crate::backend::windows::native::Bounds, x: i32, y: i32) -> bool {
+    let right = i64::from(bounds.left) + i64::from(bounds.width);
+    let bottom = i64::from(bounds.top) + i64::from(bounds.height);
+    i64::from(x) >= i64::from(bounds.left)
+        && i64::from(y) >= i64::from(bounds.top)
+        && i64::from(x) < right
+        && i64::from(y) < bottom
+}
+
 /// 【贴图】【内部参数】从 args 读取文件或有界标准输入；返回窗口运行结果，非法比例直接拒绝
 pub fn cli(mut args: impl Iterator<Item = String>) -> AppResult {
     use std::io::Read;
