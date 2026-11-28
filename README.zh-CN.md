@@ -85,7 +85,7 @@ yay -S mark-shot
 在 [Releases](https://github.com/jswysnemc/mark-shot/releases) 页面按系统版本与硬件架构下载对应的 `.deb` 安装包。例如在 Ubuntu 24.04 (x86_64) 下执行：
 
 ```sh
-sudo apt install ./mark-shot_0.2.5-1_amd64.ubuntu24.04.deb
+sudo apt install ./mark-shot_0.2.6-1_amd64.ubuntu24.04.deb
 ```
 
 请按实际使用的系统版本与架构替换文件名。
@@ -95,7 +95,7 @@ sudo apt install ./mark-shot_0.2.5-1_amd64.ubuntu24.04.deb
 当前预编译 RPM 安装包针对 Fedora 43 构建。在 [Releases](https://github.com/jswysnemc/mark-shot/releases) 页面下载对应架构的 `.rpm` 文件后执行：
 
 ```sh
-sudo dnf install ./mark-shot-0.2.5-1.fc43.x86_64.rpm
+sudo dnf install ./mark-shot-0.2.6-1.fc43.x86_64.rpm
 ```
 
 请按实际使用的硬件架构替换文件名。

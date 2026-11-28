@@ -1,3 +1,13 @@
+mark-shot (0.2.6-1) unstable; urgency=medium
+
+  * Add multi-region capture mode with transparent gaps/holes and editor handoff.
+  * Refine ruler edge snapping, collapsible readout toggles, selection frames, and eyedropper tip dragging.
+  * Preserve scrolling screenshot overlap alignment across list hover highlights.
+  * Harden Wayland portal capture, global shortcut registration, DMA-BUF recording fallbacks, and zero-frame encoder shutdown.
+  * Automate stable AUR package updates for mark-shot and mark-shot-bin after GitHub Release publication.
+
+ -- Mark Shot maintainers <snemc@qq.com>  Sat, 28 Nov 2026 17:05:00 +0900
+
 mark-shot (0.2.5-1) unstable; urgency=medium
 
   * Add simple double-arrow length style for ruler annotations.
