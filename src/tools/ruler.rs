@@ -283,11 +283,11 @@ fn finish(state: &mut EditorState, position: (f32, f32), dirty_mask: &mut u32) {
     let AnnotationShape::Ruler { measurement } = &mut annotation.shape else {
         return;
     };
-    if measurement.mode() == RulerMode::Angle {
-        if angle_draft::release(measurement, position, 4.0) == DraftStep::Continue {
-            annotation.update_bbox();
-            return;
-        }
+    if measurement.mode() == RulerMode::Angle
+        && angle_draft::release(measurement, position, 4.0) == DraftStep::Continue
+    {
+        annotation.update_bbox();
+        return;
     }
     let measures = measurement.measures();
     let annotation = state.pending.take().unwrap();
