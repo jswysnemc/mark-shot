@@ -1,0 +1,133 @@
+name: Test build artifacts
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feat/**'
+      - 'fix/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  CARGO_PROFILE_TEST_DEBUG: '0'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  windows:
+    name: Windows x86_64 test package
+    runs-on: windows-2022
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure MSVC x64 tools
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.99.1'
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-test-build
+          cache-on-failure: true
+
+      - name: Build release binary
+        run: cargo build --release --bin mark-shot --target x86_64-pc-windows-msvc --locked -j 2
+
+      - name: Package test build
+        run: |
+          $package = 'target/mark-shot-test-windows-x86_64'
+          $archive = 'target/mark-shot-test-windows-x86_64.zip'
+          New-Item -ItemType Directory -Force $package | Out-Null
+          Copy-Item 'target/x86_64-pc-windows-msvc/release/mark-shot.exe' $package
+          . ./scripts/windows-runtime.ps1
+          Resolve-WindowsRuntime -PackageDirectory $package -BuildDirectory 'target/x86_64-pc-windows-msvc/release' -LogPath "$package/windows-linkage.txt"
+          @'
+          Mark Shot test build (not a release).
+          Includes mark-shot.exe and app-local MSVC runtime DLLs.
+          The media library, OCR runtime and language models are NOT included.
+          Screenshot, pin, clipboard and annotation testing does not need them.
+          '@ | Set-Content -LiteralPath "$package/TEST-NOTES.txt" -Encoding utf8NoBOM
+          Compress-Archive -LiteralPath $package -DestinationPath $archive -Force
+          (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() |
+            Set-Content -LiteralPath "$archive.sha256" -Encoding ascii
+
+      - name: Upload Windows test package
+        uses: actions/upload-artifact@v4
+        with:
+          name: mark-shot-test-windows-x86_64
+          path: |
+            target/mark-shot-test-windows-x86_64.zip
+            target/mark-shot-test-windows-x86_64.zip.sha256
+          if-no-files-found: error
+
+  linux:
+    name: Linux x86_64 test package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang libclang-dev pkg-config \
+            libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libpipewire-0.3-dev \
+            libssl-dev libfontconfig-dev libfreetype-dev \
+            libxcomposite-dev libxrandr-dev libxfixes-dev libxdamage-dev libegl-dev libdbus-1-dev libgbm-dev \
+            libpulse-dev libva-dev libdrm-dev libcap-dev meson ninja-build nasm wayland-protocols
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.99.1'
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: linux-test-build
+          cache-on-failure: true
+
+      - name: Build release binary
+        run: cargo build --release --bin mark-shot --locked -j 2
+
+      - name: Package test build
+        run: |
+          mkdir -p target/mark-shot-test-linux-x86_64
+          install -m 755 target/release/mark-shot target/mark-shot-test-linux-x86_64/mark-shot
+          cat > target/mark-shot-test-linux-x86_64/TEST-NOTES.txt <<'EOF'
+          Mark Shot test build (not a release).
+          The media library and OCR runtime/models are NOT included.
+          Screenshot, pin, clipboard and annotation testing does not need them.
+          EOF
+          tar -C target -czf target/mark-shot-test-linux-x86_64.tar.gz mark-shot-test-linux-x86_64
+          sha256sum target/mark-shot-test-linux-x86_64.tar.gz > target/mark-shot-test-linux-x86_64.tar.gz.sha256
+
+      - name: Upload Linux test package
+        uses: actions/upload-artifact@v4
+        with:
+          name: mark-shot-test-linux-x86_64
+          path: |
+            target/mark-shot-test-linux-x86_64.tar.gz
+            target/mark-shot-test-linux-x86_64.tar.gz.sha256
+          if-no-files-found: error
