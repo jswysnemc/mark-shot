@@ -22,7 +22,16 @@ impl ToolBehavior for EyedropperTool {
     ) {
         if matches!(button, MouseButton::Left) {
             if pressed {
-                pick(state, dirty_mask);
+                if crate::features::color_sample::tip_drag::begin(state, dirty_mask) {
+                    state.input.mouse_down = true;
+                    state.tool_active = true;
+                } else {
+                    pick(state, dirty_mask);
+                }
+            } else if state.ann_drag.is_some() {
+                state.input.mouse_down = false;
+                state.tool_active = false;
+                crate::editor::annotation_drag::commit_drag_if_changed(state);
             } else {
                 commit_sample(state, dirty_mask);
             }
@@ -31,6 +40,10 @@ impl ToolBehavior for EyedropperTool {
 
     /// 【取色标注】【标签拖动】按 global 更新 state 中标签位置，dirty_mask 返回旧新范围，无返回值
     fn on_move(&self, state: &mut EditorState, global: (f64, f64), dirty_mask: &mut u32) {
+        if state.ann_drag.is_some() {
+            crate::editor::annotation_drag::apply_annotation_drag(state, global);
+            return;
+        }
         if state.input.mouse_down
             && let Some(annotation) = &mut state.pending
             && let crate::types::AnnotationShape::ColorSample { sample } = &mut annotation.shape
@@ -42,8 +55,13 @@ impl ToolBehavior for EyedropperTool {
     }
 
     fn on_key(&self, state: &mut EditorState, key: SpecialKey, _dirty_mask: &mut u32) {
-        if state.input.ctrl && matches!(key, SpecialKey::KeyC) {
-            let color = state.tool_settings.color;
+        if state.input.ctrl
+            && matches!(key, SpecialKey::KeyC)
+            && let Some(color) = state
+                .color_inspector
+                .live
+                .or_else(|| color_under_pointer(state))
+        {
             copy_value(state, ValueField::Hex, color);
         }
     }
@@ -54,6 +72,7 @@ impl ToolBehavior for EyedropperTool {
     }
 
     fn on_deactivate(&self, state: &mut EditorState, dirty_mask: &mut u32) {
+        crate::editor::annotation_drag::commit_drag_if_changed(state);
         crate::features::color_sample::inspector::close(state, dirty_mask);
         crate::editor::drawing_gesture::cancel(state, dirty_mask);
         damage_loupe(state, dirty_mask);
@@ -77,6 +96,7 @@ pub fn pick(state: &mut EditorState, dirty_mask: &mut u32) {
     let Some(source) = space.start_point(state.canvas_point()) else {
         return;
     };
+    state.select_annotation_index(None);
     let size = 14.0 * state.annotation_units().canvas_per_image();
     let label = (
         (source.0 + 20.0)
@@ -183,20 +203,12 @@ pub fn copy_text(state: &mut EditorState, text: &str) {
 /// 【取色工具】【原图采样】按 state 指针映射原图像素并反预乘，返回颜色；图片范围外返回空值
 pub(crate) fn color_under_pointer(state: &EditorState) -> Option<Color> {
     let point = state.canvas_point();
-    let pixel = crate::renderer::FrozenImage::from_parts(
+    let image = crate::renderer::FrozenImage::from_parts(
         state.file_canvas.as_ref(),
         &state.captures,
         &state.placements,
-    )
-    .sample_nearest((point.0 as f32, point.1 as f32))?;
-    let pixel = tiny_skia::PremultipliedColorU8::from_rgba(pixel[0], pixel[1], pixel[2], pixel[3])?
-        .demultiply();
-    Some(Color::from_rgba8(
-        pixel.red(),
-        pixel.green(),
-        pixel.blue(),
-        pixel.alpha(),
-    ))
+    );
+    crate::features::color_sample::sampling::at(image, (point.0 as f32, point.1 as f32))
 }
 
 fn damage_loupe(state: &mut EditorState, dirty_mask: &mut u32) {

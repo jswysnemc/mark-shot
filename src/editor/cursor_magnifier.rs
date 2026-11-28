@@ -27,7 +27,12 @@ pub fn visible(state: &EditorState) -> bool {
     {
         return false;
     }
-    if state.picking() {
+    if state.picking() && state.ann_drag.is_none()
+        || state
+            .ann_drag
+            .as_ref()
+            .is_some_and(|drag| drag.handle == crate::types::SelectionHandle::ColorSampleTip)
+    {
         return true;
     }
     !state.magnifier.hidden

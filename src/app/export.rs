@@ -64,6 +64,16 @@ pub(crate) fn render_final(editor_state: &mut EditorState) -> Option<(Vec<u8>, (
 pub(in crate::app) fn render_final_precise(
     editor_state: &mut EditorState,
 ) -> Option<(Vec<u8>, (f64, f64), f32)> {
+    if let Some(session) = &editor_state.multi_capture {
+        if !session.ready() {
+            return None;
+        }
+        return crate::features::multi_capture::export::render(
+            &editor_state.captures,
+            &editor_state.placements,
+            &session.regions.confirmed,
+        );
+    }
     crate::editor::text_session::commit(editor_state, &mut 0);
     if editor_state.file_canvas.is_some() {
         return super::image_export::render_precise(editor_state);

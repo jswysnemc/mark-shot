@@ -6,6 +6,7 @@ pub mod formats;
 pub mod inspector;
 pub mod inspector_draw;
 pub(crate) mod sampling;
+pub(crate) mod tip_drag;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ColorSample {

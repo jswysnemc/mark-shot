@@ -19,7 +19,7 @@ fn translated_cached_original_restores_the_exact_source_region() {
     let source = ImageSource::store_in(original, directory.path());
     assert_eq!(source.cached_bytes(), baseline.data().len());
     let mut file = FileCanvas {
-        original: source,
+        original: source.into(),
         viewport: Rect::from_xywh(0.0, 0.0, 1100.0, 1100.0).unwrap(),
     };
     let rect = IntRect::from_xywh(100, 200, 20, 30).unwrap();

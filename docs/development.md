@@ -147,7 +147,10 @@ workflows and waits for all verification and package jobs before publishing. `wi
 produces the Windows archive and Setup installer. The installer is compiled with Inno Setup,
 then checked with silent installation, installed-file hashes, startup and uninstall verification.
 Per-format manual runs produce Actions artifacts rather than a
-partial GitHub Release. Stable AUR metadata publication requires an explicit manual request.
+partial GitHub Release. For stable `v*` tags, `native-release.yml` and `native-release-publish.yml`
+automatically publish validated `mark-shot` and `mark-shot-bin` metadata to AUR after the GitHub
+Release is public, while standalone manual runs of `aur-publish.yml` or `release-aur-bin.yml` still
+require an explicit upload flag.
 
 Add the update description at `release/notes/<version>.md` before creating a tag. The publisher
 creates a draft, verifies every uploaded package, and then exposes the release with a collapsed

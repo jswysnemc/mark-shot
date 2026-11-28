@@ -15,8 +15,8 @@ Run `mark-shot`. The screen freezes and a selection overlay appears.
 3. **Annotate.** Pick a tool from the toolbar. See [Annotation tools](annotation-tools.md).
 4. **Finish.** Use one of the actions below.
 
-`Esc` or a right click during selection cancels the capture. The top mode selector (`Select`,
-`Fullscreen`, `Video`, `GIF`) and the bottom-left shortcut hint panel can each be hidden with
+`Esc` or a right click during selection cancels the capture. The top mode selector (`Region`,
+`Multi-region`, `Screen`, `Video`, `GIF`) and the bottom-left shortcut hint panel can each be hidden with
 `[capture].show_start_bar` and `[capture].show_hints` in **Settings → Capture**.
 
 On Windows, with both `[region_detection].enabled` and `[window_detection].enabled` turned on,
@@ -86,6 +86,18 @@ include copying, for example `mark-shot -w -t c`. `mark-shot --list-displays` pr
 On Linux, launching Mark Shot while a capture is already open hands the new request to the
 running instance instead of opening a second overlay.
 
+### Multi-region capture
+
+Choose **Multi-region** in the top mode bar during a desktop capture to compose a non-rectangular
+or disjoint selection on the frozen screen:
+
+- **Left drag** adds a rectangle to the selection.
+- **Right drag** subtracts a rectangle from the selection, leaving transparent gaps or holes.
+- **`Ctrl+Z` / `Ctrl+Shift+Z` / `Ctrl+Y`** undoes or redoes region operations.
+- **`Enter`** or **Edit (Enter)** opens the transparent masked composite in the editor at full physical resolution.
+- Finish shortcuts (`Ctrl+C`, `Ctrl+S`, `Ctrl+P`, and similar) export the masked composite directly with unselected pixels cleared to transparent.
+- **`Esc`** cancels an active drag, or leaves multi-region mode and returns to normal selection.
+
 ### Scrolling screenshots
 
 Run `mark-shot --scroll`, or press `Ctrl+Shift+S` after selecting a region. Scroll the content
@@ -111,10 +123,14 @@ Opening the editor from a pin hides the source pin until editing finishes or is 
 | --- | --- |
 | Left drag | Move |
 | Drag an edge or corner | Resize, keeping the aspect ratio, and briefly show the current zoom percentage in the top-left corner |
-| Scroll wheel | Zoom around the pointer and show the current zoom percentage in the top-left corner |
+| Scroll wheel | Zoom around the pointer and show the current zoom percentage in the top-left corner; nearby steps crossing `100%` snap cleanly to the original size |
 | Double-click | Close |
 | Right click | Menu: rotate, zoom, reset size, always on top, edit, copy, recognize text, translate, scan codes, save as, close |
 | `Ctrl+V` | Pin the clipboard content as another window |
+
+Actions on a Wayland pinned image (copying image or text, rotating 90 degrees, toggling always on
+top, switching text selection mode, toggling between original and translated view, and empty OCR
+results) also show a brief status capsule on the pin without modifying the underlying pixels.
 
 When the clipboard holds HTML, its common formatting is preserved in the pinned image: bold,
 italic, underline, strikethrough, colours, font sizes, headings, lists, quotes, code, links and

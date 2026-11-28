@@ -47,33 +47,26 @@ fn rect(state: &EditorState, monitor: usize) -> Option<Rect> {
     state
         .canvas_local_rect(annotation.damage_bbox(false), monitor)?
         .intersect(&placement.rect()?)?;
-    let mut frame =
-        crate::features::annotation_selection::frame::bounds(annotation, state.hit_window_units())?;
-    let mut radial = true;
-    let degrees = match annotation.shape {
-        AnnotationShape::Redact { filter } => filter.rotation,
-        AnnotationShape::Number { mark } => mark.rotation,
-        AnnotationShape::Magnifier { magnifier } => magnifier.rotation,
-        AnnotationShape::Ruler { measurement } => match measurement.geometry {
-            crate::features::ruler::RulerGeometry::Length { rotation, .. } => rotation,
-            _ => {
-                radial = false;
-                frame = crate::features::ruler::drag::window_frame(
-                    measurement,
-                    state.hit_window_units(),
-                )?;
-                0.0
-            }
-        },
-        _ => 0.0,
-    };
-    let corner = (frame.right(), frame.top());
-    let corner = if annotation.uses_generic_rotation() {
-        annotation.to_visual(corner)
+    let ruler_frame = state.canvas_ruler_frame(annotation);
+    let frame = if let Some(ruler) = ruler_frame {
+        ruler.rect
     } else {
-        crate::features::ruler::geometry::rotated(corner, chrome::center(frame), degrees)
+        crate::features::annotation_selection::frame::bounds(annotation, state.hit_window_units())?
     };
-    let local = state.canvas_local_rect(frame, monitor)?;
+    let radial = !matches!(annotation.shape, AnnotationShape::Ruler { measurement } if measurement.mode() == crate::features::ruler::RulerMode::Angle);
+    let corners = if let Some(ruler) = ruler_frame {
+        ruler.corners()
+    } else {
+        chrome::corners(frame).map(|point| match annotation.shape {
+            AnnotationShape::Number { mark } => mark.to_visual(point),
+            AnnotationShape::Redact { filter } => filter.to_visual(point),
+            AnnotationShape::Magnifier { magnifier } => magnifier.to_visual(point),
+            _ => annotation.to_visual(point),
+        })
+    };
+    let visual = Rect::from_points(&corners.map(|(x, y)| tiny_skia::Point::from_xy(x, y)))?;
+    let local = state.canvas_local_rect(visual, monitor)?;
+    let corner = corners[1];
     let corner = state
         .canvas_transform()
         .to_screen((f64::from(corner.0), f64::from(corner.1)));

@@ -182,3 +182,48 @@ fn hotplug_position_settlement_refreshes_outputs_without_forgetting_valid_token(
     assert_eq!(matched[0].0, 0);
     assert_eq!(matched[0].1.position, Some((1920, 0)));
 }
+
+/// 【Portal捕获测试】【部分输出容错】多屏中个别副屏超时未交付帧时保留已捕获主屏，全部输出失败时返回首个错误，无参数
+#[test]
+fn partial_output_timeout_keeps_captured_monitors_and_all_failed_errors() {
+    use crate::backend::wayland::capture::stream::PipewireFrame;
+
+    let ok_frame = PipewireFrame {
+        pixels: vec![255; 16],
+        width: 2,
+        height: 2,
+        stride: 8,
+    };
+    let frames = collect_frames(vec![
+        (0, source(71, Some((0, 0))), Ok(ok_frame)),
+        (
+            1,
+            source(78, Some((3840, 0))),
+            Err("PipeWire did not deliver a frame in time".into()),
+        ),
+    ])
+    .unwrap();
+    assert_eq!(frames.len(), 1);
+    assert_eq!(frames[0].output, 0);
+    assert_eq!(frames[0].info.node_id, 71);
+
+    let Err(error) = collect_frames(vec![
+        (
+            0,
+            source(71, Some((0, 0))),
+            Err("PipeWire did not deliver a frame in time".into()),
+        ),
+        (
+            1,
+            source(78, Some((3840, 0))),
+            Err("secondary error".into()),
+        ),
+    ]) else {
+        panic!("all-failed outputs must return an error");
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("PipeWire did not deliver a frame in time")
+    );
+}

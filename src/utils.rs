@@ -286,6 +286,7 @@ pub fn cursor_for_handle(handle: SelectionHandle, dragging: bool) -> Option<Curs
             }
         }
         SelectionHandle::AngleVertex
+        | SelectionHandle::ColorSampleTip
         | SelectionHandle::AngleFirstArm
         | SelectionHandle::AngleSecondArm
         | SelectionHandle::LinePoint(_)

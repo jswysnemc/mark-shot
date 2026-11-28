@@ -2,12 +2,17 @@
 
 use super::*;
 
-/// Runs the overlay until the user completes or cancels the selection.
-/// By the time this returns, the overlay is already closed and capture is complete.
+pub(super) enum Exit {
+    Finished,
+    Scroll,
+    EditRegions(tiny_skia::Pixmap),
+}
+
+/// 【截图】【阶段交接】处理 editor_state 与 overlay 的事件，返回交付、滚动捕获或已遮罩原图的编辑请求
 pub(super) fn run_overlay(
     editor_state: &mut EditorState,
     overlay: &mut Box<dyn ScreenOverlay>,
-) -> Result<bool, Box<dyn std::error::Error>> {
+) -> crate::AppResult<Exit> {
     let mut dirty_mask: u32 = 0;
     let mut pacing = Pacing::new(editor_state.captures.len());
     let mut annotations_were_hidden = false;
@@ -16,6 +21,7 @@ pub(super) fn run_overlay(
 
     let mut visibility = super::capture_visibility::Visibility::new(overlay.as_mut())?;
     loop {
+        super::region_detection::task::start_for_ruler(editor_state, overlay.as_mut());
         let (hidden, restored) = visibility.sync(editor_state, overlay.as_mut())?;
         if hidden {
             overlay.next_event(Some(Duration::from_millis(100)))?;
@@ -66,6 +72,9 @@ pub(super) fn run_overlay(
             pacing = Pacing::new(editor_state.captures.len());
         }
         match event {
+            OverlayEvent::EscapePressed if editor_state.multi_capture.is_some() => {
+                super::multi_capture::escape(editor_state, &mut dirty_mask);
+            }
             OverlayEvent::EscapePressed if editor_state.recording_tool.menu.is_some() => {
                 super::panels::recording::close(editor_state, &mut dirty_mask);
             }
@@ -150,7 +159,7 @@ pub(super) fn run_overlay(
             visibility.pause();
             if let Some(path) = super::save_as::open(editor_state, overlay.as_mut())? {
                 editor_state.saved_as = Some(path);
-                return Ok(false);
+                return Ok(Exit::Finished);
             }
             // 1. 【截图另存为】【恢复重绘】表面已重建，旧帧回调和局部损坏不能跳过完整背景恢复
             pacing = Pacing::new(editor_state.captures.len());
@@ -164,6 +173,9 @@ pub(super) fn run_overlay(
                 super::selection_history::record(editor_state);
             }
             break;
+        }
+        if let Some(image) = super::multi_capture::take_image(editor_state) {
+            return Ok(Exit::EditRegions(image));
         }
         if let Some(action) = editor_state.external_action_requested.take() {
             if super::external_actions::start(editor_state, overlay.as_mut(), action)? {
@@ -204,7 +216,7 @@ pub(super) fn run_overlay(
             && editor_state.selection.zone.is_some()
             && !editor_state.input.mouse_down
         {
-            return Ok(true);
+            return Ok(Exit::Scroll);
         }
 
         overlay.set_cursor(input::compute_cursor(editor_state));
@@ -230,13 +242,16 @@ pub(super) fn run_overlay(
             clear_frame_state(editor_state, &mut dirty_mask, &pacing);
         }
         pacing.source_residency.reclaim_due(
-            editor_state.file_canvas.as_ref().map(|file| &file.original),
+            editor_state
+                .file_canvas
+                .as_ref()
+                .map(|file| &*file.original),
             Instant::now(),
         );
         super::foreground_residency::reclaim(editor_state, &mut pacing, dirty_mask, Instant::now());
     }
 
-    Ok(false)
+    Ok(Exit::Finished)
 }
 /// system can't sleep waiting only for events, since we have animation and
 /// download beat and etc

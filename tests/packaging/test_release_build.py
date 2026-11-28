@@ -7,7 +7,12 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/packaging"))
-from release_build import PUBLICATION_JOB, REQUIRED_GROUPS, validate_run
+from release_build import (
+    AUR_PUBLICATION_JOB,
+    PUBLICATION_JOB,
+    REQUIRED_GROUPS,
+    validate_run,
+)
 from release_context import Context
 
 
@@ -46,8 +51,19 @@ class ReleaseBuild(unittest.TestCase):
         )
 
     def test_only_failed_publication_can_be_retried_after_complete_build(self):
-        """【原生发布】【复用成功】无传参，允许发布失败但所有构建验证成功的任务进入重试，无返回值"""
+        """【原生发布】【复用成功】无传参，允许发布或 AUR 同步失败但所有构建验证成功的任务进入重试，无返回值"""
         validate_run(self.run, self.jobs, self.context, "owner/project")
+        aur_failed = copy.deepcopy(self.jobs)
+        aur_failed[-1]["conclusion"] = "success"
+        aur_failed.append(
+            {
+                "id": len(aur_failed) + 1,
+                "name": AUR_PUBLICATION_JOB,
+                "status": "completed",
+                "conclusion": "failure",
+            }
+        )
+        validate_run(self.run, aur_failed, self.context, "owner/project")
 
     def test_wrong_source_workflow_repository_and_unfinished_run_are_rejected(self):
         """【原生发布】【来源拒绝】无传参，拒绝错误源码、工作流、仓库及未完成任务，无返回值"""

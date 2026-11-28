@@ -12,6 +12,26 @@ pub(crate) struct ExactRect {
 }
 
 impl ExactRect {
+    /// 【尺子】【矩形中心】无参数，返回窗口坐标中的中心点
+    pub(super) fn center(self) -> [f64; 2] {
+        [self.left + self.width * 0.5, self.top + self.height * 0.5]
+    }
+
+    /// 【尺子】【卡片定位】按 center 和 size 返回窗口坐标中的水平卡片
+    pub(super) fn centered(center: [f64; 2], size: (f64, f64)) -> Self {
+        Self {
+            left: center[0] - size.0 * 0.5,
+            top: center[1] - size.1 * 0.5,
+            width: size.0,
+            height: size.1,
+        }
+    }
+
+    /// 【尺子】【遮挡面积】按 other 返回两个矩形交集的面积，不相交时返回零
+    pub(super) fn overlap(self, other: Self) -> f64 {
+        (self.right().min(other.right()) - self.left.max(other.left)).max(0.0)
+            * (self.bottom().min(other.bottom()) - self.top.max(other.top)).max(0.0)
+    }
     /// 【尺子】【范围合并】按other返回两个矩形的完整外接范围，退化矩形遵循原版空范围规则
     pub(crate) fn joined(self, other: Self) -> Self {
         if self.width <= 0.0 || self.height <= 0.0 {

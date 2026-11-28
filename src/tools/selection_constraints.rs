@@ -3,7 +3,7 @@
 use crate::{
     editor::{EditorState, selection_geometry::ImageSpace},
     features::selection_size::geometry::{self, Handle},
-    types::SelectionHandle,
+    types::{SelectionHandle, SignedRect},
 };
 use tiny_skia::Rect;
 
@@ -47,6 +47,41 @@ fn handle(handle: SelectionHandle) -> Handle {
         SelectionHandle::BottomRight => Handle::BottomRight,
         _ => Handle::Other,
     }
+}
+
+/// 【选区尺寸】【吸附调整】对 raw 的可见活动边吸附；按 selected、pointer 和 before 保留比例及锚点，空矩形返回空值
+pub(super) fn snap_adjusted(
+    state: &mut EditorState,
+    before: Rect,
+    raw: SignedRect,
+    selected: SelectionHandle,
+    pointer: (f64, f64),
+) -> Option<Rect> {
+    let adjusted = raw.to_rect()?;
+    if state.selection.drag_origin == Some(pointer) {
+        return Some(before);
+    }
+    if state.selection.aspect_ratio <= 0.0 || selected == SelectionHandle::Move {
+        return crate::app::region_detection::selection_snap::align(state, raw, selected, pointer)
+            .to_rect()
+            .or(Some(adjusted));
+    }
+    // 1. 【选区尺寸】【等比吸附】先按实际可见选区查询边界，再校验吸附结果仍在允许的图像范围内
+    let constrained = adjust(state, before, adjusted, selected);
+    let visible = SignedRect {
+        left: constrained.left(),
+        top: constrained.top(),
+        right: constrained.right(),
+        bottom: constrained.bottom(),
+    };
+    let snapped =
+        crate::app::region_detection::selection_snap::align(state, visible, selected, pointer)
+            .to_rect()?;
+    Some(if snapped == constrained {
+        constrained
+    } else {
+        adjust(state, before, snapped, selected)
+    })
 }
 
 /// 【选区尺寸】【调整约束】按 state、before、adjusted 和 selected 返回保持对边或对角锚点的比例选区，移动不约束

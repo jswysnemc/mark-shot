@@ -134,7 +134,9 @@ python3 scripts/packaging/install_linux.py \
 等待全部验证和打包任务成功后再公开发布；`windows-build.yml` 生成 Windows 归档和 Setup 安装包。
 安装包使用 Inno Setup 编译，并验证静默安装、文件摘要、程序启动和卸载清理。
 单格式工作流的手动执行生成 Actions 产物，不会公开不完整的 GitHub Release。
-AUR 稳定渠道的元数据上传需要显式启用手动选项。
+对于正式 `v*` 标签，`native-release.yml` 与 `native-release-publish.yml` 会在 GitHub Release
+公开后自动同步已校验的 `mark-shot` 与 `mark-shot-bin` 元数据至 AUR；单独手动执行 `aur-publish.yml`
+或 `release-aur-bin.yml` 时仍需显式启用上传开关。
 
 创建标签之前，在 `release/notes/<version>.md` 编写更新描述。发布脚本先创建草稿，逐个核验远程
 安装包，再公开包含折叠下载列表和 SHA-256 的发布页面。摘要文件和 JSON 清单保留在 Actions

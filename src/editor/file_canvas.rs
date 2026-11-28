@@ -5,7 +5,7 @@ use tiny_skia::{IntRect, IntSize, Pixmap, Rect};
 use crate::AppResult;
 
 pub struct FileCanvas {
-    pub original: crate::image_source::ImageSource,
+    pub original: crate::types::frozen_pixmap::FrozenPixmap,
     pub viewport: Rect,
 }
 
@@ -61,7 +61,7 @@ impl FileCanvas {
             fitted.height as f32,
         )?;
         Some(Self {
-            original: crate::image_source::ImageSource::store(original),
+            original: crate::image_source::ImageSource::store(original).into(),
             viewport,
         })
     }

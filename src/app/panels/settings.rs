@@ -149,6 +149,31 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
         SettingsSource::Annotation(_) => selected_ann.map_or(&[][..], widgets_for_annotation),
         SettingsSource::Tool(tool) => widgets_for_tool(tool),
     };
+    let selected_ruler = selected_ann.and_then(|annotation| match annotation.shape {
+        AnnotationShape::Ruler { measurement } => Some(measurement),
+        _ => None,
+    });
+    if (matches!(new_source, SettingsSource::Annotation(_)) && selected_ruler.is_some())
+        || new_source == SettingsSource::Tool(Tool::Ruler)
+    {
+        let settings = &editor_state.tool_settings;
+        let (mode, style) = selected_ruler
+            .map_or((settings.ruler_mode, settings.ruler_style), |ruler| {
+                (ruler.mode(), ruler.style)
+            });
+        new_widgets = crate::ui::settings_panel::ruler::widgets(
+            mode,
+            style,
+            editor_state.settings_panel.ruler_readouts_open,
+        );
+    } else {
+        editor_state.settings_panel.ruler_readouts_open = false;
+    }
+    let metrics = selected_ruler.and_then(|ruler| ruler.length_metrics());
+    if editor_state.settings_panel.ruler_metrics != metrics {
+        editor_state.settings_panel.ruler_metrics = metrics;
+        editor_state.settings_panel.dirty = true;
+    }
     let text = matches!(
         selected_ann.map(|ann| &ann.shape),
         Some(AnnotationShape::Text { .. })
@@ -300,6 +325,13 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
                         ) => {
                             magnifier.shape == crate::features::magnifier::MagnifierShape::Rectangle
                         }
+                        (AnnotationShape::Ruler { measurement }, ToggleField::RulerSimple) => {
+                            measurement.style == crate::features::ruler::RulerStyle::Simple
+                        }
+                        (
+                            AnnotationShape::Ruler { measurement },
+                            ToggleField::RulerReadout(field),
+                        ) => measurement.readouts.contains(*field),
                         _ => false,
                     },
                     None => match field {
@@ -317,6 +349,13 @@ pub fn update_settings_panel(editor_state: &mut EditorState, dirty_mask: &mut u3
                         ToggleField::HighlighterLine => {
                             editor_state.tool_settings.highlighter_style
                                 == crate::features::highlighter::HighlighterStyle::StraightLine
+                        }
+                        ToggleField::RulerSimple => {
+                            editor_state.tool_settings.ruler_style
+                                == crate::features::ruler::RulerStyle::Simple
+                        }
+                        ToggleField::RulerReadout(field) => {
+                            editor_state.tool_settings.ruler_readouts.contains(*field)
                         }
                         ToggleField::FixedRatio => editor_state.tool_settings.fixed_ratio,
                         ToggleField::Bold => editor_state.tool_settings.bold,

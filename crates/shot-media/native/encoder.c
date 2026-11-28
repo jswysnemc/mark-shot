@@ -5,6 +5,7 @@ uint32_t ms_media_abi(void) { return 2; }
 
 /** 【媒体库】【错误记录】按阶段和错误码更新 encoder，返回原始负错误码 */
 int ms_fail(ms_encoder *encoder, const char *stage, int code) {
+    if (!encoder) return code;
     char detail[AV_ERROR_MAX_STRING_SIZE];
     av_strerror(code, detail, sizeof(detail));
     snprintf(encoder->error, sizeof(encoder->error), "%s: %s (%d)", stage, detail, code);
@@ -13,10 +14,12 @@ int ms_fail(ms_encoder *encoder, const char *stage, int code) {
 }
 
 /** 【媒体库】【错误读取】按 encoder 返回对象持有的错误，不转移内存所有权 */
-const char *ms_encoder_error(ms_encoder *encoder) { return encoder->error; }
+const char *ms_encoder_error(ms_encoder *encoder) { return encoder ? encoder->error : ""; }
 
 /** 【媒体库】【编码身份】按 encoder 返回实际选择的编码器名称 */
-const char *ms_encoder_name(ms_encoder *encoder) { return encoder->video->codec->name; }
+const char *ms_encoder_name(ms_encoder *encoder) {
+    return encoder && encoder->video && encoder->video->codec ? encoder->video->codec->name : "";
+}
 
 /** 【媒体库】【数据封装】将 frame 送入 codec 并排空已完成包到 stream，空帧表示排空编码器 */
 int ms_write(ms_encoder *encoder, AVCodecContext *codec, AVStream *stream, AVFrame *frame) {
@@ -71,16 +74,28 @@ failure:
 
 /** 【媒体库】【完整收尾】排空音视频并写容器尾部，返回首个错误，重复调用不重复编码 */
 int ms_encoder_finish(ms_encoder *encoder) {
+    if (!encoder) return AVERROR(EINVAL);
     if (encoder->finalized) return encoder->failed ? AVERROR(EIO) : 0;
     encoder->finalized = 1;
-    int first = encoder->audio ? ms_audio_flush(encoder) : 0;
-    int result = ms_write(encoder, encoder->video, encoder->video_stream, NULL);
-    if (first >= 0) first = result;
-    if (encoder->audio) {
-        result = ms_write(encoder, encoder->audio, encoder->audio_stream, NULL);
+    // 1. 【媒体库】【状态守卫】容器头或输出流未建立时直接返回，避免解引用未初始化上下文
+    if (!encoder->header_written || !encoder->output || !encoder->output->pb)
+        return encoder->failed ? AVERROR(EIO) : AVERROR(EINVAL);
+    // 2. 【媒体库】【零帧保护】已报错且未成功编码视频帧时保留原始错误并跳过排空
+    if (encoder->failed && encoder->last_video < 0) return AVERROR(EIO);
+    int first = 0;
+    // 3. 【媒体库】【编码排空】仅在送入过真实帧后排空编码器，避免 FFmpeg 硬件编码器零帧排空空指针崩溃
+    if (encoder->audio && encoder->audio_stream && encoder->audio_pts != AV_NOPTS_VALUE) {
+        first = ms_audio_flush(encoder);
+    }
+    if (encoder->video && encoder->video_stream && encoder->last_video >= 0) {
+        int result = ms_write(encoder, encoder->video, encoder->video_stream, NULL);
         if (first >= 0) first = result;
     }
-    result = av_write_trailer(encoder->output);
+    if (encoder->audio && encoder->audio_stream && encoder->audio_pts != AV_NOPTS_VALUE) {
+        int result = ms_write(encoder, encoder->audio, encoder->audio_stream, NULL);
+        if (first >= 0) first = result;
+    }
+    int result = av_write_trailer(encoder->output);
     if (result < 0 && first >= 0) first = ms_fail(encoder, "write trailer", result);
     avio_flush(encoder->output->pb);
     if (encoder->output->pb->error < 0 && first >= 0)
@@ -88,10 +103,12 @@ int ms_encoder_finish(ms_encoder *encoder) {
     return first;
 }
 
-/** 【媒体库】【资源释放】按 encoder 回收自己持有的内存和设备，异常退出尝试容器收尾 */
+/** 【媒体库】【资源释放】按 encoder 回收自己持有的内存和设备，已编码视频帧异常退出时尝试容器收尾 */
 void ms_encoder_destroy(ms_encoder *encoder) {
     if (!encoder) return;
-    if (encoder->header_written && !encoder->finalized) ms_encoder_finish(encoder);
+    // 1. 【媒体库】【安全收尾】仅在已写容器头且已有视频帧时执行收尾，防止零帧或初始化失败会话崩溃
+    if (encoder->header_written && !encoder->finalized && encoder->last_video >= 0)
+        ms_encoder_finish(encoder);
     avcodec_free_context(&encoder->video);
     avcodec_free_context(&encoder->audio);
     av_frame_free(&encoder->pixels);

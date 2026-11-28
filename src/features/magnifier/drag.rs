@@ -63,7 +63,19 @@ fn frame_controls(rect: Rect, shape: MagnifierShape) -> Vec<(SelectionHandle, Po
 
 /// 【放大镜】【完整控制点】返回 magnifier 的镜框、源框控制点及旋转后的坐标；空草稿返回空列表
 pub fn controls(magnifier: Magnifier) -> Vec<(SelectionHandle, Point)> {
-    let (Some(lens), Some(source)) = (magnifier.lens_rect(), magnifier.source_rect()) else {
+    controls_with_padding(magnifier, crate::features::annotation_selection::frame::GAP)
+}
+
+/// 【放大镜】【选框控制点】按 magnifier 和 padding 返回沿两框外移后的把手位置，零留白用于首次正文命中
+pub(crate) fn controls_with_padding(
+    magnifier: Magnifier,
+    padding: f32,
+) -> Vec<(SelectionHandle, Point)> {
+    let expand = |rect: Rect| rect.outset(padding, padding);
+    let (Some(lens), Some(source)) = (
+        magnifier.lens_rect().and_then(expand),
+        magnifier.source_rect().and_then(expand),
+    ) else {
         return Vec::new();
     };
     let mut points = frame_controls(lens, magnifier.shape);
@@ -80,11 +92,10 @@ pub fn controls(magnifier: Magnifier) -> Vec<(SelectionHandle, Point)> {
 
 /// 【放大镜】【旋转把手】返回 magnifier 联合框上方的独立旋转控制点；空草稿返回空值
 pub fn rotation_handle(magnifier: Magnifier) -> Option<Point> {
-    let bounds = magnifier.unrotated_bounds()?;
-    Some(magnifier.to_visual((
-        (bounds.left() + bounds.right()) / 2.0,
-        bounds.top() - 32.0 * magnifier.style_scale,
-    )))
+    use crate::features::annotation_selection::{frame, region_frame};
+    let window = Default::default();
+    let bounds = frame::outside(magnifier.unrotated_bounds()?, 0.0, window)?;
+    Some(magnifier.to_visual(region_frame::stem(bounds, window).1))
 }
 
 /// 【放大镜】【单框命中】返回 point 是否位于 rect、shape 对应的图形内；tolerance 提供可操作边界留量
@@ -280,10 +291,20 @@ pub fn dragged(
                 minimum
             };
             let keep_aspect = before.shape == MagnifierShape::Circle || ctrl;
+            let direction = handle.generic_rect_handle();
+            let Some((_, anchor)) = frame_controls(rect, before.shape)
+                .into_iter()
+                .find(|(kind, _)| *kind == direction)
+            else {
+                return before;
+            };
+            if delta == (0.0, 0.0) {
+                return before;
+            }
             let rect = resized_rect(
                 rect,
-                handle.generic_rect_handle(),
-                point,
+                direction,
+                (anchor.0 + delta.0, anchor.1 + delta.1),
                 (minimum, minimum),
                 keep_aspect,
             );

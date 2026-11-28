@@ -13,6 +13,7 @@ use crate::features::recording::{Format, Status, status_query::Query};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Control {
     Region,
+    MultiRegion,
     Fullscreen,
     Video,
     Gif,

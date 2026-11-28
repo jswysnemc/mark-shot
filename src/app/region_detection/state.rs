@@ -12,6 +12,7 @@ pub(super) struct Press {
 
 #[derive(Default)]
 pub(crate) struct State {
+    pub(crate) deferred_windows: Option<Vec<crate::backend::window_detection::Window>>,
     #[cfg(any(target_os = "windows", test))]
     pub(super) native: Option<super::native::Native>,
     pub(super) space: Option<Space>,

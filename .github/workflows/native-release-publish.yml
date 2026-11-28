@@ -25,6 +25,11 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.context.outputs.tag }}
+      version: ${{ steps.context.outputs.version }}
+      source_sha: ${{ steps.context.outputs.source_sha }}
+      run_id: ${{ steps.context.outputs.run_id }}
     permissions:
       contents: write
       actions: read
@@ -56,3 +61,40 @@ jobs:
           NATIVE_TAG: ${{ steps.context.outputs.tag }}
           SOURCE_SHA: ${{ steps.context.outputs.source_sha }}
         run: python3 scripts/packaging/publish_assets.py --directory target/publish-assets --tag "$NATIVE_TAG" --source-sha "$SOURCE_SHA"
+
+  aur:
+    name: Publish validated AUR packages
+    needs: publish
+    if: ${{ !contains(needs.publish.outputs.version, '-') }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.publish.outputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare immutable source AUR package
+        env:
+          NATIVE_TAG: ${{ needs.publish.outputs.tag }}
+          SOURCE_SHA: ${{ needs.publish.outputs.source_sha }}
+        run: python3 scripts/packaging/prepare_aur.py --pkgrel 1 --tag "$NATIVE_TAG" --source-sha "$SOURCE_SHA"
+      - name: Generate canonical source SRCINFO
+        run: |
+          docker run --rm -v "$PWD/target/aur-work:/pkg" -w /pkg archlinux:base-devel bash -lc 'pacman -Syu --noconfirm --needed sudo >/dev/null; useradd -m builder; chown -R builder:builder /pkg; su builder -c "cd /pkg && makepkg --printsrcinfo > .SRCINFO"'
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.publish.outputs.run_id }}
+          name: native-aur-bin-metadata
+          path: target/aur-bin-work
+      - name: Publish validated AUR metadata
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          AUR_SSH_KNOWN_HOSTS: ${{ vars.AUR_SSH_KNOWN_HOSTS }}
+        run: |
+          bash scripts/packaging/publish_aur.sh mark-shot target/aur-work
+          bash scripts/packaging/publish_aur.sh mark-shot-bin target/aur-bin-work

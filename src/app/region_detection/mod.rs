@@ -9,6 +9,10 @@ pub(crate) mod keyboard;
 pub(crate) mod motion;
 #[cfg(any(target_os = "windows", test))]
 mod native;
+pub(crate) mod ruler_move;
+pub(crate) mod ruler_snap;
+pub(crate) mod selection_snap;
+mod snap_targets;
 mod state;
 pub(crate) mod task;
 

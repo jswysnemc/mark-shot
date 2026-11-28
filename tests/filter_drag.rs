@@ -83,7 +83,8 @@ fn rotated_resize_keeps_the_opposite_visual_corner_fixed() {
         .find(|(handle, _)| *handle == SelectionHandle::BottomRight)
         .unwrap()
         .1;
-    let point = filter.to_visual((rect.right() + 36.0, rect.bottom() + 20.0));
+    let control = filter.to_local(start);
+    let point = filter.to_visual((control.0 + 36.0, control.1 + 20.0));
     let resized = drag::dragged(
         filter,
         SelectionHandle::BottomRight,

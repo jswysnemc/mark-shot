@@ -16,8 +16,12 @@ pub(super) struct Space {
 impl Space {
     /// 【截图区域识别】【截图空间】按 state 的冻结截图建立统一原图空间，返回有效边界，不读取已标注图层
     pub fn for_editor(state: &EditorState) -> Option<Self> {
-        if state.file_canvas.is_some() {
-            return None;
+        if let Some(file) = &state.file_canvas {
+            return Some(Self {
+                bounds: file.viewport,
+                scale: f64::from(file.original.width()) / f64::from(file.viewport.width()),
+                size: (file.original.width() as i32, file.original.height() as i32),
+            });
         }
         let bounds = crate::utils::get_full_workspace_rect(&state.placements)?;
         let scale = f64::from(crate::renderer::capture_scale(

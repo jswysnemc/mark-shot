@@ -79,13 +79,18 @@ impl Pin {
             Ok(text) => {
                 self.translation.source = text;
                 self.sync_translation_text();
-                if std::mem::take(&mut self.copy_after_ocr) {
-                    let text = self.text.line_text(false);
-                    if !text.is_empty() {
-                        let result = crate::utils::copy_to_clipboard(&text);
-                        self.report(result);
-                    }
-                }
+                let copy_after_ocr = std::mem::take(&mut self.copy_after_ocr);
+                let line_text = copy_after_ocr.then(|| self.text.line_text(false));
+                let result = apply_ocr_feedback(
+                    &mut self.feedback,
+                    copy_after_ocr,
+                    &mut self.text_selection,
+                    self.translation.after_ocr,
+                    !self.text.lines.is_empty(),
+                    line_text.as_deref().unwrap_or(""),
+                    crate::utils::copy_to_clipboard,
+                );
+                self.report(result);
                 if self.translation.after_ocr {
                     let result = self.start_translation();
                     self.report(result);
@@ -120,5 +125,129 @@ impl Pin {
             position.0 * self.image.image.width() as f64 / f64::from(self.size.0),
             position.1 * self.image.image.height() as f64 / f64::from(self.size.1),
         )
+    }
+}
+
+/// 【贴图】【识别反馈】按 copy_after_ocr、text_selection、translate_after_ocr 与识别文本更新 feedback，调用 copy 写入剪贴板，返回剪贴板结果
+fn apply_ocr_feedback(
+    feedback: &mut crate::features::pinned_image::feedback::Feedback,
+    copy_after_ocr: bool,
+    text_selection: &mut bool,
+    translate_after_ocr: bool,
+    has_lines: bool,
+    line_text: &str,
+    copy: impl FnOnce(&str) -> AppResult,
+) -> AppResult {
+    // 1. 优先处理识别后复制分支，空文本提示未识别到文字，复制成功展示已复制文字胶囊
+    if copy_after_ocr {
+        if line_text.is_empty() {
+            feedback.no_text();
+            return Ok(());
+        }
+        copy(line_text)?;
+        feedback.copied_text();
+        return Ok(());
+    }
+    // 2. 纯划词识别完成时，有文字展示可拖拽选词胶囊，无文字关闭划词并提示未识别到文字
+    if *text_selection && !translate_after_ocr {
+        if has_lines {
+            feedback.text_selection(true);
+        } else {
+            *text_selection = false;
+            feedback.no_text();
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::features::pinned_image::feedback::Feedback;
+
+    /// 【贴图测试】【识别复制反馈】验证识别后复制在有文本、空文本及写入失败时的提示状态
+    #[test]
+    fn copy_after_ocr_updates_feedback_for_text_empty_and_error() {
+        let mut feedback = Feedback::default();
+        let mut text_selection = false;
+        let mut copied = String::new();
+        apply_ocr_feedback(
+            &mut feedback,
+            true,
+            &mut text_selection,
+            false,
+            true,
+            "hello",
+            |text| {
+                copied = text.to_owned();
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(copied, "hello");
+        assert!(feedback.hud_title().is_some());
+        assert!(feedback.task_title().is_none());
+
+        let mut empty_feedback = Feedback::default();
+        apply_ocr_feedback(
+            &mut empty_feedback,
+            true,
+            &mut text_selection,
+            false,
+            false,
+            "",
+            |_| unreachable!("empty text should not write to clipboard"),
+        )
+        .unwrap();
+        assert!(empty_feedback.hud_title().is_none());
+        assert!(empty_feedback.task_title().is_some());
+
+        let mut failed_feedback = Feedback::default();
+        let err = apply_ocr_feedback(
+            &mut failed_feedback,
+            true,
+            &mut text_selection,
+            false,
+            true,
+            "hello",
+            |_| Err("clipboard unavailable".into()),
+        );
+        assert!(err.is_err());
+        assert!(failed_feedback.hud_title().is_none());
+    }
+
+    /// 【贴图测试】【划词识别反馈】验证划词识别完成时有文字提示可拖拽选词、无文字关闭划词并提示空结果
+    #[test]
+    fn text_selection_ocr_updates_feedback_and_clears_when_empty() {
+        let mut feedback = Feedback::default();
+        let mut text_selection = true;
+        apply_ocr_feedback(
+            &mut feedback,
+            false,
+            &mut text_selection,
+            false,
+            true,
+            "",
+            |_| Ok(()),
+        )
+        .unwrap();
+        assert!(text_selection);
+        assert!(feedback.hud_title().is_some());
+        assert!(feedback.task_title().is_none());
+
+        let mut empty_feedback = Feedback::default();
+        apply_ocr_feedback(
+            &mut empty_feedback,
+            false,
+            &mut text_selection,
+            false,
+            false,
+            "",
+            |_| Ok(()),
+        )
+        .unwrap();
+        assert!(!text_selection);
+        assert!(empty_feedback.hud_title().is_none());
+        assert!(empty_feedback.task_title().is_some());
     }
 }

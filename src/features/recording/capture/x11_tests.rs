@@ -1,6 +1,6 @@
 //! 【X11录屏测试】【新连接光标】真实服务器验证独立采集连接的光标初始化和连续取帧
 
-use super::{Source, x11::Capture};
+use super::{Source, Step, x11::Capture};
 use crate::{backend::x11::connection::Display, features::recording::Target};
 use std::time::Duration;
 
@@ -19,7 +19,10 @@ fn fresh_connections_capture_multiple_frames_with_and_without_cursor() {
         let target = Target::default();
         let mut capture = Capture::new(display, &target, cursor).unwrap();
         for _ in 0..2 {
-            assert!(capture.next(Duration::from_millis(100)).unwrap());
+            assert_eq!(
+                capture.next(Duration::from_millis(100)).unwrap(),
+                Step::Frame
+            );
             let frame = capture.frame().unwrap();
             assert_eq!(frame.pixels.len(), frame.stride * frame.size.1 as usize);
             assert!(

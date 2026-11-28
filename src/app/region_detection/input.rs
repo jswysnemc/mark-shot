@@ -11,6 +11,7 @@ use crate::{
 /// 【截图区域识别】【选择阶段】按 state 判断是否仍处于普通截图范围选择，返回候选输入是否可用
 pub(super) fn selecting(state: &EditorState) -> bool {
     state.region_detection.space.is_some()
+        && state.multi_capture.is_none()
         && state.file_canvas.is_none()
         && state.selected_tool == Tool::Selection
         && state.selection.zone.is_none()
@@ -68,13 +69,27 @@ pub(crate) fn sync(state: &mut EditorState, dirty: &mut u32) {
     }
     state.region_detection.pressed = None;
     state.region_detection.cursor.reset();
-    state.region_detection.worker = None;
-    #[cfg(any(target_os = "windows", test))]
-    {
-        state.region_detection.native = None;
+    // 1. 【截图区域识别】【编辑复用】确认选区后尺子仍需要本次分析结果，结束截图时才撤销未完成的任务
+    if state.cancel || state.finish.is_some() {
+        state.region_detection.worker = None;
+        #[cfg(any(target_os = "windows", test))]
+        {
+            state.region_detection.native = None;
+        }
     }
     draw::apply(state, None);
     apply_damage_rects(state, dirty);
+}
+
+/// 【截图区域识别】【识别完成】按当前工具刷新 state 的空闲尺子或选区候选，dirty 返回重绘区域，不提交手势
+pub(super) fn analysis_ready(state: &mut EditorState, dirty: &mut u32) {
+    if state.selected_tool == Tool::Ruler {
+        if !state.input.mouse_down && state.ann_drag.is_none() && state.pending.is_none() {
+            crate::tools::dispatch_activate(Tool::Ruler, state, dirty);
+        }
+    } else {
+        refresh(state, dirty);
+    }
 }
 
 /// 【截图区域识别】【指针移动】按 state 更新悬停或点击阈值，返回是否抑制短距离拖选，dirty 返回候选损坏

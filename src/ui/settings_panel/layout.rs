@@ -20,7 +20,7 @@ impl SettingsPanel {
             let mut y = ((row - height) * 0.5).round();
             let mut right = padding;
             for (index, widget) in self.widgets.iter().enumerate() {
-                let width = widget.size().min((limit - padding).max(1.0));
+                let width = self.widget_width(widget).min((limit - padding).max(1.0));
                 // 1. 换行首项若为分隔线则不跨行产生多余空白，普通控件超宽时换至下一行
                 if x > padding && x + width > limit {
                     x = padding;

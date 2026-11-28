@@ -51,7 +51,10 @@ fn sidebar_settings_leave_the_overlay_loop_for_window_teardown() {
     let mut overlay: Box<dyn crate::backend::ScreenOverlay> = Box::new(
         crate::app::frame_lifecycle_overlay::Overlay::new(&state.canvas, false),
     );
-    assert!(!crate::app::event_loop::run_overlay(&mut state, &mut overlay).unwrap());
+    assert!(matches!(
+        crate::app::event_loop::run_overlay(&mut state, &mut overlay).unwrap(),
+        crate::app::event_loop::Exit::Finished
+    ));
     assert!(state.preferences_requested && state.cancel);
     assert!(state.finish.is_none());
 }

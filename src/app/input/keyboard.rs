@@ -61,6 +61,21 @@ pub fn handle_key(
     dirty_mask: &mut u32,
 ) {
     crate::app::panels::tooltip::close(editor_state, dirty_mask);
+    if crate::app::multi_capture::key(editor_state, chord, dirty_mask) {
+        return;
+    }
+    if chord.is_some_and(|chord| {
+        chord.key == Key::Char('m')
+            && chord.mods.ctrl
+            && chord.mods.shift
+            && !chord.mods.alt
+            && !chord.mods.logo
+    }) && editor_state.selected_tool == Tool::Selection
+        && !typing(editor_state)
+        && crate::app::multi_capture::start(editor_state, dirty_mask)
+    {
+        return;
+    }
     if editor_state.color_inspector.panel.is_some()
         && chord.is_some_and(|chord| chord.key == keys::Key::Escape)
     {

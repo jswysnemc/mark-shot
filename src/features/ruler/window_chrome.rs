@@ -12,7 +12,11 @@ pub fn connector(
     window: WindowUnits,
 ) -> Option<(Point, Point)> {
     let clearance = if matches!(measurement.geometry, RulerGeometry::Length { .. }) {
-        Layout::new(measurement, width, allowed, window)?.top_reach()
+        if measurement.style == super::RulerStyle::Simple {
+            super::simple_draw::top_reach(measurement, width, window)
+        } else {
+            Layout::new(measurement, width, allowed, window)?.top_reach()
+        }
     } else {
         window.canvas(14.0)
     };
@@ -28,7 +32,11 @@ pub(crate) fn in_projection(
 ) -> Option<(Point, Point)> {
     let window = WindowUnits::new(1.0 / projection.scale as f32);
     let clearance = if matches!(measurement.geometry, RulerGeometry::Length { .. }) {
-        Layout::in_projection(measurement, width, allowed, projection)?.top_reach()
+        if measurement.style == super::RulerStyle::Simple {
+            super::simple_draw::top_reach(measurement, width, window)
+        } else {
+            Layout::in_projection(measurement, width, allowed, projection)?.top_reach()
+        }
     } else {
         window.canvas(14.0)
     };
@@ -41,7 +49,8 @@ fn connect(
     clearance: f32,
     window: WindowUnits,
 ) -> Option<(Point, Point)> {
-    let bounds = measurement.unrotated_bounds()?;
+    let bounds = super::simple_frame::bounds(measurement, window)
+        .or_else(|| measurement.unrotated_bounds())?;
     let center = rect_center(bounds);
     let rotation = match measurement.geometry {
         RulerGeometry::Length { rotation, .. } => rotation,

@@ -7,6 +7,7 @@ pub(crate) mod draw_controls;
 mod draw_stepper;
 mod layout;
 pub(crate) mod recording;
+pub(crate) mod ruler;
 mod state;
 mod widgets;
 

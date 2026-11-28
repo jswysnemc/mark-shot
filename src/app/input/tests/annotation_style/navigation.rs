@@ -129,8 +129,7 @@ fn highlighter_multiplies_actual_background_in_drafts_commits_and_partial_redraw
         }
         state.canvas[0] = original.clone();
         state.dimmed[0] = original.clone();
-        state.file_canvas.as_mut().unwrap().original =
-            crate::image_source::ImageSource::memory(original);
+        state.file_canvas.as_mut().unwrap().original = original.into();
         let mut dirty = 0;
         pointer(&mut state, 320.0, 240.0, &mut dirty);
         if wheel != 0 {
@@ -177,19 +176,29 @@ fn specialized_selected_controls_keep_window_sizes_and_hit_tolerances_after_file
     for tool in [Tool::Number, Tool::Magnifier, Tool::Redact] {
         let mut state = image_editor((320, 240));
         let mut dirty = 0;
+        state.tool_settings.magnifier_shape = crate::features::magnifier::MagnifierShape::Rectangle;
         draw(&mut state, tool, 6.0, &mut dirty);
         let annotation = &state.annotations[0];
-        let controls = match annotation.shape {
+        let (handle, at) = match annotation.shape {
             AnnotationShape::Number { mark } => {
-                crate::features::number::drag::controls(mark, annotation.stroke_width)
+                crate::features::number::drag::controls(mark, annotation.stroke_width)[0]
             }
             AnnotationShape::Magnifier { magnifier } => {
-                crate::features::magnifier::drag::controls(magnifier)
+                let rect = magnifier.lens_rect().unwrap();
+                (
+                    SelectionHandle::TopLeft,
+                    (rect.left() - 6.0, rect.top() - 6.0),
+                )
             }
-            AnnotationShape::Redact { filter } => crate::features::filter::drag::controls(filter),
+            AnnotationShape::Redact { filter } => {
+                let rect = filter.rect().unwrap();
+                (
+                    SelectionHandle::TopLeft,
+                    (rect.left() - 6.0, rect.top() - 6.0),
+                )
+            }
             _ => unreachable!(),
         };
-        let (handle, at) = controls[0];
         assert_eq!(
             state.canvas_handle(annotation, (f64::from(at.0), f64::from(at.1))),
             handle,
@@ -209,6 +218,14 @@ fn specialized_selected_controls_keep_window_sizes_and_hit_tolerances_after_file
             &std::collections::HashMap::new(),
             None,
         );
+        let center = pixels
+            .pixel(at.0.floor() as u32, at.1.floor() as u32)
+            .unwrap();
+        assert_eq!(
+            (center.red(), center.green(), center.blue(), center.alpha()),
+            (251, 146, 60, 255),
+            "tool={tool:?} at={at:?}"
+        );
         let left = (at.0 - 10.0).floor().max(0.0) as u32;
         let right = (at.0 + 10.0).ceil().min(640.0) as u32;
         let y = (at.1 + 2.0).floor().clamp(0.0, 479.0) as u32;
@@ -227,5 +244,68 @@ fn specialized_selected_controls_keep_window_sizes_and_hit_tolerances_after_file
             "tool={tool:?} handle={handle:?} painted={painted}"
         );
         assert_ne!(handle, SelectionHandle::None);
+    }
+}
+
+/// 【区域选框测试】【旋转圆心】缩放画布后按真实轴心核对圆心像素和外缘命中；移动过的放大镜不以双框中点代替轴心
+#[test]
+fn region_rotation_knob_tracks_the_padded_frame_after_zoom() {
+    use crate::types::{AnnotationShape, SelectionHandle};
+    for tool in [Tool::Magnifier, Tool::Redact] {
+        let mut state = image_editor((640, 480));
+        let mut dirty = 0;
+        draw(&mut state, tool, 3.0, &mut dirty);
+        select_tool(&mut state, Tool::Pick, &mut dirty);
+        match &mut state.annotations[0].shape {
+            AnnotationShape::Magnifier { magnifier } => {
+                magnifier.center.0 += 20.0;
+                magnifier.rotation = 0.3;
+            }
+            AnnotationShape::Redact { filter } => filter.rotation = 0.3,
+            _ => unreachable!(),
+        }
+        state.annotations[0].update_bbox();
+        state.select_annotation_index(Some(0));
+        pointer(&mut state, 320.0, 240.0, &mut dirty);
+        handle_axis_scroll(&mut state, ScrollEvent::wheel(-360), &mut dirty);
+        crate::app::canvas_navigation::preview::clear(&mut state, &mut dirty);
+        let annotation = &state.annotations[0];
+        let view = state.canvas_transform();
+        let expected = |distance: f64| {
+            let local = |rect: Rect| {
+                (
+                    (rect.left() + rect.right()) * 0.5,
+                    rect.top() - (distance / view.scale) as f32,
+                )
+            };
+            let point = match annotation.shape {
+                AnnotationShape::Magnifier { magnifier } => {
+                    magnifier.to_visual(local(magnifier.unrotated_bounds().unwrap()))
+                }
+                AnnotationShape::Redact { filter } => {
+                    filter.to_visual(local(filter.rect().unwrap()))
+                }
+                _ => unreachable!(),
+            };
+            (f64::from(point.0), f64::from(point.1))
+        };
+        assert_eq!(
+            state.canvas_handle(annotation, expected(41.0)),
+            SelectionHandle::Rotate
+        );
+        assert_ne!(
+            state.canvas_handle(annotation, expected(45.0)),
+            SelectionHandle::Rotate
+        );
+        let knob = view.to_screen(expected(32.0));
+        render(&mut state, None);
+        let pixel = state.canvas[0]
+            .pixel(knob.0.floor() as u32, knob.1.floor() as u32)
+            .unwrap();
+        assert_eq!(
+            (pixel.red(), pixel.green(), pixel.blue()),
+            (251, 146, 60),
+            "{tool:?}"
+        );
     }
 }

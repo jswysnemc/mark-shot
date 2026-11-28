@@ -23,12 +23,16 @@ pub struct MagnifierState {
     pub pos: (f64, f64),
 }
 
-/// 【像素采样】【指针颜色】按source与point读取实际原件颜色，返回不透明显示颜色，原件外返回空值，不复制或修改原件
+/// 【像素采样】【指针颜色】按 source 与 point 返回原件颜色和透明度，原件外返回空值，不复制或修改原件
 pub fn sample_pixel(
     source: &impl crate::image_source::PixelView,
     point: (f64, f64),
 ) -> Option<Color> {
-    let source = source.pixels_view();
+    native_color(source.pixels_view(), point)
+}
+
+/// 【像素采样】【原件色值】按只读像素和物理坐标返回反预乘颜色，超出图像时返回空值
+pub(super) fn native_color(source: tiny_skia::PixmapRef<'_>, point: (f64, f64)) -> Option<Color> {
     let (x, y) = (point.0.floor(), point.1.floor());
     if x < 0.0 || y < 0.0 {
         return None;
@@ -38,5 +42,10 @@ pub fn sample_pixel(
         return None;
     }
     let px = source.pixels()[(y * source.width() + x) as usize].demultiply();
-    Some(Color::from_rgba8(px.red(), px.green(), px.blue(), 255))
+    Some(Color::from_rgba8(
+        px.red(),
+        px.green(),
+        px.blue(),
+        px.alpha(),
+    ))
 }

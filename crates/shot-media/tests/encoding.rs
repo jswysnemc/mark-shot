@@ -92,6 +92,21 @@ fn dropping_an_encoder_flushes_the_file() {
     assert!(!root.join("invalid.mp4").exists());
 }
 
+/// 【媒体集成测试】【零帧释放】无参数，打开编码器后未提交视频帧直接丢弃或收尾不得崩溃
+#[test]
+#[ignore = "requires MARK_SHOT_MEDIA_LIBRARY and MARK_SHOT_MEDIA_EVIDENCE"]
+fn zero_frame_encoder_drop_and_finish_do_not_crash() {
+    let root = std::path::PathBuf::from(std::env::var_os("MARK_SHOT_MEDIA_EVIDENCE").unwrap());
+    std::fs::create_dir_all(&root).unwrap();
+    let media = Media::load().unwrap();
+    let mut options = settings();
+    options.audio = false;
+    let encoder = Encoder::open(&media, &root.join("zero-drop.mp4"), &options).unwrap();
+    drop(encoder);
+    let mut encoder = Encoder::open(&media, &root.join("zero-finish.mp4"), &options).unwrap();
+    encoder.finish().unwrap();
+}
+
 /// 【媒体集成测试】【音频间断】无参数，生成带半秒采集中断的音轨，独立解码必须保留静音间隔
 #[test]
 #[ignore = "requires MARK_SHOT_MEDIA_LIBRARY and MARK_SHOT_MEDIA_EVIDENCE"]

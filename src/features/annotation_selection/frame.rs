@@ -7,6 +7,14 @@ use crate::{
 };
 use tiny_skia::Rect;
 
+pub(crate) const GAP: f32 = 6.0;
+
+/// 【标注选框】【外侧间距】按正文 rect、有效描边宽度 stroke 和窗口单位 window 返回只供交互的外框
+pub(crate) fn outside(rect: Rect, stroke: f32, window: WindowUnits) -> Option<Rect> {
+    let pad = stroke * 0.5 + window.canvas(GAP);
+    rect.outset(pad, pad)
+}
+
 /// 【标注选框】【留白范围】按annotation返回是否需要扩大选框，其他工具保留专用几何
 pub(crate) fn padded(annotation: &Annotation) -> bool {
     matches!(
@@ -14,21 +22,44 @@ pub(crate) fn padded(annotation: &Annotation) -> bool {
         AnnotationShape::Rectangle { .. }
             | AnnotationShape::Circle { .. }
             | AnnotationShape::Marker { .. }
+            | AnnotationShape::ColorSample { .. }
     )
 }
 
 /// 【标注选框】【可见边界】按annotation与window返回描边外保留六窗口像素的选框，不改变正文或旋转中心
 pub(crate) fn bounds(annotation: &Annotation, window: WindowUnits) -> Option<Rect> {
+    if let Some(bounds) = super::region_frame::bounds(annotation, window) {
+        return Some(bounds);
+    }
+    if let AnnotationShape::Ruler { measurement } = annotation.shape {
+        return crate::features::ruler::selection_frame::Frame::new(
+            measurement,
+            annotation.stroke_width,
+            None,
+            window,
+            Default::default(),
+        )
+        .map(|frame| frame.rect);
+    }
+    if let AnnotationShape::ColorSample { sample } = annotation.shape {
+        return outside(sample.label_rect(), 0.0, window);
+    }
     let body = chrome::bounds(annotation)?;
     if !padded(annotation) {
         return Some(body);
     }
-    let padding = window.stroke(annotation.stroke_width, 1.5, None) * 0.5 + window.canvas(6.0);
-    body.outset(padding, padding)
+    outside(
+        body,
+        window.stroke(annotation.stroke_width, 1.5, None),
+        window,
+    )
 }
 
 /// 【标注选框】【窗口重绘】按annotation与window返回类矩形正文及全部控制点的重绘范围，其他形状返回空值
 pub(crate) fn editing_bounds(annotation: &Annotation, window: WindowUnits) -> Option<Rect> {
+    if let Some(bounds) = super::region_frame::damage(annotation, window) {
+        return Some(bounds);
+    }
     if !padded(annotation) {
         return None;
     }

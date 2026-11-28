@@ -24,6 +24,7 @@ fn is_selector_action(action: SettingsAction) -> bool {
             | SettingsAction::LineStyles
             | SettingsAction::NumberStyles
             | SettingsAction::RulerModes
+            | SettingsAction::RulerReadouts
             | SettingsAction::MarkerShapes
             | SettingsAction::ColorFormats
     )
@@ -54,6 +55,8 @@ pub(super) fn draw(
     let palette = Palette::current();
     let cfg = &crate::config::get().settings_panel;
     let selector = is_selector_action(action);
+    let expanded = action == SettingsAction::RulerReadouts && panel.ruler_readouts_open;
+    let is_selected = is_selected || expanded;
 
     // 1. 选择器芯片默认带柔和底框以便识别可展开，纯动作按钮采用与主工具栏一致的无框幽灵态
     let tint = if selector {
@@ -134,11 +137,15 @@ pub(super) fn draw(
                 );
             }
         }
-        SettingsAction::RulerModes => {
+        SettingsAction::RulerModes | SettingsAction::RulerReadouts => {
             if let Some(preview) = preview {
                 painter.text(
                     preview,
-                    ruler_label(panel.ruler_mode),
+                    if action == SettingsAction::RulerReadouts {
+                        Language::current().text("Readouts")
+                    } else {
+                        ruler_label(panel.ruler_mode)
+                    },
                     TextStyle::new(crate::ui::toolbar::metrics::font(), tint.color())
                         .weight(Weight::MEDIUM)
                         .center(),
@@ -177,18 +184,20 @@ pub(super) fn draw(
         painter,
         rect,
         action == SettingsAction::MarkerShapes,
+        expanded,
         palette.muted_text,
     );
 }
 
 /// 【副工具栏】【展开标记】在选择器芯片右侧绘制圆角下折线，无返回值
-fn draw_caret(painter: &mut Painter<'_>, rect: Rect, compact: bool, tint: Rgba) {
+fn draw_caret(painter: &mut Painter<'_>, rect: Rect, compact: bool, expanded: bool, tint: Rgba) {
     let cx = rect.right() - if compact { 6.5 } else { 8.5 };
     let cy = (rect.top() + rect.bottom()) * 0.5 + 0.5;
     let mut caret = PathBuilder::new();
-    caret.move_to(cx - 2.6, cy - 1.3);
-    caret.line_to(cx, cy + 1.4);
-    caret.line_to(cx + 2.6, cy - 1.3);
+    let direction = if expanded { -1.0 } else { 1.0 };
+    caret.move_to(cx - 2.6, cy - direction * 1.3);
+    caret.line_to(cx, cy + direction * 1.4);
+    caret.line_to(cx + 2.6, cy - direction * 1.3);
     if let Some(path) = caret.finish() {
         painter.stroke_path(
             &path,

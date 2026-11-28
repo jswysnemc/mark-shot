@@ -135,7 +135,7 @@ impl Measurement {
     }
 
     /// 【尺子】【长度数据】返回原图像素宽、高、对角线与面积；角度尺返回空值
-    pub fn length_metrics(self) -> Option<(u64, u64, u64, u64)> {
+    pub fn length_metrics(self) -> Option<super::LengthMetrics> {
         let RulerGeometry::Length { start, end, .. } = self.geometry else {
             return None;
         };
@@ -151,18 +151,13 @@ impl Measurement {
         ))
     }
 
-    /// 【尺子】【测量说明】返回长度说明或保留一位小数的角度说明；未完成测量返回空值
+    /// 【尺子】【测量说明】返回已启用的长度读数或角度说明；没有读数或未完成测量时返回空值
     pub fn info_text(self) -> Option<String> {
         if !self.measures() {
             return None;
         }
         match self.geometry {
-            RulerGeometry::Length { .. } => {
-                let (width, height, diagonal, area) = self.length_metrics()?;
-                Some(format!(
-                    "{width} x {height} px   diag {diagonal} px   area {area} px"
-                ))
-            }
+            RulerGeometry::Length { .. } => self.readouts.text(self.length_metrics()?),
             RulerGeometry::Angle { points, .. } => Some(format!(
                 "{:.1}\u{b0}",
                 angle_degrees(points[0], points[1], points[2])
@@ -217,10 +212,32 @@ pub fn angle_arc(measurement: Measurement, unit: f32) -> Option<(f32, f32, f32)>
 }
 
 impl Measurement {
-    /// 【尺子】【刻度视觉范围】在几何边界上加入 unit 对应的刻度与数字留量；返回旋转后的外接矩形
+    /// 【尺子】【刻度视觉范围】在几何边界上加入 unit 对应的刻度、箭头与数字留量；返回旋转后的外接矩形
     pub fn visual_bounds(self, unit: f32) -> Option<Rect> {
         if let RulerGeometry::Length { rotation, .. } = self.geometry {
             let bounds = self.unrotated_bounds()?;
+            if self.style == super::RulerStyle::Simple {
+                let digits = self.length_metrics().map_or(3, |(width, height, _, _)| {
+                    width.max(height).to_string().len() + 2
+                });
+                let pad_x = (16.0 + digits as f32 * 5.0) * unit;
+                let pad_y = 32.0 * unit;
+                let local = Rect::from_ltrb(
+                    bounds.left() - pad_x,
+                    bounds.top() - pad_y,
+                    bounds.right() + pad_x,
+                    bounds.bottom() + pad_y,
+                )?;
+                let center = rect_center(bounds);
+                let points = [
+                    (local.left(), local.top()),
+                    (local.right(), local.top()),
+                    (local.right(), local.bottom()),
+                    (local.left(), local.bottom()),
+                ]
+                .map(|point| rotated(point, center, rotation));
+                return super::geometry::points_bounds(&points, 1.0 / self.pixel_scale);
+            }
             let digits = self.length_metrics().map_or(1, |(width, height, _, _)| {
                 width.max(height).to_string().len()
             });

@@ -1,6 +1,6 @@
 //! 【X11录制】【共享像素】复用服务端共享段，远程服务器回退 GetImage，不依赖 OpenGL
 
-use super::{Frame, Source};
+use super::{Frame, Source, Step};
 use crate::{
     backend::x11::{connection::Display, pixels::Format},
     features::recording::Target,
@@ -109,7 +109,7 @@ impl Capture {
 
 impl Source for Capture {
     /// 【X11录制】【共享取帧】按 timeout 调用服务器读取，返回当前借用像素；服务器连接失败立即报告
-    fn next(&mut self, _timeout: Duration) -> Result<bool, String> {
+    fn next(&mut self, _timeout: Duration) -> Result<Step, String> {
         let capture = |this: &mut Self| -> crate::AppResult {
             let outputs = this.display.outputs()?;
             if !outputs.iter().any(|o| {
@@ -168,7 +168,7 @@ impl Source for Capture {
             Ok(())
         };
         capture(self).map_err(|e| e.to_string())?;
-        Ok(true)
+        Ok(Step::Frame)
     }
     /// 【X11录制】【当前像素】无参数，借用最近一帧的复用缓冲
     fn frame(&self) -> Option<Frame<'_>> {

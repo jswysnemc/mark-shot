@@ -41,6 +41,8 @@ pub struct SettingsPanel {
     pub marker_shape: crate::types::MarkerShape,
     pub marker_filled: bool,
     pub ruler_mode: crate::features::ruler::RulerMode,
+    pub ruler_readouts_open: bool,
+    pub ruler_metrics: Option<crate::features::ruler::LengthMetrics>,
     pub number_style: crate::features::number::NumberStyle,
     pub arrow_style: crate::features::arrow::ArrowStyle,
     pub line_style: crate::features::line::LineStyle,
@@ -98,6 +100,8 @@ impl SettingsPanel {
             marker_shape: crate::types::MarkerShape::default(),
             marker_filled: true,
             ruler_mode: crate::features::ruler::RulerMode::Length,
+            ruler_readouts_open: false,
+            ruler_metrics: None,
             number_style: crate::features::number::NumberStyle::Arabic,
             arrow_style: crate::features::arrow::ArrowStyle::Direct,
             line_style: crate::features::line::LineStyle::Solid,
@@ -151,10 +155,15 @@ impl SettingsPanel {
             } else {
                 item.trailing_padding()
             };
-            x += item.size() + gap;
+            x += self.widget_width(item) + gap;
         }
         let height = self.item_height();
-        Rect::from_xywh(x, (self.size.1 - height) / 2.0, widget.size(), height)
+        Rect::from_xywh(
+            x,
+            (self.size.1 - height) / 2.0,
+            self.widget_width(widget),
+            height,
+        )
     }
 
     pub fn item_height(&self) -> f32 {

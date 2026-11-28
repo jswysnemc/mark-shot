@@ -35,6 +35,7 @@ pub enum SelectionHandle {
     MagnifierSource,
     MagnifierLens,
     NumberTip,
+    ColorSampleTip,
     NumberBubble,
     /// 【线条】【骨架定点】零一起终点，二及以后为控制点
     LinePoint(usize),

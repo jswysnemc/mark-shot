@@ -57,6 +57,15 @@ impl EditorState {
         {
             return SelectionHandle::Rotate;
         }
+        if selected
+            && measurement.mode() == ruler::RulerMode::Length
+            && let Some(frame) = self.canvas_ruler_frame(annotation)
+        {
+            let handle = frame.hit(point);
+            if handle != SelectionHandle::None {
+                return handle;
+            }
+        }
         let handle = ruler::drag::body_hit(measurement, point, window.canvas(8.0), interior_moves);
         if handle != SelectionHandle::None {
             return handle;

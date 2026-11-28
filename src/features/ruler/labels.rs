@@ -8,7 +8,7 @@ use tiny_skia::Rect;
 pub use super::geometry::angle_arc;
 pub use super::label_model::{InfoLabel, LabelRequest};
 
-/// 【尺子】【说明准备】按measurement、width和bounds返回原版完整单行请求，fonts保留调用上下文，度量使用定向尺子字体
+/// 【尺子】【说明准备】按 measurement 和 width 返回排版请求，bounds 留给布局阶段，度量使用定向尺子字体
 pub fn prepare(
     measurement: Measurement,
     width: f32,
@@ -23,9 +23,9 @@ pub fn clamped(rect: Rect, bounds: Rect, gap: f32) -> Rect {
     super::label_geometry::clamped(rect, bounds, gap)
 }
 
-/// 【尺子】【全部说明布局】按requests与bounds返回角度优先、长度避让的完整单行说明
+/// 【尺子】【全部说明布局】按 requests 和 bounds 返回角度优先、长度尺内优先的完整说明
 pub fn layout(requests: &[LabelRequest], bounds: Rect) -> Vec<InfoLabel> {
-    super::label_geometry::layout(requests, bounds)
+    super::label_geometry::layout(requests, bounds, std::iter::empty())
 }
 
 /// 【尺子】【导出说明集合】按rulers与bounds生成当前绘制坐标中的完整说明，fonts保留字体上下文，返回布局列表
@@ -43,12 +43,25 @@ pub(crate) fn prepare_in_projection(
     bounds: Rect,
     projection: ViewTransform,
 ) -> Vec<InfoLabel> {
-    let requests: Vec<_> = rulers
-        .filter_map(|(measurement, width)| {
-            super::label_model::prepare(measurement, width, projection)
-        })
-        .collect();
-    layout(&requests, bounds)
+    let mut requests = Vec::new();
+    let mut unlabelled = Vec::new();
+    for (measurement, width) in rulers {
+        if measurement.mode() == super::RulerMode::Length
+            && measurement.style == super::RulerStyle::Standard
+            && measurement.readouts == Default::default()
+        {
+            if measurement.measures() {
+                unlabelled.push((measurement, width));
+            }
+        } else if let Some(request) = super::label_model::prepare(measurement, width, projection) {
+            requests.push(request);
+        }
+    }
+    // 1. 【尺子】【刻度避让】未启用说明的尺身仍参与避让，仅在存在可见长度说明时计算其刻度范围
+    let obstacles = unlabelled.into_iter().filter_map(|(measurement, width)| {
+        super::label_geometry::scale(measurement, width, bounds, projection)
+    });
+    super::label_geometry::layout(&requests, bounds, obstacles)
 }
 
 /// 【尺子】【数字边界约束】按rect、tick和bounds返回范围内刻度的完整数字范围，范围外刻度保持位置

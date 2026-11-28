@@ -337,6 +337,8 @@ async fn serve(path: &Path, root: &Path) -> crate::AppResult {
     for worker in workers.into_iter().flatten() {
         worker.close().await;
     }
+    #[cfg(target_os = "windows")]
+    drop(capture_worker);
     status::write(
         root,
         &status::Status {

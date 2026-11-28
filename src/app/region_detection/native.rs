@@ -120,14 +120,16 @@ impl Native {
 /// 【截图控件识别】【结果接入】按state与hit接入当前路径，dirty记录重绘，按下期间不改变锁定候选
 pub(super) fn apply(state: &mut EditorState, hit: Hit, dirty: &mut u32) {
     let region = &mut state.region_detection;
-    if region.pressed.is_some() || state.input.mouse_down {
+    if region.pressed.is_some()
+        || state.input.mouse_down && state.selected_tool != crate::tools::Tool::Ruler
+    {
         return;
     }
     let Some(native) = &mut region.native else {
         return;
     };
     if native.path.apply(hit.point, hit.path, hit.refined) && region.pointer_valid {
-        super::input::refresh(state, dirty);
+        super::input::analysis_ready(state, dirty);
     }
 }
 /// 【截图控件识别】【完成接收】按state读取唯一最新结果并接入路径，dirty返回需要重绘的区域，无持续轮询

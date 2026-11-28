@@ -3,7 +3,7 @@
 **English** | [简体中文](zh-CN/installation.md)
 
 The current release is
-[0.2.4](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.4).
+[0.2.6](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.6).
 The 0.1.x packages contain the earlier Qt implementation, preserved on `qt-old`.
 
 ## Package managers
@@ -31,7 +31,7 @@ To build locally from source instead:
 yay -S mark-shot
 ```
 
-AUR package versions are maintained independently and may lag behind GitHub Releases. You can verify the available version with `yay -Si mark-shot-bin`. To install the latest release directly, download `mark-shot-bin-*.pkg.tar.zst` from GitHub Releases and install with `sudo pacman -U`.
+Stable releases sync `mark-shot` and `mark-shot-bin` to the AUR automatically after GitHub Releases publication. You can verify the available version with `yay -Si mark-shot-bin`, or download `mark-shot-bin-*.pkg.tar.zst` directly from GitHub Releases and install with `sudo pacman -U`.
 
 ### Nix / NixOS
 
@@ -53,8 +53,8 @@ library and license notices; Rust is only needed for source builds.
 For the Linux x86_64 portable archive, keep the extracted directory intact:
 
 ```sh
-tar -xzf mark-shot-native-0.2.4-linux-x86_64.tar.gz
-./mark-shot-native-0.2.4-linux-x86_64/mark-shot
+tar -xzf mark-shot-native-0.2.6-linux-x86_64.tar.gz
+./mark-shot-native-0.2.6-linux-x86_64/mark-shot
 ```
 
 Use the `linux-aarch64` archive on ARM64. On Windows, extract the complete ZIP and run
@@ -66,13 +66,13 @@ Expand **Files and SHA-256** on the release page and compare the complete digest
 Checksum files and internal JSON metadata are not separate release assets.
 
 ```sh
-sha256sum mark-shot-native-0.2.4-linux-x86_64.tar.gz
+sha256sum mark-shot-native-0.2.6-linux-x86_64.tar.gz
 ```
 
 On Windows, use PowerShell:
 
 ```powershell
-Get-FileHash .\mark-shot-native-0.2.4-windows-x86_64-msvc.zip -Algorithm SHA256
+Get-FileHash .\mark-shot-native-0.2.6-windows-x86_64-msvc.zip -Algorithm SHA256
 ```
 
 Release filenames use `.` instead of `~` to comply with GitHub asset naming. Package contents and internal versions remain unchanged by filename normalization.

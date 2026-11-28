@@ -367,6 +367,7 @@ section!(Marker {
 section!(Ruler {
     width: f32 = 3.0,
     mode: crate::features::ruler::RulerMode = crate::features::ruler::RulerMode::Length,
+    style: crate::features::ruler::RulerStyle = crate::features::ruler::RulerStyle::Standard,
 });
 
 section!(MagnifierTool {

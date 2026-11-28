@@ -31,7 +31,7 @@ software, so it does not depend on Qt, GTK or a web view.
 
 | Area | What you get |
 | --- | --- |
-| Capture | Region, window, monitor and full-desktop capture, delayed capture, scrolling screenshots, headless capture with a JSON report |
+| Capture | Region, multi-region, window, monitor and full-desktop capture, delayed capture, scrolling screenshots, headless capture with a JSON report |
 | Annotation | Pen, highlighter, line, arrow, rectangle, ellipse, shape markers, numbering, text, mosaic and blur, magnifier, ruler, laser pointer |
 | Editing | Move, resize and rotate annotations, multi-selection, undo and redo, canvas zoom and pan, export frame with padding and shadow |
 | Pinning | Pin a capture, an image file or the clipboard as an always-on-top window, preserving clipboard HTML/RTF formatting: readable local images are rendered, network/unreadable images become labelled placeholders, image paragraphs become aligned rows, and `align`/centre layouts are kept (embedded RTF images and Office vector objects are not included), with OCR text selection and translation |
@@ -81,14 +81,14 @@ To build locally from source instead:
 yay -S mark-shot
 ```
 
-Note: Package versions in the AUR are maintained independently and may lag behind GitHub Releases. You can verify the available version with `yay -Si mark-shot-bin`. If you need the latest release immediately, download `mark-shot-bin-*.pkg.tar.zst` from GitHub Releases and install with `sudo pacman -U`.
+Note: Stable releases sync `mark-shot` and `mark-shot-bin` to the AUR automatically after GitHub Releases publication. You can verify the available version with `yay -Si mark-shot-bin`, or download `mark-shot-bin-*.pkg.tar.zst` directly from GitHub Releases and install with `sudo pacman -U`.
 
 #### Debian / Ubuntu
 
 Download the `.deb` package matching your distribution version and architecture from [Releases](https://github.com/jswysnemc/mark-shot/releases). For example, on Ubuntu 24.04 (x86_64):
 
 ```sh
-sudo apt install ./mark-shot_0.2.4-1_amd64.ubuntu24.04.deb
+sudo apt install ./mark-shot_0.2.6-1_amd64.ubuntu24.04.deb
 ```
 
 Replace the filename with the package matching your distribution version and architecture.
@@ -98,7 +98,7 @@ Replace the filename with the package matching your distribution version and arc
 RPM packages are currently built for Fedora 43. Download the package for your architecture from [Releases](https://github.com/jswysnemc/mark-shot/releases), then install:
 
 ```sh
-sudo dnf install ./mark-shot-0.2.4-1.fc43.x86_64.rpm
+sudo dnf install ./mark-shot-0.2.6-1.fc43.x86_64.rpm
 ```
 
 Replace the filename with the package matching your architecture.

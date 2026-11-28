@@ -4,9 +4,21 @@ use mark_shot::features::ruler::labels::{clamped, prepare_all};
 use mark_shot::features::ruler::{Measurement, RulerGeometry, RulerMode};
 use tiny_skia::Rect;
 
+#[path = "ruler_labels/adaptive.rs"]
+mod adaptive;
+
+/// 【尺子测试】【完整包含】按 outer 和 inner 判断标签四边是否都在允许范围内
+fn contains(outer: Rect, inner: Rect) -> bool {
+    outer.left() <= inner.left()
+        && outer.top() <= inner.top()
+        && inner.right() <= outer.right()
+        && inner.bottom() <= outer.bottom()
+}
+
 /// 【尺子测试】【长度构造】使用 start、end 构造源图像素比例为 2 的测量
 fn ruler(start: (f32, f32), end: (f32, f32)) -> Measurement {
     let mut measurement = Measurement::new(RulerMode::Length, start, 2.0).unwrap();
+    measurement.readouts = mark_shot::features::ruler::Readouts::ALL;
     measurement.geometry = RulerGeometry::Length {
         start,
         end,
@@ -15,24 +27,24 @@ fn ruler(start: (f32, f32), end: (f32, f32)) -> Measurement {
     measurement
 }
 
-/// 【尺子测试】【完整说明】原版rulerLabelSize与clampRulerFloatingRect在窄范围内保留完整单行，只平移不缩小
+/// 【尺子测试】【窄屏分行】窗口放不下完整单行时，按字段换行，保留原字号和全部读数
 #[test]
 fn narrow_labels_keep_all_measurement_fields() {
     let measurement = ruler((30.0, 30.0), (200.0, 150.0));
-    let bounds = Rect::from_xywh(0.0, 0.0, 130.0, 120.0).unwrap();
+    let bounds = Rect::from_xywh(0.0, 0.0, 170.0, 155.0).unwrap();
     let mut fonts = mark_shot::fonts::bundled();
     let labels = prepare_all(std::iter::once((measurement, 3.0)), bounds, &mut fonts);
     assert_eq!(labels.len(), 1);
     assert_eq!(
-        labels[0].lines,
-        ["340 x 240 px   diag 416 px   area 81600 px"]
+        labels[0].lines.join("   "),
+        "340 x 240 px   diag 416 px   area 81600 px"
     );
-    assert!(labels[0].rect.width() > bounds.width());
-    assert_eq!(labels[0].rect.left(), 8.0 * labels[0].unit);
+    assert!(labels[0].lines.len() > 1);
+    assert!(contains(bounds, labels[0].rect));
     assert_eq!(labels[0].font_size, 17.0);
 }
 
-/// 【尺子测试】【说明避让】有足够可用空间时，各长度说明避开其他尺子刻度与已放置说明
+/// 【尺子测试】【尺内说明】空间充足时标签分行置于各自尺身内，不压住其他尺身或标签
 #[test]
 fn length_labels_avoid_each_other_and_other_rulers_when_space_allows() {
     let rulers = [
@@ -48,8 +60,13 @@ fn length_labels_avoid_each_other_and_other_rulers_when_space_allows() {
     );
     assert_eq!(labels.len(), 2);
     assert!(labels[0].rect.intersect(&labels[1].rect).is_none());
-    for label in labels {
-        for ruler in rulers {
+    for (index, label) in labels.iter().enumerate() {
+        assert!(label.lines.len() > 1);
+        assert!(contains(rulers[index].bounds().unwrap(), label.rect));
+        for (other, ruler) in rulers.iter().copied().enumerate() {
+            if other == index {
+                continue;
+            }
             let body = mark_shot::features::ruler::tick_layout::Layout::new(
                 ruler,
                 3.0,
@@ -65,6 +82,27 @@ fn length_labels_avoid_each_other_and_other_rulers_when_space_allows() {
             );
         }
     }
+}
+
+/// 【尺子测试】【无标签尺身】无参数，关闭某把尺子的读数不应允许其他尺子的标签盖住它的刻度，无返回值
+#[test]
+fn visible_readouts_still_avoid_rulers_with_hidden_readouts() {
+    let first = ruler((320.0, 200.0), (520.0, 320.0));
+    let bounds = Rect::from_xywh(0.0, 0.0, 1500.0, 800.0).unwrap();
+    let mut fonts = mark_shot::fonts::bundled();
+    let original = prepare_all([(first, 3.0)].into_iter(), bounds, &mut fonts)[0].rect;
+    let mut second = ruler(
+        (original.left(), original.top()),
+        (original.right(), original.bottom()),
+    );
+    second.readouts = Default::default();
+    let labels = prepare_all(
+        [(first, 3.0), (second, 3.0)].into_iter(),
+        bounds,
+        &mut fonts,
+    );
+    assert_eq!(labels.len(), 1);
+    assert!(labels[0].rect.intersect(&original).is_none());
 }
 
 /// 【尺子测试】【原图说明比例】原版rulerFont按绘制目标取整，导出保留测量文字与样式单位但不连续缩放字体度量
@@ -110,7 +148,7 @@ fn angle_labels_are_placed_before_length_labels_and_pending_angles_are_skipped()
     );
     assert_eq!(labels.len(), 2);
     assert_eq!(labels[0].lines, ["90.0\u{b0}"]);
-    assert!(labels[1].lines[0].contains("diag"));
+    assert!(labels[1].lines.iter().any(|line| line.contains("diag")));
 }
 
 /// 【尺子测试】【越界说明】原版clampRulerFloatingRect平移超大说明到负坐标边界，不裁减尺寸

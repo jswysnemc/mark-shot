@@ -5,9 +5,60 @@ use mark_shot::features::ruler::geometry::distance;
 use mark_shot::features::ruler::{Measurement, RulerGeometry, RulerMode};
 use mark_shot::types::SelectionHandle;
 
+/// 【尺子测试】【箭头窄框】箭头选框横截面保持窗口宽度，只有轴向端点可调整，旋转后拖动也不会改变对端
+#[test]
+fn simple_ruler_frame_has_fixed_thickness_and_only_axial_handles() {
+    use mark_shot::features::{annotation_style::window::WindowUnits, ruler::RulerStyle};
+    for horizontal in [true, false] {
+        let mut ruler = length(0.0).with_style(RulerStyle::Simple);
+        if !horizontal {
+            ruler = ruler.mapped(|point| (point.1, point.0));
+        }
+        for scale in [1.0, 0.5, 2.0] {
+            let frame = drag::window_frame(ruler, WindowUnits::new(scale)).unwrap();
+            assert_eq!(
+                if horizontal {
+                    frame.height()
+                } else {
+                    frame.width()
+                },
+                20.0 * scale
+            );
+            assert_eq!(
+                if horizontal {
+                    frame.width()
+                } else {
+                    frame.height()
+                },
+                100.0 + 12.0 * scale
+            );
+        }
+        assert_eq!(
+            drag::body_hit(ruler, (102.0, 102.0), 8.0, true),
+            SelectionHandle::None
+        );
+        ruler = ruler.rotated(37.0);
+        let handles = drag::handles(ruler, 8.0);
+        assert_eq!(handles.len(), 2);
+        let (tip, handle) = handles[1];
+        let resized = drag::dragged(
+            ruler,
+            handle,
+            tip,
+            (tip.0 + 35.0, tip.1 + 24.0),
+            false,
+            false,
+        );
+        let after = drag::handles(resized, 8.0);
+        assert!(distance(after[0].0, handles[0].0) < 0.001);
+        assert!(distance(after[1].0, tip) > 1.0);
+    }
+}
+
 /// 【尺子测试】【长度构造】返回可旋转的 100×80 逻辑单位长度尺
 fn length(rotation: f32) -> Measurement {
     let mut ruler = Measurement::new(RulerMode::Length, (100.0, 100.0), 1.5).unwrap();
+    ruler.readouts = mark_shot::features::ruler::Readouts::ALL;
     ruler.geometry = RulerGeometry::Length {
         start: (100.0, 100.0),
         end: (200.0, 180.0),
@@ -99,6 +150,35 @@ fn rotated_length_resize_keeps_the_opposite_corner_stationary() {
     assert!(distance(corners[2], original[2]) < 0.0001);
     assert!(distance(corners[0], (original[0].0 - 30.0, original[0].1 - 20.0)) < 0.0001);
     assert_ne!(changed.length_metrics(), ruler.length_metrics());
+}
+
+/// 【尺子测试】【平直测量】从水平尺或垂直尺的外框角点沿主轴拖动，保留另一轴的零尺寸与零面积
+#[test]
+fn dragging_a_flat_rulers_outer_corner_does_not_create_a_measured_thickness() {
+    for (end, delta, expected) in [
+        ((200.0, 100.0), (12.0, 0.0), (112, 0, 112, 0)),
+        ((100.0, 200.0), (0.0, 12.0), (0, 112, 112, 0)),
+    ] {
+        let mut ruler = Measurement::new(RulerMode::Length, (100.0, 100.0), 1.0).unwrap();
+        ruler.geometry = RulerGeometry::Length {
+            start: (100.0, 100.0),
+            end,
+            rotation: 0.0,
+        };
+        let frame = drag::frame(ruler).unwrap();
+        let start = (frame.right() + 1.0, frame.bottom() + 1.0);
+        let handle = drag::hit_test(ruler, start, 3.0, true, false);
+        assert_eq!(handle, SelectionHandle::BottomRight);
+        let result = drag::dragged(
+            ruler,
+            handle,
+            start,
+            (start.0 + delta.0, start.1 + delta.1),
+            false,
+            false,
+        );
+        assert_eq!(result.length_metrics(), Some(expected));
+    }
 }
 
 /// 【尺子测试】【等比角度框】Ctrl 同比调整三个定点，保持夹角且不改变样式粗细

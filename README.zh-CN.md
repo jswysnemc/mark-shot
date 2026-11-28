@@ -29,7 +29,7 @@ Mark Shot 冻结屏幕画面，由用户框选区域并添加标注，然后复�
 
 | 类别 | 内容 |
 | --- | --- |
-| 截图 | 区域、窗口、显示器与整个桌面截图，延时截图，滚动长截图，输出 JSON 报告的无界面截图 |
+| 截图 | 区域、多选区、窗口、显示器与整个桌面截图，延时截图，滚动长截图，输出 JSON 报告的无界面截图 |
 | 标注 | 画笔、荧光笔、直线、箭头、矩形、椭圆、形状标记、序号、文字、马赛克与模糊、放大镜、尺子、激光笔 |
 | 编辑 | 移动、缩放、旋转标注，多选，撤销与重做，画布缩放与平移，带留白和阴影的导出外框 |
 | 贴图 | 把截图、图片文件或剪贴板内容置顶显示，保留剪贴板 HTML/RTF 格式：可读取的本地图片正常渲染，网络图片和无法读取的图片显示为带标签的占位框，同一段落的多张图片排成对齐的行，`align` 与居中布局保留（不含 RTF 嵌入图片和 Office 矢量对象），支持文字识别后选择文字和翻译 |
@@ -78,14 +78,14 @@ paru -S mark-shot-bin
 yay -S mark-shot
 ```
 
-注意：AUR 仓库版本由维护者独立维护，可能滞后于 GitHub 官方发布。安装前可使用 `yay -Si mark-shot-bin` 核对当前仓库版本；若需立即使用最新正式版，也可在 Releases 页面直接下载对应架构的 `mark-shot-bin-*.pkg.tar.zst`，并通过 `sudo pacman -U` 安装。
+注意：正式版在 GitHub Releases 公开后会自动同步更新 AUR 中的 `mark-shot` 与 `mark-shot-bin`。安装前可使用 `yay -Si mark-shot-bin` 核对当前版本，或直接在 Releases 页面下载对应架构的 `mark-shot-bin-*.pkg.tar.zst` 并通过 `sudo pacman -U` 安装。
 
 #### Debian / Ubuntu
 
 在 [Releases](https://github.com/jswysnemc/mark-shot/releases) 页面按系统版本与硬件架构下载对应的 `.deb` 安装包。例如在 Ubuntu 24.04 (x86_64) 下执行：
 
 ```sh
-sudo apt install ./mark-shot_0.2.4-1_amd64.ubuntu24.04.deb
+sudo apt install ./mark-shot_0.2.6-1_amd64.ubuntu24.04.deb
 ```
 
 请按实际使用的系统版本与架构替换文件名。
@@ -95,7 +95,7 @@ sudo apt install ./mark-shot_0.2.4-1_amd64.ubuntu24.04.deb
 当前预编译 RPM 安装包针对 Fedora 43 构建。在 [Releases](https://github.com/jswysnemc/mark-shot/releases) 页面下载对应架构的 `.rpm` 文件后执行：
 
 ```sh
-sudo dnf install ./mark-shot-0.2.4-1.fc43.x86_64.rpm
+sudo dnf install ./mark-shot-0.2.6-1.fc43.x86_64.rpm
 ```
 
 请按实际使用的硬件架构替换文件名。

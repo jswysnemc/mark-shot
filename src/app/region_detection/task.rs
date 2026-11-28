@@ -107,13 +107,21 @@ pub(crate) fn start(
         }
     };
     #[cfg(target_os = "windows")]
-    if config.window_detection.enabled {
+    if config.window_detection.enabled && !windows.is_empty() {
         match super::native::Native::new(windows, wake.clone(), space.bounds) {
             Ok(native) => state.region_detection.native = Some(native),
             Err(error) => log::error!("【截图控件识别】【启动失败】{error}"),
         }
     }
-    let captures = state.captures.clone();
+    let captures = state.file_canvas.as_ref().map_or_else(
+        || state.captures.clone(),
+        |file| {
+            vec![Capture {
+                pixmap: file.original.clone(),
+                scale: space.scale as f32,
+            }]
+        },
+    );
     let placements = state.placements.clone();
     let (sender, result) = mpsc::channel();
     let cancelled = Arc::new(AtomicBool::new(false));
@@ -137,6 +145,15 @@ pub(crate) fn start(
         thread: Some(thread),
         cancelled,
     });
+}
+
+/// 【尺子】【按需识别】全屏与文件编辑首次启用尺子时消费冻结来源；overlay 用于通知完成，其他工具不启动分析
+pub(crate) fn start_for_ruler(state: &mut EditorState, overlay: &mut dyn ScreenOverlay) {
+    if state.selected_tool == crate::tools::Tool::Ruler
+        && let Some(windows) = state.region_detection.deferred_windows.take()
+    {
+        start(state, overlay, &windows);
+    }
 }
 
 /// 【截图区域识别】【完成接入】按 state 接收唯一后台结果并恢复当前悬停，dirty 返回需要重绘的显示器，无持续轮询
@@ -171,7 +188,7 @@ pub(crate) fn poll(state: &mut EditorState, dirty: &mut u32) {
             state.region_detection.detector = Some(detector);
             state.region_detection.cursor.reset();
             if state.region_detection.pressed.is_none() && state.region_detection.pointer_valid {
-                input::refresh(state, dirty);
+                input::analysis_ready(state, dirty);
             }
         }
         Err(error) => log::error!("【截图区域识别】【完成接入】{error}"),

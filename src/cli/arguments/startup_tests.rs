@@ -78,3 +78,13 @@ fn invalid_file_tool_fails_before_graphics() {
     .unwrap_err();
     assert!(error.to_string().contains("unknown annotation tool"));
 }
+
+/// 【命令行回归】【旧版托盘】兼容 Qt 时代自启动残留的 --tray 参数，直接映射到后台常驻入口，无参数、无返回值
+#[test]
+fn legacy_tray_flag_maps_to_background_service() {
+    let parsed = parse([OsString::from("--tray")], Instant::now()).unwrap();
+    assert!(matches!(
+        parsed.command,
+        Command::Internal { kind, args } if kind == crate::features::desktop::ARG && args.is_empty()
+    ));
+}

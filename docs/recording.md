@@ -98,8 +98,12 @@ Audio is either the system sound or the default microphone; the two are not mixe
 - The recording stops when the monitor layout or the frame size changes; start again afterwards.
 - With `encoder = "hardware"`, a failure is reported instead of silently switching to software
   encoding. `auto` chooses an encoder that works.
-- On portal-based desktops the recorded source must match the monitor you selected. If it does
-  not, region cropping is refused instead of recording the wrong area.
+- On portal-based desktops the recorded source must match the monitor you selected. If the portal
+  omits stream coordinates (such as KDE Plasma 6.3), verification falls back to matching logical or
+  physical dimensions; mismatched sources are still refused instead of recording the wrong area.
+- When DMA-BUF capture cannot be imported by the active GPU driver or format, recording
+  automatically falls back to CPU frames with hardware upload (or software encoding under
+  `encoder = "auto"`).
 - On Windows an MP4 that was interrupted by a forced termination may not be recoverable.
 - The panel and hidden-controls hint request capture exclusion on supported Windows versions.
   Linux screen capture includes visible windows; hide the panel or move it outside the selected

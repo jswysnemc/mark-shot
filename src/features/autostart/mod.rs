@@ -27,8 +27,26 @@ pub(crate) fn reconcile(path: &Path) {
     if cfg!(test) {
         return;
     }
-    let result = crate::config::preferences::load(path)
-        .and_then(|config| update(path, config.desktop.autostart));
+    let result = crate::config::preferences::load(path).and_then(|config| {
+        #[cfg(target_os = "linux")]
+        let enabled = if !config.desktop.autostart && linux::has_legacy_tray_entry() {
+            // 1. 【开机启动】【旧项迁移】检测到 Qt 版遗留的 --tray 自启动项时自动迁移为新版格式并回写配置
+            log::info!(
+                "【开机启动】【旧项迁移】检测到旧版 --tray 自启动项，自动迁移为新版后台启动"
+            );
+            if let Err(error) =
+                crate::config::preferences::write(path, "desktop", "autostart", true.into())
+            {
+                log::error!("【开机启动】【旧项迁移】回写配置失败: {error}");
+            }
+            true
+        } else {
+            config.desktop.autostart
+        };
+        #[cfg(not(target_os = "linux"))]
+        let enabled = config.desktop.autostart;
+        update(path, enabled)
+    });
     if let Err(error) = result {
         log::error!("【开机启动】【启动同步】{error}");
     }

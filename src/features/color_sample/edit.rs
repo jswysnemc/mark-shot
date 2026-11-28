@@ -20,13 +20,14 @@ pub(crate) fn wheel(
     let scale = state.annotations[index].style_scale;
     let next = (sample.size / scale + steps as f32).clamp(8.0, 48.0) * scale;
     if next != sample.size {
+        let source = state.annotations[index].to_visual(sample.source);
         state.push_undo();
         if let crate::types::AnnotationShape::ColorSample { sample } =
             &mut state.annotations[index].shape
         {
             sample.size = next;
         }
-        state.annotations[index].update_bbox();
+        super::tip_drag::move_to(&mut state.annotations[index], source);
         state.annotations_dirty = true;
         crate::editor::dirty::mark_all_dirty(dirty, state.placements.len());
     }

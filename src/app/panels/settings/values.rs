@@ -199,6 +199,14 @@ pub fn apply_toggle_field(
             ToggleField::Outline => ts.outline = new_value,
             ToggleField::Fill => ts.fill = new_value,
             ToggleField::MarkerFill => ts.marker_filled = new_value,
+            ToggleField::RulerReadout(field) => *ts.ruler_readouts.field_mut(field) = new_value,
+            ToggleField::RulerSimple => {
+                ts.ruler_style = if new_value {
+                    crate::features::ruler::RulerStyle::Simple
+                } else {
+                    crate::features::ruler::RulerStyle::Standard
+                };
+            }
             ToggleField::MagnifierRectangle
             | ToggleField::FixedRatio
             | ToggleField::ArrowBidirectional
@@ -220,6 +228,16 @@ pub fn apply_toggle_field(
             }
             (AnnotationShape::Marker { filled, .. }, ToggleField::MarkerFill) => {
                 *filled = new_value
+            }
+            (AnnotationShape::Ruler { measurement }, ToggleField::RulerSimple) => {
+                measurement.style = if new_value {
+                    crate::features::ruler::RulerStyle::Simple
+                } else {
+                    crate::features::ruler::RulerStyle::Standard
+                };
+            }
+            (AnnotationShape::Ruler { measurement }, ToggleField::RulerReadout(field)) => {
+                *measurement.readouts.field_mut(field) = new_value;
             }
             _ => {}
         },

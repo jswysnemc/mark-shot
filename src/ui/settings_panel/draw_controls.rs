@@ -173,6 +173,7 @@ pub(super) fn draw_toggle(
     p: &mut Painter,
     cell: Rect,
     visual: &ToggleVisual,
+    caption: Option<&str>,
     icon_size: f32,
     is_on: bool,
     is_hovered: bool,
@@ -282,7 +283,7 @@ pub(super) fn draw_toggle(
             ) {
                 p.text(
                     label_rect,
-                    localized_toggle_label(label),
+                    caption.unwrap_or_else(|| localized_toggle_label(label)),
                     TextStyle::new(crate::ui::toolbar::metrics::font(), ink.color())
                         .weight(if is_on {
                             Weight::SEMIBOLD
@@ -296,8 +297,14 @@ pub(super) fn draw_toggle(
     }
 }
 
-/// 【副工具栏】【只读值芯片】为取色器绘制点击即可复制的圆角数值胶囊，无返回值
-pub(super) fn draw_value_field(p: &mut Painter, rect: Rect, text: &str, is_hovered: bool) {
+/// 【取色工具条】【颜色预览】在 rect 内绘制可复制的 text；swatch 有值时在文字左侧显示同色样本，is_hovered 控制高亮，无返回值
+pub(super) fn draw_value_field(
+    p: &mut Painter,
+    rect: Rect,
+    text: &str,
+    swatch: Option<Color>,
+    is_hovered: bool,
+) {
     let palette = Palette::current();
     let (fill, border, ink) = if is_hovered {
         (
@@ -309,8 +316,21 @@ pub(super) fn draw_value_field(p: &mut Painter, rect: Rect, text: &str, is_hover
         (palette.control_fill, palette.control_border, palette.text)
     };
     draw_chip_frame(p, rect, CHIP_RADIUS, fill, border, 1.0);
+    let mut text_rect = rect;
+    if let Some(color) = swatch {
+        let width = (crate::config::get().settings_panel.swatch_size
+            * crate::ui::toolbar::metrics::properties_scale())
+        .min(rect.width() * 0.35);
+        if let (Some(sample), Some(rest)) = (
+            Rect::from_xywh(rect.left(), rect.top(), width, rect.height()),
+            Rect::from_ltrb(rect.left() + width, rect.top(), rect.right(), rect.bottom()),
+        ) {
+            draw_color_swatch(p, sample, false, false, color);
+            text_rect = rest;
+        }
+    }
     p.text(
-        rect,
+        text_rect,
         text,
         TextStyle::new(crate::ui::toolbar::metrics::font(), ink.color())
             .weight(Weight::MEDIUM)

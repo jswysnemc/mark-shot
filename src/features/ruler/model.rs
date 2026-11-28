@@ -49,6 +49,33 @@ impl RulerMode {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RulerStyle {
+    #[default]
+    Standard,
+    Simple,
+}
+
+impl RulerStyle {
+    /// 【尺子】【样式名称】返回配置与状态文件使用的稳定名称
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Standard => "standard",
+            Self::Simple => "simple",
+        }
+    }
+
+    /// 【尺子】【样式解析】将 value 转为尺子样式；未知名称返回空值
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "standard" => Some(Self::Standard),
+            "simple" => Some(Self::Simple),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum RulerGeometry {
     Length {
@@ -65,6 +92,9 @@ pub enum RulerGeometry {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Measurement {
     pub geometry: RulerGeometry,
+    /// 【尺子】【绘制样式】标准刻度尺或简约双头箭头宽度尺
+    pub style: RulerStyle,
+    pub readouts: super::Readouts,
     /// 【尺子】【测量比例】每个当前坐标单位对应的原图像素数，导出映射后反向调整
     pub pixel_scale: f32,
     /// 【尺子】【样式比例】原图到当前坐标的比例乘以截图补偿，不参与测量值计算
@@ -93,9 +123,16 @@ impl Measurement {
                     count: 2,
                 },
             },
+            style: RulerStyle::Standard,
+            readouts: super::Readouts::default(),
             pixel_scale,
             style_scale: 1.0,
         })
+    }
+
+    /// 【尺子】【样式设置】按 style 返回新的测量副本，不改变几何与比例
+    pub fn with_style(self, style: RulerStyle) -> Self {
+        Self { style, ..self }
     }
 
     /// 【尺子】【测量模式】返回当前几何对应的测量模式

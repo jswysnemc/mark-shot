@@ -26,6 +26,25 @@ fn native_editor() -> EditorState {
     pointer(&mut state, 130.0, 120.0, &mut 0);
     state
 }
+
+/// 【尺子测试】【原生控件】后台交付的可见组件可供尺子吸附，不需要指针再次移动或重新选区
+#[test]
+fn ruler_uses_native_component_edges_after_switching_tools() {
+    let mut state = native_editor();
+    crate::app::input::select_tool(&mut state, Tool::Ruler, &mut 0);
+    pointer(&mut state, 123.0, 113.0, &mut 0);
+    native::apply(
+        &mut state,
+        Hit {
+            point: (123, 113),
+            path: path(),
+            refined: false,
+        },
+        &mut 0,
+    );
+    assert_eq!(state.ruler.hover.as_ref().unwrap().point, (120.0, 113.0));
+    assert!(state.region_detection.hovered.is_none());
+}
 /// 【截图控件测试】【结果交付】按state、path与refined通过正式结果接入交付，返回值保存在编辑器
 fn result(state: &mut EditorState, path: Vec<PixelRect>, refined: bool) {
     native::apply(

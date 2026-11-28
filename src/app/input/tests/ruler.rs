@@ -14,6 +14,9 @@ use crate::types::{AnnotationShape, MouseButton, StrokeGroup};
 use crate::ui::panel::AnimatedPanel;
 use crate::ui::settings_panel::{SettingsAction, SettingsWidget};
 
+#[path = "ruler_readouts.rs"]
+mod readouts;
+
 /// 【尺子测试】【工具构造】返回指定 mode 的尺子编辑器；dirty 返回初始化重绘显示器
 fn ruler_editor(mode: RulerMode, dirty: &mut u32) -> EditorState {
     let mut state = editor();
@@ -393,6 +396,7 @@ fn undoing_a_ruler_handle_drag_restores_original_geometry_and_ends_input() {
 fn stable_ruler_hover_labels_and_open_popover_do_not_poll() {
     let mut dirty = 0;
     let mut state = ruler_editor(RulerMode::Length, &mut dirty);
+    state.tool_settings.ruler_readouts = crate::features::ruler::Readouts::ALL;
     draw(&mut state, (140.0, 130.0), (280.0, 240.0), &mut dirty);
     pointer(&mut state, 440.0, 370.0, &mut dirty);
     crate::editor::ruler_labels::refresh(&mut state, &mut dirty);
@@ -411,6 +415,7 @@ fn stable_ruler_hover_labels_and_open_popover_do_not_poll() {
 fn export_includes_measurement_labels_but_excludes_hover_chrome() {
     let mut dirty = 0;
     let mut state = ruler_editor(RulerMode::Length, &mut dirty);
+    state.tool_settings.ruler_readouts = crate::features::ruler::Readouts::ALL;
     draw(&mut state, (140.0, 130.0), (280.0, 240.0), &mut dirty);
     pointer(&mut state, 500.0, 400.0, &mut dirty);
     assert!(state.ruler.hover.is_some());
@@ -426,4 +431,62 @@ fn export_includes_measurement_labels_but_excludes_hover_chrome() {
     let y = (label.rect.top() + label.rect.height() / 2.0).round() as u32;
     assert_ne!(image.get_pixel(x, y).0, [30, 34, 38, 255]);
     assert_eq!(image.get_pixel(500, 400).0, [30, 34, 38, 255]);
+}
+
+/// 【尺子测试】【样式切换】验证属性栏箭头样式开关可切换默认样式与已选中尺子，且简约样式不生成浮动详情卡片
+#[test]
+fn ruler_style_toggle_switches_between_standard_and_simple_arrow() {
+    let mut dirty = 0;
+    let mut state = ruler_editor(RulerMode::Length, &mut dirty);
+    state.tool_settings.ruler_readouts = crate::features::ruler::Readouts::ALL;
+    draw(&mut state, (120.0, 160.0), (320.0, 160.0), &mut dirty);
+    assert_eq!(
+        measurement(&state, 0).style,
+        crate::features::ruler::RulerStyle::Standard
+    );
+    crate::editor::ruler_labels::refresh(&mut state, &mut dirty);
+    assert_eq!(state.ruler.labels.len(), 1);
+
+    // 1. 选中已有尺子后开启箭头样式，立即切换选中尺子并移除浮动详情卡片
+    state.select_annotation_index(Some(0));
+    panels::settings::update_settings_panel(&mut state, &mut dirty);
+    let toggle_idx = state
+        .settings_panel
+        .widgets
+        .iter()
+        .position(|widget| {
+            matches!(
+                widget,
+                SettingsWidget::Toggle {
+                    field: crate::ui::settings_panel::ToggleField::RulerSimple,
+                    ..
+                }
+            )
+        })
+        .expect("ruler settings panel exposes arrow style toggle");
+    let center = widget_center(&state, toggle_idx);
+    click(&mut state, center, &mut dirty);
+    assert_eq!(
+        state.tool_settings.ruler_style,
+        crate::features::ruler::RulerStyle::Simple
+    );
+    assert_eq!(
+        measurement(&state, 0).style,
+        crate::features::ruler::RulerStyle::Simple
+    );
+    crate::editor::ruler_labels::refresh(&mut state, &mut dirty);
+    assert!(state.ruler.labels.is_empty());
+
+    // 2. 新绘制的尺子继承简约箭头样式，撤销后原尺子恢复标准刻度样式
+    draw(&mut state, (120.0, 260.0), (260.0, 260.0), &mut dirty);
+    assert_eq!(
+        measurement(&state, 1).style,
+        crate::features::ruler::RulerStyle::Simple
+    );
+    key(&mut state, "Ctrl+Z", &mut dirty);
+    key(&mut state, "Ctrl+Z", &mut dirty);
+    assert_eq!(
+        measurement(&state, 0).style,
+        crate::features::ruler::RulerStyle::Standard
+    );
 }

@@ -112,6 +112,9 @@ pub(crate) fn handle_pointer_move(
     let (monitor, lx, ly) =
         crate::utils::global_point_to_local(&state.placements, global, monitor, (x, y));
     state.input.pointer = PointerState::new(monitor, (lx, ly), global);
+    if crate::app::multi_capture::motion(state, dirty) {
+        return;
+    }
     crate::app::panels::tooltip::pointer_move(state, Instant::now(), dirty);
     if crate::app::panels::recording::input::pointer(state, dirty) {
         return;
@@ -201,6 +204,9 @@ pub(crate) fn handle_pointer_button(
     pressed: bool,
     dirty: &mut u32,
 ) {
+    if crate::app::multi_capture::button(state, button, pressed, dirty) {
+        return;
+    }
     if pressed {
         crate::app::panels::tooltip::close(state, dirty);
     }
@@ -384,6 +390,11 @@ pub(crate) fn scroll(state: &mut EditorState, event: ScrollEvent, dirty: &mut u3
 
 /// 【画布导航】【修饰键入口】按ctrl、shift同步state并记录非重复Ctrl按下，dirty返回复位和绘图变化
 pub(crate) fn handle_modifiers(state: &mut EditorState, ctrl: bool, shift: bool, dirty: &mut u32) {
+    if state.multi_capture.is_some() {
+        state.input.ctrl = ctrl;
+        state.input.shift = shift;
+        return;
+    }
     let pressed = ctrl && !state.input.ctrl;
     crate::app::input::handle_canvas_modifiers(state, ctrl, shift, dirty);
     if pressed {
@@ -424,6 +435,7 @@ pub(crate) fn owns_pointer(state: &EditorState) -> bool {
 
 /// 【画布导航】【焦点中断】结束state的平移、滑块与Ctrl点击序列，dirty返回控件清理，保留当前视图，无返回值
 pub(crate) fn focus_lost(state: &mut EditorState, dirty: &mut u32) {
+    crate::app::multi_capture::cancel_drag(state, dirty);
     crate::app::input::capture_actions::cancel(state);
     super::preview::clear(state, dirty);
     let pan = state.navigation.pan.take().is_some();

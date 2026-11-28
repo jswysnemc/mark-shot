@@ -98,7 +98,11 @@ pub(super) fn run(
             continue;
         }
         if !pending {
-            pending = source.next(Duration::from_millis(10))?;
+            match source.next(Duration::from_millis(10))? {
+                capture::Step::Frame => pending = true,
+                capture::Step::Wait => {}
+                capture::Step::Ended => break,
+            }
         }
         let now = Instant::now();
         if now < next {
@@ -151,12 +155,17 @@ pub(super) fn run(
             let opened = match Encoder::open(&media, path, &settings) {
                 Ok(opened) => opened,
                 Err(error) if frame.gpu.is_some() => {
-                    log::info!("【录制会话】【显存回退】{error}");
+                    log::error!(
+                        "【录制会话】【显存回退】显存编码器初始化失败，改用 CPU 帧路径: {error}"
+                    );
                     source.prefer_cpu();
                     pending = false;
                     continue;
                 }
-                Err(error) => return Err(error),
+                Err(error) => {
+                    log::error!("【录制会话】【编码初始化】打开编码器失败: {error}");
+                    return Err(error);
+                }
             };
             detail = format!("{} · {} · in-process", source.name(), opened.name());
             if settings.audio {
@@ -175,16 +184,32 @@ pub(super) fn run(
             continue;
         }
         if let Err(error) = write_frame(encoder.as_mut().unwrap(), &frame, crop, pts) {
-            if frames == 0 && !software_retry && config.encoder == "auto" {
-                log::info!("【录制会话】【首帧回退】{error}");
-                drop(encoder.take());
-                audio = None;
-                clock = None;
-                software_retry = true;
-                source.prefer_cpu();
-                pending = false;
-                continue;
+            if frames == 0 {
+                // 1. 【录制会话】【显存首帧回退】DMA-BUF 导入失败时先切到 CPU 帧加硬件上传，保留硬件编码能力
+                if frame.gpu.is_some() && source.prefer_cpu() {
+                    log::error!(
+                        "【录制会话】【显存导入失败】DMA-BUF 首帧编码失败，回退到 CPU 帧采集: {error}"
+                    );
+                    drop(encoder.take());
+                    audio = None;
+                    clock = None;
+                    pending = false;
+                    continue;
+                }
+                // 2. 【录制会话】【软件首帧回退】仅 auto 模式在硬件上传首帧也失败时切换到软件编码，hardware 模式显式报错
+                if !software_retry && config.encoder == "auto" {
+                    log::error!(
+                        "【录制会话】【首帧回退】硬件路径首帧编码失败，回退到软件编码: {error}"
+                    );
+                    drop(encoder.take());
+                    audio = None;
+                    clock = None;
+                    software_retry = true;
+                    pending = false;
+                    continue;
+                }
             }
+            log::error!("【录制会话】【帧编码失败】{error}");
             return Err(error);
         }
         frames += 1;

@@ -113,11 +113,26 @@ fn visual_bounds(annotation: &Annotation) -> Option<Rect> {
 
 /// 【标注命中】【专用正文】按annotation、point与window返回序号圆心、尖端或放大镜控制点、内部操作；其他形状返回None
 pub fn special_drag(annotation: &Annotation, point: Point, window: WindowUnits) -> SelectionHandle {
+    special_with_padding(annotation, point, window, 0.0)
+}
+
+/// 【标注命中】【控件留白】按 annotation、point、window 与 padding 命中专用控制点；首次点击仍沿用正文范围
+fn special_with_padding(
+    annotation: &Annotation,
+    point: Point,
+    window: WindowUnits,
+    padding: f32,
+) -> SelectionHandle {
     if !finite(point) {
         return SelectionHandle::None;
     }
     let tolerance = window.canvas(8.0);
     match annotation.shape {
+        AnnotationShape::ColorSample { sample }
+            if distance(annotation.to_visual(sample.source), point) <= tolerance =>
+        {
+            SelectionHandle::ColorSampleTip
+        }
         AnnotationShape::Number { mark } => {
             let local = mark.to_local(point);
             let radius = mark.bubble_radius(annotation.stroke_width);
@@ -130,10 +145,11 @@ pub fn special_drag(annotation: &Annotation, point: Point, window: WindowUnits) 
             }
         }
         AnnotationShape::Magnifier { magnifier } => {
-            // 1. 【标注命中】【双框顺序】镜框控制点优先于源框，首次点击也使用生产专用控制点
-            if let Some((handle, _)) = crate::features::magnifier::drag::controls(magnifier)
-                .into_iter()
-                .find(|(_, control)| distance(*control, point) <= tolerance * 1.2)
+            // 1. 【标注命中】【双框顺序】镜框控制点优先于源框；留白只用于选中状态
+            if let Some((handle, _)) =
+                crate::features::magnifier::drag::controls_with_padding(magnifier, padding)
+                    .into_iter()
+                    .find(|(_, control)| distance(*control, point) <= tolerance * 1.2)
             {
                 return handle;
             }
@@ -142,7 +158,8 @@ pub fn special_drag(annotation: &Annotation, point: Point, window: WindowUnits) 
                 return SelectionHandle::None;
             };
             let local = magnifier.to_local(point);
-            let inside = |bounds| {
+            let inside = |bounds: Rect| {
+                let bounds = bounds.outset(padding, padding).unwrap_or(bounds);
                 if magnifier.shape == crate::features::magnifier::MagnifierShape::Circle {
                     ellipse(bounds, local, tolerance)
                 } else {
@@ -172,6 +189,13 @@ pub fn initial(annotation: &Annotation, point: Point, window: WindowUnits) -> bo
     }
     if special_drag(annotation, point, window) != SelectionHandle::None {
         return true;
+    }
+    if let AnnotationShape::ColorSample { sample } = annotation.shape {
+        return contains(
+            sample.label_rect(),
+            annotation.to_unrotated(point),
+            tolerance,
+        );
     }
     if let Some(line) = annotation.shape.line() {
         return crate::features::line::geometry::insertion_at(
@@ -214,9 +238,23 @@ pub fn selected(annotation: &Annotation, point: Point, window: WindowUnits) -> S
     if !finite(point) {
         return SelectionHandle::None;
     }
-    let special = special_drag(annotation, point, window);
+    let special = special_with_padding(annotation, point, window, window.canvas(super::frame::GAP));
     if special != SelectionHandle::None {
         return special;
+    }
+    if matches!(
+        annotation.shape,
+        AnnotationShape::ColorSample { .. } | AnnotationShape::Redact { .. }
+    ) {
+        let local = match annotation.shape {
+            AnnotationShape::Redact { filter } => filter.to_local(point),
+            _ => annotation.to_unrotated(point),
+        };
+        return super::frame::bounds(annotation, window)
+            .filter(|frame| contains(*frame, local, window.canvas(10.0)))
+            .map_or(SelectionHandle::None, |frame| {
+                bounds_drag(frame, local, window)
+            });
     }
     let local = local_point(annotation, point);
     if let Some(line) = annotation.shape.line() {
@@ -232,6 +270,17 @@ pub fn selected(annotation: &Annotation, point: Point, window: WindowUnits) -> S
         if let Some((index, _)) = best {
             return SelectionHandle::LinePoint(index);
         }
+    }
+    if let AnnotationShape::Magnifier { magnifier } = annotation.shape {
+        // 1. 【标注命中】【双框移动】两框之间保留整体移动操作，空白角点不作为缩放把手
+        return if magnifier
+            .unrotated_bounds()
+            .is_some_and(|rect| contains(rect, local, 0.0))
+        {
+            SelectionHandle::Move
+        } else {
+            SelectionHandle::None
+        };
     }
     let bounds = if super::frame::padded(annotation) {
         super::frame::bounds(annotation, window)

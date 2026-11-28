@@ -73,8 +73,8 @@ pub fn draw_annotation_handles_only(p: &mut Painter, ann: &Annotation) {
         }
     } else if ann.shape.line().is_some() {
         super::line_handles::draw(p, ann);
-    } else if let AnnotationShape::Redact { filter } = ann.shape {
-        super::filter_handles::draw(p, filter);
+    } else if matches!(ann.shape, AnnotationShape::Redact { .. }) {
+        super::filter_handles::draw(p, ann);
     } else if matches!(ann.shape, AnnotationShape::Number { .. }) {
         super::number_handles::draw(p, ann);
     } else if matches!(ann.shape, AnnotationShape::Magnifier { .. }) {

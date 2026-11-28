@@ -1,7 +1,8 @@
-//! 【尺子说明测试】【完整Qt入口】窗口与导出说明使用完整生产drawLabels采集的尺寸、字号和位置
+//! 【尺子说明测试】【窗口与导出】沿用 Qt 的测量值、字号和角度位置，长度标签按实际可用空间换行
 
 use super::*;
 use crate::features::ruler::{Measurement, RulerGeometry, labels};
+use crate::types::AnnotationShape;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -63,6 +64,8 @@ fn measurement(input: &Input, capture: f32) -> Measurement {
                 rotation: input.rotation,
             }
         },
+        style: crate::features::ruler::RulerStyle::Standard,
+        readouts: crate::features::ruler::Readouts::ALL,
         pixel_scale: 1.0,
         style_scale: 640.0 / (640.0 / f64::from(capture)).round(),
     }
@@ -106,7 +109,7 @@ fn editor_state(scene: &Scene) -> EditorState {
     state
 }
 
-/// 【尺子说明测试】【生产说明比较】按scene比较真实说明缓存或导出布局，预期完全来自Qt，无返回值
+/// 【尺子说明测试】【参考比较】按 scene 比较窗口或导出的读数和字号；角度标签还须保持参考位置，无返回值
 fn verify(scene: &Scene) {
     let mut state = editor_state(scene);
     let view = if scene.widget {
@@ -136,10 +139,14 @@ fn verify(scene: &Scene) {
         scene.serial
     );
     for (actual, expected) in actual.iter().zip(&scene.labels) {
-        assert_eq!(
-            actual.lines.as_slice(),
-            std::slice::from_ref(&expected.text),
-            "serial={}",
+        let text = actual.lines.join("   ");
+        let expanded = expected.text.split_once(" x ").and_then(|(width, rest)| {
+            let (height, tail) = rest.split_once(" px")?;
+            Some(format!("width {width} px   height {height} px{tail}"))
+        });
+        assert!(
+            text == expected.text || expanded.as_deref() == Some(text.as_str()),
+            "serial={} text={text} expected={expected:?}",
             scene.serial
         );
         assert!(
@@ -156,6 +163,25 @@ fn verify(scene: &Scene) {
             scene.serial
         );
         let rect = view.rect(actual.rect).unwrap();
+        if !expected.text.ends_with('°') {
+            // 1. 【尺子说明测试】【长度新布局】位置和行数不再遵循旧版，使用参考字号独立核对每一行所需的绘制空间
+            let rows: Vec<_> = actual
+                .lines
+                .iter()
+                .map(|line| crate::fonts::ruler::measure(line, expected.font_pixels))
+                .collect();
+            let width =
+                rows.iter().map(|row| row.width.ceil()).fold(0.0, f32::max) + 20.0 * expected.unit;
+            let height = rows.iter().map(|row| row.height.ceil()).fold(0.0, f32::max)
+                * rows.len() as f32
+                + (10.0 + 2.0 * (rows.len() - 1) as f32) * expected.unit;
+            assert!(
+                (rect.width() - width).abs() < 0.03 && (rect.height() - height).abs() < 0.03,
+                "serial={} rect={rect:?}",
+                scene.serial
+            );
+            continue;
+        }
         for (a, b) in [rect.x(), rect.y(), rect.width(), rect.height()]
             .into_iter()
             .zip(expected.rect)
@@ -203,7 +229,7 @@ fn complete_qt_ruler_labels_match_window_and_export_entry_points() {
     }
 }
 
-/// 【尺子说明测试】【固定生产样本】正常测试复核已采集的Qt字号、完整单行尺寸及临界避让位置
+/// 【尺子说明测试】【固定生产样本】正常测试复核已采集的 Qt 读数、字号和角度位置，并验证长度标签的新尺寸
 #[test]
 fn captured_qt_ruler_labels_match_real_window_and_export_layout() {
     let reference: Reference = serde_json::from_str(include_str!(
@@ -216,10 +242,11 @@ fn captured_qt_ruler_labels_match_real_window_and_export_layout() {
     }
 }
 
-/// 【尺子说明测试】【真实调整】实际拖动同一尺子时只有一条实时说明，局部生产帧与完整帧逐像素相同
+/// 【尺子说明测试】【真实调整】把尺子拖扁后，原来的尺内标签切换到尺外，局部重绘与整帧逐像素相同
 #[test]
 fn real_ruler_resize_keeps_one_live_label_and_exact_partial_frame() {
     let mut state = image_editor((640, 480));
+    state.tool_settings.ruler_readouts = crate::features::ruler::Readouts::ALL;
     state.ui_hidden = true;
     let mut dirty = 0;
     draw(&mut state, Tool::Ruler, 6.0, &mut dirty);
@@ -233,15 +260,32 @@ fn real_ruler_resize_keeps_one_live_label_and_exact_partial_frame() {
     state.layer_damage_rects.clear();
     state.selection.prev_zone = state.selection.zone;
     assert_eq!(state.ruler.labels.len(), 1);
+    let initial = state.ruler.labels[0].rect;
+    let AnnotationShape::Ruler { measurement } = state.annotations[0].shape else {
+        unreachable!()
+    };
+    assert_eq!(
+        measurement.bounds().unwrap().intersect(&initial),
+        Some(initial)
+    );
     pointer(&mut state, 390.0, 300.0, &mut dirty);
     handle_pointer_button(&mut state, MouseButton::Left, true, &mut dirty);
-    pointer(&mut state, 414.0, 312.0, &mut dirty);
-    assert!(state.pending.is_some());
+    pointer(&mut state, 414.0, 173.0, &mut dirty);
+    let AnnotationShape::Ruler { measurement } = state.pending.as_ref().unwrap().shape else {
+        unreachable!()
+    };
     crate::editor::ruler_labels::refresh(&mut state, &mut dirty);
     assert_eq!(
         state.ruler.labels.len(),
         1,
         "same ruler was counted as both original and live pending object"
+    );
+    assert!(
+        measurement
+            .bounds()
+            .unwrap()
+            .intersect(&state.ruler.labels[0].rect)
+            .is_none()
     );
     let area = state
         .monitor_dirty_rect(0)
@@ -260,6 +304,7 @@ fn real_ruler_resize_keeps_one_live_label_and_exact_partial_frame() {
 #[test]
 fn real_ruler_resize_preserves_original_label_order() {
     let mut state = image_editor((640, 480));
+    state.tool_settings.ruler_readouts = crate::features::ruler::Readouts::ALL;
     state.ui_hidden = true;
     let mut dirty = 0;
     state.tool_settings.ruler_mode = crate::features::ruler::RulerMode::Length;

@@ -20,6 +20,7 @@ pub mod laser_trace;
 pub mod line;
 pub mod magnifier;
 pub mod marker;
+pub(crate) mod multi_capture;
 pub mod number;
 pub mod ocr_model_guide;
 pub mod ocr_result;

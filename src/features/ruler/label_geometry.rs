@@ -4,6 +4,7 @@ use super::{
     RulerGeometry,
     label_model::{InfoLabel, LabelRequest},
     layout_rect::ExactRect,
+    length_label::{self, Frame},
     tick_layout::Layout,
 };
 use tiny_skia::Rect;
@@ -71,90 +72,35 @@ fn angle(request: &LabelRequest, bounds: ExactRect) -> Option<ExactRect> {
     Some(floating(rect, bounds, 8.0 * request.paint_unit))
 }
 
-/// 【尺子】【长度刻度范围】按request和bounds返回当前窗口中的正文与实际数字条带外接矩形
-fn scale(request: &LabelRequest, bounds: Rect) -> Option<ExactRect> {
-    Some(
-        Layout::in_projection(
-            request.measurement,
-            request.width,
-            Some(bounds),
-            request.projection,
-        )?
-        .projected_scale_bounds(),
-    )
-}
-
-/// 【尺子】【长度说明候选】按request、scale和bounds依次选择下、上、右、左，occupied提供已登记的刻度和说明
-fn length(
-    request: &LabelRequest,
-    scale: ExactRect,
-    bounds: ExactRect,
-    occupied: &[ExactRect],
+/// 【尺子】【长度刻度范围】按测量、笔宽、允许范围和窗口投影返回尺身与刻度条带的外接矩形
+pub(super) fn scale(
+    measurement: super::Measurement,
+    width: f32,
+    bounds: Rect,
+    projection: crate::editor::canvas_navigation::transform::ViewTransform,
 ) -> Option<ExactRect> {
-    let RulerGeometry::Length {
-        start,
-        end,
-        rotation,
-    } = request.measurement.geometry
-    else {
-        return None;
-    };
-    let body = ExactRect {
-        left: f64::from(start.0.min(end.0)),
-        top: f64::from(start.1.min(end.1)),
-        width: f64::from((end.0 - start.0).abs()),
-        height: f64::from((end.1 - start.1).abs()),
-    }
-    .projected(Some(request.projection), false);
-    let body = body.rotated(
-        (body.left + body.width / 2.0, body.top + body.height / 2.0),
-        rotation,
-    );
-    let gap = 8.0 * request.paint_unit;
-    let size = request.paint_size;
-    let positions = [
-        (body.left, scale.bottom() + gap),
-        (body.left, scale.top - size.1 - gap),
-        (scale.right() + gap, body.top),
-        (scale.left - size.0 - gap, body.top),
-    ];
-    let candidates = positions.map(|(left, top)| {
-        floating(
-            ExactRect {
-                left,
-                top,
-                width: size.0,
-                height: size.1,
-            },
-            bounds,
-            gap,
-        )
-    });
     Some(
-        candidates
-            .into_iter()
-            .find(|candidate| {
-                !candidate.intersects(scale.outset(gap))
-                    && occupied
-                        .iter()
-                        .all(|other| !candidate.intersects(other.outset(gap)))
-            })
-            .unwrap_or(candidates[0]),
+        Layout::in_projection(measurement, width, Some(bounds), projection)?
+            .projected_scale_bounds(),
     )
 }
 
-/// 【尺子】【稳定说明】按request和窗口rect返回稳定坐标中的单行说明，字号保持窗口整数像素
-fn label(request: &LabelRequest, rect: ExactRect) -> Option<InfoLabel> {
+/// 【尺子】【稳定说明】按 request、窗口 rect 和选定的 lines 返回画布坐标中的标签，保留窗口字号
+fn label(request: &LabelRequest, rect: ExactRect, lines: &[String]) -> Option<InfoLabel> {
     Some(InfoLabel {
         rect: rect.projected(Some(request.projection), true).rect()?,
         unit: request.unit,
-        lines: request.lines.clone(),
+        lines: lines.to_vec(),
         font_size: request.font_size,
     })
 }
 
-/// 【尺子】【全部说明布局】按requests与稳定bounds返回原版角度优先、长度避让的完整标签列表
-pub(super) fn layout(requests: &[LabelRequest], bounds: Rect) -> Vec<InfoLabel> {
+/// 【尺子】【全部说明布局】按 requests、bounds 和未标注尺身的 obstacles 返回角度优先的标签列表
+pub(super) fn layout(
+    requests: &[LabelRequest],
+    bounds: Rect,
+    obstacles: impl Iterator<Item = ExactRect>,
+) -> Vec<InfoLabel> {
     let mut result = Vec::with_capacity(requests.len());
     let mut occupied = Vec::new();
     // 1. 【尺子】【角度优先】只登记角度说明，角度正文不挤占长度说明候选区域
@@ -165,22 +111,34 @@ pub(super) fn layout(requests: &[LabelRequest], bounds: Rect) -> Vec<InfoLabel> 
         let allowed = ExactRect::from_rect(bounds).projected(Some(request.projection), false);
         if let Some(rect) = angle(request, allowed) {
             occupied.push(rect);
-            if let Some(label) = label(request, rect) {
+            if let Some(label) = label(request, rect, &request.lines) {
                 result.push(label);
             }
         }
     }
     let lengths: Vec<_> = requests
         .iter()
-        .filter_map(|request| scale(request, bounds).map(|scale| (request, scale)))
+        .filter_map(|request| Frame::new(request, bounds).map(|frame| (request, frame)))
         .collect();
-    // 2. 【尺子】【完整刻度登记】长度说明避开所有长度尺刻度，再按原始顺序登记已放置说明
-    occupied.extend(lengths.iter().map(|(_, scale)| *scale));
-    for (request, scale) in lengths {
+    if lengths.is_empty() {
+        return result;
+    }
+    occupied.extend(obstacles);
+    // 2. 【尺子】【刻度避让】仅排除当前尺身，其他尺身和先前放置的标签始终参与避让
+    for (index, (request, frame)) in lengths.iter().enumerate() {
         let allowed = ExactRect::from_rect(bounds).projected(Some(request.projection), false);
-        if let Some(rect) = length(request, scale, allowed, &occupied) {
-            occupied.push(rect);
-            if let Some(label) = label(request, rect) {
+        let others = lengths[..index]
+            .iter()
+            .chain(&lengths[index + 1..])
+            .map(|(_, other)| other.scale);
+        if let Some(placement) = length_label::place(
+            request,
+            frame,
+            allowed,
+            occupied.iter().copied().chain(others),
+        ) {
+            occupied.push(placement.rect);
+            if let Some(label) = label(request, placement.rect, placement.lines) {
                 result.push(label);
             }
         }

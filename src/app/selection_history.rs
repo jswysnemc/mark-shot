@@ -19,7 +19,11 @@ pub(super) fn load(state: &mut EditorState) {
 
 /// 【历史选区】【选区提交】按 state 保存已完成的有效截图选区，不记录文件编辑、拖动过程或不足八像素的区域
 pub(crate) fn record(state: &mut EditorState) {
-    if state.file_canvas.is_some() || state.input.mouse_down || state.tool_active {
+    if state.multi_capture.is_some()
+        || state.file_canvas.is_some()
+        || state.input.mouse_down
+        || state.tool_active
+    {
         return;
     }
     if let Some(rect) = state.selection.zone

@@ -3,7 +3,7 @@
 [English](../installation.md) | **简体中文**
 
 当前正式版为
-[0.2.4](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.4)。
+[0.2.6](https://github.com/jswysnemc/mark-shot/releases/tag/v0.2.6)。
 0.1.x 安装包属于此前的 Qt 实现，源码保留在 `qt-old` 分支。
 
 ## 包管理器安装
@@ -31,7 +31,7 @@ paru -S mark-shot-bin
 yay -S mark-shot
 ```
 
-AUR 仓库版本由维护者独立维护，可能滞后于 GitHub 官方发布。安装前可通过 `yay -Si mark-shot-bin` 核对当前仓库版本。若需要当前最新发布版本的安装包，可在发布页面直接下载对应架构的 `mark-shot-bin-*.pkg.tar.zst` 并使用 `sudo pacman -U` 安装。
+正式版在 GitHub Releases 公开后会自动同步更新 AUR 中的 `mark-shot` 与 `mark-shot-bin`。安装前可通过 `yay -Si mark-shot-bin` 核对当前版本，或直接在发布页面下载对应架构的 `mark-shot-bin-*.pkg.tar.zst` 并使用 `sudo pacman -U` 安装。
 
 ### Nix / NixOS
 
@@ -52,8 +52,8 @@ Arch 安装包、AppImage、Flatpak、Linux 便携归档和 Windows x86_64 归�
 Linux x86_64 便携归档解压后应保留完整目录：
 
 ```sh
-tar -xzf mark-shot-native-0.2.4-linux-x86_64.tar.gz
-./mark-shot-native-0.2.4-linux-x86_64/mark-shot
+tar -xzf mark-shot-native-0.2.6-linux-x86_64.tar.gz
+./mark-shot-native-0.2.6-linux-x86_64/mark-shot
 ```
 
 ARM64 使用 `linux-aarch64` 归档。Windows 解压完整 ZIP 后运行 `mark-shot.exe`，
@@ -65,13 +65,13 @@ ARM64 使用 `linux-aarch64` 归档。Windows 解压完整 ZIP 后运行 `mark-s
 摘要文件和内部 JSON 元数据不再作为独立发布资产上传。
 
 ```sh
-sha256sum mark-shot-native-0.2.4-linux-x86_64.tar.gz
+sha256sum mark-shot-native-0.2.6-linux-x86_64.tar.gz
 ```
 
 Windows 使用 PowerShell：
 
 ```powershell
-Get-FileHash .\mark-shot-native-0.2.4-windows-x86_64-msvc.zip -Algorithm SHA256
+Get-FileHash .\mark-shot-native-0.2.6-windows-x86_64-msvc.zip -Algorithm SHA256
 ```
 
 发布文件名用 `.` 替换 `~`，以符合 GitHub 资产命名规则。

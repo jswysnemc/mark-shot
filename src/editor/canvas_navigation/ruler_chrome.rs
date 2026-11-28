@@ -9,6 +9,22 @@ use crate::{
 use tiny_skia::Rect;
 
 impl EditorState {
+    /// 【画布导航】【尺子选框】按 annotation、实际笔宽和当前可见选区返回与窗口绘制相同的操作框
+    pub(crate) fn canvas_ruler_frame(
+        &self,
+        annotation: &Annotation,
+    ) -> Option<crate::features::ruler::selection_frame::Frame> {
+        let AnnotationShape::Ruler { measurement } = annotation.shape else {
+            return None;
+        };
+        crate::features::ruler::selection_frame::Frame::new(
+            measurement,
+            annotation.stroke_width,
+            self.ruler_allowed_bounds(),
+            self.hit_window_units(),
+            self.canvas_transform(),
+        )
+    }
     /// 【画布导航】【尺子可见范围】无参数，返回当前可见选区的稳定坐标；交集为空时保留原版选区回退
     pub(crate) fn ruler_allowed_bounds(&self) -> Option<Rect> {
         let space = DrawingSpace::from_editor(self)?;
@@ -70,7 +86,8 @@ impl EditorState {
         if !selected {
             return Some(body);
         }
-        let frame = crate::features::ruler::drag::window_frame(measurement, window)?
+        let corners = self.canvas_ruler_frame(annotation)?.corners();
+        let frame = crate::features::ruler::geometry::points_bounds(&corners, window.canvas(1.0))?
             .outset(window.canvas(8.0), window.canvas(8.0))?;
         let (_, handle) = self.canvas_ruler_connector(annotation)?;
         let handle = Rect::from_xywh(
