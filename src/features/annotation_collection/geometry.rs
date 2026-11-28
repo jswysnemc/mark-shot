@@ -27,7 +27,10 @@ pub(crate) fn unrotated_bounds(annotation: &Annotation, canvas: Rect) -> Option<
             .unrotated_bounds()?
             .outset(annotation.stroke_width, annotation.stroke_width)?,
         AnnotationShape::Redact { filter } => filter.rect()?,
-        AnnotationShape::Ruler { measurement } => return measurement.unrotated_bounds(),
+        AnnotationShape::Ruler { measurement } => {
+            return crate::features::ruler::simple_frame::bounds(*measurement, Default::default())
+                .or_else(|| measurement.unrotated_bounds());
+        }
         _ => chrome::bounds(annotation)?,
     };
     bounds
@@ -39,6 +42,8 @@ pub(crate) fn unrotated_bounds(annotation: &Annotation, canvas: Rect) -> Option<
 pub(crate) fn rotation_center(annotation: &Annotation, canvas: Rect) -> Option<chrome::Point> {
     if let AnnotationShape::Number { mark } = annotation.shape {
         Some(mark.bubble)
+    } else if matches!(annotation.shape, AnnotationShape::ColorSample { .. }) {
+        Some(annotation.rotation_center())
     } else {
         unrotated_bounds(annotation, canvas).map(chrome::center)
     }

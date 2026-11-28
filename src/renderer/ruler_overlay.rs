@@ -4,10 +4,10 @@ use cosmic_text::{FontSystem, SwashCache};
 use tiny_skia::{Color, PathBuilder, Pixmap, Rect, Stroke, StrokeDash};
 
 use super::{Painter, rect_bounds, scale_rect};
-use crate::features::ruler::RulerGeometry;
 use crate::features::ruler::drag;
 use crate::features::ruler::labels::InfoLabel;
 use crate::features::ruler::state::RulerHover;
+use crate::features::ruler::{Measurement, Point, RulerGeometry, selection_frame::Frame};
 use crate::types::{Annotation, AnnotationShape};
 
 /// 【尺子】【全部说明绘制】按顺序把 labels 绘入 painter；导出在全部持久标注正文之后调用，无返回值
@@ -156,20 +156,23 @@ pub(crate) fn draw_handles(painter: &mut Painter<'_>, annotation: &Annotation) {
         return;
     };
     let window = painter.window_units();
-    let Some(body) = measurement
-        .bounds()
-        .and_then(|body| {
-            if measurement.mode() == crate::features::ruler::RulerMode::Angle {
-                drag::window_frame(measurement, window)
-            } else {
-                Some(body)
-            }
-        })
-        .and_then(|body| body.outset(window.canvas(8.0), window.canvas(8.0)))
+    let Some(frame) = Frame::new(
+        measurement,
+        annotation.stroke_width,
+        painter.drawing_bounds(),
+        window,
+        painter.ruler_projection(),
+    ) else {
+        return;
+    };
+    let Some(body) =
+        crate::features::ruler::geometry::points_bounds(&frame.corners(), window.canvas(1.0))
+            .and_then(|body| body.outset(window.canvas(8.0), window.canvas(8.0)))
     else {
         return;
     };
-    let handle = super::ruler_chrome::connector(painter, annotation).and_then(|(_, end)| {
+    let connector = super::ruler_chrome::connector(painter, annotation);
+    let handle = connector.and_then(|(_, end)| {
         Rect::from_xywh(
             end.0 - window.canvas(8.0),
             end.1 - window.canvas(8.0),
@@ -180,47 +183,32 @@ pub(crate) fn draw_handles(painter: &mut Painter<'_>, annotation: &Annotation) {
     let bounds = handle.and_then(|handle| body.join(&handle)).unwrap_or(body);
     // 1. 【尺子】【选中栅格】旋转虚线与连线共用固定物理网格，局部缓冲只改变最后合成的交集
     super::rotation_tiles::draw_region(painter, bounds, |painter| {
-        draw_handles_content(painter, annotation)
+        draw_handles_content(painter, measurement, frame, connector)
     });
 }
 
-/// 【尺子】【控制框内容】按painter和annotation绘制完整选中框，调用方负责固定物理网格，无返回值
-fn draw_handles_content(painter: &mut Painter<'_>, annotation: &Annotation) {
+/// 【尺子】【控制框内容】将 measurement 对应的 frame 和 connector 绘入 painter；角度定点保留在测量位置，无返回值
+fn draw_handles_content(
+    painter: &mut Painter<'_>,
+    measurement: Measurement,
+    frame: Frame,
+    connector: Option<(Point, Point)>,
+) {
     use crate::{features::annotation_selection::chrome, ui::annotation_selection::draw};
-    let AnnotationShape::Ruler { measurement } = annotation.shape else {
-        return;
-    };
-    let window = painter.window_units();
-    let Some(frame) = drag::window_frame(measurement, window) else {
-        return;
-    };
     let color = chrome::color();
-    let mut path = PathBuilder::new();
-    if let Some(corners) = measurement.corners() {
-        path.move_to(corners[0].0, corners[0].1);
-        for point in &corners[1..] {
-            path.line_to(point.0, point.1);
-        }
-        path.close();
-    } else {
-        path.push_rect(frame);
+    draw::frame(painter, frame.corners(), 1.0);
+    if let Some((top, handle)) = connector {
+        draw::rotation_points(painter, frame.stem_start(top), handle, 1.0);
     }
-    if let Some(path) = path.finish() {
-        draw::outline(painter, &path, 1.0);
-    }
-    if let Some((top, handle)) = super::ruler_chrome::connector(painter, annotation) {
-        draw::rotation_points(painter, top, handle, 1.0);
+    for (point, _) in frame.handles() {
+        draw::square(painter, point, 1.0);
     }
     if matches!(measurement.geometry, RulerGeometry::Angle { .. }) {
-        for (point, _) in drag::frame_handles(frame) {
-            draw::square(painter, point, 1.0);
-        }
-    }
-    for (point, _) in drag::handles(measurement, window.canvas(drag::HANDLE_TOLERANCE)) {
-        if matches!(measurement.geometry, RulerGeometry::Angle { .. }) {
+        for (point, _) in drag::handles(
+            measurement,
+            painter.window_units().canvas(drag::HANDLE_TOLERANCE),
+        ) {
             draw::circle(painter, point, 5.5, 1.0, color, Color::WHITE, 1.5);
-        } else {
-            draw::square(painter, point, 1.0);
         }
     }
 }

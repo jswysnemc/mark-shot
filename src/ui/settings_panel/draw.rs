@@ -30,7 +30,7 @@ pub fn draw_settings_panel(
     // 1. 预先补充中文界面下可能出现的开关、提示与录屏参数字形，防止冷启动缺字
     if Language::current() == Language::Chinese {
         p.ensure_ui_text(
-            "填充长度角度开始录制关闭正在下载正在识别文字拖拽框选其他区域继续识别选择识别引擎与语言资源格式帧率倒计时音频画质编码器光标",
+            "填充长度角度测量信息宽度高度对角线面积开始录制关闭正在下载正在识别文字拖拽框选其他区域继续识别选择识别引擎与语言资源格式帧率倒计时音频画质编码器光标",
         );
     }
 
@@ -130,6 +130,7 @@ fn draw_settings_content(
                     p,
                     cell,
                     visual,
+                    panel.readout_caption(*field).as_deref(),
                     field.icon_size() * crate::ui::toolbar::metrics::properties_scale(),
                     is_on,
                     is_hovered,
@@ -147,7 +148,13 @@ fn draw_settings_content(
                 );
             }
             SettingsWidget::Value { field } => {
-                draw_value_field(p, cell, &field.text(current_color), is_hovered);
+                draw_value_field(
+                    p,
+                    cell,
+                    &field.text(current_color),
+                    (*field == super::ValueField::Hex).then_some(current_color),
+                    is_hovered,
+                );
             }
             SettingsWidget::Download => {
                 draw_download(p, cell, panel.download.unwrap_or(0));

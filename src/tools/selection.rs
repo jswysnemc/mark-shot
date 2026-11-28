@@ -143,17 +143,11 @@ impl ToolBehavior for SelectionTool {
                 state.selection.selection_at_drag_start,
             ) {
                 let delta = ((global.0 - origin.0).round(), (global.1 - origin.1).round());
-                state.selection.zone =
-                    apply_handle_drag(&sel_start, state.selection.active_handle, delta)
-                        .to_rect()
-                        .map(|adjusted| {
-                            super::selection_constraints::adjust(
-                                state,
-                                sel_start,
-                                adjusted,
-                                state.selection.active_handle,
-                            )
-                        });
+                let handle = state.selection.active_handle;
+                let raw = apply_handle_drag(&sel_start, handle, delta);
+                state.selection.zone = super::selection_constraints::snap_adjusted(
+                    state, sel_start, raw, handle, global,
+                );
                 selection_changed = true;
             }
         } else if state.input.mouse_down {

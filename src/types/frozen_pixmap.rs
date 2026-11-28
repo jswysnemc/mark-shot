@@ -34,6 +34,13 @@ impl From<Pixmap> for FrozenPixmap {
     }
 }
 
+impl From<ImageSource> for FrozenPixmap {
+    /// 【冻结图像】【共享原件】按已有来源建立共享所有权，保留磁盘缓存，无需复制像素
+    fn from(source: ImageSource) -> Self {
+        Self(Arc::new(source))
+    }
+}
+
 impl Deref for FrozenPixmap {
     type Target = ImageSource;
 

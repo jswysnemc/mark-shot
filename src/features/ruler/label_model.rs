@@ -1,4 +1,4 @@
-//! 【尺子】【说明模型】固定单行测量文字，按当前绘制目标的整数像素字号计算完整尺寸
+//! 【尺子】【说明模型】按绘制目标的整数字号准备单行与多行说明
 
 use super::{Measurement, RulerGeometry, geometry::angle_degrees};
 use crate::editor::canvas_navigation::transform::ViewTransform;
@@ -15,6 +15,7 @@ pub struct LabelRequest {
     pub(crate) projection: ViewTransform,
     pub(crate) paint_unit: f64,
     pub(crate) paint_size: (f64, f64),
+    pub(super) wraps: Vec<super::label_flow::Flow>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -25,7 +26,7 @@ pub struct InfoLabel {
     pub font_size: f32,
 }
 
-/// 【尺子】【完整单行】按measurement返回原版说明文字，简约长度尺已在箭头中间展示宽度不额外浮窗，未完成测量返回空值
+/// 【尺子】【说明文字】按 measurement 返回启用的长度读数或角度，箭头尺和未完成测量无需额外标签
 fn text(measurement: Measurement) -> Option<String> {
     match measurement.geometry {
         RulerGeometry::Length { .. } => {
@@ -43,7 +44,7 @@ fn text(measurement: Measurement) -> Option<String> {
     }
 }
 
-/// 【尺子】【完整尺寸】按measurement、width和projection返回单行说明请求，不缩小字号或重写说明内容
+/// 【尺子】【说明候选】按 measurement、width 和 projection 返回读数及可选换行方式，不缩小字号
 pub(super) fn prepare(
     measurement: Measurement,
     width: f32,
@@ -54,11 +55,8 @@ pub(super) fn prepare(
         * measurement.style_scale
         * projection.scale;
     let pixels = (13.0 * unit).round().max(6.0) as f32;
-    let metrics = crate::fonts::ruler::measure(&text, pixels);
-    let size = (
-        f64::from(metrics.width.ceil()) + 20.0 * unit,
-        f64::from(metrics.height.ceil()) + 10.0 * unit,
-    );
+    let lines = vec![text];
+    let size = super::label_flow::size(&lines, pixels, unit);
     Some(LabelRequest {
         measurement,
         width,
@@ -66,7 +64,8 @@ pub(super) fn prepare(
         paint_unit: unit,
         paint_size: size,
         unit: (unit / projection.scale) as f32,
-        lines: vec![text],
+        lines,
+        wraps: super::label_flow::wraps(measurement, pixels, unit),
         font_size: (f64::from(pixels) / projection.scale) as f32,
         size: (
             (size.0 / projection.scale) as f32,

@@ -16,6 +16,7 @@ pub(super) fn run_overlay(
 
     let mut visibility = super::capture_visibility::Visibility::new(overlay.as_mut())?;
     loop {
+        super::region_detection::task::start_for_ruler(editor_state, overlay.as_mut());
         let (hidden, restored) = visibility.sync(editor_state, overlay.as_mut())?;
         if hidden {
             overlay.next_event(Some(Duration::from_millis(100)))?;
@@ -230,7 +231,10 @@ pub(super) fn run_overlay(
             clear_frame_state(editor_state, &mut dirty_mask, &pacing);
         }
         pacing.source_residency.reclaim_due(
-            editor_state.file_canvas.as_ref().map(|file| &file.original),
+            editor_state
+                .file_canvas
+                .as_ref()
+                .map(|file| &*file.original),
             Instant::now(),
         );
         super::foreground_residency::reclaim(editor_state, &mut pacing, dirty_mask, Instant::now());

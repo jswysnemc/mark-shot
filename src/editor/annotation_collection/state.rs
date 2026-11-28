@@ -68,7 +68,9 @@ impl EditorState {
                     &mut self.layer_damage_rects,
                     annotation,
                 );
-                let bounds = annotation.damage_bbox(true);
+                let bounds = self
+                    .annotation_window_damage(annotation, true)
+                    .unwrap_or_else(|| annotation.damage_bbox(true));
                 area = Some(area.and_then(|area| area.join(&bounds)).unwrap_or(bounds));
             }
         }

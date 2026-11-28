@@ -1,7 +1,7 @@
 use crate::config::Magnifier;
 use crate::renderer::Painter;
 use crate::types::Capture;
-use crate::ui::magnifier::{cells, offset, sample_pixel, size, zoom};
+use crate::ui::magnifier::{cells, offset, size, zoom};
 use tiny_skia::{Paint, PathBuilder, Pixmap, PixmapPaint, Rect, Stroke, Transform};
 
 /// 【光标放大区】【样式读取】无参数，返回当前放大预览配置引用
@@ -28,10 +28,25 @@ pub fn draw_magnifier(
     cursor: (f32, f32),
     (screen_w, screen_h): (f32, f32),
 ) {
-    let scale = p.scale();
-    let source = &capture.pixmap;
     let native = capture.to_native((cursor.0 as f64, cursor.1 as f64));
+    draw_at(
+        p,
+        capture.pixmap.as_ref(),
+        native,
+        cursor,
+        (screen_w, screen_h),
+    );
+}
 
+/// 【光标放大区】【原图预览】按 source 和 native 读取像素及色值，cursor 与 screen 只决定圆镜在窗口中的位置，无返回值
+pub(crate) fn draw_at(
+    p: &mut Painter,
+    source: tiny_skia::PixmapRef<'_>,
+    native: (f64, f64),
+    cursor: (f32, f32),
+    screen: (f32, f32),
+) {
+    let scale = p.scale();
     let sample_size = cells() as i32;
 
     let half = (cells() / 2) as i32;
@@ -44,13 +59,13 @@ pub fn draw_magnifier(
     cropped.draw_pixmap(
         -src_x,
         -src_y,
-        source.as_ref(),
+        source,
         &PixmapPaint::default(),
         Transform::identity(),
         None,
     );
 
-    let bounds = magnifier_rect(cursor, screen_w, screen_h);
+    let bounds = magnifier_rect(cursor, screen.0, screen.1);
     let mag_x = bounds.left() + (bounds.width() - size() as f32) / 2.0;
     let mag_y = bounds.top();
     let radius = size() as f32 / 2.0;
@@ -93,7 +108,12 @@ pub fn draw_magnifier(
         p.stroke_path(&circle_path, cfg().outline.get(), &stroke);
     }
 
-    super::readout::draw(p, bounds, native, sample_pixel(source, native));
+    super::readout::draw(
+        p,
+        bounds,
+        native,
+        super::state::native_color(source, native),
+    );
 }
 
 /// 【光标放大区】【边缘避让】按 cursor、monitor 和完整 height 返回不越过屏幕边缘的左上角

@@ -14,7 +14,6 @@ use crate::types::{
     AnnDragState, Annotation, AnnotationShape, CursorIcon, MouseButton, SelectionHandle,
     StrokeGroup,
 };
-use crate::ui::magnifier::sample_pixel;
 use crate::ui::panel::UiPanel;
 use crate::utils::{cursor_for_handle, get_overlapping_monitors};
 
@@ -37,6 +36,13 @@ impl ToolBehavior for RulerTool {
         };
         if pressed {
             let pending = angle_pending(state);
+            if !pending {
+                let pointer = state.canvas_point();
+                if let Some((index, handle)) = hit(state, (pointer.0 as f32, pointer.1 as f32)) {
+                    select_for_drag(state, index, handle, dirty_mask);
+                    return;
+                }
+            }
             let position = if pending {
                 space.clamp_point(state.canvas_point())
             } else {
@@ -46,15 +52,13 @@ impl ToolBehavior for RulerTool {
                 return;
             };
             if pending {
-                update_draft(state, position, space, dirty_mask);
+                let position = measure_point(state, space, position);
+                update_draft(state, position, dirty_mask);
                 state.input.mouse_down = true;
                 state.tool_active = true;
                 return;
             }
-            if let Some((index, handle)) = hit(state, position) {
-                select_for_drag(state, index, handle, dirty_mask);
-                return;
-            }
+            let position = measure_point(state, space, position);
             begin(state, position, space, dirty_mask);
         } else {
             state.input.mouse_down = false;
@@ -66,8 +70,9 @@ impl ToolBehavior for RulerTool {
             let Some(position) = space.clamp_point(state.canvas_point()) else {
                 return;
             };
-            update_draft(state, position, space, dirty_mask);
-            finish(state, position, space, dirty_mask);
+            let position = measure_point(state, space, position);
+            update_draft(state, position, dirty_mask);
+            finish(state, position, dirty_mask);
         }
     }
 
@@ -79,18 +84,25 @@ impl ToolBehavior for RulerTool {
         let Some(position) = space.clamp_point(global) else {
             return;
         };
-        update_hover(state, space, dirty_mask);
         if state.ann_drag.is_some() {
+            update_hover(state, space, position, dirty_mask);
             apply_annotation_drag(state, global);
-        } else if state.input.mouse_down || angle_pending(state) {
-            update_draft(state, position, space, dirty_mask);
+            return;
+        }
+        let position = measure_point(state, space, position);
+        update_hover(state, space, position, dirty_mask);
+        if state.input.mouse_down || angle_pending(state) {
+            update_draft(state, position, dirty_mask);
         }
     }
 
     /// 【尺子】【工具进入】在 state 中显示当前源图悬停信息；dirty_mask 返回重绘显示器，无返回值
     fn on_activate(&self, state: &mut EditorState, dirty_mask: &mut u32) {
-        if let Some(space) = DrawingSpace::from_editor(state) {
-            update_hover(state, space, dirty_mask);
+        if let Some(space) = DrawingSpace::from_editor(state)
+            && let Some(point) = space.clamp_point(state.canvas_point())
+        {
+            let point = measure_point(state, space, point);
+            update_hover(state, space, point, dirty_mask);
         }
     }
 
@@ -121,6 +133,22 @@ impl ToolBehavior for RulerTool {
 /// 【尺子】【待定角度】返回 state 是否保留已放置顶点、尚未提交的角度尺
 pub fn angle_pending(state: &EditorState) -> bool {
     state.ann_drag.is_none() && state.pending.as_ref().is_some_and(|annotation| matches!(annotation.shape, AnnotationShape::Ruler { measurement } if measurement.mode() == RulerMode::Angle))
+}
+
+/// 【尺子】【手势坐标】按画布点和绘图空间返回预览与提交共用的定点；整体移动由标注事务按尺身吸附，旋转独立处理
+fn measure_point(state: &mut EditorState, space: DrawingSpace, raw: (f32, f32)) -> (f32, f32) {
+    let point = crate::app::region_detection::ruler_snap::point(state, raw);
+    if state.input.shift
+        && angle_pending(state)
+        && let Some(AnnotationShape::Ruler { measurement }) =
+            state.pending.as_ref().map(|annotation| &annotation.shape)
+    {
+        let constrained = angle_draft::constrained_point(measurement.start(), point, true);
+        return space
+            .clamp_point((constrained.0.into(), constrained.1.into()))
+            .unwrap_or(point);
+    }
+    point
 }
 
 /// 【尺子】【已有尺子命中】在 state 中优先命中选中尺子，再从上到下查找其他尺子；position 为全局坐标，返回索引和调整方式
@@ -190,12 +218,13 @@ fn begin(state: &mut EditorState, position: (f32, f32), space: DrawingSpace, dir
     if state.selection.zone.is_none() {
         return;
     }
-    let Some(measurement) =
-        Measurement::new(state.tool_settings.ruler_mode, position, space.pixel_scale)
-            .map(|measurement| measurement.with_style(state.tool_settings.ruler_style))
+    let settings = &state.tool_settings;
+    let Some(mut measurement) = Measurement::new(settings.ruler_mode, position, space.pixel_scale)
     else {
         return;
     };
+    measurement.style = settings.ruler_style;
+    measurement.readouts = settings.ruler_readouts;
     if let Some(previous) = state
         .selected_annotation_index()
         .and_then(|index| state.annotations.get(index))
@@ -223,13 +252,8 @@ fn begin(state: &mut EditorState, position: (f32, f32), space: DrawingSpace, dir
     state.prev_pending = Some(annotation);
 }
 
-/// 【尺子】【草稿跟随】以 position、space 更新 state 的尺子草稿，Shift 吸附角度边；dirty_mask 返回新旧区域，无返回值
-fn update_draft(
-    state: &mut EditorState,
-    position: (f32, f32),
-    space: DrawingSpace,
-    dirty_mask: &mut u32,
-) {
+/// 【尺子】【草稿跟随】以吸附后的 position 更新 state 的尺子草稿，dirty_mask 返回新旧区域，无返回值
+fn update_draft(state: &mut EditorState, position: (f32, f32), dirty_mask: &mut u32) {
     let Some(annotation) = state.pending.as_mut() else {
         return;
     };
@@ -240,10 +264,7 @@ fn update_draft(
     match &mut measurement.geometry {
         RulerGeometry::Length { end, .. } => *end = position,
         RulerGeometry::Angle { points, count } => {
-            let point = angle_draft::constrained_point(points[0], position, state.input.shift);
-            if let Some(point) = space.clamp_point((point.0 as f64, point.1 as f64)) {
-                points[usize::from(count.saturating_sub(1).min(2))] = point;
-            }
+            points[usize::from(count.saturating_sub(1).min(2))] = position;
         }
     }
     annotation.color = state.tool_settings.color;
@@ -254,13 +275,8 @@ fn update_draft(
     damage(state, new, dirty_mask);
 }
 
-/// 【尺子】【草稿提交】在 position 松开 state 的草稿；space 用于像素约束，dirty_mask 返回重绘显示器，角度未完成时继续保留草稿
-fn finish(
-    state: &mut EditorState,
-    position: (f32, f32),
-    space: DrawingSpace,
-    dirty_mask: &mut u32,
-) {
+/// 【尺子】【草稿提交】在 position 松开 state 的草稿；dirty_mask 返回重绘显示器，角度未完成时继续保留草稿
+fn finish(state: &mut EditorState, position: (f32, f32), dirty_mask: &mut u32) {
     let Some(annotation) = state.pending.as_mut() else {
         return;
     };
@@ -268,12 +284,7 @@ fn finish(
         return;
     };
     if measurement.mode() == RulerMode::Angle {
-        let point =
-            angle_draft::constrained_point(measurement.start(), position, state.input.shift);
-        let Some(point) = space.clamp_point((point.0 as f64, point.1 as f64)) else {
-            return;
-        };
-        if angle_draft::release(measurement, point, 4.0) == DraftStep::Continue {
+        if angle_draft::release(measurement, position, 4.0) == DraftStep::Continue {
             annotation.update_bbox();
             return;
         }
@@ -331,33 +342,30 @@ fn over_ui(state: &EditorState) -> bool {
 }
 
 /// 【尺子】【悬停更新】用 space 的原图比例读取 state 指针位置与颜色；dirty_mask 返回旧十字线与新十字线区域，无返回值
-fn update_hover(state: &mut EditorState, space: DrawingSpace, dirty_mask: &mut u32) {
+fn update_hover(
+    state: &mut EditorState,
+    space: DrawingSpace,
+    point: (f32, f32),
+    dirty_mask: &mut u32,
+) {
     if !state.input.mouse_down
         && (over_ui(state) || space.start_point(state.canvas_point()).is_none())
     {
         clear_hover(state, dirty_mask);
         return;
     }
-    let Some(point) = space.clamp_point(state.canvas_point()) else {
-        return;
-    };
     let image_point = (
         (point.0 - space.bounds.left()) * space.pixel_scale,
         (point.1 - space.bounds.top()) * space.pixel_scale,
     );
-    let color = if let Some(file) = &state.file_canvas {
-        sample_pixel(&file.original, (image_point.0 as f64, image_point.1 as f64))
-    } else {
-        state
-            .captures
-            .get(state.input.pointer.monitor_idx)
-            .and_then(|capture| {
-                sample_pixel(
-                    &capture.pixmap,
-                    capture.to_native(state.input.pointer.local),
-                )
-            })
-    };
+    let color = crate::features::color_sample::sampling::at(
+        crate::renderer::FrozenImage::from_parts(
+            state.file_canvas.as_ref(),
+            &state.captures,
+            &state.placements,
+        ),
+        point,
+    );
     let color = color.unwrap_or(tiny_skia::Color::TRANSPARENT).to_color_u8();
     let text = format!(
         "x {}  y {}  #{:02X}{:02X}{:02X}",

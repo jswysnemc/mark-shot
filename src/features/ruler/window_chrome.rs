@@ -49,7 +49,8 @@ fn connect(
     clearance: f32,
     window: WindowUnits,
 ) -> Option<(Point, Point)> {
-    let bounds = measurement.unrotated_bounds()?;
+    let bounds = super::simple_frame::bounds(measurement, window)
+        .or_else(|| measurement.unrotated_bounds())?;
     let center = rect_center(bounds);
     let rotation = match measurement.geometry {
         RulerGeometry::Length { rotation, .. } => rotation,

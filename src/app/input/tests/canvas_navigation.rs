@@ -12,6 +12,7 @@ use crate::{
 };
 use tiny_skia::{Color, Pixmap, Rect};
 
+mod eyedropper;
 mod rotation;
 
 /// 【画布导航测试】【图片构造】按scale返回原始棋盘图片编辑器，故意保留不同色的预览以识别错误采样来源

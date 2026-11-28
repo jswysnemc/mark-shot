@@ -59,7 +59,7 @@ fn overlapping_frames_prioritize_lens_controls_then_source_interiors() {
     );
     let lens = value.lens_rect().unwrap();
     assert_eq!(
-        drag::hit_test(value, (lens.left(), lens.top()), true),
+        drag::hit_test(value, (lens.left() - 6.0, lens.top() - 6.0), true),
         SelectionHandle::TopLeft
     );
     let separated = magnifier(MagnifierShape::Circle);

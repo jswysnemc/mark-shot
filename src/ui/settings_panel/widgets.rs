@@ -56,7 +56,7 @@ impl ValueField {
     fn width(self) -> f32 {
         let cfg = &crate::config::get().settings_panel;
         match self {
-            ValueField::Hex => cfg.hex_width,
+            ValueField::Hex => cfg.hex_width + cfg.swatch_size,
             ValueField::Rgb | ValueField::Hsl => cfg.rgb_width.max(165.0),
         }
     }
@@ -80,6 +80,7 @@ pub enum SettingsAction {
     OcrLanguages,
     MarkerShapes,
     RulerModes,
+    RulerReadouts,
     NumberStyles,
     ResetNumber,
     ArrowStyles,
@@ -207,6 +208,7 @@ pub enum ToggleField {
     ArrowRoundedTail,
     HighlighterLine,
     RulerSimple,
+    RulerReadout(crate::features::ruler::Readout),
 }
 
 impl ToggleField {
@@ -260,25 +262,7 @@ pub fn widgets_for_tool(tool: Tool) -> &'static [SettingsWidget] {
             },
             CORNER_RADIUS,
         ],
-        Tool::Ruler => &[
-            SettingsWidget::ColorSwatch(ColorTarget::Main),
-            SettingsWidget::Action {
-                action: SettingsAction::RulerModes,
-                svg: crate::ui::icons::RULER,
-            },
-            SettingsWidget::Toggle {
-                visual: ToggleVisual::Checkbox {
-                    label: "Arrow style",
-                },
-                field: ToggleField::RulerSimple,
-            },
-            SettingsWidget::Separator,
-            SettingsWidget::Stepper {
-                label: "",
-                range: StepperRange::Stroke,
-                unit: "px",
-            },
-        ],
+        Tool::Ruler => super::ruler::widgets(Default::default(), Default::default(), false),
         Tool::Marker => &[
             SettingsWidget::ColorSwatch(ColorTarget::Main),
             SettingsWidget::Action {
@@ -573,7 +557,7 @@ impl PanelItem for SettingsWidget {
                 ..
             } => cfg.icon_button_size + cfg.char_width * 3.0,
             SettingsWidget::Action {
-                action: SettingsAction::RulerModes,
+                action: SettingsAction::RulerModes | SettingsAction::RulerReadouts,
                 ..
             } => cfg.icon_button_size + cfg.char_width * 7.0,
             SettingsWidget::ColorSwatch(_) => cfg.swatch_size,

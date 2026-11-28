@@ -1,6 +1,7 @@
 //! 【尺子说明渲染】【固定绘制】完整标签共用原版尺子字体和固定像素网格，局部重绘不改变采样
 
 use super::Painter;
+use crate::features::ruler::label_flow::{PAD_X, PAD_Y, ROW_GAP};
 use crate::features::ruler::labels::InfoLabel;
 use cosmic_text::LayoutRun;
 use tiny_skia::{Color, Rect};
@@ -35,7 +36,10 @@ fn label(painter: &mut Painter<'_>, label: &InfoLabel) {
             9.0 * label.unit,
             Color::from_rgba8(8, 13, 19, 225),
         );
-        let height = label.rect.height() / shapes.len().max(1) as f32;
+        let rows = shapes.len().max(1) as f32;
+        let padding = PAD_Y as f32 * label.unit;
+        let gap = ROW_GAP as f32 * label.unit;
+        let height = (label.rect.height() - padding * 2.0 - (rows - 1.0) * gap) / rows;
         for (index, (buffer, layout, metrics)) in shapes.iter().enumerate() {
             let Some(raw) = buffer.layout_runs().next() else {
                 continue;
@@ -49,8 +53,16 @@ fn label(painter: &mut Painter<'_>, label: &InfoLabel) {
                 ..raw
             };
             let position = (
-                label.rect.left() + (label.rect.width() - run.line_w) / 2.0,
-                label.rect.top() + index as f32 * height + (height - run.line_height) / 2.0,
+                label.rect.left()
+                    + if shapes.len() > 1 {
+                        PAD_X as f32 * label.unit
+                    } else {
+                        (label.rect.width() - run.line_w) / 2.0
+                    },
+                label.rect.top()
+                    + padding
+                    + index as f32 * (height + gap)
+                    + (height - run.line_height) / 2.0,
             );
             painter.text_layout_run(&run, position, Color::from_rgba8(229, 231, 235, 255));
         }

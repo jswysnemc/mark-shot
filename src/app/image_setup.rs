@@ -102,6 +102,7 @@ fn setup(
     editor.enable_region_rendering();
     super::frame_backdrop::configure(&mut editor, overlay.as_mut(), preferred);
     editor.file_canvas = Some(file);
+    editor.region_detection.deferred_windows = Some(Vec::new());
     editor.image_window.enabled = overlay.image_window_size().is_some();
     editor.selection.zone = (!launch.reselect).then_some(image_region);
 

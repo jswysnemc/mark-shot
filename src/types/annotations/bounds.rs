@@ -194,18 +194,22 @@ impl Annotation {
         {
             return bounds;
         }
-        if let AnnotationShape::Redact { filter } = self.shape {
-            let body = self
+        if matches!(
+            self.shape,
+            AnnotationShape::Redact { .. } | AnnotationShape::Magnifier { .. }
+        ) {
+            if is_selected
+                && let Some(bounds) = crate::features::annotation_selection::region_frame::damage(
+                    self,
+                    Default::default(),
+                )
+            {
+                return bounds;
+            }
+            return self
                 .bbox
                 .outset(self.visual_pad(), self.visual_pad())
                 .unwrap_or(self.bbox);
-            return if is_selected {
-                crate::features::filter::drag::editing_bounds(filter)
-                    .and_then(|editing| body.join(&editing))
-                    .unwrap_or(body)
-            } else {
-                body
-            };
         }
         if let Some(line) = self.shape.line() {
             let body = self
@@ -278,26 +282,6 @@ impl Annotation {
                 })
                 .fold(body, |area, handle| area.join(&handle).unwrap_or(area));
         }
-        if let AnnotationShape::Magnifier { magnifier } = self.shape {
-            let padding = if is_selected {
-                self.visual_pad().max(8.0 * magnifier.style_scale)
-            } else {
-                self.visual_pad()
-            };
-            let body = self.bbox.outset(padding, padding).unwrap_or(self.bbox);
-            if is_selected
-                && let Some(point) = crate::features::magnifier::drag::rotation_handle(magnifier)
-                && let Some(handle) = Rect::from_xywh(
-                    point.0 - 8.0 * magnifier.style_scale,
-                    point.1 - 8.0 * magnifier.style_scale,
-                    16.0 * magnifier.style_scale,
-                    16.0 * magnifier.style_scale,
-                )
-            {
-                return body.join(&handle).unwrap_or(body);
-            }
-            return body;
-        }
         if let AnnotationShape::Ruler { measurement } = self.shape {
             let body = measurement
                 .visual_bounds(measurement.unit(self.stroke_width))
@@ -306,8 +290,23 @@ impl Annotation {
             if !is_selected {
                 return body;
             }
-            let frame = crate::features::ruler::drag::frame(measurement)
-                .and_then(|frame| frame.outset(8.0, 8.0));
+            let window = crate::features::annotation_style::window::WindowUnits::new(
+                measurement.style_scale as f32,
+            );
+            let frame = crate::features::ruler::selection_frame::Frame::new(
+                measurement,
+                self.stroke_width,
+                None,
+                window,
+                Default::default(),
+            )
+            .and_then(|frame| {
+                crate::features::ruler::geometry::points_bounds(
+                    &frame.corners(),
+                    window.canvas(1.0),
+                )
+            })
+            .and_then(|frame| frame.outset(window.canvas(8.0), window.canvas(8.0)));
             let handle =
                 crate::features::ruler::drag::rotation_handle(measurement, self.stroke_width)
                     .and_then(|point| Rect::from_xywh(point.0 - 8.0, point.1 - 8.0, 16.0, 16.0));

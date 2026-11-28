@@ -14,6 +14,9 @@ use crate::types::{AnnotationShape, MouseButton, StrokeGroup};
 use crate::ui::panel::AnimatedPanel;
 use crate::ui::settings_panel::{SettingsAction, SettingsWidget};
 
+#[path = "ruler_readouts.rs"]
+mod readouts;
+
 /// 【尺子测试】【工具构造】返回指定 mode 的尺子编辑器；dirty 返回初始化重绘显示器
 fn ruler_editor(mode: RulerMode, dirty: &mut u32) -> EditorState {
     let mut state = editor();
@@ -393,6 +396,7 @@ fn undoing_a_ruler_handle_drag_restores_original_geometry_and_ends_input() {
 fn stable_ruler_hover_labels_and_open_popover_do_not_poll() {
     let mut dirty = 0;
     let mut state = ruler_editor(RulerMode::Length, &mut dirty);
+    state.tool_settings.ruler_readouts = crate::features::ruler::Readouts::ALL;
     draw(&mut state, (140.0, 130.0), (280.0, 240.0), &mut dirty);
     pointer(&mut state, 440.0, 370.0, &mut dirty);
     crate::editor::ruler_labels::refresh(&mut state, &mut dirty);
@@ -411,6 +415,7 @@ fn stable_ruler_hover_labels_and_open_popover_do_not_poll() {
 fn export_includes_measurement_labels_but_excludes_hover_chrome() {
     let mut dirty = 0;
     let mut state = ruler_editor(RulerMode::Length, &mut dirty);
+    state.tool_settings.ruler_readouts = crate::features::ruler::Readouts::ALL;
     draw(&mut state, (140.0, 130.0), (280.0, 240.0), &mut dirty);
     pointer(&mut state, 500.0, 400.0, &mut dirty);
     assert!(state.ruler.hover.is_some());
@@ -433,6 +438,7 @@ fn export_includes_measurement_labels_but_excludes_hover_chrome() {
 fn ruler_style_toggle_switches_between_standard_and_simple_arrow() {
     let mut dirty = 0;
     let mut state = ruler_editor(RulerMode::Length, &mut dirty);
+    state.tool_settings.ruler_readouts = crate::features::ruler::Readouts::ALL;
     draw(&mut state, (120.0, 160.0), (320.0, 160.0), &mut dirty);
     assert_eq!(
         measurement(&state, 0).style,

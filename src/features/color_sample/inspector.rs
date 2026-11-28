@@ -170,6 +170,17 @@ pub fn button(
             || monitor != state.input.pointer.monitor_idx
         {
             close(state, dirty);
+            // 1. 【取色标注】【连续调整】面板外按住已有指针可直接拖动，其他点击仍只关闭面板
+            if button == MouseButton::Left
+                && !state.pick_once
+                && matches!(
+                    state.selected_tool,
+                    crate::tools::Tool::Eyedropper | crate::tools::Tool::Pick
+                )
+                && super::tip_drag::hit(state).is_some()
+            {
+                return false;
+            }
         } else if button == MouseButton::Left {
             state.color_inspector.pressed = hit;
         }

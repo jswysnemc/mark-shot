@@ -260,12 +260,22 @@ pub(crate) fn render_frame_with_navigation(
     if req.is_mag_monitor
         && let Some(mag) = req.magnifier
     {
-        crate::ui::magnifier::draw_magnifier(
-            &mut p,
-            req.capture,
-            (mag.pos.0 as f32, mag.pos.1 as f32),
-            req.size,
-        );
+        let point = view.to_canvas((
+            mag.pos.0 + f64::from(req.offset.0),
+            mag.pos.1 + f64::from(req.offset.1),
+        ));
+        if let Some((pixels, native)) = req
+            .frozen_image
+            .native_source((point.0 as f32, point.1 as f32))
+        {
+            crate::ui::magnifier::draw_at(
+                &mut p,
+                pixels,
+                native,
+                (mag.pos.0 as f32, mag.pos.1 as f32),
+                req.size,
+            );
+        }
     }
 
     if let Some(tb) = req.toolbar.as_deref_mut()

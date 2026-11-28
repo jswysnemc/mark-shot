@@ -57,6 +57,7 @@ static ALLOCATOR: AllocationCounter = AllocationCounter;
 /// 【尺子说明测试】【标签环境】按unit返回完整测量说明，使用原版完整单行尺寸及整数像素字号
 fn labels(unit: f64) -> Vec<mark_shot::features::ruler::labels::InfoLabel> {
     let mut measurement = Measurement::new(RulerMode::Length, (200.5, 200.5), 1.0).unwrap();
+    measurement.readouts = mark_shot::features::ruler::Readouts::ALL;
     measurement.geometry = RulerGeometry::Length {
         start: (200.5, 200.5),
         end: (450.5, 380.5),
@@ -68,6 +69,38 @@ fn labels(unit: f64) -> Vec<mark_shot::features::ruler::labels::InfoLabel> {
         Rect::from_xywh(-37.0, 21.0, 1280.0, 800.0).unwrap(),
         &mut mark_shot::fonts::bundled(),
     )
+}
+
+/// 【尺子说明测试】【多行绘制】无参数，检查每一行都绘出了字形，且各行文本左对齐，无返回值
+#[test]
+fn multiline_card_paints_visible_text_on_every_row() {
+    let labels = labels(1.0);
+    let card = &labels[0];
+    assert!(card.lines.len() > 1);
+    let mut canvas = Pixmap::new(900, 650).unwrap();
+    ruler_overlay::draw_labels(
+        &mut mark_shot::renderer::Painter::new(&mut canvas).with_text(
+            &mut mark_shot::fonts::bundled(),
+            &mut cosmic_text::SwashCache::new(),
+        ),
+        &labels,
+    );
+    let rows = card.lines.len();
+    let padding = 5.0 * card.unit;
+    let stride = (card.rect.height() - 2.0 * padding + 2.0 * card.unit) / rows as f32;
+    for row in 0..rows {
+        let top = card.rect.top() + padding + row as f32 * stride;
+        let ink = (card.rect.left().ceil() as u32..card.rect.right().floor() as u32)
+            .find(|&column| {
+                (top.ceil() as u32..(top + stride - 2.0 * card.unit).floor() as u32).any(|line| {
+                    canvas
+                        .pixel(column, line)
+                        .is_some_and(|pixel| pixel.green() > 160)
+                })
+            })
+            .expect("each readout row must contain visible glyphs");
+        assert!((ink as f32 - card.rect.left() - 10.0 * card.unit).abs() < 4.0);
+    }
 }
 
 /// 【尺子说明测试】【大字号局部帧】原版整数字号和非整数原点下，局部重绘保持完整帧的每个像素

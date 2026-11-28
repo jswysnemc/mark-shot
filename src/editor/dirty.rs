@@ -9,7 +9,11 @@ use tiny_skia::Rect;
 
 impl EditorState {
     /// 【标注选框】【窗口损坏】按annotation与selected返回专用正文或类矩形选框范围，未选普通标注返回空值
-    fn annotation_window_damage(&self, annotation: &Annotation, selected: bool) -> Option<Rect> {
+    pub(super) fn annotation_window_damage(
+        &self,
+        annotation: &Annotation,
+        selected: bool,
+    ) -> Option<Rect> {
         self.ruler_window_damage(annotation, selected).or_else(|| {
             if selected {
                 crate::features::annotation_selection::frame::editing_bounds(

@@ -13,20 +13,23 @@ pub(crate) fn draw(painter: &mut Painter<'_>, annotation: &Annotation) {
         return;
     };
     let unit = 1.0;
+    let window = painter.window_units();
+    let padding = window.canvas(crate::features::annotation_selection::frame::GAP);
     for rect in [magnifier.lens_rect(), magnifier.source_rect()]
         .into_iter()
         .flatten()
+        .filter_map(|rect| rect.outset(padding, padding))
     {
         if let Some(path) = geometry::frame_path(magnifier, rect) {
             draw::outline(painter, &path, unit);
         }
     }
-    for (_, point) in drag::controls(magnifier) {
+    for (_, point) in drag::controls_with_padding(magnifier, padding) {
         draw::square(painter, point, unit);
     }
     if let Some((start, handle)) =
-        crate::features::annotation_selection::rotation::connector(annotation)
+        crate::features::annotation_selection::region_frame::connector(annotation, window)
     {
-        draw::rotation(painter, start, handle, unit);
+        draw::rotation_points(painter, start, handle, unit);
     }
 }

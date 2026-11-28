@@ -119,6 +119,13 @@ pub(super) fn apply(
                 );
             }
         }
+        if let AnnotationShape::ColorSample { sample } = before.shape {
+            // 3. 【取色标注】【标签编辑】标签可以移动、旋转或缩放，画布上的取色点保持在按下时的位置
+            crate::features::color_sample::tip_drag::move_to(
+                &mut change.annotation,
+                before.to_visual(sample.source),
+            );
+        }
         *annotation = change.annotation;
     }
     true

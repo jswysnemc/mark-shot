@@ -135,7 +135,7 @@ impl Measurement {
     }
 
     /// 【尺子】【长度数据】返回原图像素宽、高、对角线与面积；角度尺返回空值
-    pub fn length_metrics(self) -> Option<(u64, u64, u64, u64)> {
+    pub fn length_metrics(self) -> Option<super::LengthMetrics> {
         let RulerGeometry::Length { start, end, .. } = self.geometry else {
             return None;
         };
@@ -151,18 +151,13 @@ impl Measurement {
         ))
     }
 
-    /// 【尺子】【测量说明】返回长度说明或保留一位小数的角度说明；未完成测量返回空值
+    /// 【尺子】【测量说明】返回已启用的长度读数或角度说明；没有读数或未完成测量时返回空值
     pub fn info_text(self) -> Option<String> {
         if !self.measures() {
             return None;
         }
         match self.geometry {
-            RulerGeometry::Length { .. } => {
-                let (width, height, diagonal, area) = self.length_metrics()?;
-                Some(format!(
-                    "{width} x {height} px   diag {diagonal} px   area {area} px"
-                ))
-            }
+            RulerGeometry::Length { .. } => self.readouts.text(self.length_metrics()?),
             RulerGeometry::Angle { points, .. } => Some(format!(
                 "{:.1}\u{b0}",
                 angle_degrees(points[0], points[1], points[2])

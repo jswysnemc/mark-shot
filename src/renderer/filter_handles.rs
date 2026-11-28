@@ -2,28 +2,27 @@
 
 use super::Painter;
 use crate::{
-    features::filter::{RegionFilter, drag},
+    features::annotation_selection::{chrome, region_frame},
+    types::{Annotation, AnnotationShape},
     ui::annotation_selection::draw,
 };
 
-/// 【滤镜】【控制框绘制】按 filter 把旋转外框与控制点绘入 painter，无返回值，不进入持久图像
-pub(crate) fn draw(painter: &mut Painter<'_>, filter: RegionFilter) {
-    let unit = 1.0;
-    if let Some(path) = drag::frame(filter).and_then(|rect| filter.path(rect)) {
-        draw::outline(painter, &path, unit);
+/// 【滤镜】【控制框绘制】按 annotation 将带留白的选框和把手绘入 painter，不修改持久图像
+pub(crate) fn draw(painter: &mut Painter<'_>, annotation: &Annotation) {
+    let AnnotationShape::Redact { filter } = annotation.shape else {
+        return;
+    };
+    let window = painter.window_units();
+    let Some(rect) = region_frame::bounds(annotation, window) else {
+        return;
+    };
+    if let Some(path) = filter.path(rect) {
+        draw::outline(painter, &path, 1.0);
     }
-    for (_, point) in drag::controls(filter) {
-        draw::square(painter, point, unit);
+    for point in chrome::handles(chrome::corners(rect)) {
+        draw::square(painter, filter.to_visual(point), 1.0);
     }
-    if let Some(handle) = drag::rotation_handle(filter)
-        && let Some(rect) = drag::frame(filter)
-    {
-        let start = filter.to_visual(((rect.left() + rect.right()) * 0.5, rect.top()));
-        let handle = crate::features::annotation_selection::rotation::projected(
-            start,
-            handle,
-            1.0 / filter.style_scale,
-        );
-        draw::rotation(painter, start, handle, unit);
+    if let Some((start, handle)) = region_frame::connector(annotation, window) {
+        draw::rotation_points(painter, start, handle, 1.0);
     }
 }

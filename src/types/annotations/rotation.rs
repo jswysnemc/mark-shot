@@ -28,6 +28,9 @@ impl Annotation {
 
     /// 【普通标注】【旋转轴心】返回正文未旋转选框中心，空几何使用已计算边界，无参数
     pub fn rotation_center(&self) -> geometry::Point {
+        if let AnnotationShape::ColorSample { sample } = self.shape {
+            return geometry::center(sample.label_rect());
+        }
         geometry::center(chrome::bounds(self).unwrap_or(self.bbox))
     }
 

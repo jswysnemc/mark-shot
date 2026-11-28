@@ -2,6 +2,29 @@
 
 use super::*;
 
+/// 【尺子测试】【读数偏好】无参数，验证旧配置默认隐藏、单项设置往返及关闭最后一项后仍能恢复，无返回值
+#[test]
+fn ruler_readouts_restore_independently_and_legacy_settings_stay_quiet() {
+    use crate::features::ruler::Readouts;
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("tools.toml");
+    std::fs::write(&path, "ruler_mode = 'angle'\n").unwrap();
+    assert_eq!(load_at(&path).ruler_readouts, Readouts::default());
+    for readouts in [
+        Readouts {
+            height: true,
+            area: true,
+            ..Default::default()
+        },
+        Readouts::default(),
+    ] {
+        let mut settings = ToolSettings::default();
+        settings.ruler_readouts = readouts;
+        storage::write(&path, &snapshot(&settings, &[])).unwrap();
+        assert_eq!(load_at(&path).ruler_readouts, readouts);
+    }
+}
+
 /// 【工具偏好测试】【Windows目录回退】无参数，模拟 Windows 无状态目录，实际保存和重新读取各工具粗细，无返回值
 #[test]
 fn windows_local_data_fallback_persists_and_restores_stroke_widths() {

@@ -222,12 +222,17 @@ impl<'a> FrozenImage<'a> {
         })
     }
 
-    /// 【图像采样】【坐标共用】按 point 反解原图坐标并调用 sample，返回像素，边界与多显示器优先级保持一致
-    fn sample_with(
+    /// 【图像采样】【原件定位】按画布坐标 point 返回承载该像素的只读原件和物理坐标；显示器之间的空隙返回空值
+    pub(crate) fn native_source(self, point: (f32, f32)) -> Option<(PixmapRef<'a>, (f64, f64))> {
+        self.sample_with(point, |pixels, native| Some((pixels, native)))
+    }
+
+    /// 【图像采样】【坐标共用】按 point 反解原图坐标并调用 sample，返回采样结果，边界与多显示器优先级保持一致
+    fn sample_with<T>(
         self,
         point: (f32, f32),
-        sample: impl Fn(PixmapRef<'_>, (f64, f64)) -> Option<[u8; 4]>,
-    ) -> Option<[u8; 4]> {
+        sample: impl Fn(PixmapRef<'a>, (f64, f64)) -> Option<T>,
+    ) -> Option<T> {
         if !point.0.is_finite() || !point.1.is_finite() {
             return None;
         }

@@ -1,6 +1,7 @@
 //! 【标注】【拖动事务】管理持久标注的命中、移动、缩放和历史提交
 
 mod generic;
+mod ruler;
 
 use crate::editor::{DamageZone, EditorState};
 use crate::tools::text::update_text_bbox_inline;
@@ -32,8 +33,21 @@ pub fn handle_hit_test_for_annotation(ann: &Annotation, pos: (f64, f64)) -> Sele
                 hit_test_rect_handle(&bounds, (f64::from(local.0), f64::from(local.1)))
             });
     }
-    if let AnnotationShape::Redact { filter } = ann.shape {
-        return crate::features::filter::drag::hit_test(filter, (pos.0 as f32, pos.1 as f32), true);
+    if matches!(
+        ann.shape,
+        AnnotationShape::Redact { .. } | AnnotationShape::Magnifier { .. }
+    ) {
+        let point = (pos.0 as f32, pos.1 as f32);
+        if crate::features::annotation_selection::rotation::connector(ann)
+            .is_some_and(|(_, end)| (point.0 - end.0).hypot(point.1 - end.1) <= 11.2)
+        {
+            return SelectionHandle::Rotate;
+        }
+        return crate::features::annotation_selection::body_hit::selected(
+            ann,
+            point,
+            Default::default(),
+        );
     }
     if let Some(line) = ann.shape.line() {
         return crate::features::line::drag::hit_test(
@@ -48,13 +62,6 @@ pub fn handle_hit_test_for_annotation(ann: &Annotation, pos: (f64, f64)) -> Sele
         return crate::features::number::drag::hit_test(
             mark,
             ann.stroke_width,
-            (pos.0 as f32, pos.1 as f32),
-            true,
-        );
-    }
-    if let AnnotationShape::Magnifier { magnifier } = ann.shape {
-        return crate::features::magnifier::drag::hit_test(
-            magnifier,
             (pos.0 as f32, pos.1 as f32),
             true,
         );
@@ -83,8 +90,13 @@ pub fn handle_hit_test_for_annotation(ann: &Annotation, pos: (f64, f64)) -> Sele
 
 /// 【标注】【开始拖动】为 state 中 idx 标注保存原始快照与指针位置；无返回值
 pub fn begin_drag_for_annotation(state: &mut EditorState, idx: usize) {
+    let handle = state.canvas_handle(&state.annotations[idx], state.canvas_point());
+    begin_drag_with_handle(state, idx, handle);
+}
+
+/// 【标注】【控制点事务】按 state、idx 和已命中的 handle 保存编辑前快照，供移动、提交或撤销使用，无返回值
+pub(crate) fn begin_drag_with_handle(state: &mut EditorState, idx: usize, handle: SelectionHandle) {
     let ann = &state.annotations[idx];
-    let handle = state.canvas_handle(ann, state.canvas_point());
     if ann.shape.line().is_some() {
         let selected_point = match handle {
             SelectionHandle::LinePoint(index) => Some((ann.id, index)),
@@ -182,12 +194,8 @@ pub fn apply_annotation_drag(state: &mut EditorState, global: (f64, f64)) {
             None
         }
     });
-    let ruler_point = if ruler_geometry.is_some() {
-        crate::tools::drawing_space::DrawingSpace::from_editor(state)
-            .and_then(|space| space.clamp_point(global))
-    } else {
-        None
-    };
+    let ruler_point = ruler_geometry
+        .and_then(|before| ruler::pointer(state, before, handle, start_global, global));
     let ruler_window = state.hit_window_units();
     let magnifier_geometry = state.ann_drag.as_ref().and_then(|drag| {
         if let AnnotationShape::Magnifier { magnifier } = drag.orig.shape {
@@ -324,6 +332,16 @@ pub fn apply_annotation_drag(state: &mut EditorState, global: (f64, f64)) {
             ),
         };
         ann.update_bbox();
+    } else if handle == SelectionHandle::ColorSampleTip {
+        let target = (global.0 as f32, global.1 as f32);
+        let image = crate::renderer::FrozenImage::from_parts(
+            state.file_canvas.as_ref(),
+            &state.captures,
+            &state.placements,
+        );
+        if image.sample_nearest(target).is_some() {
+            crate::features::color_sample::tip_drag::move_to(ann, target);
+        }
     } else if let Some(options) = generic_options {
         let before = &state.ann_drag.as_ref().unwrap().orig;
         generic::apply(
@@ -366,14 +384,20 @@ pub fn apply_annotation_drag(state: &mut EditorState, global: (f64, f64)) {
     ));
 
     // 3. 【取色标注】【拖动采样】引线指向点变化后刷新原图颜色，属性栏与标签保持一致
-    if let Some(color) = crate::features::color_sample::sampling::refresh(
-        ann,
-        crate::renderer::FrozenImage::from_parts(
-            state.file_canvas.as_ref(),
-            &state.captures,
-            &state.placements,
-        ),
-    ) {
+    if let AnnotationShape::ColorSample { sample } = ann.shape {
+        let color = if handle == SelectionHandle::ColorSampleTip {
+            crate::features::color_sample::sampling::refresh(
+                ann,
+                crate::renderer::FrozenImage::from_parts(
+                    state.file_canvas.as_ref(),
+                    &state.captures,
+                    &state.placements,
+                ),
+            )
+            .unwrap_or(sample.color)
+        } else {
+            sample.color
+        };
         state.color_inspector.live = Some(color);
         state.settings_panel.dirty = true;
     }

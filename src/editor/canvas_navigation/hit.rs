@@ -53,12 +53,7 @@ impl EditorState {
             );
         }
         // 1. 【画布导航】【已选命中】旋转把手优先，正文和控制点使用当前窗口容差
-        let connector = if annotation.uses_generic_rotation() {
-            annotation.generic_rotation_handle_in_window(window)
-        } else {
-            rotation::connector(annotation)
-                .map(|(start, end)| (start, rotation::projected(start, end, window.canvas(1.0))))
-        };
+        let connector = rotation::window_connector_in_bounds(annotation, window, None);
         if connector.is_some_and(|(_, handle)| {
             (handle.0 - position.0).hypot(handle.1 - position.1) <= window.canvas(11.2)
         }) {

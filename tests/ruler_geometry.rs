@@ -9,6 +9,7 @@ use mark_shot::features::ruler::{Measurement, RulerGeometry, RulerMode};
 /// 【尺子测试】【长度构造】返回以 scale 换算原图像素的 3×4 逻辑单位长度尺
 fn length(scale: f32) -> Measurement {
     let mut ruler = Measurement::new(RulerMode::Length, (20.0, 30.0), scale).unwrap();
+    ruler.readouts = mark_shot::features::ruler::Readouts::ALL;
     ruler.geometry = RulerGeometry::Length {
         start: (20.0, 30.0),
         end: (23.0, 34.0),

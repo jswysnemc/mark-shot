@@ -234,14 +234,21 @@ impl Layout {
         self.projected_scale
     }
 
-    /// 【尺子】【完整刻度范围】无参数，返回正文、四边刻度和两条数字条带旋转后的外接矩形
-    pub fn scale_bounds(self) -> Option<Rect> {
-        let rect = self
-            .paint_rect
+    /// 【尺子】【局部刻度范围】返回旋转前包含正文、四边刻度和两条数字条带的矩形
+    pub(crate) fn local_scale_bounds(self) -> Option<Rect> {
+        self.paint_rect
             .outset(13.0 * self.unit, 13.0 * self.unit)?
             .join(&self.horizontal_band)?
-            .join(&self.vertical_band)?;
-        rotated_rect(rect, rect_center(self.paint_rect), self.rotation)
+            .join(&self.vertical_band)
+    }
+
+    /// 【尺子】【完整刻度范围】无参数，返回正文、四边刻度和两条数字条带旋转后的外接矩形
+    pub fn scale_bounds(self) -> Option<Rect> {
+        rotated_rect(
+            self.local_scale_bounds()?,
+            rect_center(self.paint_rect),
+            self.rotation,
+        )
     }
 
     /// 【尺子】【单项数字】按position、text与horizontal返回与条带一致的数字矩形，允许范围内刻度只沿对应轴约束

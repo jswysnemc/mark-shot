@@ -43,6 +43,7 @@ struct File {
     marker_filled: Option<bool>,
     ruler_mode: Option<String>,
     ruler_style: Option<String>,
+    ruler_readouts: crate::features::ruler::Readouts,
     magnifier_shape: Option<String>,
     magnifier_zoom: Option<f32>,
     number_style: Option<String>,
@@ -107,6 +108,7 @@ pub struct Saved {
     pub marker_filled: Option<bool>,
     pub ruler_mode: Option<crate::features::ruler::RulerMode>,
     pub ruler_style: Option<crate::features::ruler::RulerStyle>,
+    pub ruler_readouts: crate::features::ruler::Readouts,
     pub magnifier_shape: Option<crate::features::magnifier::MagnifierShape>,
     pub magnifier_zoom: Option<f32>,
     pub number_style: Option<crate::features::number::NumberStyle>,
@@ -191,6 +193,7 @@ fn load_at(path: &std::path::Path) -> Saved {
         marker_filled: file.marker_filled,
         ruler_mode: file.ruler_mode.as_deref().and_then(parse_ruler_mode),
         ruler_style: file.ruler_style.as_deref().and_then(parse_ruler_style),
+        ruler_readouts: file.ruler_readouts,
         magnifier_shape: file
             .magnifier_shape
             .as_deref()
@@ -371,6 +374,7 @@ fn snapshot(settings: &ToolSettings, history: &[Color]) -> File {
         marker_filled: Some(settings.marker_filled),
         ruler_mode: Some(settings.ruler_mode.key().to_string()),
         ruler_style: Some(settings.ruler_style.key().to_string()),
+        ruler_readouts: settings.ruler_readouts,
         magnifier_shape: Some(settings.magnifier_shape.key().to_string()),
         magnifier_zoom: Some(settings.magnifier_zoom),
         number_style: Some(settings.number_style.key().to_string()),

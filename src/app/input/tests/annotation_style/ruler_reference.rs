@@ -61,6 +61,7 @@ fn measurement(scene: &Scene) -> Measurement {
             rotation: scene.rotation,
         },
         style: crate::features::ruler::RulerStyle::Standard,
+        readouts: crate::features::ruler::Readouts::ALL,
         pixel_scale: 1.0 / scene.scale,
         style_scale: 640.0 / (640.0 / f64::from(scene.capture)).round() * f64::from(scene.scale),
     }

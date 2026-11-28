@@ -41,6 +41,7 @@ fn annotation(scene: &Scene) -> crate::types::Annotation {
             }
         },
         style: crate::features::ruler::RulerStyle::Standard,
+        readouts: crate::features::ruler::Readouts::ALL,
         pixel_scale: 1.0,
         style_scale: 1.0,
     };
@@ -57,6 +58,65 @@ fn annotation(scene: &Scene) -> crate::types::Annotation {
     };
     annotation.update_bbox();
     annotation
+}
+
+/// 【尺子窗口测试】【刻度外框】缩放后四边仍在最外刻度和数字之外六个窗口像素；检查旋转后把手中心的像素和实际命中
+#[test]
+fn rotated_ruler_handles_clear_the_scale_at_each_zoom() {
+    use crate::{
+        app::input::handle_axis_scroll,
+        features::ruler::tick_layout::Layout,
+        types::{AnnotationShape, ScrollEvent, SelectionHandle},
+    };
+    let mut state = image_editor((640, 480));
+    let mut dirty = 0;
+    draw(&mut state, Tool::Ruler, 3.0, &mut dirty);
+    select_tool(&mut state, Tool::Pick, &mut dirty);
+    let AnnotationShape::Ruler { measurement } = &mut state.annotations[0].shape else {
+        unreachable!()
+    };
+    *measurement = measurement.rotated(25.0);
+    let measurement = *measurement;
+    state.annotations[0].update_bbox();
+    state.select_annotation_index(Some(0));
+    pointer(&mut state, 320.0, 240.0, &mut dirty);
+    for wheel in [-360, 720] {
+        handle_axis_scroll(&mut state, ScrollEvent::wheel(wheel), &mut dirty);
+        crate::app::canvas_navigation::preview::clear(&mut state, &mut dirty);
+        let annotation = &state.annotations[0];
+        let view = state.canvas_transform();
+        let window = state.hit_window_units();
+        let layout = Layout::in_projection(
+            measurement,
+            annotation.stroke_width,
+            state.ruler_allowed_bounds(),
+            view,
+        )
+        .unwrap();
+        let scale = layout.local_scale_bounds().unwrap();
+        let frame = state.canvas_ruler_frame(annotation).unwrap();
+        for gap in [
+            scale.left() - frame.rect.left(),
+            scale.top() - frame.rect.top(),
+            frame.rect.right() - scale.right(),
+            frame.rect.bottom() - scale.bottom(),
+        ] {
+            close(window.window(gap), 6.0, wheel);
+        }
+        let corner = frame.corners()[2];
+        let canvas = (f64::from(corner.0), f64::from(corner.1));
+        assert_eq!(
+            state.canvas_handle(annotation, canvas),
+            SelectionHandle::BottomRight
+        );
+        assert!(!state.canvas_body_hit(annotation, canvas));
+        let point = view.to_screen(canvas);
+        super::navigation::render(&mut state, None);
+        let pixel = state.canvas[0]
+            .pixel(point.0.floor() as u32, point.1.floor() as u32)
+            .unwrap();
+        assert_eq!((pixel.red(), pixel.green(), pixel.blue()), (251, 146, 60));
+    }
 }
 
 /// 【尺子窗口测试】【旋转生产位置】完整Qt旋转位置与窗口连接点逐项比较，误差按窗口像素评估，不用Rust公式构造预期

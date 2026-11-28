@@ -60,7 +60,9 @@ pub(super) async fn start_capture(
         crate::backend::initialize_capture_with_cursor(&conn, launch.include_cursor)
     });
     let window_work = async {
-        if !launch.fullscreen && crate::config::get().window_detection.enabled {
+        if (!launch.fullscreen || launch.mode == Mode::Editor)
+            && crate::config::get().window_detection.enabled
+        {
             crate::backend::window_detection::snapshot(&conn).await
         } else {
             Vec::new()
@@ -152,6 +154,8 @@ pub(super) async fn start_capture(
 
     if !launch.fullscreen {
         super::region_detection::task::start(&mut editor_state, overlay.as_mut(), &windows);
+    } else {
+        editor_state.region_detection.deferred_windows = Some(windows);
     }
 
     Ok((editor_state, overlay))

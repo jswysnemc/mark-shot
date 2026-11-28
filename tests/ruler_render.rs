@@ -11,6 +11,7 @@ use tiny_skia::{Color, IntRect, Pixmap, Rect};
 /// 【尺子测试】【持久构造】按 mode 构造半透明尺子；length 支持 rotation，返回完整持久标注
 fn annotation(mode: RulerMode, rotation: f32) -> Annotation {
     let mut measurement = Measurement::new(mode, (130.5, 140.5), 1.5).unwrap();
+    measurement.readouts = mark_shot::features::ruler::Readouts::ALL;
     measurement.geometry = match mode {
         RulerMode::Length => RulerGeometry::Length {
             start: (130.5, 140.5),
@@ -54,6 +55,40 @@ fn render(ann: &Annotation, scale: f32, bounds: Rect) -> Pixmap {
         None,
     );
     pixels
+}
+
+/// 【尺子测试】【选框实际绘制】对角拖出的箭头只在轴线两侧绘制固定窄框，原测量矩形的上下边不应出现
+#[test]
+fn simple_selection_draws_the_narrow_axis_frame() {
+    let mut ruler = annotation(RulerMode::Length, 0.0);
+    let AnnotationShape::Ruler { measurement } = &mut ruler.shape else {
+        unreachable!()
+    };
+    measurement.style = mark_shot::features::ruler::RulerStyle::Simple;
+    let bounds = Rect::from_xywh(0.0, 0.0, 640.0, 480.0).unwrap();
+    let body = render(&ruler, 1.0, bounds);
+    let mut selected = Pixmap::new(640, 480).unwrap();
+    draw_annotation(
+        &mut Painter::new(&mut selected)
+            .with_drawing_bounds(Some(bounds))
+            .with_text(
+                &mut mark_shot::fonts::bundled(),
+                &mut cosmic_text::SwashCache::new(),
+            ),
+        &ruler,
+        true,
+        &mut HashMap::new(),
+        &HashMap::new(),
+        None,
+    );
+    let changed = |row: u32| {
+        (row - 1..=row + 1).any(|vertical| {
+            (145..195)
+                .any(|column| body.pixel(column, vertical) != selected.pixel(column, vertical))
+        })
+    };
+    assert!(changed(180) && changed(200));
+    assert!(!changed(140) && !changed(240));
 }
 
 /// 【尺子测试】【正文与单位】两类尺子经持久绘制入口生成像素，比例映射保留原图测量和样式
@@ -182,6 +217,7 @@ fn clipped_labels_restore_exactly_without_touching_other_pixels() {
 #[test]
 fn fractional_live_label_corners_match_after_shifted_damage() {
     let mut measurement = Measurement::new(RulerMode::Length, (224.0, 220.0), 1.5957447).unwrap();
+    measurement.readouts = mark_shot::features::ruler::Readouts::ALL;
     measurement.geometry = RulerGeometry::Length {
         start: (224.0, 220.0),
         end: (384.0, 345.0),

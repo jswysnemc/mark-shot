@@ -199,6 +199,7 @@ pub fn apply_toggle_field(
             ToggleField::Outline => ts.outline = new_value,
             ToggleField::Fill => ts.fill = new_value,
             ToggleField::MarkerFill => ts.marker_filled = new_value,
+            ToggleField::RulerReadout(field) => *ts.ruler_readouts.field_mut(field) = new_value,
             ToggleField::RulerSimple => {
                 ts.ruler_style = if new_value {
                     crate::features::ruler::RulerStyle::Simple
@@ -234,6 +235,9 @@ pub fn apply_toggle_field(
                 } else {
                     crate::features::ruler::RulerStyle::Standard
                 };
+            }
+            (AnnotationShape::Ruler { measurement }, ToggleField::RulerReadout(field)) => {
+                *measurement.readouts.field_mut(field) = new_value;
             }
             _ => {}
         },

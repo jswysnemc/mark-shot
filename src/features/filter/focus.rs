@@ -22,10 +22,12 @@ pub fn interaction_bounds(annotation: &Annotation, selected: bool) -> Rect {
         return annotation.damage_bbox(selected);
     }
     let body = annotation.bbox.outset(2.0, 2.0).unwrap_or(annotation.bbox);
-    if selected && let AnnotationShape::Redact { filter } = annotation.shape {
-        return super::drag::editing_bounds(filter)
-            .and_then(|area| body.join(&area))
-            .unwrap_or(body);
+    if selected {
+        return crate::features::annotation_selection::region_frame::damage(
+            annotation,
+            Default::default(),
+        )
+        .unwrap_or(body);
     }
     body
 }

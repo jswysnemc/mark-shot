@@ -192,7 +192,9 @@ pub(crate) fn top_reach(measurement: Measurement, width: f32, window: WindowUnit
     };
     let halo = info.unit.max(window.canvas(0.8));
     let highest = arrow_top.min(info.text_rect.top() - halo);
-    (info.bounds.top() - highest + 4.0 * info.unit).max(4.0 * info.unit)
+    let frame_top = super::simple_frame::bounds(measurement, window)
+        .map_or(info.bounds.top(), |rect| rect.top());
+    (frame_top - highest + 4.0 * info.unit).max(0.0)
 }
 
 /// 【尺子】【三角箭头】把以 tip 为尖端、朝 dir 指向的实心三角形加入 path，已按 center 和 rotation 旋转，无返回值

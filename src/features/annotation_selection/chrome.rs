@@ -16,6 +16,7 @@ pub fn center(rect: Rect) -> Point {
 pub fn bounds(annotation: &crate::types::Annotation) -> Option<Rect> {
     use crate::types::AnnotationShape;
     let bounds = match &annotation.shape {
+        AnnotationShape::ColorSample { sample } => Some(sample.label_rect()),
         AnnotationShape::Arrow { .. } | AnnotationShape::Line { .. } => {
             super::body_hit::unrotated_bounds(annotation)
         }

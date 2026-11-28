@@ -31,6 +31,10 @@ pub fn run_settings_action(
         }
         SettingsAction::MarkerShapes => super::super::marker::toggle(editor_state, dirty_mask),
         SettingsAction::RulerModes => super::super::ruler::toggle(editor_state, dirty_mask),
+        SettingsAction::RulerReadouts => {
+            editor_state.settings_panel.ruler_readouts_open =
+                !editor_state.settings_panel.ruler_readouts_open;
+        }
         SettingsAction::NumberStyles => super::super::number::toggle(editor_state, dirty_mask),
         SettingsAction::ResetNumber => {
             crate::editor::number_edits::reset_sequence(editor_state, dirty_mask);

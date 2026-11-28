@@ -98,6 +98,7 @@ fn ruler_bodies_do_not_allocate_an_output_sized_cache() {
                 measurement: Measurement {
                     geometry,
                     style: crate::features::ruler::RulerStyle::Standard,
+                    readouts: crate::features::ruler::Readouts::ALL,
                     pixel_scale: 1.0,
                     style_scale: 1.0,
                 },
