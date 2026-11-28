@@ -114,6 +114,42 @@ class WorkflowCoverage(unittest.TestCase):
         self.assertIn("github.event_name == 'workflow_dispatch'", step["if"])
         self.assertIn("inputs.publish", step["if"])
 
+    def test_native_release_publishes_both_aur_packages_after_release_publication(self):
+        """【正式发布】【AUR自动同步】无传参，验证稳定版在 GitHub Release 公开后自动同步 mark-shot 与 mark-shot-bin，无返回值"""
+        for name, expected_needs in (
+            ("native-release", {"context", "publish"}),
+            ("native-release-publish", {"publish"}),
+        ):
+            data = workflow(name)
+            aur = data["jobs"]["aur"]
+            needs = aur["needs"]
+            needs_set = {needs} if isinstance(needs, str) else set(needs)
+            self.assertEqual(needs_set, expected_needs, name)
+            self.assertIn("!contains(", aur["if"], name)
+            download = next(
+                step
+                for step in aur["steps"]
+                if step.get("uses") == "actions/download-artifact@v4"
+            )
+            self.assertEqual(download["with"]["name"], "native-aur-bin-metadata", name)
+            publish_step = next(
+                step
+                for step in aur["steps"]
+                if step.get("name") == "Publish validated AUR metadata"
+            )
+            self.assertIn("publish_aur.sh mark-shot ", publish_step["run"], name)
+            self.assertIn("publish_aur.sh mark-shot-bin ", publish_step["run"], name)
+            self.assertEqual(
+                publish_step["env"]["AUR_SSH_PRIVATE_KEY"],
+                "${{ secrets.AUR_SSH_PRIVATE_KEY }}",
+                name,
+            )
+            self.assertEqual(
+                publish_step["env"]["AUR_SSH_KNOWN_HOSTS"],
+                "${{ vars.AUR_SSH_KNOWN_HOSTS }}",
+                name,
+            )
+
     def test_deleted_branches_are_not_workflow_triggers(self):
         """【原生构建】【分支同步】无传参，禁止发布和构建入口依赖已删除分支，无返回值"""
         for name in (

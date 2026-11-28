@@ -101,3 +101,34 @@ jobs:
           NATIVE_TAG: ${{ needs.context.outputs.tag }}
           SOURCE_SHA: ${{ needs.context.outputs.source_sha }}
         run: python3 scripts/packaging/publish_assets.py --directory target/publish-assets --tag "$NATIVE_TAG" --source-sha "$SOURCE_SHA"
+
+  aur:
+    name: Publish validated AUR packages
+    needs: [context, publish]
+    if: ${{ needs.context.outputs.publish == 'true' && !contains(needs.context.outputs.version, '-') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.context.outputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare immutable source AUR package
+        env:
+          NATIVE_TAG: ${{ needs.context.outputs.tag }}
+          SOURCE_SHA: ${{ needs.context.outputs.source_sha }}
+        run: python3 scripts/packaging/prepare_aur.py --pkgrel 1 --tag "$NATIVE_TAG" --source-sha "$SOURCE_SHA"
+      - name: Generate canonical source SRCINFO
+        run: |
+          docker run --rm -v "$PWD/target/aur-work:/pkg" -w /pkg archlinux:base-devel bash -lc 'pacman -Syu --noconfirm --needed sudo >/dev/null; useradd -m builder; chown -R builder:builder /pkg; su builder -c "cd /pkg && makepkg --printsrcinfo > .SRCINFO"'
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-aur-bin-metadata
+          path: target/aur-bin-work
+      - name: Publish validated AUR metadata
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          AUR_SSH_KNOWN_HOSTS: ${{ vars.AUR_SSH_KNOWN_HOSTS }}
+        run: |
+          bash scripts/packaging/publish_aur.sh mark-shot target/aur-work
+          bash scripts/packaging/publish_aur.sh mark-shot-bin target/aur-bin-work

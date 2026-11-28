@@ -22,6 +22,8 @@ REQUIRED_GROUPS = {
     "flatpak / packages": 1,
 }
 PUBLICATION_JOB = "Publish complete verified release"
+AUR_PUBLICATION_JOB = "Publish validated AUR packages"
+RETRYABLE_PUBLICATION_JOBS = {PUBLICATION_JOB, AUR_PUBLICATION_JOB}
 
 
 def validate_run(run, jobs, context, repository):
@@ -40,7 +42,7 @@ def validate_run(run, jobs, context, repository):
     for job in sorted(jobs, key=lambda item: item["id"]):
         latest[job["name"]] = job
     for job in latest.values():
-        if job["name"] == PUBLICATION_JOB:
+        if job["name"] in RETRYABLE_PUBLICATION_JOBS:
             continue
         if job["status"] != "completed" or job["conclusion"] not in (
             "success",
@@ -79,7 +81,14 @@ def main():
             break
         page += 1
     validate_run(run, jobs, context, repository)
-    output({"tag": context.tag, "source_sha": context.commit, "run_id": options.run_id})
+    output(
+        {
+            "tag": context.tag,
+            "version": context.version,
+            "source_sha": context.commit,
+            "run_id": options.run_id,
+        }
+    )
 
 
 if __name__ == "__main__":
