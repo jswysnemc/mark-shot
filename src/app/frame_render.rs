@@ -119,7 +119,8 @@ pub(super) fn render_dirty_monitors(
             &mut pacing.dimmed_for[i],
         );
         let native_scene = editor_state.region_rendering.native_scene;
-        let opaque = !editor_state.canvas_transform().is_identity()
+        let opaque = editor_state.multi_capture.is_some()
+            || !editor_state.canvas_transform().is_identity()
             || editor_state.region_rendering.baked_background;
         let reclaim_transparent =
             native_scene && !opaque && pacing.foreground_residency.regional_due(i, Instant::now());
@@ -204,6 +205,9 @@ pub(super) fn render_monitor(
     mut dirty_rect: Option<Rect>,
     dimmed_for: &mut Option<Rect>,
 ) -> Option<DamageRect> {
+    if editor_state.multi_capture.is_some() {
+        return super::multi_capture::preview::draw(editor_state, i, dirty_rect);
+    }
     editor_state.prepare_region_layers();
     // 1. 【截图场景】【候选层级】仅将空选区的整数候选分离，已有正文及分数边缘维持原有绘制顺序
     editor_state.region_rendering.native_hover = editor_state.region_rendering.native_scene

@@ -54,7 +54,7 @@ pub(super) fn stage(
 ) -> crate::AppResult {
     if editor.region_rendering.native_scene {
         let identity = editor.canvas_transform().is_identity();
-        if identity && editor.region_rendering.baked_background {
+        if identity && editor.region_rendering.baked_background && editor.multi_capture.is_none() {
             crate::renderer::opaque_backdrop::compose(
                 &editor.captures[monitor].pixmap,
                 &mut editor.canvas[monitor],
@@ -73,7 +73,8 @@ pub(super) fn stage(
             .hovered
             .filter(|_| editor.region_rendering.native_hover)
             .and_then(to_physical);
-        let opaque = !identity || editor.region_rendering.baked_background;
+        let opaque =
+            editor.multi_capture.is_some() || !identity || editor.region_rendering.baked_background;
         overlay.stage_capture_scene(
             monitor,
             crate::types::capture_scene::Frame {

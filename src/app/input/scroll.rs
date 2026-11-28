@@ -23,6 +23,9 @@ pub fn handle_axis_scroll(
     event: crate::types::ScrollEvent,
     dirty_mask: &mut u32,
 ) {
+    if editor_state.multi_capture.is_some() {
+        return;
+    }
     crate::app::panels::tooltip::close(editor_state, dirty_mask);
     if crate::app::panels::recording::input::scroll(editor_state, event, dirty_mask) {
         apply_damage_rects(editor_state, dirty_mask);

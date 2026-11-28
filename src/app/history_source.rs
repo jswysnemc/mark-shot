@@ -4,7 +4,7 @@ use crate::{editor::EditorState, image_source::PixelView};
 
 /// 【截图历史】【原件编码】按 state 编码完整未标注原图，历史停用或合成失败返回空值
 pub(super) fn png(state: &EditorState) -> Option<Vec<u8>> {
-    if !crate::config::history::current().enabled {
+    if state.multi_capture.is_some() || !crate::config::history::current().enabled {
         return None;
     }
     if let Some(file) = &state.file_canvas {

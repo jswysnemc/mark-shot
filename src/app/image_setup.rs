@@ -21,7 +21,7 @@ pub(super) fn start(
     })
 }
 
-/// 【滚动截图】【原图编辑】以 original 初始化独立图片编辑器，connection、launch 和 profiler 负责原生会话、输出及耗时
+/// 【截图】【结果编辑】按 connection、launch 和 profiler 为 original 创建原生图片编辑器，返回编辑状态与窗口
 pub(super) fn start_pixmap(
     connection: crate::backend::session::Session,
     launch: &Launch,
@@ -29,7 +29,7 @@ pub(super) fn start_pixmap(
     original: Pixmap,
 ) -> AppResult<(EditorState, Box<dyn ScreenOverlay>)> {
     setup(connection, launch, profiler, |bounds| {
-        FileCanvas::new(original, bounds).ok_or_else(|| "invalid scroll image viewport".into())
+        FileCanvas::new(original, bounds).ok_or_else(|| "invalid capture image viewport".into())
     })
 }
 

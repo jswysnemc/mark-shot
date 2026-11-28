@@ -143,6 +143,7 @@ pub(super) fn glyphs(start: &State, cn: bool) -> String {
     let mut value = String::new();
     for control in [
         Control::Region,
+        Control::MultiRegion,
         Control::Fullscreen,
         Control::Video,
         Control::Gif,

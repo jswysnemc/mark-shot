@@ -105,6 +105,9 @@ fn activate(state: &mut EditorState, control: Control, dirty: &mut u32) {
             state.ui_hidden = false;
             crate::app::select_tool(state, crate::tools::Tool::Selection, dirty);
         }
+        Control::MultiRegion => {
+            crate::app::multi_capture::start(state, dirty);
+        }
         Control::Fullscreen => {
             state.capture_start.recording = None;
             state.mode = Mode::Editor;

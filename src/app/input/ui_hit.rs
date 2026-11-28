@@ -154,6 +154,13 @@ pub(in crate::app) fn hit_test_ui(editor_state: &EditorState, local: (f64, f64))
 
 /// 【界面】【光标选择】依据 editor_state 的弹层、按钮和工具状态返回光标类型
 pub fn compute_cursor(editor_state: &EditorState) -> CursorIcon {
+    if editor_state.multi_capture.is_some() {
+        return if crate::app::multi_capture::edit_hit(editor_state) {
+            CursorIcon::Pointer
+        } else {
+            CursorIcon::Crosshair
+        };
+    }
     if editor_state.recording_tool.menu.is_some() {
         return CursorIcon::Pointer;
     }

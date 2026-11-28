@@ -11,6 +11,7 @@ use crate::{
 /// 【截图区域识别】【选择阶段】按 state 判断是否仍处于普通截图范围选择，返回候选输入是否可用
 pub(super) fn selecting(state: &EditorState) -> bool {
     state.region_detection.space.is_some()
+        && state.multi_capture.is_none()
         && state.file_canvas.is_none()
         && state.selected_tool == Tool::Selection
         && state.selection.zone.is_none()

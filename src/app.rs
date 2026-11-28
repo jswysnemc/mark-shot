@@ -42,6 +42,7 @@ mod init;
 pub(crate) mod input;
 mod instant;
 mod layers;
+pub(crate) mod multi_capture;
 mod ocr;
 mod panels;
 pub(crate) mod selection_history;
@@ -199,8 +200,8 @@ async fn make_screenshot(
         .map(crate::backend::capture_visibility::Guard::hide_process)
         .transpose()?;
 
-    // scrolling capture needs its own connection to grab frames
-    let scroll_conn = conn.clone();
+    // 1. 【截图】【会话交接】保留连接以启动滚动捕获或结果编辑器，不重新截取桌面
+    let capture_conn = conn.clone();
     let (mut editor_state, mut overlay) = if launch.image.is_some() {
         image_setup::start(conn, &launch, &mut prof)?
     } else {
@@ -262,7 +263,7 @@ async fn make_screenshot(
     prof.dump();
 
     loop {
-        let scroll_mode = run_overlay(&mut editor_state, &mut overlay)?;
+        let exit = run_overlay(&mut editor_state, &mut overlay)?;
         // (saving what user chose)
         crate::editor::saved::save(
             &editor_state.tool_settings,
@@ -281,44 +282,67 @@ async fn make_screenshot(
             return crate::features::preferences::spawn();
         }
 
-        if scroll_mode {
-            if let Some((image, display)) =
-                finish::finish_scroll(&scroll_conn, &mut editor_state, &mut overlay).await?
-            {
-                // 1. 【滚动截图】【编辑入口】释放滚动浮层后映射原图编辑器，保留完整像素和当前导出策略
-                overlay.suspend()?;
-                editor_state.ocr.models.shutdown();
-                // 2. 【滚动截图】【替换峰值】创建结果编辑器前释放旧画布和原生缓冲
-                drop(editor_state);
-                drop(overlay);
-                crate::utils::memory::release_unused();
-                let image_launch = Launch {
-                    mode: Mode::Editor,
-                    fullscreen: true,
-                    display_names: vec![display],
-                    ..launch.clone()
+        let result_image = match exit {
+            event_loop::Exit::Finished => None,
+            event_loop::Exit::Scroll => {
+                let Some((image, display)) =
+                    finish::finish_scroll(&capture_conn, &mut editor_state, &mut overlay).await?
+                else {
+                    editor_state.ocr.models.shutdown();
+                    overlay.finish_clipboard()?;
+                    return Ok(());
                 };
-                let (mut next, mut next_overlay) = image_setup::start_pixmap(
-                    scroll_conn.clone(),
-                    &image_launch,
-                    &mut prof,
-                    image,
-                )?;
-                next.to = launch.outputs();
-                next.toolbar.to = next.to;
-                next.output = launch.output.clone();
-                next.fullscreen_scope = true;
-                next.after_selection_tool = Tool::Selection;
-                input::refresh_panels(&mut next, &mut 0);
-                init::initial_paint(&mut next, &mut next_overlay, &mut prof)?;
-                crate::utils::memory::release_unused();
-                editor_state = next;
-                overlay = next_overlay;
-                continue;
+                Some((image, vec![display], Tool::Selection))
             }
+            event_loop::Exit::EditRegions(image) => {
+                let display = overlay
+                    .surface_output(editor_state.input.pointer.monitor_idx)
+                    .and_then(|output| output.info.name.clone())
+                    .filter(|name| !name.is_empty())
+                    .into_iter()
+                    .collect();
+                let tool = match editor_state.after_selection_tool {
+                    Tool::Selection | Tool::Recording => Tool::Pick,
+                    tool => tool,
+                };
+                Some((image, display, tool))
+            }
+        };
+        if let Some((image, display_names, tool)) = result_image {
+            // 1. 【截图】【替换画布】新窗口仅接收结果图；先释放桌面原件、浮层和原生缓冲
+            let outputs = editor_state.to;
+            let output = editor_state.output.take();
+            let tool_settings = editor_state.tool_settings.clone();
+            overlay.suspend()?;
             editor_state.ocr.models.shutdown();
-            overlay.finish_clipboard()?;
-            return Ok(());
+            drop(editor_state);
+            drop(overlay);
+            crate::utils::memory::release_unused();
+            let image_launch = Launch {
+                mode: Mode::Editor,
+                fullscreen: true,
+                reselect: false,
+                display_names,
+                ..launch.clone()
+            };
+            let (mut next, mut next_overlay) =
+                image_setup::start_pixmap(capture_conn.clone(), &image_launch, &mut prof, image)?;
+            // 2. 【截图】【编辑入口】沿用当前标注样式和输出目标，完成标注前不复制或保存
+            next.to = outputs;
+            next.toolbar.to = outputs;
+            next.output = output;
+            next.tool_settings = tool_settings;
+            next.fullscreen_scope = true;
+            next.after_selection_tool = Tool::Selection;
+            if tool != next.selected_tool {
+                select_tool(&mut next, tool, &mut 0);
+            }
+            input::refresh_panels(&mut next, &mut 0);
+            init::initial_paint(&mut next, &mut next_overlay, &mut prof)?;
+            crate::utils::memory::release_unused();
+            editor_state = next;
+            overlay = next_overlay;
+            continue;
         }
         editor_state.ocr.models.shutdown();
         if launch.code_scan {

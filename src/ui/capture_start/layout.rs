@@ -105,7 +105,7 @@ pub(crate) fn rect(x: f32, y: f32, width: f32, height: f32) -> Rect {
 
 /// 【截图起始】【上方入口】按 size 和 active 返回顶部居中单行栏，录制活动时加宽以容纳状态与控制
 pub(crate) fn top(size: (i32, i32), active: bool) -> Rect {
-    let wanted: f32 = if active { 484.0 } else { 308.0 };
+    let wanted: f32 = if active { 484.0 } else { 382.0 };
     let width = wanted.min((size.0 as f32 - 16.0).max(1.0));
     rect((size.0 as f32 - width) / 2.0, 12.0, width, 38.0)
 }
@@ -188,9 +188,10 @@ pub(super) fn hint_cell(grid: &Grid, column: usize, row: usize) -> Rect {
 pub(crate) fn controls(size: (i32, i32), active: bool) -> Vec<(Control, Rect)> {
     let top = top(size, active);
     if !active {
-        let width = (top.width() - 14.0) / 4.0;
+        let width = (top.width() - 16.0) / 5.0;
         return [
             Control::Region,
+            Control::MultiRegion,
             Control::Fullscreen,
             Control::Video,
             Control::Gif,

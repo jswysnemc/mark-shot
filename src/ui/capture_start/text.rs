@@ -8,6 +8,8 @@ pub(super) fn label(control: Control, paused: bool, cn: bool) -> &'static str {
     match (control, cn) {
         (Control::Region, true) => "选区",
         (Control::Region, false) => "Region",
+        (Control::MultiRegion, true) => "多选区",
+        (Control::MultiRegion, false) => "Multi-region",
         (Control::Fullscreen, true) => "全屏",
         (Control::Fullscreen, false) => "Screen",
         (Control::Video, true) => "录屏",
