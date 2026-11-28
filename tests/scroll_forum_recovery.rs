@@ -38,6 +38,40 @@ fn viewport(source: &image::RgbImage, origin: i32) -> Image {
     Image::from_pixels(source.width() as i32, HEIGHT, pixels).unwrap()
 }
 
+/// 【论坛长截图】【悬停回归】浏览器列表的标题区切换底色后，短重叠仍按原位拼接，未高亮的头像与字段逐行保持原值
+#[test]
+fn browser_list_hover_preserves_the_stable_columns() {
+    let mut source = page(0);
+    let next = viewport(&source, 510);
+    // 1. 【论坛长截图】【局部高亮】给鼠标所在行的标题区域换色，不改变文字、头像以及页面布局
+    for row in 520..571 {
+        for column in 8..680 {
+            let pixel = source.get_pixel_mut(column, row);
+            if pixel.0 == [255; 3] {
+                pixel.0 = [108, 154, 218];
+            }
+        }
+    }
+    let first = viewport(&source, 0);
+    let mut stitcher = Stitcher::new(Config::default()).unwrap();
+    stitcher.push(first.clone()).unwrap();
+    let result = stitcher.push(next.clone()).unwrap();
+    assert_eq!(
+        (result.status, result.position, result.added),
+        (Status::Appended, 510, 510)
+    );
+    let output = stitcher.full_image().unwrap().unwrap();
+    assert_eq!(output.height(), HEIGHT + 510);
+    for row in 0..output.height() {
+        let reference = if row < HEIGHT {
+            first.row(row)
+        } else {
+            next.row(row - 510)
+        };
+        assert_eq!(&output.row(row)[680..], &reference[680..]);
+    }
+}
+
 /// 【论坛长截图】【正文核验】按 source 和 view 比较全部标题及标签像素，无返回值，右侧头像及更新字段允许显示采集时值
 fn check_body(source: &image::RgbImage, view: shot_stitch::StitchedView<'_>) {
     assert_eq!((view.width(), view.height()), (1000, LAST_ORIGIN + HEIGHT));

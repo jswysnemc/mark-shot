@@ -26,6 +26,15 @@ pub(crate) fn refine(
         // 1. 【长图拼接】【像素优先】分散清晰正文已证实位移，阴影改变整段特征评分不能覆盖原始像素证据
         return (offset, 0.0);
     }
+    // 2. 【长图拼接】【局部变色】平均亮度可能偏向另一行；先用未变的相邻纹理行提出位移，再核验整个重叠区
+    if let Some(candidate) =
+        crate::row_anchors::offset(&stitcher.last_cols, cols, stitcher.config.min_overlap)
+        && candidate != offset
+        && stitcher.reachable(stitcher.anchor + candidate, frame.height())
+        && rows(candidate) >= stitcher.config.min_overlap
+    {
+        return (candidate, 0.0);
+    }
     let mut best = (offset, confidence);
     let alternatives = stitcher.find_inner_offsets(cols);
     for candidate in [stitcher.last_offset, alternatives[0].0, alternatives[1].0] {
@@ -68,12 +77,23 @@ pub(crate) fn find(
     let required = stitcher.config.min_overlap.clamp(8, 32);
     let evidence = crate::overlap_evidence::scan(long, frame, position, span, start..end);
     let best = evidence.seam;
-    if best.end - best.start < required
-        || evidence.textured_rows < 8
-        || evidence.clean_rows < stitcher.config.min_overlap
-        || (evidence.textured_run_rows < stitcher.config.min_overlap
-            && !crate::texture_consistency::matches(long, frame, position, span, start..end))
+    let minimum = stitcher.config.min_overlap;
+    let exact = best.len() >= required as usize
+        && evidence.textured_rows >= 8
+        && evidence.clean_rows >= minimum
+        && (evidence.textured_run_rows >= minimum
+            || crate::texture_consistency::matches(long, frame, position, span, start..end));
+    let matching_rows = if exact {
+        evidence.clean_rows
+    } else if end - start >= minimum
+        && best.len() >= 8
+        && evidence.textured_rows >= 8
+        && evidence.clean_rows >= (end - start) / 4
+        && crate::hover_overlap::matches(long, frame, position, span, start..end)
     {
+        // 2. 【滚动截图】【悬停底色】变色行只补充位移证据，接缝仍从未变色的连续段中选择
+        end - start
+    } else {
         // 2. 【滚动截图】【分数缩放】整段只有均衡重采样误差时沿用原边界，避免覆盖已经清晰的旧正文
         let resampled_rows = stitcher.last_frame.as_ref().map_or(0, |previous| {
             let rows = edge_occlusion::resampled_overlap(
@@ -114,12 +134,12 @@ pub(crate) fn find(
             });
         }
         return None;
-    }
+    };
     if edge == Edge::None {
         return Some(Replacement {
             rows: 0,
             trim: 0,
-            matching_rows: evidence.clean_rows,
+            matching_rows,
         });
     }
     // 2. 【滚动截图】【正文连接】仅在匹配区中部选低纹理行，远离阴影衰减边界并减少文字边缘切换
@@ -142,17 +162,17 @@ pub(crate) fn find(
         Edge::End => Some(Replacement {
             rows: position + frame.height() - seam,
             trim: long.height() - seam,
-            matching_rows: evidence.clean_rows,
+            matching_rows,
         }),
         Edge::Start => Some(Replacement {
             rows: seam - position,
             trim: seam,
-            matching_rows: evidence.clean_rows,
+            matching_rows,
         }),
         Edge::None => Some(Replacement {
             rows: 0,
             trim: 0,
-            matching_rows: evidence.clean_rows,
+            matching_rows,
         }),
     }
 }

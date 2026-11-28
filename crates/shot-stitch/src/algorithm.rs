@@ -27,10 +27,8 @@ impl Stitcher {
 
     fn recover(&self, frame: &Image, cols: &Signature, predicted: i32) -> Option<Placement> {
         let (position, confidence) = self.find_edge(frame, cols, predicted);
-        if confidence <= self.config.accept_diff
-            && crate::seam::find(self, frame, position, Edge::None)
-                .is_some_and(|seam| seam.matching_rows >= self.config.min_overlap)
-        {
+        // 1. 【滚动截图】【边缘恢复】位置搜索已经核验了原始像素，不重复扫描同一段重叠区
+        if confidence <= self.config.accept_diff {
             return Some(Placement {
                 position,
                 offset: position - self.anchor,
@@ -162,7 +160,11 @@ impl Stitcher {
                         return Ok(self.adopt(frame, cols, known.0, applied));
                     }
                 }
-                let Some(recovered) = self.recover(&frame, &cols, predicted) else {
+                // 2. 【滚动截图】【恢复去重】边缘恢复失败后历史搜索不会改变长图，无需在同一帧上重试相同搜索
+                let Some(recovered) = (!near_edge)
+                    .then(|| self.recover(&frame, &cols, predicted))
+                    .flatten()
+                else {
                     return Ok(StitchResult::default());
                 };
                 placement = recovered;
