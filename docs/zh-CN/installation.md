@@ -31,7 +31,7 @@ paru -S mark-shot-bin
 yay -S mark-shot
 ```
 
-AUR 仓库版本由维护者独立维护，可能滞后于 GitHub 官方发布。安装前可通过 `yay -Si mark-shot-bin` 核对当前仓库版本。若需要当前最新发布版本的安装包，可在发布页面直接下载对应架构的 `mark-shot-bin-*.pkg.tar.zst` 并使用 `sudo pacman -U` 安装。
+正式版在 GitHub Releases 公开后会自动同步更新 AUR 中的 `mark-shot` 与 `mark-shot-bin`。安装前可通过 `yay -Si mark-shot-bin` 核对当前版本，或直接在发布页面下载对应架构的 `mark-shot-bin-*.pkg.tar.zst` 并使用 `sudo pacman -U` 安装。
 
 ### Nix / NixOS
 

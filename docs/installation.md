@@ -31,7 +31,7 @@ To build locally from source instead:
 yay -S mark-shot
 ```
 
-AUR package versions are maintained independently and may lag behind GitHub Releases. You can verify the available version with `yay -Si mark-shot-bin`. To install the latest release directly, download `mark-shot-bin-*.pkg.tar.zst` from GitHub Releases and install with `sudo pacman -U`.
+Stable releases sync `mark-shot` and `mark-shot-bin` to the AUR automatically after GitHub Releases publication. You can verify the available version with `yay -Si mark-shot-bin`, or download `mark-shot-bin-*.pkg.tar.zst` directly from GitHub Releases and install with `sudo pacman -U`.
 
 ### Nix / NixOS
 

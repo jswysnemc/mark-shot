@@ -71,12 +71,18 @@ mask without stacking the surrounding darkness. Strength controls the surroundin
 resizing one resizes the other so the zoom factor stays fixed. The lens is round or rectangular
 and the zoom ranges from 1.25 to 6.
 
-**Ruler.** Shows width, height, diagonal and area, or an angle, in image pixels. Press `U` again
-to switch between length and angle for the next measurement. For length measurements, the
-**Arrow style** toggle in the property bar (also `[tools.ruler].style` in the configuration)
-switches between the standard ruler with tick marks and floating detail card, and a compact
-double-headed arrow that displays the pixel span inline at the center (or raised outside on short
-spans) without a separate floating card.
+**Ruler.** Shows width, height, diagonal and area, or an angle, in image pixels, and can snap to
+detected interface region edges while drawing or moving. Press `U` again to switch between length
+and angle for the next measurement. For standard length rulers, the property bar includes a
+collapsible readout toggle group (width, height, diagonal and area) that also displays the current
+measurement values when a ruler is selected. The **Arrow style** toggle in the property bar (also
+`[tools.ruler].style` in the configuration) switches between the standard ruler with tick marks and
+floating detail card, and a compact double-headed arrow that displays the pixel span inline at the
+center (or raised outside on short spans) without a separate floating card.
+
+**Eyedropper.** Click to sample the underlying pixel colour and place a colour label. Drag the
+sampling tip of an existing colour sample to resample another pixel, or press `Ctrl+C` to copy the
+live HEX colour under the pointer.
 
 **Laser.** Strokes fade out about two seconds after the button is released. They are never part
 of the saved image and are not recorded in the undo history.
